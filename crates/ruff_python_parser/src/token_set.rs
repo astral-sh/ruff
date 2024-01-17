@@ -5,6 +5,7 @@ use crate::TokenKind;
 pub(crate) struct TokenSet(u128);
 
 impl TokenSet {
+    #[allow(unused)]
     pub(crate) const EMPTY: TokenSet = TokenSet(0);
 
     pub(crate) const fn new(kinds: &[TokenKind]) -> TokenSet {

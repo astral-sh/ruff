@@ -645,11 +645,7 @@ impl<'src> Parser<'src> {
         let if_start = self.node_start();
         self.bump(TokenKind::If);
 
-        let test = self.parse_expr_with_recovery(
-            Parser::parse_named_expression_or_higher,
-            [TokenKind::Colon].as_slice(),
-            "expecting expression after `if` keyword",
-        );
+        let test = self.parse_named_expression_or_higher();
         self.expect(TokenKind::Colon);
 
         let body = self.parse_block(Clause::If);
@@ -678,11 +674,7 @@ impl<'src> Parser<'src> {
             let elif_start = self.node_start();
             self.bump(TokenKind::Elif);
 
-            let test = self.parse_expr_with_recovery(
-                Parser::parse_named_expression_or_higher,
-                [TokenKind::Colon].as_slice(),
-                "expecting expression after `elif` keyword",
-            );
+            let test = self.parse_named_expression_or_higher();
             self.expect(TokenKind::Colon);
 
             let body = self.parse_block(Clause::ElIf);
@@ -815,22 +807,14 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::For);
 
         self.set_ctx(ParserCtxFlags::FOR_TARGET);
-        let mut target = self.parse_expr_with_recovery(
-            Parser::parse_expression,
-            [TokenKind::In, TokenKind::Colon].as_slice(),
-            "expecting expression after `for` keyword",
-        );
+        let mut target = self.parse_expression();
         self.clear_ctx(ParserCtxFlags::FOR_TARGET);
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
         self.expect(TokenKind::In);
 
-        let iter = self.parse_expr_with_recovery(
-            Parser::parse_expression,
-            EXPR_SET.union([TokenKind::Colon, TokenKind::Indent].as_slice().into()),
-            "expecting an expression after `in` keyword",
-        );
+        let iter = self.parse_expression();
 
         self.expect(TokenKind::Colon);
 
@@ -858,12 +842,7 @@ impl<'src> Parser<'src> {
         let while_start = self.node_start();
         self.bump(TokenKind::While);
 
-        let test = self.parse_expr_with_recovery(
-            Parser::parse_named_expression_or_higher,
-            [TokenKind::Colon].as_slice(),
-            "expecting expression after `while` keyword",
-        );
-
+        let test = self.parse_named_expression_or_higher();
         self.expect(TokenKind::Colon);
 
         let body = self.parse_block(Clause::While);
@@ -1164,25 +1143,22 @@ impl<'src> Parser<'src> {
         let start_offset = self.node_start();
 
         self.bump(TokenKind::Match);
-        let subject = self.parse_expr_with_recovery(
-            |parser| {
-                let start = parser.node_start();
-                let parsed_expr = parser.parse_named_expression_or_higher();
-                if parser.at(TokenKind::Comma) {
-                    let tuple = parser.parse_tuple_expression(
-                        parsed_expr.expr,
-                        start,
-                        false,
-                        Parser::parse_named_expression_or_higher,
-                    );
 
-                    return Expr::Tuple(tuple).into();
-                }
-                parsed_expr
-            },
-            [TokenKind::Colon].as_slice(),
-            "expecting expression after `match` keyword",
-        );
+        let subject_start = self.node_start();
+        let subject = self.parse_named_expression_or_higher();
+        let subject = if self.at(TokenKind::Comma) {
+            let tuple = self.parse_tuple_expression(
+                subject.expr,
+                subject_start,
+                false,
+                Parser::parse_named_expression_or_higher,
+            );
+
+            Expr::Tuple(tuple).into()
+        } else {
+            subject
+        };
+
         self.expect(TokenKind::Colon);
 
         self.eat(TokenKind::Newline);
@@ -1345,14 +1321,12 @@ impl<'src> Parser<'src> {
                     continue;
                 }
 
-                // TODO: Probably necessary to add an error? Or how does that work?
-                if !self.is_at_stmt() {
-                    while !self.is_at_stmt() && !self.at_ts(BODY_END_SET) {
-                        self.next_token();
-                    }
+                if self.is_at_stmt() {
+                    stmts.push(self.parse_statement());
+                } else {
+                    // SKip over the unexpected token.
+                    self.next_token();
                 }
-
-                stmts.push(self.parse_statement());
             }
 
             self.eat(TokenKind::Dedent);

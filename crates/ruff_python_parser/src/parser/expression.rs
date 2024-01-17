@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use std::ops::Deref;
 
 use ruff_python_ast::{
@@ -96,37 +95,6 @@ impl<'src> Parser<'src> {
     /// TODO: This seems to match the `disjunction` grammar node except that it also handles lambda expressions?
     fn parse_simple_expression(&mut self) -> ParsedExpr {
         self.parse_expression_with_precedence(1)
-    }
-
-    /// Tries to parse an expression (using `parse_func`), and recovers from
-    /// errors by skipping until a specified set of tokens.
-    ///
-    /// If the current token is not part of an expression, adds the `error_msg`
-    /// to the list of errors and returns an `Expr::Invalid`.
-    pub(super) fn parse_expr_with_recovery(
-        &mut self,
-        mut parse_func: impl FnMut(&mut Parser<'src>) -> ParsedExpr,
-        recover_set: impl Into<TokenSet>,
-        error_msg: impl Display,
-    ) -> ParsedExpr {
-        if self.at_expr() {
-            parse_func(self)
-        } else {
-            let start = self.node_start();
-            self.add_error(
-                ParseErrorType::OtherError(error_msg.to_string()),
-                self.current_range(),
-            );
-            self.skip_until(NEWLINE_EOF_SET.union(recover_set.into()));
-
-            // FIXME(micha): I don't think we should include the entire range, or the range at all because it risks including trivia
-            let range = self.node_range(start);
-            Expr::Invalid(ast::ExprInvalid {
-                value: self.src_text(range).into(),
-                range,
-            })
-            .into()
-        }
     }
 
     /// Binding powers of operators for a Pratt parser.
@@ -960,17 +928,7 @@ impl<'src> Parser<'src> {
         let range = self.current_range();
 
         let has_open_brace = self.eat(TokenKind::Lbrace);
-        let value = self.parse_expr_with_recovery(
-            Parser::parse_expression,
-            [
-                TokenKind::Exclamation,
-                TokenKind::Colon,
-                TokenKind::Rbrace,
-                TokenKind::FStringEnd,
-            ]
-            .as_slice(),
-            "f-string: expecting expression",
-        );
+        let value = self.parse_expression();
         if !value.is_parenthesized && matches!(value.expr, Expr::Lambda(_)) {
             self.add_error(
                 ParseErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
@@ -1311,33 +1269,14 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::For);
 
         self.set_ctx(ParserCtxFlags::FOR_TARGET);
-        let mut target = self.parse_expr_with_recovery(
-            Parser::parse_expression,
-            [TokenKind::In, TokenKind::Colon].as_slice(),
-            "expecting expression after `for` keyword",
-        );
+        let mut target = self.parse_expression();
         self.clear_ctx(ParserCtxFlags::FOR_TARGET);
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
         self.expect(TokenKind::In);
 
-        let iter = self.parse_expr_with_recovery(
-            Parser::parse_simple_expression,
-            EXPR_SET.union(
-                [
-                    TokenKind::Rpar,
-                    TokenKind::Rsqb,
-                    TokenKind::Rbrace,
-                    TokenKind::If,
-                    TokenKind::Async,
-                    TokenKind::For,
-                ]
-                .as_slice()
-                .into(),
-            ),
-            "expecting an expression after `in` keyword",
-        );
+        let iter = self.parse_simple_expression();
 
         let mut ifs = vec![];
         let mut progress = ParserProgress::default();
@@ -1594,11 +1533,7 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Else);
 
-        let orelse = self.parse_expr_with_recovery(
-            Parser::parse_conditional_expression_or_higher,
-            TokenSet::EMPTY,
-            "expecting expression after `else` keyword",
-        );
+        let orelse = self.parse_conditional_expression_or_higher();
 
         ast::ExprIfExp {
             body: Box::new(body),
