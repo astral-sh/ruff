@@ -1,0 +1,131 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/assignment_body_target.py
+---
+## AST
+
+ ```
+Module(
+    ModModule {
+        range: 0..33,
+        body: [
+            Assign(
+                StmtAssign {
+                    range: 0..7,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 0..1,
+                                id: "a",
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Name(
+                        ExprName {
+                            range: 4..7,
+                            id: "try",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Pass(
+                StmtPass {
+                    range: 13..17,
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 30..33,
+                    value: EllipsisLiteral(
+                        ExprEllipsisLiteral {
+                            range: 30..33,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | a = try:
+  |     ^^^ Syntax Error: Identifier expected. 'try' is a keyword that cannot be used here.
+2 |     pass
+3 | except:
+  |
+
+
+  |
+1 | a = try:
+  |        ^ Syntax Error: Expected a statement
+2 |     pass
+3 | except:
+  |
+
+
+  |
+1 | a = try:
+  |         ^ Syntax Error: Expected a statement
+2 |     pass
+3 | except:
+4 |     ...
+  |
+
+
+  |
+1 | a = try:
+2 |     pass
+  | ^^^^ Syntax Error: unexpected indentation
+3 | except:
+4 |     ...
+  |
+
+
+  |
+1 | a = try:
+2 |     pass
+3 | except:
+  |  Syntax Error: Expected a statement
+4 |     ...
+  |
+
+
+  |
+1 | a = try:
+2 |     pass
+3 | except:
+  |       ^ Syntax Error: Expected a statement
+4 |     ...
+  |
+
+
+  |
+1 | a = try:
+2 |     pass
+3 | except:
+  |        ^ Syntax Error: Expected a statement
+4 |     ...
+  |
+
+
+  |
+2 |     pass
+3 | except:
+4 |     ...
+  | ^^^^ Syntax Error: unexpected indentation
+  |
+
+
+  |
+2 |     pass
+3 | except:
+4 |     ...
+  |         Syntax Error: Expected a statement
+  |
+
+
+

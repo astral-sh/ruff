@@ -211,21 +211,49 @@ impl<'src> Parser<'src> {
         lhs
     }
 
+    pub(super) fn parse_name(&mut self) -> ast::ExprName {
+        let identifier = self.parse_identifier();
+
+        ast::ExprName {
+            range: identifier.range,
+            id: identifier.id,
+            ctx: ExprContext::Load,
+        }
+    }
+
     pub(super) fn parse_identifier(&mut self) -> ast::Identifier {
         let range = self.current_range();
+
         if self.at(TokenKind::Name) {
             let (Tok::Name { name }, _) = self.next_token() else {
                 unreachable!();
             };
             ast::Identifier { id: name, range }
         } else {
-            self.add_error(
-                ParseErrorType::OtherError("expecting an identifier".into()),
-                range,
-            );
-            ast::Identifier {
-                id: String::new(),
-                range: self.missing_node_range(),
+            if self.current_kind().is_keyword() {
+                let (tok, range) = self.next_token();
+                self.add_error(
+                    ParseErrorType::OtherError(
+                        format!(
+                            "Identifier expected. '{tok}' is a keyword that cannot be used here."
+                        ),
+                    ),
+                    range,
+                );
+
+                ast::Identifier {
+                    id: tok.to_string(),
+                    range,
+                }
+            } else {
+                self.add_error(
+                    ParseErrorType::OtherError("expecting an identifier".into()),
+                    range,
+                );
+                ast::Identifier {
+                    id: String::new(),
+                    range: self.missing_node_range(),
+                }
             }
         }
     }
@@ -288,16 +316,7 @@ impl<'src> Parser<'src> {
                     range: self.node_range(start),
                 })
             }
-            TokenKind::Name => {
-                let (Tok::Name { name }, _) = self.bump(TokenKind::Name) else {
-                    unreachable!()
-                };
-                Expr::Name(ast::ExprName {
-                    id: name,
-                    ctx: ExprContext::Load,
-                    range: self.node_range(start),
-                })
-            }
+            TokenKind::Name => Expr::Name(self.parse_name()),
             TokenKind::EscapeCommand => {
                 let (Tok::IpyEscapeCommand { value, kind }, _) =
                     self.bump(TokenKind::EscapeCommand)
@@ -339,25 +358,20 @@ impl<'src> Parser<'src> {
             TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
             TokenKind::Yield => self.parse_yield_expression(),
 
-            // Handle unexpected token
-            // FIXME(micha): This seems to panic because we don't push a token
-            // and the `last_token_end` range is smaller than `self.node_start()`.
-            // Seems to only happen if it is a single node statement.
-            // Try with "👍"
             kind => {
-                if kind != TokenKind::Unknown {
+                if kind.is_keyword() {
+                    Expr::Name(self.parse_name())
+                } else {
                     self.add_error(
-                        ParseErrorType::OtherError("Expected an expression".to_string()),
+                        ParseErrorType::OtherError("Expression expected.".to_string()),
                         self.current_range(),
                     );
+                    Expr::Name(ast::ExprName {
+                        range: self.missing_node_range(),
+                        id: String::new(),
+                        ctx: ExprContext::Load,
+                    })
                 }
-
-                // Create a placeholder expression
-                Expr::Name(ast::ExprName {
-                    range: self.missing_node_range(),
-                    id: String::new(),
-                    ctx: ExprContext::Load,
-                })
             }
         };
 

@@ -83,7 +83,7 @@ Module(
 3 | elif False:
 4 |     pass
 5 | elf:
-  |     ^ Syntax Error: Expected an expression
+  |     ^ Syntax Error: Expression expected.
 6 |     pass
   |
 

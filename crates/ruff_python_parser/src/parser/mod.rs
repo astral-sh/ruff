@@ -167,7 +167,7 @@ impl<'src> Parser<'src> {
                 range: self.node_range(start),
             })
         } else {
-            let body = self.parse_list(
+            let body = self.parse_to_list(
                 RecoveryContextKind::ModuleStatements,
                 Parser::parse_statement,
             );
@@ -222,7 +222,7 @@ impl<'src> Parser<'src> {
                 Ordering::Equal => {
                     // Skip the parse error if we already have a lex error at the same location..
                     parse_errors.next().unwrap();
-                    merged.push(lex_errors.next().unwrap().into())
+                    merged.push(lex_errors.next().unwrap().into());
                 }
                 Ordering::Greater => merged.push(lex_errors.next().unwrap().into()),
             }
@@ -414,12 +414,23 @@ impl<'src> Parser<'src> {
         &self.source[range - self.tokens_range.start()]
     }
 
-    fn parse_list<T>(
+    fn parse_to_list<T>(
         &mut self,
         kind: RecoveryContextKind,
         parse_element: impl Fn(&mut Parser<'src>) -> T,
     ) -> Vec<T> {
-        let mut elems = Vec::new();
+        let mut elements = Vec::new();
+
+        self.parse_list(kind, |p| elements.push(parse_element(p)));
+
+        elements
+    }
+
+    fn parse_list(
+        &mut self,
+        kind: RecoveryContextKind,
+        mut parse_element: impl FnMut(&mut Parser<'src>),
+    ) {
         let mut progress = ParserProgress::default();
 
         let saved_context = self.recovery_context;
@@ -436,24 +447,23 @@ impl<'src> Parser<'src> {
             }
 
             if kind.is_list_element(self) {
-                elems.push(parse_element(self));
+                parse_element(self);
             } else {
+                let should_recover = self.is_enclosing_list_element_or_terminator();
+
                 // Not a recognised element. Add an error and either skip the token or break parsing the list
                 // if the token is recognised as an element or terminator of an enclosing list.
                 let error = kind.create_error(self);
                 self.add_error(error, self.current_range());
 
-                if self.is_enclosing_list_element_or_terminator() {
+                if should_recover {
                     break;
-                } else {
-                    self.next_token();
                 }
+                self.next_token();
             }
         }
 
         self.recovery_context = saved_context;
-
-        elems
     }
 
     #[cold]
@@ -568,7 +578,14 @@ enum RecoveryContextKind {
     ModuleStatements,
     BlockStatements,
 
+    /// The `elif` clauses of an `if` statement
     Elif,
+
+    /// The `except` clauses of a `try` statement
+    Except,
+
+    /// When parsing a list of assignment targets
+    AssignmentTarget,
 }
 
 impl RecoveryContextKind {
@@ -577,7 +594,15 @@ impl RecoveryContextKind {
             // The program must consume all tokens until the end
             RecoveryContextKind::ModuleStatements => false,
             RecoveryContextKind::BlockStatements => p.at(TokenKind::Dedent),
-            RecoveryContextKind::Elif => !p.at(TokenKind::Elif),
+
+            RecoveryContextKind::Elif => p.at(TokenKind::Else),
+            RecoveryContextKind::Except => {
+                matches!(p.current_kind(), TokenKind::Finally | TokenKind::Else)
+            }
+            // TODO: Should `semi` be part of the simple statement recovery set instead?
+            RecoveryContextKind::AssignmentTarget => {
+                matches!(p.current_kind(), TokenKind::Newline | TokenKind::Semi)
+            }
         }
     }
 
@@ -586,6 +611,8 @@ impl RecoveryContextKind {
             RecoveryContextKind::ModuleStatements => p.is_at_stmt(),
             RecoveryContextKind::BlockStatements => p.is_at_stmt(),
             RecoveryContextKind::Elif => p.at(TokenKind::Elif),
+            RecoveryContextKind::Except => p.at(TokenKind::Except),
+            RecoveryContextKind::AssignmentTarget => p.at(TokenKind::Equal),
         }
     }
 
@@ -598,8 +625,22 @@ impl RecoveryContextKind {
                     ParseErrorType::OtherError("Expected a statement".to_string())
                 }
             }
-            RecoveryContextKind::Elif => {
-                ParseErrorType::OtherError("Expected an `elif` or else clause".to_string())
+            RecoveryContextKind::Elif => ParseErrorType::OtherError(
+                "Expected an `elif` or `else` clause, or the end of the `if` statement."
+                    .to_string(),
+            ),
+            RecoveryContextKind::Except => ParseErrorType::OtherError(
+                "An `except` or `finally` clause or the end of the `try` statement expected."
+                    .to_string(),
+            ),
+            RecoveryContextKind::AssignmentTarget => {
+                if p.current_kind().is_keyword() {
+                    ParseErrorType::OtherError(
+                        "The keyword is not allowed as a variable declaration name".to_string(),
+                    )
+                } else {
+                    ParseErrorType::OtherError("Assignment target expected".to_string())
+                }
             }
         }
     }
@@ -613,6 +654,9 @@ bitflags! {
         const MODULE_STATEMENTS = 1 << 0;
         const BLOCK_STATEMENTS = 1 << 1;
         const ELIF = 1 << 2;
+        const EXCEPT = 1 << 3;
+
+        const ASSIGNMENT_TARGET = 1 << 4;
     }
 }
 
@@ -622,6 +666,8 @@ impl RecoveryContext {
             RecoveryContextKind::ModuleStatements => RecoveryContext::MODULE_STATEMENTS,
             RecoveryContextKind::BlockStatements => RecoveryContext::BLOCK_STATEMENTS,
             RecoveryContextKind::Elif => RecoveryContext::ELIF,
+            RecoveryContextKind::Except => RecoveryContext::EXCEPT,
+            RecoveryContextKind::AssignmentTarget => RecoveryContext::ASSIGNMENT_TARGET,
         }
     }
 
@@ -633,6 +679,7 @@ impl RecoveryContext {
             RecoveryContext::MODULE_STATEMENTS => RecoveryContextKind::ModuleStatements,
             RecoveryContext::BLOCK_STATEMENTS => RecoveryContextKind::BlockStatements,
             RecoveryContext::ELIF => RecoveryContextKind::Elif,
+            RecoveryContext::ASSIGNMENT_TARGET => RecoveryContextKind::AssignmentTarget,
             _ => return None,
         })
     }

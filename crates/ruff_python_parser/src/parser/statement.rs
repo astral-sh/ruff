@@ -8,7 +8,8 @@ use ruff_text_size::{Ranged, TextSize};
 use crate::parser::expression::ParsedExpr;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
-    helpers, FunctionKind, Parser, ParserCtxFlags, RecoveryContextKind, EXPR_SET, LITERAL_SET,
+    helpers, FunctionKind, Parser, ParserCtxFlags, RecoveryContext, RecoveryContextKind, EXPR_SET,
+    LITERAL_SET,
 };
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, Tok, TokenKind};
@@ -511,15 +512,17 @@ impl<'src> Parser<'src> {
     fn parse_assign_statement(&mut self, target: ParsedExpr, start: TextSize) -> ast::StmtAssign {
         let mut targets = vec![target.expr];
         let mut value = self.parse_expression();
-        let mut progress = ParserProgress::default();
 
-        while self.eat(TokenKind::Equal) {
-            progress.assert_progressing(self);
-            let mut parsed_expr = self.parse_expression();
+        if self.at(TokenKind::Equal) {
+            self.parse_list(RecoveryContextKind::AssignmentTarget, |p| {
+                p.bump(TokenKind::Equal);
 
-            std::mem::swap(&mut value, &mut parsed_expr);
+                let mut parsed_expr = p.parse_expression();
 
-            targets.push(parsed_expr.expr);
+                std::mem::swap(&mut value, &mut parsed_expr);
+
+                targets.push(parsed_expr.expr);
+            });
         }
 
         targets
@@ -635,19 +638,8 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_elif_else_clauses(&mut self) -> Vec<ast::ElifElseClause> {
-        // Note: Terminators needing to be any statement is a bit an annoyance.
-        // Doesn't work well because it doesn't have an explicit terminator.
-        // Instead it's more a take_while.
-        //
-        // Support two different recovery strategies? One for terminated statements
-        // and one for unterminated ones? Or use the same logic but it uses a different loop
-        // that doesn't end on a terminator but on the first unrecognized token?
-        // it's still terminated but only by the `Else` keyword.
-        // Still pushing `is_terminator` and `is_element` is important for recovery inside of
-        // the if body to work as expected.
-        // Maybe add a `parse_clauses` method that's similar to `parse_list` but parses a list of clauses.
         let mut elif_else_clauses = if self.at(TokenKind::Elif) {
-            self.parse_list(RecoveryContextKind::Elif, |p| {
+            self.parse_clauses(Clause::ElIf, |p| {
                 let elif_start = p.node_start();
                 p.bump(TokenKind::Elif);
 
@@ -691,23 +683,18 @@ impl<'src> Parser<'src> {
 
         let try_body = self.parse_body(Clause::Try);
 
-        let mut handlers = vec![];
-
         let has_except = self.at(TokenKind::Except);
-        let mut progress = ParserProgress::default();
-
-        while self.at(TokenKind::Except) {
-            progress.assert_progressing(self);
-            let except_start = self.node_start();
-            self.bump(TokenKind::Except);
+        let handlers = self.parse_clauses(Clause::Except, |p| {
+            let except_start = p.node_start();
+            p.bump(TokenKind::Except);
 
             // TODO(micha): Should this be local to the except block or global for the try statement or do we need to track both?
-            is_star = self.eat(TokenKind::Star);
+            is_star = p.eat(TokenKind::Star);
 
-            let type_ = if self.at(TokenKind::Colon) && !is_star {
+            let type_ = if p.at(TokenKind::Colon) && !is_star {
                 None
             } else {
-                let parsed_expr = self.parse_expression();
+                let parsed_expr = p.parse_expression();
                 if matches!(
                     parsed_expr.expr,
                     Expr::Tuple(ast::ExprTuple {
@@ -715,7 +702,7 @@ impl<'src> Parser<'src> {
                         ..
                     })
                 ) {
-                    self.add_error(
+                    p.add_error(
                         ParseErrorType::OtherError(
                             "multiple exception types must be parenthesized".to_string(),
                         ),
@@ -725,26 +712,19 @@ impl<'src> Parser<'src> {
                 Some(Box::new(parsed_expr.expr))
             };
 
-            let name = self.eat(TokenKind::As).then(|| self.parse_identifier());
+            let name = p.eat(TokenKind::As).then(|| p.parse_identifier());
 
-            self.expect(TokenKind::Colon);
+            p.expect(TokenKind::Colon);
 
-            let except_body = self.parse_body(Clause::Except);
+            let except_body = p.parse_body(Clause::Except);
 
-            let except_range = self.node_range(except_start);
-            handlers.push(ExceptHandler::ExceptHandler(
-                ast::ExceptHandlerExceptHandler {
-                    type_,
-                    name,
-                    body: except_body,
-                    range: except_range,
-                },
-            ));
-
-            if !self.at(TokenKind::Except) {
-                break;
-            }
-        }
+            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                type_,
+                name,
+                body: except_body,
+                range: p.node_range(except_start),
+            })
+        });
 
         let orelse = if self.eat(TokenKind::Else) {
             self.expect(TokenKind::Colon);
@@ -1300,7 +1280,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Indent);
 
         let statements =
-            self.parse_list(RecoveryContextKind::BlockStatements, Self::parse_statement);
+            self.parse_to_list(RecoveryContextKind::BlockStatements, Self::parse_statement);
 
         self.expect(TokenKind::Dedent);
 
@@ -1539,6 +1519,57 @@ impl<'src> Parser<'src> {
             name,
             asname,
         }
+    }
+
+    /// Specialized [`Parser::parse_list`] for parsing a sequence of clauses.
+    ///
+    /// The difference is that the parser only continues parsing for as long as it sees the token indicating the start
+    /// of the specific clause. This is different from [`Parser::parse_list`] that performs error recovery when
+    /// the next token is not a list terminator or the start of a list element.
+    ///
+    /// The special method is necessary because Python uses indentation over explicit delimiters to indicate the end of a clause.
+    ///
+    /// ```python
+    /// if True: ...
+    /// elif False: ...
+    /// elf x: ....
+    /// else: ...
+    /// ```
+    ///
+    /// It would be nice if the above example would recover and either skip over the `elf x: ...` or parse it as a nested statement
+    /// so that the parser recognises the `else` clause. But Python makes this hard (without writing custom error recovery logic)
+    /// because `elf x: ` could also be an annotated assignment that went wrong ;)
+    ///
+    /// For now, don't recover when parsing clause headers, but add the terminator tokens (e.g. `Else`) to the recovery context
+    /// so that expression recovery stops when it encounters an `else` token.
+    fn parse_clauses<T>(
+        &mut self,
+        clause: Clause,
+        mut parse_clause: impl FnMut(&mut Parser<'src>) -> T,
+    ) -> Vec<T> {
+        let mut clauses = Vec::new();
+        let mut progress = ParserProgress::default();
+
+        let recovery_kind = match clause {
+            Clause::ElIf => RecoveryContextKind::Elif,
+            Clause::Except => RecoveryContextKind::Except,
+            _ => unreachable!("Clause is not supported"),
+        };
+
+        let saved_context = self.recovery_context;
+        self.recovery_context = self
+            .recovery_context
+            .union(RecoveryContext::from_kind(recovery_kind));
+
+        while recovery_kind.is_list_element(self) {
+            progress.assert_progressing(self);
+
+            clauses.push(parse_clause(self));
+        }
+
+        self.recovery_context = saved_context;
+
+        clauses
     }
 }
 
