@@ -57,7 +57,10 @@ impl Violation for TooManyPositional {
 
 /// PLR0917
 pub(crate) fn too_many_positional(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
-    let mut num_positional_args = function_def
+    let semantic = checker.semantic();
+
+    // Count the number of positional arguments.
+    let num_positional_args = function_def
         .parameters
         .args
         .iter()
@@ -70,10 +73,8 @@ pub(crate) fn too_many_positional(checker: &mut Checker, function_def: &ast::Stm
         })
         .count();
 
-    let semantic = checker.semantic();
-
     // Check if the function is a method or class method.
-    if matches!(
+    let num_positional_args = if matches!(
         function_type::classify(
             &function_def.name,
             &function_def.decorator_list,
@@ -86,8 +87,10 @@ pub(crate) fn too_many_positional(checker: &mut Checker, function_def: &ast::Stm
     ) {
         // If so, we need to subtract one from the number of positional arguments, since the first
         // argument is always `self` or `cls`.
-        num_positional_args = num_positional_args.saturating_sub(1);
-    }
+        num_positional_args.saturating_sub(1)
+    } else {
+        num_positional_args
+    };
 
     if num_positional_args > checker.settings.pylint.max_positional_args {
         // Allow excessive arguments in `@override` or `@overload` methods, since they're required
