@@ -3,8 +3,8 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 
-use ruff_cli::args::{Args, Command};
-use ruff_cli::{run, ExitStatus};
+use ruff::args::{Args, Command};
+use ruff::{run, ExitStatus};
 
 #[cfg(target_os = "windows")]
 #[global_allocator]

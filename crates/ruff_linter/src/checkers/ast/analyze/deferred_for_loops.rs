@@ -2,12 +2,12 @@ use ruff_python_ast::Stmt;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::rules::{flake8_bugbear, perflint, pyupgrade, refurb};
+use crate::rules::{flake8_bugbear, flake8_simplify, perflint, pyupgrade, refurb};
 
 /// Run lint rules over all deferred for-loops in the [`SemanticModel`].
 pub(crate) fn deferred_for_loops(checker: &mut Checker) {
-    while !checker.deferred.for_loops.is_empty() {
-        let for_loops = std::mem::take(&mut checker.deferred.for_loops);
+    while !checker.analyze.for_loops.is_empty() {
+        let for_loops = std::mem::take(&mut checker.analyze.for_loops);
         for snapshot in for_loops {
             checker.semantic.restore(snapshot);
 
@@ -26,6 +26,9 @@ pub(crate) fn deferred_for_loops(checker: &mut Checker) {
             }
             if checker.enabled(Rule::UnnecessaryEnumerate) {
                 refurb::rules::unnecessary_enumerate(checker, stmt_for);
+            }
+            if checker.enabled(Rule::EnumerateForLoop) {
+                flake8_simplify::rules::enumerate_for_loop(checker, stmt_for);
             }
         }
     }

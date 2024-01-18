@@ -20,9 +20,9 @@ use path_absolutize::path_dedot;
 use tempfile::TempDir;
 
 #[cfg(unix)]
-use ruff_cli::args::Args;
+use ruff::args::Args;
 #[cfg(unix)]
-use ruff_cli::run;
+use ruff::run;
 
 const BIN_NAME: &str = "ruff";
 
@@ -841,8 +841,9 @@ fn nursery_direct() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:2: E225 Missing whitespace around operator
+    -:1:2: E225 [*] Missing whitespace around operator
     Found 1 error.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     warning: Selection of nursery rule `E225` without the `--preview` flag is deprecated.
@@ -859,8 +860,9 @@ fn nursery_group_selector() {
     exit_code: 1
     ----- stdout -----
     -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:2: E225 Missing whitespace around operator
+    -:1:2: E225 [*] Missing whitespace around operator
     Found 2 errors.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     warning: The `NURSERY` selector has been deprecated. Use the `--preview` flag instead.
@@ -1654,5 +1656,67 @@ def log(x, base) -> float:
     ----- stderr -----
     "###
     );
+    Ok(())
+}
+
+#[test]
+fn fix_preview() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+preview = true
+explicit-preview-rules = true
+select = ["RUF017"]
+"#,
+    )?;
+
+    let mut cmd = RuffCheck::default().config(&ruff_toml).build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("x = [1, 2, 3]\ny = [4, 5, 6]\nsum([x, y], [])"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:3:1: RUF017 Avoid quadratic list summation
+    Found 1 error.
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn unfixable_preview() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+preview = true
+explicit-preview-rules = true
+select = ["RUF017"]
+unfixable = ["RUF"]
+"#,
+    )?;
+
+    let mut cmd = RuffCheck::default().config(&ruff_toml).build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("x = [1, 2, 3]\ny = [4, 5, 6]\nsum([x, y], [])"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:3:1: RUF017 Avoid quadratic list summation
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+
     Ok(())
 }

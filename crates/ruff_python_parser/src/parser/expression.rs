@@ -213,7 +213,7 @@ impl<'src> Parser<'src> {
 
     pub(super) fn parse_identifier(&mut self) -> ast::Identifier {
         let range = self.current_range();
-        if self.current_kind() == TokenKind::Name {
+        if self.at(TokenKind::Name) {
             let (Tok::Name { name }, _) = self.next_token() else {
                 unreachable!();
             };
@@ -225,7 +225,7 @@ impl<'src> Parser<'src> {
             );
             ast::Identifier {
                 id: String::new(),
-                range,
+                range: self.missing_node_range(),
             }
         }
     }

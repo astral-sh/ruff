@@ -83,7 +83,7 @@ pub enum Command {
     },
 }
 
-// The `Parser` derive is for ruff_dev, for ruff_cli `Args` would be sufficient
+// The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
 #[derive(Clone, Debug, clap::Parser)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct CheckCommand {

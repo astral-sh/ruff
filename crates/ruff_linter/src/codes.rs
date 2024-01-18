@@ -217,6 +217,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "C2801") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryDunderCall),
         #[allow(deprecated)]
         (Pylint, "C1901") => (RuleGroup::Nursery, rules::pylint::rules::CompareToEmptyString),
+        (Pylint, "C2701") => (RuleGroup::Preview, rules::pylint::rules::ImportPrivateName),
         (Pylint, "C3002") => (RuleGroup::Stable, rules::pylint::rules::UnnecessaryDirectLambdaCall),
         (Pylint, "E0100") => (RuleGroup::Stable, rules::pylint::rules::YieldInInit),
         (Pylint, "E0101") => (RuleGroup::Stable, rules::pylint::rules::ReturnInInit),
@@ -454,6 +455,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Simplify, "109") => (RuleGroup::Stable, rules::flake8_simplify::rules::CompareWithTuple),
         (Flake8Simplify, "110") => (RuleGroup::Stable, rules::flake8_simplify::rules::ReimplementedBuiltin),
         (Flake8Simplify, "112") => (RuleGroup::Stable, rules::flake8_simplify::rules::UncapitalizedEnvironmentVariables),
+        (Flake8Simplify, "113") => (RuleGroup::Preview, rules::flake8_simplify::rules::EnumerateForLoop),
         (Flake8Simplify, "114") => (RuleGroup::Stable, rules::flake8_simplify::rules::IfWithSameArms),
         (Flake8Simplify, "115") => (RuleGroup::Stable, rules::flake8_simplify::rules::OpenFileWithContextHandler),
         (Flake8Simplify, "116") => (RuleGroup::Stable, rules::flake8_simplify::rules::IfElseBlockInsteadOfDictLookup),
@@ -922,6 +924,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "019") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryKeyCheck),
         (Ruff, "020") => (RuleGroup::Preview, rules::ruff::rules::NeverUnion),
         (Ruff, "021") => (RuleGroup::Preview, rules::ruff::rules::ParenthesizeChainedOperators),
+        (Ruff, "022") => (RuleGroup::Preview, rules::ruff::rules::UnsortedDunderAll),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
 
@@ -986,6 +989,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "152") => (RuleGroup::Preview, rules::refurb::rules::MathConstant),
         (Refurb, "161") => (RuleGroup::Preview, rules::refurb::rules::BitCount),
         (Refurb, "163") => (RuleGroup::Preview, rules::refurb::rules::RedundantLogBase),
+        (Refurb, "167") => (RuleGroup::Preview, rules::refurb::rules::RegexFlagAlias),
         (Refurb, "168") => (RuleGroup::Preview, rules::refurb::rules::IsinstanceTypeNone),
         (Refurb, "169") => (RuleGroup::Preview, rules::refurb::rules::TypeNoneComparison),
         (Refurb, "171") => (RuleGroup::Preview, rules::refurb::rules::SingleItemMembershipTest),

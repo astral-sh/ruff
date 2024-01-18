@@ -278,6 +278,17 @@ impl<'src> Parser<'src> {
         self.current_range().start()
     }
 
+    /// FIXME(micha): This panics when the parsing doesn't consume any tokens. because `start` points to the start of the current
+    /// token but `last_token_end` points to the end of the previous token. Not sure how to fix this best in a reliable manner.
+    /// One solution could be to return a `Marker` from `node_start` that stores the count of the start token and the start offset.
+    /// `node_range` could then use the count to see if the parser is still positioned at the same token in which case
+    /// it returns `TextRange::empty(self.current_range().start())`.
+    ///
+    /// The downside of this is that it becomes necessary to store the current token index on the parser, which requires a
+    /// write operation during each `next` call which is unfortunate.
+    ///
+    /// There's also the question if it works if the parser consumed a `Dedent` or `Newline` token but `last_token_end` still
+    /// points to the previous token because we don't update the end position for these tokens.
     fn node_range(&self, start: TextSize) -> TextRange {
         TextRange::new(start, self.last_token_end)
     }

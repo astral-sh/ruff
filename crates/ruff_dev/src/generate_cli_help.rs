@@ -8,7 +8,7 @@ use anyhow::{bail, Context, Result};
 use clap::CommandFactory;
 use pretty_assertions::StrComparison;
 
-use ruff_cli::args;
+use ruff::args;
 
 use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
 use crate::ROOT_DIR;

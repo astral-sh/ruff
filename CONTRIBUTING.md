@@ -81,7 +81,7 @@ pre-commit install
 After cloning the repository, run Ruff locally from the repository root with:
 
 ```shell
-cargo run -p ruff_cli -- check /path/to/file.py --no-cache
+cargo run -p ruff -- check /path/to/file.py --no-cache
 ```
 
 Prior to opening a pull request, ensure that your code has been auto-formatted,
@@ -120,7 +120,7 @@ At the time of writing, the repository includes the following crates:
     If you're working on a rule, this is the crate for you.
 - `crates/ruff_benchmark`: binary crate for running micro-benchmarks.
 - `crates/ruff_cache`: library crate for caching lint results.
-- `crates/ruff_cli`: binary crate containing Ruff's command-line interface.
+- `crates/ruff`: binary crate containing Ruff's command-line interface.
 - `crates/ruff_dev`: binary crate containing utilities used in the development of Ruff itself (e.g.,
     `cargo dev generate-all`), see the [`cargo dev`](#cargo-dev) section below.
 - `crates/ruff_diagnostics`: library crate for the rule-independent abstractions in the lint
@@ -231,7 +231,7 @@ Once you've completed the code for the rule itself, you can define tests with th
     For example, if you're adding a new rule named `E402`, you would run:
 
     ```shell
-    cargo run -p ruff_cli -- check crates/ruff_linter/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402
+    cargo run -p ruff -- check crates/ruff_linter/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402
     ```
 
     **Note:** Only a subset of rules are enabled by default. When testing a new rule, ensure that
@@ -252,7 +252,7 @@ Once you've completed the code for the rule itself, you can define tests with th
 
 Ruff's user-facing settings live in a few different places.
 
-First, the command-line options are defined via the `Args` struct in `crates/ruff_cli/src/args.rs`.
+First, the command-line options are defined via the `Args` struct in `crates/ruff/src/args.rs`.
 
 Second, the `pyproject.toml` options are defined in `crates/ruff_workspace/src/options.rs` (via the
 `Options` struct), `crates/ruff_workspace/src/configuration.rs` (via the `Configuration` struct),
@@ -518,10 +518,10 @@ if the benchmark improved/regressed compared to that baseline.
 
 ```shell
 # Run once on your "baseline" code
-cargo benchmark --save-baseline=main
+cargo bench -p ruff_benchmark -- --save-baseline=main
 
 # Then iterate with
-cargo benchmark --baseline=main
+cargo bench -p ruff_benchmark -- --baseline=main
 ```
 
 #### PR Summary
@@ -531,10 +531,10 @@ This is useful to illustrate the improvements of a PR.
 
 ```shell
 # On main
-cargo benchmark --save-baseline=main
+cargo bench -p ruff_benchmark -- --save-baseline=main
 
 # After applying your changes
-cargo benchmark --save-baseline=pr
+cargo bench -p ruff_benchmark -- --save-baseline=pr
 
 critcmp main pr
 ```
@@ -547,10 +547,10 @@ cargo install critcmp
 
 #### Tips
 
-- Use `cargo benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark linter/pydantic`
-    to only run the pydantic tests.
-- Use `cargo benchmark --quiet` for a more cleaned up output (without statistical relevance)
-- Use `cargo benchmark --quick` to get faster results (more prone to noise)
+- Use `cargo bench -p ruff_benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark lexer`
+    to only run the lexer benchmarks.
+- Use `cargo bench -p ruff_benchmark -- --quiet` for a more cleaned up output (without statistical relevance)
+- Use `cargo bench -p ruff_benchmark -- --quick` to get faster results (more prone to noise)
 
 ### Profiling Projects
 
@@ -618,7 +618,7 @@ Otherwise, follow the instructions from the linux section.
 utils with it:
 
 - `cargo dev print-ast <file>`: Print the AST of a python file using the
-    [RustPython parser](https://github.com/astral-sh/RustPython-Parser/tree/main/parser) that is
+    [RustPython parser](https://github.com/astral-sh/ruff/tree/main/crates/ruff_python_parser) that is
     mainly used in Ruff. For `if True: pass # comment`, you can see the syntax tree, the byte offsets
     for start and stop of each node and also how the `:` token, the comment and whitespace are not
     represented anymore:

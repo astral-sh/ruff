@@ -16,6 +16,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
     if !checker.any_enabled(&[
         Rule::AsyncioDanglingTask,
         Rule::GlobalVariableNotAssigned,
+        Rule::ImportPrivateName,
         Rule::ImportShadowedByLoopVar,
         Rule::NoSelfUse,
         Rule::RedefinedArgumentFromLocal,
@@ -77,7 +78,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
     };
 
     let mut diagnostics: Vec<Diagnostic> = vec![];
-    for scope_id in checker.deferred.scopes.iter().rev().copied() {
+    for scope_id in checker.analyze.scopes.iter().rev().copied() {
         let scope = &checker.semantic.scopes[scope_id];
 
         if checker.enabled(Rule::UndefinedLocal) {
@@ -371,6 +372,10 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
             if checker.enabled(Rule::UnusedImport) {
                 pyflakes::rules::unused_import(checker, scope, &mut diagnostics);
+            }
+
+            if checker.enabled(Rule::ImportPrivateName) {
+                pylint::rules::import_private_name(checker, scope, &mut diagnostics);
             }
         }
 

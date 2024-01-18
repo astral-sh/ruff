@@ -108,7 +108,7 @@ pub(crate) fn is_single_rule_selector(prefix: &RuleCodePrefix) -> bool {
 pub enum ParseError {
     #[error("Unknown rule selector: `{0}`")]
     // TODO(martin): tell the user how to discover rule codes via the CLI once such a command is
-    // implemented (but that should of course be done only in ruff_cli and not here)
+    // implemented (but that should of course be done only in ruff and not here)
     Unknown(String),
 }
 
