@@ -5,13 +5,12 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_semantic::ScopeKind;
-use ruff_source_file::Locator;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::sequence_sorting::{
-    sort_single_line_elements_dict, sort_single_line_elements_sequence, DisplayKind, SequenceKind,
-    SortClassification,
+    sort_single_line_elements_dict, sort_single_line_elements_sequence, DisplayKind,
+    MultilineStringSequenceValue, SequenceKind, SortClassification,
 };
 
 use natord;
@@ -130,12 +129,12 @@ fn sort_dunder_slots(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr
         return;
     };
 
-    let Some((elts, range, display_kind)) = extract_elts(dunder_kind, node) else {
+    let Some(elts_analysis) = NodeAnalysis::new(node, dunder_kind) else {
         return;
     };
 
-    let elts_analysis = SortClassification::from_elements(&elts, natord::compare);
-    if elts_analysis.is_not_a_list_of_string_literals() || elts_analysis.is_sorted() {
+    let sort_classification = SortClassification::of_elements(&elts_analysis.elts, natord::compare);
+    if sort_classification.is_not_a_list_of_string_literals() || sort_classification.is_sorted() {
         return;
     }
 
@@ -144,92 +143,130 @@ fn sort_dunder_slots(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr
             class_name: class_name.to_string(),
             class_variable: dunder_kind,
         },
-        range,
+        elts_analysis.range,
     );
 
-    if let SortClassification::UnsortedAndMaybeFixable { items } = elts_analysis {
-        let locator = checker.locator();
-        if !locator.contains_line_break(range) {
-            diagnostic.set_fix(create_fix(display_kind, &elts, &items, range, locator));
+    if let SortClassification::UnsortedAndMaybeFixable { items } = sort_classification {
+        if let Some(fix) = create_fix(&elts_analysis, &items, checker) {
+            diagnostic.set_fix(fix);
         }
     }
 
     checker.diagnostics.push(diagnostic);
 }
 
-fn extract_elts(
-    dunder_kind: SpecialClassDunder,
-    node: &ast::Expr,
-) -> Option<(Cow<'_, Vec<ast::Expr>>, TextRange, DisplayKind<'_>)> {
-    let result = match (dunder_kind, node) {
-        (_, ast::Expr::List(ast::ExprList { elts, range, .. })) => (
-            Cow::Borrowed(elts),
-            *range,
-            DisplayKind::Sequence(SequenceKind::List),
-        ),
-        (_, ast::Expr::Tuple(tuple_node @ ast::ExprTuple { elts, range, .. })) => {
-            let display_kind = DisplayKind::Sequence(SequenceKind::Tuple(tuple_node));
-            (Cow::Borrowed(elts), *range, display_kind)
-        }
-        (SpecialClassDunder::Slots, ast::Expr::Set(ast::ExprSet { elts, range })) => (
-            Cow::Borrowed(elts),
-            *range,
-            DisplayKind::Sequence(SequenceKind::Set),
-        ),
-        (
-            SpecialClassDunder::Slots,
-            ast::Expr::Dict(ast::ExprDict {
-                keys,
-                values,
-                range,
-            }),
-        ) => {
-            let mut narrowed_keys = Vec::with_capacity(values.len());
-            for key in keys {
-                if let Some(key) = key {
-                    // This is somewhat unfortunate,
-                    // *but* only `__slots__` can be a dict out of
-                    // `__all__`, `__slots__` and `__match_args__`,
-                    // and even for `__slots__`, using a dict is very rare
-                    narrowed_keys.push(key.to_owned());
-                } else {
-                    return None;
+#[derive(Debug)]
+struct NodeAnalysis<'a> {
+    elts: Cow<'a, Vec<ast::Expr>>,
+    range: TextRange,
+    display_kind: DisplayKind<'a>,
+}
+
+impl<'a> NodeAnalysis<'a> {
+    fn new(node: &'a ast::Expr, dunder_kind: SpecialClassDunder) -> Option<Self> {
+        let result = match (dunder_kind, node) {
+            (_, ast::Expr::List(ast::ExprList { elts, range, .. })) => {
+                let display_kind = DisplayKind::Sequence(SequenceKind::List);
+                Self {
+                    elts: Cow::Borrowed(elts),
+                    range: *range,
+                    display_kind,
                 }
             }
-            // If `None` was present in the keys, it indicates a "** splat", .e.g
-            // `__slots__ = {"foo": "bar", **other_dict}`
-            // If `None` wasn't present in the keys,
-            // the length of the keys should always equal the length of the values
-            assert_eq!(narrowed_keys.len(), values.len());
+            (_, ast::Expr::Tuple(tuple_node @ ast::ExprTuple { elts, range, .. })) => {
+                let display_kind = DisplayKind::Sequence(SequenceKind::Tuple(tuple_node));
+                Self {
+                    elts: Cow::Borrowed(elts),
+                    range: *range,
+                    display_kind,
+                }
+            }
+            (SpecialClassDunder::Slots, ast::Expr::Set(ast::ExprSet { elts, range })) => {
+                let display_kind = DisplayKind::Sequence(SequenceKind::Set);
+                Self {
+                    elts: Cow::Borrowed(elts),
+                    range: *range,
+                    display_kind,
+                }
+            }
             (
-                Cow::Owned(narrowed_keys),
-                *range,
-                DisplayKind::Dict { values },
-            )
-        }
-        _ => return None,
-    };
-    Some(result)
+                SpecialClassDunder::Slots,
+                ast::Expr::Dict(ast::ExprDict {
+                    keys,
+                    values,
+                    range,
+                }),
+            ) => {
+                let mut narrowed_keys = Vec::with_capacity(values.len());
+                for key in keys {
+                    if let Some(key) = key {
+                        // This is somewhat unfortunate,
+                        // *but* only `__slots__` can be a dict out of
+                        // `__all__`, `__slots__` and `__match_args__`,
+                        // and even for `__slots__`, using a dict is very rare
+                        narrowed_keys.push(key.to_owned());
+                    } else {
+                        return None;
+                    }
+                }
+                // If `None` was present in the keys, it indicates a "** splat", .e.g
+                // `__slots__ = {"foo": "bar", **other_dict}`
+                // If `None` wasn't present in the keys,
+                // the length of the keys should always equal the length of the values
+                assert_eq!(narrowed_keys.len(), values.len());
+                let display_kind = DisplayKind::Dict { values };
+                Self {
+                    elts: Cow::Owned(narrowed_keys),
+                    range: *range,
+                    display_kind,
+                }
+            }
+            _ => return None,
+        };
+        Some(result)
+    }
 }
 
 fn create_fix(
-    display_kind: DisplayKind<'_>,
-    elts: &[ast::Expr],
+    NodeAnalysis {
+        elts,
+        range,
+        display_kind,
+    }: &NodeAnalysis,
     items: &[&str],
-    range: TextRange,
-    locator: &Locator,
-) -> Fix {
-    let new_var = match display_kind {
-        DisplayKind::Dict { values } => {
-            sort_single_line_elements_dict(elts, items, values, locator, natord::compare)
+    checker: &Checker,
+) -> Option<Fix> {
+    let locator = checker.locator();
+    let is_multiline = locator.contains_line_break(*range);
+    let sorted_source_code = {
+        if is_multiline {
+            // Sorting multiline dicts is unsupported
+            let display_kind = display_kind.as_sequence()?;
+            let analyzed_sequence =
+                MultilineStringSequenceValue::from_source_range(*range, display_kind, locator)?;
+            assert_eq!(analyzed_sequence.len(), elts.len());
+            analyzed_sequence.into_sorted_source_code(
+                |this, next| natord::compare(this.value(), next.value()),
+                locator,
+                checker.stylist(),
+            )
+        } else {
+            match display_kind {
+                DisplayKind::Dict { values } => {
+                    sort_single_line_elements_dict(elts, items, values, locator, natord::compare)
+                }
+                DisplayKind::Sequence(sequence_kind) => sort_single_line_elements_sequence(
+                    sequence_kind,
+                    elts,
+                    items,
+                    locator,
+                    natord::compare,
+                ),
+            }
         }
-        DisplayKind::Sequence(sequence_kind) => sort_single_line_elements_sequence(
-            &sequence_kind,
-            elts,
-            items,
-            locator,
-            natord::compare,
-        ),
     };
-    Fix::safe_edit(Edit::range_replacement(new_var, range))
+    Some(Fix::safe_edit(Edit::range_replacement(
+        sorted_source_code,
+        *range,
+    )))
 }
