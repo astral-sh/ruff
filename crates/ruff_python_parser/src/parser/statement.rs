@@ -785,9 +785,9 @@ impl<'src> Parser<'src> {
     fn parse_for_statement(&mut self, for_start: TextSize) -> ast::StmtFor {
         self.bump(TokenKind::For);
 
-        self.set_ctx(ParserCtxFlags::FOR_TARGET);
+        let saved_context = self.set_ctx(ParserCtxFlags::FOR_TARGET);
         let mut target = self.parse_expression();
-        self.clear_ctx(ParserCtxFlags::FOR_TARGET);
+        self.restore_ctx(ParserCtxFlags::FOR_TARGET, saved_context);
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
@@ -801,7 +801,6 @@ impl<'src> Parser<'src> {
 
         let orelse = if self.eat(TokenKind::Else) {
             self.expect(TokenKind::Colon);
-
             self.parse_body(Clause::Else)
         } else {
             vec![]

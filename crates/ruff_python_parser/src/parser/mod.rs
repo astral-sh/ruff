@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
-use std::iter::FusedIterator;
 
-use bitflags::{bitflags, Flags};
+use bitflags::bitflags;
+use drop_bomb::DebugDropBomb;
 
 use ast::Mod;
 use ruff_python_ast as ast;
@@ -70,20 +70,6 @@ pub(crate) struct Parser<'src> {
     /// an expression or statement is done parsing.
     ctx: ParserCtxFlags,
 
-    /// During the parsing of expression or statement, multiple `ctx`s can be created.
-    /// `ctx_stack` stores the previous `ctx`s that were created during the parsing. For example,
-    /// when parsing a tuple expression, e.g. `(1, 2, 3)`, two [`ParserCtxFlags`] will be
-    /// created `ParserCtxFlags::PARENTHESIZED_EXPR` and `ParserCtxFlags::TUPLE_EXPR`.
-    ///
-    /// When parsing a tuple the first context created is `ParserCtxFlags::PARENTHESIZED_EXPR`.
-    /// Afterwards, the `ParserCtxFlags::TUPLE_EXPR` is created and `ParserCtxFlags::PARENTHESIZED_EXPR`
-    /// is pushed onto the `ctx_stack`.
-    /// `ParserCtxFlags::PARENTHESIZED_EXPR` is removed from the stack and set to be the current `ctx`,
-    /// after we parsed all elements in the tuple.
-    ///
-    /// The end of the vector is the top of the stack.
-    ctx_stack: Vec<ParserCtxFlags>,
-
     /// Stores the last `ctx` of an expression or statement that was parsed.
     last_ctx: ParserCtxFlags,
 
@@ -151,7 +137,6 @@ impl<'src> Parser<'src> {
             mode,
             source,
             errors: Vec::new(),
-            ctx_stack: Vec::new(),
             ctx: ParserCtxFlags::empty(),
             last_ctx: ParserCtxFlags::empty(),
             tokens,
@@ -205,7 +190,6 @@ impl<'src> Parser<'src> {
         // After parsing, the `ctx` and `ctx_stack` should be empty.
         // If it's not, you probably forgot to call `clear_ctx` somewhere.
         assert_eq!(self.ctx, ParserCtxFlags::empty());
-        assert_eq!(&self.ctx_stack, &[]);
         assert_eq!(
             self.current_kind(),
             TokenKind::EndOfFile,
@@ -251,18 +235,22 @@ impl<'src> Parser<'src> {
     }
 
     #[inline]
-    fn set_ctx(&mut self, ctx: ParserCtxFlags) {
-        self.ctx_stack.push(self.ctx);
-        self.ctx = ctx;
+    #[must_use]
+    fn set_ctx(&mut self, ctx: ParserCtxFlags) -> SavedParserContext {
+        SavedParserContext {
+            flags: std::mem::replace(&mut self.ctx, ctx),
+            bomb: DebugDropBomb::new(
+                "You must restore the old parser context explicit by calling `clear_ctx`.",
+            ),
+        }
     }
 
     #[inline]
-    fn clear_ctx(&mut self, ctx: ParserCtxFlags) {
-        assert_eq!(self.ctx, ctx);
-        self.last_ctx = ctx;
-        if let Some(top) = self.ctx_stack.pop() {
-            self.ctx = top;
-        }
+    fn restore_ctx(&mut self, current: ParserCtxFlags, mut saved_context: SavedParserContext) {
+        assert_eq!(self.ctx, current);
+        self.last_ctx = current;
+        saved_context.bomb.defuse();
+        self.ctx = saved_context.flags;
     }
 
     #[inline]
@@ -656,4 +644,10 @@ impl RecoveryContext {
                 .expect("Expected context to be of a single kind.")
         })
     }
+}
+
+#[derive(Debug)]
+struct SavedParserContext {
+    flags: ParserCtxFlags,
+    bomb: DebugDropBomb,
 }

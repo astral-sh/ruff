@@ -389,7 +389,7 @@ impl<'src> Parser<'src> {
     pub(super) fn parse_arguments(&mut self) -> ast::Arguments {
         let start = self.node_start();
 
-        self.set_ctx(ParserCtxFlags::ARGUMENTS);
+        let saved_context = self.set_ctx(ParserCtxFlags::ARGUMENTS);
 
         let mut args: Vec<Expr> = vec![];
         let mut keywords: Vec<ast::Keyword> = vec![];
@@ -473,7 +473,7 @@ impl<'src> Parser<'src> {
                 }
             },
         );
-        self.clear_ctx(ParserCtxFlags::ARGUMENTS);
+        self.restore_ctx(ParserCtxFlags::ARGUMENTS, saved_context);
 
         let arguments = ast::Arguments {
             range: self.node_range(start),
@@ -1086,7 +1086,7 @@ impl<'src> Parser<'src> {
     /// Parses an expression in parentheses, a tuple expression, or a generator expression.
     fn parse_parenthesized_expression(&mut self) -> ParsedExpr {
         let start = self.node_start();
-        self.set_ctx(ParserCtxFlags::PARENTHESIZED_EXPR);
+        let saved_context = self.set_ctx(ParserCtxFlags::PARENTHESIZED_EXPR);
 
         self.bump(TokenKind::Lpar);
 
@@ -1101,7 +1101,7 @@ impl<'src> Parser<'src> {
 
         // Return an empty `TupleExpr` when finding a `)` right after the `(`
         if self.eat(TokenKind::Rpar) {
-            self.clear_ctx(ParserCtxFlags::PARENTHESIZED_EXPR);
+            self.restore_ctx(ParserCtxFlags::PARENTHESIZED_EXPR, saved_context);
 
             return Expr::Tuple(ast::ExprTuple {
                 elts: vec![],
@@ -1148,7 +1148,7 @@ impl<'src> Parser<'src> {
             }
         };
 
-        self.clear_ctx(ParserCtxFlags::PARENTHESIZED_EXPR);
+        self.restore_ctx(ParserCtxFlags::PARENTHESIZED_EXPR, saved_context);
 
         parsed
     }
@@ -1268,9 +1268,9 @@ impl<'src> Parser<'src> {
 
         self.bump(TokenKind::For);
 
-        self.set_ctx(ParserCtxFlags::FOR_TARGET);
+        let saved_context = self.set_ctx(ParserCtxFlags::FOR_TARGET);
         let mut target = self.parse_expression();
-        self.clear_ctx(ParserCtxFlags::FOR_TARGET);
+        self.restore_ctx(ParserCtxFlags::FOR_TARGET, saved_context);
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 

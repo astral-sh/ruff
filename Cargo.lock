@@ -2344,6 +2344,7 @@ dependencies = [
  "annotate-snippets 0.9.2",
  "anyhow",
  "bitflags 2.4.1",
+ "drop_bomb",
  "insta",
  "is-macro",
  "itertools 0.12.0",
