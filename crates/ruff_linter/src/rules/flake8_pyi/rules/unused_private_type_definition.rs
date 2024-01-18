@@ -349,6 +349,21 @@ pub(crate) fn unused_private_typed_dict(
 fn extract_typeddict_name<'a>(stmt: &'a Stmt, semantic: &SemanticModel) -> Option<&'a str> {
     let is_typeddict = |expr: &ast::Expr| semantic.match_typing_expr(expr, "TypedDict");
     match stmt {
+        // E.g. return `Some("Foo")` for the first one of these classes,
+        // and `Some("Bar")` for the second:
+        //
+        // ```python
+        // import typing
+        // from typing import TypedDict
+        //
+        // class Foo(TypedDict):
+        //     x: int
+        //
+        // T = typing.TypeVar("T")
+        //
+        // class Bar(typing.TypedDict, typing.Generic[T]):
+        //     y: T
+        // ```
         Stmt::ClassDef(class_def @ ast::StmtClassDef { name, .. }) => {
             if class_def.bases().iter().any(is_typeddict) {
                 Some(name)
@@ -356,6 +371,13 @@ fn extract_typeddict_name<'a>(stmt: &'a Stmt, semantic: &SemanticModel) -> Optio
                 None
             }
         }
+        // E.g. return `Some("Baz")` for this assignment,
+        // which is an accepted alternative way of creating a TypedDict type:
+        //
+        // ```python
+        // import typing
+        // Baz = typing.TypedDict("Baz", {"z": bytes})
+        // ```
         Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
             let [target] = targets.as_slice() else {
                 return None;
