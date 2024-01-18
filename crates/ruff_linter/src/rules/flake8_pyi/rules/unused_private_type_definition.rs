@@ -323,11 +323,16 @@ pub(crate) fn unused_private_typed_dict(
     scope: &Scope,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
+    let semantic = checker.semantic();
+
     for binding in scope
         .binding_ids()
-        .map(|binding_id| checker.semantic().binding(binding_id))
+        .map(|binding_id| semantic.binding(binding_id))
     {
-        if !(binding.kind.is_class_definition() && binding.is_private_declaration()) {
+        if !binding.is_private_declaration() {
+            continue;
+        }
+        if !(binding.kind.is_class_definition() || binding.kind.is_assignment()) {
             continue;
         }
         if binding.is_used() {
@@ -337,23 +342,64 @@ pub(crate) fn unused_private_typed_dict(
         let Some(source) = binding.source else {
             continue;
         };
-        let Stmt::ClassDef(class_def) = checker.semantic().statement(source) else {
+
+        let Some(class_name) = extract_typeddict_name(semantic.statement(source), semantic) else {
             continue;
         };
 
-        if !class_def
-            .bases()
-            .iter()
-            .any(|base| checker.semantic().match_typing_expr(base, "TypedDict"))
-        {
-            continue;
-        }
-
         diagnostics.push(Diagnostic::new(
             UnusedPrivateTypedDict {
-                name: class_def.name.to_string(),
+                name: class_name.to_string(),
             },
             binding.range(),
         ));
+    }
+}
+
+fn extract_typeddict_name<'a>(stmt: &'a Stmt, semantic: &SemanticModel) -> Option<&'a str> {
+    let is_typeddict = |expr: &ast::Expr| semantic.match_typing_expr(expr, "TypedDict");
+    match stmt {
+        // E.g. return `Some("Foo")` for the first one of these classes,
+        // and `Some("Bar")` for the second:
+        //
+        // ```python
+        // import typing
+        // from typing import TypedDict
+        //
+        // class Foo(TypedDict):
+        //     x: int
+        //
+        // T = typing.TypeVar("T")
+        //
+        // class Bar(typing.TypedDict, typing.Generic[T]):
+        //     y: T
+        // ```
+        Stmt::ClassDef(class_def @ ast::StmtClassDef { name, .. }) => {
+            if class_def.bases().iter().any(is_typeddict) {
+                Some(name)
+            } else {
+                None
+            }
+        }
+        // E.g. return `Some("Baz")` for this assignment,
+        // which is an accepted alternative way of creating a TypedDict type:
+        //
+        // ```python
+        // import typing
+        // Baz = typing.TypedDict("Baz", {"z": bytes})
+        // ```
+        Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+            let [target] = targets.as_slice() else {
+                return None;
+            };
+            let ast::ExprName { id, .. } = target.as_name_expr()?;
+            let ast::ExprCall { func, .. } = value.as_call_expr()?;
+            if is_typeddict(func) {
+                Some(id)
+            } else {
+                None
+            }
+        }
+        _ => None,
     }
 }
