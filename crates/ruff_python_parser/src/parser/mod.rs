@@ -167,7 +167,7 @@ impl<'src> Parser<'src> {
                 range: self.node_range(start),
             })
         } else {
-            let body = self.parse_to_list(
+            let body = self.parse_list(
                 RecoveryContextKind::ModuleStatements,
                 Parser::parse_statement,
             );
@@ -414,19 +414,19 @@ impl<'src> Parser<'src> {
         &self.source[range - self.tokens_range.start()]
     }
 
-    fn parse_to_list<T>(
+    fn parse_list<T>(
         &mut self,
         kind: RecoveryContextKind,
         parse_element: impl Fn(&mut Parser<'src>) -> T,
     ) -> Vec<T> {
         let mut elements = Vec::new();
 
-        self.parse_list(kind, |p| elements.push(parse_element(p)));
+        self.parse_sequence(kind, |p| elements.push(parse_element(p)));
 
         elements
     }
 
-    fn parse_list(
+    fn parse_sequence(
         &mut self,
         kind: RecoveryContextKind,
         mut parse_element: impl FnMut(&mut Parser<'src>),
@@ -464,6 +464,80 @@ impl<'src> Parser<'src> {
         }
 
         self.recovery_context = saved_context;
+    }
+
+    fn parse_delimited_list<T>(
+        &mut self,
+        kind: RecoveryContextKind,
+        parse_element: impl Fn(&mut Parser<'src>) -> T,
+        allow_trailing_comma: bool,
+    ) -> Vec<T> {
+        let mut progress = ParserProgress::default();
+        let mut elements = Vec::new();
+
+        let saved_context = self.recovery_context;
+        self.recovery_context = self
+            .recovery_context
+            .union(RecoveryContext::from_kind(kind));
+
+        let mut trailing_comma_range: Option<TextRange> = None;
+
+        loop {
+            progress.assert_progressing(self);
+
+            if kind.is_list_element(self) {
+                elements.push(parse_element(self));
+
+                let maybe_comma_range = self.current_range();
+                if self.eat(TokenKind::Comma) {
+                    trailing_comma_range = Some(maybe_comma_range);
+                    continue;
+                } else {
+                    trailing_comma_range = None;
+                }
+
+                if kind.is_list_terminator(self) {
+                    break;
+                }
+
+                self.expect(TokenKind::Comma);
+            } else if kind.is_list_terminator(self) {
+                break;
+            } else {
+                // Run the error recovery: This also handles the case when an element is missing between two commas: `a,,b`
+                let should_recover = self.is_enclosing_list_element_or_terminator();
+
+                // Not a recognised element. Add an error and either skip the token or break parsing the list
+                // if the token is recognised as an element or terminator of an enclosing list.
+                let error = kind.create_error(self);
+                self.add_error(error, self.current_range());
+
+                if should_recover {
+                    break;
+                }
+
+                if self.at(TokenKind::Comma) {
+                    trailing_comma_range = Some(self.current_range());
+                } else {
+                    trailing_comma_range = None;
+                }
+
+                self.next_token();
+            }
+        }
+
+        if let Some(trailing_comma) = trailing_comma_range {
+            if !allow_trailing_comma {
+                self.add_error(
+                    ParseErrorType::OtherError("Trailing comma not allowed".to_string()),
+                    trailing_comma,
+                );
+            }
+        }
+
+        self.recovery_context = saved_context;
+
+        elements
     }
 
     #[cold]
@@ -585,7 +659,9 @@ enum RecoveryContextKind {
     Except,
 
     /// When parsing a list of assignment targets
-    AssignmentTarget,
+    AssignmentTargets,
+
+    TypeParams,
 }
 
 impl RecoveryContextKind {
@@ -599,9 +675,23 @@ impl RecoveryContextKind {
             RecoveryContextKind::Except => {
                 matches!(p.current_kind(), TokenKind::Finally | TokenKind::Else)
             }
+
             // TODO: Should `semi` be part of the simple statement recovery set instead?
-            RecoveryContextKind::AssignmentTarget => {
+            RecoveryContextKind::AssignmentTargets => {
                 matches!(p.current_kind(), TokenKind::Newline | TokenKind::Semi)
+            }
+
+            // Tokens other than `]` are for better error recovery: For example, recover when we find the `:` of a clause header or
+            // the equal of a type assignment.
+            RecoveryContextKind::TypeParams => {
+                matches!(
+                    p.current_kind(),
+                    TokenKind::Rsqb
+                        | TokenKind::Newline
+                        | TokenKind::Colon
+                        | TokenKind::Equal
+                        | TokenKind::Lpar
+                )
             }
         }
     }
@@ -612,7 +702,8 @@ impl RecoveryContextKind {
             RecoveryContextKind::BlockStatements => p.is_at_stmt(),
             RecoveryContextKind::Elif => p.at(TokenKind::Elif),
             RecoveryContextKind::Except => p.at(TokenKind::Except),
-            RecoveryContextKind::AssignmentTarget => p.at(TokenKind::Equal),
+            RecoveryContextKind::AssignmentTargets => p.at(TokenKind::Equal),
+            RecoveryContextKind::TypeParams => p.is_at_type_param(),
         }
     }
 
@@ -633,7 +724,7 @@ impl RecoveryContextKind {
                 "An `except` or `finally` clause or the end of the `try` statement expected."
                     .to_string(),
             ),
-            RecoveryContextKind::AssignmentTarget => {
+            RecoveryContextKind::AssignmentTargets => {
                 if p.current_kind().is_keyword() {
                     ParseErrorType::OtherError(
                         "The keyword is not allowed as a variable declaration name".to_string(),
@@ -642,6 +733,9 @@ impl RecoveryContextKind {
                     ParseErrorType::OtherError("Assignment target expected".to_string())
                 }
             }
+            RecoveryContextKind::TypeParams => ParseErrorType::OtherError(
+                "Expected a type parameter or the end of the type parameter list".to_string(),
+            ),
         }
     }
 }
@@ -656,7 +750,8 @@ bitflags! {
         const ELIF = 1 << 2;
         const EXCEPT = 1 << 3;
 
-        const ASSIGNMENT_TARGET = 1 << 4;
+        const ASSIGNMENT_TARGETS = 1 << 4;
+        const TYPE_PARAMS = 1 << 5;
     }
 }
 
@@ -667,7 +762,8 @@ impl RecoveryContext {
             RecoveryContextKind::BlockStatements => RecoveryContext::BLOCK_STATEMENTS,
             RecoveryContextKind::Elif => RecoveryContext::ELIF,
             RecoveryContextKind::Except => RecoveryContext::EXCEPT,
-            RecoveryContextKind::AssignmentTarget => RecoveryContext::ASSIGNMENT_TARGET,
+            RecoveryContextKind::AssignmentTargets => RecoveryContext::ASSIGNMENT_TARGETS,
+            RecoveryContextKind::TypeParams => RecoveryContext::TYPE_PARAMS,
         }
     }
 
@@ -679,7 +775,8 @@ impl RecoveryContext {
             RecoveryContext::MODULE_STATEMENTS => RecoveryContextKind::ModuleStatements,
             RecoveryContext::BLOCK_STATEMENTS => RecoveryContextKind::BlockStatements,
             RecoveryContext::ELIF => RecoveryContextKind::Elif,
-            RecoveryContext::ASSIGNMENT_TARGET => RecoveryContextKind::AssignmentTarget,
+            RecoveryContext::ASSIGNMENT_TARGETS => RecoveryContextKind::AssignmentTargets,
+            RecoveryContext::TYPE_PARAMS => RecoveryContextKind::TypeParams,
             _ => return None,
         })
     }

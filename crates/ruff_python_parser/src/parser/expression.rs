@@ -233,11 +233,9 @@ impl<'src> Parser<'src> {
             if self.current_kind().is_keyword() {
                 let (tok, range) = self.next_token();
                 self.add_error(
-                    ParseErrorType::OtherError(
-                        format!(
-                            "Identifier expected. '{tok}' is a keyword that cannot be used here."
-                        ),
-                    ),
+                    ParseErrorType::OtherError(format!(
+                        "Identifier expected. '{tok}' is a keyword that cannot be used here."
+                    )),
                     range,
                 );
 

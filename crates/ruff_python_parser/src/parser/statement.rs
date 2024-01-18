@@ -514,7 +514,7 @@ impl<'src> Parser<'src> {
         let mut value = self.parse_expression();
 
         if self.at(TokenKind::Equal) {
-            self.parse_list(RecoveryContextKind::AssignmentTarget, |p| {
+            self.parse_sequence(RecoveryContextKind::AssignmentTargets, |p| {
                 p.bump(TokenKind::Equal);
 
                 let mut parsed_expr = p.parse_expression();
@@ -1280,7 +1280,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Indent);
 
         let statements =
-            self.parse_to_list(RecoveryContextKind::BlockStatements, Self::parse_statement);
+            self.parse_list(RecoveryContextKind::BlockStatements, Self::parse_statement);
 
         self.expect(TokenKind::Dedent);
 
@@ -1422,16 +1422,16 @@ impl<'src> Parser<'src> {
 
     fn parse_type_params(&mut self) -> ast::TypeParams {
         let start = self.node_start();
-        let mut type_params = vec![];
-        self.parse_delimited(
+
+        self.bump(TokenKind::Lsqb);
+
+        let type_params = self.parse_delimited_list(
+            RecoveryContextKind::TypeParams,
+            |p| p.parse_type_param(),
             true,
-            TokenKind::Lsqb,
-            TokenKind::Comma,
-            TokenKind::Rsqb,
-            |parser| {
-                type_params.push(parser.parse_type_param());
-            },
         );
+
+        self.expect(TokenKind::Rsqb);
 
         ast::TypeParams {
             range: self.node_range(start),
@@ -1441,6 +1441,13 @@ impl<'src> Parser<'src> {
 
     fn try_parse_type_params(&mut self) -> Option<ast::TypeParams> {
         self.at(TokenKind::Lsqb).then(|| self.parse_type_params())
+    }
+
+    pub(super) fn is_at_type_param(&self) -> bool {
+        matches!(
+            self.current_kind(),
+            TokenKind::Star | TokenKind::DoubleStar | TokenKind::Name
+        ) || self.current_kind().is_keyword()
     }
 
     fn parse_type_param(&mut self) -> ast::TypeParam {
@@ -1463,6 +1470,7 @@ impl<'src> Parser<'src> {
             let bound = self
                 .eat(TokenKind::Colon)
                 .then(|| Box::new(self.parse_conditional_expression_or_higher().expr));
+
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
                 range: self.node_range(start),
                 name,
@@ -1521,10 +1529,10 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Specialized [`Parser::parse_list`] for parsing a sequence of clauses.
+    /// Specialized [`Parser::parse_sequence`] for parsing a sequence of clauses.
     ///
     /// The difference is that the parser only continues parsing for as long as it sees the token indicating the start
-    /// of the specific clause. This is different from [`Parser::parse_list`] that performs error recovery when
+    /// of the specific clause. This is different from [`Parser::parse_sequence`] that performs error recovery when
     /// the next token is not a list terminator or the start of a list element.
     ///
     /// The special method is necessary because Python uses indentation over explicit delimiters to indicate the end of a clause.
