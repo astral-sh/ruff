@@ -256,6 +256,7 @@ impl AnyNode {
             AnyNode::ExprTuple(node) => Some(Expr::Tuple(node)),
             AnyNode::ExprSlice(node) => Some(Expr::Slice(node)),
             AnyNode::ExprIpyEscapeCommand(node) => Some(Expr::IpyEscapeCommand(node)),
+            #[allow(deprecated)]
             AnyNode::ExprInvalid(range) => Some(Expr::Invalid(range)),
 
             AnyNode::ModModule(_)
@@ -430,6 +431,7 @@ impl AnyNode {
             AnyNode::PatternMatchStar(node) => Some(Pattern::MatchStar(node)),
             AnyNode::PatternMatchAs(node) => Some(Pattern::MatchAs(node)),
             AnyNode::PatternMatchOr(node) => Some(Pattern::MatchOr(node)),
+            #[allow(deprecated)]
             AnyNode::PatternMatchInvalid(node) => Some(Pattern::Invalid(node)),
 
             AnyNode::ModModule(_)
@@ -4617,6 +4619,7 @@ impl From<Expr> for AnyNode {
             Expr::Tuple(node) => AnyNode::ExprTuple(node),
             Expr::Slice(node) => AnyNode::ExprSlice(node),
             Expr::IpyEscapeCommand(node) => AnyNode::ExprIpyEscapeCommand(node),
+            #[allow(deprecated)]
             Expr::Invalid(range) => AnyNode::ExprInvalid(range),
         }
     }
@@ -4636,6 +4639,7 @@ impl From<FStringElement> for AnyNode {
         match element {
             FStringElement::Literal(node) => AnyNode::FStringLiteralElement(node),
             FStringElement::Expression(node) => AnyNode::FStringExpressionElement(node),
+            #[allow(deprecated)]
             FStringElement::Invalid(node) => AnyNode::FStringInvalidElement(node),
         }
     }
@@ -4652,6 +4656,7 @@ impl From<Pattern> for AnyNode {
             Pattern::MatchStar(node) => AnyNode::PatternMatchStar(node),
             Pattern::MatchAs(node) => AnyNode::PatternMatchAs(node),
             Pattern::MatchOr(node) => AnyNode::PatternMatchOr(node),
+            #[allow(deprecated)]
             Pattern::Invalid(node) => AnyNode::PatternMatchInvalid(node),
         }
     }
@@ -6851,6 +6856,7 @@ impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
             Expr::Tuple(node) => AnyNodeRef::ExprTuple(node),
             Expr::Slice(node) => AnyNodeRef::ExprSlice(node),
             Expr::IpyEscapeCommand(node) => AnyNodeRef::ExprIpyEscapeCommand(node),
+            #[allow(deprecated)]
             Expr::Invalid(node) => AnyNodeRef::ExprInvalid(node),
         }
     }
@@ -6870,6 +6876,7 @@ impl<'a> From<&'a FStringElement> for AnyNodeRef<'a> {
         match element {
             FStringElement::Expression(node) => AnyNodeRef::FStringExpressionElement(node),
             FStringElement::Literal(node) => AnyNodeRef::FStringLiteralElement(node),
+            #[allow(deprecated)]
             FStringElement::Invalid(node) => AnyNodeRef::FStringInvalidElement(node),
         }
     }
@@ -6886,6 +6893,7 @@ impl<'a> From<&'a Pattern> for AnyNodeRef<'a> {
             Pattern::MatchStar(node) => AnyNodeRef::PatternMatchStar(node),
             Pattern::MatchAs(node) => AnyNodeRef::PatternMatchAs(node),
             Pattern::MatchOr(node) => AnyNodeRef::PatternMatchOr(node),
+            #[allow(deprecated)]
             Pattern::Invalid(node) => AnyNodeRef::PatternMatchInvalid(node),
         }
     }

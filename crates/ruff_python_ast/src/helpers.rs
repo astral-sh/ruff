@@ -258,8 +258,10 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         | Expr::BooleanLiteral(_)
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_)
-        | Expr::IpyEscapeCommand(_)
-        | Expr::Invalid(_) => false,
+        | Expr::IpyEscapeCommand(_) => false,
+
+        #[allow(deprecated)]
+        Expr::Invalid(_) => false,
     }
 }
 
@@ -278,6 +280,7 @@ pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool
         Pattern::MatchValue(ast::PatternMatchValue { value, range: _ }) => {
             any_over_expr(value, func)
         }
+        #[allow(deprecated)]
         Pattern::MatchSingleton(_) | Pattern::Invalid(_) => false,
         Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ }) => patterns
             .iter()
@@ -314,6 +317,7 @@ pub fn any_over_f_string_element(
     func: &dyn Fn(&Expr) -> bool,
 ) -> bool {
     match element {
+        #[allow(deprecated)]
         ast::FStringElement::Literal(_) | ast::FStringElement::Invalid(_) => false,
         ast::FStringElement::Expression(ast::FStringExpressionElement {
             expression,
@@ -1296,6 +1300,7 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
             Expr::Name(_) => false,
             Expr::Slice(_) => false,
             Expr::IpyEscapeCommand(_) => false,
+            #[allow(deprecated)]
             Expr::Invalid(_) => false,
 
             // These literals may or may not be empty.
@@ -1311,6 +1316,7 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
             f_string.elements.iter().all(|element| match element {
                 FStringElement::Literal(string_literal) => !string_literal.is_empty(),
                 FStringElement::Expression(f_string) => inner(&f_string.expression),
+                #[allow(deprecated)]
                 FStringElement::Invalid(_) => false,
             })
         }
@@ -1335,6 +1341,7 @@ fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
                             expression,
                             ..
                         }) => inner(expression),
+                        #[allow(deprecated)]
                         FStringElement::Invalid(_) => false,
                     })
             }
@@ -1348,6 +1355,7 @@ fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
             f_string.elements.iter().all(|element| match element {
                 FStringElement::Literal(string_literal) => string_literal.is_empty(),
                 FStringElement::Expression(f_string) => inner(&f_string.expression),
+                #[allow(deprecated)]
                 FStringElement::Invalid(_) => false,
             })
         }

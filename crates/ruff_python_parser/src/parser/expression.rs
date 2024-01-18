@@ -408,6 +408,7 @@ impl<'src> Parser<'src> {
         let mut has_seen_kw_arg = false;
         let mut has_seen_kw_unpack = false;
 
+        #[allow(deprecated)]
         self.parse_delimited(
             true,
             TokenKind::Lpar,
@@ -518,6 +519,7 @@ impl<'src> Parser<'src> {
 
             let range = self.node_range(start);
             self.add_error(ParseErrorType::EmptySlice, range);
+            #[allow(deprecated)]
             return ast::ExprSubscript {
                 value: Box::new(value),
                 slice: Box::new(Expr::Invalid(ast::ExprInvalid {
@@ -534,6 +536,7 @@ impl<'src> Parser<'src> {
 
         if self.eat(TokenKind::Comma) {
             let mut slices = vec![slice];
+            #[allow(deprecated)]
             self.parse_separated(
                 true,
                 TokenKind::Comma,
@@ -778,6 +781,7 @@ impl<'src> Parser<'src> {
                         range,
                     })
                 }
+                #[allow(deprecated)]
                 StringType::Invalid(invalid) => Expr::Invalid(ast::ExprInvalid {
                     value: invalid.value,
                     range,
@@ -788,6 +792,7 @@ impl<'src> Parser<'src> {
 
         concatenated_strings(strings, range).unwrap_or_else(|error| {
             self.add_error(ParseErrorType::Lexical(error.error), error.location);
+            #[allow(deprecated)]
             Expr::Invalid(ast::ExprInvalid {
                 value: self.src_text(error.location).into(),
                 range: error.location,
@@ -861,6 +866,7 @@ impl<'src> Parser<'src> {
         concatenated_strings(strings, range).unwrap_or_else(|error| {
             self.add_error(ParseErrorType::Lexical(error.error), error.location);
 
+            #[allow(deprecated)]
             Expr::Invalid(ast::ExprInvalid {
                 value: self.src_text(error.location).into(),
                 range: error.location,
@@ -906,7 +912,7 @@ impl<'src> Parser<'src> {
                                 ParseErrorType::Lexical(lex_error.error),
                                 lex_error.location,
                             );
-
+                            #[allow(deprecated)]
                             ast::FStringElement::Invalid(ast::FStringInvalidElement {
                                 value: self.src_text(lex_error.location).into(),
                                 range: lex_error.location,
@@ -1185,6 +1191,7 @@ impl<'src> Parser<'src> {
 
         let mut elts = vec![first_element];
 
+        #[allow(deprecated)]
         self.parse_separated(true, TokenKind::Comma, Self::END_SEQUENCE_SET, |parser| {
             elts.push(parse_func(parser).expr);
         });
@@ -1208,6 +1215,7 @@ impl<'src> Parser<'src> {
 
         let mut elts = vec![first_element];
 
+        #[allow(deprecated)]
         self.parse_separated(true, TokenKind::Comma, Self::END_SEQUENCE_SET, |parser| {
             elts.push(parser.parse_named_expression_or_higher().expr);
         });
@@ -1228,6 +1236,7 @@ impl<'src> Parser<'src> {
 
         let mut elts = vec![first_element];
 
+        #[allow(deprecated)]
         self.parse_separated(true, TokenKind::Comma, Self::END_SEQUENCE_SET, |parser| {
             elts.push(parser.parse_named_expression_or_higher().expr);
         });
@@ -1253,6 +1262,7 @@ impl<'src> Parser<'src> {
         let mut keys = vec![key];
         let mut values = vec![value];
 
+        #[allow(deprecated)]
         self.parse_separated(true, TokenKind::Comma, Self::END_SEQUENCE_SET, |parser| {
             if parser.eat(TokenKind::DoubleStar) {
                 keys.push(None);

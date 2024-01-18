@@ -93,11 +93,9 @@ pub(crate) struct Parser<'src> {
 
 const NEWLINE_EOF_SET: TokenSet = TokenSet::new([TokenKind::Newline, TokenKind::EndOfFile]);
 const LITERAL_SET: TokenSet = TokenSet::new([
-    TokenKind::Name,
     TokenKind::Int,
     TokenKind::Float,
     TokenKind::Complex,
-    TokenKind::Plus,
     TokenKind::String,
     TokenKind::Ellipsis,
     TokenKind::True,
@@ -106,11 +104,12 @@ const LITERAL_SET: TokenSet = TokenSet::new([
 ]);
 /// Tokens that are usually an expression or the start of one.
 const EXPR_SET: TokenSet = TokenSet::new([
+    TokenKind::Name,
     TokenKind::Minus,
+    TokenKind::Plus,
     TokenKind::Tilde,
     TokenKind::Star,
     TokenKind::DoubleStar,
-    TokenKind::Vbar,
     TokenKind::Lpar,
     TokenKind::Lbrace,
     TokenKind::Lsqb,
@@ -388,6 +387,8 @@ impl<'src> Parser<'src> {
     }
 
     /// Skip tokens until [`TokenSet`]. Returns the range of the skipped tokens.
+
+    #[deprecated(note = "We should not perform error recovery outside of lists. Remove")]
     fn skip_until(&mut self, token_set: TokenSet) {
         let mut progress = ParserProgress::default();
         while !self.at_ts(token_set) {
@@ -485,6 +486,8 @@ impl<'src> Parser<'src> {
         loop {
             progress.assert_progressing(self);
 
+            self.current_kind();
+
             if kind.is_list_element(self) {
                 elements.push(parse_element(self));
 
@@ -553,6 +556,7 @@ impl<'src> Parser<'src> {
 
     /// Parses elements enclosed within a delimiter pair, such as parentheses, brackets,
     /// or braces.
+    #[deprecated(note = "Use `parse_delimited_list` instead.")]
     fn parse_delimited(
         &mut self,
         allow_trailing_delim: bool,
@@ -563,6 +567,7 @@ impl<'src> Parser<'src> {
     ) {
         self.bump(opening);
 
+        #[allow(deprecated)]
         self.parse_separated(allow_trailing_delim, delim, [closing], func);
 
         self.expect(closing);
@@ -572,6 +577,7 @@ impl<'src> Parser<'src> {
     /// parsing upon encountering any of the tokens in `ending_set`, if it doesn't
     /// encounter the tokens in `ending_set` it stops parsing when seeing the `EOF`
     /// or `Newline` token.
+    #[deprecated(note = "Use `parse_delimited_list` instead.")]
     fn parse_separated(
         &mut self,
         allow_trailing_delim: bool,
@@ -662,6 +668,8 @@ enum RecoveryContextKind {
     AssignmentTargets,
 
     TypeParams,
+
+    ImportNames,
 }
 
 impl RecoveryContextKind {
@@ -693,6 +701,9 @@ impl RecoveryContextKind {
                         | TokenKind::Lpar
                 )
             }
+            RecoveryContextKind::ImportNames => {
+                matches!(p.current_kind(), TokenKind::Rpar | TokenKind::Newline)
+            }
         }
     }
 
@@ -704,6 +715,9 @@ impl RecoveryContextKind {
             RecoveryContextKind::Except => p.at(TokenKind::Except),
             RecoveryContextKind::AssignmentTargets => p.at(TokenKind::Equal),
             RecoveryContextKind::TypeParams => p.is_at_type_param(),
+            RecoveryContextKind::ImportNames => {
+                matches!(p.current_kind(), TokenKind::Star | TokenKind::Name)
+            }
         }
     }
 
@@ -736,6 +750,9 @@ impl RecoveryContextKind {
             RecoveryContextKind::TypeParams => ParseErrorType::OtherError(
                 "Expected a type parameter or the end of the type parameter list".to_string(),
             ),
+            RecoveryContextKind::ImportNames => {
+                ParseErrorType::OtherError("Expected an import name or a ')'".to_string())
+            }
         }
     }
 }
@@ -752,6 +769,8 @@ bitflags! {
 
         const ASSIGNMENT_TARGETS = 1 << 4;
         const TYPE_PARAMS = 1 << 5;
+
+        const IMPORT_NAMES = 1 << 6;
     }
 }
 
@@ -764,6 +783,7 @@ impl RecoveryContext {
             RecoveryContextKind::Except => RecoveryContext::EXCEPT,
             RecoveryContextKind::AssignmentTargets => RecoveryContext::ASSIGNMENT_TARGETS,
             RecoveryContextKind::TypeParams => RecoveryContext::TYPE_PARAMS,
+            RecoveryContextKind::ImportNames => RecoveryContext::IMPORT_NAMES,
         }
     }
 
@@ -777,6 +797,7 @@ impl RecoveryContext {
             RecoveryContext::ELIF => RecoveryContextKind::Elif,
             RecoveryContext::ASSIGNMENT_TARGETS => RecoveryContextKind::AssignmentTargets,
             RecoveryContext::TYPE_PARAMS => RecoveryContextKind::TypeParams,
+            RecoveryContext::IMPORT_NAMES => RecoveryContextKind::ImportNames,
             _ => return None,
         })
     }
