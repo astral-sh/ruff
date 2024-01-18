@@ -211,15 +211,13 @@ pub fn parse_expression(source: &str) -> Result<Expr, ParseError> {
 /// Parsing a single expression denoting the addition of two numbers, but this time specifying a different,
 /// somewhat silly, location:
 ///
-// FIXME(micha): This test does currently not work because the created EOF token uses `source.text_len()` which is less than
-// the original source code length. Not sure what's the best solution: Pass the offset to the a parser? Require to pass the entire source and a text range that should be parsed?
-// ```
-// use ruff_python_parser::{parse_expression_starts_at};
-// # use ruff_text_size::TextSize;
-//
-// let expr = parse_expression_starts_at("1 + 2", TextSize::from(400));
-// assert!(expr.is_ok());
-// ```
+/// ```
+/// use ruff_python_parser::{parse_expression_starts_at};
+/// # use ruff_text_size::TextSize;
+///
+/// let expr = parse_expression_starts_at("1 + 2", TextSize::from(400));
+/// assert!(expr.is_ok());
+/// ```
 pub fn parse_expression_starts_at(source: &str, offset: TextSize) -> Result<Expr, ParseError> {
     let lexer = lex_starts_at(source, Mode::Module, offset).collect();
     match parse_tokens(lexer, source, Mode::Expression)? {

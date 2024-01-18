@@ -2,7 +2,7 @@ use bitflags::bitflags;
 
 use ast::Mod;
 use ruff_python_ast::{self as ast, Stmt};
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::lexer::lex;
 use crate::parser::progress::ParserProgress;
@@ -91,6 +91,13 @@ pub(crate) struct Parser<'src> {
 
     /// The end of the last processed. Used to determine a node's end.
     last_token_end: TextSize,
+
+    /// The range of the tokens to parse.
+    ///
+    /// The range is equal to [0; source.len()) when parsing an entire file.
+    /// The range can be different when parsing only a part of a file using the `lex_starts_at` and `parse_expression_starts_at` APIs
+    /// in which case the the range is equal to [offset; subrange.len()).
+    tokens_range: TextRange,
 }
 
 const NEWLINE_EOF_SET: TokenSet = TokenSet::new(&[TokenKind::Newline, TokenKind::EndOfFile]);
@@ -126,9 +133,14 @@ const EXPR_SET: TokenSet = TokenSet::new(&[
 
 impl<'src> Parser<'src> {
     pub(crate) fn new(source: &'src str, mode: Mode, mut tokens: TokenSource) -> Parser<'src> {
+        let tokens_range = TextRange::new(
+            tokens.position().unwrap_or_default(),
+            tokens.end().unwrap_or_default(),
+        );
+
         let current = tokens
             .next()
-            .unwrap_or_else(|| (Tok::EndOfFile, TextRange::empty(source.text_len())));
+            .unwrap_or_else(|| (Tok::EndOfFile, TextRange::empty(tokens_range.end())));
 
         Parser {
             mode,
@@ -138,8 +150,9 @@ impl<'src> Parser<'src> {
             ctx: ParserCtxFlags::empty(),
             last_ctx: ParserCtxFlags::empty(),
             tokens,
-            last_token_end: TextSize::default(),
+            last_token_end: tokens_range.start(),
             current,
+            tokens_range,
         }
     }
 
@@ -150,20 +163,22 @@ impl<'src> Parser<'src> {
             let start = self.node_start();
             let parsed_expr = self.parse_expression();
             let mut progress = ParserProgress::default();
+
+            // TODO: How should error recovery work here? Just truncate after the expression?
             loop {
                 progress.assert_progressing(&self);
                 if !self.eat(TokenKind::Newline) {
                     break;
                 }
             }
-            self.expect(TokenKind::EndOfFile);
+            self.bump(TokenKind::EndOfFile);
 
             ast::Mod::Expression(ast::ModExpression {
                 body: Box::new(parsed_expr.expr),
                 range: self.node_range(start),
             })
         } else {
-            let is_src_empty = self.at(TokenKind::EndOfFile);
+            let start = self.tokens_range.start();
             let mut progress = ParserProgress::default();
             while !self.at(TokenKind::EndOfFile) {
                 progress.assert_progressing(&self);
@@ -179,22 +194,15 @@ impl<'src> Parser<'src> {
                     self.next_token();
                 }
             }
+
+            self.bump(TokenKind::EndOfFile);
+
             ast::Mod::Module(ast::ModModule {
                 body,
                 // If the `source` only contains comments or empty spaces, return
                 // an empty range.
                 // FIXME(micha): The module should always enclose the entire file
-                range: if is_src_empty {
-                    TextRange::default()
-                } else {
-                    TextRange::new(
-                        0.into(),
-                        self.source
-                            .len()
-                            .try_into()
-                            .expect("source length is  bigger than u32 max"),
-                    )
-                },
+                range: self.node_range(start),
             })
         };
 
@@ -284,7 +292,7 @@ impl<'src> Parser<'src> {
         let next = self
             .tokens
             .next()
-            .unwrap_or_else(|| (Tok::EndOfFile, TextRange::empty(self.source.text_len())));
+            .unwrap_or_else(|| (Tok::EndOfFile, TextRange::empty(self.tokens_range.end())));
 
         let current = std::mem::replace(&mut self.current, next);
 
@@ -404,25 +412,10 @@ impl<'src> Parser<'src> {
     where
         T: Ranged,
     {
-        // This check is to prevent the parser from panicking when using the
-        // `parse_expression_starts_at` function with an offset bigger than zero.
-        //
-        // The parser assumes that the token's range values are smaller than
-        // the source length. But, with an offset bigger than zero, it can
-        // happen that the token's range values are bigger than the source
-        // length, causing the parser to panic when calling this function
-        // with such ranges.
-        //
-        // Therefore, we fix this by creating a new range starting at 0 up to
-        // the source length - 1.
-        //
-        // TODO: Create the proper range here.
-        let src_len = self.source.len();
-        let mut range = ranged.range();
-        if range.start().to_usize() > src_len || range.end().to_usize() > src_len {
-            range = TextRange::new(0.into(), self.source.text_len() - TextSize::from(1));
-        }
-        &self.source[range]
+        let range = ranged.range();
+        // `ranged` uses absolute ranges to the source text of an entire file.
+        // Fix the source by subtracting the start offset when parsing only a part of a file (when parsing the tokens from `lex_starts_at`).
+        &self.source[range - self.tokens_range.start()]
     }
 
     /// Parses elements enclosed within a delimiter pair, such as parentheses, brackets,

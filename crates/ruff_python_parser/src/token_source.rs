@@ -1,6 +1,6 @@
 use crate::lexer::{LexResult, LexicalError, Spanned};
 use crate::{Tok, TokenKind};
-use ruff_text_size::TextRange;
+use ruff_text_size::{TextRange, TextSize};
 use std::iter::FusedIterator;
 
 #[derive(Clone, Debug)]
@@ -15,6 +15,32 @@ impl TokenSource {
             tokens: tokens.into_iter(),
             errors: Vec::new(),
         }
+    }
+
+    /// Returns the position of the current token.
+    ///
+    /// This is the position before any whitespace or comments.
+    pub(crate) fn position(&self) -> Option<TextSize> {
+        let first = self.tokens.as_slice().first()?;
+
+        let range = match first {
+            Ok((_, range)) => *range,
+            Err(LexicalError { location, .. }) => *location,
+        };
+
+        Some(range.start())
+    }
+
+    /// Returns the end of the last token
+    pub(crate) fn end(&self) -> Option<TextSize> {
+        let last = self.tokens.as_slice().last()?;
+
+        let range = match last {
+            Ok((_, range)) => *range,
+            Err(LexicalError { location, .. }) => *location,
+        };
+
+        Some(range.end())
     }
 
     pub(crate) fn peek_nth(&self, mut n: usize) -> Option<(TokenKind, TextRange)> {

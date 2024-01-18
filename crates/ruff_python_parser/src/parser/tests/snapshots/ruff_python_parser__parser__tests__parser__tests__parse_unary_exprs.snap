@@ -5,7 +5,7 @@ expression: "parse(\"\n-1\n+1\n~1\n-1 + 2\n---1\nnot x\n    \")"
 Program {
     ast: Module(
         ModModule {
-            range: 0..32,
+            range: 0..28,
             body: [
                 Expr(
                     StmtExpr {
