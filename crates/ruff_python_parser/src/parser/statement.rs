@@ -1,24 +1,23 @@
+use std::fmt::Display;
+
 use ruff_python_ast::{
     self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt,
 };
 use ruff_text_size::{Ranged, TextSize};
-use std::fmt::Display;
 
 use crate::parser::expression::ParsedExpr;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
-    helpers, FunctionKind, Parser, ParserCtxFlags, EXPR_SET, LITERAL_SET, NEWLINE_EOF_SET,
+    helpers, FunctionKind, Parser, ParserCtxFlags, RecoveryContextKind, EXPR_SET, LITERAL_SET,
 };
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, Tok, TokenKind};
 
 /// Tokens that can appear after an expression.
 /// Tokens that represent compound statements.
-const COMPOUND_STMT_SET: TokenSet = TokenSet::new(&[
+const COMPOUND_STMT_SET: TokenSet = TokenSet::new([
     TokenKind::Match,
     TokenKind::If,
-    TokenKind::Else,
-    TokenKind::Elif,
     TokenKind::With,
     TokenKind::While,
     TokenKind::For,
@@ -30,7 +29,7 @@ const COMPOUND_STMT_SET: TokenSet = TokenSet::new(&[
 ]);
 
 /// Tokens that represent simple statements, but doesn't include expressions.
-const SIMPLE_STMT_SET: TokenSet = TokenSet::new(&[
+const SIMPLE_STMT_SET: TokenSet = TokenSet::new([
     TokenKind::Pass,
     TokenKind::Return,
     TokenKind::Break,
@@ -50,6 +49,8 @@ const SIMPLE_STMT_SET: TokenSet = TokenSet::new(&[
 /// Tokens that represent simple statements, including expressions.
 const SIMPLE_STMT_SET2: TokenSet = SIMPLE_STMT_SET.union(EXPR_SET);
 
+const STMTS_SET: TokenSet = SIMPLE_STMT_SET2.union(COMPOUND_STMT_SET);
+
 impl<'src> Parser<'src> {
     fn at_compound_stmt(&self) -> bool {
         self.at_ts(COMPOUND_STMT_SET)
@@ -60,7 +61,7 @@ impl<'src> Parser<'src> {
     }
 
     pub(super) fn is_at_stmt(&self) -> bool {
-        self.at_simple_stmt() || self.at_compound_stmt()
+        self.at_ts(STMTS_SET)
     }
 
     /// Parses a compound or a simple statement.
@@ -224,27 +225,22 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Del);
         let mut targets = vec![];
 
-        self.parse_separated(
-            true,
-            TokenKind::Comma,
-            [TokenKind::Newline].as_slice(),
-            |parser| {
-                let mut target = parser.parse_conditional_expression_or_higher();
-                helpers::set_expr_ctx(&mut target.expr, ExprContext::Del);
+        self.parse_separated(true, TokenKind::Comma, [TokenKind::Newline], |parser| {
+            let mut target = parser.parse_conditional_expression_or_higher();
+            helpers::set_expr_ctx(&mut target.expr, ExprContext::Del);
 
-                if matches!(target.expr, Expr::BoolOp(_) | Expr::Compare(_)) {
-                    // Should we make `target` an `Expr::Invalid` here?
-                    parser.add_error(
-                        ParseErrorType::OtherError(format!(
-                            "`{}` not allowed in `del` statement",
-                            parser.src_text(&target.expr)
-                        )),
-                        &target.expr,
-                    );
-                }
-                targets.push(target.expr);
-            },
-        );
+            if matches!(target.expr, Expr::BoolOp(_) | Expr::Compare(_)) {
+                // Should we make `target` an `Expr::Invalid` here?
+                parser.add_error(
+                    ParseErrorType::OtherError(format!(
+                        "`{}` not allowed in `del` statement",
+                        parser.src_text(&target.expr)
+                    )),
+                    &target.expr,
+                );
+            }
+            targets.push(target.expr);
+        });
 
         ast::StmtDelete {
             targets,
@@ -321,14 +317,9 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Import);
 
         let mut names = vec![];
-        self.parse_separated(
-            false,
-            TokenKind::Comma,
-            [TokenKind::Newline].as_slice(),
-            |parser| {
-                names.push(parser.parse_alias());
-            },
-        );
+        self.parse_separated(false, TokenKind::Comma, [TokenKind::Newline], |parser| {
+            names.push(parser.parse_alias());
+        });
 
         ast::StmtImport {
             range: self.node_range(start),
@@ -337,7 +328,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_from_import_statement(&mut self) -> ast::StmtImportFrom {
-        const DOT_ELLIPSIS_SET: TokenSet = TokenSet::new(&[TokenKind::Dot, TokenKind::Ellipsis]);
+        const DOT_ELLIPSIS_SET: TokenSet = TokenSet::new([TokenKind::Dot, TokenKind::Ellipsis]);
 
         let start = self.node_start();
         self.bump(TokenKind::From);
@@ -384,14 +375,9 @@ impl<'src> Parser<'src> {
                 },
             );
         } else {
-            self.parse_separated(
-                false,
-                TokenKind::Comma,
-                [TokenKind::Newline].as_slice(),
-                |parser| {
-                    names.push(parser.parse_alias());
-                },
-            );
+            self.parse_separated(false, TokenKind::Comma, [TokenKind::Newline], |parser| {
+                names.push(parser.parse_alias());
+            });
         };
 
         ast::StmtImportFrom {
@@ -448,14 +434,9 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Global);
 
         let mut names = vec![];
-        self.parse_separated(
-            false,
-            TokenKind::Comma,
-            [TokenKind::Newline].as_slice(),
-            |parser| {
-                names.push(parser.parse_identifier());
-            },
-        );
+        self.parse_separated(false, TokenKind::Comma, [TokenKind::Newline], |parser| {
+            names.push(parser.parse_identifier());
+        });
 
         ast::StmtGlobal {
             range: self.node_range(start),
@@ -469,14 +450,9 @@ impl<'src> Parser<'src> {
 
         let mut names = vec![];
 
-        self.parse_separated(
-            false,
-            TokenKind::Comma,
-            [TokenKind::Newline].as_slice(),
-            |parser| {
-                names.push(parser.parse_identifier());
-            },
-        );
+        self.parse_separated(false, TokenKind::Comma, [TokenKind::Newline], |parser| {
+            names.push(parser.parse_identifier());
+        });
 
         ast::StmtNonlocal {
             range: self.node_range(start),
@@ -640,21 +616,15 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_if_statement(&mut self) -> ast::StmtIf {
-        const ELSE_ELIF_SET: TokenSet = TokenSet::new(&[TokenKind::Else, TokenKind::Elif]);
-
         let if_start = self.node_start();
         self.bump(TokenKind::If);
 
         let test = self.parse_named_expression_or_higher();
         self.expect(TokenKind::Colon);
 
-        let body = self.parse_block(Clause::If);
+        let body = self.parse_body(Clause::If);
 
-        let elif_else_clauses = if self.at_ts(ELSE_ELIF_SET) {
-            self.parse_elif_else_clauses()
-        } else {
-            vec![]
-        };
+        let elif_else_clauses = self.parse_elif_else_clauses();
 
         ast::StmtIf {
             test: Box::new(test.expr),
@@ -665,42 +635,51 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_elif_else_clauses(&mut self) -> Vec<ast::ElifElseClause> {
-        let mut elif_else_stmts = vec![];
-        let mut progress = ParserProgress::default();
+        // Note: Terminators needing to be any statement is a bit an annoyance.
+        // Doesn't work well because it doesn't have an explicit terminator.
+        // Instead it's more a take_while.
+        //
+        // Support two different recovery strategies? One for terminated statements
+        // and one for unterminated ones? Or use the same logic but it uses a different loop
+        // that doesn't end on a terminator but on the first unrecognized token?
+        // it's still terminated but only by the `Else` keyword.
+        // Still pushing `is_terminator` and `is_element` is important for recovery inside of
+        // the if body to work as expected.
+        // Maybe add a `parse_clauses` method that's similar to `parse_list` but parses a list of clauses.
+        let mut elif_else_clauses = if self.at(TokenKind::Elif) {
+            self.parse_list(RecoveryContextKind::Elif, |p| {
+                let elif_start = p.node_start();
+                p.bump(TokenKind::Elif);
 
-        while self.at(TokenKind::Elif) {
-            progress.assert_progressing(self);
+                let test = p.parse_named_expression_or_higher();
+                p.expect(TokenKind::Colon);
 
-            let elif_start = self.node_start();
-            self.bump(TokenKind::Elif);
+                let body = p.parse_body(Clause::ElIf);
 
-            let test = self.parse_named_expression_or_higher();
+                ast::ElifElseClause {
+                    test: Some(test.expr),
+                    body,
+                    range: p.node_range(elif_start),
+                }
+            })
+        } else {
+            Vec::new()
+        };
+
+        let else_start = self.node_start();
+        if self.eat(TokenKind::Else) {
             self.expect(TokenKind::Colon);
 
-            let body = self.parse_block(Clause::ElIf);
+            let body = self.parse_body(Clause::Else);
 
-            elif_else_stmts.push(ast::ElifElseClause {
-                test: Some(test.expr),
-                body,
-                range: self.node_range(elif_start),
-            });
-        }
-
-        if self.at(TokenKind::Else) {
-            let else_start = self.node_start();
-            self.bump(TokenKind::Else);
-            self.expect(TokenKind::Colon);
-
-            let body = self.parse_block(Clause::Else);
-
-            elif_else_stmts.push(ast::ElifElseClause {
+            elif_else_clauses.push(ast::ElifElseClause {
                 test: None,
                 body,
                 range: self.node_range(else_start),
             });
         }
 
-        elif_else_stmts
+        elif_else_clauses
     }
 
     fn parse_try_statement(&mut self) -> ast::StmtTry {
@@ -710,7 +689,7 @@ impl<'src> Parser<'src> {
 
         let mut is_star = false;
 
-        let try_body = self.parse_block(Clause::Try);
+        let try_body = self.parse_body(Clause::Try);
 
         let mut handlers = vec![];
 
@@ -750,7 +729,7 @@ impl<'src> Parser<'src> {
 
             self.expect(TokenKind::Colon);
 
-            let except_body = self.parse_block(Clause::Except);
+            let except_body = self.parse_body(Clause::Except);
 
             let except_range = self.node_range(except_start);
             handlers.push(ExceptHandler::ExceptHandler(
@@ -769,14 +748,14 @@ impl<'src> Parser<'src> {
 
         let orelse = if self.eat(TokenKind::Else) {
             self.expect(TokenKind::Colon);
-            self.parse_block(Clause::Else)
+            self.parse_body(Clause::Else)
         } else {
             vec![]
         };
 
         let (finalbody, has_finally) = if self.eat(TokenKind::Finally) {
             self.expect(TokenKind::Colon);
-            (self.parse_block(Clause::Finally), true)
+            (self.parse_body(Clause::Finally), true)
         } else {
             (vec![], false)
         };
@@ -818,12 +797,12 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Colon);
 
-        let body = self.parse_block(Clause::For);
+        let body = self.parse_body(Clause::For);
 
         let orelse = if self.eat(TokenKind::Else) {
             self.expect(TokenKind::Colon);
 
-            self.parse_block(Clause::Else)
+            self.parse_body(Clause::Else)
         } else {
             vec![]
         };
@@ -845,11 +824,11 @@ impl<'src> Parser<'src> {
         let test = self.parse_named_expression_or_higher();
         self.expect(TokenKind::Colon);
 
-        let body = self.parse_block(Clause::While);
+        let body = self.parse_body(Clause::While);
 
         let orelse = if self.eat(TokenKind::Else) {
             self.expect(TokenKind::Colon);
-            self.parse_block(Clause::Else)
+            self.parse_body(Clause::Else)
         } else {
             vec![]
         };
@@ -892,7 +871,7 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Colon);
 
-        let body = self.parse_block(Clause::FunctionDef);
+        let body = self.parse_body(Clause::FunctionDef);
 
         ast::StmtFunctionDef {
             name,
@@ -921,7 +900,7 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Colon);
 
-        let body = self.parse_block(Clause::Class);
+        let body = self.parse_body(Clause::Class);
 
         ast::StmtClassDef {
             range: self.node_range(start_offset),
@@ -939,7 +918,7 @@ impl<'src> Parser<'src> {
         let items = self.parse_with_items();
         self.expect(TokenKind::Colon);
 
-        let body = self.parse_block(Clause::With);
+        let body = self.parse_body(Clause::With);
 
         ast::StmtWith {
             items,
@@ -1056,7 +1035,7 @@ impl<'src> Parser<'src> {
             // Only allow a trailing delimiter if we've seen a `(`.
             has_seen_lpar,
             TokenKind::Comma,
-            ending.as_slice(),
+            ending,
             |parser| {
                 items.push(parser.parse_with_item());
             },
@@ -1213,7 +1192,7 @@ impl<'src> Parser<'src> {
             .then(|| Box::new(self.parse_named_expression_or_higher().expr));
 
         self.expect(TokenKind::Colon);
-        let body = self.parse_block(Clause::Match);
+        let body = self.parse_body(Clause::Match);
 
         ast::MatchCase {
             pattern,
@@ -1297,50 +1276,36 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_block(&mut self, parent_clause: Clause) -> Vec<Stmt> {
-        let mut stmts = vec![];
-
-        // Check if we are currently at a simple statement
-        if !self.eat(TokenKind::Newline) && self.at_simple_stmt() {
+    /// Parses a single statement that's on the same line as the clause header or
+    /// an indented block.
+    fn parse_body(&mut self, parent_clause: Clause) -> Vec<Stmt> {
+        if self.eat(TokenKind::Newline) {
+            if self.at(TokenKind::Indent) {
+                return self.parse_block();
+            }
+        } else if self.at_simple_stmt() {
             return self.parse_simple_statements();
         }
 
-        if self.eat(TokenKind::Indent) {
-            const BODY_END_SET: TokenSet =
-                TokenSet::new(&[TokenKind::Dedent]).union(NEWLINE_EOF_SET);
-            let mut progress = ParserProgress::default();
+        self.add_error(
+            ParseErrorType::OtherError(format!(
+                "expected a single statement or an indented body after {parent_clause}"
+            )),
+            self.current_range(),
+        );
 
-            while !self.at_ts(BODY_END_SET) {
-                progress.assert_progressing(self);
+        Vec::new()
+    }
 
-                if self.at(TokenKind::Indent) {
-                    self.handle_unexpected_indentation(
-                        &mut stmts,
-                        "indentation doesn't match previous indentation",
-                    );
-                    continue;
-                }
+    fn parse_block(&mut self) -> Vec<Stmt> {
+        self.bump(TokenKind::Indent);
 
-                if self.is_at_stmt() {
-                    stmts.push(self.parse_statement());
-                } else {
-                    // SKip over the unexpected token.
-                    self.next_token();
-                }
-            }
+        let statements =
+            self.parse_list(RecoveryContextKind::BlockStatements, Self::parse_statement);
 
-            self.eat(TokenKind::Dedent);
-        } else {
-            let range = self.current_range();
-            self.add_error(
-                ParseErrorType::OtherError(format!(
-                    "expected an indented block after {parent_clause}"
-                )),
-                range,
-            );
-        }
+        self.expect(TokenKind::Dedent);
 
-        stmts
+        statements
     }
 
     fn parse_parameter(&mut self, function_kind: FunctionKind) -> ast::Parameter {
@@ -1396,7 +1361,7 @@ impl<'src> Parser<'src> {
             FunctionKind::FunctionDef => TokenKind::Rpar,
         };
 
-        let ending_set = TokenSet::new(&[TokenKind::Rarrow, ending]).union(COMPOUND_STMT_SET);
+        let ending_set = TokenSet::new([TokenKind::Rarrow, ending]).union(COMPOUND_STMT_SET);
         let start = self.node_start();
 
         self.parse_separated(true, TokenKind::Comma, ending_set, |parser| {
@@ -1451,7 +1416,7 @@ impl<'src> Parser<'src> {
 
                 let range = parser.current_range();
                 parser.skip_until(
-                    ending_set.union([TokenKind::Comma, TokenKind::Colon].as_slice().into()),
+                    ending_set.union(TokenSet::new([TokenKind::Comma, TokenKind::Colon])),
                 );
                 parser.add_error(
                     ParseErrorType::OtherError("expected parameter".to_string()),

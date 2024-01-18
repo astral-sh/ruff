@@ -8,7 +8,7 @@ use crate::parser::{Parser, SequenceMatchPatternParentheses, NEWLINE_EOF_SET};
 use crate::token_set::TokenSet;
 use crate::{ParseErrorType, Tok, TokenKind};
 
-const END_EXPR_SET: TokenSet = TokenSet::new(&[
+const END_EXPR_SET: TokenSet = TokenSet::new([
     TokenKind::Newline,
     TokenKind::Semi,
     TokenKind::Colon,
@@ -312,7 +312,7 @@ impl<'src> Parser<'src> {
 
         let mut patterns = vec![first_elt];
 
-        self.parse_separated(true, TokenKind::Comma, [ending].as_slice(), |parser| {
+        self.parse_separated(true, TokenKind::Comma, [ending], |parser| {
             patterns.push(parser.parse_match_pattern());
         });
 
@@ -421,7 +421,7 @@ impl<'src> Parser<'src> {
             }
             kind => {
                 const RECOVERY_SET: TokenSet =
-                    TokenSet::new(&[TokenKind::Colon]).union(NEWLINE_EOF_SET);
+                    TokenSet::new([TokenKind::Colon]).union(NEWLINE_EOF_SET);
                 self.add_error(
                     ParseErrorType::InvalidMatchPatternLiteral {
                         pattern: kind.into(),

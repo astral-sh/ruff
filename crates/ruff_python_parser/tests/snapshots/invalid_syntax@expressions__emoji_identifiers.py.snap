@@ -85,9 +85,22 @@ Module(
 
   |
 1 | a = (🐶
-  |      ^^ Syntax Error: expected Rpar, found Unknown
 2 |     # comment 🐶
 3 | )
+  | ^ Syntax Error: Expected a statement
+4 | 
+5 | a = (🐶 +
+  |
+
+
+  |
+1 | a = (🐶
+2 |     # comment 🐶
+3 | )
+  |  ^ Syntax Error: Expected a statement
+4 | 
+5 | a = (🐶 +
+6 |     # comment
   |
 
 
@@ -102,20 +115,26 @@ Module(
 
 
   |
-3 | )
-4 | 
-5 | a = (🐶 +
-  |      ^^ Syntax Error: expected Rpar, found Unknown
-6 |     # comment
-7 | 🐶)
-  |
-
-
-  |
 5 | a = (🐶 +
 6 |     # comment
 7 | 🐶)
   | ^^ Syntax Error: Got unexpected token 🐶
+  |
+
+
+  |
+5 | a = (🐶 +
+6 |     # comment
+7 | 🐶)
+  |   ^ Syntax Error: Expected a statement
+  |
+
+
+  |
+5 | a = (🐶 +
+6 |     # comment
+7 | 🐶)
+  |    ^ Syntax Error: Expected a statement
   |
 
 

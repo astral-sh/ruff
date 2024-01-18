@@ -5,14 +5,13 @@ use crate::TokenKind;
 pub(crate) struct TokenSet(u128);
 
 impl TokenSet {
-    #[allow(unused)]
-    pub(crate) const EMPTY: TokenSet = TokenSet(0);
-
-    pub(crate) const fn new(kinds: &[TokenKind]) -> TokenSet {
+    pub(crate) const fn new<const N: usize>(kinds: [TokenKind; N]) -> TokenSet {
         let mut res = 0u128;
-        let mut i = 0;
-        while i < kinds.len() {
-            res |= mask(kinds[i]);
+        let mut i = 0usize;
+
+        while i < N {
+            let kind = kinds[i];
+            res |= mask(kind);
             i += 1;
         }
         TokenSet(res)
@@ -35,16 +34,16 @@ const fn mask(kind: TokenKind) -> u128 {
     1u128 << (kind as usize)
 }
 
-impl From<&[TokenKind]> for TokenSet {
-    fn from(value: &[TokenKind]) -> Self {
-        TokenSet::new(value)
+impl<const N: usize> From<[TokenKind; N]> for TokenSet {
+    fn from(kinds: [TokenKind; N]) -> Self {
+        TokenSet::new(kinds)
     }
 }
 
 #[test]
 fn token_set_works_for_tokens() {
     use crate::TokenKind::*;
-    let mut ts = TokenSet::new(&[EndOfFile, Name]);
+    let mut ts = TokenSet::new([EndOfFile, Name]);
     assert!(ts.contains(EndOfFile));
     assert!(ts.contains(Name));
     assert!(!ts.contains(Plus));

@@ -23,10 +23,18 @@ fn ok_ipy_escape_command() {
 #[test]
 #[ignore]
 fn parser_quick_test() {
-    let src = r"
-a = (🐶 +
-    # comment
-🐶)
+    let src = r"if True:
+    1
+    ...
+if x < 1:
+    ...
+else:
+    pass
+
+if a:
+    pass
+elif b:
+    ...
 ";
 
     let tokens = crate::lexer::lex(src, Mode::Module).collect();

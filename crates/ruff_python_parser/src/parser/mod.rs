@@ -1,7 +1,10 @@
-use bitflags::bitflags;
+use std::cmp::Ordering;
+use std::iter::FusedIterator;
+
+use bitflags::{bitflags, Flags};
 
 use ast::Mod;
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::lexer::lex;
@@ -98,10 +101,12 @@ pub(crate) struct Parser<'src> {
     /// The range can be different when parsing only a part of a file using the `lex_starts_at` and `parse_expression_starts_at` APIs
     /// in which case the the range is equal to [offset; subrange.len()).
     tokens_range: TextRange,
+
+    recovery_context: RecoveryContext,
 }
 
-const NEWLINE_EOF_SET: TokenSet = TokenSet::new(&[TokenKind::Newline, TokenKind::EndOfFile]);
-const LITERAL_SET: TokenSet = TokenSet::new(&[
+const NEWLINE_EOF_SET: TokenSet = TokenSet::new([TokenKind::Newline, TokenKind::EndOfFile]);
+const LITERAL_SET: TokenSet = TokenSet::new([
     TokenKind::Name,
     TokenKind::Int,
     TokenKind::Float,
@@ -114,7 +119,7 @@ const LITERAL_SET: TokenSet = TokenSet::new(&[
     TokenKind::None,
 ]);
 /// Tokens that are usually an expression or the start of one.
-const EXPR_SET: TokenSet = TokenSet::new(&[
+const EXPR_SET: TokenSet = TokenSet::new([
     TokenKind::Minus,
     TokenKind::Tilde,
     TokenKind::Star,
@@ -150,6 +155,7 @@ impl<'src> Parser<'src> {
             ctx: ParserCtxFlags::empty(),
             last_ctx: ParserCtxFlags::empty(),
             tokens,
+            recovery_context: RecoveryContext::empty(),
             last_token_end: tokens_range.start(),
             current,
             tokens_range,
@@ -157,8 +163,6 @@ impl<'src> Parser<'src> {
     }
 
     pub(crate) fn parse_program(mut self) -> Program {
-        let mut body = vec![];
-
         let ast = if self.mode == Mode::Expression {
             let start = self.node_start();
             let parsed_expr = self.parse_expression();
@@ -173,36 +177,21 @@ impl<'src> Parser<'src> {
             }
             self.bump(TokenKind::EndOfFile);
 
-            ast::Mod::Expression(ast::ModExpression {
+            Mod::Expression(ast::ModExpression {
                 body: Box::new(parsed_expr.expr),
                 range: self.node_range(start),
             })
         } else {
-            let start = self.tokens_range.start();
-            let mut progress = ParserProgress::default();
-            while !self.at(TokenKind::EndOfFile) {
-                progress.assert_progressing(&self);
-                if self.at(TokenKind::Indent) {
-                    self.handle_unexpected_indentation(&mut body, "unexpected indentation");
-                    continue;
-                }
-
-                if self.is_at_stmt() {
-                    body.push(self.parse_statement());
-                } else {
-                    // SKip over the unexpected token.
-                    self.next_token();
-                }
-            }
+            let body = self.parse_list(
+                RecoveryContextKind::ModuleStatements,
+                Parser::parse_statement,
+            );
 
             self.bump(TokenKind::EndOfFile);
 
-            ast::Mod::Module(ast::ModModule {
+            Mod::Module(ast::ModModule {
                 body,
-                // If the `source` only contains comments or empty spaces, return
-                // an empty range.
-                // FIXME(micha): The module should always enclose the entire file
-                range: self.node_range(start),
+                range: self.tokens_range,
             })
         };
 
@@ -240,10 +229,18 @@ impl<'src> Parser<'src> {
         let mut lex_errors = lex_errors.into_iter().peekable();
 
         while let (Some(parse_error), Some(lex_error)) = (parse_errors.peek(), lex_errors.peek()) {
-            if parse_error.location.start() < lex_error.location.start() {
-                merged.push(parse_errors.next().unwrap());
-            } else {
-                merged.push(ParseError::from(lex_errors.next().unwrap()));
+            match parse_error
+                .location
+                .start()
+                .cmp(&lex_error.location.start())
+            {
+                Ordering::Less => merged.push(parse_errors.next().unwrap()),
+                Ordering::Equal => {
+                    // Skip the parse error if we already have a lex error at the same location..
+                    parse_errors.next().unwrap();
+                    merged.push(lex_errors.next().unwrap().into())
+                }
+                Ordering::Greater => merged.push(lex_errors.next().unwrap().into()),
             }
         }
 
@@ -429,6 +426,59 @@ impl<'src> Parser<'src> {
         &self.source[range - self.tokens_range.start()]
     }
 
+    fn parse_list<T>(
+        &mut self,
+        kind: RecoveryContextKind,
+        parse_element: impl Fn(&mut Parser<'src>) -> T,
+    ) -> Vec<T> {
+        let mut elems = Vec::new();
+        let mut progress = ParserProgress::default();
+
+        let saved_context = self.recovery_context;
+        self.recovery_context = self
+            .recovery_context
+            .union(RecoveryContext::from_kind(kind));
+
+        while !kind.is_list_terminator(self) {
+            progress.assert_progressing(self);
+
+            // The end of file marker ends all lists.
+            if self.at(TokenKind::EndOfFile) {
+                break;
+            }
+
+            if kind.is_list_element(self) {
+                elems.push(parse_element(self));
+            } else {
+                // Not a recognised element. Add an error and either skip the token or break parsing the list
+                // if the token is recognised as an element or terminator of an enclosing list.
+                let error = kind.create_error(self);
+                self.add_error(error, self.current_range());
+
+                if self.is_enclosing_list_element_or_terminator() {
+                    break;
+                } else {
+                    self.next_token();
+                }
+            }
+        }
+
+        self.recovery_context = saved_context;
+
+        elems
+    }
+
+    #[cold]
+    fn is_enclosing_list_element_or_terminator(&self) -> bool {
+        for context in self.recovery_context.kind_iter() {
+            if context.is_list_terminator(self) || context.is_list_element(self) {
+                return true;
+            }
+        }
+
+        false
+    }
+
     /// Parses elements enclosed within a delimiter pair, such as parentheses, brackets,
     /// or braces.
     fn parse_delimited(
@@ -441,7 +491,7 @@ impl<'src> Parser<'src> {
     ) {
         self.bump(opening);
 
-        self.parse_separated(allow_trailing_delim, delim, [closing].as_slice(), func);
+        self.parse_separated(allow_trailing_delim, delim, [closing], func);
 
         self.expect(closing);
     }
@@ -485,26 +535,6 @@ impl<'src> Parser<'src> {
             TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Dot | TokenKind::Async | TokenKind::For
         )
     }
-
-    fn handle_unexpected_indentation(&mut self, stmts: &mut Vec<Stmt>, error_msg: &str) {
-        self.bump(TokenKind::Indent);
-
-        self.add_error(
-            ParseErrorType::OtherError(error_msg.to_string()),
-            self.current_range(),
-        );
-
-        let mut progress = ParserProgress::default();
-
-        while !self.at(TokenKind::Dedent) && !self.at(TokenKind::EndOfFile) {
-            progress.assert_progressing(self);
-
-            let stmt = self.parse_statement();
-            stmts.push(stmt);
-        }
-
-        assert!(self.eat(TokenKind::Dedent));
-    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -542,4 +572,88 @@ bitflags! {
 enum FunctionKind {
     Lambda,
     FunctionDef,
+}
+
+#[repr(u8)]
+#[derive(Copy, Clone, Debug)]
+enum RecoveryContextKind {
+    ModuleStatements,
+    BlockStatements,
+
+    Elif,
+}
+
+impl RecoveryContextKind {
+    fn is_list_terminator(self, p: &Parser) -> bool {
+        match self {
+            // The program must consume all tokens until the end
+            RecoveryContextKind::ModuleStatements => false,
+            RecoveryContextKind::BlockStatements => p.at(TokenKind::Dedent),
+            RecoveryContextKind::Elif => !p.at(TokenKind::Elif),
+        }
+    }
+
+    fn is_list_element(self, p: &Parser) -> bool {
+        match self {
+            RecoveryContextKind::ModuleStatements => p.is_at_stmt(),
+            RecoveryContextKind::BlockStatements => p.is_at_stmt(),
+            RecoveryContextKind::Elif => p.at(TokenKind::Elif),
+        }
+    }
+
+    fn create_error(self, p: &Parser) -> ParseErrorType {
+        match self {
+            RecoveryContextKind::ModuleStatements | RecoveryContextKind::BlockStatements => {
+                if p.at(TokenKind::Indent) {
+                    ParseErrorType::UnexpectedIndentation
+                } else {
+                    ParseErrorType::OtherError("Expected a statement".to_string())
+                }
+            }
+            RecoveryContextKind::Elif => {
+                ParseErrorType::OtherError("Expected an `elif` or else clause".to_string())
+            }
+        }
+    }
+}
+
+#[derive(Copy, Clone, Default, PartialEq, Eq)]
+struct RecoveryContext(u8);
+
+bitflags! {
+    impl RecoveryContext: u8 {
+        const MODULE_STATEMENTS = 1 << 0;
+        const BLOCK_STATEMENTS = 1 << 1;
+        const ELIF = 1 << 2;
+    }
+}
+
+impl RecoveryContext {
+    const fn from_kind(kind: RecoveryContextKind) -> Self {
+        match kind {
+            RecoveryContextKind::ModuleStatements => RecoveryContext::MODULE_STATEMENTS,
+            RecoveryContextKind::BlockStatements => RecoveryContext::BLOCK_STATEMENTS,
+            RecoveryContextKind::Elif => RecoveryContext::ELIF,
+        }
+    }
+
+    /// Safe conversion to the corresponding [`RecoveryContextKind`] (inverse of [`Self::from_kind`]).
+    ///
+    /// Returns `None` if the `RecoveryContext` is empty or has multiple flags set.
+    const fn to_kind(self) -> Option<RecoveryContextKind> {
+        Some(match self {
+            RecoveryContext::MODULE_STATEMENTS => RecoveryContextKind::ModuleStatements,
+            RecoveryContext::BLOCK_STATEMENTS => RecoveryContextKind::BlockStatements,
+            RecoveryContext::ELIF => RecoveryContextKind::Elif,
+            _ => return None,
+        })
+    }
+
+    fn kind_iter(self) -> impl Iterator<Item = RecoveryContextKind> {
+        self.iter().map(|context| {
+            context
+                .to_kind()
+                .expect("Expected context to be of a single kind.")
+        })
+    }
 }

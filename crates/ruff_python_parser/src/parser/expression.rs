@@ -17,7 +17,7 @@ use crate::token_set::TokenSet;
 use crate::{FStringErrorType, Mode, ParseErrorType, Tok, TokenKind};
 
 /// Tokens that can appear after an expression.
-const END_EXPR_SET: TokenSet = TokenSet::new(&[
+const END_EXPR_SET: TokenSet = TokenSet::new([
     TokenKind::Newline,
     TokenKind::Semi,
     TokenKind::Colon,
@@ -525,7 +525,7 @@ impl<'src> Parser<'src> {
             self.parse_separated(
                 true,
                 TokenKind::Comma,
-                TokenSet::new(&[TokenKind::Rsqb]),
+                TokenSet::new([TokenKind::Rsqb]),
                 |parser| {
                     slices.push(parser.parse_slice());
                 },
@@ -551,10 +551,10 @@ impl<'src> Parser<'src> {
 
     fn parse_slice(&mut self) -> Expr {
         const UPPER_END_SET: TokenSet =
-            TokenSet::new(&[TokenKind::Comma, TokenKind::Colon, TokenKind::Rsqb])
+            TokenSet::new([TokenKind::Comma, TokenKind::Colon, TokenKind::Rsqb])
                 .union(NEWLINE_EOF_SET);
         const STEP_END_SET: TokenSet =
-            TokenSet::new(&[TokenKind::Comma, TokenKind::Rsqb]).union(NEWLINE_EOF_SET);
+            TokenSet::new([TokenKind::Comma, TokenKind::Rsqb]).union(NEWLINE_EOF_SET);
 
         let start = self.node_start();
 
@@ -829,7 +829,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_fstring_expression(&mut self) -> Expr {
-        const FSTRING_SET: TokenSet = TokenSet::new(&[TokenKind::FStringStart, TokenKind::String]);
+        const FSTRING_SET: TokenSet = TokenSet::new([TokenKind::FStringStart, TokenKind::String]);
 
         let start = self.node_start();
         let fstring = self.parse_fstring();
@@ -872,7 +872,7 @@ impl<'src> Parser<'src> {
 
     fn parse_fstring_elements(&mut self) -> Vec<FStringElement> {
         const FSTRING_END_SET: TokenSet =
-            TokenSet::new(&[TokenKind::FStringEnd, TokenKind::Rbrace]).union(NEWLINE_EOF_SET);
+            TokenSet::new([TokenKind::FStringEnd, TokenKind::Rbrace]).union(NEWLINE_EOF_SET);
         let mut elements = vec![];
 
         let mut progress = ParserProgress::default();
@@ -1296,7 +1296,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_generators(&mut self) -> Vec<ast::Comprehension> {
-        const GENERATOR_SET: TokenSet = TokenSet::new(&[TokenKind::For, TokenKind::Async]);
+        const GENERATOR_SET: TokenSet = TokenSet::new([TokenKind::For, TokenKind::Async]);
 
         let mut generators = vec![];
         let mut progress = ParserProgress::default();
