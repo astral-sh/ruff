@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fmt::Display;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
@@ -159,19 +160,19 @@ fn sort_dunder_slots(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr
 fn extract_elts(
     dunder_kind: SpecialClassDunder,
     node: &ast::Expr,
-) -> Option<(Vec<&ast::Expr>, TextRange, DisplayKind<'_>)> {
+) -> Option<(Cow<'_, Vec<ast::Expr>>, TextRange, DisplayKind<'_>)> {
     let result = match (dunder_kind, node) {
         (_, ast::Expr::List(ast::ExprList { elts, range, .. })) => (
-            elts.iter().collect(),
+            Cow::Borrowed(elts),
             *range,
             DisplayKind::Sequence(SequenceKind::List),
         ),
         (_, ast::Expr::Tuple(tuple_node @ ast::ExprTuple { elts, range, .. })) => {
             let display_kind = DisplayKind::Sequence(SequenceKind::Tuple(tuple_node));
-            (elts.iter().collect(), *range, display_kind)
+            (Cow::Borrowed(elts), *range, display_kind)
         }
         (SpecialClassDunder::Slots, ast::Expr::Set(ast::ExprSet { elts, range })) => (
-            elts.iter().collect(),
+            Cow::Borrowed(elts),
             *range,
             DisplayKind::Sequence(SequenceKind::Set),
         ),
@@ -183,10 +184,14 @@ fn extract_elts(
                 range,
             }),
         ) => {
-            let mut narrowed_keys = Vec::with_capacity(keys.len());
+            let mut narrowed_keys = Vec::with_capacity(values.len());
             for key in keys {
                 if let Some(key) = key {
-                    narrowed_keys.push(key);
+                    // This is somewhat unfortunate,
+                    // *but* only `__slots__` can be a dict out of
+                    // `__all__`, `__slots__` and `__match_args__`,
+                    // and even for `__slots__`, using a dict is very rare
+                    narrowed_keys.push(key.to_owned());
                 } else {
                     return None;
                 }
@@ -196,7 +201,11 @@ fn extract_elts(
             // If `None` wasn't present in the keys,
             // the length of the keys should always equal the length of the values
             assert_eq!(narrowed_keys.len(), values.len());
-            (narrowed_keys, *range, DisplayKind::Dict { values })
+            (
+                Cow::Owned(narrowed_keys),
+                *range,
+                DisplayKind::Dict { values },
+            )
         }
         _ => return None,
     };
@@ -205,7 +214,7 @@ fn extract_elts(
 
 fn create_fix(
     display_kind: DisplayKind<'_>,
-    elts: &[&ast::Expr],
+    elts: &[ast::Expr],
     items: &[&str],
     range: TextRange,
     locator: &Locator,

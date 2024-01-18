@@ -79,7 +79,7 @@ pub(super) enum DisplayKind<'a> {
 /// source code as a `range_replacement` autofix.
 pub(super) fn sort_single_line_elements_sequence<F>(
     kind: &SequenceKind,
-    elts: &[&ast::Expr],
+    elts: &[ast::Expr],
     elements: &[&str],
     locator: &Locator,
     mut cmp_fn: F,
@@ -114,7 +114,7 @@ where
 /// that can be inserted into the
 /// source code as a `range_replacement` autofix.
 pub(super) fn sort_single_line_elements_dict<F>(
-    key_elts: &[&ast::Expr],
+    key_elts: &[ast::Expr],
     elements: &[&str],
     value_elts: &[ast::Expr],
     locator: &Locator,
@@ -165,7 +165,7 @@ pub(super) enum SortClassification<'a> {
 }
 
 impl<'a> SortClassification<'a> {
-    pub(super) fn from_elements<F>(elements: &'a [&ast::Expr], mut cmp_fn: F) -> Self
+    pub(super) fn from_elements<F>(elements: &'a [ast::Expr], mut cmp_fn: F) -> Self
     where
         F: FnMut(&str, &str) -> Ordering,
     {

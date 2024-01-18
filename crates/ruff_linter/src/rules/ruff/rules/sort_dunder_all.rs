@@ -16,7 +16,6 @@ use crate::rules::ruff::rules::sequence_sorting::{
     sort_single_line_elements_sequence, SequenceKind, SortClassification,
 };
 
-use itertools::Itertools;
 use natord;
 
 /// ## What it does
@@ -165,9 +164,8 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
         }
         _ => return,
     };
-    let elts = elts.iter().collect_vec();
 
-    let elts_analysis = SortClassification::from_elements(&elts, |a, b| {
+    let elts_analysis = SortClassification::from_elements(elts, |a, b| {
         AllItemSortKey::from(a).cmp(&AllItemSortKey::from(b))
     });
     if elts_analysis.is_not_a_list_of_string_literals() || elts_analysis.is_sorted() {
@@ -177,7 +175,7 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
     let mut diagnostic = Diagnostic::new(UnsortedDunderAll, range);
 
     if let SortClassification::UnsortedAndMaybeFixable { items } = elts_analysis {
-        if let Some(fix) = create_fix(range, &elts, &items, &kind, checker) {
+        if let Some(fix) = create_fix(range, elts, &items, &kind, checker) {
             diagnostic.set_fix(fix);
         }
     }
@@ -274,7 +272,7 @@ impl InferredMemberType {
 /// is unfixable in this instance.
 fn create_fix(
     range: TextRange,
-    elts: &[&ast::Expr],
+    elts: &[ast::Expr],
     string_items: &[&str],
     kind: &SequenceKind,
     checker: &Checker,
