@@ -51,7 +51,7 @@ impl SequenceKind<'_> {
         }
     }
 
-    pub(super) fn opening_token_for_multiline_definition(&self) -> Tok {
+    fn opening_token_for_multiline_definition(&self) -> Tok {
         match self {
             Self::List => Tok::Lsqb,
             Self::Set => Tok::Lbrace,
@@ -59,7 +59,7 @@ impl SequenceKind<'_> {
         }
     }
 
-    pub(super) fn closing_token_for_multiline_definition(&self) -> Tok {
+    fn closing_token_for_multiline_definition(&self) -> Tok {
         match self {
             Self::List => Tok::Rsqb,
             Self::Set => Tok::Rbrace,
