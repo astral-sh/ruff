@@ -113,6 +113,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Tuple(expr) => expr.format().fmt(f),
             Expr::Slice(expr) => expr.format().fmt(f),
             Expr::IpyEscapeCommand(expr) => expr.format().fmt(f),
+            #[allow(deprecated)]
             Expr::Invalid(expr) => expr.format().fmt(f),
         });
         let parenthesize = match parentheses {
@@ -302,6 +303,7 @@ fn format_with_parentheses_comments(
         Expr::Tuple(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Slice(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::IpyEscapeCommand(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        #[allow(deprecated)]
         Expr::Invalid(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
     });
 
@@ -504,6 +506,7 @@ impl NeedsParentheses for Expr {
             Expr::Tuple(expr) => expr.needs_parentheses(parent, context),
             Expr::Slice(expr) => expr.needs_parentheses(parent, context),
             Expr::IpyEscapeCommand(expr) => expr.needs_parentheses(parent, context),
+            #[allow(deprecated)]
             Expr::Invalid(expr) => expr.needs_parentheses(parent, context),
         }
     }
@@ -812,8 +815,11 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             | Expr::EllipsisLiteral(_)
             | Expr::Name(_)
             | Expr::Slice(_)
-            | Expr::IpyEscapeCommand(_)
-            | Expr::Invalid(_) => {
+            | Expr::IpyEscapeCommand(_) => {
+                return;
+            }
+            #[allow(deprecated)]
+            Expr::Invalid(_) => {
                 return;
             }
         };
@@ -1165,8 +1171,9 @@ pub(crate) fn is_expression_huggable(
         | Expr::NumberLiteral(_)
         | Expr::BooleanLiteral(_)
         | Expr::NoneLiteral(_)
-        | Expr::EllipsisLiteral(_)
-        | Expr::Invalid(_) => None,
+        | Expr::EllipsisLiteral(_) => None,
+        #[allow(deprecated)]
+        Expr::Invalid(_) => None,
     }
 }
 
@@ -1239,8 +1246,9 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_)
         | Expr::Slice(_)
-        | Expr::IpyEscapeCommand(_)
-        | Expr::Invalid(_) => false,
+        | Expr::IpyEscapeCommand(_) => false,
+        #[allow(deprecated)]
+        Expr::Invalid(_) => false,
 
         // Expressions that insert split points when parenthesized.
         Expr::Compare(_)

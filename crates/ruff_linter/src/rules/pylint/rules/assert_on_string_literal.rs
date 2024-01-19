@@ -77,6 +77,7 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
                         ast::FStringElement::Literal(ast::FStringLiteralElement {
                             value, ..
                         }) => value.is_empty(),
+                        #[allow(deprecated)]
                         ast::FStringElement::Expression(_) | ast::FStringElement::Invalid(_) => {
                             false
                         }
@@ -91,6 +92,7 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
                         ast::FStringElement::Literal(ast::FStringLiteralElement {
                             value, ..
                         }) => !value.is_empty(),
+                        #[allow(deprecated)]
                         ast::FStringElement::Expression(_) | ast::FStringElement::Invalid(_) => {
                             false
                         }

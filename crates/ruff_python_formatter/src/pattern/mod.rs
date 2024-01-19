@@ -49,6 +49,7 @@ impl FormatRule<Pattern, PyFormatContext<'_>> for FormatPattern {
             Pattern::MatchStar(pattern) => pattern.format().fmt(f),
             Pattern::MatchAs(pattern) => pattern.format().fmt(f),
             Pattern::MatchOr(pattern) => pattern.format().fmt(f),
+            #[allow(deprecated)]
             Pattern::Invalid(pattern) => pattern.format().fmt(f),
         });
 
@@ -149,6 +150,7 @@ impl NeedsParentheses for Pattern {
             Pattern::MatchStar(pattern) => pattern.needs_parentheses(parent, context),
             Pattern::MatchAs(pattern) => pattern.needs_parentheses(parent, context),
             Pattern::MatchOr(pattern) => pattern.needs_parentheses(parent, context),
+            #[allow(deprecated)]
             Pattern::Invalid(pattern) => pattern.needs_parentheses(parent, context),
         }
     }
