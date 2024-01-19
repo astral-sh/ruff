@@ -30,7 +30,6 @@
 
 ### Bug fixes
 
-- Add an explicit fast path for whitespace to `is_identifier_continuation` ([#9532](https://github.com/astral-sh/ruff/pull/9532))
 - Recursively visit deferred AST nodes ([#9541](https://github.com/astral-sh/ruff/pull/9541))
 - Visit deferred lambdas before type definitions ([#9540](https://github.com/astral-sh/ruff/pull/9540))
 - \[`flake8-simplify`\] Avoid some more `enumerate-for-loop` false positives (`SIM113`) ([#9515](https://github.com/astral-sh/ruff/pull/9515))
