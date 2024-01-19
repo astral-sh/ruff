@@ -116,7 +116,7 @@ fn process_documentation(documentation: &str, out: &mut String, rule_name: &str)
                     }
                 }
 
-                let anchor = option.replace('.', "-");
+                let anchor = option.replace('.', "_");
                 out.push_str(&format!("- [`{option}`][{option}]\n"));
                 after.push_str(&format!("[{option}]: ../settings.md#{anchor}\n"));
 
@@ -167,8 +167,8 @@ Something [`else`][other].
 
 [other]: http://example.com.
 
-[lint.task-tags]: ../settings.md#lint-task-tags
-[lint.mccabe.max-complexity]: ../settings.md#lint-mccabe-max-complexity
+[lint.task-tags]: ../settings.md#lint_task-tags
+[lint.mccabe.max-complexity]: ../settings.md#lint_mccabe_max-complexity
 "
         );
     }

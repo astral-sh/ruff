@@ -3,7 +3,7 @@ use std::hash::BuildHasherDefault;
 
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
 use crate::options_base::{OptionsMetadata, Visit};
@@ -479,7 +479,8 @@ pub struct LintOptions {
 }
 
 /// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
-#[derive(Debug, PartialEq, Eq, Default)]
+#[derive(Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct DeprecatedTopLevelLintOptions {
     pub common: LintCommonOptions,
 }
@@ -529,37 +530,17 @@ impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
     }
 }
 
-/// Pass-through serialization because nested `#[serde(flatten)]` didn't seem to work.
-impl serde::Serialize for DeprecatedTopLevelLintOptions {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        LintCommonOptions::serialize(&self.common, serializer)
-    }
-}
-
-/// Pass-through deserialization because nested `#[serde(flatten)]` didn't seem to work.
-
-impl<'de> serde::Deserialize<'de> for DeprecatedTopLevelLintOptions {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        Ok(Self {
-            common: LintCommonOptions::deserialize(deserializer)?,
-        })
-    }
-}
-
 // Note: This struct should be inlined into [`LintOptions`] once support for the top-level lint settings
 // is removed.
+// Don't add any new options to this struct. Add them to [`LintOptions`] directly to avoid exposing them in the
+// global settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(
     Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct LintCommonOptions {
+    // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
     /// A list of allowed "confusable" Unicode characters to ignore when
     /// enforcing `RUF001`, `RUF002`, and `RUF003`.
     #[option(
@@ -808,6 +789,7 @@ pub struct LintCommonOptions {
     )]
     pub unfixable: Option<Vec<RuleSelector>>,
 
+    // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
     /// Options for the `flake8-annotations` plugin.
     #[option_group]
     pub flake8_annotations: Option<Flake8AnnotationsOptions>,
@@ -904,6 +886,8 @@ pub struct LintCommonOptions {
     #[option_group]
     pub pyupgrade: Option<PyUpgradeOptions>,
 
+    // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
+
     // Tables are required to go last.
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, when considering any matching files.
@@ -931,6 +915,7 @@ pub struct LintCommonOptions {
         "#
     )]
     pub extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
 }
 
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
