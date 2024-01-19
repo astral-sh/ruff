@@ -15,7 +15,7 @@
 ### Rule changes
 
 - \[`flake8-pyi`\] Fix `PYI047` false negatives on PEP-695 type aliases ([#9566](https://github.com/astral-sh/ruff/pull/9566))
-- \[`flake8-pyi`\] Fix `PYI049` false negatives on call-based `TypedDict` ([#9567](https://github.com/astral-sh/ruff/pull/9567))
+- \[`flake8-pyi`\] Fix `PYI049` false negatives on call-based `TypedDict`s ([#9567](https://github.com/astral-sh/ruff/pull/9567))
 - \[`pylint`\] Exclude `self` and `cls` when counting method arguments ([#9563](https://github.com/astral-sh/ruff/pull/9563))
 
 ### CLI
