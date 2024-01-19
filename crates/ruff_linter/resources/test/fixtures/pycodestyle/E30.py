@@ -530,7 +530,7 @@ def fn():
 
     # arbitrary comment
 
-    def inner():  # E306 not expected
+    def inner():  # E306 not expected (pycodestyle detects E306)
         pass
 # end
 
@@ -541,7 +541,7 @@ def fn():
 
 
     # arbitrary comment
-    def inner():  # E306 not expected
+    def inner():  # E306 not expected (pycodestyle detects E306)
         pass
 # end
 
@@ -635,7 +635,7 @@ def function():
 # E304
 @decorator
 
-# comment
+# comment    E304 not expected
 def function():
     pass
 # end
