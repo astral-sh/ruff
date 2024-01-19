@@ -11,11 +11,10 @@ use ruff_text_size::TextRange;
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::sequence_sorting::{
     sort_single_line_elements_sequence, DisplayKind, MultilineStringSequenceValue, SequenceKind,
-    SortClassification,
+    SortClassification, SortingStyle,
 };
 
 use itertools::{izip, Itertools};
-use natord;
 
 /// ## What it does
 /// Checks for `__slots__` and `__match_args__`
@@ -106,6 +105,8 @@ pub(crate) fn sort_dunder_slots_ann_assign(checker: &mut Checker, node: &ast::St
     }
 }
 
+const SORTING_STYLE: &SortingStyle = &SortingStyle::Natural;
+
 /// Sort a tuple, list, dict or set that defines `__slots__`
 /// or `__match_args__` in a class scope.
 ///
@@ -135,7 +136,7 @@ fn sort_dunder_slots(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr
         return;
     };
 
-    let sort_classification = SortClassification::of_elements(&elts_analysis.elts, natord::compare);
+    let sort_classification = SortClassification::of_elements(&elts_analysis.elts, SORTING_STYLE);
     if sort_classification.is_not_a_list_of_string_literals() || sort_classification.is_sorted() {
         return;
     }
@@ -247,11 +248,7 @@ fn create_fix(
             let analyzed_sequence =
                 MultilineStringSequenceValue::from_source_range(*range, display_kind, locator)?;
             assert_eq!(analyzed_sequence.len(), elts.len());
-            analyzed_sequence.into_sorted_source_code(
-                |this, next| natord::compare(this.value(), next.value()),
-                locator,
-                checker.stylist(),
-            )
+            analyzed_sequence.into_sorted_source_code(SORTING_STYLE, locator, checker.stylist())
         } else {
             match display_kind {
                 DisplayKind::Dict { values } => {
@@ -262,7 +259,7 @@ fn create_fix(
                     elts,
                     items,
                     locator,
-                    natord::compare,
+                    SORTING_STYLE,
                 ),
             }
         }
@@ -274,9 +271,14 @@ fn create_fix(
 }
 
 /// Create a string representing a fixed-up single-line
-/// definition of `__all__` or `__slots__` (etc.),
-/// that can be inserted into the
-/// source code as a `range_replacement` autofix.
+/// definition of a `__slots__` dictionary that can be
+/// inserted into the source code as a `range_replacement`
+/// autofix.
+///
+/// N.B. This function could potentially be moved into
+/// `sequence_sorting.rs` if any other modules need it,
+/// but stays here for now, since this is currently the
+/// only module that needs it
 pub(super) fn sort_single_line_elements_dict(
     key_elts: &[ast::Expr],
     elements: &[&str],
@@ -288,7 +290,7 @@ pub(super) fn sort_single_line_elements_dict(
     let mut result = String::from('{');
 
     let mut element_trios = izip!(elements, key_elts, value_elts).collect_vec();
-    element_trios.sort_by(|(elem1, _, _), (elem2, _, _)| natord::compare(elem1, elem2));
+    element_trios.sort_by(|(elem1, _, _), (elem2, _, _)| SORTING_STYLE.compare(elem1, elem2));
     // We grab the original source-code ranges using `locator.slice()`
     // rather than using the expression generator, as this approach allows
     // us to easily preserve stylistic choices in the original source code

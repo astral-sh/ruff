@@ -9,12 +9,114 @@ use std::cmp::Ordering;
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{lexer, Mode, Tok, TokenKind};
+use ruff_python_stdlib::str::is_cased_uppercase;
 use ruff_python_trivia::leading_indentation;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use is_macro;
 use itertools::Itertools;
+use natord;
+
+/// An enumeration of the different sorting styles
+/// currently supported for displays of string literals
+#[derive(Debug)]
+pub(super) enum SortingStyle {
+    Natural,
+    Isort,
+}
+
+impl SortingStyle {
+    pub(super) fn compare(&self, a: &str, b: &str) -> Ordering {
+        match self {
+            Self::Natural => natord::compare(a, b),
+            Self::Isort => IsortSortKey::from(a).cmp(&IsortSortKey::from(b)),
+        }
+    }
+}
+
+/// A struct to implement logic necessary to achieve
+/// an "isort-style sort".
+///
+/// An isort-style sort sorts items first according to their casing:
+/// `SCREAMING_SNAKE_CASE` names (conventionally used for global constants)
+/// come first, followed by CamelCase names (conventionally used for
+/// classes), followed by anything else. Within each category,
+/// a [natural sort](https://en.wikipedia.org/wiki/Natural_sort_order)
+/// is used to order the elements.
+struct IsortSortKey<'a> {
+    category: InferredMemberType,
+    value: &'a str,
+}
+
+impl Ord for IsortSortKey<'_> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.category
+            .cmp(&other.category)
+            .then_with(|| natord::compare(self.value, other.value))
+    }
+}
+
+impl PartialOrd for IsortSortKey<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for IsortSortKey<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for IsortSortKey<'_> {}
+
+impl<'a> From<&'a str> for IsortSortKey<'a> {
+    fn from(value: &'a str) -> Self {
+        Self {
+            category: InferredMemberType::of(value),
+            value,
+        }
+    }
+}
+
+impl<'a> From<&'a StringSequenceItem> for IsortSortKey<'a> {
+    fn from(item: &'a StringSequenceItem) -> Self {
+        Self::from(item.value.as_str())
+    }
+}
+
+/// Classification for the casing of an element in a
+/// sequence of literal strings.
+///
+/// This is necessary to achieve an "isort-style" sort,
+/// where elements are sorted first by category,
+/// then, within categories, are sorted according
+/// to a natural sort.
+///
+/// You'll notice that a very similar enum exists
+/// in ruff's reimplementation of isort.
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy)]
+enum InferredMemberType {
+    Constant,
+    Class,
+    Other,
+}
+
+impl InferredMemberType {
+    fn of(value: &str) -> Self {
+        // E.g. `CONSTANT`
+        if value.len() > 1 && is_cased_uppercase(value) {
+            Self::Constant
+        // E.g. `Class`
+        } else if value.starts_with(char::is_uppercase) {
+            Self::Class
+        // E.g. `some_variable` or `some_function`
+        } else {
+            Self::Other
+        }
+    }
+}
 
 /// An enumeration of the various kinds of sequences for which Python has
 /// [display literals](https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries).
@@ -81,23 +183,20 @@ pub(super) enum DisplayKind<'a> {
 /// definition of `__all__` or `__slots__` (etc.),
 /// that can be inserted into the
 /// source code as a `range_replacement` autofix.
-pub(super) fn sort_single_line_elements_sequence<F>(
+pub(super) fn sort_single_line_elements_sequence(
     kind: &SequenceKind,
     elts: &[ast::Expr],
     elements: &[&str],
     locator: &Locator,
-    mut cmp_fn: F,
-) -> String
-where
-    F: FnMut(&str, &str) -> Ordering,
-{
+    sorting_style: &SortingStyle,
+) -> String {
     assert_eq!(elts.len(), elements.len());
     let (opening_paren, closing_paren) = kind.surrounding_parens(locator.contents());
     let last_item_index = elements.len().saturating_sub(1);
     let mut result = String::from(opening_paren);
 
     let mut element_pairs = elements.iter().zip(elts).collect_vec();
-    element_pairs.sort_by(|(elem1, _), (elem2, _)| cmp_fn(elem1, elem2));
+    element_pairs.sort_by(|(elem1, _), (elem2, _)| sorting_style.compare(elem1, elem2));
     // We grab the original source-code ranges using `locator.slice()`
     // rather than using the expression generator, as this approach allows
     // us to easily preserve stylistic choices in the original source code
@@ -131,10 +230,7 @@ pub(super) enum SortClassification<'a> {
 }
 
 impl<'a> SortClassification<'a> {
-    pub(super) fn of_elements<F>(elements: &'a [ast::Expr], mut cmp_fn: F) -> Self
-    where
-        F: FnMut(&str, &str) -> Ordering,
-    {
+    pub(super) fn of_elements(elements: &'a [ast::Expr], sorting_style: &SortingStyle) -> Self {
         let Some((first, rest @ [_, ..])) = elements.split_first() else {
             return Self::Sorted;
         };
@@ -148,7 +244,7 @@ impl<'a> SortClassification<'a> {
                 return Self::NotAListOfStringLiterals;
             };
             let next = string_node.value.to_str();
-            if cmp_fn(next, this).is_lt() {
+            if sorting_style.compare(next, this).is_lt() {
                 let mut items = Vec::with_capacity(elements.len());
                 for expr in elements {
                     let Some(string_node) = expr.as_string_literal_expr() else {
@@ -220,15 +316,12 @@ impl MultilineStringSequenceValue {
     /// has length < 2. It's redundant to call this method in this case,
     /// since lists with < 2 items cannot be unsorted,
     /// so this is a logic error.
-    pub(super) fn into_sorted_source_code<F>(
+    pub(super) fn into_sorted_source_code(
         mut self,
-        cmp_fn: F,
+        sorting_style: &SortingStyle,
         locator: &Locator,
         stylist: &Stylist,
-    ) -> String
-    where
-        F: FnMut(&StringSequenceItem, &StringSequenceItem) -> Ordering,
-    {
+    ) -> String {
         let (first_item_start, last_item_end) = match self.items.as_slice() {
             [first_item, .., last_item] => (first_item.start(), last_item.end()),
             _ => panic!(
@@ -289,7 +382,8 @@ impl MultilineStringSequenceValue {
             locator,
         );
 
-        self.items.sort_by(cmp_fn);
+        self.items
+            .sort_by(|a, b| sorting_style.compare(&a.value, &b.value));
         let joined_items = join_multiline_string_sequence_items(
             &self.items,
             locator,
@@ -594,7 +688,7 @@ fn collect_string_sequence_items(
 /// of `# comment1` does not form a contiguous range with the
 /// source-code range of `"a"`.
 #[derive(Debug)]
-pub(super) struct StringSequenceItem {
+struct StringSequenceItem {
     value: String,
     preceding_comment_ranges: Vec<TextRange>,
     element_range: TextRange,
@@ -607,10 +701,6 @@ pub(super) struct StringSequenceItem {
 }
 
 impl StringSequenceItem {
-    pub(super) fn value(&self) -> &str {
-        &self.value
-    }
-
     fn new(
         value: String,
         preceding_comment_ranges: Vec<TextRange>,

@@ -1,24 +1,19 @@
-use std::cmp::Ordering;
-
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_stdlib::str::is_cased_uppercase;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::sequence_sorting::{
     sort_single_line_elements_sequence, MultilineStringSequenceValue, SequenceKind,
-    SortClassification, StringSequenceItem,
+    SortClassification, SortingStyle,
 };
-
-use natord;
 
 /// ## What it does
 /// Checks for `__all__` definitions that are not ordered
 /// according to an "isort-style" sort.
 ///
-/// An isort-style sort sorts items first according to their casing:
+/// An isort-style sort orders items first according to their casing:
 /// SCREAMING_SNAKE_CASE names (conventionally used for global constants)
 /// come first, followed by CamelCase names (conventionally used for
 /// classes), followed by anything else. Within each category,
@@ -81,6 +76,8 @@ impl Violation for UnsortedDunderAll {
         Some("Apply an isort-style sorting to `__all__`".to_string())
     }
 }
+
+const SORTING_STYLE: &SortingStyle = &SortingStyle::Isort;
 
 /// Sort an `__all__` definition represented by a `StmtAssign` AST node.
 /// For example: `__all__ = ["b", "c", "a"]`.
@@ -161,9 +158,7 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
         _ => return,
     };
 
-    let elts_analysis = SortClassification::of_elements(elts, |a, b| {
-        AllItemSortKey::from(a).cmp(&AllItemSortKey::from(b))
-    });
+    let elts_analysis = SortClassification::of_elements(elts, SORTING_STYLE);
     if elts_analysis.is_not_a_list_of_string_literals() || elts_analysis.is_sorted() {
         return;
     }
@@ -177,84 +172,6 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
     }
 
     checker.diagnostics.push(diagnostic);
-}
-
-/// A struct to implement logic necessary to achieve
-/// an "isort-style sort".
-///
-/// See the docs for this module as a whole for the
-/// definition we use here of an "isort-style sort".
-struct AllItemSortKey<'a> {
-    category: InferredMemberType,
-    value: &'a str,
-}
-
-impl Ord for AllItemSortKey<'_> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.category
-            .cmp(&other.category)
-            .then_with(|| natord::compare(self.value, other.value))
-    }
-}
-
-impl PartialOrd for AllItemSortKey<'_> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl PartialEq for AllItemSortKey<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == Ordering::Equal
-    }
-}
-
-impl Eq for AllItemSortKey<'_> {}
-
-impl<'a> From<&'a str> for AllItemSortKey<'a> {
-    fn from(value: &'a str) -> Self {
-        Self {
-            category: InferredMemberType::of(value),
-            value,
-        }
-    }
-}
-
-impl<'a> From<&'a StringSequenceItem> for AllItemSortKey<'a> {
-    fn from(item: &'a StringSequenceItem) -> Self {
-        Self::from(item.value())
-    }
-}
-
-/// Classification for an element in `__all__`.
-///
-/// This is necessary to achieve an "isort-style" sort,
-/// where elements are sorted first by category,
-/// then, within categories, are sorted according
-/// to a natural sort.
-///
-/// You'll notice that a very similar enum exists
-/// in ruff's reimplementation of isort.
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy)]
-enum InferredMemberType {
-    Constant,
-    Class,
-    Other,
-}
-
-impl InferredMemberType {
-    fn of(value: &str) -> Self {
-        // E.g. `CONSTANT`
-        if value.len() > 1 && is_cased_uppercase(value) {
-            Self::Constant
-        // E.g. `Class`
-        } else if value.starts_with(char::is_uppercase) {
-            Self::Class
-        // E.g. `some_variable` or `some_function`
-        } else {
-            Self::Other
-        }
-    }
 }
 
 /// Attempt to return `Some(fix)`, where `fix` is a `Fix`
@@ -293,15 +210,9 @@ fn create_fix(
         if is_multiline {
             let value = MultilineStringSequenceValue::from_source_range(range, kind, locator)?;
             assert_eq!(value.len(), elts.len());
-            value.into_sorted_source_code(
-                |this, next| AllItemSortKey::from(this).cmp(&AllItemSortKey::from(next)),
-                locator,
-                checker.stylist(),
-            )
+            value.into_sorted_source_code(SORTING_STYLE, locator, checker.stylist())
         } else {
-            sort_single_line_elements_sequence(kind, elts, string_items, locator, |a, b| {
-                AllItemSortKey::from(a).cmp(&AllItemSortKey::from(b))
-            })
+            sort_single_line_elements_sequence(kind, elts, string_items, locator, SORTING_STYLE)
         }
     };
 
