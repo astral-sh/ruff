@@ -285,7 +285,8 @@ pub(super) fn sort_single_line_elements_dict(
     value_elts: &[ast::Expr],
     locator: &Locator,
 ) -> String {
-    assert!(key_elts.len() == elements.len() && elements.len() == value_elts.len());
+    assert_eq!(key_elts.len(), elements.len());
+    assert_eq!(elements.len(), value_elts.len());
     let last_item_index = elements.len().saturating_sub(1);
     let mut result = String::from('{');
 
