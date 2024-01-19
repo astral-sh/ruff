@@ -154,7 +154,6 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "CONFIG_OPTION",
-        conflicts_with = "isolated",
         value_parser = ConfigOptionParser,
     )]
     pub config: Option<Vec<ConfigOption>>,
@@ -290,7 +289,7 @@ pub struct CheckCommand {
     #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
     pub no_cache: bool,
     /// Ignore all configuration files.
-    #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
+    #[arg(long, help_heading = "Miscellaneous")]
     pub isolated: bool,
     /// Path to the cache directory.
     #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]
@@ -389,7 +388,6 @@ pub struct FormatCommand {
         long,
         value_delimiter = ',',
         value_name = "CONFIG_OPTION",
-        conflicts_with = "isolated",
         value_parser = ConfigOptionParser,
     )]
     pub config: Option<Vec<ConfigOption>>,
@@ -434,7 +432,7 @@ pub struct FormatCommand {
     #[arg(long, help_heading = "Format configuration")]
     pub line_length: Option<LineLength>,
     /// Ignore all configuration files.
-    #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
+    #[arg(long, help_heading = "Miscellaneous")]
     pub isolated: bool,
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]

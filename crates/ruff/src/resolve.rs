@@ -9,7 +9,7 @@ use ruff_workspace::options::Options;
 use ruff_workspace::pyproject::{self, parse_ruff_toml_from_cli};
 use ruff_workspace::resolver::{
     resolve_root_settings, ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy,
-    Relativity,
+    Relativity
 };
 
 use crate::args::{CliOverrides, ConfigOption};
@@ -61,10 +61,16 @@ pub fn resolve(
     overrides: &CliOverrides,
     stdin_filename: Option<&Path>,
 ) -> Result<PyprojectConfig> {
+    let config_args = ConfigArgs::from_cli_options(config_options)?;
+
     // First priority: if we're running in isolated mode, use the default settings.
     if isolated {
-        let config = overrides.transform(Configuration::default());
-        let settings = config.into_settings(&path_dedot::CWD)?;
+        let mut config = overrides.transform(Configuration::default());
+        let project_root = &path_dedot::CWD;
+        for option in config_args.overrides {
+            config = config.combine(Configuration::from_options(option, project_root)?);
+        }
+        let settings = config.into_settings(project_root)?;
         debug!("Isolated mode, not reading any pyproject.toml");
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Fixed,
@@ -72,8 +78,6 @@ pub fn resolve(
             None,
         ));
     }
-
-    let config_args = ConfigArgs::from_cli_options(config_options)?;
 
     // Second priority: the user specified a `pyproject.toml` file. Use that
     // `pyproject.toml` for _all_ configuration, and resolve paths relative to the
