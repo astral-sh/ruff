@@ -64,7 +64,7 @@ pub(crate) fn format(
 ) -> Result<ExitStatus> {
     let pyproject_config = resolve(
         cli.isolated,
-        cli.config.as_deref(),
+        &cli.config,
         overrides,
         cli.stdin_filename.as_deref(),
     )?;

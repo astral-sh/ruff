@@ -47,6 +47,11 @@ fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
         .with_context(|| format!("Failed to parse {}", path.as_ref().display()))
 }
 
+/// Parse "inline TOML" passed from the CLI
+pub fn parse_ruff_toml_from_cli(contents: &str) -> Result<Options, toml::de::Error> {
+    toml::from_str(contents)
+}
+
 /// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
     let contents = std::fs::read_to_string(path.as_ref())

@@ -1,5 +1,7 @@
 use std::path::PathBuf;
+use std::str::FromStr;
 
+use clap::builder::{TypedValueParser, ValueParserFactory};
 use clap::{command, Parser};
 use regex::Regex;
 use rustc_hash::FxHashMap;
@@ -146,10 +148,16 @@ pub struct CheckCommand {
     preview: bool,
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
-    /// Path to the `pyproject.toml` or `ruff.toml` file to use for
-    /// configuration.
-    #[arg(long, conflicts_with = "isolated")]
-    pub config: Option<PathBuf>,
+    /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
+    /// or "inline TOML" providing configuration overrides from the command line.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "CONFIG_OPTION",
+        conflicts_with = "isolated",
+        value_parser = ConfigOptionParser,
+    )]
+    pub config: Option<Vec<ConfigOption>>,
     /// Comma-separated list of rule codes to enable (or ALL, to enable all rules).
     #[arg(
         long,
@@ -375,9 +383,16 @@ pub struct FormatCommand {
     /// difference between the current file and how the formatted file would look like.
     #[arg(long)]
     pub diff: bool,
-    /// Path to the `pyproject.toml` or `ruff.toml` file to use for configuration.
-    #[arg(long, conflicts_with = "isolated")]
-    pub config: Option<PathBuf>,
+    /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
+    /// or "inline TOML" providing configuration overrides from the command line.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "CONFIG_OPTION",
+        conflicts_with = "isolated",
+        value_parser = ConfigOptionParser,
+    )]
+    pub config: Option<Vec<ConfigOption>>,
 
     /// Disable cache reads.
     #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
@@ -594,12 +609,59 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
     }
 }
 
+/// --config arguments passed via the CLI
+/// Users may pass 0 or 1 paths to a configuration file,
+/// and an arbitrary number of "inline TOML" options
+///
+/// For example:
+///
+/// ```
+/// ruff check --config "path/to/pyproject.toml" --config "max-line-length=90" --config "isort.case-sensitive=false"
+/// ```
+#[derive(Clone, Debug)]
+pub enum ConfigOption {
+    PathToConfigFile(PathBuf),
+    InlineToml(String),
+}
+
+#[derive(Clone)]
+pub struct ConfigOptionParser;
+
+impl ValueParserFactory for ConfigOption {
+    type Parser = ConfigOptionParser;
+
+    fn value_parser() -> Self::Parser {
+        ConfigOptionParser
+    }
+}
+
+impl TypedValueParser for ConfigOptionParser {
+    type Value = ConfigOption;
+
+    fn parse_ref(
+        &self,
+        _: &clap::Command,
+        _: Option<&clap::Arg>,
+        value: &std::ffi::OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        let value = value
+            .to_str()
+            .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
+        if let Ok(path_to_config_file) = PathBuf::from_str(value) {
+            if path_to_config_file.exists() {
+                return Ok(ConfigOption::PathToConfigFile(path_to_config_file));
+            }
+        }
+        Ok(ConfigOption::InlineToml(value.to_string()))
+    }
+}
+
 /// CLI settings that are distinct from configuration (commands, lists of files,
 /// etc.).
 #[allow(clippy::struct_excessive_bools)]
 pub struct CheckArguments {
     pub add_noqa: bool,
-    pub config: Option<PathBuf>,
+    pub config: Option<Vec<ConfigOption>>,
     pub diff: bool,
     pub ecosystem_ci: bool,
     pub exit_non_zero_on_fix: bool,
@@ -623,7 +685,7 @@ pub struct FormatArguments {
     pub check: bool,
     pub no_cache: bool,
     pub diff: bool,
-    pub config: Option<PathBuf>,
+    pub config: Option<Vec<ConfigOption>>,
     pub files: Vec<PathBuf>,
     pub isolated: bool,
     pub stdin_filename: Option<PathBuf>,

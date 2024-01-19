@@ -220,7 +220,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     // files are present, or files are injected from outside of the hierarchy.
     let pyproject_config = resolve::resolve(
         cli.isolated,
-        cli.config.as_deref(),
+        &cli.config,
         &overrides,
         cli.stdin_filename.as_deref(),
     )?;
@@ -369,7 +369,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                     if matches!(change_kind, ChangeKind::Configuration) {
                         pyproject_config = resolve::resolve(
                             cli.isolated,
-                            cli.config.as_deref(),
+                            &cli.config,
                             &overrides,
                             cli.stdin_filename.as_deref(),
                         )?;

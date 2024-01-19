@@ -54,7 +54,7 @@ fn find_pyproject_config(
 ) -> anyhow::Result<PyprojectConfig> {
     let mut pyproject_config = resolve(
         cli.isolated,
-        cli.config.as_deref(),
+        &cli.config,
         overrides,
         cli.stdin_filename.as_deref(),
     )?;
