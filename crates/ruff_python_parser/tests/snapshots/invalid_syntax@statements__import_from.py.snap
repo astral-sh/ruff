@@ -172,7 +172,7 @@ Module(
 3 | a + b
 4 | 
 5 | from abc import ,,
-  |                 ^ Syntax Error: Expected an import name or a '}'
+  |                 ^ Syntax Error: Expected an import name or a ')'
 6 | 
 7 | from abc import
   |
@@ -182,7 +182,7 @@ Module(
 3 | a + b
 4 | 
 5 | from abc import ,,
-  |                  ^ Syntax Error: Expected an import name or a '}'
+  |                  ^ Syntax Error: Expected an import name or a ')'
 6 | 
 7 | from abc import
   |

@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use ruff_python_ast::{
-    self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt,
+    self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt, WithItem,
 };
 use ruff_text_size::{Ranged, TextSize};
 
@@ -92,8 +92,6 @@ impl<'src> Parser<'src> {
     fn parse_single_simple_statement(&mut self) -> Stmt {
         let stmt = self.parse_simple_statement();
 
-        // TODO(micha): Why reset the context?
-        self.last_ctx = ParserCtxFlags::empty();
         let has_eaten_semicolon = self.eat(TokenKind::Semi);
         let has_eaten_newline = self.eat(TokenKind::Newline);
 
@@ -1006,6 +1004,8 @@ impl<'src> Parser<'src> {
         } else {
             [TokenKind::Rpar]
         };
+
+        let mut is_last_parenthesized = false;
         #[allow(deprecated)]
         self.parse_separated(
             // Only allow a trailing delimiter if we've seen a `(`.
@@ -1013,7 +1013,9 @@ impl<'src> Parser<'src> {
             TokenKind::Comma,
             ending,
             |parser| {
-                items.push(parser.parse_with_item());
+                let parsed_with_item = parser.parse_with_item();
+                is_last_parenthesized = parsed_with_item.is_parenthesized;
+                items.push(parsed_with_item.item);
             },
         );
         // Special-case: if we have a parenthesized `WithItem` that was parsed as
@@ -1027,11 +1029,10 @@ impl<'src> Parser<'src> {
         // ```
         // In this case, the `(` and `)` are part of the `with` statement.
         // The exception is when `WithItem` is an `()` (empty tuple).
-        if items.len() == 1 {
-            let with_item = items.last_mut().unwrap();
+        if let [with_item] = items.as_mut_slice() {
             if treat_it_as_expr
                 && with_item.optional_vars.is_none()
-                && self.last_ctx.contains(ParserCtxFlags::PARENTHESIZED_EXPR)
+                && is_last_parenthesized
                 && !matches!(with_item.context_expr, Expr::Tuple(_))
             {
                 with_item.range = with_item.range.add_start(1.into()).sub_end(1.into());
@@ -1045,7 +1046,7 @@ impl<'src> Parser<'src> {
         items
     }
 
-    fn parse_with_item(&mut self) -> ast::WithItem {
+    fn parse_with_item(&mut self) -> ParsedWithItem {
         let start = self.node_start();
 
         let context_expr = self.parse_conditional_expression_or_higher();
@@ -1087,10 +1088,13 @@ impl<'src> Parser<'src> {
             None
         };
 
-        ast::WithItem {
-            range: self.node_range(start),
-            context_expr: context_expr.expr,
-            optional_vars,
+        ParsedWithItem {
+            is_parenthesized: context_expr.is_parenthesized,
+            item: ast::WithItem {
+                range: self.node_range(start),
+                context_expr: context_expr.expr,
+                optional_vars,
+            },
         }
     }
 
@@ -1613,4 +1617,9 @@ impl Display for Clause {
             Clause::Finally => write!(f, "`finally` clause"),
         }
     }
+}
+
+struct ParsedWithItem {
+    item: WithItem,
+    is_parenthesized: bool,
 }

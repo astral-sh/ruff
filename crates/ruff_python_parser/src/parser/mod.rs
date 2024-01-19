@@ -70,9 +70,6 @@ pub(crate) struct Parser<'src> {
     /// an expression or statement is done parsing.
     ctx: ParserCtxFlags,
 
-    /// Stores the last `ctx` of an expression or statement that was parsed.
-    last_ctx: ParserCtxFlags,
-
     /// Specify the mode in which the code will be parsed.
     mode: Mode,
 
@@ -137,7 +134,6 @@ impl<'src> Parser<'src> {
             source,
             errors: Vec::new(),
             ctx: ParserCtxFlags::empty(),
-            last_ctx: ParserCtxFlags::empty(),
             tokens,
             recovery_context: RecoveryContext::empty(),
             last_token_end: tokens_range.start(),
@@ -247,7 +243,6 @@ impl<'src> Parser<'src> {
     #[inline]
     fn restore_ctx(&mut self, current: ParserCtxFlags, mut saved_context: SavedParserContext) {
         assert_eq!(self.ctx, current);
-        self.last_ctx = current;
         saved_context.bomb.defuse();
         self.ctx = saved_context.flags;
     }
