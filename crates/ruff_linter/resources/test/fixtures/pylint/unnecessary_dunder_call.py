@@ -1,6 +1,6 @@
 from typing import Any
 
-
+a = 2
 print((3.0).__add__(4.0))  # PLC2801
 print((3.0).__sub__(4.0))  # PLC2801
 print((3.0).__mul__(4.0))  # PLC2801
@@ -17,6 +17,13 @@ print((3.0).__str__())  # PLC2801
 print((3.0).__repr__())  # PLC2801
 print([1, 2, 3].__len__())  # PLC2801
 print((1).__neg__())  # PLC2801
+print(-a.__sub__(1))  # PLC2801
+print(-(a).__sub__(1))  # PLC2801
+print(-(-a.__sub__(1)))  # PLC2801
+print((5 - a).__sub__(1))  # PLC2801
+print(-(5 - a).__sub__(1))  # PLC2801
+print(-(-5 - a).__sub__(1))  # PLC2801
+print(+-+-+-a.__sub__(1))  # PLC2801
 
 
 class Thing:

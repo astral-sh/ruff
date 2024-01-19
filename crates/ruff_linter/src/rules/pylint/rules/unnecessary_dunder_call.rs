@@ -2,6 +2,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::SemanticModel;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -156,8 +157,44 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
         call.range(),
     );
 
-    if let Some(fixed) = fixed {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(fixed, call.range())));
+    if let Some(mut fixed) = fixed {
+        let is_in_unary = checker
+            .semantic()
+            .current_expression_parent()
+            .is_some_and(|parent| matches!(parent, Expr::UnaryOp(ast::ExprUnaryOp { .. })));
+
+        // find the first ")" before our dunder method
+        let rparen = SimpleTokenizer::starts_at(value.as_ref().end(), checker.locator().contents())
+            .find(|token| token.kind == SimpleTokenKind::RParen);
+
+        // find the "." before our dunder method
+        let dot = SimpleTokenizer::starts_at(value.as_ref().end(), checker.locator().contents())
+            .find(|token| token.kind == SimpleTokenKind::Dot)
+            .unwrap();
+
+        if is_in_unary {
+            if rparen.is_some() {
+                // if we're within parentheses with a unary, we're going to take
+                // the value operand, and insert the fix in its place within its
+                // existing parentheses.
+                // for example, `-(-a).__sub__(1)` -> `-(-a - 1)`
+
+                diagnostic.set_fix(Fix::safe_edits(
+                    Edit::range_replacement(fixed, value.as_ref().range()),
+                    [Edit::deletion(dot.start(), call.end())],
+                ));
+            } else {
+                // `-a.__sub__(1)` -> `-(a - 1)`
+                fixed = format!("({fixed})");
+                diagnostic.set_fix(Fix::safe_edits(
+                    Edit::range_replacement(fixed, value.as_ref().range()),
+                    [Edit::deletion(dot.start(), call.end())],
+                ));
+            }
+        } else {
+            // `(3).__add__(1)` -> `3 + 1`
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(fixed, call.range())));
+        }
     };
 
     checker.diagnostics.push(diagnostic);
