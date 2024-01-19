@@ -113,6 +113,7 @@ impl<'src> Parser<'src> {
             // ```
             // The `!` (an unexpected token) will be parsed as `Expr::Invalid`.
             if let Stmt::Expr(expr) = &stmt {
+                #[allow(deprecated)]
                 if let Expr::Invalid(_) = expr.value.as_ref() {
                     return stmt;
                 }
@@ -226,6 +227,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Del);
         let mut targets = vec![];
 
+        #[allow(deprecated)]
         self.parse_separated(true, TokenKind::Comma, [TokenKind::Newline], |parser| {
             let mut target = parser.parse_conditional_expression_or_higher();
             helpers::set_expr_ctx(&mut target.expr, ExprContext::Del);
@@ -318,6 +320,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Import);
 
         let mut names = vec![];
+        #[allow(deprecated)]
         self.parse_separated(false, TokenKind::Comma, [TokenKind::Newline], |parser| {
             names.push(parser.parse_alias());
         });
@@ -364,22 +367,13 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Import);
 
-        let mut names = vec![];
-        if self.at(TokenKind::Lpar) {
-            self.parse_delimited(
-                true,
-                TokenKind::Lpar,
-                TokenKind::Comma,
-                TokenKind::Rpar,
-                |parser| {
-                    names.push(parser.parse_alias());
-                },
-            );
-        } else {
-            self.parse_separated(false, TokenKind::Comma, [TokenKind::Newline], |parser| {
-                names.push(parser.parse_alias());
-            });
-        };
+        let parenthesized = self.eat(TokenKind::Lpar);
+        let names =
+            self.parse_delimited_list(RecoveryContextKind::ImportNames, |p| p.parse_alias(), true);
+
+        if parenthesized {
+            self.expect(TokenKind::Rpar);
+        }
 
         ast::StmtImportFrom {
             module,
@@ -435,6 +429,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Global);
 
         let mut names = vec![];
+        #[allow(deprecated)]
         self.parse_separated(false, TokenKind::Comma, [TokenKind::Newline], |parser| {
             names.push(parser.parse_identifier());
         });
@@ -450,7 +445,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Nonlocal);
 
         let mut names = vec![];
-
+        #[allow(deprecated)]
         self.parse_separated(false, TokenKind::Comma, [TokenKind::Newline], |parser| {
             names.push(parser.parse_identifier());
         });
@@ -477,6 +472,7 @@ impl<'src> Parser<'src> {
                 ParseErrorType::OtherError(format!("expecting identifier, got {tok}")),
                 tok_range,
             );
+            #[allow(deprecated)]
             Expr::Invalid(ast::ExprInvalid {
                 value: self.src_text(tok_range).into(),
                 range: tok_range,
@@ -1010,6 +1006,7 @@ impl<'src> Parser<'src> {
         } else {
             [TokenKind::Rpar]
         };
+        #[allow(deprecated)]
         self.parse_separated(
             // Only allow a trailing delimiter if we've seen a `(`.
             has_seen_lpar,
@@ -1343,6 +1340,7 @@ impl<'src> Parser<'src> {
         let ending_set = TokenSet::new([TokenKind::Rarrow, ending]).union(COMPOUND_STMT_SET);
         let start = self.node_start();
 
+        #[allow(deprecated)]
         self.parse_separated(true, TokenKind::Comma, ending_set, |parser| {
             // Don't allow any parameter after we have seen a vararg `**kwargs`
             if has_seen_vararg {
@@ -1394,6 +1392,7 @@ impl<'src> Parser<'src> {
                 }
 
                 let range = parser.current_range();
+                #[allow(deprecated)]
                 parser.skip_until(
                     ending_set.union(TokenSet::new([TokenKind::Comma, TokenKind::Colon])),
                 );

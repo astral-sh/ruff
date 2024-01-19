@@ -287,6 +287,7 @@ impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
                     patterns: patterns.iter().map(Into::into).collect(),
                 })
             }
+            #[allow(deprecated)]
             ast::Pattern::Invalid(_) => Self::Invalid,
         }
     }
@@ -543,6 +544,7 @@ impl<'a> From<&'a ast::FStringElement> for ComparableFStringElement<'a> {
                         .map(|spec| spec.elements.iter().map(Into::into).collect()),
                 })
             }
+            #[allow(deprecated)]
             ast::FStringElement::Invalid(_) => Self::Invalid,
         }
     }
@@ -1099,6 +1101,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 kind: *kind,
                 value: value.as_str(),
             }),
+            #[allow(deprecated)]
             ast::Expr::Invalid(_) => Self::Invalid,
         }
     }

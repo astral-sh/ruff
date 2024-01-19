@@ -554,6 +554,7 @@ impl From<StmtContinue> for Stmt {
 }
 
 /// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)
+#[allow(deprecated)]
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Expr {
     #[is(name = "bool_op_expr")]
@@ -624,6 +625,8 @@ pub enum Expr {
     IpyEscapeCommand(ExprIpyEscapeCommand),
 
     #[is(name = "invalid_expr")]
+    #[deprecated]
+    #[allow(deprecated)]
     Invalid(ExprInvalid),
 }
 
@@ -666,6 +669,7 @@ pub struct ExprInvalid {
 
 impl From<ExprInvalid> for Expr {
     fn from(payload: ExprInvalid) -> Self {
+        #[allow(deprecated)]
         Expr::Invalid(payload)
     }
 }
@@ -1223,9 +1227,13 @@ impl From<FString> for Expr {
 }
 
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
+#[allow(deprecated)]
 pub enum FStringElement {
     Literal(FStringLiteralElement),
     Expression(FStringExpressionElement),
+
+    #[allow(deprecated)]
+    #[deprecated]
     Invalid(FStringInvalidElement),
 }
 
@@ -1234,6 +1242,7 @@ impl Ranged for FStringElement {
         match self {
             FStringElement::Literal(node) => node.range(),
             FStringElement::Expression(node) => node.range(),
+            #[allow(deprecated)]
             FStringElement::Invalid(node) => node.range(),
         }
     }
@@ -2692,6 +2701,7 @@ pub struct MatchCase {
 
 /// See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
+#[allow(deprecated)]
 pub enum Pattern {
     MatchValue(PatternMatchValue),
     MatchSingleton(PatternMatchSingleton),
@@ -2701,6 +2711,7 @@ pub enum Pattern {
     MatchStar(PatternMatchStar),
     MatchAs(PatternMatchAs),
     MatchOr(PatternMatchOr),
+    #[deprecated]
     Invalid(PatternMatchInvalid),
 }
 
@@ -2840,6 +2851,7 @@ pub struct PatternMatchInvalid {
     pub range: TextRange,
 }
 
+#[allow(deprecated)]
 impl From<PatternMatchInvalid> for Pattern {
     fn from(payload: PatternMatchInvalid) -> Self {
         Pattern::Invalid(payload)
@@ -3748,6 +3760,7 @@ impl Ranged for crate::Expr {
             Self::Tuple(node) => node.range(),
             Self::Slice(node) => node.range(),
             Self::IpyEscapeCommand(node) => node.range(),
+            #[allow(deprecated)]
             Self::Invalid(node) => node.range(),
         }
     }
@@ -3850,6 +3863,7 @@ impl Ranged for crate::Pattern {
             Self::MatchStar(node) => node.range(),
             Self::MatchAs(node) => node.range(),
             Self::MatchOr(node) => node.range(),
+            #[allow(deprecated)]
             Self::Invalid(node) => node.range(),
         }
     }

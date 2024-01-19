@@ -110,6 +110,7 @@ impl<'src> Parser<'src> {
                     &lhs,
                 );
 
+                #[allow(deprecated)]
                 Box::new(Expr::Invalid(ast::ExprInvalid {
                     value: self.src_text(lhs.range()).into(),
                     range: lhs.range(),
@@ -133,6 +134,7 @@ impl<'src> Parser<'src> {
                     rhs_pattern.range(),
                 );
 
+                #[allow(deprecated)]
                 Box::new(Expr::Invalid(ast::ExprInvalid {
                     value: self.src_text(rhs_pattern.range()).into(),
                     range: rhs_pattern.range(),
@@ -176,6 +178,7 @@ impl<'src> Parser<'src> {
         let mut patterns = vec![];
         let mut rest = None;
 
+        #[allow(deprecated)]
         self.parse_delimited(
             true,
             TokenKind::Lbrace,
@@ -312,6 +315,7 @@ impl<'src> Parser<'src> {
 
         let mut patterns = vec![first_elt];
 
+        #[allow(deprecated)]
         self.parse_separated(true, TokenKind::Comma, [ending], |parser| {
             patterns.push(parser.parse_match_pattern());
         });
@@ -428,8 +432,11 @@ impl<'src> Parser<'src> {
                     },
                     tok_range,
                 );
+
+                #[allow(deprecated)]
                 self.skip_until(RECOVERY_SET);
 
+                #[allow(deprecated)]
                 Pattern::Invalid(ast::PatternMatchInvalid {
                     value: self.src_text(tok_range).into(),
                     range: self.node_range(start),
@@ -457,6 +464,7 @@ impl<'src> Parser<'src> {
         let mut has_seen_keyword_pattern = false;
 
         let arguments_start = self.node_start();
+        #[allow(deprecated)]
         self.parse_delimited(
             true,
             TokenKind::Lpar,
@@ -482,6 +490,7 @@ impl<'src> Parser<'src> {
                             range: parser.node_range(pattern_start),
                         });
                     } else {
+                        #[allow(deprecated)]
                         parser.skip_until(END_EXPR_SET);
                         parser.add_error(
                             ParseErrorType::OtherError("`not valid keyword pattern".to_string()),
@@ -517,6 +526,7 @@ impl<'src> Parser<'src> {
                         ctx: ExprContext::Load,
                     }))
                 } else {
+                    #[allow(deprecated)]
                     Box::new(Expr::Invalid(ast::ExprInvalid {
                         value: self.src_text(&ident).into(),
                         range: ident.range(),
@@ -534,6 +544,7 @@ impl<'src> Parser<'src> {
                     &pattern,
                 );
                 // FIXME(micha): Including the entire range is not ideal because it also includes trivia.
+                #[allow(deprecated)]
                 Box::new(Expr::Invalid(ast::ExprInvalid {
                     value: self.src_text(pattern.range()).into(),
                     range: pattern.range(),
