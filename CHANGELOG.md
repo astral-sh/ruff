@@ -37,7 +37,7 @@
 - \[`pandas-vet`\] Limit inplace diagnostics to methods that accept inplace ([#9495](https://github.com/astral-sh/ruff/pull/9495))
 - \[`pylint`\] Add the `__prepare__` method to the list of recognized dunder method ([#9529](https://github.com/astral-sh/ruff/pull/9529))
 - \[`pylint`\] Ignore unnecessary dunder calls within dunder definitions ([#9496](https://github.com/astral-sh/ruff/pull/9496))
-- \[`refurb`\] Avoid bailing when `reimplemented-operator` is called on function ([#9556](https://github.com/astral-sh/ruff/pull/9556))
+- \[`refurb`\] Avoid bailing when `reimplemented-operator` is called on function (`FURB118`) ([#9556](https://github.com/astral-sh/ruff/pull/9556))
 - \[`ruff`\] Avoid treating named expressions as static keys (`RUF011`) ([#9494](https://github.com/astral-sh/ruff/pull/9494))
 
 ### Documentation
