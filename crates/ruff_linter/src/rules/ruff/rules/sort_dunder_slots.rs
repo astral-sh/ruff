@@ -5,14 +5,16 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_semantic::ScopeKind;
+use ruff_source_file::Locator;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::sequence_sorting::{
-    sort_single_line_elements_dict, sort_single_line_elements_sequence, DisplayKind,
-    MultilineStringSequenceValue, SequenceKind, SortClassification,
+    sort_single_line_elements_sequence, DisplayKind, MultilineStringSequenceValue, SequenceKind,
+    SortClassification,
 };
 
+use itertools::{izip, Itertools};
 use natord;
 
 /// ## What it does
@@ -253,7 +255,7 @@ fn create_fix(
         } else {
             match display_kind {
                 DisplayKind::Dict { values } => {
-                    sort_single_line_elements_dict(elts, items, values, locator, natord::compare)
+                    sort_single_line_elements_dict(elts, items, values, locator)
                 }
                 DisplayKind::Sequence(sequence_kind) => sort_single_line_elements_sequence(
                     sequence_kind,
@@ -269,4 +271,37 @@ fn create_fix(
         sorted_source_code,
         *range,
     )))
+}
+
+/// Create a string representing a fixed-up single-line
+/// definition of `__all__` or `__slots__` (etc.),
+/// that can be inserted into the
+/// source code as a `range_replacement` autofix.
+pub(super) fn sort_single_line_elements_dict(
+    key_elts: &[ast::Expr],
+    elements: &[&str],
+    value_elts: &[ast::Expr],
+    locator: &Locator,
+) -> String {
+    assert!(key_elts.len() == elements.len() && elements.len() == value_elts.len());
+    let last_item_index = elements.len().saturating_sub(1);
+    let mut result = String::from('{');
+
+    let mut element_trios = izip!(elements, key_elts, value_elts).collect_vec();
+    element_trios.sort_by(|(elem1, _, _), (elem2, _, _)| natord::compare(elem1, elem2));
+    // We grab the original source-code ranges using `locator.slice()`
+    // rather than using the expression generator, as this approach allows
+    // us to easily preserve stylistic choices in the original source code
+    // such as whether double or single quotes were used.
+    for (i, (_, key, value)) in element_trios.iter().enumerate() {
+        result.push_str(locator.slice(key));
+        result.push_str(": ");
+        result.push_str(locator.slice(value));
+        if i < last_item_index {
+            result.push_str(", ");
+        }
+    }
+
+    result.push('}');
+    result
 }

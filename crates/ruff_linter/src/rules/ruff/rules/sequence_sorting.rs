@@ -8,13 +8,13 @@ use std::cmp::Ordering;
 
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_python_parser::{lexer, Mode, Tok, TokenKind};
 use ruff_python_trivia::leading_indentation;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use is_macro;
-use itertools::{izip, Itertools};
+use itertools::Itertools;
 
 /// An enumeration of the various kinds of sequences for which Python has
 /// [display literals](https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries).
@@ -51,19 +51,19 @@ impl SequenceKind<'_> {
         }
     }
 
-    fn opening_token_for_multiline_definition(&self) -> Tok {
+    const fn opening_token_for_multiline_definition(&self) -> TokenKind {
         match self {
-            Self::List => Tok::Lsqb,
-            Self::Set => Tok::Lbrace,
-            Self::Tuple(_) => Tok::Lpar,
+            Self::List => TokenKind::Lsqb,
+            Self::Set => TokenKind::Lbrace,
+            Self::Tuple(_) => TokenKind::Lpar,
         }
     }
 
-    fn closing_token_for_multiline_definition(&self) -> Tok {
+    const fn closing_token_for_multiline_definition(&self) -> TokenKind {
         match self {
-            Self::List => Tok::Rsqb,
-            Self::Set => Tok::Rbrace,
-            Self::Tuple(_) => Tok::Rpar,
+            Self::List => TokenKind::Rsqb,
+            Self::Set => TokenKind::Rbrace,
+            Self::Tuple(_) => TokenKind::Rpar,
         }
     }
 }
@@ -113,58 +113,20 @@ where
     result
 }
 
-/// Create a string representing a fixed-up single-line
-/// definition of `__all__` or `__slots__` (etc.),
-/// that can be inserted into the
-/// source code as a `range_replacement` autofix.
-pub(super) fn sort_single_line_elements_dict<F>(
-    key_elts: &[ast::Expr],
-    elements: &[&str],
-    value_elts: &[ast::Expr],
-    locator: &Locator,
-    mut cmp_fn: F,
-) -> String
-where
-    F: FnMut(&str, &str) -> Ordering,
-{
-    assert!(key_elts.len() == elements.len() && elements.len() == value_elts.len());
-    let last_item_index = elements.len().saturating_sub(1);
-    let mut result = String::from('{');
-
-    let mut element_trios = izip!(elements, key_elts, value_elts).collect_vec();
-    element_trios.sort_by(|(elem1, _, _), (elem2, _, _)| cmp_fn(elem1, elem2));
-    // We grab the original source-code ranges using `locator.slice()`
-    // rather than using the expression generator, as this approach allows
-    // us to easily preserve stylistic choices in the original source code
-    // such as whether double or single quotes were used.
-    for (i, (_, key, value)) in element_trios.iter().enumerate() {
-        result.push_str(locator.slice(key));
-        result.push_str(": ");
-        result.push_str(locator.slice(value));
-        if i < last_item_index {
-            result.push_str(", ");
-        }
-    }
-
-    result.push('}');
-    result
-}
-
 /// An enumeration of the possible conclusions we could come to
-/// regarding the ordering of the elements in a display of string literals:
-///
-/// 1. It's a display of string literals that is already sorted
-/// 2. It's an unsorted display of string literals,
-///    but we wouldn't be able to autofix it
-/// 3. It's an unsorted display of string literals,
-///    and it's possible we could generate a fix for it
-/// 4. The display contains one or more items that are not string
-///    literals.
+/// regarding the ordering of the elements in a display of string literals
 #[derive(Debug, is_macro::Is)]
 pub(super) enum SortClassification<'a> {
+    /// It's a display of string literals that is already sorted
     Sorted,
+    /// It's an unsorted display of string literals,
+    /// but we wouldn't be able to autofix it
     UnsortedButUnfixable,
+    /// It's an unsorted display of string literals,
+    /// and it's possible we could generate a fix for it
     UnsortedAndMaybeFixable { items: Vec<&'a str> },
+    /// The display contains one or more items that are not string
+    /// literals.
     NotAListOfStringLiterals,
 }
 
@@ -383,7 +345,7 @@ fn collect_string_sequence_lines(
     let mut token_iter =
         lexer::lex_starts_at(locator.slice(range), Mode::Expression, range.start());
     let (first_tok, _) = token_iter.next()?.ok()?;
-    if first_tok != kind.opening_token_for_multiline_definition() {
+    if TokenKind::from(&first_tok) != kind.opening_token_for_multiline_definition() {
         return None;
     }
     let expected_final_token = kind.closing_token_for_multiline_definition();
@@ -406,7 +368,7 @@ fn collect_string_sequence_lines(
                 line_state.visit_comma_token(subrange);
                 ends_with_trailing_comma = true;
             }
-            tok if tok == expected_final_token => {
+            tok if TokenKind::from(&tok) == expected_final_token => {
                 lines.push(line_state.into_string_sequence_line());
                 break;
             }
