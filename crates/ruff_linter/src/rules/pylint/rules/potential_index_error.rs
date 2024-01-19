@@ -2,7 +2,6 @@ use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 
@@ -32,22 +31,24 @@ impl Violation for PotentialIndexError {
 pub(crate) fn potential_index_error(checker: &mut Checker, value: &Expr, slice: &Expr) {
     let length = match value {
         Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
-            i32::try_from(elts.len())
+            match i64::try_from(elts.len()) {
+                Ok(length) => length,
+                Err(_) => return,
+            }
         }
         _ => {
             return;
         }
     };
 
-    let Ok(length) = length else {
-        return;
-    };
-
     let (number_value, range) = match slice {
         Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Int(number_value),
             range,
-        }) => (number_value.as_i32(), *range),
+        }) => match number_value.as_i64() {
+            Some(value) => (-value, *range),
+            None => return,
+        },
         Expr::UnaryOp(ast::ExprUnaryOp {
             op: ast::UnaryOp::USub,
             operand,
@@ -56,17 +57,13 @@ pub(crate) fn potential_index_error(checker: &mut Checker, value: &Expr, slice: 
             Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Int(number_value),
                 ..
-            }) => match number_value.as_i32() {
-                Some(value) => (Some(-value), *range),
-                None => (None, TextRange::default()),
+            }) => match number_value.as_i64() {
+                Some(value) => (-value, *range),
+                None => return,
             },
-            _ => (None, TextRange::default()),
+            _ => return,
         },
-        _ => (None, TextRange::default()),
-    };
-
-    let Some(number_value) = number_value else {
-        return;
+        _ => return,
     };
 
     if number_value >= length || number_value < -length {
