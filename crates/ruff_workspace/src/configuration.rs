@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
 use glob::{glob, GlobError, Paths, PatternError};
+use itertools::Itertools;
 use regex::Regex;
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -41,9 +42,9 @@ use crate::options::{
     Flake8ComprehensionsOptions, Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
     Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8PytestStyleOptions,
     Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
-    Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintOptions, McCabeOptions, Options,
-    Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions, PydocstyleOptions, PyflakesOptions,
-    PylintOptions,
+    Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
+    McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
+    PydocstyleOptions, PyflakesOptions, PylintOptions,
 };
 use crate::settings::{
     FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
@@ -395,12 +396,14 @@ impl Configuration {
     }
 
     pub fn from_options(options: Options, project_root: &Path) -> Result<Self> {
+        warn_about_deprecated_top_level_lint_options(&options.lint_top_level.0);
+
         let lint = if let Some(mut lint) = options.lint {
-            lint.common = lint.common.combine(options.lint_top_level.common);
+            lint.common = lint.common.combine(options.lint_top_level.0);
             lint
         } else {
             LintOptions {
-                common: options.lint_top_level.common,
+                common: options.lint_top_level.0,
                 ..LintOptions::default()
             }
         };
@@ -1130,6 +1133,201 @@ pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> 
         .flatten()
         .collect::<Result<Vec<PathBuf>, GlobError>>()?;
     Ok(paths)
+}
+
+fn warn_about_deprecated_top_level_lint_options(top_level_options: &LintCommonOptions) {
+    let mut used_options = Vec::new();
+
+    if top_level_options.allowed_confusables.is_some() {
+        used_options.push("allowed-confusables");
+    }
+
+    if top_level_options.dummy_variable_rgx.is_some() {
+        used_options.push("dummy-variable-rgx");
+    }
+
+    #[allow(deprecated)]
+    if top_level_options.extend_ignore.is_some() {
+        used_options.push("extend-ignore");
+    }
+
+    if top_level_options.extend_select.is_some() {
+        used_options.push("extend-select");
+    }
+
+    if top_level_options.extend_fixable.is_some() {
+        used_options.push("extend-fixable");
+    }
+
+    #[allow(deprecated)]
+    if top_level_options.extend_unfixable.is_some() {
+        used_options.push("extend-unfixable");
+    }
+
+    if top_level_options.external.is_some() {
+        used_options.push("external");
+    }
+
+    if top_level_options.fixable.is_some() {
+        used_options.push("fixable");
+    }
+
+    if top_level_options.ignore.is_some() {
+        used_options.push("ignore");
+    }
+
+    if top_level_options.extend_safe_fixes.is_some() {
+        used_options.push("extend-safe-fixes");
+    }
+
+    if top_level_options.extend_unsafe_fixes.is_some() {
+        used_options.push("extend-unsafe-fixes");
+    }
+
+    if top_level_options.ignore_init_module_imports.is_some() {
+        used_options.push("ignore-init-module-imports");
+    }
+
+    if top_level_options.logger_objects.is_some() {
+        used_options.push("logger-objects");
+    }
+
+    if top_level_options.select.is_some() {
+        used_options.push("select");
+    }
+
+    if top_level_options.explicit_preview_rules.is_some() {
+        used_options.push("explicit-preview-rules");
+    }
+
+    if top_level_options.task_tags.is_some() {
+        used_options.push("task-tags");
+    }
+
+    if top_level_options.typing_modules.is_some() {
+        used_options.push("typing-modules");
+    }
+
+    if top_level_options.unfixable.is_some() {
+        used_options.push("unfixable");
+    }
+
+    if top_level_options.flake8_annotations.is_some() {
+        used_options.push("flake8-annotations");
+    }
+
+    if top_level_options.flake8_bandit.is_some() {
+        used_options.push("flake8-bandit");
+    }
+
+    if top_level_options.flake8_bugbear.is_some() {
+        used_options.push("flake8-bugbear");
+    }
+
+    if top_level_options.flake8_builtins.is_some() {
+        used_options.push("flake8-builtins");
+    }
+
+    if top_level_options.flake8_comprehensions.is_some() {
+        used_options.push("flake8-comprehensions");
+    }
+
+    if top_level_options.flake8_copyright.is_some() {
+        used_options.push("flake8-copyright");
+    }
+
+    if top_level_options.flake8_errmsg.is_some() {
+        used_options.push("flake8-errmsg");
+    }
+
+    if top_level_options.flake8_quotes.is_some() {
+        used_options.push("flake8-quotes");
+    }
+
+    if top_level_options.flake8_self.is_some() {
+        used_options.push("flake8-self");
+    }
+
+    if top_level_options.flake8_tidy_imports.is_some() {
+        used_options.push("flake8-tidy-imports");
+    }
+
+    if top_level_options.flake8_type_checking.is_some() {
+        used_options.push("flake8-type-checking");
+    }
+
+    if top_level_options.flake8_gettext.is_some() {
+        used_options.push("flake8-gettext");
+    }
+
+    if top_level_options.flake8_implicit_str_concat.is_some() {
+        used_options.push("flake8-implicit-str-concat");
+    }
+
+    if top_level_options.flake8_import_conventions.is_some() {
+        used_options.push("flake8-import-conventions");
+    }
+
+    if top_level_options.flake8_pytest_style.is_some() {
+        used_options.push("flake8-pytest-style");
+    }
+
+    if top_level_options.flake8_unused_arguments.is_some() {
+        used_options.push("flake8-unused-arguments");
+    }
+
+    if top_level_options.isort.is_some() {
+        used_options.push("isort");
+    }
+
+    if top_level_options.mccabe.is_some() {
+        used_options.push("mccabe");
+    }
+
+    if top_level_options.pep8_naming.is_some() {
+        used_options.push("pep8-naming");
+    }
+
+    if top_level_options.pycodestyle.is_some() {
+        used_options.push("pycodestyle");
+    }
+
+    if top_level_options.pydocstyle.is_some() {
+        used_options.push("pydocstyle");
+    }
+
+    if top_level_options.pyflakes.is_some() {
+        used_options.push("pyflakes");
+    }
+
+    if top_level_options.pylint.is_some() {
+        used_options.push("pylint");
+    }
+
+    if top_level_options.pyupgrade.is_some() {
+        used_options.push("pyupgrade");
+    }
+
+    if top_level_options.per_file_ignores.is_some() {
+        used_options.push("per-file-ignores");
+    }
+
+    if top_level_options.extend_per_file_ignores.is_some() {
+        used_options.push("extend-per-file-ignores");
+    }
+
+    if used_options.is_empty() {
+        return;
+    }
+
+    let options_mapping = used_options
+        .iter()
+        .map(|option| format!("{option} -> lint.{option}"))
+        .join(",\n  ");
+
+    warn_user!(
+        "The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:\n  {options_mapping}\n\n",
+    );
 }
 
 #[cfg(test)]
