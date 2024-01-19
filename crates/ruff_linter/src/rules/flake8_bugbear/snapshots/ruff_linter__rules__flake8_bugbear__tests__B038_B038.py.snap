@@ -1,0 +1,137 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B038.py:11:9: B038 editing a loop's mutable iterable often leads to unexpected results/bugs
+   |
+ 9 |     print(elem)
+10 |     if elem % 2 == 0:
+11 |         some_list.remove(elem)  # should error
+   |         ^^^^^^^^^^^^^^^^^^^^^^ B038
+12 | 
+13 | some_list = [1, 2, 3]
+   |
+
+B038.py:26:9: B038 editing a loop's mutable iterable often leads to unexpected results/bugs
+   |
+24 |     print(elem)
+25 |     if elem % 2 == 0:
+26 |         del some_list[2]  # should error
+   |         ^^^^^^^^^^^^^^^^ B038
+27 |         del some_list
+   |
+
+B038.py:27:9: B038 editing a loop's mutable iterable often leads to unexpected results/bugs
+   |
+25 |     if elem % 2 == 0:
+26 |         del some_list[2]  # should error
+27 |         del some_list
+   |         ^^^^^^^^^^^^^ B038
+   |
+
+B038.py:41:9: B038 editing a loop's mutable iterable often leads to unexpected results/bugs
+   |
+39 |     print(elem)
+40 |     if elem % 2 == 0:
+41 |         a.some_list.remove(elem)  # should error
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^ B038
+42 | 
+43 | a = A((1, 2, 3))
+   |
+
+B038.py:47:9: B038 editing a loop's mutable iterable often leads to unexpected results/bugs
+   |
+45 |     print(elem)
+46 |     if elem % 2 == 0:
+47 |         del a.some_list[2]  # should error
+   |         ^^^^^^^^^^^^^^^^^^ B038
+   |
+
+B038.py:56:9: B038 editing a loop's mutable iterable often leads to unexpected results/bugs
+   |
+54 |     if elem == 2:
+55 |         found_idx = some_list.index(elem)  # should not error
+56 |         some_list.append(elem)  # should error
+   |         ^^^^^^^^^^^^^^^^^^^^^^ B038
+57 |         some_list.sort()  # should error
+58 |         some_list.reverse()  # should error
+   |
+
+B038.py:57:9: B038 editing a loop's mutable iterable often leads to unexpected results/bugs
+   |
+55 |         found_idx = some_list.index(elem)  # should not error
+56 |         some_list.append(elem)  # should error
+57 |         some_list.sort()  # should error
+   |         ^^^^^^^^^^^^^^^^ B038
+58 |         some_list.reverse()  # should error
+59 |         some_list.clear()  # should error
+   |
+
+B038.py:58:9: B038 editing a loop's mutable iterable often leads to unexpected results/bugs
+   |
+56 |         some_list.append(elem)  # should error
+57 |         some_list.sort()  # should error
+58 |         some_list.reverse()  # should error
+   |         ^^^^^^^^^^^^^^^^^^^ B038
+59 |         some_list.clear()  # should error
+60 |         some_list.extend([1,2])  # should error
+   |
+
+B038.py:59:9: B038 editing a loop's mutable iterable often leads to unexpected results/bugs
+   |
+57 |         some_list.sort()  # should error
+58 |         some_list.reverse()  # should error
+59 |         some_list.clear()  # should error
+   |         ^^^^^^^^^^^^^^^^^ B038
+60 |         some_list.extend([1,2])  # should error
+61 |         some_list.insert(1, 1)  # should error
+   |
+
+B038.py:60:9: B038 editing a loop's mutable iterable often leads to unexpected results/bugs
+   |
+58 |         some_list.reverse()  # should error
+59 |         some_list.clear()  # should error
+60 |         some_list.extend([1,2])  # should error
+   |         ^^^^^^^^^^^^^^^^^^^^^^^ B038
+61 |         some_list.insert(1, 1)  # should error
+62 |         some_list.pop(1) # should error
+   |
+
+B038.py:61:9: B038 editing a loop's mutable iterable often leads to unexpected results/bugs
+   |
+59 |         some_list.clear()  # should error
+60 |         some_list.extend([1,2])  # should error
+61 |         some_list.insert(1, 1)  # should error
+   |         ^^^^^^^^^^^^^^^^^^^^^^ B038
+62 |         some_list.pop(1) # should error
+63 |         some_list.pop() # should error
+   |
+
+B038.py:62:9: B038 editing a loop's mutable iterable often leads to unexpected results/bugs
+   |
+60 |         some_list.extend([1,2])  # should error
+61 |         some_list.insert(1, 1)  # should error
+62 |         some_list.pop(1) # should error
+   |         ^^^^^^^^^^^^^^^^ B038
+63 |         some_list.pop() # should error
+64 |         some_list = 3 # should error
+   |
+
+B038.py:63:9: B038 editing a loop's mutable iterable often leads to unexpected results/bugs
+   |
+61 |         some_list.insert(1, 1)  # should error
+62 |         some_list.pop(1) # should error
+63 |         some_list.pop() # should error
+   |         ^^^^^^^^^^^^^^^ B038
+64 |         some_list = 3 # should error
+65 |         break
+   |
+
+B038.py:74:9: B038 editing a loop's mutable iterable often leads to unexpected results/bugs
+   |
+72 |     if mydicts.get('a', ''):
+73 |         print(mydict['foo'])  # should not error
+74 |         mydicts.popitem() # should error
+   |         ^^^^^^^^^^^^^^^^^ B038
+   |
+
+
