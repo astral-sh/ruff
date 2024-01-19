@@ -1,52 +1,53 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30.py:609:1: E304 [*] blank lines found after function decorator
+E30.py:630:1: E304 [*] blank lines found after function decorator
     |
-607 | @decorator
-608 | 
-609 | def function():
+628 | @decorator
+629 | 
+630 | def function():
     | ^^^ E304
-610 |     pass
+631 |     pass
+632 | # end
     |
     = help: Remove extraneous blank line(s)
 
 ℹ Safe fix
-605 605 | 
-606 606 | # E304
-607 607 | @decorator
-608     |-
-609 608 | def function():
-610 609 |     pass
-611 610 | 
+626 626 | 
+627 627 | # E304
+628 628 | @decorator
+629     |-
+630 629 | def function():
+631 630 |     pass
+632 631 | # end
 
-E30.py:615:1: E304 [*] blank lines found after function decorator
+E30.py:638:1: E304 [*] blank lines found after function decorator
     |
-613 | @decorator
-614 | 
-615 | # comment
+636 | @decorator
+637 | 
+638 | # comment
     | ^^^^^^^^^ E304
-616 | def function():
-617 |     pass
+639 | def function():
+640 |     pass
     |
     = help: Remove extraneous blank line(s)
 
 ℹ Safe fix
-611 611 | 
-612 612 | 
-613 613 | @decorator
-614     |-
-615 614 | # comment
-616 615 | def function():
-617 616 |     pass
+634 634 | 
+635 635 | # E304
+636 636 | @decorator
+637     |-
+638 637 | # comment
+639 638 | def function():
+640 639 |     pass
 
-E30.py:616:1: E304 [*] blank lines found after function decorator
+E30.py:639:1: E304 [*] blank lines found after function decorator
     |
-615 | # comment
-616 | def function():
+638 | # comment
+639 | def function():
     | ^^^ E304
-617 |     pass
-618 | # end
+640 |     pass
+641 | # end
     |
     = help: Remove extraneous blank line(s)
 

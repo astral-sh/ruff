@@ -417,6 +417,14 @@ async def function1():
 # end
 
 
+# no error
+class Test:
+    async
+
+    def a(self): pass
+# end
+
+
 # E301
 class Class(object):
 
@@ -603,13 +611,28 @@ if True:
 # end
 
 
+# E303
+class Test:
+
+
+    # comment
+
+
+    # another comment
+
+    def test(self): pass
+# end
+
+
 # E304
 @decorator
 
 def function():
     pass
+# end
 
 
+# E304
 @decorator
 
 # comment
@@ -755,20 +778,3 @@ def a():
     async def b():
         pass
 # end
-
-
-class Test:
-    async
-
-    def a(self): pass
-
-
-class Test:
-
-
-    # comment
-
-
-    # another comment
-
-    def test(self): pass
