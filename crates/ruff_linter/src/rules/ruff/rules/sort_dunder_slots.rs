@@ -132,11 +132,11 @@ fn sort_dunder_slots(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr
         return;
     };
 
-    let Some(elts_analysis) = NodeAnalysis::new(node, dunder_kind) else {
+    let Some(display) = StringLiteralDisplay::new(node, dunder_kind) else {
         return;
     };
 
-    let sort_classification = SortClassification::of_elements(&elts_analysis.elts, SORTING_STYLE);
+    let sort_classification = SortClassification::of_elements(&display.elts, SORTING_STYLE);
     if sort_classification.is_not_a_list_of_string_literals() || sort_classification.is_sorted() {
         return;
     }
@@ -146,11 +146,11 @@ fn sort_dunder_slots(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr
             class_name: class_name.to_string(),
             class_variable: dunder_kind,
         },
-        elts_analysis.range,
+        display.range,
     );
 
     if let SortClassification::UnsortedAndMaybeFixable { items } = sort_classification {
-        if let Some(fix) = create_fix(&elts_analysis, &items, checker) {
+        if let Some(fix) = create_fix(&display, &items, checker) {
             diagnostic.set_fix(fix);
         }
     }
@@ -158,14 +158,21 @@ fn sort_dunder_slots(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr
     checker.diagnostics.push(diagnostic);
 }
 
+/// Struct representing a [display](https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries)
+/// of string literals.
 #[derive(Debug)]
-struct NodeAnalysis<'a> {
+struct StringLiteralDisplay<'a> {
+    /// The elts from the original AST node representing the display.
+    /// Each elt is the AST representation of a single string literal
+    /// element in the display
     elts: Cow<'a, Vec<ast::Expr>>,
+    /// The source-code range of the display as a whole
     range: TextRange,
+    /// What kind of a display is it? A dict, set, list or tuple?
     display_kind: DisplayKind<'a>,
 }
 
-impl<'a> NodeAnalysis<'a> {
+impl<'a> StringLiteralDisplay<'a> {
     fn new(node: &'a ast::Expr, dunder_kind: SpecialClassDunder) -> Option<Self> {
         let result = match (dunder_kind, node) {
             (_, ast::Expr::List(ast::ExprList { elts, range, .. })) => {
@@ -231,11 +238,11 @@ impl<'a> NodeAnalysis<'a> {
 }
 
 fn create_fix(
-    NodeAnalysis {
+    StringLiteralDisplay {
         elts,
         range,
         display_kind,
-    }: &NodeAnalysis,
+    }: &StringLiteralDisplay,
     items: &[&str],
     checker: &Checker,
 ) -> Option<Fix> {
