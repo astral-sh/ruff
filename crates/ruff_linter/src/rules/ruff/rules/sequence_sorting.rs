@@ -37,7 +37,7 @@ pub(super) enum SequenceKind<'a> {
 }
 
 impl SequenceKind<'_> {
-    fn surrounding_parens(&self, source: &str) -> (&str, &str) {
+    fn surrounding_parens(&self, source: &str) -> (&'static str, &'static str) {
         match self {
             Self::List => ("[", "]"),
             Self::Set => ("{", "}"),
