@@ -180,6 +180,8 @@ class Klass6:
     else:
         __slots__ += ["alpha", "omega"]
 
+    __slots__ = {"not": "sorted", "but": "includes", **a_kwarg_splat}
+
 __slots__ = ("b", "a", "e", "d")
 __slots__ = ["b", "a", "e", "d"]
 __match_args__ = ["foo", "bar", "antipasti"]
