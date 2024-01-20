@@ -331,7 +331,6 @@ struct LogicalLineInfo {
 
     /// The number of blank lines preceding the current line.
     blank_lines: BlankLines,
-    blank_lines_len: TextSize,
 
     /// The maximum number of consecutive blank lines between the current line
     /// and the previous non-comment logical line.
@@ -376,7 +375,6 @@ impl<'a> Iterator for LinePreprocessor<'a> {
         let mut is_docstring = false;
         // Number of consecutive blank lines directly preceding this logical line.
         let mut blank_lines = BlankLines::Zero;
-        let mut blank_lines_len = TextSize::default();
         let mut logical_line_start: Option<(LogicalLineKind, TextRange)> = None;
         let mut last_token: TokenKind = TokenKind::EndOfFile;
         let mut parens = 0u32;
@@ -402,7 +400,6 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                 // An empty line
                 if token_kind == TokenKind::NonLogicalNewline {
                     blank_lines.add(*range);
-                    blank_lines_len += range.len();
 
                     self.line_start = range.end();
 
@@ -466,8 +463,6 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         is_docstring,
                         indent_length,
                         blank_lines,
-                        blank_lines_len,
-
                         preceding_blank_lines: self.max_preceding_blank_lines,
                     };
 
@@ -715,12 +710,14 @@ impl BlankLinesChecker {
                             blank_lines_range,
                         )));
                     }
-                    BlankLines::Zero => diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                        stylist
-                            .line_ending()
-                            .repeat((BLANK_LINES_TOP_LEVEL) as usize),
-                        locator.line_start(self.last_non_comment_line_end),
-                    ))),
+                    BlankLines::Zero => {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                            stylist
+                                .line_ending()
+                                .repeat((BLANK_LINES_TOP_LEVEL) as usize),
+                            locator.line_start(self.last_non_comment_line_end),
+                        )));
+                    }
                 }
 
                 diagnostics.push(diagnostic);
@@ -737,28 +734,46 @@ impl BlankLinesChecker {
                     line.first_token_range,
                 );
 
-                let chars_to_remove = if line.indent_length > 0 {
-                    u32::from(line.blank_lines_len) - BLANK_LINES_METHOD_LEVEL
-                } else {
-                    u32::from(line.blank_lines_len) - BLANK_LINES_TOP_LEVEL
-                };
-                let end = locator.line_start(line.first_token_range.start());
-                let start = end - TextSize::new(chars_to_remove);
-                diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
+                if let BlankLines::Many {
+                    count: _,
+                    range: blank_lines_range,
+                } = line.blank_lines
+                {
+                    if line.indent_length > 0 {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                            stylist
+                                .line_ending()
+                                .repeat((BLANK_LINES_METHOD_LEVEL) as usize),
+                            blank_lines_range,
+                        )));
+                    } else {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                            stylist
+                                .line_ending()
+                                .repeat((BLANK_LINES_TOP_LEVEL) as usize),
+                            blank_lines_range,
+                        )));
+                    };
+                }
 
                 diagnostics.push(diagnostic);
             }
 
-            if matches!(self.follows, Follows::Decorator) && line.preceding_blank_lines > 0 {
+            if matches!(self.follows, Follows::Decorator)
+                && !line.is_comment_only
+                && line.preceding_blank_lines > 0
+            {
                 // E304
                 let mut diagnostic =
                     Diagnostic::new(BlankLineAfterDecorator, line.first_token_range);
 
-                let range = line.first_token_range;
-                diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-                    locator.line_start(range.start()) - line.blank_lines_len,
-                    locator.line_start(range.start()),
-                )));
+                if let BlankLines::Many {
+                    count: _,
+                    range: blank_lines_range,
+                } = line.preceding_blank_lines
+                {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(blank_lines_range)));
+                }
 
                 diagnostics.push(diagnostic);
             }
@@ -778,13 +793,6 @@ impl BlankLinesChecker {
                     },
                     line.first_token_range,
                 );
-
-                // diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                //     stylist
-                //         .line_ending()
-                //         .repeat((BLANK_LINES_TOP_LEVEL - line.blank_lines) as usize),
-                //     locator.line_start(line.first_token_range.start()),
-                // )));
 
                 match line.blank_lines {
                     BlankLines::Many {

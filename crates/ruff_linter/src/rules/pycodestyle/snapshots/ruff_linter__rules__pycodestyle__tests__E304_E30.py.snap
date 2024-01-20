@@ -21,26 +21,6 @@ E30.py:630:1: E304 [*] blank lines found after function decorator
 631 630 |     pass
 632 631 | # end
 
-E30.py:638:1: E304 [*] blank lines found after function decorator
-    |
-636 | @decorator
-637 | 
-638 | # comment    E304 not expected
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E304
-639 | def function():
-640 |     pass
-    |
-    = help: Remove extraneous blank line(s)
-
-ℹ Safe fix
-634 634 | 
-635 635 | # E304
-636 636 | @decorator
-637     |-
-638 637 | # comment    E304 not expected
-639 638 | def function():
-640 639 |     pass
-
 E30.py:639:1: E304 [*] blank lines found after function decorator
     |
 638 | # comment    E304 not expected
@@ -52,5 +32,12 @@ E30.py:639:1: E304 [*] blank lines found after function decorator
     = help: Remove extraneous blank line(s)
 
 ℹ Safe fix
+634 634 | 
+635 635 | # E304
+636 636 | @decorator
+637     |-
+638 637 | # comment    E304 not expected
+639 638 | def function():
+640 639 |     pass
 
 
