@@ -1069,13 +1069,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ruff::rules::sort_dunder_all_aug_assign(checker, aug_assign);
             }
         }
-        Stmt::If(
-            if_ @ ast::StmtIf {
-                test,
-                elif_else_clauses,
-                ..
-            },
-        ) => {
+        Stmt::If(if_ @ ast::StmtIf { test, .. }) => {
             if checker.enabled(Rule::EmptyTypeCheckingBlock) {
                 if typing::is_type_checking_block(if_, &checker.semantic) {
                     flake8_type_checking::rules::empty_type_checking_block(checker, if_);
@@ -1117,9 +1111,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pyupgrade::rules::outdated_version_block(checker, if_);
             }
             if checker.enabled(Rule::CollapsibleElseIf) {
-                if let Some(diagnostic) = pylint::rules::collapsible_else_if(elif_else_clauses) {
-                    checker.diagnostics.push(diagnostic);
-                }
+                pylint::rules::collapsible_else_if(checker, stmt);
             }
             if checker.enabled(Rule::CheckAndRemoveFromSet) {
                 refurb::rules::check_and_remove_from_set(checker, if_);
