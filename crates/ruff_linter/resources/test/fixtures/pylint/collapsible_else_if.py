@@ -49,6 +49,16 @@ def not_ok1():
             pass
 
 
+def not_ok_with_comments():
+    if 1:
+        pass
+    else:  # else comment
+        if 2:
+            pass
+        else:
+            pass  # final pass comment
+
+
 # Regression test for https://github.com/apache/airflow/blob/f1e1cdcc3b2826e68ba133f350300b5065bbca33/airflow/models/dag.py#L1737
 def not_ok2():
     if True:

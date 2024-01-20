@@ -1,0 +1,115 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+collapsible_else_if.py:37:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+35 |       if 1:
+36 |           pass
+37 |       else:
+   |  _____^
+38 | |         if 2:
+   | |________^ PLR5501
+39 |               pass
+   |
+   = help: Use `elif` instead of `else` then `if`, to reduce indentation
+
+ℹ Safe fix
+34 34 | def not_ok0():
+35 35 |     if 1:
+36 36 |         pass
+37    |-    else:
+38    |-        if 2:
+39    |-            pass
+   37 |+    elif 2:
+   38 |+        pass
+40 39 | 
+41 40 | 
+42 41 | def not_ok1():
+
+collapsible_else_if.py:45:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+43 |       if 1:
+44 |           pass
+45 |       else:
+   |  _____^
+46 | |         if 2:
+   | |________^ PLR5501
+47 |               pass
+48 |           else:
+   |
+   = help: Use `elif` instead of `else` then `if`, to reduce indentation
+
+ℹ Safe fix
+42 42 | def not_ok1():
+43 43 |     if 1:
+44 44 |         pass
+   45 |+    elif 2:
+   46 |+        pass
+45 47 |     else:
+46    |-        if 2:
+47    |-            pass
+48    |-        else:
+49    |-            pass
+   48 |+        pass
+50 49 | 
+51 50 | 
+52 51 | def not_ok_with_comments():
+
+collapsible_else_if.py:55:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+53 |       if 1:
+54 |           pass
+55 |       else:  # else comment
+   |  _____^
+56 | |         if 2:
+   | |________^ PLR5501
+57 |               pass
+58 |           else:
+   |
+   = help: Use `elif` instead of `else` then `if`, to reduce indentation
+
+ℹ Safe fix
+52 52 | def not_ok_with_comments():
+53 53 |     if 1:
+54 54 |         pass
+55    |-    else:  # else comment
+56    |-        if 2:
+57    |-            pass
+58    |-        else:
+59    |-            pass  # final pass comment
+   55 |+    elif 2:
+   56 |+        pass
+   57 |+    else:
+   58 |+        pass  # final pass comment  # else comment
+60 59 | 
+61 60 | 
+62 61 | # Regression test for https://github.com/apache/airflow/blob/f1e1cdcc3b2826e68ba133f350300b5065bbca33/airflow/models/dag.py#L1737
+
+collapsible_else_if.py:68:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+66 |       elif True:
+67 |           print(2)
+68 |       else:
+   |  _____^
+69 | |         if True:
+   | |________^ PLR5501
+70 |               print(3)
+71 |           else:
+   |
+   = help: Use `elif` instead of `else` then `if`, to reduce indentation
+
+ℹ Safe fix
+65 65 |         print(1)
+66 66 |     elif True:
+67 67 |         print(2)
+   68 |+    elif True:
+   69 |+        print(3)
+68 70 |     else:
+69    |-        if True:
+70    |-            print(3)
+71    |-        else:
+72    |-            print(4)
+   71 |+        print(4)
+73 72 | 
+
+

@@ -11,6 +11,7 @@ collapsible_else_if.py:37:5: PLR5501 Use `elif` instead of `else` then `if`, to 
    | |________^ PLR5501
 39 |               pass
    |
+   = help: Use `elif` instead of `else` then `if`, to reduce indentation
 
 collapsible_else_if.py:45:5: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
    |
@@ -23,17 +24,32 @@ collapsible_else_if.py:45:5: PLR5501 Use `elif` instead of `else` then `if`, to 
 47 |               pass
 48 |           else:
    |
+   = help: Use `elif` instead of `else` then `if`, to reduce indentation
 
-collapsible_else_if.py:58:5: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
+collapsible_else_if.py:55:5: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
    |
-56 |       elif True:
-57 |           print(2)
-58 |       else:
+53 |       if 1:
+54 |           pass
+55 |       else:  # else comment
    |  _____^
-59 | |         if True:
+56 | |         if 2:
    | |________^ PLR5501
-60 |               print(3)
-61 |           else:
+57 |               pass
+58 |           else:
    |
+   = help: Use `elif` instead of `else` then `if`, to reduce indentation
+
+collapsible_else_if.py:68:5: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+66 |       elif True:
+67 |           print(2)
+68 |       else:
+   |  _____^
+69 | |         if True:
+   | |________^ PLR5501
+70 |               print(3)
+71 |           else:
+   |
+   = help: Use `elif` instead of `else` then `if`, to reduce indentation
 
 

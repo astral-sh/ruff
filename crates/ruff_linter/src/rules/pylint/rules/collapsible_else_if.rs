@@ -86,11 +86,13 @@ pub(crate) fn collapsible_else_if(checker: &mut Checker, stmt: &Stmt) {
 
     if checker.settings.preview.is_enabled() {
         let inner_if_line_start = checker.locator().line_start(first.start());
+        let inner_if_line_end = checker.locator().line_end(first.end());
+        let inner_if_full_line_end = checker.locator().full_line_end(first.end());
 
         let desired_indentation = indentation(checker.locator(), else_clause).unwrap_or("");
 
         let indented = adjust_indentation(
-            TextRange::new(inner_if_line_start, first.end()),
+            TextRange::new(inner_if_line_start, inner_if_line_end),
             desired_indentation,
             checker.locator(),
             checker.stylist(),
@@ -105,13 +107,13 @@ pub(crate) fn collapsible_else_if(checker: &mut Checker, stmt: &Stmt) {
                 .unwrap();
 
         diagnostic.set_fix(Fix::applicable_edits(
-            Edit::deletion(inner_if_line_start, first.end()),
+            Edit::deletion(inner_if_line_start, inner_if_full_line_end),
             [Edit::range_replacement(
                 fixed_indented,
                 TextRange::new(else_clause.start(), else_colon.end()),
             )],
             Applicability::Safe,
-        ))
+        ));
     }
 
     checker.diagnostics.push(diagnostic);
