@@ -1,8 +1,11 @@
+use ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, ExceptHandler, MatchCase, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -42,12 +45,17 @@ use crate::checkers::ast::Checker;
 pub struct UselessElseOnLoop;
 
 impl Violation for UselessElseOnLoop {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
             "`else` clause on loop without a `break` statement; remove the `else` and de-indent all the \
              code inside it"
         )
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Remove redundant `else` clause".to_string())
     }
 }
 
@@ -98,10 +106,72 @@ pub(crate) fn useless_else_on_loop(
     body: &[Stmt],
     orelse: &[Stmt],
 ) {
-    if !orelse.is_empty() && !loop_exits_early(body) {
-        checker.diagnostics.push(Diagnostic::new(
-            UselessElseOnLoop,
-            identifier::else_(stmt, checker.locator().contents()).unwrap(),
-        ));
+    if orelse.is_empty() || loop_exits_early(body) {
+        return;
     }
+
+    let else_range = identifier::else_(stmt, checker.locator().contents()).unwrap();
+
+    let mut diagnostic = Diagnostic::new(UselessElseOnLoop, else_range);
+
+    if checker.settings.preview.is_enabled() {
+        let start = orelse.first().unwrap();
+        let end = orelse.last().unwrap();
+        let start_indentation = indentation(checker.locator(), start);
+        if start_indentation.is_none() {
+            // Inline `else` block (e.g., `else: x = 1`).
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(
+                    String::new(),
+                    TextRange::new(else_range.start(), start.start()),
+                ),
+                Applicability::Safe,
+            ));
+        } else {
+            let start_indentation = start_indentation.unwrap();
+
+            let desired_indentation = indentation(checker.locator(), stmt).unwrap_or("");
+            let mut indented = String::new();
+
+            checker
+                .locator()
+                .lines(TextRange::new(start.start(), end.end()))
+                .split(checker.stylist().line_ending().as_str())
+                .for_each(|line| {
+                    if let Some(stripped_line) = line.strip_prefix(start_indentation) {
+                        indented.push_str(desired_indentation);
+                        indented.push_str(stripped_line);
+                    } else {
+                        indented.push_str(line);
+                    }
+                    indented.push_str(checker.stylist().line_ending().as_str());
+                });
+
+            // we'll either delete the whole "else" line, or preserve the comment if there is one
+            let else_line_range = checker.locator().full_line_range(else_range.start());
+            let else_deletion_range = if let Some(comment_token) =
+                SimpleTokenizer::starts_at(else_range.start(), checker.locator().contents())
+                    .find(|token| token.kind == SimpleTokenKind::Comment)
+            {
+                TextRange::new(else_range.start(), comment_token.start())
+            } else {
+                else_line_range
+            };
+
+            let final_string = indented
+                .trim_end_matches(checker.stylist().line_ending().as_str())
+                .to_string();
+
+            diagnostic.set_fix(Fix::applicable_edits(
+                Edit::range_replacement(
+                    final_string,
+                    TextRange::new(else_line_range.end(), end.end()),
+                ),
+                [Edit::range_deletion(else_deletion_range)],
+                Applicability::Safe,
+            ));
+        }
+    }
+
+    checker.diagnostics.push(diagnostic);
 }

@@ -10,6 +10,7 @@ useless_else_on_loop.py:9:5: PLW0120 `else` clause on loop without a `break` sta
 10 |         print("math is broken")
 11 |     return None
    |
+   = help: Remove redundant `else` clause
 
 useless_else_on_loop.py:18:5: PLW0120 `else` clause on loop without a `break` statement; remove the `else` and de-indent all the code inside it
    |
@@ -20,6 +21,7 @@ useless_else_on_loop.py:18:5: PLW0120 `else` clause on loop without a `break` st
 19 |         print("math is broken")
 20 |     return None
    |
+   = help: Remove redundant `else` clause
 
 useless_else_on_loop.py:30:1: PLW0120 `else` clause on loop without a `break` statement; remove the `else` and de-indent all the code inside it
    |
@@ -29,6 +31,7 @@ useless_else_on_loop.py:30:1: PLW0120 `else` clause on loop without a `break` st
    | ^^^^ PLW0120
 31 |     print("or else!")
    |
+   = help: Remove redundant `else` clause
 
 useless_else_on_loop.py:37:1: PLW0120 `else` clause on loop without a `break` statement; remove the `else` and de-indent all the code inside it
    |
@@ -38,6 +41,7 @@ useless_else_on_loop.py:37:1: PLW0120 `else` clause on loop without a `break` st
    | ^^^^ PLW0120
 38 |     print("or else!")
    |
+   = help: Remove redundant `else` clause
 
 useless_else_on_loop.py:42:1: PLW0120 `else` clause on loop without a `break` statement; remove the `else` and de-indent all the code inside it
    |
@@ -48,6 +52,7 @@ useless_else_on_loop.py:42:1: PLW0120 `else` clause on loop without a `break` st
 43 |     print("fat chance")
 44 |     for j in range(10):
    |
+   = help: Remove redundant `else` clause
 
 useless_else_on_loop.py:88:5: PLW0120 `else` clause on loop without a `break` statement; remove the `else` and de-indent all the code inside it
    |
@@ -58,6 +63,7 @@ useless_else_on_loop.py:88:5: PLW0120 `else` clause on loop without a `break` st
 89 |         return True
 90 |     return False
    |
+   = help: Remove redundant `else` clause
 
 useless_else_on_loop.py:98:9: PLW0120 `else` clause on loop without a `break` statement; remove the `else` and de-indent all the code inside it
     |
@@ -68,5 +74,6 @@ useless_else_on_loop.py:98:9: PLW0120 `else` clause on loop without a `break` st
  99 |             if 1 < 2:  # pylint: disable=comparison-of-constants
 100 |                 break
     |
+    = help: Remove redundant `else` clause
 
 
