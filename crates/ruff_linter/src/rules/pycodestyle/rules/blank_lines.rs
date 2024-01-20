@@ -17,6 +17,7 @@ use ruff_text_size::TextSize;
 
 use crate::checkers::logical_lines::expand_indent;
 use crate::line_width::IndentWidth;
+use regex::Regex;
 
 /// Number of blank lines around top level classes and functions.
 const BLANK_LINES_TOP_LEVEL: u32 = 2;
@@ -767,13 +768,23 @@ impl BlankLinesChecker {
                 let mut diagnostic =
                     Diagnostic::new(BlankLineAfterDecorator, line.first_token_range);
 
-                if let BlankLines::Many {
-                    count: _,
-                    range: blank_lines_range,
-                } = line.preceding_blank_lines
-                {
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(blank_lines_range)));
-                }
+                // Get all the lines between the last decorator line (included) and the current line (included).
+                // Then remove all blank lines.
+                let trivia_range = locator.lines_range(TextRange::new(
+                    self.last_non_comment_line_end - stylist.line_ending().text_len(),
+                    line.first_token_range.start(),
+                ));
+                let text = locator.full_lines(trivia_range);
+                let pattern = Regex::new(r"\n+").unwrap();
+                let result_string = pattern.replace_all(text, "\n");
+
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    result_string.to_string(),
+                    TextRange::new(
+                        trivia_range.start(),
+                        trivia_range.end() + stylist.line_ending().text_len(),
+                    ),
+                )));
 
                 diagnostics.push(diagnostic);
             }
