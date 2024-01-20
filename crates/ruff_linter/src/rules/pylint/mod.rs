@@ -168,6 +168,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryDunderCall, Path::new("unnecessary_dunder_call.py"))]
     #[test_case(Rule::NoStaticmethodDecorator, Path::new("no_method_decorator.py"))]
     #[test_case(Rule::SuperWithoutBrackets, Path::new("super_without_brackets.py"))]
+    #[test_case(Rule::TooManyNestedBlocks, Path::new("too_many_nested_blocks.py"))]
     #[test_case(
         Rule::UnnecessaryDictIndexLookup,
         Path::new("unnecessary_dict_index_lookup.py")

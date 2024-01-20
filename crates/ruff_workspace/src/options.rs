@@ -2728,6 +2728,11 @@ pub struct PylintOptions {
     /// (see: `PLR0916`).
     #[option(default = r"5", value_type = "int", example = r"max-bool-expr = 5")]
     pub max_bool_expr: Option<usize>,
+
+    /// Maximum number of nested blocks allowed within a function / method body
+    /// (see: `PLR1702`).
+    #[option(default = r"5", value_type = "int", example = r"max-nested-blocks = 5")]
+    pub max_nested_blocks: Option<usize>,
 }
 
 impl PylintOptions {
@@ -2751,6 +2756,7 @@ impl PylintOptions {
                 .max_public_methods
                 .unwrap_or(defaults.max_public_methods),
             max_locals: self.max_locals.unwrap_or(defaults.max_locals),
+            max_nested_blocks: self.max_nested_blocks.unwrap_or(defaults.max_nested_blocks),
         }
     }
 }
