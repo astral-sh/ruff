@@ -4,6 +4,11 @@ if a:
 elif c:
     b
 
+if a:  # we preserve comments, too!
+    b
+elif c:  # yes, even this one!
+    b
+
 if x == 1:
     for _ in range(20):
         print("hello")

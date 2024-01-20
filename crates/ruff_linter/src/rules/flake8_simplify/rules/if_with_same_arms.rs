@@ -1,8 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ast::whitespace::indentation;
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableStmt;
 use ruff_python_ast::stmt_if::{if_elif_branches, IfElifBranch};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -32,9 +34,14 @@ use crate::checkers::ast::Checker;
 pub struct IfWithSameArms;
 
 impl Violation for IfWithSameArms {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Combine `if` branches using logical `or` operator")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Combine `if` branches using logical `or` operator".to_string())
     }
 }
 
@@ -76,10 +83,59 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_i
             continue;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             IfWithSameArms,
             TextRange::new(current_branch.start(), following_branch.end()),
-        ));
+        );
+
+        if checker.settings.preview.is_enabled() {
+            let current_branch_colon =
+                SimpleTokenizer::starts_at(current_branch.test.end(), checker.locator().contents())
+                    .find(|token| token.kind == SimpleTokenKind::Colon)
+                    .unwrap();
+
+            let mut following_branch_tokenizer = SimpleTokenizer::starts_at(
+                following_branch.test.end(),
+                checker.locator().contents(),
+            );
+
+            let following_branch_colon = following_branch_tokenizer
+                .find(|token| token.kind == SimpleTokenKind::Colon)
+                .unwrap();
+
+            let main_edit = if let Some(following_branch_comment) =
+                following_branch_tokenizer.find(|token| token.kind == SimpleTokenKind::Comment)
+            {
+                let indentation =
+                    indentation(checker.locator(), following_branch.body.first().unwrap())
+                        .unwrap_or("");
+                Edit::range_replacement(
+                    format!("{indentation}"),
+                    TextRange::new(
+                        checker.locator().full_line_end(current_branch_colon.end()),
+                        following_branch_comment.start(),
+                    ),
+                )
+            } else {
+                Edit::deletion(
+                    checker.locator().full_line_end(current_branch_colon.end()),
+                    checker
+                        .locator()
+                        .full_line_end(following_branch_colon.end()),
+                )
+            };
+
+            diagnostic.set_fix(Fix::applicable_edits(
+                main_edit,
+                [Edit::insertion(
+                    format!(" or {}", checker.generator().expr(following_branch.test)),
+                    current_branch_colon.start(),
+                )],
+                Applicability::Safe,
+            ));
+        }
+
+        checker.diagnostics.push(diagnostic);
     }
 }
 
