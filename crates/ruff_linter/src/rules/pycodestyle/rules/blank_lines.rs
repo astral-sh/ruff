@@ -1,3 +1,4 @@
+use std::num::NonZeroU32;
 use std::slice::Iter;
 
 use ruff_diagnostics::AlwaysFixableViolation;
@@ -329,13 +330,13 @@ struct LogicalLineInfo {
     indent_length: usize,
 
     /// The number of blank lines preceding the current line.
-    blank_lines: u32,
+    blank_lines: BlankLines,
     blank_lines_len: TextSize,
 
     /// The maximum number of consecutive blank lines between the current line
     /// and the previous non-comment logical line.
     /// One of its main uses is to allow a comment to directly precede a class/function definition.
-    preceding_blank_lines: u32,
+    preceding_blank_lines: BlankLines,
 }
 
 /// Iterator that processes tokens until a full logical line (or comment line) is "built".
@@ -348,7 +349,7 @@ struct LinePreprocessor<'a> {
     line_start: TextSize,
     /// Maximum number of consecutive blank lines between the current line and the previous non-comment logical line.
     /// One of its main uses is to allow a comment to directly precede a class/function definition.
-    max_preceding_blank_lines: u32,
+    max_preceding_blank_lines: BlankLines,
 }
 
 impl<'a> LinePreprocessor<'a> {
@@ -361,7 +362,7 @@ impl<'a> LinePreprocessor<'a> {
             tokens: tokens.iter(),
             locator,
             line_start: TextSize::new(0),
-            max_preceding_blank_lines: 0,
+            max_preceding_blank_lines: BlankLines::Zero,
             indent_width,
         }
     }
@@ -374,7 +375,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
         let mut line_is_comment_only = true;
         let mut is_docstring = false;
         // Number of consecutive blank lines directly preceding this logical line.
-        let mut blank_lines = 0;
+        let mut blank_lines = BlankLines::Zero;
         let mut blank_lines_len = TextSize::default();
         let mut logical_line_start: Option<(LogicalLineKind, TextRange)> = None;
         let mut last_token: TokenKind = TokenKind::EndOfFile;
@@ -400,7 +401,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
             else {
                 // An empty line
                 if token_kind == TokenKind::NonLogicalNewline {
-                    blank_lines += 1;
+                    blank_lines.add(*range);
                     blank_lines_len += range.len();
 
                     self.line_start = range.end();
@@ -452,8 +453,9 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     let indent_length =
                         expand_indent(self.locator.slice(indent_range), self.indent_width);
 
-                    self.max_preceding_blank_lines =
-                        self.max_preceding_blank_lines.max(blank_lines);
+                    if blank_lines.count() > self.max_preceding_blank_lines.count() {
+                        self.max_preceding_blank_lines = blank_lines;
+                    }
 
                     let logical_line = LogicalLineInfo {
                         kind: logical_line_kind,
@@ -463,7 +465,6 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         is_comment_only: line_is_comment_only,
                         is_docstring,
                         indent_length,
-
                         blank_lines,
                         blank_lines_len,
 
@@ -472,7 +473,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
 
                     // Reset the blank lines after a non-comment only line.
                     if !line_is_comment_only {
-                        self.max_preceding_blank_lines = 0;
+                        self.max_preceding_blank_lines = BlankLines::Zero;
                     }
 
                     // Set the start for the next logical line.
@@ -487,6 +488,58 @@ impl<'a> Iterator for LinePreprocessor<'a> {
         }
 
         None
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+enum BlankLines {
+    /// No blank lines
+    #[default]
+    Zero,
+
+    /// One or more blank lines
+    Many { count: NonZeroU32, range: TextRange },
+}
+
+impl BlankLines {
+    fn add(&mut self, line_range: TextRange) {
+        match self {
+            BlankLines::Zero => {
+                *self = BlankLines::Many {
+                    count: NonZeroU32::MIN,
+                    range: line_range,
+                }
+            }
+            BlankLines::Many { count, range } => {
+                assert_eq!(range.end(), line_range.start());
+                *count = count.saturating_add(1);
+                *range = TextRange::new(range.start(), line_range.end());
+            }
+        }
+    }
+
+    fn count(&self) -> u32 {
+        match self {
+            BlankLines::Zero => 0,
+            BlankLines::Many { count, .. } => count.get(),
+        }
+    }
+}
+
+use std::cmp::Ordering;
+
+impl PartialEq<u32> for BlankLines {
+    fn eq(&self, other: &u32) -> bool {
+        match self {
+            BlankLines::Zero => *other == 0,
+            BlankLines::Many { count, range: _ } => count.get() == *other,
+        }
+    }
+}
+
+impl PartialOrd<u32> for BlankLines {
+    fn partial_cmp(&self, other: &u32) -> Option<Ordering> {
+        self.count().partial_cmp(other)
     }
 }
 
@@ -620,7 +673,7 @@ impl BlankLinesChecker {
                 // E301
                 let mut diagnostic = Diagnostic::new(
                     BlankLineBetweenMethods {
-                        actual_blank_lines: line.preceding_blank_lines,
+                        actual_blank_lines: line.preceding_blank_lines.count(),
                     },
                     line.first_token_range,
                 );
@@ -645,16 +698,30 @@ impl BlankLinesChecker {
                 // E302
                 let mut diagnostic = Diagnostic::new(
                     BlankLinesTopLevel {
-                        actual_blank_lines: line.preceding_blank_lines,
+                        actual_blank_lines: line.preceding_blank_lines.count(),
                     },
                     line.first_token_range,
                 );
-                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    stylist
-                        .line_ending()
-                        .repeat((BLANK_LINES_TOP_LEVEL - line.preceding_blank_lines) as usize),
-                    locator.line_start(self.last_non_comment_line_end),
-                )));
+
+                match line.blank_lines {
+                    BlankLines::Many {
+                        count: _blank_lines,
+                        range: blank_lines_range,
+                    } => {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                            stylist
+                                .line_ending()
+                                .repeat((BLANK_LINES_TOP_LEVEL) as usize),
+                            blank_lines_range,
+                        )));
+                    }
+                    BlankLines::Zero => diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                        stylist
+                            .line_ending()
+                            .repeat((BLANK_LINES_TOP_LEVEL) as usize),
+                        locator.line_start(self.last_non_comment_line_end),
+                    ))),
+                }
 
                 diagnostics.push(diagnostic);
             }
@@ -665,7 +732,7 @@ impl BlankLinesChecker {
                 // E303
                 let mut diagnostic = Diagnostic::new(
                     TooManyBlankLines {
-                        actual_blank_lines: line.blank_lines,
+                        actual_blank_lines: line.blank_lines.count(),
                     },
                     line.first_token_range,
                 );
@@ -707,17 +774,37 @@ impl BlankLinesChecker {
                 // E305
                 let mut diagnostic = Diagnostic::new(
                     BlankLinesAfterFunctionOrClass {
-                        actual_blank_lines: line.blank_lines,
+                        actual_blank_lines: line.blank_lines.count(),
                     },
                     line.first_token_range,
                 );
 
-                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    stylist
-                        .line_ending()
-                        .repeat((BLANK_LINES_TOP_LEVEL - line.blank_lines) as usize),
-                    locator.line_start(line.first_token_range.start()),
-                )));
+                // diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                //     stylist
+                //         .line_ending()
+                //         .repeat((BLANK_LINES_TOP_LEVEL - line.blank_lines) as usize),
+                //     locator.line_start(line.first_token_range.start()),
+                // )));
+
+                match line.blank_lines {
+                    BlankLines::Many {
+                        count: _blank_lines,
+                        range: blank_lines_range,
+                    } => {
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                            stylist
+                                .line_ending()
+                                .repeat((BLANK_LINES_TOP_LEVEL) as usize),
+                            blank_lines_range,
+                        )));
+                    }
+                    BlankLines::Zero => diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                        stylist
+                            .line_ending()
+                            .repeat((BLANK_LINES_TOP_LEVEL) as usize),
+                        locator.line_start(line.first_token_range.start()),
+                    ))),
+                }
 
                 diagnostics.push(diagnostic);
             }

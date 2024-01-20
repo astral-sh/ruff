@@ -6,7 +6,7 @@ E30.py:531:5: E303 [*] Too many blank lines (2)
 531 |     # arbitrary comment
     |     ^^^^^^^^^^^^^^^^^^^ E303
 532 | 
-533 |     def inner():  # E306 not expected
+533 |     def inner():  # E306 not expected (pycodestyle detects E306)
     |
     = help: Remove extraneous blank line(s)
 
@@ -17,13 +17,13 @@ E30.py:531:5: E303 [*] Too many blank lines (2)
 530     |-
 531 530 |     # arbitrary comment
 532 531 | 
-533 532 |     def inner():  # E306 not expected
+533 532 |     def inner():  # E306 not expected (pycodestyle detects E306)
 
 E30.py:543:5: E303 [*] Too many blank lines (2)
     |
 543 |     # arbitrary comment
     |     ^^^^^^^^^^^^^^^^^^^ E303
-544 |     def inner():  # E306 not expected
+544 |     def inner():  # E306 not expected (pycodestyle detects E306)
 545 |         pass
     |
     = help: Remove extraneous blank line(s)
@@ -34,7 +34,7 @@ E30.py:543:5: E303 [*] Too many blank lines (2)
 541 541 | 
 542     |-
 543 542 |     # arbitrary comment
-544 543 |     def inner():  # E306 not expected
+544 543 |     def inner():  # E306 not expected (pycodestyle detects E306)
 545 544 |         pass
 
 E30.py:554:1: E303 [*] Too many blank lines (3)
