@@ -262,6 +262,8 @@ SIM114.py:67:1: SIM114 [*] Combine `if` branches using logical `or` operator
 69 | | elif result.eofs == "E":
 70 | |     errors = 1
    | |______________^ SIM114
+71 |   elif result.eofs == "X":
+72 |       errors = 1
    |
    = help: Combine `if` branches using logical `or` operator
 
@@ -274,57 +276,107 @@ SIM114.py:67:1: SIM114 [*] Combine `if` branches using logical `or` operator
 69    |-elif result.eofs == "E":
    67 |+elif result.eofs == "F" or result.eofs == "E":
 70 68 |     errors = 1
-71 69 | 
-72 70 | 
+71 69 | elif result.eofs == "X":
+72 70 |     errors = 1
 
-SIM114.py:114:5: SIM114 [*] Combine `if` branches using logical `or` operator
-    |
-112 |       a = True
-113 |       b = False
-114 |       if a > b:  # end-of-line
-    |  _____^
-115 | |         return 3
-116 | |     elif a == b:
-117 | |         return 3
-    | |________________^ SIM114
-118 |       elif a < b:  # end-of-line
-119 |           return 4
-    |
-    = help: Combine `if` branches using logical `or` operator
+SIM114.py:69:1: SIM114 [*] Combine `if` branches using logical `or` operator
+   |
+67 |   elif result.eofs == "F":
+68 |       errors = 1
+69 | / elif result.eofs == "E":
+70 | |     errors = 1
+71 | | elif result.eofs == "X":
+72 | |     errors = 1
+   | |______________^ SIM114
+73 |   elif result.eofs == "C":
+74 |       errors = 1
+   |
+   = help: Combine `if` branches using logical `or` operator
 
 ℹ Safe fix
-111 111 | def foo():
-112 112 |     a = True
-113 113 |     b = False
-114     |-    if a > b:  # end-of-line
-115     |-        return 3
-116     |-    elif a == b:
-    114 |+    if a > b or a == b:  # end-of-line
-117 115 |         return 3
-118 116 |     elif a < b:  # end-of-line
-119 117 |         return 4
+66 66 |     skipped = 1
+67 67 | elif result.eofs == "F":
+68 68 |     errors = 1
+69    |-elif result.eofs == "E":
+70    |-    errors = 1
+71    |-elif result.eofs == "X":
+   69 |+elif result.eofs == "E" or result.eofs == "X":
+72 70 |     errors = 1
+73 71 | elif result.eofs == "C":
+74 72 |     errors = 1
+
+SIM114.py:71:1: SIM114 [*] Combine `if` branches using logical `or` operator
+   |
+69 |   elif result.eofs == "E":
+70 |       errors = 1
+71 | / elif result.eofs == "X":
+72 | |     errors = 1
+73 | | elif result.eofs == "C":
+74 | |     errors = 1
+   | |______________^ SIM114
+   |
+   = help: Combine `if` branches using logical `or` operator
+
+ℹ Safe fix
+68 68 |     errors = 1
+69 69 | elif result.eofs == "E":
+70 70 |     errors = 1
+71    |-elif result.eofs == "X":
+72    |-    errors = 1
+73    |-elif result.eofs == "C":
+   71 |+elif result.eofs == "X" or result.eofs == "C":
+74 72 |     errors = 1
+75 73 | 
+76 74 | 
 
 SIM114.py:118:5: SIM114 [*] Combine `if` branches using logical `or` operator
     |
-116 |       elif a == b:
-117 |           return 3
-118 |       elif a < b:  # end-of-line
+116 |       a = True
+117 |       b = False
+118 |       if a > b:  # end-of-line
     |  _____^
-119 | |         return 4
-120 | |     elif b is None:
-121 | |         return 4
+119 | |         return 3
+120 | |     elif a == b:
+121 | |         return 3
+    | |________________^ SIM114
+122 |       elif a < b:  # end-of-line
+123 |           return 4
+    |
+    = help: Combine `if` branches using logical `or` operator
+
+ℹ Safe fix
+115 115 | def foo():
+116 116 |     a = True
+117 117 |     b = False
+118     |-    if a > b:  # end-of-line
+119     |-        return 3
+120     |-    elif a == b:
+    118 |+    if a > b or a == b:  # end-of-line
+121 119 |         return 3
+122 120 |     elif a < b:  # end-of-line
+123 121 |         return 4
+
+SIM114.py:122:5: SIM114 [*] Combine `if` branches using logical `or` operator
+    |
+120 |       elif a == b:
+121 |           return 3
+122 |       elif a < b:  # end-of-line
+    |  _____^
+123 | |         return 4
+124 | |     elif b is None:
+125 | |         return 4
     | |________________^ SIM114
     |
     = help: Combine `if` branches using logical `or` operator
 
 ℹ Safe fix
-115 115 |         return 3
-116 116 |     elif a == b:
-117 117 |         return 3
-118     |-    elif a < b:  # end-of-line
-119     |-        return 4
-120     |-    elif b is None:
-    118 |+    elif a < b or b is None:  # end-of-line
-121 119 |         return 4
+119 119 |         return 3
+120 120 |     elif a == b:
+121 121 |         return 3
+122     |-    elif a < b:  # end-of-line
+123     |-        return 4
+124     |-    elif b is None:
+    122 |+    elif a < b or b is None:  # end-of-line
+125 123 |         return 4
 
 
