@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use ruff_python_ast::{self as ast, CmpOp, Expr};
@@ -42,6 +42,7 @@ pub struct TypeComparison {
 }
 
 impl Violation for TypeComparison {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.preview {
@@ -49,6 +50,13 @@ impl Violation for TypeComparison {
             PreviewMode::Enabled => format!(
                 "Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks"
             ),
+        }
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        match self.preview {
+            PreviewMode::Disabled => Some("Replace with `isinstance()`".to_string()),
+            PreviewMode::Enabled => Some("Replace with `is` or `is not`".to_string()),
         }
     }
 }
@@ -67,12 +75,17 @@ fn deprecated_type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
         .tuple_windows()
         .zip(compare.ops.iter())
     {
-        if !matches!(op, CmpOp::Is | CmpOp::IsNot | CmpOp::Eq | CmpOp::NotEq) {
-            continue;
-        }
+        let op_string = match op {
+            CmpOp::Is | CmpOp::Eq => "",
+            CmpOp::NotEq | CmpOp::IsNot => "not ",
+            _ => continue,
+        };
 
         // Left-hand side must be, e.g., `type(obj)`.
-        let Expr::Call(ast::ExprCall { func, .. }) = left else {
+        let Expr::Call(ast::ExprCall {
+            func, arguments, ..
+        }) = left
+        else {
             continue;
         };
 
@@ -117,12 +130,29 @@ fn deprecated_type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
                     .resolve_call_path(value.as_ref())
                     .is_some_and(|call_path| matches!(call_path.as_slice(), ["types", ..]))
                 {
-                    checker.diagnostics.push(Diagnostic::new(
+                    let mut diagnostic = Diagnostic::new(
                         TypeComparison {
                             preview: PreviewMode::Disabled,
                         },
                         compare.range(),
-                    ));
+                    );
+
+                    if checker.settings.preview.is_enabled() {
+                        if let Some(arg) = arguments.args.first() {
+                            let content = format!(
+                                "{op_string}isinstance({}, {})",
+                                checker.generator().expr(arg),
+                                checker.generator().expr(value.as_ref()),
+                            );
+
+                            diagnostic.set_fix(Fix::applicable_edit(
+                                Edit::range_replacement(content, compare.range()),
+                                Applicability::Safe,
+                            ));
+                        }
+                    }
+
+                    checker.diagnostics.push(diagnostic);
                 }
             }
             Expr::Name(ast::ExprName { id, .. }) => {
@@ -141,12 +171,28 @@ fn deprecated_type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
                         | "memoryview"
                 ) && checker.semantic().is_builtin(id)
                 {
-                    checker.diagnostics.push(Diagnostic::new(
+                    let mut diagnostic = Diagnostic::new(
                         TypeComparison {
                             preview: PreviewMode::Disabled,
                         },
                         compare.range(),
-                    ));
+                    );
+
+                    if checker.settings.preview.is_enabled() {
+                        if let Some(arg) = arguments.args.first() {
+                            let content = format!(
+                                "{op_string}isinstance({}, {id})",
+                                checker.generator().expr(arg)
+                            );
+
+                            diagnostic.set_fix(Fix::applicable_edit(
+                                Edit::range_replacement(content, compare.range()),
+                                Applicability::Safe,
+                            ));
+                        }
+                    }
+
+                    checker.diagnostics.push(diagnostic);
                 }
             }
             _ => {}
