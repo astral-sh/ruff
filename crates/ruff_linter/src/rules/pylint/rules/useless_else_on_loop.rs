@@ -7,6 +7,8 @@ use ruff_python_ast::identifier;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::rules::pyupgrade::fixes::adjust_indentation;
+
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -128,27 +130,18 @@ pub(crate) fn useless_else_on_loop(
                 Applicability::Safe,
             ));
         } else {
-            let start_indentation = start_indentation.unwrap();
-
             let desired_indentation = indentation(checker.locator(), stmt).unwrap_or("");
-            let mut indented = String::new();
+            let else_line_range = checker.locator().full_line_range(else_range.start());
 
-            checker
-                .locator()
-                .lines(TextRange::new(start.start(), end.end()))
-                .split(checker.stylist().line_ending().as_str())
-                .for_each(|line| {
-                    if let Some(stripped_line) = line.strip_prefix(start_indentation) {
-                        indented.push_str(desired_indentation);
-                        indented.push_str(stripped_line);
-                    } else {
-                        indented.push_str(line);
-                    }
-                    indented.push_str(checker.stylist().line_ending().as_str());
-                });
+            let indented = adjust_indentation(
+                TextRange::new(else_line_range.end(), end.end()),
+                desired_indentation,
+                checker.locator(),
+                checker.stylist(),
+            )
+            .unwrap();
 
             // we'll either delete the whole "else" line, or preserve the comment if there is one
-            let else_line_range = checker.locator().full_line_range(else_range.start());
             let else_deletion_range = if let Some(comment_token) =
                 SimpleTokenizer::starts_at(else_range.start(), checker.locator().contents())
                     .find(|token| token.kind == SimpleTokenKind::Comment)
@@ -158,15 +151,8 @@ pub(crate) fn useless_else_on_loop(
                 else_line_range
             };
 
-            let final_string = indented
-                .trim_end_matches(checker.stylist().line_ending().as_str())
-                .to_string();
-
             diagnostic.set_fix(Fix::applicable_edits(
-                Edit::range_replacement(
-                    final_string,
-                    TextRange::new(else_line_range.end(), end.end()),
-                ),
+                Edit::range_replacement(indented, TextRange::new(else_line_range.end(), end.end())),
                 [Edit::range_deletion(else_deletion_range)],
                 Applicability::Safe,
             ));
