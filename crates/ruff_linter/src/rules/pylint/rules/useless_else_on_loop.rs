@@ -132,6 +132,10 @@ pub(crate) fn useless_else_on_loop(
         } else {
             let desired_indentation = indentation(checker.locator(), stmt).unwrap_or("");
             let else_line_range = checker.locator().full_line_range(else_range.start());
+            let else_colon =
+                SimpleTokenizer::starts_at(else_range.start(), checker.locator().contents())
+                    .find(|token| token.kind == SimpleTokenKind::Colon)
+                    .unwrap();
 
             let indented = adjust_indentation(
                 TextRange::new(else_line_range.end(), end.end()),
@@ -141,19 +145,15 @@ pub(crate) fn useless_else_on_loop(
             )
             .unwrap();
 
-            // we'll either delete the whole "else" line, or preserve the comment if there is one
-            let else_deletion_range = if let Some(comment_token) =
-                SimpleTokenizer::starts_at(else_range.start(), checker.locator().contents())
-                    .find(|token| token.kind == SimpleTokenKind::Comment)
-            {
-                TextRange::new(else_range.start(), comment_token.start())
-            } else {
-                else_line_range
-            };
-
             diagnostic.set_fix(Fix::applicable_edits(
-                Edit::range_replacement(indented, TextRange::new(else_line_range.end(), end.end())),
-                [Edit::range_deletion(else_deletion_range)],
+                Edit::deletion(
+                    else_line_range.end(),
+                    checker.locator().full_line_end(end.end()),
+                ),
+                [Edit::range_replacement(
+                    indented,
+                    TextRange::new(else_line_range.start(), else_colon.end()),
+                )],
                 Applicability::Safe,
             ));
         }
