@@ -641,6 +641,18 @@ def function():
 # end
 
 
+# E304
+@decorator
+
+# comment  E304 not expected
+
+
+# second comment  E304 not expected
+def function():
+    pass
+# end
+
+
 # E305:7:1
 def fn():
     print()
