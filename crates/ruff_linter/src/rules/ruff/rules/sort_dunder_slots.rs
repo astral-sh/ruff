@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_semantic::ScopeKind;
 use ruff_source_file::Locator;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::sequence_sorting::{
@@ -150,7 +150,7 @@ fn sort_dunder_slots(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr
     );
 
     if let SortClassification::UnsortedAndMaybeFixable { items } = sort_classification {
-        if let Some(fix) = create_fix(&display, &items, checker) {
+        if let Some(fix) = display.generate_fix(&items, checker) {
             diagnostic.set_fix(fix);
         }
     }
@@ -170,6 +170,12 @@ struct StringLiteralDisplay<'a> {
     range: TextRange,
     /// What kind of a display is it? A dict, set, list or tuple?
     display_kind: DisplayKind<'a>,
+}
+
+impl Ranged for StringLiteralDisplay<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
 }
 
 impl<'a> StringLiteralDisplay<'a> {
@@ -235,46 +241,41 @@ impl<'a> StringLiteralDisplay<'a> {
         };
         Some(result)
     }
-}
 
-fn create_fix(
-    StringLiteralDisplay {
-        elts,
-        range,
-        display_kind,
-    }: &StringLiteralDisplay,
-    items: &[&str],
-    checker: &Checker,
-) -> Option<Fix> {
-    let locator = checker.locator();
-    let is_multiline = locator.contains_line_break(*range);
-    let sorted_source_code = {
-        if is_multiline {
-            // Sorting multiline dicts is unsupported
-            let display_kind = display_kind.as_sequence()?;
-            let analyzed_sequence =
-                MultilineStringSequenceValue::from_source_range(*range, display_kind, locator)?;
-            assert_eq!(analyzed_sequence.len(), elts.len());
-            analyzed_sequence.into_sorted_source_code(SORTING_STYLE, locator, checker.stylist())
-        } else {
-            match display_kind {
-                DisplayKind::Dict { values } => {
-                    sort_single_line_elements_dict(elts, items, values, locator)
-                }
-                DisplayKind::Sequence(sequence_kind) => sort_single_line_elements_sequence(
-                    sequence_kind,
-                    elts,
-                    items,
+    fn generate_fix(&self, items: &[&str], checker: &Checker) -> Option<Fix> {
+        let locator = checker.locator();
+        let is_multiline = locator.contains_line_break(self.range());
+        let sorted_source_code = {
+            if is_multiline {
+                // Sorting multiline dicts is unsupported
+                let display_kind = self.display_kind.as_sequence()?;
+                let analyzed_sequence = MultilineStringSequenceValue::from_source_range(
+                    self.range(),
+                    display_kind,
                     locator,
-                    SORTING_STYLE,
-                ),
+                )?;
+                assert_eq!(analyzed_sequence.len(), self.elts.len());
+                analyzed_sequence.into_sorted_source_code(SORTING_STYLE, locator, checker.stylist())
+            } else {
+                match &self.display_kind {
+                    DisplayKind::Dict { values } => {
+                        sort_single_line_elements_dict(&self.elts, items, values, locator)
+                    }
+                    DisplayKind::Sequence(sequence_kind) => sort_single_line_elements_sequence(
+                        sequence_kind,
+                        &self.elts,
+                        items,
+                        locator,
+                        SORTING_STYLE,
+                    ),
+                }
             }
-        }
-    };
-    Some(Fix::safe_edit(Edit::range_replacement(
-        sorted_source_code,
-        *range,
-    )))
+        };
+        Some(Fix::safe_edit(Edit::range_replacement(
+            sorted_source_code,
+            self.range,
+        )))
+    }
 }
 
 /// Create a string representing a fixed-up single-line
