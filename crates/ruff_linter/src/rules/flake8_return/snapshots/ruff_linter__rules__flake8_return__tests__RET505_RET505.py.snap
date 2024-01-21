@@ -10,6 +10,7 @@ RET505.py:8:5: RET505 Unnecessary `elif` after `return` statement
  9 |         b = 2
 10 |         return w
    |
+   = help: Remove unnecessary `elif`
 
 RET505.py:23:5: RET505 Unnecessary `elif` after `return` statement
    |
@@ -20,6 +21,7 @@ RET505.py:23:5: RET505 Unnecessary `elif` after `return` statement
 24 |         c = 2
 25 |     else:
    |
+   = help: Remove unnecessary `elif`
 
 RET505.py:41:5: RET505 Unnecessary `elif` after `return` statement
    |
@@ -30,6 +32,7 @@ RET505.py:41:5: RET505 Unnecessary `elif` after `return` statement
 42 |         b = 2
 43 |         return w
    |
+   = help: Remove unnecessary `elif`
 
 RET505.py:53:5: RET505 Unnecessary `else` after `return` statement
    |
@@ -40,6 +43,7 @@ RET505.py:53:5: RET505 Unnecessary `else` after `return` statement
 54 |         b = 2
 55 |         return z
    |
+   = help: Remove unnecessary `else`
 
 RET505.py:64:9: RET505 Unnecessary `else` after `return` statement
    |
@@ -50,6 +54,7 @@ RET505.py:64:9: RET505 Unnecessary `else` after `return` statement
 65 |             c = 3
 66 |             return x
    |
+   = help: Remove unnecessary `else`
 
 RET505.py:79:5: RET505 Unnecessary `else` after `return` statement
    |
@@ -60,6 +65,7 @@ RET505.py:79:5: RET505 Unnecessary `else` after `return` statement
 80 |         c = 3
 81 |     return
    |
+   = help: Remove unnecessary `else`
 
 RET505.py:89:9: RET505 Unnecessary `else` after `return` statement
    |
@@ -70,6 +76,7 @@ RET505.py:89:9: RET505 Unnecessary `else` after `return` statement
 90 |             b = 2
 91 |     else:
    |
+   = help: Remove unnecessary `else`
 
 RET505.py:99:5: RET505 Unnecessary `else` after `return` statement
     |
@@ -80,5 +87,6 @@ RET505.py:99:5: RET505 Unnecessary `else` after `return` statement
 100 |         try:
 101 |             return False
     |
+    = help: Remove unnecessary `else`
 
 

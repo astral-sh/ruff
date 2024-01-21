@@ -3,7 +3,7 @@ use std::ops::Add;
 use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, FixAvailability, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
@@ -12,12 +12,13 @@ use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::is_python_whitespace;
+use ruff_python_trivia::{is_python_whitespace, SimpleTokenKind, SimpleTokenizer};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
 use crate::registry::{AsRule, Rule};
 use crate::rules::flake8_return::helpers::end_of_last_statement;
+use crate::rules::pyupgrade::fixes::adjust_indentation;
 
 use super::super::branch::Branch;
 use super::super::helpers::result_exists;
@@ -210,10 +211,16 @@ pub struct SuperfluousElseReturn {
 }
 
 impl Violation for SuperfluousElseReturn {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         let SuperfluousElseReturn { branch } = self;
         format!("Unnecessary `{branch}` after `return` statement")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let SuperfluousElseReturn { branch } = self;
+        Some(format!("Remove unnecessary `{branch}`"))
     }
 }
 
@@ -248,10 +255,16 @@ pub struct SuperfluousElseRaise {
 }
 
 impl Violation for SuperfluousElseRaise {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         let SuperfluousElseRaise { branch } = self;
         format!("Unnecessary `{branch}` after `raise` statement")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let SuperfluousElseRaise { branch } = self;
+        Some(format!("Remove unnecessary `{branch}`"))
     }
 }
 
@@ -288,10 +301,16 @@ pub struct SuperfluousElseContinue {
 }
 
 impl Violation for SuperfluousElseContinue {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         let SuperfluousElseContinue { branch } = self;
         format!("Unnecessary `{branch}` after `continue` statement")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let SuperfluousElseContinue { branch } = self;
+        Some(format!("Remove unnecessary `{branch}`"))
     }
 }
 
@@ -328,10 +347,16 @@ pub struct SuperfluousElseBreak {
 }
 
 impl Violation for SuperfluousElseBreak {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         let SuperfluousElseBreak { branch } = self;
         format!("Unnecessary `{branch}` after `break` statement")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let SuperfluousElseBreak { branch } = self;
+        Some(format!("Remove unnecessary `{branch}`"))
     }
 }
 
@@ -575,42 +600,46 @@ fn superfluous_else_node(
     };
     for child in if_elif_body {
         if child.is_return_stmt() {
-            let diagnostic = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 SuperfluousElseReturn { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
+                raise_branch(checker, &mut diagnostic, elif_else);
                 checker.diagnostics.push(diagnostic);
             }
             return true;
         } else if child.is_break_stmt() {
-            let diagnostic = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 SuperfluousElseBreak { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
+                raise_branch(checker, &mut diagnostic, elif_else);
                 checker.diagnostics.push(diagnostic);
             }
             return true;
         } else if child.is_raise_stmt() {
-            let diagnostic = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 SuperfluousElseRaise { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
+                raise_branch(checker, &mut diagnostic, elif_else);
                 checker.diagnostics.push(diagnostic);
             }
             return true;
         } else if child.is_continue_stmt() {
-            let diagnostic = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 SuperfluousElseContinue { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
+                raise_branch(checker, &mut diagnostic, elif_else);
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -687,4 +716,50 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
             }
         }
     }
+}
+
+fn raise_branch(checker: &mut Checker, diagnostic: &mut Diagnostic, elif_else: &ElifElseClause) {
+    if checker.settings.preview.is_disabled() {
+        return;
+    }
+
+    if elif_else.test.is_some() {
+        // it's an elif, so we can just make it an if
+
+        // delete "el" from "elif"
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::deletion(elif_else.start(), elif_else.start() + TextSize::from(2)),
+            Applicability::Safe,
+        ));
+
+        return;
+    }
+
+    let else_colon = SimpleTokenizer::starts_at(elif_else.start(), checker.locator().contents())
+        .find(|token| token.kind == SimpleTokenKind::Colon)
+        .unwrap();
+
+    let else_line_range = checker.locator().full_line_range(elif_else.start());
+
+    let desired_indentation = indentation(checker.locator(), elif_else).unwrap_or("");
+
+    let indented = adjust_indentation(
+        TextRange::new(else_line_range.end(), elif_else.end()),
+        desired_indentation,
+        checker.locator(),
+        checker.stylist(),
+    )
+    .unwrap();
+
+    diagnostic.set_fix(Fix::applicable_edits(
+        Edit::deletion(
+            else_line_range.end(),
+            checker.locator().full_line_end(elif_else.end()),
+        ),
+        [Edit::range_replacement(
+            indented,
+            TextRange::new(else_line_range.start(), else_colon.end()),
+        )],
+        Applicability::Safe,
+    ));
 }

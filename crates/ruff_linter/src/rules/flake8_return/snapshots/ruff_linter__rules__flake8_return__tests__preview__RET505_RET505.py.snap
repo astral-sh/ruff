@@ -1,0 +1,187 @@
+---
+source: crates/ruff_linter/src/rules/flake8_return/mod.rs
+---
+RET505.py:8:5: RET505 [*] Unnecessary `elif` after `return` statement
+   |
+ 6 |         a = 1
+ 7 |         return y
+ 8 |     elif z:
+   |     ^^^^ RET505
+ 9 |         b = 2
+10 |         return w
+   |
+   = help: Remove unnecessary `elif`
+
+ℹ Safe fix
+5 5 |     if x:  # [no-else-return]
+6 6 |         a = 1
+7 7 |         return y
+8   |-    elif z:
+  8 |+    if z:
+9 9 |         b = 2
+10 10 |         return w
+11 11 |     else:
+
+RET505.py:23:5: RET505 [*] Unnecessary `elif` after `return` statement
+   |
+21 |             b = 2
+22 |         return
+23 |     elif z:
+   |     ^^^^ RET505
+24 |         c = 2
+25 |     else:
+   |
+   = help: Remove unnecessary `elif`
+
+ℹ Safe fix
+20 20 |         else:
+21 21 |             b = 2
+22 22 |         return
+23    |-    elif z:
+   23 |+    if z:
+24 24 |         c = 2
+25 25 |     else:
+26 26 |         c = 3
+
+RET505.py:41:5: RET505 [*] Unnecessary `elif` after `return` statement
+   |
+39 |         a = 1
+40 |         return y
+41 |     elif z:
+   |     ^^^^ RET505
+42 |         b = 2
+43 |         return w
+   |
+   = help: Remove unnecessary `elif`
+
+ℹ Safe fix
+38 38 |     if x:  # [no-else-return]
+39 39 |         a = 1
+40 40 |         return y
+41    |-    elif z:
+   41 |+    if z:
+42 42 |         b = 2
+43 43 |         return w
+44 44 |     else:
+
+RET505.py:53:5: RET505 [*] Unnecessary `else` after `return` statement
+   |
+51 |         a = 1
+52 |         return y
+53 |     else:
+   |     ^^^^ RET505
+54 |         b = 2
+55 |         return z
+   |
+   = help: Remove unnecessary `else`
+
+ℹ Safe fix
+50 50 |     if x:  # [no-else-return]
+51 51 |         a = 1
+52 52 |         return y
+53    |-    else:
+54    |-        b = 2
+55    |-        return z
+   53 |+    b = 2
+   54 |+    return z
+56 55 | 
+57 56 | 
+58 57 | def foo3(x, y, z):
+
+RET505.py:64:9: RET505 [*] Unnecessary `else` after `return` statement
+   |
+62 |             b = 2
+63 |             return y
+64 |         else:
+   |         ^^^^ RET505
+65 |             c = 3
+66 |             return x
+   |
+   = help: Remove unnecessary `else`
+
+ℹ Safe fix
+61 61 |         if y:  # [no-else-return]
+62 62 |             b = 2
+63 63 |             return y
+64    |-        else:
+65    |-            c = 3
+66    |-            return x
+   64 |+        c = 3
+   65 |+        return x
+67 66 |     else:
+68 67 |         d = 4
+69 68 |         return z
+
+RET505.py:79:5: RET505 [*] Unnecessary `else` after `return` statement
+   |
+77 |             b = 2
+78 |         return
+79 |     else:
+   |     ^^^^ RET505
+80 |         c = 3
+81 |     return
+   |
+   = help: Remove unnecessary `else`
+
+ℹ Safe fix
+76 76 |         else:
+77 77 |             b = 2
+78 78 |         return
+79    |-    else:
+80    |-        c = 3
+   79 |+    c = 3
+81 80 |     return
+82 81 | 
+83 82 | 
+
+RET505.py:89:9: RET505 [*] Unnecessary `else` after `return` statement
+   |
+87 |             a = 4
+88 |             return
+89 |         else:
+   |         ^^^^ RET505
+90 |             b = 2
+91 |     else:
+   |
+   = help: Remove unnecessary `else`
+
+ℹ Safe fix
+86 86 |         if y:  # [no-else-return]
+87 87 |             a = 4
+88 88 |             return
+89    |-        else:
+90    |-            b = 2
+   89 |+        b = 2
+91 90 |     else:
+92 91 |         c = 3
+93 92 |     return
+
+RET505.py:99:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+ 97 |     if x:  # [no-else-return]
+ 98 |         return True
+ 99 |     else:
+    |     ^^^^ RET505
+100 |         try:
+101 |             return False
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+96  96  | def bar4(x):
+97  97  |     if x:  # [no-else-return]
+98  98  |         return True
+99      |-    else:
+100     |-        try:
+101     |-            return False
+102     |-        except ValueError:
+103     |-            return None
+    99  |+    try:
+    100 |+        return False
+    101 |+    except ValueError:
+    102 |+        return None
+104 103 | 
+105 104 | 
+106 105 | ###
+
+
