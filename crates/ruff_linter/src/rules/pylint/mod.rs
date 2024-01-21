@@ -167,6 +167,7 @@ mod tests {
     #[test_case(Rule::NoClassmethodDecorator, Path::new("no_method_decorator.py"))]
     #[test_case(Rule::UnnecessaryDunderCall, Path::new("unnecessary_dunder_call.py"))]
     #[test_case(Rule::NoStaticmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::PotentialIndexError, Path::new("potential_index_error.py"))]
     #[test_case(Rule::SuperWithoutBrackets, Path::new("super_without_brackets.py"))]
     #[test_case(
         Rule::UnnecessaryDictIndexLookup,
