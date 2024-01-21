@@ -9,7 +9,7 @@ E40.py:2:1: E401 Multiple imports on one line
 3 | 
 4 | #: Okay
   |
-  = help: Split imports onto multiple lines
+  = help: Split imports
 
 E40.py:65:1: E401 Multiple imports on one line
    |
@@ -18,7 +18,7 @@ E40.py:65:1: E401 Multiple imports on one line
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
 66 | import re as regex, string; x = 1
    |
-   = help: Split imports onto multiple lines
+   = help: Split imports
 
 E40.py:66:1: E401 Multiple imports on one line
    |
@@ -29,7 +29,7 @@ E40.py:66:1: E401 Multiple imports on one line
 67 | 
 68 | x = 1; import re as regex, string
    |
-   = help: Split imports onto multiple lines
+   = help: Split imports
 
 E40.py:68:8: E401 Multiple imports on one line
    |
@@ -38,7 +38,7 @@ E40.py:68:8: E401 Multiple imports on one line
 68 | x = 1; import re as regex, string
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
    |
-   = help: Split imports onto multiple lines
+   = help: Split imports
 
 E40.py:72:5: E401 Multiple imports on one line
    |
@@ -48,7 +48,7 @@ E40.py:72:5: E401 Multiple imports on one line
 73 | 
 74 |     def nested_and_tested():
    |
-   = help: Split imports onto multiple lines
+   = help: Split imports
 
 E40.py:75:9: E401 Multiple imports on one line
    |
@@ -58,7 +58,7 @@ E40.py:75:9: E401 Multiple imports on one line
 76 | 
 77 |         x = 1; import re as regex, string
    |
-   = help: Split imports onto multiple lines
+   = help: Split imports
 
 E40.py:77:16: E401 Multiple imports on one line
    |
@@ -68,7 +68,7 @@ E40.py:77:16: E401 Multiple imports on one line
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
 78 |         import re as regex, string; x = 1
    |
-   = help: Split imports onto multiple lines
+   = help: Split imports
 
 E40.py:78:9: E401 Multiple imports on one line
    |
@@ -78,7 +78,7 @@ E40.py:78:9: E401 Multiple imports on one line
 79 | 
 80 |     if True: import re as regex, string
    |
-   = help: Split imports onto multiple lines
+   = help: Split imports
 
 E40.py:80:14: E401 Multiple imports on one line
    |
@@ -87,6 +87,6 @@ E40.py:80:14: E401 Multiple imports on one line
 80 |     if True: import re as regex, string
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
    |
-   = help: Split imports onto multiple lines
+   = help: Split imports
 
 

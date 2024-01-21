@@ -1,8 +1,14 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
+use anyhow::Result;
+use itertools::Itertools;
+
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{Alias, Stmt};
-use ruff_python_trivia::{indentation_at_offset, PythonWhitespace};
-use ruff_text_size::Ranged;
+use ruff_python_codegen::Stylist;
+use ruff_python_index::Indexer;
+use ruff_python_trivia::indentation_at_offset;
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -28,9 +34,15 @@ use crate::checkers::ast::Checker;
 pub struct MultipleImportsOnOneLine;
 
 impl Violation for MultipleImportsOnOneLine {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Multiple imports on one line")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Split imports"))
     }
 }
 
@@ -38,38 +50,77 @@ impl Violation for MultipleImportsOnOneLine {
 pub(crate) fn multiple_imports_on_one_line(checker: &mut Checker, stmt: &Stmt, names: &[Alias]) {
     if names.len() > 1 {
         let mut diagnostic = Diagnostic::new(MultipleImportsOnOneLine, stmt.range());
-
         if checker.settings.preview.is_enabled() {
-            let indentation = indentation_at_offset(stmt.start(), checker.locator()).unwrap_or("");
+            diagnostic.try_set_fix(|| {
+                split_imports(
+                    stmt,
+                    names,
+                    checker.locator(),
+                    checker.indexer(),
+                    checker.stylist(),
+                )
+            });
+        }
+        checker.diagnostics.push(diagnostic);
+    }
+}
 
-            let mut replacement = String::new();
-
-            for item in names {
+/// Generate a [`Fix`] to split the imports across multiple statements.
+fn split_imports(
+    stmt: &Stmt,
+    names: &[Alias],
+    locator: &Locator,
+    indexer: &Indexer,
+    stylist: &Stylist,
+) -> Result<Fix> {
+    if indexer.in_multi_statement_line(stmt, locator) {
+        // Ex) `x = 1; import os, sys` (convert to `x = 1; import os; import sys`)
+        let replacement = names
+            .iter()
+            .map(|alias| {
                 let Alias {
                     range: _,
                     name,
                     asname,
-                } = item;
+                } = alias;
 
                 if let Some(asname) = asname {
-                    replacement = format!("{replacement}{indentation}import {name} as {asname}\n");
+                    format!("import {name} as {asname}")
                 } else {
-                    replacement = format!("{replacement}{indentation}import {name}\n");
+                    format!("import {name}")
                 }
-            }
+            })
+            .join("; ");
 
-            // remove leading whitespace because we start at the import keyword
-            replacement = replacement.trim_whitespace_start().to_string();
+        Ok(Fix::safe_edit(Edit::range_replacement(
+            replacement,
+            stmt.range(),
+        )))
+    } else {
+        // Ex) `import os, sys` (convert to `import os\nimport sys`)
+        let indentation = indentation_at_offset(stmt.start(), locator).unwrap_or_default();
 
-            // remove trailing newline
-            replacement = replacement.trim_end_matches('\n').to_string();
+        // Generate newline-delimited imports.
+        let replacement = names
+            .iter()
+            .map(|alias| {
+                let Alias {
+                    range: _,
+                    name,
+                    asname,
+                } = alias;
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                replacement,
-                stmt.range(),
-            )));
-        }
+                if let Some(asname) = asname {
+                    format!("{indentation}import {name} as {asname}")
+                } else {
+                    format!("{indentation}import {name}")
+                }
+            })
+            .join(stylist.line_ending().as_str());
 
-        checker.diagnostics.push(diagnostic);
+        Ok(Fix::safe_edit(Edit::range_replacement(
+            replacement,
+            TextRange::new(locator.line_start(stmt.start()), stmt.end()),
+        )))
     }
 }
