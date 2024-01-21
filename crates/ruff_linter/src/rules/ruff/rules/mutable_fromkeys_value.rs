@@ -53,7 +53,7 @@ impl Violation for MutableFromkeysValue {
     }
 }
 
-/// RUF023
+/// RUF024
 pub(crate) fn mutable_fromkeys_value(checker: &mut Checker, call: &ast::ExprCall) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = call.func.as_ref() else {
         return;
