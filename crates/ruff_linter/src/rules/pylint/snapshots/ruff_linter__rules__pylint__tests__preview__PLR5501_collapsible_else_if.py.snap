@@ -80,7 +80,7 @@ collapsible_else_if.py:55:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    55 |+    elif 2:
    56 |+        pass
    57 |+    else:
-   58 |+        pass  # final pass comment  # else comment
+   58 |+        pass  # final pass comment
 60 59 | 
 61 60 | 
 62 61 | # Regression test for https://github.com/apache/airflow/blob/f1e1cdcc3b2826e68ba133f350300b5065bbca33/airflow/models/dag.py#L1737

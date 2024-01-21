@@ -1,6 +1,5 @@
 use ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, ElifElseClause, Stmt};
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
@@ -87,10 +86,11 @@ pub(crate) fn collapsible_else_if(checker: &mut Checker, stmt: &Stmt) {
     if checker.settings.preview.is_enabled() {
         let inner_if_line_start = checker.locator().line_start(first.start());
         let inner_if_line_end = checker.locator().line_end(first.end());
-        let inner_if_full_line_end = checker.locator().full_line_end(first.end());
 
+        // Identify the indentation of the loop itself (e.g., the `while` or `for`).
         let desired_indentation = indentation(checker.locator(), else_clause).unwrap_or("");
 
+        // Dedent the content from the end of the `else` to the end of the `if`.
         let indented = adjust_indentation(
             TextRange::new(inner_if_line_start, inner_if_line_end),
             desired_indentation,
@@ -99,19 +99,14 @@ pub(crate) fn collapsible_else_if(checker: &mut Checker, stmt: &Stmt) {
         )
         .unwrap();
 
+        // Unindent the first line (which is the `if` and add `el` to the start)
         let fixed_indented = format!("el{}", indented.strip_prefix(desired_indentation).unwrap());
 
-        let else_colon =
-            SimpleTokenizer::starts_at(else_clause.start(), checker.locator().contents())
-                .find(|token| token.kind() == SimpleTokenKind::Colon)
-                .unwrap();
-
-        diagnostic.set_fix(Fix::applicable_edits(
-            Edit::deletion(inner_if_line_start, inner_if_full_line_end),
-            [Edit::range_replacement(
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_replacement(
                 fixed_indented,
-                TextRange::new(else_clause.start(), else_colon.end()),
-            )],
+                TextRange::new(else_clause.start(), inner_if_line_end),
+            ),
             Applicability::Safe,
         ));
     }
