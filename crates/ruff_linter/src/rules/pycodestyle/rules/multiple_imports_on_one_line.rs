@@ -1,4 +1,3 @@
-use anyhow::Result;
 use itertools::Itertools;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
