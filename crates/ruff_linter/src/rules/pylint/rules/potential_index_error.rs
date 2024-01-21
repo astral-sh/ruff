@@ -46,7 +46,7 @@ pub(crate) fn potential_index_error(checker: &mut Checker, value: &Expr, slice: 
             value: ast::Number::Int(number_value),
             range,
         }) => match number_value.as_i64() {
-            Some(value) => (-value, *range),
+            Some(value) => (value, *range),
             None => return,
         },
         Expr::UnaryOp(ast::ExprUnaryOp {
