@@ -192,7 +192,11 @@ pub(super) fn sort_single_line_elements_sequence(
 ) -> String {
     assert_eq!(elts.len(), elements.len());
     let (opening_paren, closing_paren) = kind.surrounding_parens(locator.contents());
-    let last_item_index = elements.len().saturating_sub(1);
+    assert!(
+        elements.len() >= 2,
+        "A sequence with < 2 elements cannot be unsorted"
+    );
+    let last_item_index = elements.len() - 1;
     let mut result = String::from(opening_paren);
 
     let mut element_pairs = elements.iter().zip(elts).collect_vec();
@@ -273,7 +277,7 @@ pub(super) struct MultilineStringSequenceValue {
 }
 
 impl MultilineStringSequenceValue {
-    pub(super) fn len(&self) -> usize {
+    pub(super) fn num_items(&self) -> usize {
         self.items.len()
     }
 
@@ -778,6 +782,10 @@ fn join_multiline_string_sequence_items(
     newline: &str,
     needs_trailing_comma: bool,
 ) -> String {
+    assert!(
+        sorted_items.len() >= 2,
+        "A sequence with < 2 items cannot be unsorted"
+    );
     let last_item_index = sorted_items.len() - 1;
 
     let mut new_dunder_all = String::new();

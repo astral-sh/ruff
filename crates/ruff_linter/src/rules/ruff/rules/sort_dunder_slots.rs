@@ -254,7 +254,7 @@ fn create_fix(
             let display_kind = display_kind.as_sequence()?;
             let analyzed_sequence =
                 MultilineStringSequenceValue::from_source_range(*range, display_kind, locator)?;
-            assert_eq!(analyzed_sequence.len(), elts.len());
+            assert_eq!(analyzed_sequence.num_items(), elts.len());
             analyzed_sequence.into_sorted_source_code(SORTING_STYLE, locator, checker.stylist())
         } else {
             match display_kind {
@@ -294,7 +294,11 @@ pub(super) fn sort_single_line_elements_dict(
 ) -> String {
     assert_eq!(key_elts.len(), elements.len());
     assert_eq!(elements.len(), value_elts.len());
-    let last_item_index = elements.len().saturating_sub(1);
+    assert!(
+        elements.len() >= 2,
+        "A sequence with < 2 elements cannot be unsorted"
+    );
+    let last_item_index = elements.len() - 1;
     let mut result = String::from('{');
 
     let mut element_trios = izip!(elements, key_elts, value_elts).collect_vec();

@@ -209,7 +209,7 @@ fn create_fix(
         // definitions:
         if is_multiline {
             let value = MultilineStringSequenceValue::from_source_range(range, kind, locator)?;
-            assert_eq!(value.len(), elts.len());
+            assert_eq!(value.num_items(), elts.len());
             value.into_sorted_source_code(SORTING_STYLE, locator, checker.stylist())
         } else {
             sort_single_line_elements_sequence(kind, elts, string_items, locator, SORTING_STYLE)
