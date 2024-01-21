@@ -233,7 +233,7 @@ mod test {
     use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
     use ruff_workspace::Settings;
 
-    use crate::args::CliOverrides;
+    use crate::args::ConfigArgs;
 
     use super::check;
 
@@ -272,7 +272,7 @@ mod test {
             // Notebooks are not included by default
             &[tempdir.path().to_path_buf(), notebook],
             &pyproject_config,
-            &CliOverrides::default(),
+            &ConfigArgs::default(),
             flags::Cache::Disabled,
             flags::Noqa::Disabled,
             flags::FixMode::Generate,

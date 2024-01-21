@@ -506,6 +506,7 @@ impl From<&LogLevelArgs> for LogLevel {
     }
 }
 
+#[derive(Default)]
 pub struct ConfigArgs {
     /// Path to a pyproject.toml or ruff.toml config file (etc.), if provided
     config_file: Option<PathBuf>,
@@ -520,20 +521,15 @@ impl ConfigArgs {
         self.config_file.as_ref()
     }
 
-    fn with_no_config_flag_provided(cli_overrides: CliOverrides) -> Self {
-        Self {
-            cli_overrides,
-            config_file: None,
-            config_overrides: Configuration::default(),
-        }
-    }
-
     fn from_cli_options(
         config_options: Option<Vec<ConfigOption>>,
         cli_overrides: CliOverrides,
         isolated: bool,
     ) -> Result<Self, anyhow::Error> {
-        let mut new = Self::with_no_config_flag_provided(cli_overrides);
+        let mut new = Self {
+            cli_overrides,
+            ..Self::default()
+        };
 
         let Some(options) = config_options else {
             return Ok(new);
@@ -690,7 +686,7 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
 ///
 /// For example:
 ///
-/// ```
+/// ```sh
 /// ruff check --config "path/to/pyproject.toml" --config "max-line-length=90" --config "isort.case-sensitive=false"
 /// ```
 #[derive(Clone, Debug)]
