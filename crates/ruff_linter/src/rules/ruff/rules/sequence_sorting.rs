@@ -139,7 +139,7 @@ pub(super) enum SequenceKind<'a> {
 }
 
 impl SequenceKind<'_> {
-    fn surrounding_parens(&self, source: &str) -> (&'static str, &'static str) {
+    fn surrounding_brackets(&self, source: &str) -> (&'static str, &'static str) {
         match self {
             Self::List => ("[", "]"),
             Self::Set => ("{", "}"),
@@ -191,7 +191,7 @@ pub(super) fn sort_single_line_elements_sequence(
     sorting_style: &SortingStyle,
 ) -> String {
     assert_eq!(elts.len(), elements.len());
-    let (opening_paren, closing_paren) = kind.surrounding_parens(locator.contents());
+    let (opening_paren, closing_paren) = kind.surrounding_brackets(locator.contents());
     assert!(
         elements.len() >= 2,
         "A sequence with < 2 elements cannot be unsorted"
@@ -226,7 +226,9 @@ pub(super) enum SortClassification<'a> {
     /// but we wouldn't be able to autofix it
     UnsortedButUnfixable,
     /// It's an unsorted display of string literals,
-    /// and it's possible we could generate a fix for it
+    /// and it's possible we could generate a fix for it;
+    /// here's the values of the elts so we can use them to
+    /// generate an autofix:
     UnsortedAndMaybeFixable { items: Vec<&'a str> },
     /// The display contains one or more items that are not string
     /// literals.
@@ -235,20 +237,37 @@ pub(super) enum SortClassification<'a> {
 
 impl<'a> SortClassification<'a> {
     pub(super) fn of_elements(elements: &'a [ast::Expr], sorting_style: &SortingStyle) -> Self {
+        // If it's of length less than 2, it has to be sorted already
         let Some((first, rest @ [_, ..])) = elements.split_first() else {
             return Self::Sorted;
         };
+
+        // If any elt we encounter is not an ExprStringLiteral AST node,
+        // that indicates at least one item in the sequence is not a string literal,
+        // which means the sequence is out of scope for RUF022/RUF023/etc.
         let Some(string_node) = first.as_string_literal_expr() else {
             return Self::NotAListOfStringLiterals;
         };
-        let mut this = string_node.value.to_str();
+        let mut current = string_node.value.to_str();
 
         for expr in rest {
             let Some(string_node) = expr.as_string_literal_expr() else {
                 return Self::NotAListOfStringLiterals;
             };
             let next = string_node.value.to_str();
-            if sorting_style.compare(next, this).is_lt() {
+            if sorting_style.compare(next, current).is_lt() {
+                // Looks like the sequence was not in fact already sorted!
+                //
+                // Now we need to gather the necessary information we'd need
+                // to create an autofix. We need to know three things for this:
+                //
+                // 1. Are all items in the sequence string literals?
+                //    (If not, we won't even be emitting the violation, let alone
+                //    trying to fix it.)
+                // 2. Are any items in the sequence implicitly concatenated?
+                //    (If so, we might be *emitting* the violation, but we definitely
+                //    won't be trying to fix it.)
+                // 3. What is the value of each elt in the sequence?
                 let mut items = Vec::with_capacity(elements.len());
                 for expr in elements {
                     let Some(string_node) = expr.as_string_literal_expr() else {
@@ -261,8 +280,10 @@ impl<'a> SortClassification<'a> {
                 }
                 return Self::UnsortedAndMaybeFixable { items };
             }
-            this = next;
+            current = next;
         }
+        // Looks like the sequence was already sorted -- hooray!
+        // We won't be emitting a violation this time.
         Self::Sorted
     }
 }
@@ -277,7 +298,7 @@ pub(super) struct MultilineStringSequenceValue {
 }
 
 impl MultilineStringSequenceValue {
-    pub(super) fn num_items(&self) -> usize {
+    pub(super) fn len(&self) -> usize {
         self.items.len()
     }
 

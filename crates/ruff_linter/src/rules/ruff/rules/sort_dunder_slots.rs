@@ -254,7 +254,7 @@ fn create_fix(
             let display_kind = display_kind.as_sequence()?;
             let analyzed_sequence =
                 MultilineStringSequenceValue::from_source_range(*range, display_kind, locator)?;
-            assert_eq!(analyzed_sequence.num_items(), elts.len());
+            assert_eq!(analyzed_sequence.len(), elts.len());
             analyzed_sequence.into_sorted_source_code(SORTING_STYLE, locator, checker.stylist())
         } else {
             match display_kind {
