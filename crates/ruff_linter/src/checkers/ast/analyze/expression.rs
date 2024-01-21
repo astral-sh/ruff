@@ -125,6 +125,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SliceCopy) {
                 refurb::rules::slice_copy(checker, subscript);
             }
+            if checker.enabled(Rule::PotentialIndexError) {
+                pylint::rules::potential_index_error(checker, value, slice);
+            }
 
             pandas_vet::rules::subscript(checker, value, expr);
         }
