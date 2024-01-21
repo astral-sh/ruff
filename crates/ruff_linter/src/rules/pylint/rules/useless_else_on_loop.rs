@@ -52,13 +52,12 @@ impl Violation for UselessElseOnLoop {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "`else` clause on loop without a `break` statement; remove the `else` and de-indent all the \
-             code inside it"
+            "`else` clause on loop without a `break` statement; remove the `else` and dedent its contents"
         )
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Remove redundant `else` clause".to_string())
+        Some("Remove `else`".to_string())
     }
 }
 
