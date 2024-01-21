@@ -116,10 +116,14 @@ pub(crate) fn bool_literal_compare(checker: &mut Checker, compare: &ast::ExprCom
 
     let mut diagnostic = Diagnostic::new(BoolLiteralCompare { check_type }, compare.range());
 
-    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        content,
-        compare.range(),
-    )));
+    let edit = Edit::range_replacement(content, compare.range());
+
+    let fix = match check_type {
+        CheckType::Truthy => Fix::safe_edit(edit),
+        CheckType::Falsey => Fix::unsafe_edit(edit),
+    };
+
+    diagnostic.set_fix(fix);
 
     checker.diagnostics.push(diagnostic);
 }

@@ -11,7 +11,7 @@ FURB149.py:3:4: FURB149 [*] Comparison to `True` should be `cond`
   |
   = help: Use shorthand truthy check
 
-ℹ Unsafe fix
+ℹ Safe fix
 1 1 | failed = True
 2 2 | 
 3   |-if True == failed:  # FURB149
@@ -70,7 +70,7 @@ FURB149.py:12:4: FURB149 [*] Comparison to `True` should be `cond`
    |
    = help: Use shorthand truthy check
 
-ℹ Unsafe fix
+ℹ Safe fix
 9  9  | if False == failed:  # FURB149
 10 10 |     print("You did not fail")
 11 11 | 
@@ -90,7 +90,7 @@ FURB149.py:15:4: FURB149 [*] Comparison to `True` should be `cond`
    |
    = help: Use shorthand truthy check
 
-ℹ Unsafe fix
+ℹ Safe fix
 12 12 | if False != failed:  # FURB149
 13 13 |     print("You failed")
 14 14 | 
@@ -150,7 +150,7 @@ FURB149.py:24:4: FURB149 [*] Comparison to `True` should be `cond`
    |
    = help: Use shorthand truthy check
 
-ℹ Unsafe fix
+ℹ Safe fix
 21 21 | if False is failed:  # FURB149
 22 22 |     print("You did not fail")
 23 23 | 
@@ -170,7 +170,7 @@ FURB149.py:27:4: FURB149 [*] Comparison to `True` should be `cond`
    |
    = help: Use shorthand truthy check
 
-ℹ Unsafe fix
+ℹ Safe fix
 24 24 | if False is not failed:  # FURB149
 25 25 |     print("You failed")
 26 26 | 
@@ -230,7 +230,7 @@ FURB149.py:36:4: FURB149 [*] Comparison to `True` should be `cond`
    |
    = help: Use shorthand truthy check
 
-ℹ Unsafe fix
+ℹ Safe fix
 33 33 | if failed is False:  # FURB149
 34 34 |     print("You did not fail")
 35 35 | 
@@ -250,7 +250,7 @@ FURB149.py:39:4: FURB149 [*] Comparison to `True` should be `cond`
    |
    = help: Use shorthand truthy check
 
-ℹ Unsafe fix
+ℹ Safe fix
 36 36 | if failed is not False:  # FURB149
 37 37 |     print("You failed")
 38 38 | 
@@ -310,7 +310,7 @@ FURB149.py:48:4: FURB149 [*] Comparison to `True` should be `cond`
    |
    = help: Use shorthand truthy check
 
-ℹ Unsafe fix
+ℹ Safe fix
 45 45 | if failed == False:  # FURB149
 46 46 |     print("You did not fail")
 47 47 | 
@@ -330,7 +330,7 @@ FURB149.py:51:5: FURB149 [*] Comparison to `True` should be `cond`
    |
    = help: Use shorthand truthy check
 
-ℹ Unsafe fix
+ℹ Safe fix
 48 48 | if failed != False:  # FURB149
 49 49 |     print("You failed")
 50 50 | 
