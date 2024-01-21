@@ -744,7 +744,7 @@ impl TypedValueParser for ConfigOptionParser {
             new_error.insert(
                 clap::error::ContextKind::Suggested,
                 clap::error::ContextValue::StyledStrs(vec![
-                    "The `--config` flag must either be a path to a `.toml` configuation file or a TOML string providing configuration overrides".into(),
+                    "The `--config` flag must either be a path to a `.toml` configuration file or a TOML string providing configuration overrides".into(),
                     format!("The path `{value}` does not exist on your filesystem").into()
                 ]),
             );
