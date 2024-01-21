@@ -76,4 +76,15 @@ useless_else_on_loop.py:98:9: PLW0120 `else` clause on loop without a `break` st
     |
     = help: Remove redundant `else` clause
 
+useless_else_on_loop.py:144:5: PLW0120 `else` clause on loop without a `break` statement; remove the `else` and de-indent all the code inside it
+    |
+142 |     for j in range(10):
+143 |         pass
+144 |     else:
+    |     ^^^^ PLW0120
+145 |         # [useless-else-on-loop]
+146 |         print("fat chance")
+    |
+    = help: Remove redundant `else` clause
+
 
