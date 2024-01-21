@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -45,10 +47,7 @@ pub(crate) fn potential_index_error(checker: &mut Checker, value: &Expr, slice: 
         Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Int(number_value),
             range,
-        }) => match number_value.as_i64() {
-            Some(value) => (value, *range),
-            None => return,
-        },
+        }) => (number_value.to_owned(), *range),
         Expr::UnaryOp(ast::ExprUnaryOp {
             op: ast::UnaryOp::USub,
             operand,
@@ -57,16 +56,23 @@ pub(crate) fn potential_index_error(checker: &mut Checker, value: &Expr, slice: 
             Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Int(number_value),
                 ..
-            }) => match number_value.as_i64() {
-                Some(value) => (-value, *range),
-                None => return,
-            },
+            }) => (
+                ast::Int::from_str(&format!("-{number_value}")).unwrap(),
+                *range,
+            ),
             _ => return,
         },
         _ => return,
     };
 
-    if number_value >= length || number_value < -length {
+    let emit = if let Some(number) = number_value.as_i64() {
+        number >= length || number < -length
+    } else {
+        // this should be impossible
+        true
+    };
+
+    if emit {
         checker
             .diagnostics
             .push(Diagnostic::new(PotentialIndexError, range));
