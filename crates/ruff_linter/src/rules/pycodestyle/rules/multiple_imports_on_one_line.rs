@@ -51,15 +51,13 @@ pub(crate) fn multiple_imports_on_one_line(checker: &mut Checker, stmt: &Stmt, n
     if names.len() > 1 {
         let mut diagnostic = Diagnostic::new(MultipleImportsOnOneLine, stmt.range());
         if checker.settings.preview.is_enabled() {
-            diagnostic.try_set_fix(|| {
-                split_imports(
-                    stmt,
-                    names,
-                    checker.locator(),
-                    checker.indexer(),
-                    checker.stylist(),
-                )
-            });
+            diagnostic.set_fix(split_imports(
+                stmt,
+                names,
+                checker.locator(),
+                checker.indexer(),
+                checker.stylist(),
+            ));
         }
         checker.diagnostics.push(diagnostic);
     }
@@ -72,7 +70,7 @@ fn split_imports(
     locator: &Locator,
     indexer: &Indexer,
     stylist: &Stylist,
-) -> Result<Fix> {
+) -> Fix {
     if indexer.in_multi_statement_line(stmt, locator) {
         // Ex) `x = 1; import os, sys` (convert to `x = 1; import os; import sys`)
         let replacement = names
@@ -92,10 +90,7 @@ fn split_imports(
             })
             .join("; ");
 
-        Ok(Fix::safe_edit(Edit::range_replacement(
-            replacement,
-            stmt.range(),
-        )))
+        Fix::safe_edit(Edit::range_replacement(replacement, stmt.range()))
     } else {
         // Ex) `import os, sys` (convert to `import os\nimport sys`)
         let indentation = indentation_at_offset(stmt.start(), locator).unwrap_or_default();
@@ -118,9 +113,9 @@ fn split_imports(
             })
             .join(stylist.line_ending().as_str());
 
-        Ok(Fix::safe_edit(Edit::range_replacement(
+        Fix::safe_edit(Edit::range_replacement(
             replacement,
             TextRange::new(locator.line_start(stmt.start()), stmt.end()),
-        )))
+        ))
     }
 }
