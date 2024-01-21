@@ -95,11 +95,15 @@ class ConfigOverrides(Serializable):
         """
         Temporarily patch the Ruff configuration file in the given directory.
         """
+        dot_ruff_toml = dirpath / ".ruff.toml"
         ruff_toml = dirpath / "ruff.toml"
         pyproject_toml = dirpath / "pyproject.toml"
 
         # Prefer `ruff.toml` over `pyproject.toml`
-        if ruff_toml.exists():
+        if dot_ruff_toml.exists():
+            path = dot_ruff_toml
+            base = []
+        elif ruff_toml.exists():
             path = ruff_toml
             base = []
         else:
