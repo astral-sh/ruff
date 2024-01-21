@@ -52,7 +52,8 @@ def not_ok1():
 def not_ok_with_comments():
     if 1:
         pass
-    else:  # else comment
+    else:
+        # inner comment
         if 2:
             pass
         else:

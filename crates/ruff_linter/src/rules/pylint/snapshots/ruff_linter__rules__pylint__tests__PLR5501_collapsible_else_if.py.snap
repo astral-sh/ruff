@@ -30,25 +30,26 @@ collapsible_else_if.py:55:5: PLR5501 Use `elif` instead of `else` then `if`, to 
    |
 53 |       if 1:
 54 |           pass
-55 |       else:  # else comment
+55 |       else:
    |  _____^
-56 | |         if 2:
+56 | |         # inner comment
+57 | |         if 2:
    | |________^ PLR5501
-57 |               pass
-58 |           else:
+58 |               pass
+59 |           else:
    |
    = help: Use `elif` instead of `else` then `if`, to reduce indentation
 
-collapsible_else_if.py:68:5: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
+collapsible_else_if.py:69:5: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
    |
-66 |       elif True:
-67 |           print(2)
-68 |       else:
+67 |       elif True:
+68 |           print(2)
+69 |       else:
    |  _____^
-69 | |         if True:
+70 | |         if True:
    | |________^ PLR5501
-70 |               print(3)
-71 |           else:
+71 |               print(3)
+72 |           else:
    |
    = help: Use `elif` instead of `else` then `if`, to reduce indentation
 

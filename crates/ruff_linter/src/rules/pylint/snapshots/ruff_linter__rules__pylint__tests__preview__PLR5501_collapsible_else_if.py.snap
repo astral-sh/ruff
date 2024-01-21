@@ -59,12 +59,13 @@ collapsible_else_if.py:55:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    |
 53 |       if 1:
 54 |           pass
-55 |       else:  # else comment
+55 |       else:
    |  _____^
-56 | |         if 2:
+56 | |         # inner comment
+57 | |         if 2:
    | |________^ PLR5501
-57 |               pass
-58 |           else:
+58 |               pass
+59 |           else:
    |
    = help: Use `elif` instead of `else` then `if`, to reduce indentation
 
@@ -72,44 +73,44 @@ collapsible_else_if.py:55:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
 52 52 | def not_ok_with_comments():
 53 53 |     if 1:
 54 54 |         pass
-55    |-    else:  # else comment
-56    |-        if 2:
-57    |-            pass
-58    |-        else:
-59    |-            pass  # final pass comment
    55 |+    elif 2:
    56 |+        pass
-   57 |+    else:
+55 57 |     else:
+56    |-        # inner comment
+57    |-        if 2:
+58    |-            pass
+59    |-        else:
+60    |-            pass  # final pass comment
    58 |+        pass  # final pass comment
-60 59 | 
-61 60 | 
-62 61 | # Regression test for https://github.com/apache/airflow/blob/f1e1cdcc3b2826e68ba133f350300b5065bbca33/airflow/models/dag.py#L1737
+61 59 | 
+62 60 | 
+63 61 | # Regression test for https://github.com/apache/airflow/blob/f1e1cdcc3b2826e68ba133f350300b5065bbca33/airflow/models/dag.py#L1737
 
-collapsible_else_if.py:68:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+collapsible_else_if.py:69:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
    |
-66 |       elif True:
-67 |           print(2)
-68 |       else:
+67 |       elif True:
+68 |           print(2)
+69 |       else:
    |  _____^
-69 | |         if True:
+70 | |         if True:
    | |________^ PLR5501
-70 |               print(3)
-71 |           else:
+71 |               print(3)
+72 |           else:
    |
    = help: Use `elif` instead of `else` then `if`, to reduce indentation
 
 ℹ Safe fix
-65 65 |         print(1)
-66 66 |     elif True:
-67 67 |         print(2)
-   68 |+    elif True:
-   69 |+        print(3)
-68 70 |     else:
-69    |-        if True:
-70    |-            print(3)
-71    |-        else:
-72    |-            print(4)
-   71 |+        print(4)
-73 72 | 
+66 66 |         print(1)
+67 67 |     elif True:
+68 68 |         print(2)
+   69 |+    elif True:
+   70 |+        print(3)
+69 71 |     else:
+70    |-        if True:
+71    |-            print(3)
+72    |-        else:
+73    |-            print(4)
+   72 |+        print(4)
+74 73 | 
 
 
