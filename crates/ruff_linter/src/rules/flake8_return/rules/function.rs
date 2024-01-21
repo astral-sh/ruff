@@ -1,9 +1,10 @@
+use anyhow::Result;
 use std::ops::Add;
 
 use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, FixAvailability, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, FixAvailability, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
@@ -12,7 +13,7 @@ use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::{is_python_whitespace, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::is_python_whitespace;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
@@ -606,7 +607,9 @@ fn superfluous_else_node(
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
-                raise_branch(checker, &mut diagnostic, elif_else);
+                if checker.settings.preview.is_enabled() {
+                    diagnostic.try_set_fix(|| remove_else(checker, elif_else));
+                }
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -617,7 +620,9 @@ fn superfluous_else_node(
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
-                raise_branch(checker, &mut diagnostic, elif_else);
+                if checker.settings.preview.is_enabled() {
+                    diagnostic.try_set_fix(|| remove_else(checker, elif_else));
+                }
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -628,7 +633,9 @@ fn superfluous_else_node(
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
-                raise_branch(checker, &mut diagnostic, elif_else);
+                if checker.settings.preview.is_enabled() {
+                    diagnostic.try_set_fix(|| remove_else(checker, elif_else));
+                }
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -639,7 +646,9 @@ fn superfluous_else_node(
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
-                raise_branch(checker, &mut diagnostic, elif_else);
+                if checker.settings.preview.is_enabled() {
+                    diagnostic.try_set_fix(|| remove_else(checker, elif_else));
+                }
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -718,48 +727,33 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
     }
 }
 
-fn raise_branch(checker: &mut Checker, diagnostic: &mut Diagnostic, elif_else: &ElifElseClause) {
-    if checker.settings.preview.is_disabled() {
-        return;
-    }
-
+fn remove_else(checker: &mut Checker, elif_else: &ElifElseClause) -> Result<Fix> {
     if elif_else.test.is_some() {
         // it's an elif, so we can just make it an if
 
         // delete "el" from "elif"
-        diagnostic.set_fix(Fix::applicable_edit(
-            Edit::deletion(elif_else.start(), elif_else.start() + TextSize::from(2)),
-            Applicability::Safe,
-        ));
+        Ok(Fix::safe_edit(Edit::deletion(
+            elif_else.start(),
+            elif_else.start() + TextSize::from(2),
+        )))
+    } else {
+        let else_line_range = checker.locator().full_line_range(elif_else.start());
 
-        return;
-    }
+        let Some(desired_indentation) = indentation(checker.locator(), elif_else) else {
+            return Err(anyhow::anyhow!("Compound statement cannot be inlined"));
+        };
 
-    let else_colon = SimpleTokenizer::starts_at(elif_else.start(), checker.locator().contents())
-        .find(|token| token.kind == SimpleTokenKind::Colon)
-        .unwrap();
+        let indented = adjust_indentation(
+            TextRange::new(else_line_range.end(), elif_else.end()),
+            desired_indentation,
+            checker.locator(),
+            checker.stylist(),
+        )?;
 
-    let else_line_range = checker.locator().full_line_range(elif_else.start());
-
-    let desired_indentation = indentation(checker.locator(), elif_else).unwrap_or("");
-
-    let indented = adjust_indentation(
-        TextRange::new(else_line_range.end(), elif_else.end()),
-        desired_indentation,
-        checker.locator(),
-        checker.stylist(),
-    )
-    .unwrap();
-
-    diagnostic.set_fix(Fix::applicable_edits(
-        Edit::deletion(
-            else_line_range.end(),
-            checker.locator().full_line_end(elif_else.end()),
-        ),
-        [Edit::range_replacement(
+        Ok(Fix::safe_edit(Edit::replacement(
             indented,
-            TextRange::new(else_line_range.start(), else_colon.end()),
-        )],
-        Applicability::Safe,
-    ));
+            else_line_range.start(),
+            elif_else.end(),
+        )))
+    }
 }
