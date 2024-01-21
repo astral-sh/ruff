@@ -431,6 +431,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::EqWithoutHash) {
                 pylint::rules::object_without_hash_method(checker, class_def);
             }
+            if checker.enabled(Rule::TooFewPublicMethods) {
+                pylint::rules::too_few_public_methods(
+                    checker,
+                    class_def,
+                    checker.settings.pylint.min_public_methods,
+                );
+            }
             if checker.enabled(Rule::TooManyPublicMethods) {
                 pylint::rules::too_many_public_methods(
                     checker,

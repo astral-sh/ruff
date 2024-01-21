@@ -2699,6 +2699,15 @@
           ],
           "format": "uint",
           "minimum": 0.0
+        },
+        "min-public-methods": {
+          "description": "Minimum number of public methods allowed within a single class (see: `PLR0903`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
         }
       },
       "additionalProperties": false
@@ -3559,6 +3568,7 @@
         "PLR0402",
         "PLR09",
         "PLR090",
+        "PLR0903",
         "PLR0904",
         "PLR091",
         "PLR0911",

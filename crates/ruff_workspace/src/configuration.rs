@@ -1571,7 +1571,7 @@ mod tests {
     const PREVIEW_RULES: &[Rule] = &[
         Rule::ReimplementedStarmap,
         Rule::SliceCopy,
-        Rule::TooManyPublicMethods,
+        Rule::TooFewPublicMethods,
         Rule::TooManyPublicMethods,
         Rule::UnnecessaryEnumerate,
         Rule::MathConstant,

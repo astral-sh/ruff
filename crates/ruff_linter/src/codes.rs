@@ -293,6 +293,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W1514") => (RuleGroup::Preview, rules::pylint::rules::UnspecifiedEncoding),
         (Pylint, "W1641") => (RuleGroup::Preview, rules::pylint::rules::EqWithoutHash),
         (Pylint, "W2101") => (RuleGroup::Stable, rules::pylint::rules::UselessWithLock),
+        (Pylint, "R0903") => (RuleGroup::Preview, rules::pylint::rules::TooFewPublicMethods),
         (Pylint, "W2901") => (RuleGroup::Stable, rules::pylint::rules::RedefinedLoopName),
         (Pylint, "W3201") => (RuleGroup::Preview, rules::pylint::rules::BadDunderMethodName),
         (Pylint, "W3301") => (RuleGroup::Stable, rules::pylint::rules::NestedMinMax),

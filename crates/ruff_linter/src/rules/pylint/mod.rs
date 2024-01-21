@@ -393,6 +393,22 @@ mod tests {
     }
 
     #[test]
+    fn too_few_public_methods() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_few_public_methods.py"),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    min_public_methods: 2,
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules(vec![Rule::TooFewPublicMethods])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn too_many_locals() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/too_many_locals.py"),
