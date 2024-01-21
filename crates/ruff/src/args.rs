@@ -1,10 +1,12 @@
 use std::path::PathBuf;
-use std::str::FromStr;
 
+use anyhow::anyhow;
 use clap::builder::{TypedValueParser, ValueParserFactory};
 use clap::{command, Parser};
+use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashMap;
+use toml;
 
 use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
@@ -15,7 +17,7 @@ use ruff_linter::settings::types::{
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
-use ruff_workspace::options::PycodestyleOptions;
+use ruff_workspace::options::{Options, PycodestyleOptions};
 use ruff_workspace::resolver::ConfigurationTransformer;
 
 #[derive(Debug, Parser)]
@@ -504,97 +506,172 @@ impl From<&LogLevelArgs> for LogLevel {
     }
 }
 
+pub struct ConfigArgs {
+    /// Path to a pyproject.toml or ruff.toml config file (etc.), if provided
+    config_file: Option<PathBuf>,
+    /// Overrides provided via the `--config FOO=BAR` option on the CLI
+    config_overrides: Configuration,
+    /// Overrides provided via specific (legacy-ish) flags such as --line-length etc
+    cli_overrides: CliOverrides,
+}
+
+impl ConfigArgs {
+    pub fn config_file(&self) -> Option<&PathBuf> {
+        self.config_file.as_ref()
+    }
+
+    fn with_no_config_flag_provided(cli_overrides: CliOverrides) -> Self {
+        Self {
+            cli_overrides,
+            config_file: None,
+            config_overrides: Configuration::default(),
+        }
+    }
+
+    fn from_cli_options(
+        config_options: Option<Vec<ConfigOption>>,
+        cli_overrides: CliOverrides,
+        isolated: bool,
+    ) -> Result<Self, anyhow::Error> {
+        let mut new = Self::with_no_config_flag_provided(cli_overrides);
+
+        let Some(options) = config_options else {
+            return Ok(new);
+        };
+
+        for option in options {
+            match option {
+                ConfigOption::ConfigOverride(overridden_option) => {
+                    new.config_overrides = new.config_overrides.combine(
+                        Configuration::from_options(*overridden_option, &path_dedot::CWD)?,
+                    );
+                }
+                ConfigOption::PathToConfigFile(path) => {
+                    if isolated {
+                        let context = format!(
+                            "Both `--isolated` and `--config={}` were specified on the command line",
+                            path.display()
+                        );
+                        let error = anyhow!(
+                            "Cannot specify `--isolated` and also specify a configuration file"
+                        )
+                        .context(context);
+                        return Err(error);
+                    }
+                    match new.config_file {
+                        None => new.config_file = Some(path),
+                        Some(ref config_file) => {
+                            if config_file == &path {
+                                // I'm not sure why you'd specify the same config file twice,
+                                // but it seems reasonable to let it pass if we do encounter that
+                                continue;
+                            }
+                            let (first, second) = (config_file.display(), path.display());
+                            return Err(anyhow!("Cannot specify more than one configuration file on the command line")
+                                .context(format!("Both `--config={first}` and `--config={second}` were specified")));
+                        }
+                    }
+                }
+            }
+        }
+        Ok(new)
+    }
+}
+
+impl ConfigurationTransformer for ConfigArgs {
+    fn transform(&self, config: Configuration) -> Configuration {
+        self.cli_overrides
+            .transform(self.config_overrides.transform(config))
+    }
+}
+
 impl CheckCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(self) -> (CheckArguments, CliOverrides) {
-        (
-            CheckArguments {
-                add_noqa: self.add_noqa,
-                config: self.config,
-                diff: self.diff,
-                ecosystem_ci: self.ecosystem_ci,
-                exit_non_zero_on_fix: self.exit_non_zero_on_fix,
-                exit_zero: self.exit_zero,
-                files: self.files,
-                ignore_noqa: self.ignore_noqa,
-                isolated: self.isolated,
-                no_cache: self.no_cache,
-                output_file: self.output_file,
-                show_files: self.show_files,
-                show_settings: self.show_settings,
-                statistics: self.statistics,
-                stdin_filename: self.stdin_filename,
-                watch: self.watch,
-            },
-            CliOverrides {
-                dummy_variable_rgx: self.dummy_variable_rgx,
-                exclude: self.exclude,
-                extend_exclude: self.extend_exclude,
-                extend_fixable: self.extend_fixable,
-                extend_ignore: self.extend_ignore,
-                extend_per_file_ignores: self.extend_per_file_ignores,
-                extend_select: self.extend_select,
-                extend_unfixable: self.extend_unfixable,
-                fixable: self.fixable,
-                ignore: self.ignore,
-                line_length: self.line_length,
-                per_file_ignores: self.per_file_ignores,
-                preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
-                respect_gitignore: resolve_bool_arg(
-                    self.respect_gitignore,
-                    self.no_respect_gitignore,
-                ),
-                select: self.select,
-                show_source: resolve_bool_arg(self.show_source, self.no_show_source),
-                target_version: self.target_version,
-                unfixable: self.unfixable,
-                // TODO(charlie): Included in `pyproject.toml`, but not inherited.
-                cache_dir: self.cache_dir,
-                fix: resolve_bool_arg(self.fix, self.no_fix),
-                fix_only: resolve_bool_arg(self.fix_only, self.no_fix_only),
-                unsafe_fixes: resolve_bool_arg(self.unsafe_fixes, self.no_unsafe_fixes)
-                    .map(UnsafeFixes::from),
-                force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-                output_format: self.output_format,
-                show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
-                extension: self.extension,
-            },
-        )
+    pub fn partition(self) -> Result<(CheckArguments, ConfigArgs), anyhow::Error> {
+        let check_arguments = CheckArguments {
+            add_noqa: self.add_noqa,
+            diff: self.diff,
+            ecosystem_ci: self.ecosystem_ci,
+            exit_non_zero_on_fix: self.exit_non_zero_on_fix,
+            exit_zero: self.exit_zero,
+            files: self.files,
+            ignore_noqa: self.ignore_noqa,
+            isolated: self.isolated,
+            no_cache: self.no_cache,
+            output_file: self.output_file,
+            show_files: self.show_files,
+            show_settings: self.show_settings,
+            statistics: self.statistics,
+            stdin_filename: self.stdin_filename,
+            watch: self.watch,
+        };
+
+        let cli_overrides = CliOverrides {
+            dummy_variable_rgx: self.dummy_variable_rgx,
+            exclude: self.exclude,
+            extend_exclude: self.extend_exclude,
+            extend_fixable: self.extend_fixable,
+            extend_ignore: self.extend_ignore,
+            extend_per_file_ignores: self.extend_per_file_ignores,
+            extend_select: self.extend_select,
+            extend_unfixable: self.extend_unfixable,
+            fixable: self.fixable,
+            ignore: self.ignore,
+            line_length: self.line_length,
+            per_file_ignores: self.per_file_ignores,
+            preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
+            respect_gitignore: resolve_bool_arg(self.respect_gitignore, self.no_respect_gitignore),
+            select: self.select,
+            show_source: resolve_bool_arg(self.show_source, self.no_show_source),
+            target_version: self.target_version,
+            unfixable: self.unfixable,
+            // TODO(charlie): Included in `pyproject.toml`, but not inherited.
+            cache_dir: self.cache_dir,
+            fix: resolve_bool_arg(self.fix, self.no_fix),
+            fix_only: resolve_bool_arg(self.fix_only, self.no_fix_only),
+            unsafe_fixes: resolve_bool_arg(self.unsafe_fixes, self.no_unsafe_fixes)
+                .map(UnsafeFixes::from),
+            force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
+            output_format: self.output_format,
+            show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
+            extension: self.extension,
+        };
+
+        let config_args = ConfigArgs::from_cli_options(self.config, cli_overrides, self.isolated)?;
+        Ok((check_arguments, config_args))
     }
 }
 
 impl FormatCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(self) -> (FormatArguments, CliOverrides) {
-        (
-            FormatArguments {
-                check: self.check,
-                diff: self.diff,
-                config: self.config,
-                files: self.files,
-                isolated: self.isolated,
-                no_cache: self.no_cache,
-                stdin_filename: self.stdin_filename,
-            },
-            CliOverrides {
-                line_length: self.line_length,
-                respect_gitignore: resolve_bool_arg(
-                    self.respect_gitignore,
-                    self.no_respect_gitignore,
-                ),
-                exclude: self.exclude,
-                preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
-                force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-                target_version: self.target_version,
-                cache_dir: self.cache_dir,
-                extension: self.extension,
+    pub fn partition(self) -> Result<(FormatArguments, ConfigArgs), anyhow::Error> {
+        let format_args = FormatArguments {
+            check: self.check,
+            diff: self.diff,
+            files: self.files,
+            isolated: self.isolated,
+            no_cache: self.no_cache,
+            stdin_filename: self.stdin_filename,
+        };
 
-                // Unsupported on the formatter CLI, but required on `Overrides`.
-                ..CliOverrides::default()
-            },
-        )
+        let cli_overrides = CliOverrides {
+            line_length: self.line_length,
+            respect_gitignore: resolve_bool_arg(self.respect_gitignore, self.no_respect_gitignore),
+            exclude: self.exclude,
+            preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
+            force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
+            target_version: self.target_version,
+            cache_dir: self.cache_dir,
+            extension: self.extension,
+
+            // Unsupported on the formatter CLI, but required on `Overrides`.
+            ..CliOverrides::default()
+        };
+
+        let config_args = ConfigArgs::from_cli_options(self.config, cli_overrides, self.isolated)?;
+        Ok((format_args, config_args))
     }
 }
 
@@ -619,7 +696,7 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
 #[derive(Clone, Debug)]
 pub enum ConfigOption {
     PathToConfigFile(PathBuf),
-    InlineToml(String),
+    ConfigOverride(Box<Options>),
 }
 
 #[derive(Clone)]
@@ -638,19 +715,41 @@ impl TypedValueParser for ConfigOptionParser {
 
     fn parse_ref(
         &self,
-        _: &clap::Command,
-        _: Option<&clap::Arg>,
+        cmd: &clap::Command,
+        arg: Option<&clap::Arg>,
         value: &std::ffi::OsStr,
     ) -> Result<Self::Value, clap::Error> {
         let value = value
             .to_str()
             .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
-        if let Ok(path_to_config_file) = PathBuf::from_str(value) {
-            if path_to_config_file.exists() {
-                return Ok(ConfigOption::PathToConfigFile(path_to_config_file));
-            }
+        let path_to_config_file = PathBuf::from(value);
+        if path_to_config_file.exists() {
+            return Ok(ConfigOption::PathToConfigFile(path_to_config_file));
         }
-        Ok(ConfigOption::InlineToml(value.to_string()))
+        if let Ok(option) = toml::from_str(value) {
+            Ok(ConfigOption::ConfigOverride(option))
+        } else {
+            let mut new_error =
+                clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
+            if let Some(arg) = arg {
+                new_error.insert(
+                    clap::error::ContextKind::InvalidArg,
+                    clap::error::ContextValue::String(arg.to_string()),
+                );
+            }
+            new_error.insert(
+                clap::error::ContextKind::InvalidValue,
+                clap::error::ContextValue::String(value.to_string()),
+            );
+            new_error.insert(
+                clap::error::ContextKind::Suggested,
+                clap::error::ContextValue::StyledStrs(vec![
+                    "The `--config` flag must either be a path to a `.toml` configuation file or a TOML string providing configuration overrides".into(),
+                    format!("The path `{value}` does not exist on your filesystem").into()
+                ]),
+            );
+            Err(new_error)
+        }
     }
 }
 
@@ -659,7 +758,6 @@ impl TypedValueParser for ConfigOptionParser {
 #[allow(clippy::struct_excessive_bools)]
 pub struct CheckArguments {
     pub add_noqa: bool,
-    pub config: Option<Vec<ConfigOption>>,
     pub diff: bool,
     pub ecosystem_ci: bool,
     pub exit_non_zero_on_fix: bool,
@@ -683,7 +781,6 @@ pub struct FormatArguments {
     pub check: bool,
     pub no_cache: bool,
     pub diff: bool,
-    pub config: Option<Vec<ConfigOption>>,
     pub files: Vec<PathBuf>,
     pub isolated: bool,
     pub stdin_filename: Option<PathBuf>,
@@ -692,34 +789,34 @@ pub struct FormatArguments {
 /// CLI settings that function as configuration overrides.
 #[derive(Clone, Default)]
 #[allow(clippy::struct_excessive_bools)]
-pub struct CliOverrides {
-    pub dummy_variable_rgx: Option<Regex>,
-    pub exclude: Option<Vec<FilePattern>>,
-    pub extend_exclude: Option<Vec<FilePattern>>,
-    pub extend_fixable: Option<Vec<RuleSelector>>,
-    pub extend_ignore: Option<Vec<RuleSelector>>,
-    pub extend_select: Option<Vec<RuleSelector>>,
-    pub extend_unfixable: Option<Vec<RuleSelector>>,
-    pub fixable: Option<Vec<RuleSelector>>,
-    pub ignore: Option<Vec<RuleSelector>>,
-    pub line_length: Option<LineLength>,
-    pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
-    pub extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
-    pub preview: Option<PreviewMode>,
-    pub respect_gitignore: Option<bool>,
-    pub select: Option<Vec<RuleSelector>>,
-    pub show_source: Option<bool>,
-    pub target_version: Option<PythonVersion>,
-    pub unfixable: Option<Vec<RuleSelector>>,
+struct CliOverrides {
+    dummy_variable_rgx: Option<Regex>,
+    exclude: Option<Vec<FilePattern>>,
+    extend_exclude: Option<Vec<FilePattern>>,
+    extend_fixable: Option<Vec<RuleSelector>>,
+    extend_ignore: Option<Vec<RuleSelector>>,
+    extend_select: Option<Vec<RuleSelector>>,
+    extend_unfixable: Option<Vec<RuleSelector>>,
+    fixable: Option<Vec<RuleSelector>>,
+    ignore: Option<Vec<RuleSelector>>,
+    line_length: Option<LineLength>,
+    per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    preview: Option<PreviewMode>,
+    respect_gitignore: Option<bool>,
+    select: Option<Vec<RuleSelector>>,
+    show_source: Option<bool>,
+    target_version: Option<PythonVersion>,
+    unfixable: Option<Vec<RuleSelector>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
-    pub cache_dir: Option<PathBuf>,
-    pub fix: Option<bool>,
-    pub fix_only: Option<bool>,
-    pub unsafe_fixes: Option<UnsafeFixes>,
-    pub force_exclude: Option<bool>,
-    pub output_format: Option<SerializationFormat>,
-    pub show_fixes: Option<bool>,
-    pub extension: Option<Vec<ExtensionPair>>,
+    cache_dir: Option<PathBuf>,
+    fix: Option<bool>,
+    fix_only: Option<bool>,
+    unsafe_fixes: Option<UnsafeFixes>,
+    force_exclude: Option<bool>,
+    output_format: Option<SerializationFormat>,
+    show_fixes: Option<bool>,
+    extension: Option<Vec<ExtensionPair>>,
 }
 
 impl ConfigurationTransformer for CliOverrides {

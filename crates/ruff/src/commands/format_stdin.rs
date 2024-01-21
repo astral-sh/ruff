@@ -9,7 +9,7 @@ use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{match_exclusion, python_file_at_path, Resolver};
 use ruff_workspace::FormatterSettings;
 
-use crate::args::{CliOverrides, FormatArguments};
+use crate::args::{ConfigArgs, FormatArguments};
 use crate::commands::format::{
     format_source, warn_incompatible_formatter_settings, FormatCommandError, FormatMode,
     FormatResult, FormattedSource,
@@ -19,13 +19,8 @@ use crate::stdin::{parrot_stdin, read_from_stdin};
 use crate::ExitStatus;
 
 /// Run the formatter over a single file, read from `stdin`.
-pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> Result<ExitStatus> {
-    let pyproject_config = resolve(
-        cli.isolated,
-        &cli.config,
-        overrides,
-        cli.stdin_filename.as_deref(),
-    )?;
+pub(crate) fn format_stdin(cli: &FormatArguments, config_args: &ConfigArgs) -> Result<ExitStatus> {
+    let pyproject_config = resolve(cli.isolated, config_args, cli.stdin_filename.as_deref())?;
 
     let mut resolver = Resolver::new(&pyproject_config);
     warn_incompatible_formatter_settings(&resolver);
@@ -34,7 +29,7 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
 
     if resolver.force_exclude() {
         if let Some(filename) = cli.stdin_filename.as_deref() {
-            if !python_file_at_path(filename, &mut resolver, overrides)? {
+            if !python_file_at_path(filename, &mut resolver, config_args)? {
                 if mode.is_write() {
                     parrot_stdin()?;
                 }

@@ -526,7 +526,7 @@ impl Default for SerializationFormat {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(try_from = "String")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Version(String);

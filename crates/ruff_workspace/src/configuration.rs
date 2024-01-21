@@ -45,11 +45,12 @@ use crate::options::{
     Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions, PydocstyleOptions, PyflakesOptions,
     PylintOptions,
 };
+use crate::resolver::ConfigurationTransformer;
 use crate::settings::{
     FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
 };
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct RuleSelection {
     pub select: Option<Vec<RuleSelector>>,
     pub ignore: Vec<RuleSelector>,
@@ -549,7 +550,100 @@ impl Configuration {
     }
 }
 
-#[derive(Debug, Default)]
+impl ConfigurationTransformer for Configuration {
+    fn transform(&self, config: Configuration) -> Configuration {
+        // Important: unpack *everything* in the struct as a local variable,
+        // so that we'll get a compile-time warning about unused variables if we forget to
+        // take account of a particular field when undergoing the transformation
+        let Configuration {
+            cache_dir,
+            extend,
+            fix,
+            fix_only,
+            unsafe_fixes,
+            output_format,
+            preview,
+            required_version,
+            extension,
+            show_fixes,
+            show_source,
+            exclude,
+            extend_exclude,
+            extend_include,
+            force_exclude,
+            include,
+            respect_gitignore,
+            builtins,
+            namespace_packages,
+            src,
+            target_version,
+            line_length,
+            indent_width,
+            lint,
+            format,
+        } = self;
+
+        let mut new_config = Configuration {
+            fix: fix.or(config.fix),
+            fix_only: fix_only.or(config.fix_only),
+            unsafe_fixes: unsafe_fixes.or(config.unsafe_fixes),
+            output_format: output_format.or(config.output_format),
+            preview: preview.or(config.preview),
+            show_fixes: show_fixes.or(config.show_fixes),
+            show_source: show_source.or(config.show_source),
+            extend_exclude: config
+                .extend_exclude
+                .into_iter()
+                .chain(extend_exclude.clone())
+                .collect(),
+            extend_include: config
+                .extend_include
+                .into_iter()
+                .chain(extend_include.clone())
+                .collect(),
+            force_exclude: force_exclude.or(config.force_exclude),
+            respect_gitignore: respect_gitignore.or(config.respect_gitignore),
+            target_version: target_version.or(config.target_version),
+            line_length: line_length.or(config.line_length),
+            indent_width: indent_width.or(config.indent_width),
+            lint: lint.clone().combine(config.lint),
+            format: format.clone().combine(config.format),
+            ..config
+        };
+
+        if let Some(cache_dir) = cache_dir {
+            new_config.cache_dir = Some(cache_dir.clone());
+        }
+        if let Some(extend) = extend {
+            new_config.extend = Some(extend.clone());
+        }
+        if let Some(required_version) = required_version {
+            new_config.required_version = Some(required_version.clone());
+        }
+        if let Some(extension) = extension {
+            new_config.extension = Some(extension.clone());
+        }
+        if let Some(exclude) = exclude {
+            new_config.exclude = Some(exclude.clone());
+        }
+        if let Some(include) = include {
+            new_config.include = Some(include.clone());
+        };
+        if let Some(builtins) = builtins {
+            new_config.builtins = Some(builtins.clone());
+        }
+        if let Some(namespace_packages) = namespace_packages {
+            new_config.namespace_packages = Some(namespace_packages.clone());
+        }
+        if let Some(src) = src {
+            new_config.src = Some(src.clone());
+        }
+
+        new_config
+    }
+}
+
+#[derive(Clone, Debug, Default)]
 pub struct LintConfiguration {
     pub exclude: Option<Vec<FilePattern>>,
     pub preview: Option<PreviewMode>,
@@ -1026,7 +1120,7 @@ impl LintConfiguration {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct FormatConfiguration {
     pub exclude: Option<Vec<FilePattern>>,
     pub preview: Option<PreviewMode>,

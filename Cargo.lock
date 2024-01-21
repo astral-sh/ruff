@@ -2048,6 +2048,7 @@ dependencies = [
  "test-case",
  "thiserror",
  "tikv-jemallocator",
+ "toml",
  "tracing",
  "walkdir",
  "wild",

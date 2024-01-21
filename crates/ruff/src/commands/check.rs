@@ -24,7 +24,7 @@ use ruff_workspace::resolver::{
     match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile,
 };
 
-use crate::args::CliOverrides;
+use crate::args::ConfigArgs;
 use crate::cache::{Cache, PackageCacheMap, PackageCaches};
 use crate::diagnostics::Diagnostics;
 use crate::panic::catch_unwind;
@@ -34,7 +34,7 @@ use crate::panic::catch_unwind;
 pub(crate) fn check(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    overrides: &CliOverrides,
+    overrides: &ConfigArgs,
     cache: flags::Cache,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,

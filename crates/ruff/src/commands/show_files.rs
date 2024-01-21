@@ -7,13 +7,13 @@ use itertools::Itertools;
 use ruff_linter::warn_user_once;
 use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, ResolvedFile};
 
-use crate::args::CliOverrides;
+use crate::args::ConfigArgs;
 
 /// Show the list of files to be checked based on current settings.
 pub(crate) fn show_files(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    overrides: &CliOverrides,
+    overrides: &ConfigArgs,
     writer: &mut impl Write,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
