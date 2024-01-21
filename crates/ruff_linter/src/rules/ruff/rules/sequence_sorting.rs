@@ -22,7 +22,17 @@ use natord;
 /// currently supported for displays of string literals
 #[derive(Debug)]
 pub(super) enum SortingStyle {
+    /// Sort string-literal items according to a
+    /// [natural sort](https://en.wikipedia.org/wiki/Natural_sort_order).
     Natural,
+    /// Sort string-literal items "isort-style".
+    ///
+    /// An isort-style sort orders items first according to their casing:
+    /// SCREAMING_SNAKE_CASE names (conventionally used for global constants)
+    /// come first, followed by CamelCase names (conventionally used for
+    /// classes), followed by anything else. Within each category,
+    /// a [natural sort](https://en.wikipedia.org/wiki/Natural_sort_order)
+    /// is used to order the elements.
     Isort,
 }
 
@@ -176,7 +186,7 @@ impl SequenceKind<'_> {
 #[derive(Debug, is_macro::Is)]
 pub(super) enum DisplayKind<'a> {
     Sequence(SequenceKind<'a>),
-    Dict { values: &'a Vec<ast::Expr> },
+    Dict { values: &'a [ast::Expr] },
 }
 
 /// Create a string representing a fixed-up single-line
