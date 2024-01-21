@@ -1198,7 +1198,7 @@ mod tests {
         Rule::ManualDictComprehension,
         Rule::ReimplementedStarmap,
         Rule::SliceCopy,
-        Rule::TooManyPublicMethods,
+        Rule::TooFewPublicMethods,
         Rule::TooManyPublicMethods,
         Rule::UndocumentedWarn,
         Rule::UnnecessaryEnumerate,
