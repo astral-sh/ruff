@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use ruff_cli::check;
+use ruff::check;
 use ruff_linter::logging::{set_up_logging, LogLevel};
 use std::process::ExitCode;
 
@@ -56,9 +56,9 @@ enum Command {
     /// Run a ruff command n times for profiling/benchmarking
     Repeat {
         #[clap(flatten)]
-        args: ruff_cli::args::CheckCommand,
+        args: ruff::args::CheckCommand,
         #[clap(flatten)]
-        log_level_args: ruff_cli::args::LogLevelArgs,
+        log_level_args: ruff::args::LogLevelArgs,
         /// Run this many times
         #[clap(long)]
         repeat: usize,

@@ -27,8 +27,8 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
-use ruff_cli::args::{CliOverrides, FormatArguments, FormatCommand, LogLevelArgs};
-use ruff_cli::resolve::resolve;
+use ruff::args::{CliOverrides, FormatArguments, FormatCommand, LogLevelArgs};
+use ruff::resolve::resolve;
 use ruff_formatter::{FormatError, LineWidth, PrintError};
 use ruff_linter::logging::LogLevel;
 use ruff_linter::settings::types::{FilePattern, FilePatternSet};
@@ -67,7 +67,7 @@ fn find_pyproject_config(
     Ok(pyproject_config)
 }
 
-/// Find files that ruff would check so we can format them. Adapted from `ruff_cli`.
+/// Find files that ruff would check so we can format them. Adapted from `ruff`.
 #[allow(clippy::type_complexity)]
 fn ruff_check_paths<'a>(
     pyproject_config: &'a PyprojectConfig,
@@ -287,7 +287,7 @@ fn setup_logging(log_level_args: &LogLevelArgs, log_file: Option<&Path>) -> io::
         LogLevel::Quiet => tracing::Level::WARN,
         LogLevel::Silent => tracing::Level::ERROR,
     };
-    // 1. `RUST_LOG=`, 2. explicit CLI log level, 3. info, the ruff_cli default
+    // 1. `RUST_LOG=`, 2. explicit CLI log level, 3. info, the ruff default
     let filter_layer = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         EnvFilter::builder()
             .with_default_directive(log_level.into())
@@ -461,7 +461,7 @@ fn format_dev_project(
 
     // TODO(konstin): Respect black's excludes.
 
-    // Find files to check (or in this case, format twice). Adapted from ruff_cli
+    // Find files to check (or in this case, format twice). Adapted from ruff
     // First argument is ignored
     let (cli, overrides) = parse_cli(files)?;
     let pyproject_config = find_pyproject_config(&cli, &overrides)?;

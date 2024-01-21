@@ -149,7 +149,7 @@ def main() -> None:
                 "cargo",
                 "run",
                 "-p",
-                "ruff_cli",
+                "ruff",
                 "--",
                 "rule",
                 "--all",

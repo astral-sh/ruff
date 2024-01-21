@@ -977,6 +977,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SslInsecureVersion) {
                 flake8_bandit::rules::ssl_insecure_version(checker, call);
             }
+            if checker.enabled(Rule::UnsortedDunderAll) {
+                ruff::rules::sort_dunder_all_extend_call(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[

@@ -5,7 +5,7 @@ from _f.g import h
 from i import _j
 from k import _l as m
 import _aaa
-import bbb._ccc
+import bbb.ccc._ddd as eee  # Panicked in https://github.com/astral-sh/ruff/pull/5920
 
 # Non-errors.
 import n

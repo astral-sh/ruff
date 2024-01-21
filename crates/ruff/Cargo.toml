@@ -1,6 +1,6 @@
 [package]
-name = "ruff_cli"
-version = "0.1.13"
+name = "ruff"
+version = "0.1.14"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -10,9 +10,7 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = "../../README.md"
-
-[[bin]]
-name = "ruff"
+default-run = "ruff"
 
 [dependencies]
 ruff_cache = { path = "../ruff_cache" }

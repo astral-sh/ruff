@@ -4,7 +4,7 @@ exclude: |
   (?x)^(
     crates/ruff_linter/resources/.*|
     crates/ruff_linter/src/rules/.*/snapshots/.*|
-    crates/ruff_cli/resources/.*|
+    crates/ruff/resources/.*|
     crates/ruff_python_formatter/resources/.*|
     crates/ruff_python_formatter/tests/snapshots/.*|
     crates/ruff_python_resolver/resources/.*|

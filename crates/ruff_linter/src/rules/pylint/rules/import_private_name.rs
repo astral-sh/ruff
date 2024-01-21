@@ -83,7 +83,7 @@ pub(crate) fn import_private_name(
         let import_info = match import {
             import if import.is_import() => ImportInfo::from(import.import().unwrap()),
             import if import.is_from_import() => ImportInfo::from(import.from_import().unwrap()),
-            _ => return,
+            _ => continue,
         };
 
         let Some(root_module) = import_info.module_name.first() else {
@@ -134,7 +134,7 @@ pub(crate) fn import_private_name(
 
         let name = (*private_name).to_string();
         let module = if index > 0 {
-            Some(import_info.module_name[..index].join("."))
+            Some(import_info.call_path[..index].join("."))
         } else {
             None
         };

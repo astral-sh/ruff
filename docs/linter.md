@@ -304,6 +304,14 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
 """  # noqa: E501
 ```
 
+For import sorting, the `noqa` should come at the end of the first line in the import block, and
+will apply to all imports in the block, like so:
+
+```python
+import os  # noqa: I100
+import abc
+```
+
 To ignore all violations across an entire file, add the line `# ruff: noqa` anywhere in the file,
 preferably towards the top, like so:
 
