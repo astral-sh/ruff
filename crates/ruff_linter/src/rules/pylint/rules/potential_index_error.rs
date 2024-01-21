@@ -1,24 +1,23 @@
-use std::str::FromStr;
-
-use ruff_python_ast::{self as ast, Expr};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for potential hard-coded IndexErrors, which occurs when accessing
-/// a list or tuple with an index that is known to be out of bounds.
+/// Checks for hard-coded sequence accesses that are known to be out of bounds.
 ///
 /// ## Why is this bad?
-/// This will cause a runtime error.
+/// Attempting to access a sequence with an out-of-bounds index will cause an
+/// `IndexError` to be raised at runtime. When the sequence and index are
+/// defined statically (e.g., subscripts on `list` and `tuple` literals, with
+/// integer indexes), such errors can be detected ahead of time.
 ///
 /// ## Example
 /// ```python
-/// print([1, 2, 3][123])
+/// print([0, 1, 2][3])
 /// ```
-///
 #[violation]
 pub struct PotentialIndexError;
 
@@ -31,6 +30,7 @@ impl Violation for PotentialIndexError {
 
 /// PLE0643
 pub(crate) fn potential_index_error(checker: &mut Checker, value: &Expr, slice: &Expr) {
+    // Determine the length of the sequence.
     let length = match value {
         Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
             match i64::try_from(elts.len()) {
@@ -43,38 +43,31 @@ pub(crate) fn potential_index_error(checker: &mut Checker, value: &Expr, slice: 
         }
     };
 
-    let (number_value, range) = match slice {
+    // Determine the index value.
+    let index = match slice {
         Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Int(number_value),
-            range,
-        }) => (number_value.to_owned(), *range),
+            ..
+        }) => number_value.as_i64(),
         Expr::UnaryOp(ast::ExprUnaryOp {
             op: ast::UnaryOp::USub,
             operand,
-            range,
+            ..
         }) => match operand.as_ref() {
             Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Int(number_value),
                 ..
-            }) => (
-                ast::Int::from_str(&format!("-{number_value}")).unwrap(),
-                *range,
-            ),
+            }) => number_value.as_i64().map(|number| -number),
             _ => return,
         },
         _ => return,
     };
 
-    let emit = if let Some(number) = number_value.as_i64() {
-        number >= length || number < -length
-    } else {
-        // this should be impossible
-        true
-    };
-
-    if emit {
+    // Emit a diagnostic if the index is out of bounds. If the index can't be represented as an
+    // `i64`, but the length _can_, then the index is definitely out of bounds.
+    if index.map_or(true, |index| index >= length || index < -length) {
         checker
             .diagnostics
-            .push(Diagnostic::new(PotentialIndexError, range));
+            .push(Diagnostic::new(PotentialIndexError, slice.range()));
     }
 }
