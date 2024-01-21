@@ -203,6 +203,8 @@ class Klass6:
         "duplicate_element",  # comment0
     )
 
+    __slots__ = "foo", "an" "implicitly_concatenated_second_item", not_a_string_literal
+
     __slots__ =[
         []
     ]

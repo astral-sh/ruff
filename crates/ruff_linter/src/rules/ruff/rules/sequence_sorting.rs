@@ -269,14 +269,16 @@ impl<'a> SortClassification<'a> {
                 //    won't be trying to fix it.)
                 // 3. What is the value of each elt in the sequence?
                 let mut items = Vec::with_capacity(elements.len());
+                let mut any_implicit_concatenation = false;
                 for expr in elements {
                     let Some(string_node) = expr.as_string_literal_expr() else {
                         return Self::NotAListOfStringLiterals;
                     };
-                    if string_node.value.is_implicit_concatenated() {
-                        return Self::UnsortedButUnfixable;
-                    }
+                    any_implicit_concatenation |= string_node.value.is_implicit_concatenated();
                     items.push(string_node.value.to_str());
+                }
+                if any_implicit_concatenation {
+                    return Self::UnsortedButUnfixable;
                 }
                 return Self::UnsortedAndMaybeFixable { items };
             }

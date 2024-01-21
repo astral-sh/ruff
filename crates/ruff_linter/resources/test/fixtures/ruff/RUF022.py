@@ -306,3 +306,5 @@ __all__ = (
 __all__ = [
     "foo", (), "bar"
 ]
+
+__all__ = "foo", "an" "implicitly_concatenated_second_item", not_a_string_literal
