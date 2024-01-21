@@ -800,7 +800,7 @@ impl BlankLinesChecker {
                 // E305
                 let mut diagnostic = Diagnostic::new(
                     BlankLinesAfterFunctionOrClass {
-                        actual_blank_lines: line.blank_lines.count(),
+                        actual_blank_lines: line.preceding_blank_lines.count(),
                     },
                     line.first_token_range,
                 );

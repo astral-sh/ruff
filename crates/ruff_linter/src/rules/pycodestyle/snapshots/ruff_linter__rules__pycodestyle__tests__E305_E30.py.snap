@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30.py:663:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+E30.py:663:1: E305 [*] expected 2 blank lines after class or function definition, found (1)
     |
 662 |     # another comment
 663 | fn()
@@ -20,7 +20,7 @@ E30.py:663:1: E305 [*] expected 2 blank lines after class or function definition
 664 666 | # end
 665 667 | 
 
-E30.py:674:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+E30.py:674:1: E305 [*] expected 2 blank lines after class or function definition, found (1)
     |
 673 |     # another comment
 674 | a = 1
@@ -59,7 +59,7 @@ E30.py:686:1: E305 [*] expected 2 blank lines after class or function definition
 687 688 |     fn()
 688 689 | except Exception:
 
-E30.py:698:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+E30.py:698:1: E305 [*] expected 2 blank lines after class or function definition, found (1)
     |
 697 | # Two spaces before comments, too.
 698 | if a():
@@ -70,7 +70,7 @@ E30.py:698:1: E305 [*] expected 2 blank lines after class or function definition
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-695 695 |     print
+695 695 |     print()
 696 696 | 
 697 697 | # Two spaces before comments, too.
     698 |+

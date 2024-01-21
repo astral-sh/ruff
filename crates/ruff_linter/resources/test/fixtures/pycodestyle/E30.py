@@ -692,7 +692,7 @@ except Exception:
 
 # E305:5:1
 def a():
-    print
+    print()
 
 # Two spaces before comments, too.
 if a():
