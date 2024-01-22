@@ -308,7 +308,7 @@ For import sorting, the `noqa` should come at the end of the first line in the i
 will apply to all imports in the block, like so:
 
 ```python
-import os  # noqa: I100
+import os  # noqa: I001
 import abc
 ```
 

@@ -15,4 +15,13 @@ PYI049.pyi:10:7: PYI049 Private TypedDict `_UnusedTypedDict2` is never used
 11 |     bar: int
    |
 
+PYI049.pyi:34:1: PYI049 Private TypedDict `_UnusedTypedDict3` is never used
+   |
+32 |    bar: list[int]
+33 | 
+34 | _UnusedTypedDict3 = TypedDict("_UnusedTypedDict3", {"foo": int})
+   | ^^^^^^^^^^^^^^^^^ PYI049
+35 | _UsedTypedDict3 = TypedDict("_UsedTypedDict3", {"bar": bytes})
+   |
+
 

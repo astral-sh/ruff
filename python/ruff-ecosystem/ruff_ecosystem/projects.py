@@ -50,6 +50,12 @@ class Project(Serializable):
             )
 
 
+ALWAYS_CONFIG_OVERRIDES = {
+    # Always unset the required version or we'll fail
+    "required-version": None
+}
+
+
 @dataclass(frozen=True)
 class ConfigOverrides(Serializable):
     """
@@ -89,11 +95,15 @@ class ConfigOverrides(Serializable):
         """
         Temporarily patch the Ruff configuration file in the given directory.
         """
+        dot_ruff_toml = dirpath / ".ruff.toml"
         ruff_toml = dirpath / "ruff.toml"
         pyproject_toml = dirpath / "pyproject.toml"
 
         # Prefer `ruff.toml` over `pyproject.toml`
-        if ruff_toml.exists():
+        if dot_ruff_toml.exists():
+            path = dot_ruff_toml
+            base = []
+        elif ruff_toml.exists():
             path = ruff_toml
             base = []
         else:
@@ -101,6 +111,7 @@ class ConfigOverrides(Serializable):
             base = ["tool", "ruff"]
 
         overrides = {
+            **ALWAYS_CONFIG_OVERRIDES,
             **self.always,
             **(self.when_preview if preview else self.when_no_preview),
         }
@@ -117,9 +128,17 @@ class ConfigOverrides(Serializable):
             contents = None
             toml = {}
 
+            # Do not write a toml file if it does not exist and we're just nulling values
+            if all((value is None for value in overrides.values())):
+                yield
+                return
+
         # Update the TOML, using `.` to descend into nested keys
         for key, value in overrides.items():
-            logger.debug(f"Setting {key}={value!r} in {path}")
+            if value is not None:
+                logger.debug(f"Setting {key}={value!r} in {path}")
+            else:
+                logger.debug(f"Restoring {key} to default in {path}")
 
             target = toml
             names = base + key.split(".")
@@ -127,7 +146,12 @@ class ConfigOverrides(Serializable):
                 if name not in target:
                     target[name] = {}
                 target = target[name]
-            target[names[-1]] = value
+
+            if value is None:
+                # Remove null values i.e. restore to default
+                target.pop(names[-1], None)
+            else:
+                target[names[-1]] = value
 
         tomli_w.dump(toml, path.open("wb"))
 
