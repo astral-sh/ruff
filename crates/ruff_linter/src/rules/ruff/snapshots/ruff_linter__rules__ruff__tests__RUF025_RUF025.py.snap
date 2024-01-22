@@ -5,7 +5,7 @@ RUF025.py:5:5: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite u
   |
 3 | def foo():
 4 |     numbers = [1,2,3]
-5 |     {n: None for n in numbers} # RUF023
+5 |     {n: None for n in numbers} # RUF025
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF025
 6 | 
 7 | def foo():
@@ -16,27 +16,27 @@ RUF025.py:5:5: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite u
 2 2 | 
 3 3 | def foo():
 4 4 |     numbers = [1,2,3]
-5   |-    {n: None for n in numbers} # RUF023
-  5 |+    dict.fromkeys(numbers) # RUF023
+5   |-    {n: None for n in numbers} # RUF025
+  5 |+    dict.fromkeys(numbers) # RUF025
 6 6 | 
 7 7 | def foo():
-8 8 |     for key, value in {n: 1 for n in [1,2,3]}.items(): # RUF023
+8 8 |     for key, value in {n: 1 for n in [1,2,3]}.items(): # RUF025
 
 RUF025.py:8:23: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite using `dict.fromkeys(iterable, value)`)
   |
 7 | def foo():
-8 |     for key, value in {n: 1 for n in [1,2,3]}.items(): # RUF023
+8 |     for key, value in {n: 1 for n in [1,2,3]}.items(): # RUF025
   |                       ^^^^^^^^^^^^^^^^^^^^^^^ RUF025
 9 |         pass
   |
   = help: Rewrite using `dict.fromkeys(iterable)`)
 
 ℹ Safe fix
-5 5 |     {n: None for n in numbers} # RUF023
+5 5 |     {n: None for n in numbers} # RUF025
 6 6 | 
 7 7 | def foo():
-8   |-    for key, value in {n: 1 for n in [1,2,3]}.items(): # RUF023
-  8 |+    for key, value in dict.fromkeys([1,2,3], 1).items(): # RUF023
+8   |-    for key, value in {n: 1 for n in [1,2,3]}.items(): # RUF025
+  8 |+    for key, value in dict.fromkeys([1,2,3], 1).items(): # RUF025
 9 9 |         pass
 10 10 | 
 11 11 | def foo():
@@ -44,7 +44,7 @@ RUF025.py:8:23: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite 
 RUF025.py:12:5: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite using `dict.fromkeys(iterable, value)`)
    |
 11 | def foo():
-12 |     {n: 1.1 for n in [1,2,3]} # RUF023
+12 |     {n: 1.1 for n in [1,2,3]} # RUF025
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF025
 13 | 
 14 | def foo():
@@ -55,17 +55,17 @@ RUF025.py:12:5: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite 
 9  9  |         pass
 10 10 | 
 11 11 | def foo():
-12    |-    {n: 1.1 for n in [1,2,3]} # RUF023
-   12 |+    dict.fromkeys([1,2,3], 1.1) # RUF023
+12    |-    {n: 1.1 for n in [1,2,3]} # RUF025
+   12 |+    dict.fromkeys([1,2,3], 1.1) # RUF025
 13 13 | 
 14 14 | def foo():
-15 15 |     {n: complex(3, 5) for n in [1,2,3]} # RUF023
+15 15 |     {n: complex(3, 5) for n in [1,2,3]} # RUF025
 
 RUF025.py:20:7: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite using `dict.fromkeys(iterable, value)`)
    |
 18 |     def f(data):
 19 |         return data
-20 |     f({c: "a" for c in "12345"}) # RUF023
+20 |     f({c: "a" for c in "12345"}) # RUF025
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF025
 21 | 
 22 | def foo():
@@ -76,16 +76,16 @@ RUF025.py:20:7: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite 
 17 17 | def foo():
 18 18 |     def f(data):
 19 19 |         return data
-20    |-    f({c: "a" for c in "12345"}) # RUF023
-   20 |+    f(dict.fromkeys("12345", "a")) # RUF023
+20    |-    f({c: "a" for c in "12345"}) # RUF025
+   20 |+    f(dict.fromkeys("12345", "a")) # RUF025
 21 21 | 
 22 22 | def foo():
-23 23 |     {n: True for n in [1,2,2]} # RUF023
+23 23 |     {n: True for n in [1,2,2]} # RUF025
 
 RUF025.py:23:5: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite using `dict.fromkeys(iterable, value)`)
    |
 22 | def foo():
-23 |     {n: True for n in [1,2,2]} # RUF023
+23 |     {n: True for n in [1,2,2]} # RUF025
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF025
 24 | 
 25 | def foo():
@@ -93,19 +93,19 @@ RUF025.py:23:5: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite 
    = help: Rewrite using `dict.fromkeys(iterable)`)
 
 ℹ Safe fix
-20 20 |     f({c: "a" for c in "12345"}) # RUF023
+20 20 |     f({c: "a" for c in "12345"}) # RUF025
 21 21 | 
 22 22 | def foo():
-23    |-    {n: True for n in [1,2,2]} # RUF023
-   23 |+    dict.fromkeys([1,2,2], True) # RUF023
+23    |-    {n: True for n in [1,2,2]} # RUF025
+   23 |+    dict.fromkeys([1,2,2], True) # RUF025
 24 24 | 
 25 25 | def foo():
-26 26 |     {n: b'hello' for n in (1,2,2)} # RUF023
+26 26 |     {n: b'hello' for n in (1,2,2)} # RUF025
 
 RUF025.py:26:5: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite using `dict.fromkeys(iterable, value)`)
    |
 25 | def foo():
-26 |     {n: b'hello' for n in (1,2,2)} # RUF023
+26 |     {n: b'hello' for n in (1,2,2)} # RUF025
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF025
 27 | 
 28 | def foo():
@@ -113,19 +113,19 @@ RUF025.py:26:5: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite 
    = help: Rewrite using `dict.fromkeys(iterable)`)
 
 ℹ Safe fix
-23 23 |     {n: True for n in [1,2,2]} # RUF023
+23 23 |     {n: True for n in [1,2,2]} # RUF025
 24 24 | 
 25 25 | def foo():
-26    |-    {n: b'hello' for n in (1,2,2)} # RUF023
-   26 |+    dict.fromkeys((1,2,2), b'hello') # RUF023
+26    |-    {n: b'hello' for n in (1,2,2)} # RUF025
+   26 |+    dict.fromkeys((1,2,2), b'hello') # RUF025
 27 27 | 
 28 28 | def foo():
-29 29 |     {n: ... for n in [1,2,3]} # RUF023
+29 29 |     {n: ... for n in [1,2,3]} # RUF025
 
 RUF025.py:29:5: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite using `dict.fromkeys(iterable, value)`)
    |
 28 | def foo():
-29 |     {n: ... for n in [1,2,3]} # RUF023
+29 |     {n: ... for n in [1,2,3]} # RUF025
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF025
 30 | 
 31 | def foo():
@@ -133,11 +133,11 @@ RUF025.py:29:5: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite 
    = help: Rewrite using `dict.fromkeys(iterable)`)
 
 ℹ Safe fix
-26 26 |     {n: b'hello' for n in (1,2,2)} # RUF023
+26 26 |     {n: b'hello' for n in (1,2,2)} # RUF025
 27 27 | 
 28 28 | def foo():
-29    |-    {n: ... for n in [1,2,3]} # RUF023
-   29 |+    dict.fromkeys([1,2,3], ...) # RUF023
+29    |-    {n: ... for n in [1,2,3]} # RUF025
+   29 |+    dict.fromkeys([1,2,3], ...) # RUF025
 30 30 | 
 31 31 | def foo():
 32 32 |     values = ["a", "b", "c"]
@@ -146,7 +146,7 @@ RUF025.py:33:6: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite 
    |
 31 | def foo():
 32 |     values = ["a", "b", "c"]
-33 |     [{n: values for n in [1,2,3]}] # RUF023
+33 |     [{n: values for n in [1,2,3]}] # RUF025
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF025
 34 | 
 35 | def foo():
@@ -157,8 +157,8 @@ RUF025.py:33:6: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite 
 30 30 | 
 31 31 | def foo():
 32 32 |     values = ["a", "b", "c"]
-33    |-    [{n: values for n in [1,2,3]}] # RUF023
-   33 |+    [dict.fromkeys([1,2,3], values)] # RUF023
+33    |-    [{n: values for n in [1,2,3]}] # RUF025
+   33 |+    [dict.fromkeys([1,2,3], values)] # RUF025
 34 34 | 
 35 35 | def foo():
 36 36 |     def f():
@@ -166,7 +166,7 @@ RUF025.py:33:6: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite 
 RUF025.py:40:5: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite using `dict.fromkeys(iterable, value)`)
    |
 39 |     a = f()
-40 |     {n: a for n in [1,2,3]} # RUF023
+40 |     {n: a for n in [1,2,3]} # RUF025
    |     ^^^^^^^^^^^^^^^^^^^^^^^ RUF025
 41 | 
 42 | def foo():
@@ -177,8 +177,8 @@ RUF025.py:40:5: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite 
 37 37 |         return 1
 38 38 |     
 39 39 |     a = f()
-40    |-    {n: a for n in [1,2,3]} # RUF023
-   40 |+    dict.fromkeys([1,2,3], a) # RUF023
+40    |-    {n: a for n in [1,2,3]} # RUF025
+   40 |+    dict.fromkeys([1,2,3], a) # RUF025
 41 41 | 
 42 42 | def foo():
 43 43 |     def f():
@@ -194,7 +194,7 @@ RUF025.py:52:5: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite 
    = help: Rewrite using `dict.fromkeys(iterable)`)
 
 ℹ Safe fix
-49 49 | # Non-violation cases: RUF023
+49 49 | # Non-violation cases: RUF025
 50 50 | 
 51 51 | def foo():
 52    |-    {n: 1 for n in [1,2,3,4,5] if n < 3} # OK

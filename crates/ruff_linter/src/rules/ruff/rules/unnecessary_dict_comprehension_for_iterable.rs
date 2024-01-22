@@ -63,7 +63,7 @@ impl AlwaysFixableViolation for UnnecessaryDictComprehensionForIterable {
     }
 }
 
-/// RUF023
+/// RUF025
 pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     checker: &mut Checker,
     expr: &Expr,
@@ -112,7 +112,7 @@ fn has_valid_expression_type(node: &ast::Expr) -> bool {
 }
 
 /// Generate a [`Fix`] to replace `dict` comprehension with `dict.fromkeys`.
-/// (RUF023) Convert `{n: None for n in [1,2,3]}` to `dict.fromkeys([1,2,3])` or
+/// (RUF025) Convert `{n: None for n in [1,2,3]}` to `dict.fromkeys([1,2,3])` or
 /// `{n: 1 for n in [1,2,3]}` to `dict.fromkeys([1,2,3], 1)`.
 fn fix_unnecessary_dict_comprehension(
     expr: &Expr,
