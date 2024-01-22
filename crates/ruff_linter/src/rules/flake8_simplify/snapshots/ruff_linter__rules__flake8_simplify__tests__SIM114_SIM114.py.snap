@@ -20,7 +20,7 @@ SIM114.py:7:1: SIM114 Combine `if` branches using logical `or` operator
  6 |   
  7 | / if a:  # we preserve comments, too!
  8 | |     b
- 9 | | elif c:  # yes, even this one!
+ 9 | | elif c:  # but not on the second branch
 10 | |     b
    | |_____^ SIM114
 11 |   
@@ -226,6 +226,24 @@ SIM114.py:132:5: SIM114 Combine `if` branches using logical `or` operator
 134 | |     elif a := 1:
 135 | |         return 3
     | |________________^ SIM114
+    |
+    = help: Combine `if` branches
+
+SIM114.py:138:1: SIM114 Combine `if` branches using logical `or` operator
+    |
+138 | / if a:  # we preserve comments, too!
+139 | |     b
+140 | | elif c:  # but not on the second branch
+141 | |     b
+    | |_____^ SIM114
+    |
+    = help: Combine `if` branches
+
+SIM114.py:144:1: SIM114 Combine `if` branches using logical `or` operator
+    |
+144 | / if a: b  # here's a comment
+145 | | elif c: b
+    | |_________^ SIM114
     |
     = help: Combine `if` branches
 

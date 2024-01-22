@@ -6,7 +6,7 @@ elif c:
 
 if a:  # we preserve comments, too!
     b
-elif c:  # yes, even this one!
+elif c:  # but not on the second branch
     b
 
 if x == 1:
@@ -133,3 +133,13 @@ def func():
         return 3
     elif a := 1:
         return 3
+
+
+if a:  # we preserve comments, too!
+    b
+elif c:  # but not on the second branch
+    b
+
+
+if a: b  # here's a comment
+elif c: b

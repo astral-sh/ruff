@@ -1,14 +1,13 @@
-use anyhow::Result;
 use std::borrow::Cow;
 
-use ast::whitespace::indentation;
+use anyhow::Result;
+
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableStmt;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::stmt_if::{if_elif_branches, IfElifBranch};
-use ruff_python_ast::Expr;
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_index::Indexer;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
@@ -137,24 +136,10 @@ fn merge_branches(
         return Err(anyhow::anyhow!("Expected colon after test"));
     };
 
-    let main_edit = if let Some(following_branch_comment) =
-        following_branch_tokenizer.find(|token| token.kind == SimpleTokenKind::Comment)
-    {
-        let indentation =
-            indentation(locator, following_branch.body.first().unwrap()).unwrap_or("");
-        Edit::range_replacement(
-            format!("{indentation}"),
-            TextRange::new(
-                locator.full_line_end(current_branch_colon.end()),
-                following_branch_comment.start(),
-            ),
-        )
-    } else {
-        Edit::deletion(
-            locator.full_line_end(current_branch_colon.end()),
-            locator.full_line_end(following_branch_colon.end()),
-        )
-    };
+    let main_edit = Edit::deletion(
+        locator.full_line_end(current_branch_colon.end()),
+        locator.full_line_end(following_branch_colon.end()),
+    );
 
     // If the test isn't parenthesized, consider parenthesizing it.
     let following_branch_test = if let Some(range) = parenthesized_range(
