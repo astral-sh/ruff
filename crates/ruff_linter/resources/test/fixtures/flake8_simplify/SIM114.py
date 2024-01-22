@@ -4,6 +4,11 @@ if a:
 elif c:
     b
 
+if a:  # we preserve comments, too!
+    b
+elif c:  # but not on the second branch
+    b
+
 if x == 1:
     for _ in range(20):
         print("hello")
@@ -63,6 +68,10 @@ elif result.eofs == "F":
     errors = 1
 elif result.eofs == "E":
     errors = 1
+elif result.eofs == "X":
+    errors = 1
+elif result.eofs == "C":
+    errors = 1
 
 
 # OK
@@ -70,7 +79,7 @@ def complicated_calc(*arg, **kwargs):
     return 42
 
 
-def foo(p):
+def func(p):
     if p == 2:
         return complicated_calc(microsecond=0)
     elif p == 3:
@@ -103,7 +112,7 @@ elif c:
     x = 1
 
 
-def foo():
+def func():
     a = True
     b = False
     if a > b:  # end-of-line
@@ -114,3 +123,23 @@ def foo():
         return 4
     elif b is None:
         return 4
+
+
+def func():
+    """Ensure that the named expression is parenthesized when merged."""
+    a = True
+    b = False
+    if a > b:  # end-of-line
+        return 3
+    elif a := 1:
+        return 3
+
+
+if a:  # we preserve comments, too!
+    b
+elif c:  # but not on the second branch
+    b
+
+
+if a: b  # here's a comment
+elif c: b
