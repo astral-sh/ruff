@@ -1,0 +1,85 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+unreachable.py:2:5: PLW0101 Code after return is unreachable
+  |
+1 |   def say_hello():
+2 |       return True
+  |  _____^
+3 | |     print("Hello World!, Outside function.")  # PLW0101
+  | |____________________________________________^ PLW0101
+  |
+
+unreachable.py:8:9: PLW0101 Code after return is unreachable
+   |
+ 6 |   def branched_hello():
+ 7 |       if True:
+ 8 |           return
+   |  _________^
+ 9 | |         print("Hello World!, Inside if.")  # PLW0101
+   | |_________________________________________^ PLW0101
+10 |       else:
+11 |           print("Hello World!, Inside else.")
+   |
+
+unreachable.py:21:9: PLW0101 Code after raise is unreachable
+   |
+19 |           print("Hello World!, Inside if.")  # PLW0101
+20 |       else:
+21 |           raise
+   |  _________^
+22 | |         print("Hello World!, Inside else.")  # PLW0101
+   | |___________________________________________^ PLW0101
+23 |       print("Hello World!")  # PLW0101
+   |
+
+unreachable.py:27:5: PLW0101 Code after return is unreachable
+   |
+26 |   def branched_hello3():
+27 |       return
+   |  _____^
+28 | |     if True:
+29 | |         print("Hello World!, Inside if.")
+30 | |     else:
+31 | |         raise
+32 | |         print("Hello World!, Inside else.")
+33 | |     print("Hello World!")  # PLW0101
+   | |_________________________^ PLW0101
+   |
+
+unreachable.py:39:13: PLW0101 Code after return is unreachable
+   |
+37 |       def nested():
+38 |           if True:
+39 |               return
+   |  _____________^
+40 | |             print("Hello World!, Inside nested.")
+   | |_________________________________________________^ PLW0101
+41 |           else:
+42 |               print("Hello World!, Inside else.")
+   |
+
+unreachable.py:46:5: PLW0101 Code after return is unreachable
+   |
+44 |           print("Hello World!, Inside nested.")
+45 |   
+46 |       return
+   |  _____^
+47 | |     print("Hello World!, Outside nested.")  # PLW0101
+   | |__________________________________________^ PLW0101
+   |
+
+unreachable.py:51:5: PLW0101 Code after return is unreachable
+   |
+50 |   def many_returns():
+51 |       return
+   |  _____^
+52 | |     return
+53 | |     return
+54 | |     return
+55 | |     return
+56 | |     return  # PLW0101
+   | |__________^ PLW0101
+   |
+
+

@@ -83,6 +83,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 range: _,
             },
         ) => {
+            if checker.enabled(Rule::Unreachable) {
+                pylint::rules::unreachable(checker, body);
+            }
             if checker.enabled(Rule::DjangoNonLeadingReceiverDecorator) {
                 flake8_django::rules::non_leading_receiver_decorator(checker, decorator_list);
             }
