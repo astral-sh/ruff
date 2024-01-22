@@ -552,94 +552,68 @@ impl Configuration {
 
 impl ConfigurationTransformer for Configuration {
     fn transform(&self, config: Configuration) -> Configuration {
-        // Important: unpack *everything* in the struct as a local variable,
-        // so that we'll get a compile-time warning about unused variables if we forget to
-        // take account of a particular field when undergoing the transformation
-        let Configuration {
-            cache_dir,
-            extend,
-            fix,
-            fix_only,
-            unsafe_fixes,
-            output_format,
-            preview,
-            required_version,
-            extension,
-            show_fixes,
-            show_source,
-            exclude,
-            extend_exclude,
-            extend_include,
-            force_exclude,
-            include,
-            respect_gitignore,
-            builtins,
-            namespace_packages,
-            src,
-            target_version,
-            line_length,
-            indent_width,
-            lint,
-            format,
-        } = self;
+        Configuration {
+            fix: self.fix.or(config.fix),
+            fix_only: self.fix_only.or(config.fix_only),
+            unsafe_fixes: self.unsafe_fixes.or(config.unsafe_fixes),
+            output_format: self.output_format.or(config.output_format),
+            preview: self.preview.or(config.preview),
+            show_fixes: self.show_fixes.or(config.show_fixes),
+            show_source: self.show_source.or(config.show_source),
+            force_exclude: self.force_exclude.or(config.force_exclude),
+            respect_gitignore: self.respect_gitignore.or(config.respect_gitignore),
+            target_version: self.target_version.or(config.target_version),
+            line_length: self.line_length.or(config.line_length),
+            indent_width: self.indent_width.or(config.indent_width),
 
-        let mut new_config = Configuration {
-            fix: fix.or(config.fix),
-            fix_only: fix_only.or(config.fix_only),
-            unsafe_fixes: unsafe_fixes.or(config.unsafe_fixes),
-            output_format: output_format.or(config.output_format),
-            preview: preview.or(config.preview),
-            show_fixes: show_fixes.or(config.show_fixes),
-            show_source: show_source.or(config.show_source),
             extend_exclude: config
                 .extend_exclude
                 .into_iter()
-                .chain(extend_exclude.clone())
+                .chain(self.extend_exclude.clone())
                 .collect(),
             extend_include: config
                 .extend_include
                 .into_iter()
-                .chain(extend_include.clone())
+                .chain(self.extend_include.clone())
                 .collect(),
-            force_exclude: force_exclude.or(config.force_exclude),
-            respect_gitignore: respect_gitignore.or(config.respect_gitignore),
-            target_version: target_version.or(config.target_version),
-            line_length: line_length.or(config.line_length),
-            indent_width: indent_width.or(config.indent_width),
-            lint: lint.clone().combine(config.lint),
-            format: format.clone().combine(config.format),
-            ..config
-        };
 
-        if let Some(cache_dir) = cache_dir {
-            new_config.cache_dir = Some(cache_dir.clone());
-        }
-        if let Some(extend) = extend {
-            new_config.extend = Some(extend.clone());
-        }
-        if let Some(required_version) = required_version {
-            new_config.required_version = Some(required_version.clone());
-        }
-        if let Some(extension) = extension {
-            new_config.extension = Some(extension.clone());
-        }
-        if let Some(exclude) = exclude {
-            new_config.exclude = Some(exclude.clone());
-        }
-        if let Some(include) = include {
-            new_config.include = Some(include.clone());
-        };
-        if let Some(builtins) = builtins {
-            new_config.builtins = Some(builtins.clone());
-        }
-        if let Some(namespace_packages) = namespace_packages {
-            new_config.namespace_packages = Some(namespace_packages.clone());
-        }
-        if let Some(src) = src {
-            new_config.src = Some(src.clone());
-        }
+            lint: self.lint.clone().combine(config.lint),
+            format: self.format.clone().combine(config.format),
 
-        new_config
+            cache_dir: self
+                .cache_dir
+                .as_ref()
+                .map_or(config.cache_dir, |dir| Some(dir.clone())),
+            extend: self
+                .extend
+                .as_ref()
+                .map_or(config.extend, |path| Some(path.clone())),
+            required_version: self
+                .required_version
+                .as_ref()
+                .map_or(config.required_version, |ver| Some(ver.clone())),
+            extension: self
+                .extension
+                .as_ref()
+                .map_or(config.extension, |ext| Some(ext.clone())),
+            exclude: self
+                .exclude
+                .as_ref()
+                .map_or(config.exclude, |excl| Some(excl.clone())),
+            include: self
+                .include
+                .as_ref()
+                .map_or(config.include, |inc| Some(inc.clone())),
+            builtins: self
+                .builtins
+                .as_ref()
+                .map_or(config.builtins, |bltns| Some(bltns.clone())),
+            namespace_packages: self
+                .namespace_packages
+                .as_ref()
+                .map_or(config.namespace_packages, |pkgs| Some(pkgs.clone())),
+            src: self.src.as_ref().map_or(config.src, |s| Some(s.clone())),
+        }
     }
 }
 
