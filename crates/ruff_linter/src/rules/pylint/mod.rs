@@ -193,6 +193,7 @@ mod tests {
     }
 
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"))]
+    #[test_case(Rule::CollapsibleElseIf, Path::new("collapsible_else_if.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
