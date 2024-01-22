@@ -146,6 +146,7 @@ Call(
                                             ),
                                         ],
                                         ctx: Load,
+                                        is_parenthesized: true,
                                     },
                                 ),
                                 ifs: [],

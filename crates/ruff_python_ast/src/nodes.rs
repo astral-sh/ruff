@@ -8,7 +8,6 @@ use std::slice::{Iter, IterMut};
 
 use itertools::Itertools;
 
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::{int, LiteralExpressionRef};
@@ -1796,42 +1795,14 @@ pub struct ExprTuple {
     pub range: TextRange,
     pub elts: Vec<Expr>,
     pub ctx: ExprContext,
+
+    /// Whether the tuple is parenthesized in the source code.
+    pub is_parenthesized: bool,
 }
 
 impl From<ExprTuple> for Expr {
     fn from(payload: ExprTuple) -> Self {
         Expr::Tuple(payload)
-    }
-}
-
-impl ExprTuple {
-    /// Return `true` if a tuple is parenthesized in the source code.
-    pub fn is_parenthesized(&self, source: &str) -> bool {
-        let Some(elt) = self.elts.first() else {
-            return true;
-        };
-
-        // Count the number of open parentheses between the start of the tuple and the first element.
-        let open_parentheses_count =
-            SimpleTokenizer::new(source, TextRange::new(self.start(), elt.start()))
-                .skip_trivia()
-                .filter(|token| token.kind() == SimpleTokenKind::LParen)
-                .count();
-        if open_parentheses_count == 0 {
-            return false;
-        }
-
-        // Count the number of parentheses between the end of the first element and its trailing comma.
-        let close_parentheses_count =
-            SimpleTokenizer::new(source, TextRange::new(elt.end(), self.end()))
-                .skip_trivia()
-                .take_while(|token| token.kind() != SimpleTokenKind::Comma)
-                .filter(|token| token.kind() == SimpleTokenKind::RParen)
-                .count();
-
-        // If the number of open parentheses is greater than the number of close parentheses, the tuple
-        // is parenthesized.
-        open_parentheses_count > close_parentheses_count
     }
 }
 

@@ -145,6 +145,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
                         elts: comparators.iter().copied().cloned().collect(),
                         range: TextRange::default(),
                         ctx: ExprContext::Load,
+                        is_parenthesized: true,
                     })]),
                     range: bool_op.range(),
                 })),

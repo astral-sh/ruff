@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 8c85e4bbac54760ed8be03b56a428d76e14d18e6dbde62b424d0b2b5e8e65dbe
+// sha3: 7a000e58d9f27e971b204e2e53ef25a811c300174be0b0a1b9dfd89dddc441fb
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -33938,7 +33938,8 @@ fn __action86<
                     ast::ExprTuple {
                         elts: vec![subject.into()],
                         ctx: ast::ExprContext::Load,
-                        range: (tuple_location..tuple_end_location).into()
+                        range: (tuple_location..tuple_end_location).into(),
+                        is_parenthesized: false
                     },
                 )),
                 cases,
@@ -33982,7 +33983,8 @@ fn __action87<
                     ast::ExprTuple {
                         elts,
                         ctx: ast::ExprContext::Load,
-                        range: (tuple_location..tuple_end_location).into()
+                        range: (tuple_location..tuple_end_location).into(),
+                        is_parenthesized: false
                     },
                 )),
                 cases,
@@ -36227,6 +36229,7 @@ fn __action208<
             elts: vec![s1.into()],
             ctx: ast::ExprContext::Load,
             range: (location..end_location).into(),
+            is_parenthesized: false
         }.into()
     }
 }
@@ -36249,6 +36252,7 @@ fn __action209<
             elts,
             ctx: ast::ExprContext::Load,
             range: (location..end_location).into(),
+            is_parenthesized: false
         }.into()
     }
 }
@@ -37049,7 +37053,12 @@ fn __action259<
             }
         } else {
             let elts = elts.into_iter().map(ast::Expr::from).collect();
-            ast::ExprTuple { elts, ctx: ast::ExprContext::Load, range: (location..end_location).into() }.into()
+            ast::ExprTuple {
+              elts,
+              ctx: ast::ExprContext::Load,
+              range: (location..end_location).into(),
+              is_parenthesized: false
+            }.into()
         }
     }
 }
@@ -37103,7 +37112,12 @@ fn __action262<
             }
         } else {
             let elts = elts.into_iter().map(ast::Expr::from).collect();
-            ast::ExprTuple { elts, ctx: ast::ExprContext::Load, range: (location..end_location).into() }.into()
+            ast::ExprTuple {
+              elts,
+              ctx: ast::ExprContext::Load,
+              range: (location..end_location).into(),
+              is_parenthesized: false
+            }.into()
         }
     }
 }
@@ -41292,7 +41306,12 @@ fn __action553<
             }
         } else {
             let elts = elts.into_iter().map(ast::Expr::from).collect();
-            ast::ExprTuple { elts, ctx: ast::ExprContext::Load, range: (location..end_location).into() }.into()
+            ast::ExprTuple {
+              elts,
+              ctx: ast::ExprContext::Load,
+              range: (location..end_location).into(),
+              is_parenthesized: true
+            }.into()
         }
     }
 }
@@ -41327,7 +41346,12 @@ fn __action554<
             })
         } else {
             let elts = left.into_iter().flatten().chain([mid]).chain(right).map(ast::Expr::from).collect();
-            Ok(ast::ExprTuple { elts, ctx: ast::ExprContext::Load, range: (location..end_location).into() }.into())
+            Ok(ast::ExprTuple {
+              elts,
+              ctx: ast::ExprContext::Load,
+              range: (location..end_location).into(),
+              is_parenthesized: true
+            }.into())
         }
     }
 }
@@ -41348,6 +41372,7 @@ fn __action555<
         elts: Vec::new(),
         ctx: ast::ExprContext::Load,
         range: (location..end_location).into(),
+        is_parenthesized: true
     }.into()
 }
 
@@ -42025,7 +42050,12 @@ fn __action596<
             })
         } else {
             let elts = left.into_iter().flatten().chain([mid]).chain(right).map(ast::Expr::from).collect();
-            Ok(ast::ExprTuple { elts, ctx: ast::ExprContext::Load, range: (location..end_location).into() }.into())
+            Ok(ast::ExprTuple {
+              elts,
+              ctx: ast::ExprContext::Load,
+              range: (location..end_location).into(),
+              is_parenthesized: true
+            }.into())
         }
     }
 }
@@ -42046,6 +42076,7 @@ fn __action597<
         elts: Vec::new(),
         ctx: ast::ExprContext::Load,
         range: (location..end_location).into(),
+        is_parenthesized: true
     }.into()
 }
 

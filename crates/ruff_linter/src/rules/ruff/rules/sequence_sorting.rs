@@ -145,12 +145,14 @@ impl SequenceKind<'_> {
     // N.B. We only need the source code for the Tuple variant here,
     // but if you already have a `Locator` instance handy,
     // getting the source code is very cheap.
-    fn surrounding_brackets(&self, source: &str) -> (&'static str, &'static str) {
+    fn surrounding_brackets(&self) -> (&'static str, &'static str) {
         match self {
             Self::List => ("[", "]"),
             Self::Set => ("{", "}"),
-            Self::Tuple(ast_node) => {
-                if ast_node.is_parenthesized(source) {
+            Self::Tuple(ast::ExprTuple {
+                is_parenthesized, ..
+            }) => {
+                if *is_parenthesized {
                     ("(", ")")
                 } else {
                     ("", "")
@@ -225,7 +227,7 @@ pub(super) fn sort_single_line_elements_sequence(
 ) -> String {
     let element_pairs = SequenceElements::new(elements, elts);
     let last_item_index = element_pairs.last_item_index();
-    let (opening_paren, closing_paren) = kind.surrounding_brackets(locator.contents());
+    let (opening_paren, closing_paren) = kind.surrounding_brackets();
     let mut result = String::from(opening_paren);
     // We grab the original source-code ranges using `locator.slice()`
     // rather than using the expression generator, as this approach allows

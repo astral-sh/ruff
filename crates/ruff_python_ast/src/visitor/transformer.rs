@@ -528,6 +528,7 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             elts,
             ctx,
             range: _,
+            is_parenthesized: _,
         }) => {
             for expr in elts {
                 visitor.visit_expr(expr);

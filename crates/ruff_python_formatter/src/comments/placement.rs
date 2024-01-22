@@ -315,9 +315,10 @@ fn handle_enclosed_comment<'a>(
         | AnyNodeRef::ExprSet(_)
         | AnyNodeRef::ExprListComp(_)
         | AnyNodeRef::ExprSetComp(_) => handle_bracketed_end_of_line_comment(comment, locator),
-        AnyNodeRef::ExprTuple(tuple) if tuple.is_parenthesized(locator.contents()) => {
-            handle_bracketed_end_of_line_comment(comment, locator)
-        }
+        AnyNodeRef::ExprTuple(ast::ExprTuple {
+            is_parenthesized: true,
+            ..
+        }) => handle_bracketed_end_of_line_comment(comment, locator),
         AnyNodeRef::ExprGeneratorExp(generator)
             if is_generator_parenthesized(generator, locator.contents()) =>
         {

@@ -661,7 +661,10 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 return;
             }
 
-            Expr::Tuple(tuple) if tuple.is_parenthesized(self.context.source()) => {
+            Expr::Tuple(ast::ExprTuple {
+                is_parenthesized: true,
+                ..
+            }) => {
                 self.any_parenthesized_expressions = true;
                 // The values are always parenthesized, don't visit.
                 return;
@@ -1050,7 +1053,12 @@ pub(crate) fn has_own_parentheses(
             }
         }
 
-        Expr::Tuple(tuple) if tuple.is_parenthesized(context.source()) => {
+        Expr::Tuple(
+            tuple @ ast::ExprTuple {
+                is_parenthesized: true,
+                ..
+            },
+        ) => {
             if !tuple.elts.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
                 Some(OwnParentheses::NonEmpty)
             } else {

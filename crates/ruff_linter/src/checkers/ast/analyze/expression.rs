@@ -134,6 +134,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             elts,
             ctx,
             range: _,
+            is_parenthesized: _,
         })
         | Expr::List(ast::ExprList {
             elts,
