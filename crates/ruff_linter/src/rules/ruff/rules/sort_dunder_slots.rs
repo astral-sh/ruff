@@ -14,7 +14,7 @@ use crate::rules::ruff::rules::sequence_sorting::{
     SortClassification, SortingStyle,
 };
 
-use itertools::{izip, Itertools};
+use itertools::izip;
 
 /// ## What it does
 /// Checks for `__slots__` and `__match_args__`
@@ -278,6 +278,32 @@ impl<'a> StringLiteralDisplay<'a> {
     }
 }
 
+struct DictElements<'a>(Vec<(&'a &'a str, &'a ast::Expr, &'a ast::Expr)>);
+
+impl<'a> DictElements<'a> {
+    fn new(elements: &'a [&str], key_elts: &'a [ast::Expr], value_elts: &'a [ast::Expr]) -> Self {
+        assert_eq!(key_elts.len(), elements.len());
+        assert_eq!(elements.len(), value_elts.len());
+        assert!(
+            elements.len() >= 2,
+            "A sequence with < 2 elements cannot be unsorted"
+        );
+        Self(izip!(elements, key_elts, value_elts).collect())
+    }
+
+    fn last_item_index(&self) -> usize {
+        // Safe from underflow, as the constructor guarantees
+        // that the underlying vector has length >= 2
+        self.0.len() - 1
+    }
+
+    fn into_sorted_elts(mut self) -> impl Iterator<Item = (&'a ast::Expr, &'a ast::Expr)> {
+        self.0
+            .sort_by(|(elem1, _, _), (elem2, _, _)| SORTING_STYLE.compare(elem1, elem2));
+        self.0.into_iter().map(|(_, key, value)| (key, value))
+    }
+}
+
 /// Create a string representing a fixed-up single-line
 /// definition of a `__slots__` dictionary that can be
 /// inserted into the source code as a `range_replacement`
@@ -293,22 +319,14 @@ pub(super) fn sort_single_line_elements_dict(
     value_elts: &[ast::Expr],
     locator: &Locator,
 ) -> String {
-    assert_eq!(key_elts.len(), elements.len());
-    assert_eq!(elements.len(), value_elts.len());
-    assert!(
-        elements.len() >= 2,
-        "A sequence with < 2 elements cannot be unsorted"
-    );
-    let last_item_index = elements.len() - 1;
+    let element_trios = DictElements::new(elements, key_elts, value_elts);
+    let last_item_index = element_trios.last_item_index();
     let mut result = String::from('{');
-
-    let mut element_trios = izip!(elements, key_elts, value_elts).collect_vec();
-    element_trios.sort_by(|(elem1, _, _), (elem2, _, _)| SORTING_STYLE.compare(elem1, elem2));
     // We grab the original source-code ranges using `locator.slice()`
     // rather than using the expression generator, as this approach allows
     // us to easily preserve stylistic choices in the original source code
     // such as whether double or single quotes were used.
-    for (i, (_, key, value)) in element_trios.iter().enumerate() {
+    for (i, (key, value)) in element_trios.into_sorted_elts().enumerate() {
         result.push_str(locator.slice(key));
         result.push_str(": ");
         result.push_str(locator.slice(value));

@@ -15,7 +15,6 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use is_macro;
-use itertools::Itertools;
 use natord;
 
 /// An enumeration of the different sorting styles
@@ -189,6 +188,34 @@ pub(super) enum DisplayKind<'a> {
     Dict { values: &'a [ast::Expr] },
 }
 
+struct SequenceElements<'a>(Vec<(&'a &'a str, &'a ast::Expr)>);
+
+impl<'a> SequenceElements<'a> {
+    fn new(elements: &'a [&str], elts: &'a [ast::Expr]) -> Self {
+        assert_eq!(elements.len(), elts.len());
+        assert!(
+            elements.len() >= 2,
+            "A sequence with < 2 elements cannot be unsorted"
+        );
+        Self(elements.iter().zip(elts).collect())
+    }
+
+    fn last_item_index(&self) -> usize {
+        // Safe from underflow, as the constructor guarantees
+        // that the underlying vector has length >= 2
+        self.0.len() - 1
+    }
+
+    fn into_sorted_elts(
+        mut self,
+        sorting_style: &SortingStyle,
+    ) -> impl Iterator<Item = &'a ast::Expr> {
+        self.0
+            .sort_by(|(elem1, _), (elem2, _)| sorting_style.compare(elem1, elem2));
+        self.0.into_iter().map(|(_, elt)| elt)
+    }
+}
+
 /// Create a string representing a fixed-up single-line
 /// definition of `__all__` or `__slots__` (etc.),
 /// that can be inserted into the
@@ -200,28 +227,20 @@ pub(super) fn sort_single_line_elements_sequence(
     locator: &Locator,
     sorting_style: &SortingStyle,
 ) -> String {
-    assert_eq!(elts.len(), elements.len());
+    let element_pairs = SequenceElements::new(elements, elts);
+    let last_item_index = element_pairs.last_item_index();
     let (opening_paren, closing_paren) = kind.surrounding_brackets(locator.contents());
-    assert!(
-        elements.len() >= 2,
-        "A sequence with < 2 elements cannot be unsorted"
-    );
-    let last_item_index = elements.len() - 1;
     let mut result = String::from(opening_paren);
-
-    let mut element_pairs = elements.iter().zip(elts).collect_vec();
-    element_pairs.sort_by(|(elem1, _), (elem2, _)| sorting_style.compare(elem1, elem2));
     // We grab the original source-code ranges using `locator.slice()`
     // rather than using the expression generator, as this approach allows
     // us to easily preserve stylistic choices in the original source code
     // such as whether double or single quotes were used.
-    for (i, (_, elt)) in element_pairs.iter().enumerate() {
+    for (i, elt) in element_pairs.into_sorted_elts(sorting_style).enumerate() {
         result.push_str(locator.slice(elt));
         if i < last_item_index {
             result.push_str(", ");
         }
     }
-
     result.push_str(closing_paren);
     result
 }
@@ -595,8 +614,8 @@ impl LineState {
 #[derive(Debug)]
 struct LineWithJustAComment(TextRange);
 
-/// Instances of this struct represent source-code lines in single-line
-/// or multiline tuples/lists/sets where the line contains at least
+/// Instances of this struct represent source-code lines in
+/// multiline tuples/lists/sets where the line contains at least
 /// 1 element of the sequence. The line may contain > 1 element of the
 /// sequence, and may also have a trailing comment after the element(s).
 #[derive(Debug)]
