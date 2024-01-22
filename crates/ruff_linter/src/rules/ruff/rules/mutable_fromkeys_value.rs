@@ -59,7 +59,7 @@ impl Violation for MutableFromkeysValue {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Replace with a comprehension".to_string())
+        Some("Replace with comprehension".to_string())
     }
 }
 
