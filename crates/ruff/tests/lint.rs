@@ -45,8 +45,8 @@ inline-quotes = "single"
 
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
-      extend-select -> lint.extend-select,
-      flake8-quotes -> lint.flake8-quotes
+      - 'extend-select' -> 'lint.extend-select'
+      - 'flake8-quotes' -> 'lint.flake8-quotes'
 
 
     "###);
@@ -120,7 +120,7 @@ inline-quotes = "single"
 
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
-      extend-select -> lint.extend-select
+      - 'extend-select' -> 'lint.extend-select'
 
 
     "###);
@@ -163,7 +163,7 @@ inline-quotes = "single"
 
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
-      flake8-quotes -> lint.flake8-quotes
+      - 'flake8-quotes' -> 'lint.flake8-quotes'
 
 
     "###);
@@ -242,7 +242,7 @@ OTHER = "OTHER"
 
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
-      extend-select -> lint.extend-select
+      - 'extend-select' -> 'lint.extend-select'
 
 
     "###);
@@ -289,7 +289,7 @@ if __name__ == "__main__":
 
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
-      extend-select -> lint.extend-select
+      - 'extend-select' -> 'lint.extend-select'
 
 
     "###);
@@ -331,8 +331,8 @@ _ = "---------------------------------------------------------------------------
 
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
-      select -> lint.select,
-      pycodestyle -> lint.pycodestyle
+      - 'select' -> 'lint.select'
+      - 'pycodestyle' -> 'lint.pycodestyle'
 
 
     "###);
@@ -378,7 +378,7 @@ if __name__ == "__main__":
 
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
-      extend-select -> lint.extend-select
+      - 'extend-select' -> 'lint.extend-select'
 
 
     "###);
@@ -424,7 +424,7 @@ if __name__ == "__main__":
 
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
-      extend-select -> lint.extend-select
+      - 'extend-select' -> 'lint.extend-select'
 
 
     "###);

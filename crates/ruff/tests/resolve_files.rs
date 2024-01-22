@@ -40,7 +40,7 @@ fn check_project_include_defaults() {
 
         ----- stderr -----
         warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
-          select -> lint.select
+          - 'select' -> 'lint.select'
 
 
         "###);

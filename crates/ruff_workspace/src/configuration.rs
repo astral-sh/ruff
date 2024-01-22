@@ -1322,8 +1322,8 @@ fn warn_about_deprecated_top_level_lint_options(top_level_options: &LintCommonOp
 
     let options_mapping = used_options
         .iter()
-        .map(|option| format!("{option} -> lint.{option}"))
-        .join(",\n  ");
+        .map(|option| format!("- '{option}' -> 'lint.{option}'"))
+        .join("\n  ");
 
     warn_user!(
         "The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:\n  {options_mapping}\n\n",

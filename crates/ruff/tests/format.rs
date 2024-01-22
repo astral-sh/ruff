@@ -509,8 +509,8 @@ if __name__ == '__main__':
 
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
-      extend-select -> lint.extend-select,
-      ignore -> lint.ignore
+      - 'extend-select' -> 'lint.extend-select'
+      - 'ignore' -> 'lint.ignore'
 
 
     "###);
@@ -552,8 +552,8 @@ if __name__ == '__main__':
 
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
-      extend-select -> lint.extend-select,
-      ignore -> lint.ignore
+      - 'extend-select' -> 'lint.extend-select'
+      - 'ignore' -> 'lint.ignore'
 
 
     "###);
