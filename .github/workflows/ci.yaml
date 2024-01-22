@@ -35,7 +35,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: tj-actions/changed-files@v41
+      - uses: tj-actions/changed-files@v42
         id: changed
         with:
           files_yaml: |
@@ -120,7 +120,7 @@ jobs:
         env:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: ruff
           path: target/debug/ruff
@@ -219,7 +219,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         name: Download comparison Ruff binary
         id: ruff-target
         with:
@@ -305,13 +305,13 @@ jobs:
         run: |
           echo ${{ github.event.number }} > pr-number
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         name: Upload PR Number
         with:
           name: pr-number
           path: pr-number
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         name: Upload Results
         with:
           name: ecosystem-result
@@ -371,7 +371,7 @@ jobs:
       - name: "Install pre-commit"
         run: pip install pre-commit
       - name: "Cache pre-commit"
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
@@ -459,7 +459,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         name: Download development ruff binary
         id: ruff-target
         with:
