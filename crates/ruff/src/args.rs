@@ -557,11 +557,6 @@ impl ConfigArgs {
                     match new.config_file {
                         None => new.config_file = Some(path),
                         Some(ref config_file) => {
-                            if config_file == &path {
-                                // I'm not sure why you'd specify the same config file twice,
-                                // but it seems reasonable to let it pass if we do encounter that
-                                continue;
-                            }
                             let (first, second) = (config_file.display(), path.display());
                             return Err(anyhow!("Cannot specify more than one configuration file on the command line")
                                 .context(format!("Both `--config={first}` and `--config={second}` were specified")));
