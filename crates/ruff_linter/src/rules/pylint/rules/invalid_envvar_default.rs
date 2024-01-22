@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_python_ast as ast;
+use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -40,43 +41,6 @@ impl Violation for InvalidEnvvarDefault {
     }
 }
 
-fn is_valid_default(expr: &Expr) -> bool {
-    // We can't infer the types of these defaults, so assume they're valid.
-    if matches!(
-        expr,
-        Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_)
-    ) {
-        return true;
-    }
-
-    // Allow string concatenation.
-    if let Expr::BinOp(ast::ExprBinOp {
-        left,
-        right,
-        op: Operator::Add,
-        range: _,
-    }) = expr
-    {
-        return is_valid_default(left) && is_valid_default(right);
-    }
-
-    // Allow string formatting.
-    if let Expr::BinOp(ast::ExprBinOp {
-        left,
-        op: Operator::Mod,
-        ..
-    }) = expr
-    {
-        return is_valid_default(left);
-    }
-
-    // Otherwise, the default must be a string or `None`.
-    matches!(
-        expr,
-        Expr::StringLiteral(_) | Expr::NoneLiteral(_) | Expr::FString(_)
-    )
-}
-
 /// PLW1508
 pub(crate) fn invalid_envvar_default(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
@@ -89,10 +53,16 @@ pub(crate) fn invalid_envvar_default(checker: &mut Checker, call: &ast::ExprCall
             return;
         };
 
-        if !is_valid_default(expr) {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(InvalidEnvvarDefault, expr.range()));
+        if matches!(
+            ResolvedPythonType::from(expr),
+            ResolvedPythonType::Unknown
+                | ResolvedPythonType::Atom(PythonType::String)
+                | ResolvedPythonType::Atom(PythonType::None)
+        ) {
+            return;
         }
+        checker
+            .diagnostics
+            .push(Diagnostic::new(InvalidEnvvarDefault, expr.range()));
     }
 }
