@@ -31,7 +31,7 @@ use crate::checkers::ast::Checker;
 /// Does not ignore private name imports from within the module that defines
 /// the private name if the module is defined with [PEP 420] namespace packages
 /// (i.e., directories that omit the `__init__.py` file). Namespace packages
-/// must be configured via the [`namespace-packages`][namespace-packages] setting.
+/// must be configured via the [`namespace-packages`] setting.
 ///
 /// ## Example
 /// ```python
@@ -39,8 +39,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Options
-/// - [`namespace-packages`][namespace-packages]: List of packages that are defined as namespace
-///   packages.
+/// - `namespace-packages`
 ///
 /// ## References
 /// - [PEP 8: Naming Conventions](https://peps.python.org/pep-0008/#naming-conventions)
@@ -48,7 +47,6 @@ use crate::checkers::ast::Checker;
 ///
 /// [PEP 8]: https://www.python.org/dev/peps/pep-0008/
 /// [PEP 420]: https://www.python.org/dev/peps/pep-0420/
-/// [namespace-packages]: https://beta.ruff.rs/docs/settings/#namespace-packages
 #[violation]
 pub struct ImportPrivateName {
     name: String,
