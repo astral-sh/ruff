@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-too_few_public_methods.py:4:1: PLR0903 Too few public methods (1 < 2)
+too_few_public_methods.py:6:1: PLR0903 Too few public methods (1 < 2)
   |
-4 | / class Point:  # PLR0903
-5 | |     def __init__(self, x: float, y: float) -> None:
-6 | |         self.x = x
-7 | |         self.y = y
+6 | / class Point:  # PLR0903
+7 | |     def __init__(self, x: float, y: float) -> None:
+8 | |         self.x = x
+9 | |         self.y = y
   | |__________________^ PLR0903
   |
 
