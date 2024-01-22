@@ -99,7 +99,7 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt_if: &ast::StmtIf) {
                 merge_branches(
                     stmt_if,
                     &current_branch,
-                    &following_branch,
+                    following_branch,
                     checker.locator(),
                     checker.indexer(),
                 )
