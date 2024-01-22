@@ -105,7 +105,7 @@ pub(crate) fn sort_dunder_slots_ann_assign(checker: &mut Checker, node: &ast::St
     }
 }
 
-const SORTING_STYLE: &SortingStyle = &SortingStyle::Natural;
+const SORTING_STYLE: SortingStyle = SortingStyle::Natural;
 
 /// Sort a tuple, list, dict or set that defines `__slots__`
 /// or `__match_args__` in a class scope.

@@ -19,7 +19,7 @@ use natord;
 
 /// An enumeration of the different sorting styles
 /// currently supported for displays of string literals
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub(super) enum SortingStyle {
     /// Sort string-literal items according to a
     /// [natural sort](https://en.wikipedia.org/wiki/Natural_sort_order).
@@ -36,7 +36,7 @@ pub(super) enum SortingStyle {
 }
 
 impl SortingStyle {
-    pub(super) fn compare(&self, a: &str, b: &str) -> Ordering {
+    pub(super) fn compare(self, a: &str, b: &str) -> Ordering {
         match self {
             Self::Natural => natord::compare(a, b),
             Self::Isort => IsortSortKey::from(a).cmp(&IsortSortKey::from(b)),
@@ -208,7 +208,7 @@ impl<'a> SequenceElements<'a> {
 
     fn into_sorted_elts(
         mut self,
-        sorting_style: &SortingStyle,
+        sorting_style: SortingStyle,
     ) -> impl Iterator<Item = &'a ast::Expr> {
         self.0
             .sort_by(|(elem1, _), (elem2, _)| sorting_style.compare(elem1, elem2));
@@ -225,7 +225,7 @@ pub(super) fn sort_single_line_elements_sequence(
     elts: &[ast::Expr],
     elements: &[&str],
     locator: &Locator,
-    sorting_style: &SortingStyle,
+    sorting_style: SortingStyle,
 ) -> String {
     let element_pairs = SequenceElements::new(elements, elts);
     let last_item_index = element_pairs.last_item_index();
@@ -265,7 +265,7 @@ pub(super) enum SortClassification<'a> {
 }
 
 impl<'a> SortClassification<'a> {
-    pub(super) fn of_elements(elements: &'a [ast::Expr], sorting_style: &SortingStyle) -> Self {
+    pub(super) fn of_elements(elements: &'a [ast::Expr], sorting_style: SortingStyle) -> Self {
         // If it's of length less than 2, it has to be sorted already
         let Some((first, rest @ [_, ..])) = elements.split_first() else {
             return Self::Sorted;
@@ -374,7 +374,7 @@ impl MultilineStringSequenceValue {
     /// so this is a logic error.
     pub(super) fn into_sorted_source_code(
         mut self,
-        sorting_style: &SortingStyle,
+        sorting_style: SortingStyle,
         locator: &Locator,
         stylist: &Stylist,
     ) -> String {

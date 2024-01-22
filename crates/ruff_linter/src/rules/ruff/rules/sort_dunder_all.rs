@@ -77,7 +77,7 @@ impl Violation for UnsortedDunderAll {
     }
 }
 
-const SORTING_STYLE: &SortingStyle = &SortingStyle::Isort;
+const SORTING_STYLE: SortingStyle = SortingStyle::Isort;
 
 /// Sort an `__all__` definition represented by a `StmtAssign` AST node.
 /// For example: `__all__ = ["b", "c", "a"]`.
