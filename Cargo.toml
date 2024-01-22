@@ -40,7 +40,7 @@ fs-err = { version ="2.11.0"}
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 hexf-parse = { version ="0.2.1"}
-ignore = { version = "0.4.21" }
+ignore = { version = "0.4.22" }
 imara-diff ={ version = "0.1.5"}
 imperative = { version = "1.0.4" }
 indicatif ={ version = "0.17.7"}
