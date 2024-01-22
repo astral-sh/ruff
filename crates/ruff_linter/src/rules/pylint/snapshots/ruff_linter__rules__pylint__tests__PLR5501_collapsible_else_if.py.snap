@@ -53,4 +53,42 @@ collapsible_else_if.py:69:5: PLR5501 Use `elif` instead of `else` then `if`, to 
    |
    = help: Use `elif` instead of `else` then `if`, to reduce indentation
 
+collapsible_else_if.py:79:5: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+77 |       if 1:
+78 |           pass
+79 |       else:
+   |  _____^
+80 | |         if 2: pass
+   | |________^ PLR5501
+81 |           else: pass
+   |
+   = help: Use `elif` instead of `else` then `if`, to reduce indentation
+
+collapsible_else_if.py:87:5: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+85 |       if 1:
+86 |           pass
+87 |       else:
+   |  _____^
+88 | |         if 2: pass
+   | |________^ PLR5501
+89 |           else:
+90 |               pass
+   |
+   = help: Use `elif` instead of `else` then `if`, to reduce indentation
+
+collapsible_else_if.py:96:5: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+94 |       if 1:
+95 |           pass
+96 |       else:
+   |  _____^
+97 | |         if 2:
+   | |________^ PLR5501
+98 |               pass
+99 |           else: pass
+   |
+   = help: Use `elif` instead of `else` then `if`, to reduce indentation
+
 

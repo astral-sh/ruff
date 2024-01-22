@@ -49,7 +49,7 @@ def not_ok1():
             pass
 
 
-def not_ok_with_comments():
+def not_ok1_with_comments():
     if 1:
         pass
     else:
@@ -72,3 +72,28 @@ def not_ok2():
         else:
             print(4)
 
+
+def not_ok3():
+    if 1:
+        pass
+    else:
+        if 2: pass
+        else: pass
+
+
+def not_ok4():
+    if 1:
+        pass
+    else:
+        if 2: pass
+        else:
+            pass
+
+
+def not_ok5():
+    if 1:
+        pass
+    else:
+        if 2:
+            pass
+        else: pass
