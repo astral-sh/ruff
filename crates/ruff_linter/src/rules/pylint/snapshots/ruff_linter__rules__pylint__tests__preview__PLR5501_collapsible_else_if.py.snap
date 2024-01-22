@@ -11,7 +11,7 @@ collapsible_else_if.py:37:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    | |________^ PLR5501
 39 |               pass
    |
-   = help: Use `elif` instead of `else` then `if`, to reduce indentation
+   = help: Convert to `elif`
 
 ℹ Safe fix
 34 34 | def not_ok0():
@@ -37,7 +37,7 @@ collapsible_else_if.py:45:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
 47 |               pass
 48 |           else:
    |
-   = help: Use `elif` instead of `else` then `if`, to reduce indentation
+   = help: Convert to `elif`
 
 ℹ Safe fix
 42 42 | def not_ok1():
@@ -67,7 +67,7 @@ collapsible_else_if.py:55:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
 58 |               pass
 59 |           else:
    |
-   = help: Use `elif` instead of `else` then `if`, to reduce indentation
+   = help: Convert to `elif`
 
 ℹ Safe fix
 52 52 | def not_ok1_with_comments():
@@ -97,7 +97,7 @@ collapsible_else_if.py:69:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
 71 |               print(3)
 72 |           else:
    |
-   = help: Use `elif` instead of `else` then `if`, to reduce indentation
+   = help: Convert to `elif`
 
 ℹ Safe fix
 66 66 |         print(1)
@@ -125,7 +125,7 @@ collapsible_else_if.py:79:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
    | |________^ PLR5501
 81 |           else: pass
    |
-   = help: Use `elif` instead of `else` then `if`, to reduce indentation
+   = help: Convert to `elif`
 
 ℹ Safe fix
 76 76 | def not_ok3():
@@ -151,7 +151,7 @@ collapsible_else_if.py:87:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
 89 |           else:
 90 |               pass
    |
-   = help: Use `elif` instead of `else` then `if`, to reduce indentation
+   = help: Convert to `elif`
 
 ℹ Safe fix
 84 84 | def not_ok4():
@@ -178,7 +178,7 @@ collapsible_else_if.py:96:5: PLR5501 [*] Use `elif` instead of `else` then `if`,
 98 |               pass
 99 |           else: pass
    |
-   = help: Use `elif` instead of `else` then `if`, to reduce indentation
+   = help: Convert to `elif`
 
 ℹ Safe fix
 93 93 | def not_ok5():

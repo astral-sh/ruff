@@ -1,12 +1,12 @@
-use ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, ElifElseClause, Stmt};
-use ruff_text_size::{Ranged, TextRange};
-
 use anyhow::Result;
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+
+use ast::whitespace::indentation;
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, ElifElseClause, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::rules::pyupgrade::fixes::adjust_indentation;
@@ -48,13 +48,14 @@ pub struct CollapsibleElseIf;
 
 impl Violation for CollapsibleElseIf {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `elif` instead of `else` then `if`, to reduce indentation")
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Use `elif` instead of `else` then `if`, to reduce indentation".to_string())
+        Some("Convert to `elif`".to_string())
     }
 }
 
@@ -85,13 +86,16 @@ pub(crate) fn collapsible_else_if(checker: &mut Checker, stmt: &Stmt) {
     );
 
     if checker.settings.preview.is_enabled() {
-        diagnostic.try_set_fix(|| do_fix(first, else_clause, checker.locator(), checker.stylist()));
+        diagnostic.try_set_fix(|| {
+            convert_to_elif(first, else_clause, checker.locator(), checker.stylist())
+        });
     }
 
     checker.diagnostics.push(diagnostic);
 }
 
-fn do_fix(
+/// Generate [`Fix`] to convert an `else` block to an `elif` block.
+fn convert_to_elif(
     first: &Stmt,
     else_clause: &ElifElseClause,
     locator: &Locator,
@@ -101,25 +105,27 @@ fn do_fix(
     let inner_if_line_end = locator.line_end(first.end());
 
     // Identify the indentation of the loop itself (e.g., the `while` or `for`).
-    let desired_indentation = indentation(locator, else_clause).unwrap_or("");
+    let Some(indentation) = indentation(locator, else_clause) else {
+        return Err(anyhow::anyhow!("`else` is expected to be on its own line"));
+    };
 
     // Dedent the content from the end of the `else` to the end of the `if`.
     let indented = adjust_indentation(
         TextRange::new(inner_if_line_start, inner_if_line_end),
-        desired_indentation,
+        indentation,
         locator,
         stylist,
-    )
-    .unwrap();
+    )?;
 
-    // Unindent the first line (which is the `if` and add `el` to the start)
-    let fixed_indented = format!("el{}", indented.strip_prefix(desired_indentation).unwrap());
+    // Strip the indent from the first line of the `if` statement, and add `el` to the start.
+    let Some(unindented) = indented.strip_prefix(indentation) else {
+        return Err(anyhow::anyhow!("indented block to start with indentation"));
+    };
+    let indented = format!("{indentation}el{unindented}");
 
-    Ok(Fix::applicable_edit(
-        Edit::range_replacement(
-            fixed_indented,
-            TextRange::new(else_clause.start(), inner_if_line_end),
-        ),
-        Applicability::Safe,
-    ))
+    Ok(Fix::safe_edit(Edit::replacement(
+        indented,
+        locator.line_start(else_clause.start()),
+        inner_if_line_end,
+    )))
 }
