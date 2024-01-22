@@ -173,8 +173,7 @@ impl<'a> Resolver<'a> {
         // Determine whether any of the settings require namespace packages. If not, we can save
         // a lookup for every file.
         let has_namespace_packages = self
-            .settings
-            .values()
+            .settings()
             .any(|settings| !settings.linter.namespace_packages.is_empty());
 
         // Search for the package root for each file.
