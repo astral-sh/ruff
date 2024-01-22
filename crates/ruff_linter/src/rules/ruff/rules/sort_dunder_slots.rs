@@ -10,7 +10,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::sequence_sorting::{
-    sort_single_line_elements_sequence, DisplayKind, MultilineStringSequenceValue, SequenceKind,
+    sort_single_line_elements_sequence, MultilineStringSequenceValue, SequenceKind,
     SortClassification, SortingStyle,
 };
 
@@ -245,30 +245,27 @@ impl<'a> StringLiteralDisplay<'a> {
     fn generate_fix(&self, items: &[&str], checker: &Checker) -> Option<Fix> {
         let locator = checker.locator();
         let is_multiline = locator.contains_line_break(self.range());
-        let sorted_source_code = {
-            if is_multiline {
-                // Sorting multiline dicts is unsupported
-                let display_kind = self.display_kind.as_sequence()?;
+        let sorted_source_code = match (&self.display_kind, is_multiline) {
+            (DisplayKind::Sequence(sequence_kind), true) => {
                 let analyzed_sequence = MultilineStringSequenceValue::from_source_range(
                     self.range(),
-                    display_kind,
+                    sequence_kind,
                     locator,
                 )?;
                 assert_eq!(analyzed_sequence.len(), self.elts.len());
                 analyzed_sequence.into_sorted_source_code(SORTING_STYLE, locator, checker.stylist())
-            } else {
-                match &self.display_kind {
-                    DisplayKind::Dict { values } => {
-                        sort_single_line_elements_dict(&self.elts, items, values, locator)
-                    }
-                    DisplayKind::Sequence(sequence_kind) => sort_single_line_elements_sequence(
-                        sequence_kind,
-                        &self.elts,
-                        items,
-                        locator,
-                        SORTING_STYLE,
-                    ),
-                }
+            }
+            // Sorting multiline dicts is unsupported
+            (DisplayKind::Dict { .. }, true) => return None,
+            (DisplayKind::Sequence(sequence_kind), false) => sort_single_line_elements_sequence(
+                sequence_kind,
+                &self.elts,
+                items,
+                locator,
+                SORTING_STYLE,
+            ),
+            (DisplayKind::Dict { values }, false) => {
+                sort_single_line_elements_dict(&self.elts, items, values, locator)
             }
         };
         Some(Fix::safe_edit(Edit::range_replacement(
@@ -278,6 +275,26 @@ impl<'a> StringLiteralDisplay<'a> {
     }
 }
 
+/// An enumeration of the various kinds of
+/// [display literals](https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries)
+/// Python provides for builtin containers.
+#[derive(Debug)]
+enum DisplayKind<'a> {
+    Sequence(SequenceKind<'a>),
+    Dict { values: &'a [ast::Expr] },
+}
+
+/// A newtype that zips together three iterables:
+///
+/// 1. The string values of a dict literal's keys;
+/// 2. The original AST nodes for the dict literal's keys; and,
+/// 3. The original AST nodes for the dict literal's values
+///
+/// The main purpose of separating this out into a separate struct
+/// is to enforce the invariants that:
+///
+/// 1. The three iterables that are zipped together have the same length; and,
+/// 2. The length of all three iterables is >= 2
 struct DictElements<'a>(Vec<(&'a &'a str, &'a ast::Expr, &'a ast::Expr)>);
 
 impl<'a> DictElements<'a> {
@@ -313,7 +330,7 @@ impl<'a> DictElements<'a> {
 /// `sequence_sorting.rs` if any other modules need it,
 /// but stays here for now, since this is currently the
 /// only module that needs it
-pub(super) fn sort_single_line_elements_dict(
+fn sort_single_line_elements_dict(
     key_elts: &[ast::Expr],
     elements: &[&str],
     value_elts: &[ast::Expr],
@@ -334,7 +351,6 @@ pub(super) fn sort_single_line_elements_dict(
             result.push_str(", ");
         }
     }
-
     result.push('}');
     result
 }

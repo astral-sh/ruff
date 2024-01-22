@@ -89,12 +89,6 @@ impl<'a> From<&'a str> for IsortSortKey<'a> {
     }
 }
 
-impl<'a> From<&'a StringSequenceItem> for IsortSortKey<'a> {
-    fn from(item: &'a StringSequenceItem) -> Self {
-        Self::from(item.value.as_str())
-    }
-}
-
 /// Classification for the casing of an element in a
 /// sequence of literal strings.
 ///
@@ -135,9 +129,9 @@ impl InferredMemberType {
 /// since in terms of the AST structure it's almost identical
 /// to tuples/lists.)
 ///
-/// Whereas lists, dicts and sets are always parenthesized
+/// Whereas list, dict and set literals are always parenthesized
 /// (e.g. lists always start with `[` and end with `]`),
-/// single-line tuples *can* be unparenthesized.
+/// single-line tuple literals *can* be unparenthesized.
 /// We keep the original AST node around for the
 /// Tuple variant so that this can be queried later.
 #[derive(Debug)]
@@ -148,6 +142,9 @@ pub(super) enum SequenceKind<'a> {
 }
 
 impl SequenceKind<'_> {
+    // N.B. We only need the source code for the Tuple variant here,
+    // but if you already have a `Locator` instance handy,
+    // getting the source code is very cheap.
     fn surrounding_brackets(&self, source: &str) -> (&'static str, &'static str) {
         match self {
             Self::List => ("[", "]"),
@@ -179,15 +176,14 @@ impl SequenceKind<'_> {
     }
 }
 
-/// An enumeration of the various kinds of
-/// [display literals](https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries)
-/// Python provides for builtin containers.
-#[derive(Debug, is_macro::Is)]
-pub(super) enum DisplayKind<'a> {
-    Sequence(SequenceKind<'a>),
-    Dict { values: &'a [ast::Expr] },
-}
-
+/// A newtype that zips together the string values of a display literal's elts,
+/// together with the original AST nodes for that display literal's elts.
+///
+/// The main purpose of separating this out into a separate struct
+/// is to enforce the invariants that:
+///
+/// 1. The two iterables that are zipped together have the same length; and,
+/// 2. The length of both iterables is >= 2
 struct SequenceElements<'a>(Vec<(&'a &'a str, &'a ast::Expr)>);
 
 impl<'a> SequenceElements<'a> {
