@@ -1,0 +1,187 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+useless_else_on_loop.py:9:5: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
+   |
+ 7 |         if i % 2:
+ 8 |             return i
+ 9 |     else:  # [useless-else-on-loop]
+   |     ^^^^ PLW0120
+10 |         print("math is broken")
+11 |     return None
+   |
+   = help: Remove `else`
+
+ℹ Safe fix
+6  6  |     for i in range(10):
+7  7  |         if i % 2:
+8  8  |             return i
+9     |-    else:  # [useless-else-on-loop]
+10    |-        print("math is broken")
+   9  |+    print("math is broken")
+11 10 |     return None
+12 11 | 
+13 12 | 
+
+useless_else_on_loop.py:18:5: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
+   |
+16 |     while True:
+17 |         return 1
+18 |     else:  # [useless-else-on-loop]
+   |     ^^^^ PLW0120
+19 |         print("math is broken")
+20 |     return None
+   |
+   = help: Remove `else`
+
+ℹ Safe fix
+15 15 |     """else + return is not acceptable."""
+16 16 |     while True:
+17 17 |         return 1
+18    |-    else:  # [useless-else-on-loop]
+19    |-        print("math is broken")
+   18 |+    print("math is broken")
+20 19 |     return None
+21 20 | 
+22 21 | 
+
+useless_else_on_loop.py:30:1: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
+   |
+28 |             break
+29 | 
+30 | else:  # [useless-else-on-loop]
+   | ^^^^ PLW0120
+31 |     print("or else!")
+   |
+   = help: Remove `else`
+
+ℹ Safe fix
+27 27 |         for _ in range(10):
+28 28 |             break
+29 29 | 
+30    |-else:  # [useless-else-on-loop]
+31    |-    print("or else!")
+   30 |+print("or else!")
+32 31 | 
+33 32 | 
+34 33 | while True:
+
+useless_else_on_loop.py:37:1: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
+   |
+35 |     while False:
+36 |         break
+37 | else:  # [useless-else-on-loop]
+   | ^^^^ PLW0120
+38 |     print("or else!")
+   |
+   = help: Remove `else`
+
+ℹ Safe fix
+34 34 | while True:
+35 35 |     while False:
+36 36 |         break
+37    |-else:  # [useless-else-on-loop]
+38    |-    print("or else!")
+   37 |+print("or else!")
+39 38 | 
+40 39 | for j in range(10):
+41 40 |     pass
+
+useless_else_on_loop.py:42:1: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
+   |
+40 | for j in range(10):
+41 |     pass
+42 | else:  # [useless-else-on-loop]
+   | ^^^^ PLW0120
+43 |     print("fat chance")
+44 |     for j in range(10):
+   |
+   = help: Remove `else`
+
+ℹ Safe fix
+39 39 | 
+40 40 | for j in range(10):
+41 41 |     pass
+42    |-else:  # [useless-else-on-loop]
+43    |-    print("fat chance")
+44    |-    for j in range(10):
+45    |-        break
+   42 |+print("fat chance")
+   43 |+for j in range(10):
+   44 |+    break
+46 45 | 
+47 46 | 
+48 47 | def test_return_for2():
+
+useless_else_on_loop.py:88:5: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
+   |
+86 |             else:
+87 |                 print("all right")
+88 |     else:  # [useless-else-on-loop]
+   |     ^^^^ PLW0120
+89 |         return True
+90 |     return False
+   |
+   = help: Remove `else`
+
+ℹ Safe fix
+85 85 |                     break
+86 86 |             else:
+87 87 |                 print("all right")
+88    |-    else:  # [useless-else-on-loop]
+89    |-        return True
+   88 |+    return True
+90 89 |     return False
+91 90 | 
+92 91 | 
+
+useless_else_on_loop.py:98:9: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
+    |
+ 96 |         for _ in range(3):
+ 97 |             pass
+ 98 |         else:
+    |         ^^^^ PLW0120
+ 99 |             if 1 < 2:  # pylint: disable=comparison-of-constants
+100 |                 break
+    |
+    = help: Remove `else`
+
+ℹ Safe fix
+95  95  |     for _ in range(10):
+96  96  |         for _ in range(3):
+97  97  |             pass
+98      |-        else:
+99      |-            if 1 < 2:  # pylint: disable=comparison-of-constants
+100     |-                break
+    98  |+        if 1 < 2:  # pylint: disable=comparison-of-constants
+    99  |+            break
+101 100 |     else:
+102 101 |         return True
+103 102 |     return False
+
+useless_else_on_loop.py:144:5: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
+    |
+142 |     for j in range(10):
+143 |         pass
+144 |     else:
+    |     ^^^^ PLW0120
+145 |         # [useless-else-on-loop]
+146 |         print("fat chance")
+    |
+    = help: Remove `else`
+
+ℹ Safe fix
+141 141 |     """Retain the comment within the `else` block"""
+142 142 |     for j in range(10):
+143 143 |         pass
+144     |-    else:
+145     |-        # [useless-else-on-loop]
+146     |-        print("fat chance")
+147     |-        for j in range(10):
+148     |-            break
+    144 |+    # [useless-else-on-loop]
+    145 |+    print("fat chance")
+    146 |+    for j in range(10):
+    147 |+        break
+
+

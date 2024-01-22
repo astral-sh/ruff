@@ -78,13 +78,13 @@ seahash = { version ="4.1.0"}
 semver = { version = "1.0.21" }
 serde = { version = "1.0.195", features = ["derive"] }
 serde-wasm-bindgen = { version = "0.6.3" }
-serde_json = { version = "1.0.109" }
+serde_json = { version = "1.0.111" }
 serde_test = { version = "1.0.152" }
-serde_with = { version = "3.4.0", default-features = false, features = ["macros"] }
+serde_with = { version = "3.5.0", default-features = false, features = ["macros"] }
 shellexpand = { version = "3.0.0" }
-shlex = { version ="1.2.0"}
+shlex = { version ="1.3.0"}
 similar = { version = "2.4.0", features = ["inline"] }
-smallvec = { version = "1.11.2" }
+smallvec = { version = "1.13.1" }
 static_assertions = "1.1.0"
 strum = { version = "0.25.0", features = ["strum_macros"] }
 strum_macros = { version = "0.25.3" }
