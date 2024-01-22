@@ -335,7 +335,9 @@ struct LogicalLineInfo {
 
     /// The maximum number of consecutive blank lines between the current line
     /// and the previous non-comment logical line.
-    /// One of its main uses is to allow a comment to directly precede a class/function definition.
+    /// One of its main uses is to allow a comments to directly precede or follow a class/function definition.
+    /// As such, `preceding_blank_lines` is used for rules that cannot trigger on comments (all rules except E303),
+    /// and `blank_lines` is used for the rule that can trigger on comments (E303).
     preceding_blank_lines: BlankLines,
 }
 
