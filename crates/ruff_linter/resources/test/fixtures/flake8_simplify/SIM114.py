@@ -79,7 +79,7 @@ def complicated_calc(*arg, **kwargs):
     return 42
 
 
-def foo(p):
+def func(p):
     if p == 2:
         return complicated_calc(microsecond=0)
     elif p == 3:
@@ -112,7 +112,7 @@ elif c:
     x = 1
 
 
-def foo():
+def func():
     a = True
     b = False
     if a > b:  # end-of-line
@@ -123,3 +123,13 @@ def foo():
         return 4
     elif b is None:
         return 4
+
+
+def func():
+    """Ensure that the named expression is parenthesized when merged."""
+    a = True
+    b = False
+    if a > b:  # end-of-line
+        return 3
+    elif a := 1:
+        return 3

@@ -1,12 +1,15 @@
 use anyhow::Result;
+use std::borrow::Cow;
 
 use ast::whitespace::indentation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableStmt;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::stmt_if::{if_elif_branches, IfElifBranch};
-use ruff_python_codegen::Generator;
+use ruff_python_ast::Expr;
+use ruff_python_index::Indexer;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -95,10 +98,11 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt_if: &ast::StmtIf) {
         if checker.settings.preview.is_enabled() {
             diagnostic.try_set_fix(|| {
                 merge_branches(
+                    stmt_if,
                     &current_branch,
                     &following_branch,
                     checker.locator(),
-                    checker.generator(),
+                    checker.indexer(),
                 )
             });
         }
@@ -109,22 +113,29 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt_if: &ast::StmtIf) {
 
 /// Generate a [`Fix`] to merge two [`IfElifBranch`] branches.
 fn merge_branches(
+    stmt_if: &ast::StmtIf,
     current_branch: &IfElifBranch,
     following_branch: &IfElifBranch,
     locator: &Locator,
-    generator: Generator,
+    indexer: &Indexer,
 ) -> Result<Fix> {
-    let current_branch_colon =
+    // Identify the colon (`:`) at the end of the current branch's test.
+    let Some(current_branch_colon) =
         SimpleTokenizer::starts_at(current_branch.test.end(), locator.contents())
             .find(|token| token.kind == SimpleTokenKind::Colon)
-            .unwrap();
+    else {
+        return Err(anyhow::anyhow!("Expected colon after test"));
+    };
 
     let mut following_branch_tokenizer =
         SimpleTokenizer::starts_at(following_branch.test.end(), locator.contents());
 
-    let following_branch_colon = following_branch_tokenizer
-        .find(|token| token.kind == SimpleTokenKind::Colon)
-        .unwrap();
+    // Identify the colon (`:`) at the end of the following branch's test.
+    let Some(following_branch_colon) =
+        following_branch_tokenizer.find(|token| token.kind == SimpleTokenKind::Colon)
+    else {
+        return Err(anyhow::anyhow!("Expected colon after test"));
+    };
 
     let main_edit = if let Some(following_branch_comment) =
         following_branch_tokenizer.find(|token| token.kind == SimpleTokenKind::Comment)
@@ -145,10 +156,31 @@ fn merge_branches(
         )
     };
 
+    // If the test isn't parenthesized, consider parenthesizing it.
+    let following_branch_test = if let Some(range) = parenthesized_range(
+        following_branch.test.into(),
+        stmt_if.into(),
+        indexer.comment_ranges(),
+        locator.contents(),
+    ) {
+        Cow::Borrowed(locator.slice(range))
+    } else if matches!(
+        following_branch.test,
+        Expr::BoolOp(ast::ExprBoolOp {
+            op: ast::BoolOp::Or,
+            ..
+        }) | Expr::Lambda(_)
+            | Expr::NamedExpr(_)
+    ) {
+        Cow::Owned(format!("({})", locator.slice(following_branch.test)))
+    } else {
+        Cow::Borrowed(locator.slice(following_branch.test))
+    };
+
     Ok(Fix::safe_edits(
         main_edit,
         [Edit::insertion(
-            format!(" or {}", generator.expr(following_branch.test)),
+            format!(" or {following_branch_test}"),
             current_branch_colon.start(),
         )],
     ))

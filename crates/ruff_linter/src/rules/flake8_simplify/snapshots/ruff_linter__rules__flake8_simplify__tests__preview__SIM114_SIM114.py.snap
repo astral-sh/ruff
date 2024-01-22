@@ -345,7 +345,7 @@ SIM114.py:118:5: SIM114 [*] Combine `if` branches using logical `or` operator
     = help: Combine `if` branches
 
 ℹ Safe fix
-115 115 | def foo():
+115 115 | def func():
 116 116 |     a = True
 117 117 |     b = False
 118     |-    if a > b:  # end-of-line
@@ -378,5 +378,30 @@ SIM114.py:122:5: SIM114 [*] Combine `if` branches using logical `or` operator
 124     |-    elif b is None:
     122 |+    elif a < b or b is None:  # end-of-line
 125 123 |         return 4
+126 124 | 
+127 125 | 
+
+SIM114.py:132:5: SIM114 [*] Combine `if` branches using logical `or` operator
+    |
+130 |       a = True
+131 |       b = False
+132 |       if a > b:  # end-of-line
+    |  _____^
+133 | |         return 3
+134 | |     elif a := 1:
+135 | |         return 3
+    | |________________^ SIM114
+    |
+    = help: Combine `if` branches
+
+ℹ Safe fix
+129 129 |     """Ensure that the named expression is parenthesized when merged."""
+130 130 |     a = True
+131 131 |     b = False
+132     |-    if a > b:  # end-of-line
+133     |-        return 3
+134     |-    elif a := 1:
+    132 |+    if a > b or (a := 1):  # end-of-line
+135 133 |         return 3
 
 
