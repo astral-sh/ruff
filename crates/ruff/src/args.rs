@@ -522,7 +522,7 @@ impl ConfigArgs {
     }
 
     fn from_cli_options(
-        config_options: Option<Vec<ConfigOption>>,
+        config_options: Vec<ConfigOption>,
         cli_overrides: CliOverrides,
         isolated: bool,
     ) -> Result<Self, anyhow::Error> {
@@ -531,11 +531,7 @@ impl ConfigArgs {
             ..Self::default()
         };
 
-        let Some(options) = config_options else {
-            return Ok(new);
-        };
-
-        for option in options {
+        for option in config_options {
             match option {
                 ConfigOption::ConfigOverride(overridden_option) => {
                     new.config_overrides = new.config_overrides.combine(
@@ -629,7 +625,11 @@ impl CheckCommand {
             extension: self.extension,
         };
 
-        let config_args = ConfigArgs::from_cli_options(self.config, cli_overrides, self.isolated)?;
+        let config_args = ConfigArgs::from_cli_options(
+            self.config.unwrap_or_default(),
+            cli_overrides,
+            self.isolated,
+        )?;
         Ok((check_arguments, config_args))
     }
 }
@@ -661,7 +661,11 @@ impl FormatCommand {
             ..CliOverrides::default()
         };
 
-        let config_args = ConfigArgs::from_cli_options(self.config, cli_overrides, self.isolated)?;
+        let config_args = ConfigArgs::from_cli_options(
+            self.config.unwrap_or_default(),
+            cli_overrides,
+            self.isolated,
+        )?;
         Ok((format_args, config_args))
     }
 }
