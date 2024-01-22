@@ -61,6 +61,16 @@ pub(crate) fn too_few_public_methods(
     class_def: &ast::StmtClassDef,
     min_methods: usize,
 ) {
+    // allow decorated classes
+    if !class_def.decorator_list.is_empty() {
+        return;
+    }
+
+    // allow classes with base classes
+    if class_def.arguments.is_some() {
+        return;
+    }
+
     let methods = class_def
         .body
         .iter()

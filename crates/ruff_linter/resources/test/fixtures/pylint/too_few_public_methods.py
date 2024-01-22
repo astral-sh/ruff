@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 
 class Point:  # PLR0903
     def __init__(self, x: float, y: float) -> None:
@@ -13,3 +15,16 @@ class Rectangle:  # OK
 
     def area(self) -> float:
         ...
+
+
+@dataclass
+class Circle:  # OK
+    center: Point
+    radius: float
+
+    def area(self) -> float:
+        ...
+
+
+class CustomException(Exception):  # OK
+    ...
