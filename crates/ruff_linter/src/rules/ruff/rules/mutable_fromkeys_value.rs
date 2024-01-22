@@ -13,11 +13,15 @@ use crate::checkers::ast::Checker;
 /// Checks for mutable objects passed as a value argument to `dict.fromkeys`.
 ///
 /// ## Why is this bad?
-/// All values in the dictionary created by the `dict.fromkeys` classmethod
-/// refer to the same instance of an object. If that object is modified, all
-/// values are modified, which can lead to unexpected behavior.
+/// All values in the dictionary created by the `dict.fromkeys` method
+/// refer to the same instance of the provided object. If that object is
+/// modified, all values are modified, which can lead to unexpected behavior.
+/// For example, if the empty list (`[]`) is provided as the default value,
+/// all values in the dictionary will use the same list; as such, appending to
+/// any one entry will append to all entries.
 ///
-/// Instead, use a comprehension to generate a dictionary with distinct values.
+/// Instead, use a comprehension to generate a dictionary with distinct
+/// instances of the default value.
 ///
 /// ## Example
 /// ```python
@@ -35,8 +39,14 @@ use crate::checkers::ast::Checker;
 /// print(cities)  # {'UK': ['London'], 'Poland': ['Poznan']}
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as the edit will change the behavior of
+/// the program by using a distinct object for every value in the dictionary,
+/// rather than a shared mutable instance. In some cases, programs may rely on
+/// the previous behavior.
+///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#dict.fromkeys)
+/// - [Python documentation: `dict.fromkeys`](https://docs.python.org/3/library/stdtypes.html#dict.fromkeys)
 #[violation]
 pub struct MutableFromkeysValue;
 
@@ -49,7 +59,7 @@ impl Violation for MutableFromkeysValue {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Replace with a comprehension to generate distinct values".to_string())
+        Some("Replace with a comprehension".to_string())
     }
 }
 
@@ -82,11 +92,10 @@ pub(crate) fn mutable_fromkeys_value(checker: &mut Checker, call: &ast::ExprCall
     }
 
     let mut diagnostic = Diagnostic::new(MutableFromkeysValue, call.range());
-    let replacement = Edit::range_replacement(
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         generate_dict_comprehension(keys, value, checker.generator()),
         call.range(),
-    );
-    diagnostic.set_fix(Fix::unsafe_edit(replacement));
+    )));
     checker.diagnostics.push(diagnostic);
 }
 
