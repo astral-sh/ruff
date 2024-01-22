@@ -1,9 +1,12 @@
+use anyhow::Result;
+
 use ast::whitespace::indentation;
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableStmt;
 use ruff_python_ast::stmt_if::{if_elif_branches, IfElifBranch};
+use ruff_python_codegen::Generator;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -46,7 +49,7 @@ impl Violation for IfWithSameArms {
 }
 
 /// SIM114
-pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_if: &ast::StmtIf) {
+pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     let mut branches_iter = if_elif_branches(stmt_if).peekable();
     while let Some(current_branch) = branches_iter.next() {
         let Some(following_branch) = branches_iter.peek() else {
@@ -70,15 +73,15 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_i
         let first_comments = checker
             .indexer()
             .comment_ranges()
-            .comments_in_range(body_range(&current_branch, locator))
+            .comments_in_range(body_range(&current_branch, checker.locator()))
             .iter()
-            .map(|range| locator.slice(*range));
+            .map(|range| checker.locator().slice(*range));
         let second_comments = checker
             .indexer()
             .comment_ranges()
-            .comments_in_range(body_range(following_branch, locator))
+            .comments_in_range(body_range(following_branch, checker.locator()))
             .iter()
-            .map(|range| locator.slice(*range));
+            .map(|range| checker.locator().slice(*range));
         if !first_comments.eq(second_comments) {
             continue;
         }
@@ -89,54 +92,65 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, locator: &Locator, stmt_i
         );
 
         if checker.settings.preview.is_enabled() {
-            let current_branch_colon =
-                SimpleTokenizer::starts_at(current_branch.test.end(), checker.locator().contents())
-                    .find(|token| token.kind == SimpleTokenKind::Colon)
-                    .unwrap();
-
-            let mut following_branch_tokenizer = SimpleTokenizer::starts_at(
-                following_branch.test.end(),
-                checker.locator().contents(),
-            );
-
-            let following_branch_colon = following_branch_tokenizer
-                .find(|token| token.kind == SimpleTokenKind::Colon)
-                .unwrap();
-
-            let main_edit = if let Some(following_branch_comment) =
-                following_branch_tokenizer.find(|token| token.kind == SimpleTokenKind::Comment)
-            {
-                let indentation =
-                    indentation(checker.locator(), following_branch.body.first().unwrap())
-                        .unwrap_or("");
-                Edit::range_replacement(
-                    format!("{indentation}"),
-                    TextRange::new(
-                        checker.locator().full_line_end(current_branch_colon.end()),
-                        following_branch_comment.start(),
-                    ),
+            diagnostic.try_set_fix(|| {
+                merge_branches(
+                    &current_branch,
+                    &following_branch,
+                    checker.locator(),
+                    checker.generator(),
                 )
-            } else {
-                Edit::deletion(
-                    checker.locator().full_line_end(current_branch_colon.end()),
-                    checker
-                        .locator()
-                        .full_line_end(following_branch_colon.end()),
-                )
-            };
-
-            diagnostic.set_fix(Fix::applicable_edits(
-                main_edit,
-                [Edit::insertion(
-                    format!(" or {}", checker.generator().expr(following_branch.test)),
-                    current_branch_colon.start(),
-                )],
-                Applicability::Safe,
-            ));
+            });
         }
 
         checker.diagnostics.push(diagnostic);
     }
+}
+
+/// Generate a [`Fix`] to merge two [`IfElifBranch`] branches.
+fn merge_branches(
+    current_branch: &IfElifBranch,
+    following_branch: &IfElifBranch,
+    locator: &Locator,
+    generator: Generator,
+) -> Result<Fix> {
+    let current_branch_colon =
+        SimpleTokenizer::starts_at(current_branch.test.end(), locator.contents())
+            .find(|token| token.kind == SimpleTokenKind::Colon)
+            .unwrap();
+
+    let mut following_branch_tokenizer =
+        SimpleTokenizer::starts_at(following_branch.test.end(), locator.contents());
+
+    let following_branch_colon = following_branch_tokenizer
+        .find(|token| token.kind == SimpleTokenKind::Colon)
+        .unwrap();
+
+    let main_edit = if let Some(following_branch_comment) =
+        following_branch_tokenizer.find(|token| token.kind == SimpleTokenKind::Comment)
+    {
+        let indentation =
+            indentation(locator, following_branch.body.first().unwrap()).unwrap_or("");
+        Edit::range_replacement(
+            format!("{indentation}"),
+            TextRange::new(
+                locator.full_line_end(current_branch_colon.end()),
+                following_branch_comment.start(),
+            ),
+        )
+    } else {
+        Edit::deletion(
+            locator.full_line_end(current_branch_colon.end()),
+            locator.full_line_end(following_branch_colon.end()),
+        )
+    };
+
+    Ok(Fix::safe_edits(
+        main_edit,
+        [Edit::insertion(
+            format!(" or {}", generator.expr(following_branch.test)),
+            current_branch_colon.start(),
+        )],
+    ))
 }
 
 /// Return the [`TextRange`] of an [`IfElifBranch`]'s body (from the end of the test to the end of

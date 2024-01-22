@@ -1092,7 +1092,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 );
             }
             if checker.enabled(Rule::IfWithSameArms) {
-                flake8_simplify::rules::if_with_same_arms(checker, checker.locator, if_);
+                flake8_simplify::rules::if_with_same_arms(checker, if_);
             }
             if checker.enabled(Rule::NeedlessBool) {
                 flake8_simplify::rules::needless_bool(checker, if_);
