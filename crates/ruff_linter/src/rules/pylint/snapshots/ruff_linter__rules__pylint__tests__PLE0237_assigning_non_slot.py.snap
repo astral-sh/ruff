@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+assigning_non_slot.py:1:7: PLE0237 Assigning an attribute that is not defined in class slots
+  |
+1 | class StudentA:
+  |       ^^^^^^^^ PLE0237
+2 |     __slots__ = ("name",)
+  |
+
+
