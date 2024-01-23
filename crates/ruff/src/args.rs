@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::anyhow;
 use clap::builder::{TypedValueParser, ValueParserFactory};
@@ -534,8 +535,10 @@ impl ConfigArgs {
         for option in config_options {
             match option {
                 ConfigOption::ConfigOverride(overridden_option) => {
+                    let overridden_option = Arc::try_unwrap(overridden_option)
+                        .unwrap_or_else(|option| Options::clone(&option));
                     new.config_overrides = new.config_overrides.combine(
-                        Configuration::from_options(*overridden_option, &path_dedot::CWD)?,
+                        Configuration::from_options(overridden_option, &path_dedot::CWD)?,
                     );
                 }
                 ConfigOption::PathToConfigFile(path) => {
@@ -696,7 +699,7 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
 #[derive(Clone, Debug)]
 pub enum ConfigOption {
     PathToConfigFile(PathBuf),
-    ConfigOverride(Box<Options>),
+    ConfigOverride(Arc<Options>),
 }
 
 #[derive(Clone)]
@@ -727,7 +730,7 @@ impl TypedValueParser for ConfigOptionParser {
             return Ok(ConfigOption::PathToConfigFile(path_to_config_file));
         }
         if let Ok(option) = toml::from_str(value) {
-            return Ok(ConfigOption::ConfigOverride(option));
+            return Ok(ConfigOption::ConfigOverride(Arc::new(option)));
         }
         let mut new_error = clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
         if let Some(arg) = arg {
