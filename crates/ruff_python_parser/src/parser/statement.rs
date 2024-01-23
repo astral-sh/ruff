@@ -160,6 +160,7 @@ impl<'src> Parser<'src> {
         stmts
     }
 
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#simple-statements>
     fn parse_simple_statement(&mut self) -> Stmt {
         match self.current_kind() {
             TokenKind::Return => Stmt::Return(self.parse_return_statement()),
@@ -219,6 +220,7 @@ impl<'src> Parser<'src> {
     ///
     /// # Panics
     /// If the parser isn't positioned at a `del` token.
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-del_stmt>
     fn parse_delete_statement(&mut self) -> ast::StmtDelete {
         let start = self.node_start();
 
@@ -249,6 +251,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-return_stmt>
     fn parse_return_statement(&mut self) -> ast::StmtReturn {
         let start = self.node_start();
         self.bump(TokenKind::Return);
@@ -263,6 +266,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-raise_stmt>
     fn parse_raise_statement(&mut self) -> ast::StmtRaise {
         let start = self.node_start();
         self.bump(TokenKind::Raise);
@@ -313,6 +317,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-import_stmt>
     fn parse_import_statement(&mut self) -> ast::StmtImport {
         let start = self.node_start();
         self.bump(TokenKind::Import);
@@ -381,6 +386,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-pass_stmt>
     fn parse_pass_statement(&mut self) -> ast::StmtPass {
         let start = self.node_start();
         self.bump(TokenKind::Pass);
@@ -389,6 +395,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-continue_stmt>
     fn parse_continue_statement(&mut self) -> ast::StmtContinue {
         let start = self.node_start();
         self.bump(TokenKind::Continue);
@@ -397,6 +404,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-break_stmt>
     fn parse_break_statement(&mut self) -> ast::StmtBreak {
         let start = self.node_start();
         self.bump(TokenKind::Break);
@@ -405,6 +413,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-assert_stmt>
     fn parse_assert_statement(&mut self) -> ast::StmtAssert {
         let start = self.node_start();
         self.bump(TokenKind::Assert);
@@ -422,6 +431,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-global_stmt>
     fn parse_global_statement(&mut self) -> ast::StmtGlobal {
         let start = self.node_start();
         self.bump(TokenKind::Global);
@@ -438,6 +448,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-nonlocal_stmt>
     fn parse_nonlocal_statement(&mut self) -> ast::StmtNonlocal {
         let start = self.node_start();
         self.bump(TokenKind::Nonlocal);
@@ -454,6 +465,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-type_stmt>
     fn parse_type_alias_statement(&mut self) -> ast::StmtTypeAlias {
         let start = self.node_start();
         self.bump(TokenKind::Type);
@@ -503,6 +515,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-assignment_stmt>
     fn parse_assign_statement(&mut self, target: ParsedExpr, start: TextSize) -> ast::StmtAssign {
         let mut targets = vec![target.expr];
         let mut value = self.parse_expression();
@@ -537,6 +550,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-annotated_assignment_stmt>
     fn parse_annotated_assignment_statement(
         &mut self,
         mut target: ParsedExpr,
@@ -586,6 +600,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-augmented_assignment_stmt>
     fn parse_augmented_assignment_statement(
         &mut self,
         mut target: ParsedExpr,
@@ -612,6 +627,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-if_stmt>
     fn parse_if_statement(&mut self) -> ast::StmtIf {
         let if_start = self.node_start();
         self.bump(TokenKind::If);
@@ -668,6 +684,7 @@ impl<'src> Parser<'src> {
         elif_else_clauses
     }
 
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-try_stmt>
     fn parse_try_statement(&mut self) -> ast::StmtTry {
         let try_start = self.node_start();
         self.bump(TokenKind::Try);
@@ -756,6 +773,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-for_stmt>
     fn parse_for_statement(&mut self, for_start: TextSize) -> ast::StmtFor {
         self.bump(TokenKind::For);
 
@@ -790,6 +808,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-while_stmt>
     fn parse_while_statement(&mut self) -> ast::StmtWhile {
         let while_start = self.node_start();
         self.bump(TokenKind::While);
@@ -814,6 +833,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-funcdef>
     fn parse_function_definition(
         &mut self,
         decorator_list: Vec<ast::Decorator>,
@@ -858,6 +878,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-classdef>
     fn parse_class_definition(
         &mut self,
         decorator_list: Vec<ast::Decorator>,
@@ -885,6 +906,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-with_stmt>
     fn parse_with_statement(&mut self, start_offset: TextSize) -> ast::StmtWith {
         self.bump(TokenKind::With);
 
@@ -1098,6 +1120,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-match_stmt>
     fn parse_match_statement(&mut self) -> ast::StmtMatch {
         let start_offset = self.node_start();
 
@@ -1183,6 +1206,10 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses any statement that is valid after an `async` token.
+    /// See:
+    ///  - <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-async_with_stmt>
+    ///  - <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-async_for_stmt>
+    ///  - <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-async_funcdef>
     fn parse_async_statement(&mut self) -> Stmt {
         let async_start = self.node_start();
         self.bump(TokenKind::Async);

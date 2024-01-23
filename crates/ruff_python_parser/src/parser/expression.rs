@@ -41,6 +41,7 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses every Python expression.
+    /// Matches the `expressions` rule in the Python grammar.
     pub(super) fn parse_expression(&mut self) -> ParsedExpr {
         let start = self.node_start();
         let parsed_expr = self.parse_conditional_expression_or_higher();
@@ -59,6 +60,7 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses every Python expression except unparenthesized tuple.
+    /// Matches the `named_expression` rule in the Python grammar.
     ///
     /// NOTE: If you have expressions separated by commas and want to parse them individually,
     /// instead of a tuple, use this function!
@@ -74,11 +76,10 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses every Python expression except unparenthesized tuple and named expressions.
+    /// Matches the `expression` rule in the Python grammar.
     ///
     /// NOTE: If you have expressions separated by commas and want to parse them individually,
     /// instead of a tuple, use this function!
-    ///
-    /// TODO: This seems to match the `expression` node in the python grammar?
     pub(super) fn parse_conditional_expression_or_higher(&mut self) -> ParsedExpr {
         let start = self.node_start();
         let parsed_expr = self.parse_simple_expression();
@@ -91,8 +92,12 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses every Python expression except unparenthesized tuples, named expressions, and `if` expression.
+    /// This is a combination of the `disjunction` and `starred_expression` rules of the Python
+    /// grammar.
     ///
-    /// TODO: This seems to match the `disjunction` grammar node except that it also handles lambda expressions?
+    /// When parsing an AST node that only uses one of the rules (`disjunction` or `starred_expression`),
+    /// you need to **explicitly** check if an invalid node for that AST node was parsed. Check the
+    /// `parse_yield_from_expression` function for an example of this situation.
     fn parse_simple_expression(&mut self) -> ParsedExpr {
         self.parse_expression_with_precedence(1)
     }
@@ -256,6 +261,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/expressions.html#atoms>
     fn parse_atom(&mut self) -> ParsedExpr {
         let start = self.node_start();
 
@@ -387,6 +393,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/expressions.html#calls>
     fn parse_call_expression(&mut self, lhs: Expr, start: TextSize) -> ast::ExprCall {
         assert_eq!(self.current_kind(), TokenKind::Lpar);
         let arguments = self.parse_arguments();
@@ -501,6 +508,7 @@ impl<'src> Parser<'src> {
         arguments
     }
 
+    /// See: <https://docs.python.org/3/reference/expressions.html#subscriptions>
     fn parse_subscript_expression(
         &mut self,
         mut value: Expr,
@@ -564,6 +572,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/expressions.html#slicings>
     fn parse_slice(&mut self) -> Expr {
         const UPPER_END_SET: TokenSet =
             TokenSet::new([TokenKind::Comma, TokenKind::Colon, TokenKind::Rsqb])
@@ -1208,6 +1217,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/expressions.html#list-displays>
     fn parse_list_expression(&mut self, first_element: Expr, start: TextSize) -> ast::ExprList {
         if !self.at_ts(Self::END_SEQUENCE_SET) {
             self.expect(TokenKind::Comma);
@@ -1229,6 +1239,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/expressions.html#set-displays>
     fn parse_set_expression(&mut self, first_element: Expr, start: TextSize) -> ast::ExprSet {
         if !self.at_ts(Self::END_SEQUENCE_SET) {
             self.expect(TokenKind::Comma);
@@ -1249,6 +1260,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/expressions.html#dictionary-displays>
     fn parse_dictionary_expression(
         &mut self,
         key: Option<Expr>,
@@ -1283,6 +1295,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
     fn parse_comprehension(&mut self) -> ast::Comprehension {
         let start = self.node_start();
 
@@ -1331,6 +1344,7 @@ impl<'src> Parser<'src> {
         generators
     }
 
+    /// See: <https://docs.python.org/3/reference/expressions.html#generator-expressions>
     fn parse_generator_expression(
         &mut self,
         element: Expr,
@@ -1412,6 +1426,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/expressions.html#await-expression>
     fn parse_await_expression(&mut self) -> ast::ExprAwait {
         let start = self.node_start();
         self.bump(TokenKind::Await);
@@ -1432,6 +1447,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/expressions.html#yield-expressions>
     fn parse_yield_expression(&mut self) -> Expr {
         let start = self.node_start();
         self.bump(TokenKind::Yield);
@@ -1450,6 +1466,7 @@ impl<'src> Parser<'src> {
         })
     }
 
+    /// See: <https://docs.python.org/3/reference/expressions.html#yield-expressions>
     fn parse_yield_from_expression(&mut self, start: TextSize) -> Expr {
         let parsed_expr = self.parse_expression();
 
@@ -1499,6 +1516,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// See: <https://docs.python.org/3/reference/expressions.html#lambda>
     fn parse_lambda_expr(&mut self) -> ast::ExprLambda {
         let start = self.node_start();
         self.bump(TokenKind::Lambda);
