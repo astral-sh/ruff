@@ -229,7 +229,7 @@ impl Violation for MissingSpaceAfterTodoColon {
 static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     RegexSet::new([
         r"^#.*(http|https)://.*", // issue link
-        r"^#.*#*\d+",             // issue code - like "#003"
+        r"^#.*#\d+",              // issue code - like "#003"
         r"^#\s\d+",               // issue code - like "003"
         r"^#\s[A-Z]{1,6}\-?\d+",  // issue code - like "TD003"
     ])
