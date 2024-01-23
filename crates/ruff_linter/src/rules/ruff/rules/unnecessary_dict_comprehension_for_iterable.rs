@@ -1,16 +1,10 @@
-use anyhow::{bail, Result};
-use libcst_native::{Arg, Call, Expression, Name, ParenthesizableWhitespace};
+use ast::ExprName;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Comprehension, Expr};
-use ruff_python_codegen::Stylist;
-use ruff_source_file::Locator;
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprCall, ExprContext};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::cst::matchers::match_expression;
-use crate::fix::codemods::CodegenStylist;
-use crate::fix::edits::pad;
 
 /// ## What it does
 /// Checks for unnecessary `dict` comprehension when creating a new dictionary from iterable.
@@ -40,7 +34,6 @@ pub struct UnnecessaryDictComprehensionForIterable {
 
 impl AlwaysFixableViolation for UnnecessaryDictComprehensionForIterable {
     #[derive_message_formats]
-    #[allow(clippy::match_bool)]
     fn message(&self) -> String {
         if self.is_value_none_literal {
             format!(
@@ -53,7 +46,6 @@ impl AlwaysFixableViolation for UnnecessaryDictComprehensionForIterable {
         }
     }
 
-    #[allow(clippy::match_bool)]
     fn fix_title(&self) -> String {
         if self.is_value_none_literal {
             format!("Rewrite using `dict.fromkeys(iterable, value)`)",)
@@ -75,13 +67,15 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         return;
     };
 
-    // Don't suggest `dict.fromkeys` for async generator expressions, because `dict.fromkeys` is not async.
-    // Don't suggest `dict.fromkeys` for nested generator expressions, because `dict.fromkeys` might be error-prone option at least for fixing.
-    // Don't suggest `dict.fromkeys` for generator expressions with `if` clauses, because `dict.fromkeys` might not be valid option.
-    if !generator.ifs.is_empty() && generator.is_async && generators.len() > 1 {
+    // Don't suggest `dict.fromkeys` for:
+    // - async generator expressions, because `dict.fromkeys` is not async.
+    // - nested generator expressions, because `dict.fromkeys` might be error-prone option at least for fixing.
+    // - generator expressions with `if` clauses, because `dict.fromkeys` might not be valid option.
+    if !generator.ifs.is_empty() && generator.is_async {
         return;
     }
-    let Expr::Name(_) = &generator.target else {
+
+    if !generator.target.is_name_expr() {
         return;
     };
 
@@ -102,10 +96,13 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         },
         expr.range(),
     );
-    diagnostic.try_set_fix(|| {
-        fix_unnecessary_dict_comprehension(expr, checker.locator(), checker.stylist())
-            .map(Fix::safe_edit)
-    });
+
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        checker
+            .generator()
+            .expr(&fix_unnecessary_dict_comprehension(value, generator)),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -126,67 +123,24 @@ fn has_valid_expression_type(node: &ast::Expr) -> bool {
 /// Generate a [`Fix`] to replace `dict` comprehension with `dict.fromkeys`.
 /// (RUF025) Convert `{n: None for n in [1,2,3]}` to `dict.fromkeys([1,2,3])` or
 /// `{n: 1 for n in [1,2,3]}` to `dict.fromkeys([1,2,3], 1)`.
-fn fix_unnecessary_dict_comprehension(
-    expr: &Expr,
-    locator: &Locator,
-    stylist: &Stylist,
-) -> Result<Edit> {
-    let module_text = locator.slice(expr);
-    let mut tree = match_expression(module_text)?;
-
-    match &tree {
-        Expression::DictComp(inner) => {
-            let args = match &*inner.value {
-                Expression::Name(value) if value.value == "None" => {
-                    vec![Arg {
-                        value: inner.for_in.iter.clone(),
-                        keyword: None,
-                        equal: None,
-                        comma: None,
-                        star: "",
-                        whitespace_after_star: ParenthesizableWhitespace::default(),
-                        whitespace_after_arg: ParenthesizableWhitespace::default(),
-                    }]
-                }
-                _ => vec![
-                    Arg {
-                        value: inner.for_in.iter.clone(),
-                        keyword: None,
-                        equal: None,
-                        comma: None,
-                        star: "",
-                        whitespace_after_star: ParenthesizableWhitespace::default(),
-                        whitespace_after_arg: ParenthesizableWhitespace::default(),
-                    },
-                    Arg {
-                        value: *inner.value.clone(),
-                        keyword: None,
-                        equal: None,
-                        comma: None,
-                        star: "",
-                        whitespace_after_star: ParenthesizableWhitespace::default(),
-                        whitespace_after_arg: ParenthesizableWhitespace::default(),
-                    },
-                ],
-            };
-            tree = Expression::Call(Box::new(Call {
-                func: Box::new(Expression::Name(Box::new(Name {
-                    value: "dict.fromkeys",
-                    lpar: vec![],
-                    rpar: vec![],
-                }))),
-                args,
-                lpar: vec![],
-                rpar: vec![],
-                whitespace_after_func: ParenthesizableWhitespace::default(),
-                whitespace_before_args: ParenthesizableWhitespace::default(),
-            }));
-        }
-        _ => bail!("Expected a dict comprehension"),
-    }
-
-    Ok(Edit::range_replacement(
-        pad(tree.codegen_stylist(stylist), expr.range(), locator),
-        expr.range(),
-    ))
+fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -> Expr {
+    let iterable = generator.iter.clone();
+    let args = Arguments {
+        args: if value.is_none_literal_expr() {
+            vec![iterable]
+        } else {
+            vec![iterable, value.clone()]
+        },
+        keywords: vec![],
+        range: TextRange::default(),
+    };
+    Expr::Call(ExprCall {
+        func: Box::new(Expr::Name(ExprName {
+            id: "dict.fromkeys".into(),
+            ctx: ExprContext::Load,
+            range: TextRange::default(),
+        })),
+        arguments: args,
+        range: TextRange::default(),
+    })
 }
