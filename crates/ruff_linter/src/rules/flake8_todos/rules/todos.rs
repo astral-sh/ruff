@@ -92,7 +92,6 @@ impl Violation for MissingTodoAuthor {
 ///
 /// # TODO(charlie): this comment has an issue code of (up to) 6 characters, then digits
 /// # SIXCHR-003
-///
 /// ```
 #[violation]
 pub struct MissingTodoLink;
