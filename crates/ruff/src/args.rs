@@ -151,7 +151,7 @@ pub struct CheckCommand {
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
     /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
-    /// or "inline TOML" providing configuration overrides from the command line.
+    /// or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting.
     #[arg(
         long,
         value_delimiter = ',',
@@ -385,7 +385,7 @@ pub struct FormatCommand {
     #[arg(long)]
     pub diff: bool,
     /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
-    /// or "inline TOML" providing configuration overrides from the command line.
+    /// or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting.
     #[arg(
         long,
         value_delimiter = ',',
@@ -742,8 +742,8 @@ impl TypedValueParser for ConfigOptionParser {
         );
         let tips = vec![
             "The `--config` flag must either be a path to a `.toml` \
-            configuration file or a TOML `<KEY> = <VALUE>` pair providing \
-            a configuration override"
+            configuration file or a TOML `<KEY> = <VALUE>` pair overriding \
+            a specific config setting"
                 .into(),
             format!("The path `{value}` does not exist on your filesystem").into(),
         ];
