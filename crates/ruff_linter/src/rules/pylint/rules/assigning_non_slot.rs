@@ -81,7 +81,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> bool {
                     let Expr::Tuple(ast::ExprTuple { elts, .. }) = value.as_ref() else {
                         continue;
                     };
-                    for elt in elts.iter() {
+                    for elt in elts {
                         let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt else {
                             continue;
                         };
@@ -92,21 +92,18 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> bool {
             Stmt::FunctionDef(ast::StmtFunctionDef { name, body, .. }) => {
                 if name == "__init__" {
                     for stmt in body {
-                        match stmt {
-                            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                                let [Expr::Attribute(ast::ExprAttribute { value, attr, .. })] =
-                                    targets.as_slice()
-                                else {
-                                    continue;
-                                };
-                                let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
-                                    continue;
-                                };
-                                if id == "self" {
-                                    attrs.push(attr.as_str());
-                                }
+                        if let Stmt::Assign(ast::StmtAssign { targets, .. }) = stmt {
+                            let [Expr::Attribute(ast::ExprAttribute { value, attr, .. })] =
+                                targets.as_slice()
+                            else {
+                                continue;
+                            };
+                            let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+                                continue;
+                            };
+                            if id == "self" {
+                                attrs.push(attr.as_str());
                             }
-                            _ => {}
                         }
                     }
                 }
