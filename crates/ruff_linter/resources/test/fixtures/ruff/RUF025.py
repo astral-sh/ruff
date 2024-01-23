@@ -40,10 +40,7 @@ def foo():
     {n: a for n in [1,2,3]} # RUF025
 
 def foo():
-    def f():
-        return {n: 1 for c in [1,2,3,4,5] for n in [1,2,3]} # RUF025
-    
-    f()
+    {n: False for n in {1: "a", 2: "b"}} # RUF025
 
 
 # Non-violation cases: RUF025
@@ -58,3 +55,12 @@ def foo():
     def f():
         pass
     {n: f() for n in [1,2,3]} # OK
+
+def foo():
+    {n: n for n in [1,2,3,4,5]} # OK
+
+def foo():
+    def f():
+        return {n: 1 for c in [1,2,3,4,5] for n in [1,2,3]} # OK
+    
+    f()

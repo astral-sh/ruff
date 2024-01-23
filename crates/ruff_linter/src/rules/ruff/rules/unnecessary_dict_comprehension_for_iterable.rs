@@ -67,18 +67,30 @@ impl AlwaysFixableViolation for UnnecessaryDictComprehensionForIterable {
 pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     checker: &mut Checker,
     expr: &Expr,
+    key: &Expr,
     value: &Expr,
     generators: &[Comprehension],
 ) {
     let [generator] = generators else {
         return;
     };
-    if !generator.ifs.is_empty() && generator.is_async {
+
+    // Don't suggest `dict.fromkeys` for async generator expressions, because `dict.fromkeys` is not async.
+    // Don't suggest `dict.fromkeys` for nested generator expressions, because `dict.fromkeys` might be error-prone option at least for fixing.
+    // Don't suggest `dict.fromkeys` for generator expressions with `if` clauses, because `dict.fromkeys` might not be valid option.
+    if !generator.ifs.is_empty() && generator.is_async && generators.len() > 1 {
         return;
     }
     let Expr::Name(_) = &generator.target else {
         return;
     };
+
+    // Don't suggest `dict.fromkeys` if key and value are binded to the same name.
+    if let (Expr::Name(key_name), Expr::Name(value_name)) = (key, value) {
+        if key_name.id == value_name.id {
+            return;
+        }
+    }
 
     if !has_valid_expression_type(value) {
         return;

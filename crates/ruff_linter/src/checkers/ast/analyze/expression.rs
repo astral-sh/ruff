@@ -1431,7 +1431,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
 
             if checker.enabled(Rule::UnnecessaryDictComprehensionForIterable) {
                 ruff::rules::unnecessary_dict_comprehension_for_iterable(
-                    checker, expr, value, generators,
+                    checker, expr, key, value, generators,
                 );
             }
 

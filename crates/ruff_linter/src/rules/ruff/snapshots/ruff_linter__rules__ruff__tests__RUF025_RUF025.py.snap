@@ -181,26 +181,44 @@ RUF025.py:40:5: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite 
    40 |+    dict.fromkeys([1,2,3], a) # RUF025
 41 41 | 
 42 42 | def foo():
-43 43 |     def f():
+43 43 |     {n: False for n in {1: "a", 2: "b"}} # RUF025
 
-RUF025.py:52:5: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite using `dict.fromkeys(iterable, value)`)
+RUF025.py:43:5: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite using `dict.fromkeys(iterable, value)`)
    |
-51 | def foo():
-52 |     {n: 1 for n in [1,2,3,4,5] if n < 3} # OK
+42 | def foo():
+43 |     {n: False for n in {1: "a", 2: "b"}} # RUF025
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF025
-53 | 
-54 | def foo():
    |
    = help: Rewrite using `dict.fromkeys(iterable)`)
 
 ℹ Safe fix
-49 49 | # Non-violation cases: RUF025
+40 40 |     {n: a for n in [1,2,3]} # RUF025
+41 41 | 
+42 42 | def foo():
+43    |-    {n: False for n in {1: "a", 2: "b"}} # RUF025
+   43 |+    dict.fromkeys({1: "a", 2: "b"}, False) # RUF025
+44 44 | 
+45 45 | 
+46 46 | # Non-violation cases: RUF025
+
+RUF025.py:49:5: RUF025 [*] Unnecessary dict comprehension for iterable (rewrite using `dict.fromkeys(iterable, value)`)
+   |
+48 | def foo():
+49 |     {n: 1 for n in [1,2,3,4,5] if n < 3} # OK
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF025
+50 | 
+51 | def foo():
+   |
+   = help: Rewrite using `dict.fromkeys(iterable)`)
+
+ℹ Safe fix
+46 46 | # Non-violation cases: RUF025
+47 47 | 
+48 48 | def foo():
+49    |-    {n: 1 for n in [1,2,3,4,5] if n < 3} # OK
+   49 |+    dict.fromkeys([1,2,3,4,5], 1) # OK
 50 50 | 
 51 51 | def foo():
-52    |-    {n: 1 for n in [1,2,3,4,5] if n < 3} # OK
-   52 |+    dict.fromkeys([1,2,3,4,5], 1) # OK
-53 53 | 
-54 54 | def foo():
-55 55 |     {n: 1 for c in [1,2,3,4,5] for n in [1,2,3] if c < 3} # OK
+52 52 |     {n: 1 for c in [1,2,3,4,5] for n in [1,2,3] if c < 3} # OK
 
 
