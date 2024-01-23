@@ -512,8 +512,8 @@ pub struct ConfigArgs {
     config_file: Option<PathBuf>,
     /// Overrides provided via the `--config FOO=BAR` option on the CLI
     config_overrides: Configuration,
-    /// Overrides provided via specific (legacy-ish) flags such as --line-length etc
-    cli_overrides: CliOverrides,
+    /// Overrides provided via dedicated flags such as --line-length etc.
+    per_flag_overrides: ExplicitConfigOverrides,
 }
 
 impl ConfigArgs {
@@ -523,11 +523,11 @@ impl ConfigArgs {
 
     fn from_cli_options(
         config_options: Vec<ConfigOption>,
-        cli_overrides: CliOverrides,
+        per_flag_overrides: ExplicitConfigOverrides,
         isolated: bool,
     ) -> Result<Self, anyhow::Error> {
         let mut new = Self {
-            cli_overrides,
+            per_flag_overrides,
             ..Self::default()
         };
 
@@ -550,14 +550,18 @@ impl ConfigArgs {
                         .context(context);
                         return Err(error);
                     }
-                    match new.config_file {
-                        None => new.config_file = Some(path),
-                        Some(ref config_file) => {
-                            let (first, second) = (config_file.display(), path.display());
-                            return Err(anyhow!("Cannot specify more than one configuration file on the command line")
-                                .context(format!("Both `--config={first}` and `--config={second}` were specified")));
-                        }
+                    if let Some(ref config_file) = new.config_file {
+                        let (first, second) = (config_file.display(), path.display());
+                        let context = format!(
+                            "Both `--config={first}` and `--config={second}` were specified"
+                        );
+                        let error = anyhow!(
+                            "Cannot specify more than one configuration file on the command line"
+                        )
+                        .context(context);
+                        return Err(error);
                     }
+                    new.config_file = Some(path);
                 }
             }
         }
@@ -567,7 +571,7 @@ impl ConfigArgs {
 
 impl ConfigurationTransformer for ConfigArgs {
     fn transform(&self, config: Configuration) -> Configuration {
-        self.cli_overrides
+        self.per_flag_overrides
             .transform(self.config_overrides.transform(config))
     }
 }
@@ -594,7 +598,7 @@ impl CheckCommand {
             watch: self.watch,
         };
 
-        let cli_overrides = CliOverrides {
+        let cli_overrides = ExplicitConfigOverrides {
             dummy_variable_rgx: self.dummy_variable_rgx,
             exclude: self.exclude,
             extend_exclude: self.extend_exclude,
@@ -647,7 +651,7 @@ impl FormatCommand {
             stdin_filename: self.stdin_filename,
         };
 
-        let cli_overrides = CliOverrides {
+        let cli_overrides = ExplicitConfigOverrides {
             line_length: self.line_length,
             respect_gitignore: resolve_bool_arg(self.respect_gitignore, self.no_respect_gitignore),
             exclude: self.exclude,
@@ -658,7 +662,7 @@ impl FormatCommand {
             extension: self.extension,
 
             // Unsupported on the formatter CLI, but required on `Overrides`.
-            ..CliOverrides::default()
+            ..ExplicitConfigOverrides::default()
         };
 
         let config_args = ConfigArgs::from_cli_options(
@@ -679,9 +683,10 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
     }
 }
 
-/// --config arguments passed via the CLI
+/// `--config` arguments passed via the CLI.
+///
 /// Users may pass 0 or 1 paths to a configuration file,
-/// and an arbitrary number of "inline TOML" options
+/// and an arbitrary number of "inline TOML" options.
 ///
 /// For example:
 ///
@@ -722,29 +727,31 @@ impl TypedValueParser for ConfigOptionParser {
             return Ok(ConfigOption::PathToConfigFile(path_to_config_file));
         }
         if let Ok(option) = toml::from_str(value) {
-            Ok(ConfigOption::ConfigOverride(option))
-        } else {
-            let mut new_error =
-                clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
-            if let Some(arg) = arg {
-                new_error.insert(
-                    clap::error::ContextKind::InvalidArg,
-                    clap::error::ContextValue::String(arg.to_string()),
-                );
-            }
-            new_error.insert(
-                clap::error::ContextKind::InvalidValue,
-                clap::error::ContextValue::String(value.to_string()),
-            );
-            new_error.insert(
-                clap::error::ContextKind::Suggested,
-                clap::error::ContextValue::StyledStrs(vec![
-                    "The `--config` flag must either be a path to a `.toml` configuration file or a TOML string providing configuration overrides".into(),
-                    format!("The path `{value}` does not exist on your filesystem").into()
-                ]),
-            );
-            Err(new_error)
+            return Ok(ConfigOption::ConfigOverride(option));
         }
+        let mut new_error = clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
+        if let Some(arg) = arg {
+            new_error.insert(
+                clap::error::ContextKind::InvalidArg,
+                clap::error::ContextValue::String(arg.to_string()),
+            );
+        }
+        new_error.insert(
+            clap::error::ContextKind::InvalidValue,
+            clap::error::ContextValue::String(value.to_string()),
+        );
+        let tips = vec![
+            "The `--config` flag must either be a path to a `.toml` \
+            configuration file or a TOML `<KEY> = <VALUE>` pair providing \
+            a configuration override"
+                .into(),
+            format!("The path `{value}` does not exist on your filesystem").into(),
+        ];
+        new_error.insert(
+            clap::error::ContextKind::Suggested,
+            clap::error::ContextValue::StyledStrs(tips),
+        );
+        Err(new_error)
     }
 }
 
@@ -781,10 +788,11 @@ pub struct FormatArguments {
     pub stdin_filename: Option<PathBuf>,
 }
 
-/// CLI settings that function as configuration overrides.
+/// Configuration overrides provided via dedicated CLI flags:
+/// `--line-length`, `--respect-gitignore`, etc.
 #[derive(Clone, Default)]
 #[allow(clippy::struct_excessive_bools)]
-struct CliOverrides {
+struct ExplicitConfigOverrides {
     dummy_variable_rgx: Option<Regex>,
     exclude: Option<Vec<FilePattern>>,
     extend_exclude: Option<Vec<FilePattern>>,
@@ -814,7 +822,7 @@ struct CliOverrides {
     extension: Option<Vec<ExtensionPair>>,
 }
 
-impl ConfigurationTransformer for CliOverrides {
+impl ConfigurationTransformer for ExplicitConfigOverrides {
     fn transform(&self, mut config: Configuration) -> Configuration {
         if let Some(cache_dir) = &self.cache_dir {
             config.cache_dir = Some(cache_dir.clone());

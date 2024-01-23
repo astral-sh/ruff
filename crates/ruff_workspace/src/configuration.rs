@@ -569,12 +569,12 @@ impl ConfigurationTransformer for Configuration {
             extend_exclude: config
                 .extend_exclude
                 .into_iter()
-                .chain(self.extend_exclude.clone())
+                .chain(self.extend_exclude.iter().cloned())
                 .collect(),
             extend_include: config
                 .extend_include
                 .into_iter()
-                .chain(self.extend_include.clone())
+                .chain(self.extend_include.iter().cloned())
                 .collect(),
 
             lint: self.lint.clone().combine(config.lint),
