@@ -8,4 +8,11 @@ assigning_non_slot.py:1:7: PLE0237 Assigning an attribute that is not defined in
 2 |     __slots__ = ("name",)
   |
 
+assigning_non_slot.py:13:7: PLE0237 Assigning an attribute that is not defined in class slots
+   |
+13 | class StudentB:
+   |       ^^^^^^^^ PLE0237
+14 |     __slots__ = ("name", "surname")
+   |
+
 
