@@ -33,7 +33,7 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 /// ```python
 /// class Student:
-///     __slots__ = ("name","surname")
+///     __slots__ = ("name", "surname")
 ///
 ///     def __init__(self, name, surname):
 ///         self.name = name
