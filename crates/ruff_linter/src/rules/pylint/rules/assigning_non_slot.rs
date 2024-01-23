@@ -103,7 +103,6 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> bool {
                                     continue;
                                 };
                                 if id == "self" {
-                                    // check `attr` is in slots.
                                     attrs.push(attr.as_str());
                                 }
                             }
