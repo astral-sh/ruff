@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.1.14
+
+### Preview features
+
+- \[`flake8-bugbear`\] Add fix for `duplicate-value` (`B033`) ([#9510](https://github.com/astral-sh/ruff/pull/9510))
+- \[`flake8-simplify`\] Implement `enumerate-for-loop` (`SIM113`) ([#7777](https://github.com/astral-sh/ruff/pull/7777))
+- \[`pygrep_hooks`\] Add fix for `deprecated-log-warn` (`PGH002`) ([#9519](https://github.com/astral-sh/ruff/pull/9519))
+- \[`pylint`\] Implement `import-private-name` (`C2701`) ([#5920](https://github.com/astral-sh/ruff/pull/5920))
+- \[`refurb`\] Implement `regex-flag-alias` with fix (`FURB167`) ([#9516](https://github.com/astral-sh/ruff/pull/9516))
+- \[`ruff`\] Add rule and fix to sort contents of `__all__` (`RUF022`) ([#9474](https://github.com/astral-sh/ruff/pull/9474))
+- \[`tryceratops`\] Add fix for `error-instead-of-exception` (`TRY400`) ([#9520](https://github.com/astral-sh/ruff/pull/9520))
+
+### Rule changes
+
+- \[`flake8-pyi`\] Fix `PYI047` false negatives on PEP-695 type aliases ([#9566](https://github.com/astral-sh/ruff/pull/9566))
+- \[`flake8-pyi`\] Fix `PYI049` false negatives on call-based `TypedDict`s ([#9567](https://github.com/astral-sh/ruff/pull/9567))
+- \[`pylint`\] Exclude `self` and `cls` when counting method arguments (`PLR0917`) ([#9563](https://github.com/astral-sh/ruff/pull/9563))
+
+### CLI
+
+- `--show-settings` displays active settings in a far more readable format ([#9464](https://github.com/astral-sh/ruff/pull/9464))
+- Add `--extension` support to the formatter ([#9483](https://github.com/astral-sh/ruff/pull/9483))
+
+### Configuration
+
+- Ignore preview status for fixable and unfixable selectors ([#9538](https://github.com/astral-sh/ruff/pull/9538))
+- \[`pycodestyle`\] Use the configured tab size when expanding indents ([#9506](https://github.com/astral-sh/ruff/pull/9506))
+
+### Bug fixes
+
+- Recursively visit deferred AST nodes ([#9541](https://github.com/astral-sh/ruff/pull/9541))
+- Visit deferred lambdas before type definitions ([#9540](https://github.com/astral-sh/ruff/pull/9540))
+- \[`flake8-simplify`\] Avoid some more `enumerate-for-loop` false positives (`SIM113`) ([#9515](https://github.com/astral-sh/ruff/pull/9515))
+- \[`pandas-vet`\] Limit inplace diagnostics to methods that accept inplace ([#9495](https://github.com/astral-sh/ruff/pull/9495))
+- \[`pylint`\] Add the `__prepare__` method to the list of recognized dunder method ([#9529](https://github.com/astral-sh/ruff/pull/9529))
+- \[`pylint`\] Ignore unnecessary dunder calls within dunder definitions ([#9496](https://github.com/astral-sh/ruff/pull/9496))
+- \[`refurb`\] Avoid bailing when `reimplemented-operator` is called on function (`FURB118`) ([#9556](https://github.com/astral-sh/ruff/pull/9556))
+- \[`ruff`\] Avoid treating named expressions as static keys (`RUF011`) ([#9494](https://github.com/astral-sh/ruff/pull/9494))
+
+### Documentation
+
+- Add instructions on using `noqa` with isort rules ([#9555](https://github.com/astral-sh/ruff/pull/9555))
+- Documentation update for URL giving 'page not found' ([#9565](https://github.com/astral-sh/ruff/pull/9565))
+- Fix admonition in dark mode ([#9502](https://github.com/astral-sh/ruff/pull/9502))
+- Update contributing docs to use `cargo bench -p ruff_benchmark` ([#9535](https://github.com/astral-sh/ruff/pull/9535))
+- Update emacs integration section to include `emacs-ruff-format` ([#9403](https://github.com/astral-sh/ruff/pull/9403))
+- \[`flake8-blind-except`\] Document exceptions to `blind-except` rule ([#9580](https://github.com/astral-sh/ruff/pull/9580))
+
 ## 0.1.13
 
 ### Bug fixes

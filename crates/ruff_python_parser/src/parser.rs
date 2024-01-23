@@ -31,7 +31,7 @@ use crate::{
     lexer::{self, LexicalError, LexicalErrorType},
     python,
     token::Tok,
-    Mode,
+    tokenize_all, Mode,
 };
 
 /// Parse a full Python program usually consisting of multiple lines.
@@ -55,8 +55,7 @@ use crate::{
 /// assert!(program.is_ok());
 /// ```
 pub fn parse_program(source: &str) -> Result<ModModule, ParseError> {
-    let lexer = lex(source, Mode::Module);
-    match parse_tokens(lexer.collect(), source, Mode::Module)? {
+    match parse_tokens(tokenize_all(source, Mode::Module), source, Mode::Module)? {
         Mod::Module(m) => Ok(m),
         Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
     }
