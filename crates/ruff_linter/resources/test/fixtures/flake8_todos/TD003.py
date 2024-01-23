@@ -2,8 +2,12 @@
 # TODO: this comment has a link
 # https://github.com/astral-sh/ruff/issues/3870
 
+# TODO: https://github.com/astral-sh/ruff/issues/8061 This comment also has a link
+
 # TODO: this comment has an issue
 # TDO-3870
+
+# TODO: #31 This comment also has a number
 
 # TDO003 - errors
 # TODO: this comment has no

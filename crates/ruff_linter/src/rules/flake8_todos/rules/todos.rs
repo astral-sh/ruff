@@ -69,8 +69,7 @@ impl Violation for MissingTodoAuthor {
 }
 
 /// ## What it does
-/// Checks that a TODO comment is associated with a link to a relevant issue
-/// or ticket.
+/// Checks that a TODO comment is associated with a link or issue code.
 ///
 /// ## Why is this bad?
 /// Including an issue link near a TODO makes it easier for resolvers
@@ -86,11 +85,14 @@ impl Violation for MissingTodoAuthor {
 /// # TODO(charlie): this comment has an issue link
 /// # https://github.com/astral-sh/ruff/issues/3870
 ///
+/// # TODO: https://github.com/astral-sh/ruff/issues/8061 This comment has an issue link
+///
 /// # TODO(charlie): this comment has a 3-digit issue code
 /// # 003
 ///
 /// # TODO(charlie): this comment has an issue code of (up to) 6 characters, then digits
 /// # SIXCHR-003
+///
 /// ```
 #[violation]
 pub struct MissingTodoLink;
@@ -98,7 +100,7 @@ pub struct MissingTodoLink;
 impl Violation for MissingTodoLink {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing issue link on the line following this TODO")
+        format!("Missing issue link for this TODO")
     }
 }
 
@@ -222,11 +224,14 @@ impl Violation for MissingSpaceAfterTodoColon {
     }
 }
 
+// TD003 will trigger if neither the TODO itself nor the following line
+// matches any of the patterns.
 static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     RegexSet::new([
-        r"^#\s*(http|https)://.*", // issue link
-        r"^#\s*\d+$",              // issue code - like "003"
-        r"^#\s*[A-Z]{1,6}\-?\d+$", // issue code - like "TD003"
+        r"^#.*(http|https)://.*", // issue link
+        r"^#.*#*\d+",             // issue code - like "#003"
+        r"^#\s\d+",               // issue code - like "003"
+        r"^#\s[A-Z]{1,6}\-?\d+",  // issue code - like "TD003"
     ])
     .unwrap()
 });
@@ -256,35 +261,40 @@ pub(crate) fn todos(
 
         let mut has_issue_link = false;
         let mut curr_range = range;
-        for next_range in indexer
-            .comment_ranges()
-            .iter()
-            .skip(range_index + 1)
-            .copied()
-        {
-            // Ensure that next_comment_range is in the same multiline comment "block" as
-            // comment_range.
-            if !locator
-                .slice(TextRange::new(curr_range.end(), next_range.start()))
-                .chars()
-                .all(char::is_whitespace)
+
+        if ISSUE_LINK_REGEX_SET.is_match(content) {
+            has_issue_link = true;
+        } else {
+            for next_range in indexer
+                .comment_ranges()
+                .iter()
+                .skip(range_index + 1)
+                .copied()
             {
-                break;
-            }
+                // Ensure that next_comment_range is in the same multiline comment "block" as
+                // comment_range.
+                if !locator
+                    .slice(TextRange::new(curr_range.end(), next_range.start()))
+                    .chars()
+                    .all(char::is_whitespace)
+                {
+                    break;
+                }
 
-            let next_comment = locator.slice(next_range);
-            if TodoDirective::from_comment(next_comment, next_range).is_some() {
-                break;
-            }
+                let next_comment = locator.slice(next_range);
+                if TodoDirective::from_comment(next_comment, next_range).is_some() {
+                    break;
+                }
 
-            if ISSUE_LINK_REGEX_SET.is_match(next_comment) {
-                has_issue_link = true;
-            }
+                if ISSUE_LINK_REGEX_SET.is_match(next_comment) {
+                    has_issue_link = true;
+                }
 
-            // If the next_comment isn't a tag or an issue, it's worthles in the context of this
-            // linter. We can increment here instead of waiting for the next iteration of the outer
-            // loop.
-            curr_range = next_range;
+                // If the next_comment isn't a tag or an issue, it's worthles in the context of this
+                // linter. We can increment here instead of waiting for the next iteration of the outer
+                // loop.
+                curr_range = next_range;
+            }
         }
 
         if !has_issue_link {
