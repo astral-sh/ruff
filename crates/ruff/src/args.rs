@@ -543,26 +543,37 @@ impl ConfigArgs {
                 }
                 ConfigOption::PathToConfigFile(path) => {
                     if isolated {
+                        let error = anyhow!(
+                            "Cannot specify `--isolated` and also specify a configuration file"
+                        );
                         let context = format!(
                             "Both `--isolated` and `--config={}` were specified on the command line",
                             path.display()
                         );
-                        let error = anyhow!(
-                            "Cannot specify `--isolated` and also specify a configuration file"
-                        )
-                        .context(context);
-                        return Err(error);
+                        return Err(error.context(context));
                     }
                     if let Some(ref config_file) = new.config_file {
                         let (first, second) = (config_file.display(), path.display());
-                        let context = format!(
-                            "Both `--config={first}` and `--config={second}` were specified"
+                        let mut error = clap::Error::new(clap::error::ErrorKind::ValueValidation);
+                        error.insert(
+                            clap::error::ContextKind::InvalidArg,
+                            clap::error::ContextValue::String("--config".to_string()),
                         );
-                        let error = anyhow!(
+                        error.insert(
+                            clap::error::ContextKind::InvalidValue,
+                            clap::error::ContextValue::String(second.to_string()),
+                        );
+                        let tips = vec![
                             "Cannot specify more than one configuration file on the command line"
-                        )
-                        .context(context);
-                        return Err(error);
+                                .into(),
+                            format!("Remove either `--config={first}` or `--config={second}`")
+                                .into(),
+                        ];
+                        error.insert(
+                            clap::error::ContextKind::Suggested,
+                            clap::error::ContextValue::StyledStrs(tips),
+                        );
+                        return Err(error.into());
                     }
                     new.config_file = Some(path);
                 }
