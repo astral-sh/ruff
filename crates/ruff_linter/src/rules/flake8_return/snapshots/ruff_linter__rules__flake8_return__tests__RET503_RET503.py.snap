@@ -402,57 +402,55 @@ RET503.py:329:5: RET503 [*] Missing explicit `return` at the end of function abl
 332 333 | 
 333 334 | # function return type annotation NoReturn
 
-RET503.py:341:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:339:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-339 |     if x == 5:
-340 |         return 5
-341 |     bar()
+337 |     if x == 5:
+338 |         return 5
+339 |     bar()
     |     ^^^^^ RET503
     |
     = help: Add explicit `return` statement
 
 ℹ Unsafe fix
-339 339 |     if x == 5:
-340 340 |         return 5
-341 341 |     bar()
-    342 |+    return None
-342 343 | 
-343 344 | 
-344 345 | def foo(string: str) -> str:
+337 337 |     if x == 5:
+338 338 |         return 5
+339 339 |     bar()
+    340 |+    return None
+340 341 | 
+341 342 | 
+342 343 | def foo(string: str) -> str:
 
-RET503.py:356:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:354:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-354 |             return "third"
-355 |         case _:
-356 |             raises(string)
+352 |             return "third"
+353 |         case _:
+354 |             raises(string)
     |             ^^^^^^^^^^^^^^ RET503
     |
     = help: Add explicit `return` statement
 
 ℹ Unsafe fix
-354 354 |             return "third"
-355 355 |         case _:
-356 356 |             raises(string)
-    357 |+            return None
-357 358 | 
-358 359 | 
-359 360 | def foo() -> int:
+352 352 |             return "third"
+353 353 |         case _:
+354 354 |             raises(string)
+    355 |+            return None
+355 356 | 
+356 357 | 
+357 358 | def foo() -> int:
 
-RET503.py:372:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:370:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
-370 |     if baz() > 3:
-371 |         return 1
-372 |     bar()
+368 |     if baz() > 3:
+369 |         return 1
+370 |     bar()
     |     ^^^^^ RET503
     |
     = help: Add explicit `return` statement
 
 ℹ Unsafe fix
-369 369 | 
-370 370 |     if baz() > 3:
-371 371 |         return 1
-372     |-    bar()
-    372 |+    bar()
-    373 |+    return None
+368 368 |     if baz() > 3:
+369 369 |         return 1
+370 370 |     bar()
+    371 |+    return None
 
 

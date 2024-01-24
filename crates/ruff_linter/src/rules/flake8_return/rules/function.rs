@@ -368,7 +368,24 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
     }
 }
 
-fn is_func_def_annotated_with_noreturn(func: &Expr, semantic: &SemanticModel) -> bool {
+/// Return `true` if the `func` appears to be non-returning.
+fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
+    // First, look for known functions that never return from the standard library and popular
+    // libraries.
+    if semantic.resolve_call_path(func).is_some_and(|call_path| {
+        matches!(
+            call_path.as_slice(),
+            ["" | "builtins" | "sys" | "_thread" | "pytest", "exit"]
+                | ["" | "builtins", "quit"]
+                | ["os" | "posix", "_exit" | "abort"]
+                | ["_winapi", "ExitProcess"]
+                | ["pytest", "fail" | "skip" | "xfail"]
+        ) || semantic.match_typing_call_path(&call_path, "assert_never")
+    }) {
+        return true;
+    }
+
+    // Second, look for `NoReturn` annotations on the return type.
     let Some(func_binding) = semantic.lookup_attribute(func) else {
         return false;
     };
@@ -381,29 +398,15 @@ fn is_func_def_annotated_with_noreturn(func: &Expr, semantic: &SemanticModel) ->
         return false;
     };
 
-    let Some(return_expr) = returns.as_ref() else {
+    let Some(returns) = returns.as_ref() else {
         return false;
     };
 
-    let Some(call_path) = semantic.resolve_call_path(return_expr) else {
+    let Some(call_path) = semantic.resolve_call_path(returns) else {
         return false;
     };
 
     semantic.match_typing_call_path(&call_path, "NoReturn")
-}
-
-/// Return `true` if the `func` is a known function that never returns.
-fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(func).is_some_and(|call_path| {
-        matches!(
-            call_path.as_slice(),
-            ["" | "builtins" | "sys" | "_thread" | "pytest", "exit"]
-                | ["" | "builtins", "quit"]
-                | ["os" | "posix", "_exit" | "abort"]
-                | ["_winapi", "ExitProcess"]
-                | ["pytest", "fail" | "skip" | "xfail"]
-        ) || semantic.match_typing_call_path(&call_path, "assert_never")
-    })
 }
 
 /// RET503
@@ -479,7 +482,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             if matches!(
                 value.as_ref(),
                 Expr::Call(ast::ExprCall { func, ..  })
-                    if is_noreturn_func(func, checker.semantic()) || is_func_def_annotated_with_noreturn(func, checker.semantic())
+                    if is_noreturn_func(func, checker.semantic())
             ) => {}
         _ => {
             let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());

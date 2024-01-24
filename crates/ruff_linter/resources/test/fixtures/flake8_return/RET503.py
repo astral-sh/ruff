@@ -331,8 +331,6 @@ def end_of_file():
 
 
 # function return type annotation NoReturn
-
-
 def foo(x: int) -> int:
     def bar() -> NoReturn:
         abort()
