@@ -1,1 +1,2 @@
-with 1 as x: pass
+with 1 as x:
+    pass

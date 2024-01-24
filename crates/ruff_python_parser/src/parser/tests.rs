@@ -19,7 +19,7 @@ fn ok_ipy_escape_command() {
 }
 
 // Test that is intentionally ignored by default.
-// Use it for quicky debugging a parser issue.
+// Use it for quickly debugging a parser issue.
 #[test]
 #[ignore]
 fn parser_quick_test() {

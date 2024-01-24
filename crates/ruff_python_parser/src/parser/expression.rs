@@ -99,21 +99,25 @@ impl<'src> Parser<'src> {
     /// you need to **explicitly** check if an invalid node for that AST node was parsed. Check the
     /// `parse_yield_from_expression` function for an example of this situation.
     fn parse_simple_expression(&mut self) -> ParsedExpr {
-        self.parse_expression_with_precedence(1)
+        self.parse_expression_with_precedence(Precedence::Initial)
     }
 
     /// Binding powers of operators for a Pratt parser.
     ///
     /// See <https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html>
-    fn current_op(&mut self) -> (u8, TokenKind, Associativity) {
-        const NOT_AN_OP: (u8, TokenKind, Associativity) =
-            (0, TokenKind::Unknown, Associativity::Left);
+    fn current_op(&mut self) -> (Precedence, TokenKind, Associativity) {
+        const NOT_AN_OP: (Precedence, TokenKind, Associativity) =
+            (Precedence::Unknown, TokenKind::Unknown, Associativity::Left);
         let kind = self.current_kind();
 
         match kind {
-            TokenKind::Or => (4, kind, Associativity::Left),
-            TokenKind::And => (5, kind, Associativity::Left),
-            TokenKind::Not if self.peek_nth(1) == TokenKind::In => (7, kind, Associativity::Left),
+            TokenKind::Or => (Precedence::Or, kind, Associativity::Left),
+            TokenKind::And => (Precedence::And, kind, Associativity::Left),
+            TokenKind::Not if self.peek_nth(1) == TokenKind::In => (
+                Precedence::ComparisonsMembershipIdentity,
+                kind,
+                Associativity::Left,
+            ),
             TokenKind::Is
             | TokenKind::In
             | TokenKind::EqEqual
@@ -121,18 +125,24 @@ impl<'src> Parser<'src> {
             | TokenKind::Less
             | TokenKind::LessEqual
             | TokenKind::Greater
-            | TokenKind::GreaterEqual => (7, kind, Associativity::Left),
-            TokenKind::Vbar => (8, kind, Associativity::Left),
-            TokenKind::CircumFlex => (9, kind, Associativity::Left),
-            TokenKind::Amper => (10, kind, Associativity::Left),
-            TokenKind::LeftShift | TokenKind::RightShift => (11, kind, Associativity::Left),
-            TokenKind::Plus | TokenKind::Minus => (12, kind, Associativity::Left),
+            | TokenKind::GreaterEqual => (
+                Precedence::ComparisonsMembershipIdentity,
+                kind,
+                Associativity::Left,
+            ),
+            TokenKind::Vbar => (Precedence::BitOr, kind, Associativity::Left),
+            TokenKind::CircumFlex => (Precedence::BitAnd, kind, Associativity::Left),
+            TokenKind::Amper => (Precedence::BitXor, kind, Associativity::Left),
+            TokenKind::LeftShift | TokenKind::RightShift => {
+                (Precedence::LeftRightShift, kind, Associativity::Left)
+            }
+            TokenKind::Plus | TokenKind::Minus => (Precedence::AddSub, kind, Associativity::Left),
             TokenKind::Star
             | TokenKind::Slash
             | TokenKind::DoubleSlash
             | TokenKind::Percent
-            | TokenKind::At => (14, kind, Associativity::Left),
-            TokenKind::DoubleStar => (18, kind, Associativity::Right),
+            | TokenKind::At => (Precedence::MulDivRemain, kind, Associativity::Left),
+            TokenKind::DoubleStar => (Precedence::Exponent, kind, Associativity::Right),
             _ => NOT_AN_OP,
         }
     }
@@ -141,8 +151,7 @@ impl<'src> Parser<'src> {
     ///
     /// Uses the Pratt parser algorithm.
     /// See <https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html>
-    // FIXME(micha): Introduce precedence enum instead of passing cryptic u8 values.
-    fn parse_expression_with_precedence(&mut self, bp: u8) -> ParsedExpr {
+    fn parse_expression_with_precedence(&mut self, previous_precedence: Precedence) -> ParsedExpr {
         let start = self.node_start();
         let mut lhs = self.parse_lhs_expression();
 
@@ -151,8 +160,8 @@ impl<'src> Parser<'src> {
         loop {
             progress.assert_progressing(self);
 
-            let (op_bp, op, associativity) = self.current_op();
-            if op_bp < bp {
+            let (current_precedence, op, associativity) = self.current_op();
+            if current_precedence < previous_precedence {
                 break;
             }
 
@@ -162,8 +171,8 @@ impl<'src> Parser<'src> {
             }
 
             let op_bp = match associativity {
-                Associativity::Left => op_bp + 1,
-                Associativity::Right => op_bp,
+                Associativity::Left => current_precedence.increment_precedence(),
+                Associativity::Right => current_precedence,
             };
 
             self.bump(op);
@@ -629,10 +638,10 @@ impl<'src> Parser<'src> {
         self.bump(self.current_kind());
 
         let operand = if matches!(op, UnaryOp::Not) {
-            self.parse_expression_with_precedence(6)
+            self.parse_expression_with_precedence(Precedence::Not)
         } else {
             // plus, minus and tilde
-            self.parse_expression_with_precedence(17)
+            self.parse_expression_with_precedence(Precedence::PosNegBitNot)
         };
 
         ast::ExprUnaryOp {
@@ -664,7 +673,7 @@ impl<'src> Parser<'src> {
         lhs: Expr,
         start: TextSize,
         op: TokenKind,
-        op_bp: u8,
+        op_bp: Precedence,
     ) -> ast::ExprBoolOp {
         let mut values = vec![lhs];
         let mut progress = ParserProgress::default();
@@ -695,7 +704,7 @@ impl<'src> Parser<'src> {
         lhs: Expr,
         start: TextSize,
         op: TokenKind,
-        op_bp: u8,
+        op_bp: Precedence,
     ) -> ast::ExprCompare {
         let mut comparators = vec![];
         let op = token_kind_to_cmp_op([op, self.current_kind()]).unwrap();
@@ -784,7 +793,7 @@ impl<'src> Parser<'src> {
                     range,
                 }),
                 StringType::Bytes(bytes) => {
-                    // TODO(micha): Is this valid? I thought string and byte literals can't be concatenated? Maybe not a syntax erro?
+                    // TODO(micha): Is this valid? I thought string and byte literals can't be concatenated? Maybe not a syntax error?
                     Expr::BytesLiteral(ast::ExprBytesLiteral {
                         value: ast::BytesLiteralValue::single(bytes),
                         range,
@@ -1430,7 +1439,7 @@ impl<'src> Parser<'src> {
     fn parse_await_expression(&mut self) -> ast::ExprAwait {
         let start = self.node_start();
         self.bump(TokenKind::Await);
-        let parsed_expr = self.parse_expression_with_precedence(19);
+        let parsed_expr = self.parse_expression_with_precedence(Precedence::Await);
 
         if matches!(parsed_expr.expr, Expr::Starred(_)) {
             self.add_error(
@@ -1619,4 +1628,75 @@ impl Ranged for ParsedExpr {
 enum Associativity {
     Left,
     Right,
+}
+
+/// Represents the precedence levels for various operators and expressions of Python.
+/// Variants at the top have lower precedence and variants at the bottom have
+/// higher precedence.
+///
+/// Note: Some expressions like if-else, named expression (`:=`), lambda, subscription,
+/// slicing, call and attribute reference expressions, that are mentioned in the link
+/// below are better handled in other parts of the parser.
+///
+/// See: <https://docs.python.org/3/reference/expressions.html#operator-precedence>
+#[derive(Ord, Eq, PartialEq, PartialOrd, Copy, Clone)]
+enum Precedence {
+    /// Precedence for an unknown operator.
+    Unknown,
+    /// The initital precedence when parsing an expression.
+    Initial,
+    /// Precedence of boolean `or` operator.
+    Or,
+    /// Precedence of boolean `and` operator.
+    And,
+    /// Precedence of boolean `not` unary operator.
+    Not,
+    /// Precedence of comparisons operators (`<`, `<=`, `>`, `>=`, `!=`, `==`),
+    /// memberships tests (`in`, `not in`) and identity tests (`is` `is not`).
+    ComparisonsMembershipIdentity,
+    /// Precedence of `Bitwise OR` (`|`) operator.
+    BitOr,
+    /// Precedence of `Bitwise XOR` (`^`) operator.
+    BitXor,
+    /// Precedence of `Bitwise AND` (`&`) operator.
+    BitAnd,
+    /// Precedence of left and right shift operators (`<<`, `>>`).
+    LeftRightShift,
+    /// Precedence of addition (`+`) and subtraction (`-`) operators.
+    AddSub,
+    /// Precedence of multiplication (`*`), matrix multiplication (`@`), division (`/`), floor
+    /// division (`//`) and remainder operators (`%`).
+    MulDivRemain,
+    /// Precedence of positive (`+`), negative (`-`), `Bitwise NOT` (`~`) unary operators.
+    PosNegBitNot,
+    /// Precedence of exponentiation operator (`**`).
+    Exponent,
+    /// Precedence of `await` expression.
+    Await,
+}
+
+impl Precedence {
+    fn increment_precedence(&self) -> Precedence {
+        match self {
+            Precedence::Or => Precedence::And,
+            Precedence::And => Precedence::Not,
+            Precedence::Not => Precedence::ComparisonsMembershipIdentity,
+            Precedence::ComparisonsMembershipIdentity => Precedence::BitOr,
+            Precedence::BitOr => Precedence::BitXor,
+            Precedence::BitXor => Precedence::BitAnd,
+            Precedence::BitAnd => Precedence::LeftRightShift,
+            Precedence::LeftRightShift => Precedence::AddSub,
+            Precedence::AddSub => Precedence::MulDivRemain,
+            Precedence::MulDivRemain => Precedence::PosNegBitNot,
+            Precedence::PosNegBitNot => Precedence::Exponent,
+            Precedence::Exponent => Precedence::Await,
+            // We've reached the highest precedence, we can't increment anymore,
+            // so return the same precedence.
+            Precedence::Await => Precedence::Await,
+            // When this function is invoked, the precedence will never be 'Unknown' or 'Initial'.
+            // This is due to their lower precedence values, causing them to exit the loop in the
+            // `parse_expression_with_precedence` function before the execution of this function.
+            Precedence::Unknown | Precedence::Initial => unreachable!(),
+        }
+    }
 }
