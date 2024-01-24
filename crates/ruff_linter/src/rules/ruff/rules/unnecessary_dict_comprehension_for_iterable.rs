@@ -81,7 +81,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
 
     // Don't suggest `dict.fromkeys` if any of the expressions in the value are defined within
     // the comprehension (e.g., by the target).
-    if any_over_expr(dict_comp.value.as_ref(), &|expr| {
+    let self_referential = any_over_expr(dict_comp.value.as_ref(), &|expr| {
         let Expr::Name(name) = expr else {
             return false;
         };
@@ -93,7 +93,8 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         let binding = checker.semantic().binding(id);
 
         dict_comp.range().contains_range(binding.range())
-    }) {
+    });
+    if self_referential {
         return;
     }
 
