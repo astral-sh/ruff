@@ -125,6 +125,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SliceCopy) {
                 refurb::rules::slice_copy(checker, subscript);
             }
+            if checker.enabled(Rule::PotentialIndexError) {
+                pylint::rules::potential_index_error(checker, value, slice);
+            }
 
             pandas_vet::rules::subscript(checker, value, expr);
         }
@@ -974,6 +977,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SslInsecureVersion) {
                 flake8_bandit::rules::ssl_insecure_version(checker, call);
             }
+            if checker.enabled(Rule::MutableFromkeysValue) {
+                ruff::rules::mutable_fromkeys_value(checker, call);
+            }
             if checker.enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_extend_call(checker, call);
             }
@@ -1416,11 +1422,17 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UnnecessaryDictIndexLookup) {
                 pylint::rules::unnecessary_dict_index_lookup_comprehension(checker, expr);
             }
+
             if checker.enabled(Rule::UnnecessaryComprehension) {
                 flake8_comprehensions::rules::unnecessary_dict_comprehension(
                     checker, expr, key, value, generators,
                 );
             }
+
+            if checker.enabled(Rule::UnnecessaryDictComprehensionForIterable) {
+                ruff::rules::unnecessary_dict_comprehension_for_iterable(checker, dict_comp);
+            }
+
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Expr(expr));
             }

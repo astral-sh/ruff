@@ -11,6 +11,7 @@ collapsible_else_if.py:37:5: PLR5501 Use `elif` instead of `else` then `if`, to 
    | |________^ PLR5501
 39 |               pass
    |
+   = help: Convert to `elif`
 
 collapsible_else_if.py:45:5: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
    |
@@ -23,17 +24,71 @@ collapsible_else_if.py:45:5: PLR5501 Use `elif` instead of `else` then `if`, to 
 47 |               pass
 48 |           else:
    |
+   = help: Convert to `elif`
 
-collapsible_else_if.py:58:5: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
+collapsible_else_if.py:55:5: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
    |
-56 |       elif True:
-57 |           print(2)
-58 |       else:
+53 |       if 1:
+54 |           pass
+55 |       else:
    |  _____^
-59 | |         if True:
+56 | |         # inner comment
+57 | |         if 2:
    | |________^ PLR5501
-60 |               print(3)
-61 |           else:
+58 |               pass
+59 |           else:
    |
+   = help: Convert to `elif`
+
+collapsible_else_if.py:69:5: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+67 |       elif True:
+68 |           print(2)
+69 |       else:
+   |  _____^
+70 | |         if True:
+   | |________^ PLR5501
+71 |               print(3)
+72 |           else:
+   |
+   = help: Convert to `elif`
+
+collapsible_else_if.py:79:5: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+77 |       if 1:
+78 |           pass
+79 |       else:
+   |  _____^
+80 | |         if 2: pass
+   | |________^ PLR5501
+81 |           else: pass
+   |
+   = help: Convert to `elif`
+
+collapsible_else_if.py:87:5: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+85 |       if 1:
+86 |           pass
+87 |       else:
+   |  _____^
+88 | |         if 2: pass
+   | |________^ PLR5501
+89 |           else:
+90 |               pass
+   |
+   = help: Convert to `elif`
+
+collapsible_else_if.py:96:5: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+94 |       if 1:
+95 |           pass
+96 |       else:
+   |  _____^
+97 | |         if 2:
+   | |________^ PLR5501
+98 |               pass
+99 |           else: pass
+   |
+   = help: Convert to `elif`
 
 
