@@ -750,12 +750,26 @@
     "DocstringCodeLineWidth": {
       "anyOf": [
         {
-          "$ref": "#/definitions/LineWidth"
+          "description": "Wrap docstring code examples at a fixed line width.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/LineWidth"
+            }
+          ]
         },
         {
-          "type": "null"
+          "description": "Respect the line length limit setting for the surrounding Python code.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Dynamic"
+            }
+          ]
         }
       ]
+    },
+    "Dynamic": {
+      "type": "string",
+      "const": "dynamic"
     },
     "Flake8AnnotationsOptions": {
       "type": "object",
