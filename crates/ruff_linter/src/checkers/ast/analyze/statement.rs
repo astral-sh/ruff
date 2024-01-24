@@ -507,6 +507,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::NoSlotsInNamedtupleSubclass) {
                 flake8_slots::rules::no_slots_in_namedtuple_subclass(checker, stmt, class_def);
             }
+            if checker.enabled(Rule::NonSlotAssignment) {
+                pylint::rules::non_slot_assignment(checker, class_def);
+            }
             if checker.enabled(Rule::SingleStringSlots) {
                 pylint::rules::single_string_slots(checker, class_def);
             }
