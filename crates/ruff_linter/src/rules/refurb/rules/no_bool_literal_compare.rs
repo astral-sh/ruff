@@ -66,6 +66,10 @@ impl AlwaysFixableViolation for BoolLiteralCompare {
 
 /// FURB149
 pub(crate) fn bool_literal_compare(checker: &mut Checker, compare: &ast::ExprCompare) {
+    if compare.ops.len() != 1 {
+        // don't do chained comparisons
+        return;
+    }
     let comparator = compare.left.as_ref();
     let [op, ..] = compare.ops.as_slice() else {
         return;
@@ -75,40 +79,49 @@ pub(crate) fn bool_literal_compare(checker: &mut Checker, compare: &ast::ExprCom
     };
 
     // we'll try to determine what they're doing, whether or not they're using a yoda comparison
-    let (expr, boolvalue) = match (comparator, next) {
-        (
-            Expr::BooleanLiteral(ast::ExprBooleanLiteral { .. }),
-            Expr::BooleanLiteral(ast::ExprBooleanLiteral { .. }),
-        ) => {
+    let (expr, boolvalue, in_parentheses) = match (comparator, next) {
+        (Expr::BooleanLiteral(_), Expr::BooleanLiteral(_)) => {
             // they're comparing two bools, so we can't do anything here
             return;
         }
         (
             Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-                value: boolvalue, ..
+                value: boolvalue,
+                range: boolrange,
             }),
             expr,
-        )
-        | (
+        ) => {
+            let in_parentheses =
+                compare.start() != boolrange.start() || compare.end() != expr.end();
+            (expr, boolvalue, in_parentheses)
+        }
+        (
             expr,
             Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-                value: boolvalue, ..
+                value: boolvalue,
+                range: boolrange,
             }),
-        ) => (expr, boolvalue),
+        ) => {
+            let in_parentheses =
+                compare.start() != expr.start() || compare.end() != boolrange.end();
+            (expr, boolvalue, in_parentheses)
+        }
         _ => {
             return;
         }
     };
 
+    let (lparen, rparen) = if in_parentheses { ("(", ")") } else { ("", "") };
+
     let (content, check_type) = match (op, boolvalue) {
         (ast::CmpOp::Is | ast::CmpOp::Eq, true)
-        | (ast::CmpOp::IsNot | ast::CmpOp::NotEq, false) => {
-            (checker.generator().expr(expr), CheckType::Truthy)
-        }
-
+        | (ast::CmpOp::IsNot | ast::CmpOp::NotEq, false) => (
+            format!("{lparen}{}{rparen}", checker.generator().expr(expr)),
+            CheckType::Truthy,
+        ),
         (ast::CmpOp::Is | ast::CmpOp::Eq, false)
         | (ast::CmpOp::IsNot | ast::CmpOp::NotEq, true) => (
-            format!("not {}", checker.generator().expr(expr)),
+            format!("{lparen}not {}{rparen}", checker.generator().expr(expr)),
             CheckType::Falsey,
         ),
         _ => return,
@@ -119,7 +132,7 @@ pub(crate) fn bool_literal_compare(checker: &mut Checker, compare: &ast::ExprCom
     let edit = Edit::range_replacement(content, compare.range());
 
     let fix = match check_type {
-        CheckType::Truthy => Fix::safe_edit(edit),
+        CheckType::Truthy => Fix::unsafe_edit(edit),
         CheckType::Falsey => Fix::unsafe_edit(edit),
     };
 

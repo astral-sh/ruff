@@ -51,6 +51,18 @@ if failed != False:  # FURB149
 if (failed == True) or (failed == False):  # FURB149
     print("wat")
 
+if(True) == failed:  # FURB149
+    print("You failed")
+
+if(failed) == True:  # FURB149
+    print("You failed")
+
+if(((failed))) == True:  # FURB149
+    print("You failed")
+
+if(yield failed) == True:  # FURB149
+    print("You failed")
+
 
 # OK
 if failed:
