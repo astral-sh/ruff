@@ -7,11 +7,11 @@ input_file: crates/ruff_python_parser/resources/valid/statement/for.py
  ```
 Module(
     ModModule {
-        range: 0..25,
+        range: 0..29,
         body: [
             For(
                 StmtFor {
-                    range: 0..24,
+                    range: 0..28,
                     is_async: false,
                     target: Name(
                         ExprName {
@@ -56,7 +56,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                range: 20..24,
+                                range: 24..28,
                             },
                         ),
                     ],

@@ -7,14 +7,14 @@ input_file: crates/ruff_python_parser/resources/valid/expressions/named_expressi
  ```
 Module(
     ModModule {
-        range: 0..25,
+        range: 0..30,
         body: [
             If(
                 StmtIf {
-                    range: 0..14,
+                    range: 0..19,
                     test: NamedExpr(
                         ExprNamedExpr {
-                            range: 3..8,
+                            range: 3..9,
                             target: Name(
                                 ExprName {
                                     range: 3..4,
@@ -24,7 +24,7 @@ Module(
                             ),
                             value: NumberLiteral(
                                 ExprNumberLiteral {
-                                    range: 7..8,
+                                    range: 8..9,
                                     value: Int(
                                         1,
                                     ),
@@ -35,7 +35,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                range: 10..14,
+                                range: 15..19,
                             },
                         ),
                     ],
@@ -44,20 +44,20 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 16..24,
+                    range: 21..29,
                     value: NamedExpr(
                         ExprNamedExpr {
-                            range: 17..23,
+                            range: 22..28,
                             target: Name(
                                 ExprName {
-                                    range: 17..18,
+                                    range: 22..23,
                                     id: "x",
                                     ctx: Store,
                                 },
                             ),
                             value: NumberLiteral(
                                 ExprNumberLiteral {
-                                    range: 22..23,
+                                    range: 27..28,
                                     value: Int(
                                         5,
                                     ),

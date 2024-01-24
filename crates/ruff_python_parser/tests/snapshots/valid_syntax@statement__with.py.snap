@@ -7,11 +7,11 @@ input_file: crates/ruff_python_parser/resources/valid/statement/with.py
  ```
 Module(
     ModModule {
-        range: 0..18,
+        range: 0..22,
         body: [
             With(
                 StmtWith {
-                    range: 0..17,
+                    range: 0..21,
                     is_async: false,
                     items: [
                         WithItem {
@@ -38,7 +38,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                range: 13..17,
+                                range: 17..21,
                             },
                         ),
                     ],
