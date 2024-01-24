@@ -368,9 +368,11 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
     }
 }
 
-/// Return `true` if the `func` is a known function that never returns.
+/// Return `true` if the `func` appears to be non-returning.
 fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(func).is_some_and(|call_path| {
+    // First, look for known functions that never return from the standard library and popular
+    // libraries.
+    if semantic.resolve_call_path(func).is_some_and(|call_path| {
         matches!(
             call_path.as_slice(),
             ["" | "builtins" | "sys" | "_thread" | "pytest", "exit"]
@@ -379,7 +381,32 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
                 | ["_winapi", "ExitProcess"]
                 | ["pytest", "fail" | "skip" | "xfail"]
         ) || semantic.match_typing_call_path(&call_path, "assert_never")
-    })
+    }) {
+        return true;
+    }
+
+    // Second, look for `NoReturn` annotations on the return type.
+    let Some(func_binding) = semantic.lookup_attribute(func) else {
+        return false;
+    };
+    let Some(node_id) = semantic.binding(func_binding).source else {
+        return false;
+    };
+
+    let Stmt::FunctionDef(ast::StmtFunctionDef { returns, .. }) = semantic.statement(node_id)
+    else {
+        return false;
+    };
+
+    let Some(returns) = returns.as_ref() else {
+        return false;
+    };
+
+    let Some(call_path) = semantic.resolve_call_path(returns) else {
+        return false;
+    };
+
+    semantic.match_typing_call_path(&call_path, "NoReturn")
 }
 
 /// RET503

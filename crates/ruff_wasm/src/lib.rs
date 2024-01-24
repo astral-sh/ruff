@@ -17,7 +17,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
 use ruff_python_index::{CommentRangesBuilder, Indexer};
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{parse_tokens, AsMode, Mode};
+use ruff_python_parser::{parse_tokens, tokenize_all, AsMode, Mode};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, SourceLocation};
 use ruff_text_size::Ranged;
@@ -272,7 +272,7 @@ struct ParsedModule<'a> {
 
 impl<'a> ParsedModule<'a> {
     fn from_source(source_code: &'a str) -> Result<Self, Error> {
-        let tokens: Vec<_> = ruff_python_parser::lexer::lex(source_code, Mode::Module).collect();
+        let tokens: Vec<_> = tokenize_all(source_code, Mode::Module);
         let mut comment_ranges = CommentRangesBuilder::default();
 
         for (token, range) in tokens.iter().flatten() {

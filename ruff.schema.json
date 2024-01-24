@@ -750,12 +750,26 @@
     "DocstringCodeLineWidth": {
       "anyOf": [
         {
-          "$ref": "#/definitions/LineWidth"
+          "description": "Wrap docstring code examples at a fixed line width.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/LineWidth"
+            }
+          ]
         },
         {
-          "type": "null"
+          "description": "Respect the line length limit setting for the surrounding Python code.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Dynamic"
+            }
+          ]
         }
       ]
+    },
+    "Dynamic": {
+      "type": "string",
+      "const": "dynamic"
     },
     "Flake8AnnotationsOptions": {
       "type": "object",
@@ -2419,6 +2433,15 @@
           "format": "uint",
           "minimum": 0.0
         },
+        "max-nested-blocks": {
+          "description": "Maximum number of nested blocks allowed within a function or method body (see: `PLR1702`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
         "max-positional-args": {
           "description": "Maximum number of positional arguments allowed for a function or method definition (see: `PLR0917`).\n\nIf not specified, defaults to the value of `max-args`.",
           "type": [
@@ -3119,6 +3142,8 @@
         "PLE0117",
         "PLE0118",
         "PLE02",
+        "PLE023",
+        "PLE0237",
         "PLE024",
         "PLE0241",
         "PLE03",
@@ -3129,6 +3154,8 @@
         "PLE060",
         "PLE0604",
         "PLE0605",
+        "PLE064",
+        "PLE0643",
         "PLE07",
         "PLE070",
         "PLE0704",
@@ -3194,6 +3221,7 @@
         "PLR17",
         "PLR170",
         "PLR1701",
+        "PLR1702",
         "PLR1704",
         "PLR1706",
         "PLR171",
@@ -3447,6 +3475,9 @@
         "RUF020",
         "RUF021",
         "RUF022",
+        "RUF023",
+        "RUF024",
+        "RUF025",
         "RUF1",
         "RUF10",
         "RUF100",

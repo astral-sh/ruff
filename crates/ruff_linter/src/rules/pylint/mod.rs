@@ -12,12 +12,13 @@ mod tests {
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
-    use crate::assert_messages;
     use crate::registry::Rule;
     use crate::rules::pylint;
+    use crate::settings::types::PreviewMode;
     use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
+    use crate::{assert_messages, settings};
 
     #[test_case(Rule::AndOrTernary, Path::new("and_or_ternary.py"))]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
@@ -91,6 +92,7 @@ mod tests {
         Path::new("named_expr_without_context.py")
     )]
     #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"))]
+    #[test_case(Rule::NonSlotAssignment, Path::new("non_slot_assignment.py"))]
     #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"))]
     #[test_case(
         Rule::RedefinedArgumentFromLocal,
@@ -167,7 +169,9 @@ mod tests {
     #[test_case(Rule::NoClassmethodDecorator, Path::new("no_method_decorator.py"))]
     #[test_case(Rule::UnnecessaryDunderCall, Path::new("unnecessary_dunder_call.py"))]
     #[test_case(Rule::NoStaticmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::PotentialIndexError, Path::new("potential_index_error.py"))]
     #[test_case(Rule::SuperWithoutBrackets, Path::new("super_without_brackets.py"))]
+    #[test_case(Rule::TooManyNestedBlocks, Path::new("too_many_nested_blocks.py"))]
     #[test_case(
         Rule::UnnecessaryDictIndexLookup,
         Path::new("unnecessary_dict_index_lookup.py")
@@ -184,6 +188,25 @@ mod tests {
                     ..pylint::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"))]
+    #[test_case(Rule::CollapsibleElseIf, Path::new("collapsible_else_if.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("pylint").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_messages!(snapshot, diagnostics);

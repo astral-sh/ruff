@@ -60,6 +60,7 @@ pub struct Settings {
     pub max_statements: usize,
     pub max_public_methods: usize,
     pub max_locals: usize,
+    pub max_nested_blocks: usize,
 }
 
 impl Default for Settings {
@@ -75,6 +76,7 @@ impl Default for Settings {
             max_statements: 50,
             max_public_methods: 20,
             max_locals: 15,
+            max_nested_blocks: 5,
         }
     }
 }
