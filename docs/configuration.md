@@ -537,9 +537,10 @@ Options:
       --preview
           Enable preview mode; checks will include unstable rules and fixes.
           Use `--no-preview` to disable
-      --config <CONFIG>
-          Path to the `pyproject.toml` or `ruff.toml` file to use for
-          configuration
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair overriding a specific
+          config setting
       --extension <EXTENSION>
           List of mappings from file extension to language (one of ["python",
           "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython
@@ -636,9 +637,10 @@ Options:
           Avoid writing any formatted files back; instead, exit with a non-zero
           status code and the difference between the current file and how the
           formatted file would look like
-      --config <CONFIG>
-          Path to the `pyproject.toml` or `ruff.toml` file to use for
-          configuration
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair overriding a specific
+          config setting
       --extension <EXTENSION>
           List of mappings from file extension to language (one of ["python",
           "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython
