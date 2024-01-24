@@ -368,6 +368,30 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
     }
 }
 
+fn is_func_def_annotated_with_noreturn(func: &Expr, semantic: &SemanticModel) -> bool {
+    let Some(func_binding) = semantic.lookup_attribute(func) else {
+        return false;
+    };
+    let Some(node_id) = semantic.binding(func_binding).source else {
+        return false;
+    };
+
+    let Stmt::FunctionDef(ast::StmtFunctionDef { returns, .. }) = semantic.statement(node_id)
+    else {
+        return false;
+    };
+
+    let Some(return_expr) = returns.as_ref() else {
+        return false;
+    };
+
+    let Some(call_path) = semantic.resolve_call_path(return_expr) else {
+        return false;
+    };
+
+    semantic.match_typing_call_path(&call_path, "NoReturn")
+}
+
 /// Return `true` if the `func` is a known function that never returns.
 fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic.resolve_call_path(func).is_some_and(|call_path| {
@@ -455,7 +479,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             if matches!(
                 value.as_ref(),
                 Expr::Call(ast::ExprCall { func, ..  })
-                    if is_noreturn_func(func, checker.semantic())
+                    if is_noreturn_func(func, checker.semantic()) || is_func_def_annotated_with_noreturn(func, checker.semantic())
             ) => {}
         _ => {
             let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
