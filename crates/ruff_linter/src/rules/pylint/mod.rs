@@ -22,7 +22,6 @@ mod tests {
 
     #[test_case(Rule::AndOrTernary, Path::new("and_or_ternary.py"))]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
-    #[test_case(Rule::AssigningNonSlot, Path::new("assigning_non_slot.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
     #[test_case(Rule::BadOpenMode, Path::new("bad_open_mode.py"))]
     #[test_case(
@@ -93,6 +92,7 @@ mod tests {
         Path::new("named_expr_without_context.py")
     )]
     #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"))]
+    #[test_case(Rule::NonSlotAssignment, Path::new("non_slot_assignment.py"))]
     #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"))]
     #[test_case(
         Rule::RedefinedArgumentFromLocal,

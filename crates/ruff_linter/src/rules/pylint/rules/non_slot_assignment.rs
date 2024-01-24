@@ -44,9 +44,9 @@ use crate::checkers::ast::Checker;
 ///         pass
 /// ```
 #[violation]
-pub struct AssigningNonSlot;
+pub struct NonSlotAssignment;
 
-impl Violation for AssigningNonSlot {
+impl Violation for NonSlotAssignment {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Assigning an attribute that is not defined in class slots")
@@ -54,14 +54,14 @@ impl Violation for AssigningNonSlot {
 }
 
 // E0237
-pub(crate) fn assigning_non_slot(
+pub(crate) fn non_slot_assignment(
     checker: &mut Checker,
     ast::StmtClassDef { name, body, .. }: &ast::StmtClassDef,
 ) {
     if is_attributes_not_in_slots(body) {
         checker
             .diagnostics
-            .push(Diagnostic::new(AssigningNonSlot, name.range()));
+            .push(Diagnostic::new(NonSlotAssignment, name.range()));
     }
 }
 
