@@ -2,7 +2,7 @@ use ast::ExprName;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::is_constant;
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprCall, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -74,7 +74,26 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         return;
     }
 
-    if !is_constant(dict_comp.value.as_ref()) {
+    // Don't suggest `dict.fromkeys` if the value is not a constant or constant-like.
+    if !is_constant_like(dict_comp.value.as_ref()) {
+        return;
+    }
+
+    // Don't suggest `dict.fromkeys` if any of the expressions in the value are defined within
+    // the comprehension (e.g., by the target).
+    if any_over_expr(dict_comp.value.as_ref(), &|expr| {
+        let Expr::Name(name) = expr else {
+            return false;
+        };
+
+        let Some(id) = checker.semantic().resolve_name(name) else {
+            return false;
+        };
+
+        let binding = checker.semantic().binding(id);
+
+        dict_comp.range().contains_range(binding.range())
+    }) {
         return;
     }
 
@@ -98,6 +117,34 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     }
 
     checker.diagnostics.push(diagnostic);
+}
+
+/// Returns `true` if the expression can be shared across multiple values.
+///
+/// When converting from `{key: value for key in iterable}` to `dict.fromkeys(iterable, value)`,
+/// the `value` is shared across all values without being evaluated multiple times. If the value
+/// contains, e.g., a function call, it cannot be shared, as the function might have side effects.
+/// Similarly, if the value contains a list comprehension, it cannot be shared, as `dict.fromkeys`
+/// would leave each value with a reference to the same list.
+fn is_constant_like(expr: &Expr) -> bool {
+    !any_over_expr(expr, &|expr| {
+        matches!(
+            expr,
+            Expr::Lambda(_)
+                | Expr::List(_)
+                | Expr::Dict(_)
+                | Expr::Set(_)
+                | Expr::ListComp(_)
+                | Expr::SetComp(_)
+                | Expr::DictComp(_)
+                | Expr::GeneratorExp(_)
+                | Expr::Await(_)
+                | Expr::Yield(_)
+                | Expr::YieldFrom(_)
+                | Expr::Call(_)
+                | Expr::NamedExpr(_)
+        )
+    })
 }
 
 /// Generate a [`Fix`] to replace `dict` comprehension with `dict.fromkeys`.

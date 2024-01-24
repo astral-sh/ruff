@@ -46,6 +46,19 @@ def func():
     {(a, b): 1 for (a, b) in [(1, 2), (3, 4)]}  # RUF025
 
 
+def func():
+    def f():
+        return 1
+
+    a = f()
+    {n: a for n in [1, 2, 3]}  # RUF025
+
+
+def func():
+    values = ["a", "b", "c"]
+    [{n: values for n in [1, 2, 3]}]  # RUF025
+
+
 # Non-violation cases: RUF025
 
 
@@ -76,13 +89,4 @@ def func():
 
 
 def func():
-    def f():
-        return 1
-
-    a = f()
-    {n: a for n in [1, 2, 3]}  # OK
-
-
-def func():
-    values = ["a", "b", "c"]
-    [{n: values for n in [1, 2, 3]}]  # OK
+    {(a, b): a + b for (a, b) in [(1, 2), (3, 4)]}  # OK

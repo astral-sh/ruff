@@ -164,24 +164,61 @@ RUF025.py:46:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
    46 |+    dict.fromkeys([(1, 2), (3, 4)], 1)  # RUF025
 47 47 | 
 48 48 | 
-49 49 | # Non-violation cases: RUF025
+49 49 | def func():
 
-RUF025.py:53:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+RUF025.py:54:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
    |
-52 | def func():
-53 |     {n: 1 for n in [1, 2, 3, 4, 5] if n < 3}  # OK
+53 |     a = f()
+54 |     {n: a for n in [1, 2, 3]}  # RUF025
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF025
+   |
+   = help: Replace with `dict.fromkeys(iterable)`)
+
+ℹ Safe fix
+51 51 |         return 1
+52 52 | 
+53 53 |     a = f()
+54    |-    {n: a for n in [1, 2, 3]}  # RUF025
+   54 |+    dict.fromkeys([1, 2, 3], a)  # RUF025
+55 55 | 
+56 56 | 
+57 57 | def func():
+
+RUF025.py:59:6: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+   |
+57 | def func():
+58 |     values = ["a", "b", "c"]
+59 |     [{n: values for n in [1, 2, 3]}]  # RUF025
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF025
+   |
+   = help: Replace with `dict.fromkeys(iterable)`)
+
+ℹ Safe fix
+56 56 | 
+57 57 | def func():
+58 58 |     values = ["a", "b", "c"]
+59    |-    [{n: values for n in [1, 2, 3]}]  # RUF025
+   59 |+    [dict.fromkeys([1, 2, 3], values)]  # RUF025
+60 60 | 
+61 61 | 
+62 62 | # Non-violation cases: RUF025
+
+RUF025.py:66:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+   |
+65 | def func():
+66 |     {n: 1 for n in [1, 2, 3, 4, 5] if n < 3}  # OK
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF025
    |
    = help: Replace with `dict.fromkeys(iterable)`)
 
 ℹ Safe fix
-50 50 | 
-51 51 | 
-52 52 | def func():
-53    |-    {n: 1 for n in [1, 2, 3, 4, 5] if n < 3}  # OK
-   53 |+    dict.fromkeys([1, 2, 3, 4, 5], 1)  # OK
-54 54 | 
-55 55 | 
-56 56 | def func():
+63 63 | 
+64 64 | 
+65 65 | def func():
+66    |-    {n: 1 for n in [1, 2, 3, 4, 5] if n < 3}  # OK
+   66 |+    dict.fromkeys([1, 2, 3, 4, 5], 1)  # OK
+67 67 | 
+68 68 | 
+69 69 | def func():
 
 
