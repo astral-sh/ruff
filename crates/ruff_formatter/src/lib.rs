@@ -53,7 +53,7 @@ pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, Pri
 pub use format_element::{normalize_newlines, FormatElement, LINE_TERMINATORS};
 pub use group_id::GroupId;
 use ruff_macros::CacheKey;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash, CacheKey)]
 #[cfg_attr(
@@ -431,6 +431,122 @@ impl Printed {
     /// Takes the ranges of nodes that have been formatted as verbatim, replacing them with an empty list.
     pub fn take_verbatim_ranges(&mut self) -> Vec<TextRange> {
         std::mem::take(&mut self.verbatim_ranges)
+    }
+
+    /// Slices the formatted code to the sub-slices that covers the passed `source_range`.
+    ///
+    /// The implementation uses the source map generated during formatting to find the closest range
+    /// in the formatted document that covers `source_range` or more. The returned slice
+    /// matches the `source_range` exactly (except indent, see below) if the formatter emits [`FormatElement::SourcePosition`] for
+    /// the range's offsets.
+    ///
+    /// Returns the entire document if the source map is empty.
+    ///
+    /// ## Indentation
+    /// The `source_range` is extended to include any leading whitespace. This is to use the formatter generated
+    /// indentation over the indentation in the source document.
+    #[must_use]
+    pub fn slice_range(self, source_range: TextRange, source: &str) -> PrintedRange {
+        let mut start_marker: Option<SourceMarker> = None;
+        let mut end_marker: Option<SourceMarker> = None;
+
+        // Note: The printer can generate multiple source map entries for the same source position.
+        // For example if you have:
+        // * `source_position(276)`
+        // * `token("def")`
+        // * `token("foo")`
+        // * `source_position(284)`
+        // The printer uses the source position 276 for both the tokens `def` and `foo` because that's the only position it knows of.
+        for marker in self.sourcemap {
+            // Take the closest start marker, but skip over start_markers that have the same start.
+            if marker.source <= source_range.start()
+                && !start_marker.is_some_and(|start| start.source == marker.source)
+            {
+                start_marker = Some(marker);
+            }
+
+            if marker.source >= source_range.end() {
+                // Take the closest marker to the end range. Override succeeding markers that have the same source
+                // to get the *ultimate* destination position.
+                end_marker = Some(match end_marker {
+                    Some(end) if end.source == marker.source => marker,
+                    None => marker,
+                    Some(_) => break,
+                });
+            }
+        }
+
+        let start = start_marker.map(|marker| marker.dest).unwrap_or_default();
+        let end = end_marker.map_or_else(|| self.code.text_len(), |marker| marker.dest);
+
+        // Extend the formatted range and the source range to both cover any leading whitespace.
+        // Extending the ranges is necessary because the source map positions point to the start of the node's, which is after any indentation.
+        // Copying over the indentation is important when the indent in the source document doesn't match the
+        // indent produced by the formatter, in which case we want to use the indent produced by the formatter.
+        let source_range = extend_range_to_include_indent(source_range, source);
+        let code_range = extend_range_to_include_indent(TextRange::new(start, end), &self.code);
+
+        let code = &self.code[code_range];
+
+        // Trim any trailing whitespace because some statements insert newlines.
+        // Keeping the new lines would lead to new-newlines after each range formatting.
+        let code = code.trim_end_matches(|c: char| c.is_ascii_whitespace());
+
+        PrintedRange {
+            code: code.into(),
+            source_range,
+        }
+    }
+}
+
+/// Extends `range` backwards (by reducing `range.start`) to include any directly preceding whitespace (`\t` or ` `).
+///
+/// # Panics
+/// If `range.start` is out of `source`'s bounds.
+fn extend_range_to_include_indent(range: TextRange, source: &str) -> TextRange {
+    let whitespace_len: TextSize = source[..usize::from(range.start())]
+        .chars()
+        .rev()
+        .take_while(|c| matches!(c, ' ' | '\t'))
+        .map(TextLen::text_len)
+        .sum();
+
+    TextRange::new(range.start() - whitespace_len, range.end())
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct PrintedRange {
+    code: String,
+    source_range: TextRange,
+}
+
+impl PrintedRange {
+    pub fn new(code: String, source_range: TextRange) -> Self {
+        Self { code, source_range }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            code: String::new(),
+            source_range: TextRange::default(),
+        }
+    }
+
+    /// The formatted code.
+    pub fn as_code(&self) -> &str {
+        &self.code
+    }
+
+    /// The range the formatted code corresponds to in the source document.
+    pub fn source_range(&self) -> TextRange {
+        self.source_range
+    }
+
+    #[must_use]
+    pub fn with_code(self, code: String) -> Self {
+        Self { code, ..self }
     }
 }
 

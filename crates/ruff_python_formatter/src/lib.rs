@@ -1,6 +1,7 @@
 use thiserror::Error;
 use tracing::Level;
 
+pub use range::format_range;
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
 use ruff_python_ast::AstNode;
@@ -33,6 +34,7 @@ pub(crate) mod other;
 pub(crate) mod pattern;
 mod prelude;
 mod preview;
+mod range;
 mod shared_traits;
 pub(crate) mod statement;
 pub(crate) mod string;
@@ -170,8 +172,9 @@ mod tests {
     use ruff_python_ast::PySourceType;
     use ruff_python_index::tokens_and_ranges;
     use ruff_python_parser::{parse_tokens, AsMode};
+    use ruff_text_size::{TextRange, TextSize};
 
-    use crate::{format_module_ast, format_module_source, PyFormatOptions};
+    use crate::{format_module_ast, format_module_source, format_range, PyFormatOptions};
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]
@@ -239,6 +242,34 @@ def main() -> None:
 ) + expression.get_db_converters(connection):
     ...
 "
+        );
+    }
+
+    /// Use this test to quickly debug some formatting issue.
+    #[ignore]
+    #[test]
+    fn range_formatting_quick_test() {
+        let source = r#"def  test2(  a):    print("body"  )
+    "#;
+
+        let start = TextSize::new(20);
+        let end = TextSize::new(35);
+
+        let source_type = PySourceType::Python;
+        let options = PyFormatOptions::from_source_type(source_type);
+        let printed = format_range(source, TextRange::new(start, end), options).unwrap();
+
+        let mut formatted = source.to_string();
+        formatted.replace_range(
+            std::ops::Range::<usize>::from(printed.source_range()),
+            printed.as_code(),
+        );
+
+        assert_eq!(
+            formatted,
+            r#"def test2(a):
+    print("body")
+    "#
         );
     }
 

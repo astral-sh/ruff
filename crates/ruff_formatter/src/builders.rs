@@ -328,6 +328,12 @@ pub struct SourcePosition(TextSize);
 
 impl<Context> Format<Context> for SourcePosition {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
+        if let Some(FormatElement::SourcePosition(last_position)) = f.buffer.elements().last() {
+            if *last_position == self.0 {
+                return Ok(());
+            }
+        }
+
         f.write_element(FormatElement::SourcePosition(self.0));
 
         Ok(())
@@ -353,8 +359,8 @@ where
     Context: FormatContext,
 {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        if let Some(source_position) = self.position {
-            f.write_element(FormatElement::SourcePosition(source_position));
+        if let Some(position) = self.position {
+            source_position(position).fmt(f)?;
         }
 
         f.write_element(FormatElement::Text {
