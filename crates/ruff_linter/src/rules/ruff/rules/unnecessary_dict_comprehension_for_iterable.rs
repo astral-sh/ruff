@@ -1,20 +1,23 @@
 use ast::ExprName;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::helpers::is_constant;
 use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprCall, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for unnecessary `dict` comprehension when creating a new dictionary from iterable.
+/// Checks for unnecessary `dict` comprehension when creating a dictionary from
+/// an iterable.
 ///
 /// ## Why is this bad?
-/// It's unnecessary to use a `dict` comprehension to build a dictionary from an iterable when the value is `static`.
-/// Use `dict.fromkeys(iterable)` instead of `{value: None for value in iterable}`.
+/// It's unnecessary to use a `dict` comprehension to build a dictionary from
+/// an iterable when the value is static.
 ///
-/// `dict.fromkeys(iterable)` is more readable and faster than `{value: None for value in iterable}`.
-///
+/// Prefer `dict.fromkeys(iterable)` over `{value: None for value in iterable}`,
+/// as `dict.fromkeys` is more readable and efficient.
 ///
 /// ## Examples
 /// ```python
@@ -32,25 +35,19 @@ pub struct UnnecessaryDictComprehensionForIterable {
     is_value_none_literal: bool,
 }
 
-impl AlwaysFixableViolation for UnnecessaryDictComprehensionForIterable {
+impl Violation for UnnecessaryDictComprehensionForIterable {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        if self.is_value_none_literal {
-            format!(
-                "Unnecessary dict comprehension for iterable (rewrite using `dict.fromkeys(iterable)`)"
-            )
-        } else {
-            format!(
-                "Unnecessary dict comprehension for iterable (rewrite using `dict.fromkeys(iterable, value)`)"
-            )
-        }
+        format!("Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead")
     }
 
-    fn fix_title(&self) -> String {
+    fn fix_title(&self) -> Option<String> {
         if self.is_value_none_literal {
-            format!("Rewrite using `dict.fromkeys(iterable, value)`)",)
+            Some(format!("Replace with `dict.fromkeys(iterable, value)`)"))
         } else {
-            format!("Rewrite using `dict.fromkeys(iterable)`)")
+            Some(format!("Replace with `dict.fromkeys(iterable)`)"))
         }
     }
 }
@@ -58,12 +55,9 @@ impl AlwaysFixableViolation for UnnecessaryDictComprehensionForIterable {
 /// RUF025
 pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     checker: &mut Checker,
-    expr: &Expr,
-    key: &Expr,
-    value: &Expr,
-    generators: &[Comprehension],
+    dict_comp: &ast::ExprDictComp,
 ) {
-    let [generator] = generators else {
+    let [generator] = dict_comp.generators.as_slice() else {
         return;
     };
 
@@ -75,54 +69,42 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         return;
     }
 
-    if !generator.target.is_name_expr() {
+    // Don't suggest `dict.keys` if the target is not the same as the key.
+    if ComparableExpr::from(&generator.target) != ComparableExpr::from(dict_comp.key.as_ref()) {
         return;
-    };
-
-    // Don't suggest `dict.fromkeys` if key and value are binded to the same name.
-    if let (Expr::Name(key_name), Expr::Name(value_name)) = (key, value) {
-        if key_name.id == value_name.id {
-            return;
-        }
     }
 
-    if !has_valid_expression_type(value) {
+    if !is_constant(dict_comp.value.as_ref()) {
         return;
     }
 
     let mut diagnostic = Diagnostic::new(
         UnnecessaryDictComprehensionForIterable {
-            is_value_none_literal: value.is_none_literal_expr(),
+            is_value_none_literal: dict_comp.value.is_none_literal_expr(),
         },
-        expr.range(),
+        dict_comp.range(),
     );
 
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        checker
-            .generator()
-            .expr(&fix_unnecessary_dict_comprehension(value, generator)),
-        expr.range(),
-    )));
+    if checker.semantic().is_builtin("dict") {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            checker
+                .generator()
+                .expr(&fix_unnecessary_dict_comprehension(
+                    dict_comp.value.as_ref(),
+                    generator,
+                )),
+            dict_comp.range(),
+        )));
+    }
+
     checker.diagnostics.push(diagnostic);
 }
 
-// only accept `None`, `Ellipsis`, `True`, `False`, `Number`, `String`, `Bytes`, `Name` as value
-fn has_valid_expression_type(node: &ast::Expr) -> bool {
-    matches!(
-        node,
-        ast::Expr::StringLiteral(_)
-            | ast::Expr::BytesLiteral(_)
-            | ast::Expr::NumberLiteral(_)
-            | ast::Expr::BooleanLiteral(_)
-            | ast::Expr::NoneLiteral(_)
-            | ast::Expr::EllipsisLiteral(_)
-            | ast::Expr::Name(_)
-    )
-}
-
 /// Generate a [`Fix`] to replace `dict` comprehension with `dict.fromkeys`.
-/// (RUF025) Convert `{n: None for n in [1,2,3]}` to `dict.fromkeys([1,2,3])` or
-/// `{n: 1 for n in [1,2,3]}` to `dict.fromkeys([1,2,3], 1)`.
+///
+/// For example:
+/// - Given `{n: None for n in [1,2,3]}`, generate `dict.fromkeys([1,2,3])`.
+/// - Given `{n: 1 for n in [1,2,3]}`, generate `dict.fromkeys([1,2,3], 1)`.
 fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -> Expr {
     let iterable = generator.iter.clone();
     let args = Arguments {
