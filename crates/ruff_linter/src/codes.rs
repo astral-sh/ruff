@@ -224,6 +224,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E0116") => (RuleGroup::Stable, rules::pylint::rules::ContinueInFinally),
         (Pylint, "E0117") => (RuleGroup::Stable, rules::pylint::rules::NonlocalWithoutBinding),
         (Pylint, "E0118") => (RuleGroup::Stable, rules::pylint::rules::LoadBeforeGlobalDeclaration),
+        (Pylint, "E0237") => (RuleGroup::Stable, rules::pylint::rules::NonSlotAssignment),
         (Pylint, "E0241") => (RuleGroup::Stable, rules::pylint::rules::DuplicateBases),
         (Pylint, "E0302") => (RuleGroup::Stable, rules::pylint::rules::UnexpectedSpecialMethodSignature),
         (Pylint, "E0307") => (RuleGroup::Stable, rules::pylint::rules::InvalidStrReturnType),
@@ -926,6 +927,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "020") => (RuleGroup::Preview, rules::ruff::rules::NeverUnion),
         (Ruff, "021") => (RuleGroup::Preview, rules::ruff::rules::ParenthesizeChainedOperators),
         (Ruff, "022") => (RuleGroup::Preview, rules::ruff::rules::UnsortedDunderAll),
+        (Ruff, "023") => (RuleGroup::Preview, rules::ruff::rules::UnsortedDunderSlots),
+        (Ruff, "024") => (RuleGroup::Preview, rules::ruff::rules::MutableFromkeysValue),
+        (Ruff, "025") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryDictComprehensionForIterable),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
 

@@ -92,6 +92,7 @@ mod tests {
         Path::new("named_expr_without_context.py")
     )]
     #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"))]
+    #[test_case(Rule::NonSlotAssignment, Path::new("non_slot_assignment.py"))]
     #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"))]
     #[test_case(
         Rule::RedefinedArgumentFromLocal,
@@ -193,6 +194,7 @@ mod tests {
     }
 
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"))]
+    #[test_case(Rule::CollapsibleElseIf, Path::new("collapsible_else_if.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

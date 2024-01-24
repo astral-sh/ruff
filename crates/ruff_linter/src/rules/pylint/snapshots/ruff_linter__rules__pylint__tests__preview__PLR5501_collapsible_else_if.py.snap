@@ -1,0 +1,195 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+collapsible_else_if.py:37:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+35 |       if 1:
+36 |           pass
+37 |       else:
+   |  _____^
+38 | |         if 2:
+   | |________^ PLR5501
+39 |               pass
+   |
+   = help: Convert to `elif`
+
+ℹ Safe fix
+34 34 | def not_ok0():
+35 35 |     if 1:
+36 36 |         pass
+37    |-    else:
+38    |-        if 2:
+39    |-            pass
+   37 |+    elif 2:
+   38 |+        pass
+40 39 | 
+41 40 | 
+42 41 | def not_ok1():
+
+collapsible_else_if.py:45:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+43 |       if 1:
+44 |           pass
+45 |       else:
+   |  _____^
+46 | |         if 2:
+   | |________^ PLR5501
+47 |               pass
+48 |           else:
+   |
+   = help: Convert to `elif`
+
+ℹ Safe fix
+42 42 | def not_ok1():
+43 43 |     if 1:
+44 44 |         pass
+   45 |+    elif 2:
+   46 |+        pass
+45 47 |     else:
+46    |-        if 2:
+47    |-            pass
+48    |-        else:
+49    |-            pass
+   48 |+        pass
+50 49 | 
+51 50 | 
+52 51 | def not_ok1_with_comments():
+
+collapsible_else_if.py:55:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+53 |       if 1:
+54 |           pass
+55 |       else:
+   |  _____^
+56 | |         # inner comment
+57 | |         if 2:
+   | |________^ PLR5501
+58 |               pass
+59 |           else:
+   |
+   = help: Convert to `elif`
+
+ℹ Safe fix
+52 52 | def not_ok1_with_comments():
+53 53 |     if 1:
+54 54 |         pass
+   55 |+    elif 2:
+   56 |+        pass
+55 57 |     else:
+56    |-        # inner comment
+57    |-        if 2:
+58    |-            pass
+59    |-        else:
+60    |-            pass  # final pass comment
+   58 |+        pass  # final pass comment
+61 59 | 
+62 60 | 
+63 61 | # Regression test for https://github.com/apache/airflow/blob/f1e1cdcc3b2826e68ba133f350300b5065bbca33/airflow/models/dag.py#L1737
+
+collapsible_else_if.py:69:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+67 |       elif True:
+68 |           print(2)
+69 |       else:
+   |  _____^
+70 | |         if True:
+   | |________^ PLR5501
+71 |               print(3)
+72 |           else:
+   |
+   = help: Convert to `elif`
+
+ℹ Safe fix
+66 66 |         print(1)
+67 67 |     elif True:
+68 68 |         print(2)
+   69 |+    elif True:
+   70 |+        print(3)
+69 71 |     else:
+70    |-        if True:
+71    |-            print(3)
+72    |-        else:
+73    |-            print(4)
+   72 |+        print(4)
+74 73 | 
+75 74 | 
+76 75 | def not_ok3():
+
+collapsible_else_if.py:79:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+77 |       if 1:
+78 |           pass
+79 |       else:
+   |  _____^
+80 | |         if 2: pass
+   | |________^ PLR5501
+81 |           else: pass
+   |
+   = help: Convert to `elif`
+
+ℹ Safe fix
+76 76 | def not_ok3():
+77 77 |     if 1:
+78 78 |         pass
+79    |-    else:
+80    |-        if 2: pass
+81    |-        else: pass
+   79 |+    elif 2: pass
+   80 |+    else: pass
+82 81 | 
+83 82 | 
+84 83 | def not_ok4():
+
+collapsible_else_if.py:87:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+85 |       if 1:
+86 |           pass
+87 |       else:
+   |  _____^
+88 | |         if 2: pass
+   | |________^ PLR5501
+89 |           else:
+90 |               pass
+   |
+   = help: Convert to `elif`
+
+ℹ Safe fix
+84 84 | def not_ok4():
+85 85 |     if 1:
+86 86 |         pass
+   87 |+    elif 2: pass
+87 88 |     else:
+88    |-        if 2: pass
+89    |-        else:
+90    |-            pass
+   89 |+        pass
+91 90 | 
+92 91 | 
+93 92 | def not_ok5():
+
+collapsible_else_if.py:96:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+   |
+94 |       if 1:
+95 |           pass
+96 |       else:
+   |  _____^
+97 | |         if 2:
+   | |________^ PLR5501
+98 |               pass
+99 |           else: pass
+   |
+   = help: Convert to `elif`
+
+ℹ Safe fix
+93 93 | def not_ok5():
+94 94 |     if 1:
+95 95 |         pass
+96    |-    else:
+97    |-        if 2:
+98    |-            pass
+99    |-        else: pass
+   96 |+    elif 2:
+   97 |+        pass
+   98 |+    else: pass
+
+

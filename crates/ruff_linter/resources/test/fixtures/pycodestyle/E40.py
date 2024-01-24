@@ -1,5 +1,6 @@
 #: E401
 import os, sys
+
 #: Okay
 import os
 import sys
@@ -59,3 +60,21 @@ import foo
 a = 1
 
 import bar
+
+#: E401
+import re as regex, string  # also with a comment!
+import re as regex, string; x = 1
+
+x = 1; import re as regex, string
+
+
+def blah():
+    import datetime as dt, copy
+
+    def nested_and_tested():
+        import builtins, textwrap as tw
+
+        x = 1; import re as regex, string
+        import re as regex, string; x = 1
+
+    if True: import re as regex, string

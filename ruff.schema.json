@@ -750,12 +750,26 @@
     "DocstringCodeLineWidth": {
       "anyOf": [
         {
-          "$ref": "#/definitions/LineWidth"
+          "description": "Wrap docstring code examples at a fixed line width.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/LineWidth"
+            }
+          ]
         },
         {
-          "type": "null"
+          "description": "Respect the line length limit setting for the surrounding Python code.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Dynamic"
+            }
+          ]
         }
       ]
+    },
+    "Dynamic": {
+      "type": "string",
+      "const": "dynamic"
     },
     "Flake8AnnotationsOptions": {
       "type": "object",
@@ -3119,6 +3133,8 @@
         "PLE0117",
         "PLE0118",
         "PLE02",
+        "PLE023",
+        "PLE0237",
         "PLE024",
         "PLE0241",
         "PLE03",
@@ -3449,6 +3465,9 @@
         "RUF020",
         "RUF021",
         "RUF022",
+        "RUF023",
+        "RUF024",
+        "RUF025",
         "RUF1",
         "RUF10",
         "RUF100",
