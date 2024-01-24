@@ -111,7 +111,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> bool {
             _ => {}
         }
     }
-    slots.sort();
-    attrs.sort();
+    slots.sort_unstable();
+    attrs.sort_unstable();
     has_slots && slots.len() != attrs.len() || !slots.iter().zip(attrs.iter()).all(|(a, b)| a == b)
 }
