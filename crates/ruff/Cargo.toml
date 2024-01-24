@@ -30,7 +30,7 @@ bincode = { workspace = true }
 bitflags = { workspace = true }
 cachedir = { workspace = true }
 chrono = { workspace = true }
-clap = { workspace = true, features = ["derive", "env"] }
+clap = { workspace = true, features = ["derive", "env", "wrap_help"] }
 clap_complete_command = { workspace = true }
 clearscreen = { workspace = true }
 colored = { workspace = true }
