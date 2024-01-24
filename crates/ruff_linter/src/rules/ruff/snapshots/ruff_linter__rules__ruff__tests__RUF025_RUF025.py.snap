@@ -203,22 +203,4 @@ RUF025.py:59:6: RUF025 [*] Unnecessary dict comprehension for iterable; use `dic
 61 61 | 
 62 62 | # Non-violation cases: RUF025
 
-RUF025.py:66:5: RUF025 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
-   |
-65 | def func():
-66 |     {n: 1 for n in [1, 2, 3, 4, 5] if n < 3}  # OK
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF025
-   |
-   = help: Replace with `dict.fromkeys(iterable)`)
-
-ℹ Safe fix
-63 63 | 
-64 64 | 
-65 65 | def func():
-66    |-    {n: 1 for n in [1, 2, 3, 4, 5] if n < 3}  # OK
-   66 |+    dict.fromkeys([1, 2, 3, 4, 5], 1)  # OK
-67 67 | 
-68 68 | 
-69 69 | def func():
-
 

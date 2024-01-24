@@ -65,7 +65,10 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     // - async generator expressions, because `dict.fromkeys` is not async.
     // - nested generator expressions, because `dict.fromkeys` might be error-prone option at least for fixing.
     // - generator expressions with `if` clauses, because `dict.fromkeys` might not be valid option.
-    if !generator.ifs.is_empty() && generator.is_async {
+    if !generator.ifs.is_empty() {
+        return;
+    }
+    if generator.is_async {
         return;
     }
 
