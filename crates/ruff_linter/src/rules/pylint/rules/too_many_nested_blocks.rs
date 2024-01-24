@@ -37,75 +37,78 @@ impl Violation for TooManyNestedBlocks {
 
 /// PLR1702
 pub(crate) fn too_many_nested_blocks(checker: &mut Checker, stmt: &Stmt) {
-    // check that we're in a function
-    // if not, return
+    // Only enforce nesting within functions or methods.
     if !checker.semantic().current_scope().kind.is_function() {
         return;
     }
 
-    // check if this statement has any more branching statements
-    // if so, return
-    if stmt_has_more_stmts(stmt) {
+    // If the statement isn't a leaf node, we don't want to emit a diagnostic, since the diagnostic
+    // will be emitted on the leaves.
+    if has_nested_block(stmt) {
         return;
     }
 
     let max_nested_blocks = checker.settings.pylint.max_nested_blocks;
 
-    let (count, oldest_ancestor_id) =
+    // Traverse up the hierarchy, identifying the root node and counting the number of nested
+    // blocks between the root and this leaf.
+    let (count, root_id) =
         checker
             .semantic()
             .current_statement_ids()
-            .fold((0, None), |(count, previous_id), id| {
+            .fold((0, None), |(count, ancestor_id), id| {
                 let stmt = checker.semantic().statement(id);
-                if stmt.is_with_stmt()
-                    || stmt.is_if_stmt()
-                    || stmt.is_try_stmt()
-                    || stmt.is_while_stmt()
-                    || stmt.is_for_stmt()
-                {
-                    // we want to emit the diagnostic on the
-                    // oldest nested statement
-                    return (count + 1, Some(id));
+                if is_nested_block(stmt) {
+                    (count + 1, Some(id))
+                } else {
+                    (count, ancestor_id)
                 }
-                (count, previous_id)
             });
 
-    let Some(oldest_ancestor_id) = oldest_ancestor_id else {
+    let Some(root_id) = root_id else {
         return;
     };
 
+    // If the number of nested blocks is less than the maximum, we don't want to emit a diagnostic.
     if count <= max_nested_blocks {
         return;
     }
-
-    let oldest_ancestor = checker.semantic().statement(oldest_ancestor_id);
 
     checker.diagnostics.push(Diagnostic::new(
         TooManyNestedBlocks {
             nested_blocks: count,
             max_nested_blocks,
         },
-        oldest_ancestor.range(),
+        checker.semantic().statement(root_id).range(),
     ));
 }
 
-fn stmt_has_more_stmts(stmt: &Stmt) -> bool {
+/// Returns `true` if the given statement is a nested block.
+fn is_nested_block(stmt: &Stmt) -> bool {
+    matches!(
+        stmt,
+        Stmt::If(_) | Stmt::While(_) | Stmt::For(_) | Stmt::Try(_) | Stmt::With(_)
+    )
+}
+
+/// Returns `true` if the given statement is a leaf node.
+fn has_nested_block(stmt: &Stmt) -> bool {
     match stmt {
         Stmt::If(ast::StmtIf {
             body,
             elif_else_clauses,
             ..
         }) => {
-            body.iter().any(stmt_has_more_stmts)
+            body.iter().any(is_nested_block)
                 || elif_else_clauses
                     .iter()
-                    .any(|elif_else| elif_else.body.iter().any(stmt_has_more_stmts))
+                    .any(|elif_else| elif_else.body.iter().any(is_nested_block))
         }
         Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-            body.iter().any(stmt_has_more_stmts) || orelse.iter().any(stmt_has_more_stmts)
+            body.iter().any(is_nested_block) || orelse.iter().any(is_nested_block)
         }
         Stmt::For(ast::StmtFor { body, orelse, .. }) => {
-            body.iter().any(stmt_has_more_stmts) || orelse.iter().any(stmt_has_more_stmts)
+            body.iter().any(is_nested_block) || orelse.iter().any(is_nested_block)
         }
         Stmt::Try(ast::StmtTry {
             body,
@@ -114,16 +117,16 @@ fn stmt_has_more_stmts(stmt: &Stmt) -> bool {
             finalbody,
             ..
         }) => {
-            body.iter().any(stmt_has_more_stmts)
+            body.iter().any(is_nested_block)
                 || handlers.iter().any(|handler| match handler {
                     ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                         body, ..
-                    }) => body.iter().any(stmt_has_more_stmts),
+                    }) => body.iter().any(is_nested_block),
                 })
-                || orelse.iter().any(stmt_has_more_stmts)
-                || finalbody.iter().any(stmt_has_more_stmts)
+                || orelse.iter().any(is_nested_block)
+                || finalbody.iter().any(is_nested_block)
         }
-        Stmt::With(ast::StmtWith { body, .. }) => body.iter().any(stmt_has_more_stmts),
+        Stmt::With(ast::StmtWith { body, .. }) => body.iter().any(is_nested_block),
         _ => false,
     }
 }

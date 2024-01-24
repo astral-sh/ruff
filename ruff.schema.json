@@ -2434,7 +2434,7 @@
           "minimum": 0.0
         },
         "max-nested-blocks": {
-          "description": "Maximum number of nested blocks allowed within a function / method body (see: `PLR1702`).",
+          "description": "Maximum number of nested blocks allowed within a function or method body (see: `PLR1702`).",
           "type": [
             "integer",
             "null"
