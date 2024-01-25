@@ -1,8 +1,7 @@
 use std::borrow::Cow;
 
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
-use ruff_python_ast::PySourceType;
-use ruff_python_ast::{AnyNodeRef, AstNode};
+use ruff_python_ast::{AnyNodeRef, AstNode, NodeKind, PySourceType};
 use ruff_python_trivia::{
     is_pragma_comment, lines_after, lines_after_ignoring_trivia, lines_before,
 };
@@ -11,6 +10,8 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 use crate::comments::{CommentLinePosition, SourceComment};
 use crate::context::NodeLevel;
 use crate::prelude::*;
+use crate::preview::is_blank_line_after_nested_stub_class_enabled;
+use crate::statement::suite::blank_line_after_nested_stub_class_condition;
 
 /// Formats the leading comments of a node.
 pub(crate) fn leading_node_comments<T>(node: &T) -> FormatLeadingComments
@@ -85,45 +86,61 @@ pub(crate) struct FormatLeadingAlternateBranchComments<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        let empty_line_condition = if is_blank_line_after_nested_stub_class_enabled(f.context()) {
+            self.last_node.map_or(false, |preceding| {
+                blank_line_after_nested_stub_class_condition(preceding, None, f)
+            })
+        } else {
+            false
+        };
+
         if let Some(first_leading) = self.comments.first() {
-            // Leading comments only preserves the lines after the comment but not before.
-            // Insert the necessary lines.
-            write!(
-                f,
-                [empty_lines(lines_before(
-                    first_leading.start(),
-                    f.context().source()
-                ))]
-            )?;
+            if empty_line_condition {
+                write!(f, [empty_line()])?;
+            } else {
+                // Leading comments only preserves the lines after the comment but not before.
+                // Insert the necessary lines.
+                write!(
+                    f,
+                    [empty_lines(lines_before(
+                        first_leading.start(),
+                        f.context().source()
+                    ))]
+                )?;
+            }
 
             write!(f, [leading_comments(self.comments)])?;
         } else if let Some(last_preceding) = self.last_node {
-            // The leading comments formatting ensures that it preserves the right amount of lines
-            // after We need to take care of this ourselves, if there's no leading `else` comment.
-            // Since the `last_node` could be a compound node, we need to skip _all_ trivia.
-            //
-            // For example, here, when formatting the `if` statement, the `last_node` (the `while`)
-            // would end at the end of `pass`, but we want to skip _all_ comments:
-            // ```python
-            // if True:
-            //     while True:
-            //         pass
-            //         # comment
-            //
-            //     # comment
-            // else:
-            //     ...
-            // ```
-            //
-            // `lines_after_ignoring_trivia` is safe here, as we _know_ that the `else` doesn't
-            // have any leading comments.
-            write!(
-                f,
-                [empty_lines(lines_after_ignoring_trivia(
-                    last_preceding.end(),
-                    f.context().source()
-                ))]
-            )?;
+            if empty_line_condition {
+                write!(f, [empty_line()])?;
+            } else {
+                // The leading comments formatting ensures that it preserves the right amount of lines
+                // after We need to take care of this ourselves, if there's no leading `else` comment.
+                // Since the `last_node` could be a compound node, we need to skip _all_ trivia.
+                //
+                // For example, here, when formatting the `if` statement, the `last_node` (the `while`)
+                // would end at the end of `pass`, but we want to skip _all_ comments:
+                // ```python
+                // if True:
+                //     while True:
+                //         pass
+                //         # comment
+                //
+                //     # comment
+                // else:
+                //     ...
+                // ```
+                //
+                // `lines_after_ignoring_trivia` is safe here, as we _know_ that the `else` doesn't
+                // have any leading comments.
+                write!(
+                    f,
+                    [empty_lines(lines_after_ignoring_trivia(
+                        last_preceding.end(),
+                        f.context().source()
+                    ))]
+                )?;
+            }
         }
 
         Ok(())
@@ -513,14 +530,32 @@ fn strip_comment_prefix(comment_text: &str) -> FormatResult<&str> {
 /// ```
 ///
 /// This builder will insert two empty lines before the comment.
+///
+/// # Preview
+///
+/// For preview style, this builder will insert a single empty line after a
+/// class definition in a stub file.
+///
+/// For example, given:
+/// ```python
+/// class Foo:
+///     pass
+/// # comment
+/// ```
+///
+/// This builder will insert a single empty line before the comment.
 pub(crate) fn empty_lines_before_trailing_comments<'a>(
     f: &PyFormatter,
     comments: &'a [SourceComment],
+    node_kind: NodeKind,
 ) -> FormatEmptyLinesBeforeTrailingComments<'a> {
     // Black has different rules for stub vs. non-stub and top level vs. indented
     let empty_lines = match (f.options().source_type(), f.context().node_level()) {
         (PySourceType::Stub, NodeLevel::TopLevel(_)) => 1,
-        (PySourceType::Stub, _) => 0,
+        (PySourceType::Stub, _) => u32::from(
+            is_blank_line_after_nested_stub_class_enabled(f.context())
+                && node_kind == NodeKind::StmtClassDef,
+        ),
         (_, NodeLevel::TopLevel(_)) => 2,
         (_, _) => 1,
     };

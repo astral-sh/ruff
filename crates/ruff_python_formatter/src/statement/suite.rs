@@ -12,8 +12,8 @@ use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, With
 use crate::expression::expr_string_literal::ExprStringLiteralKind;
 use crate::prelude::*;
 use crate::preview::{
-    is_dummy_implementations_enabled, is_module_docstring_newlines_enabled,
-    is_no_blank_line_before_class_docstring_enabled,
+    is_blank_line_after_nested_stub_class_enabled, is_dummy_implementations_enabled,
+    is_module_docstring_newlines_enabled, is_no_blank_line_before_class_docstring_enabled,
 };
 use crate::statement::stmt_expr::FormatStmtExpr;
 use crate::verbatim::{
@@ -472,21 +472,68 @@ fn stub_file_empty_lines(
         || !stub_suite_can_omit_empty_line(preceding, following, f);
     match kind {
         SuiteKind::TopLevel => {
-            if empty_line_condition {
-                empty_line().fmt(f)
-            } else {
-                hard_line_break().fmt(f)
-            }
-        }
-        SuiteKind::Class | SuiteKind::Other | SuiteKind::Function => {
             if empty_line_condition
-                && lines_after_ignoring_end_of_line_trivia(preceding.end(), source) > 1
+                || (is_blank_line_after_nested_stub_class_enabled(f.context())
+                    && blank_line_after_nested_stub_class_condition(
+                        preceding.into(),
+                        Some(following.into()),
+                        f,
+                    ))
             {
                 empty_line().fmt(f)
             } else {
                 hard_line_break().fmt(f)
             }
         }
+        SuiteKind::Class | SuiteKind::Other | SuiteKind::Function => {
+            if (empty_line_condition
+                && lines_after_ignoring_end_of_line_trivia(preceding.end(), source) > 1)
+                || (is_blank_line_after_nested_stub_class_enabled(f.context())
+                    && blank_line_after_nested_stub_class_condition(
+                        preceding.into(),
+                        Some(following.into()),
+                        f,
+                    ))
+            {
+                empty_line().fmt(f)
+            } else {
+                hard_line_break().fmt(f)
+            }
+        }
+    }
+}
+
+/// Checks if an empty line should be inserted between the preceding and, optionally,
+/// the following node according to the [`blank_line_after_nested_stub_class`](https://github.com/astral-sh/ruff/issues/8891)
+/// preview style.
+///
+/// If `following` is `None`, then the preceding node is the last node in the suite.
+pub(crate) fn blank_line_after_nested_stub_class_condition(
+    preceding: AnyNodeRef<'_>,
+    following: Option<AnyNodeRef<'_>>,
+    f: &PyFormatter,
+) -> bool {
+    let comments = f.context().comments();
+    match preceding.as_stmt_class_def() {
+        Some(class) if contains_only_an_ellipsis(&class.body, comments) => {
+            !class.decorator_list.is_empty()
+                || match following {
+                    Some(AnyNodeRef::StmtClassDef(ast::StmtClassDef {
+                        body,
+                        decorator_list,
+                        ..
+                    })) => !contains_only_an_ellipsis(body, comments) || !decorator_list.is_empty(),
+                    Some(AnyNodeRef::StmtFunctionDef(_)) | None => true,
+                    _ => false,
+                }
+        }
+        Some(_) => !comments.has_trailing_own_line(preceding),
+        None => std::iter::successors(
+            preceding.last_child_in_body(),
+            AnyNodeRef::last_child_in_body,
+        )
+        .take_while(|last_child| !comments.has_trailing_own_line(*last_child))
+        .any(|last_child| last_child.is_stmt_class_def()),
     }
 }
 
