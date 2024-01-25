@@ -1,9 +1,3 @@
-"""
-Should emit:
-B999 - on lines 11, 25, 26, 40, 46
-"""
-
-
 some_list = [1, 2, 3]
 for elem in some_list:
     print(elem)
@@ -47,7 +41,6 @@ for elem in a.some_list:
         del a.some_list[2]  # should error
 
 
-
 some_list = [1, 2, 3]
 for elem in some_list:
     print(elem)
@@ -57,19 +50,17 @@ for elem in some_list:
         some_list.sort()  # should error
         some_list.reverse()  # should error
         some_list.clear()  # should error
-        some_list.extend([1,2])  # should error
+        some_list.extend([1, 2])  # should error
         some_list.insert(1, 1)  # should error
-        some_list.pop(1) # should error
-        some_list.pop() # should error
-        some_list = 3 # should error
+        some_list.pop(1)  # should error
+        some_list.pop()  # should error
+        some_list = 3  # should error
         break
 
 
-
-mydicts = {'a': {'foo': 1, 'bar': 2}}
+mydicts = {"a": {"foo": 1, "bar": 2}}
 
 for mydict in mydicts:
-    if mydicts.get('a', ''):
-        print(mydict['foo'])  # should not error
-        mydicts.popitem() # should error
-        
+    if mydicts.get("a", ""):
+        print(mydict["foo"])  # should not error
+        mydicts.popitem()  # should error
