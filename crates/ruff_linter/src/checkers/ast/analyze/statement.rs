@@ -507,6 +507,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::NoSlotsInNamedtupleSubclass) {
                 flake8_slots::rules::no_slots_in_namedtuple_subclass(checker, stmt, class_def);
             }
+            if checker.enabled(Rule::NonSlotAssignment) {
+                pylint::rules::non_slot_assignment(checker, class_def);
+            }
             if checker.enabled(Rule::SingleStringSlots) {
                 pylint::rules::single_string_slots(checker, class_def);
             }
@@ -1069,13 +1072,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ruff::rules::sort_dunder_all_aug_assign(checker, aug_assign);
             }
         }
-        Stmt::If(
-            if_ @ ast::StmtIf {
-                test,
-                elif_else_clauses,
-                ..
-            },
-        ) => {
+        Stmt::If(if_ @ ast::StmtIf { test, .. }) => {
+            if checker.enabled(Rule::TooManyNestedBlocks) {
+                pylint::rules::too_many_nested_blocks(checker, stmt);
+            }
             if checker.enabled(Rule::EmptyTypeCheckingBlock) {
                 if typing::is_type_checking_block(if_, &checker.semantic) {
                     flake8_type_checking::rules::empty_type_checking_block(checker, if_);
@@ -1092,7 +1092,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 );
             }
             if checker.enabled(Rule::IfWithSameArms) {
-                flake8_simplify::rules::if_with_same_arms(checker, checker.locator, if_);
+                flake8_simplify::rules::if_with_same_arms(checker, if_);
             }
             if checker.enabled(Rule::NeedlessBool) {
                 flake8_simplify::rules::needless_bool(checker, if_);
@@ -1117,9 +1117,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pyupgrade::rules::outdated_version_block(checker, if_);
             }
             if checker.enabled(Rule::CollapsibleElseIf) {
-                if let Some(diagnostic) = pylint::rules::collapsible_else_if(elif_else_clauses) {
-                    checker.diagnostics.push(diagnostic);
-                }
+                pylint::rules::collapsible_else_if(checker, stmt);
             }
             if checker.enabled(Rule::CheckAndRemoveFromSet) {
                 refurb::rules::check_and_remove_from_set(checker, if_);
@@ -1210,6 +1208,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::With(with_stmt @ ast::StmtWith { items, body, .. }) => {
+            if checker.enabled(Rule::TooManyNestedBlocks) {
+                pylint::rules::too_many_nested_blocks(checker, stmt);
+            }
             if checker.enabled(Rule::AssertRaisesException) {
                 flake8_bugbear::rules::assert_raises_exception(checker, items);
             }
@@ -1237,6 +1238,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::While(while_stmt @ ast::StmtWhile { body, orelse, .. }) => {
+            if checker.enabled(Rule::TooManyNestedBlocks) {
+                pylint::rules::too_many_nested_blocks(checker, stmt);
+            }
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Stmt(stmt));
             }
@@ -1260,6 +1264,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 range: _,
             },
         ) => {
+            if checker.enabled(Rule::TooManyNestedBlocks) {
+                pylint::rules::too_many_nested_blocks(checker, stmt);
+            }
             if checker.any_enabled(&[
                 Rule::EnumerateForLoop,
                 Rule::IncorrectDictIterator,
@@ -1325,6 +1332,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             finalbody,
             ..
         }) => {
+            if checker.enabled(Rule::TooManyNestedBlocks) {
+                pylint::rules::too_many_nested_blocks(checker, stmt);
+            }
             if checker.enabled(Rule::JumpStatementInFinally) {
                 flake8_bugbear::rules::jump_statement_in_finally(checker, finalbody);
             }
@@ -1459,6 +1469,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_assign(checker, assign);
             }
+            if checker.enabled(Rule::UnsortedDunderSlots) {
+                ruff::rules::sort_dunder_slots_assign(checker, assign);
+            }
             if checker.source_type.is_stub() {
                 if checker.any_enabled(&[
                     Rule::UnprefixedTypeParam,
@@ -1531,6 +1544,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_ann_assign(checker, assign_stmt);
+            }
+            if checker.enabled(Rule::UnsortedDunderSlots) {
+                ruff::rules::sort_dunder_slots_ann_assign(checker, assign_stmt);
             }
             if checker.source_type.is_stub() {
                 if let Some(value) = value {

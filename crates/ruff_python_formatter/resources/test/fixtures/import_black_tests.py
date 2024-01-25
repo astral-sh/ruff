@@ -45,6 +45,10 @@ def import_fixture(fixture: Path, fixture_set: str):
             if "--pyi" in flags:
                 extension = "pyi"
 
+            if "--line-ranges=" in flags:
+                # Black preserves the flags for line-ranges tests to not mess up the line numbers
+                input.insert(0, flags)
+
             if "--line-length=" in flags:
                 [_, length_and_rest] = flags.split("--line-length=", 1)
                 length = length_and_rest.split(" ", 1)[0]

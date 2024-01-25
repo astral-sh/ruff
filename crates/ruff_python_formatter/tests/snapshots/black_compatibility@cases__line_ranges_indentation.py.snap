@@ -5,6 +5,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/lin
 ## Input
 
 ```python
+# flags: --line-ranges=5-5
 # NOTE: If you need to modify this file, pay special attention to the --line-ranges=
 # flag above as it's formatting specifically these lines.
 if cond1:
@@ -23,12 +24,7 @@ if another_cond:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,4 +1,3 @@
--# flags: --line-ranges=5-5
- # NOTE: If you need to modify this file, pay special attention to the --line-ranges=
- # flag above as it's formatting specifically these lines.
- if cond1:
-@@ -9,4 +8,4 @@
+@@ -9,4 +9,4 @@
          print("else")
  
  if another_cond:
@@ -39,6 +35,7 @@ if another_cond:
 ## Ruff Output
 
 ```python
+# flags: --line-ranges=5-5
 # NOTE: If you need to modify this file, pay special attention to the --line-ranges=
 # flag above as it's formatting specifically these lines.
 if cond1:

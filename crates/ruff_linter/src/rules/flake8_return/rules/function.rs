@@ -1,9 +1,10 @@
+use anyhow::Result;
 use std::ops::Add;
 
 use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, FixAvailability, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
@@ -12,12 +13,13 @@ use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::is_python_whitespace;
+use ruff_python_trivia::{is_python_whitespace, SimpleTokenKind, SimpleTokenizer};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
 use crate::registry::{AsRule, Rule};
 use crate::rules::flake8_return::helpers::end_of_last_statement;
+use crate::rules::pyupgrade::fixes::adjust_indentation;
 
 use super::super::branch::Branch;
 use super::super::helpers::result_exists;
@@ -210,10 +212,16 @@ pub struct SuperfluousElseReturn {
 }
 
 impl Violation for SuperfluousElseReturn {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         let SuperfluousElseReturn { branch } = self;
         format!("Unnecessary `{branch}` after `return` statement")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let SuperfluousElseReturn { branch } = self;
+        Some(format!("Remove unnecessary `{branch}`"))
     }
 }
 
@@ -248,10 +256,16 @@ pub struct SuperfluousElseRaise {
 }
 
 impl Violation for SuperfluousElseRaise {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         let SuperfluousElseRaise { branch } = self;
         format!("Unnecessary `{branch}` after `raise` statement")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let SuperfluousElseRaise { branch } = self;
+        Some(format!("Remove unnecessary `{branch}`"))
     }
 }
 
@@ -288,10 +302,16 @@ pub struct SuperfluousElseContinue {
 }
 
 impl Violation for SuperfluousElseContinue {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         let SuperfluousElseContinue { branch } = self;
         format!("Unnecessary `{branch}` after `continue` statement")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let SuperfluousElseContinue { branch } = self;
+        Some(format!("Remove unnecessary `{branch}`"))
     }
 }
 
@@ -328,10 +348,16 @@ pub struct SuperfluousElseBreak {
 }
 
 impl Violation for SuperfluousElseBreak {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         let SuperfluousElseBreak { branch } = self;
         format!("Unnecessary `{branch}` after `break` statement")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let SuperfluousElseBreak { branch } = self;
+        Some(format!("Remove unnecessary `{branch}`"))
     }
 }
 
@@ -368,9 +394,11 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
     }
 }
 
-/// Return `true` if the `func` is a known function that never returns.
+/// Return `true` if the `func` appears to be non-returning.
 fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(func).is_some_and(|call_path| {
+    // First, look for known functions that never return from the standard library and popular
+    // libraries.
+    if semantic.resolve_call_path(func).is_some_and(|call_path| {
         matches!(
             call_path.as_slice(),
             ["" | "builtins" | "sys" | "_thread" | "pytest", "exit"]
@@ -379,7 +407,32 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
                 | ["_winapi", "ExitProcess"]
                 | ["pytest", "fail" | "skip" | "xfail"]
         ) || semantic.match_typing_call_path(&call_path, "assert_never")
-    })
+    }) {
+        return true;
+    }
+
+    // Second, look for `NoReturn` annotations on the return type.
+    let Some(func_binding) = semantic.lookup_attribute(func) else {
+        return false;
+    };
+    let Some(node_id) = semantic.binding(func_binding).source else {
+        return false;
+    };
+
+    let Stmt::FunctionDef(ast::StmtFunctionDef { returns, .. }) = semantic.statement(node_id)
+    else {
+        return false;
+    };
+
+    let Some(returns) = returns.as_ref() else {
+        return false;
+    };
+
+    let Some(call_path) = semantic.resolve_call_path(returns) else {
+        return false;
+    };
+
+    semantic.match_typing_call_path(&call_path, "NoReturn")
 }
 
 /// RET503
@@ -575,42 +628,54 @@ fn superfluous_else_node(
     };
     for child in if_elif_body {
         if child.is_return_stmt() {
-            let diagnostic = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 SuperfluousElseReturn { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
+                if checker.settings.preview.is_enabled() {
+                    diagnostic.try_set_fix(|| remove_else(checker, elif_else));
+                }
                 checker.diagnostics.push(diagnostic);
             }
             return true;
         } else if child.is_break_stmt() {
-            let diagnostic = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 SuperfluousElseBreak { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
+                if checker.settings.preview.is_enabled() {
+                    diagnostic.try_set_fix(|| remove_else(checker, elif_else));
+                }
                 checker.diagnostics.push(diagnostic);
             }
             return true;
         } else if child.is_raise_stmt() {
-            let diagnostic = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 SuperfluousElseRaise { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
+                if checker.settings.preview.is_enabled() {
+                    diagnostic.try_set_fix(|| remove_else(checker, elif_else));
+                }
                 checker.diagnostics.push(diagnostic);
             }
             return true;
         } else if child.is_continue_stmt() {
-            let diagnostic = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 SuperfluousElseContinue { branch },
                 elif_else_range(elif_else, checker.locator().contents())
                     .unwrap_or_else(|| elif_else.range()),
             );
             if checker.enabled(diagnostic.kind.rule()) {
+                if checker.settings.preview.is_enabled() {
+                    diagnostic.try_set_fix(|| remove_else(checker, elif_else));
+                }
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -686,5 +751,69 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
                 unnecessary_return_none(checker, &stack);
             }
         }
+    }
+}
+
+fn remove_else(checker: &mut Checker, elif_else: &ElifElseClause) -> Result<Fix> {
+    if elif_else.test.is_some() {
+        // it's an elif, so we can just make it an if
+
+        // delete "el" from "elif"
+        Ok(Fix::safe_edit(Edit::deletion(
+            elif_else.start(),
+            elif_else.start() + TextSize::from(2),
+        )))
+    } else {
+        // the start of the line where the `else`` is
+        let else_line_start = checker.locator().line_start(elif_else.start());
+
+        // making a tokenizer to find the Colon for the `else`, not always on the same line!
+        let mut else_line_tokenizer =
+            SimpleTokenizer::starts_at(elif_else.start(), checker.locator().contents());
+
+        // find the Colon for the `else`
+        let Some(else_colon) =
+            else_line_tokenizer.find(|token| token.kind == SimpleTokenKind::Colon)
+        else {
+            return Err(anyhow::anyhow!("Cannot find `:` in `else` statement"));
+        };
+
+        // get the indentation of the `else`, since that is the indent level we want to end with
+        let Some(desired_indentation) = indentation(checker.locator(), elif_else) else {
+            return Err(anyhow::anyhow!("Compound statement cannot be inlined"));
+        };
+
+        // we're deleting the `else`, and it's Colon, and the rest of the line(s) they're on,
+        // so here we get the last position of the line the Colon is on
+        let else_colon_end = checker.locator().full_line_end(else_colon.end());
+
+        // if there is a comment on the same line as the Colon, let's keep it
+        // and give it the proper indentation once we unindent it
+        let else_comment_after_colon = else_line_tokenizer
+            .find(|token| token.kind.is_comment())
+            .and_then(|token| {
+                if token.kind == SimpleTokenKind::Comment && token.start() < else_colon_end {
+                    return Some(format!(
+                        "{desired_indentation}{}{}",
+                        checker.locator().slice(token),
+                        checker.stylist().line_ending().as_str(),
+                    ));
+                }
+                None
+            })
+            .unwrap_or(String::new());
+
+        let indented = adjust_indentation(
+            TextRange::new(else_colon_end, elif_else.end()),
+            desired_indentation,
+            checker.locator(),
+            checker.stylist(),
+        )?;
+
+        Ok(Fix::safe_edit(Edit::replacement(
+            format!("{else_comment_after_colon}{indented}"),
+            else_line_start,
+            elif_else.end(),
+        )))
     }
 }

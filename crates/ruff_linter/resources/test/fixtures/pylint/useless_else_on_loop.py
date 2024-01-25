@@ -135,3 +135,14 @@ def test_break_in_match():
     else:
         return True
     return False
+
+
+def test_retain_comment():
+    """Retain the comment within the `else` block"""
+    for j in range(10):
+        pass
+    else:
+        # [useless-else-on-loop]
+        print("fat chance")
+        for j in range(10):
+            break
