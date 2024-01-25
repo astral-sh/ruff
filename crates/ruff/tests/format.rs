@@ -216,7 +216,7 @@ def foo():
 }
 
 #[test]
-fn config_doubly_overriden_via_cli() -> Result<()> {
+fn config_doubly_overridden_via_cli() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_toml = tempdir.path().join("ruff.toml");
     fs::write(&ruff_toml, "line-length = 70")?;
