@@ -28,3 +28,11 @@ class Circle:  # OK
 
 class CustomException(Exception):  # OK
     ...
+
+
+class A:
+    class B:
+        ...
+    
+    def __init__(self):
+        ...

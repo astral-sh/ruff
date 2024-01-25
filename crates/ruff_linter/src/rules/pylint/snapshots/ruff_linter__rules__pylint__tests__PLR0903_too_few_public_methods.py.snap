@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-too_few_public_methods.py:6:1: PLR0903 Too few public methods (1 < 2)
+too_few_public_methods.py:6:1: PLR0903 Class could be dataclass or namedtuple
   |
 6 | / class Point:  # PLR0903
 7 | |     def __init__(self, x: float, y: float) -> None:

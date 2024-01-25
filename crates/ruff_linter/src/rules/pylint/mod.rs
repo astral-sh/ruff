@@ -172,6 +172,7 @@ mod tests {
     #[test_case(Rule::PotentialIndexError, Path::new("potential_index_error.py"))]
     #[test_case(Rule::SuperWithoutBrackets, Path::new("super_without_brackets.py"))]
     #[test_case(Rule::TooManyNestedBlocks, Path::new("too_many_nested_blocks.py"))]
+    #[test_case(Rule::TooFewPublicMethods, Path::new("too_few_public_methods.py"))]
     #[test_case(
         Rule::UnnecessaryDictIndexLookup,
         Path::new("unnecessary_dict_index_lookup.py")
@@ -370,22 +371,6 @@ mod tests {
                     ..pylint::settings::Settings::default()
                 },
                 ..LinterSettings::for_rules(vec![Rule::TooManyPublicMethods])
-            },
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn too_few_public_methods() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pylint/too_few_public_methods.py"),
-            &LinterSettings {
-                pylint: pylint::settings::Settings {
-                    min_public_methods: 2,
-                    ..pylint::settings::Settings::default()
-                },
-                ..LinterSettings::for_rules(vec![Rule::TooFewPublicMethods])
             },
         )?;
         assert_messages!(diagnostics);
