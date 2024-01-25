@@ -154,11 +154,11 @@ pub struct CheckCommand {
     /// or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting.
     #[arg(
         long,
-        value_delimiter = ',',
+        action = clap::ArgAction::Append,
         value_name = "CONFIG_OPTION",
         value_parser = ConfigOptionParser,
     )]
-    pub config: Option<Vec<ConfigOption>>,
+    pub config: Vec<ConfigOption>,
     /// Comma-separated list of rule codes to enable (or ALL, to enable all rules).
     #[arg(
         long,
@@ -388,11 +388,11 @@ pub struct FormatCommand {
     /// or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting.
     #[arg(
         long,
-        value_delimiter = ',',
+        action = clap::ArgAction::Append,
         value_name = "CONFIG_OPTION",
         value_parser = ConfigOptionParser,
     )]
-    pub config: Option<Vec<ConfigOption>>,
+    pub config: Vec<ConfigOption>,
 
     /// Disable cache reads.
     #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
@@ -649,11 +649,7 @@ impl CheckCommand {
             extension: self.extension,
         };
 
-        let config_args = ConfigArgs::from_cli_options(
-            self.config.unwrap_or_default(),
-            cli_overrides,
-            self.isolated,
-        )?;
+        let config_args = ConfigArgs::from_cli_options(self.config, cli_overrides, self.isolated)?;
         Ok((check_arguments, config_args))
     }
 }
@@ -685,11 +681,7 @@ impl FormatCommand {
             ..ExplicitConfigOverrides::default()
         };
 
-        let config_args = ConfigArgs::from_cli_options(
-            self.config.unwrap_or_default(),
-            cli_overrides,
-            self.isolated,
-        )?;
+        let config_args = ConfigArgs::from_cli_options(self.config, cli_overrides, self.isolated)?;
         Ok((format_args, config_args))
     }
 }
