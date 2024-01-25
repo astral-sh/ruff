@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use anyhow::anyhow;
 use clap::builder::{TypedValueParser, ValueParserFactory};
 use clap::{command, Parser};
 use path_absolutize::path_dedot;
@@ -541,24 +540,23 @@ impl ConfigArgs {
                         Configuration::from_options(overridden_option, &path_dedot::CWD)?,
                     );
                 }
-                ConfigOption::PathToConfigFile(path) => {
+                ConfigOption::PathToConfigFile { path, arg, mut cmd } => {
                     if isolated {
-                        let error = anyhow!(
-                            "Cannot specify `--isolated` and also specify a configuration file"
+                        let error = cmd.error(
+                            clap::error::ErrorKind::ArgumentConflict,
+                            "Cannot specify `--isolated` and also specify a configuration file",
                         );
-                        let context = format!(
-                            "Both `--isolated` and `--config={}` were specified on the command line",
-                            path.display()
-                        );
-                        return Err(error.context(context));
+                        return Err(error.into());
                     }
                     if let Some(ref config_file) = new.config_file {
                         let (first, second) = (config_file.display(), path.display());
                         let mut error = clap::Error::new(clap::error::ErrorKind::ValueValidation);
-                        error.insert(
-                            clap::error::ContextKind::InvalidArg,
-                            clap::error::ContextValue::String("--config".to_string()),
-                        );
+                        if let Some(arg) = arg {
+                            error.insert(
+                                clap::error::ContextKind::InvalidArg,
+                                clap::error::ContextValue::String(arg),
+                            );
+                        }
                         error.insert(
                             clap::error::ContextKind::InvalidValue,
                             clap::error::ContextValue::String(second.to_string()),
@@ -573,7 +571,7 @@ impl ConfigArgs {
                             clap::error::ContextKind::Suggested,
                             clap::error::ContextValue::StyledStrs(tips),
                         );
-                        return Err(error.into());
+                        return Err(error.with_cmd(&cmd).into());
                     }
                     new.config_file = Some(path);
                 }
@@ -709,7 +707,11 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
 /// ```
 #[derive(Clone, Debug)]
 pub enum ConfigOption {
-    PathToConfigFile(PathBuf),
+    PathToConfigFile {
+        path: PathBuf,
+        arg: Option<String>,
+        cmd: clap::Command,
+    },
     ConfigOverride(Arc<Options>),
 }
 
@@ -738,7 +740,11 @@ impl TypedValueParser for ConfigOptionParser {
             .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
         let path_to_config_file = PathBuf::from(value);
         if path_to_config_file.exists() {
-            return Ok(ConfigOption::PathToConfigFile(path_to_config_file));
+            return Ok(ConfigOption::PathToConfigFile {
+                path: path_to_config_file,
+                arg: arg.map(clap::Arg::to_string),
+                cmd: cmd.clone(),
+            });
         }
         if let Ok(option) = toml::from_str(value) {
             return Ok(ConfigOption::ConfigOverride(Arc::new(option)));
