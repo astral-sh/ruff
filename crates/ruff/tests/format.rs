@@ -109,6 +109,24 @@ fn nonexistent_config_file() {
 }
 
 #[test]
+fn config_override_rejected_if_invalid_toml() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--config", "foo = bar", "."]), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'foo = bar' for '--config <CONFIG_OPTION>'
+
+      tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
+      tip: The path `foo = bar` does not exist on your filesystem
+
+    For more information, try '--help'.
+    "###);
+}
+
+#[test]
 fn too_many_config_files() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_dot_toml = tempdir.path().join("ruff.toml");
@@ -163,6 +181,68 @@ For more information, try '--help'.
         .output()?;
     let stderr = std::str::from_utf8(&cmd.stderr)?;
     assert_eq!(stderr, expected_stderr);
+    Ok(())
+}
+
+#[test]
+fn config_override_via_cli() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(&ruff_toml, "line-length = 100")?;
+    let fixture = r#"
+def foo():
+    print("looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong string")
+
+    "#;
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .arg("format")
+        .arg("--config")
+        .arg(&ruff_toml)
+        // This overrides the long line length set in the config file
+        .args(["--config", "line-length=80"])
+        .arg("-")
+        .pass_stdin(fixture), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    def foo():
+        print(
+            "looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong string"
+        )
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn config_doubly_overriden_via_cli() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(&ruff_toml, "line-length = 70")?;
+    let fixture = r#"
+def foo():
+    print("looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong string")
+
+    "#;
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .arg("format")
+        .arg("--config")
+        .arg(&ruff_toml)
+        // This overrides the long line length set in the config file...
+        .args(["--config", "line-length=80"])
+        // ...but this overrides them both:
+        .args(["--line-length", "100"])
+        .arg("-")
+        .pass_stdin(fixture), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    def foo():
+        print("looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong string")
+
+    ----- stderr -----
+    "###);
     Ok(())
 }
 

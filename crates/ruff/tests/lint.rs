@@ -457,6 +457,25 @@ fn nonexistent_config_file() {
 }
 
 #[test]
+fn config_override_rejected_if_invalid_toml() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", "foo = bar", "."]), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'foo = bar' for '--config <CONFIG_OPTION>'
+
+      tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
+      tip: The path `foo = bar` does not exist on your filesystem
+
+    For more information, try '--help'.
+    "###);
+}
+
+#[test]
 fn too_many_config_files() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_dot_toml = tempdir.path().join("ruff.toml");
@@ -511,6 +530,114 @@ For more information, try '--help'.
         .output()?;
     let stderr = std::str::from_utf8(&cmd.stderr)?;
     assert_eq!(stderr, expected_stderr);
+    Ok(())
+}
+
+#[test]
+fn config_override_via_cli() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+line-length = 100
+
+[lint]
+select = ["I"]
+
+[lint.isort]
+combine-as-imports = true
+        "#,
+    )?;
+    let fixture = r#"
+from foo import (
+    aaaaaaaaaaaaaaaaaaa,
+    bbbbbbbbbbb as bbbbbbbbbbbbbbbb,
+    cccccccccccccccc,
+    ddddddddddd as ddddddddddddd,
+    eeeeeeeeeeeeeee,
+    ffffffffffff as ffffffffffffff,
+    ggggggggggggg,
+    hhhhhhh as hhhhhhhhhhh,
+    iiiiiiiiiiiiii,
+    jjjjjjjjjjjjj as jjjjjj,
+)
+
+x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"
+"#;
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .args(["--config", "line-length=90"])
+        .args(["--config", "extend-select=['E501']"])
+        .args(["--config", "lint.isort.combine-as-imports = false"])
+        .arg("-")
+        .pass_stdin(fixture), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:2:1: I001 [*] Import block is un-sorted or un-formatted
+    -:15:91: E501 Line too long (97 > 90)
+    Found 2 errors.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn config_doubly_overridden_via_cli() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+line-length = 100
+select=["E501"]
+"#,
+    )?;
+    let fixture = "x = 'longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss'";
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .args(["--config", "line-length=110"])  // This overrides the config file...
+        .args(["--line-length", "90"])  // ... but *this* takes priority over both "inline TOML" and the config file
+        .arg("-")
+        .pass_stdin(fixture), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:91: E501 Line too long (97 > 90)
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn complex_config_setting_overridden_via_cli() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(&ruff_toml, "select = ['N801']")?;
+    let fixture = "class violates_n801: pass";
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .args(["--config", "lint.per-file-ignores = {'generated.py' = ['N801']}"])
+        .args(["--stdin-filename", "generated.py"])
+        .arg("-")
+        .pass_stdin(fixture), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###);
     Ok(())
 }
 
