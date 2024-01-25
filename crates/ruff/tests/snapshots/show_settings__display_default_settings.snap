@@ -371,7 +371,6 @@ linter.pylint.max_bool_expr = 5
 linter.pylint.max_branches = 12
 linter.pylint.max_statements = 50
 linter.pylint.max_public_methods = 20
-linter.pylint.min_public_methods = 2
 linter.pylint.max_locals = 15
 linter.pyupgrade.keep_runtime_typing = false
 linter.ruff.parenthesize_tuple_in_subscript = false

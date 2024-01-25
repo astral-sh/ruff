@@ -7,17 +7,14 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for classes with too few public methods
-///
-/// By default, this rule allows down to 2 public methods, as configured by
-/// the [`pylint.min-public-methods`] option.
+/// Checks for classes that only have a public `__init__` method,
+/// as well as 0 base classes, and 0 decorators.
 ///
 /// ## Why is this bad?
-/// Classes with too few public methods are possibly better off
+/// Classes with just an `__init__` are possibly better off
 /// being a dataclass or a namedtuple, which are more lightweight.
 ///
 /// ## Example
-/// Assuming that `pylint.min-public-settings` is set to 2:
 /// ```python
 /// class Point:
 ///     def __init__(self, x: float, y: float):
@@ -35,32 +32,18 @@ use crate::checkers::ast::Checker;
 ///     x: float
 ///     y: float
 /// ```
-///
-/// ## Options
-/// - `pylint.min-public-methods`
 #[violation]
-pub struct TooFewPublicMethods {
-    methods: usize,
-    min_methods: usize,
-}
+pub struct TooFewPublicMethods;
 
 impl Violation for TooFewPublicMethods {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooFewPublicMethods {
-            methods,
-            min_methods,
-        } = self;
-        format!("Too few public methods ({methods} < {min_methods})")
+        format!("Class could be dataclass or namedtuple")
     }
 }
 
 /// R0903
-pub(crate) fn too_few_public_methods(
-    checker: &mut Checker,
-    class_def: &ast::StmtClassDef,
-    min_methods: usize,
-) {
+pub(crate) fn too_few_public_methods(checker: &mut Checker, class_def: &ast::StmtClassDef) {
     // allow decorated classes
     if !class_def.decorator_list.is_empty() {
         return;
@@ -71,22 +54,34 @@ pub(crate) fn too_few_public_methods(
         return;
     }
 
-    let methods = class_def
-        .body
-        .iter()
-        .filter(|stmt| {
-            stmt.as_function_def_stmt()
-                .is_some_and(|node| matches!(visibility::method_visibility(node), Public))
-        })
-        .count();
+    let mut public_methods = 0;
+    let mut has_dunder_init = false;
 
-    if methods < min_methods {
-        checker.diagnostics.push(Diagnostic::new(
-            TooFewPublicMethods {
-                methods,
-                min_methods,
-            },
-            class_def.range(),
-        ));
+    for stmt in &class_def.body {
+        if public_methods > 1 && has_dunder_init {
+            // we're good to break here
+            break;
+        }
+        match stmt {
+            ast::Stmt::FunctionDef(node) => {
+                if !has_dunder_init && node.name.to_string() == "__init__" {
+                    has_dunder_init = true;
+                }
+                if matches!(visibility::method_visibility(node), Public) {
+                    public_methods += 1;
+                }
+            }
+            ast::Stmt::ClassDef(_) => {
+                // allow classes with nested classes, often used for config
+                return;
+            }
+            _ => {}
+        }
+    }
+
+    if has_dunder_init && public_methods == 1 {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(TooFewPublicMethods, class_def.range()));
     }
 }

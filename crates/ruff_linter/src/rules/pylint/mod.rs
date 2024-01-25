@@ -207,6 +207,7 @@ mod tests {
     #[test_case(Rule::TooManyNestedBlocks, Path::new("too_many_nested_blocks.py"))]
     #[test_case(Rule::DictIndexMissingItems, Path::new("dict_index_missing_items.py"))]
     #[test_case(Rule::DictIterMissingItems, Path::new("dict_iter_missing_items.py"))]
+    #[test_case(Rule::TooFewPublicMethods, Path::new("too_few_public_methods.py"))]
     #[test_case(
         Rule::UnnecessaryDictIndexLookup,
         Path::new("unnecessary_dict_index_lookup.py")
@@ -386,22 +387,6 @@ mod tests {
                     ..pylint::settings::Settings::default()
                 },
                 ..LinterSettings::for_rules(vec![Rule::TooManyPublicMethods])
-            },
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn too_few_public_methods() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pylint/too_few_public_methods.py"),
-            &LinterSettings {
-                pylint: pylint::settings::Settings {
-                    min_public_methods: 2,
-                    ..pylint::settings::Settings::default()
-                },
-                ..LinterSettings::for_rules(vec![Rule::TooFewPublicMethods])
             },
         )?;
         assert_messages!(diagnostics);
