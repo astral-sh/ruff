@@ -1073,6 +1073,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::If(if_ @ ast::StmtIf { test, .. }) => {
+            if checker.enabled(Rule::TooManyNestedBlocks) {
+                pylint::rules::too_many_nested_blocks(checker, stmt);
+            }
             if checker.enabled(Rule::EmptyTypeCheckingBlock) {
                 if typing::is_type_checking_block(if_, &checker.semantic) {
                     flake8_type_checking::rules::empty_type_checking_block(checker, if_);
@@ -1205,6 +1208,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::With(with_stmt @ ast::StmtWith { items, body, .. }) => {
+            if checker.enabled(Rule::TooManyNestedBlocks) {
+                pylint::rules::too_many_nested_blocks(checker, stmt);
+            }
             if checker.enabled(Rule::AssertRaisesException) {
                 flake8_bugbear::rules::assert_raises_exception(checker, items);
             }
@@ -1232,6 +1238,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::While(while_stmt @ ast::StmtWhile { body, orelse, .. }) => {
+            if checker.enabled(Rule::TooManyNestedBlocks) {
+                pylint::rules::too_many_nested_blocks(checker, stmt);
+            }
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Stmt(stmt));
             }
@@ -1255,6 +1264,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 range: _,
             },
         ) => {
+            if checker.enabled(Rule::TooManyNestedBlocks) {
+                pylint::rules::too_many_nested_blocks(checker, stmt);
+            }
             if checker.any_enabled(&[
                 Rule::EnumerateForLoop,
                 Rule::IncorrectDictIterator,
@@ -1319,6 +1331,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             finalbody,
             ..
         }) => {
+            if checker.enabled(Rule::TooManyNestedBlocks) {
+                pylint::rules::too_many_nested_blocks(checker, stmt);
+            }
             if checker.enabled(Rule::JumpStatementInFinally) {
                 flake8_bugbear::rules::jump_statement_in_finally(checker, finalbody);
             }

@@ -2433,6 +2433,15 @@
           "format": "uint",
           "minimum": 0.0
         },
+        "max-nested-blocks": {
+          "description": "Maximum number of nested blocks allowed within a function or method body (see: `PLR1702`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
         "max-positional-args": {
           "description": "Maximum number of positional arguments allowed for a function or method definition (see: `PLR0917`).\n\nIf not specified, defaults to the value of `max-args`.",
           "type": [
@@ -3212,6 +3221,7 @@
         "PLR17",
         "PLR170",
         "PLR1701",
+        "PLR1702",
         "PLR1704",
         "PLR1706",
         "PLR171",
