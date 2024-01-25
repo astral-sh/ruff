@@ -12,4 +12,7 @@ pub(crate) fn module(suite: &Suite, checker: &mut Checker) {
     if checker.enabled(Rule::InvalidFormatterSuppressionComment) {
         ruff::rules::ignored_formatter_suppression_comment(checker, suite);
     }
+    if checker.enabled(Rule::RedefinedSlotsInSubclass) {
+        pylint::rules::redefined_slots_in_subclass(checker, suite);
+    }
 }
