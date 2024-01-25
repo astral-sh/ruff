@@ -2,17 +2,27 @@ use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
     visitor::{self, Visitor},
-    Expr, ExprAttribute, ExprCall, ExprContext, ExprName, ExprSubscript, Stmt, StmtDelete, StmtFor,
+    Expr, ExprAttribute, ExprCall, ExprName, ExprSubscript, Stmt, StmtDelete, StmtFor,
 };
-use ruff_text_size::Ranged;
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::Diagnostic;
 
-static MUTATING_FUNCTIONS: &'static [&'static str] = &[
-    "append", "sort", "reverse", "remove", "clear", "extend", "insert", "pop", "popitem",
-];
-
+fn is_mutating_function(function_name: &str) -> bool {
+    matches!(
+        function_name,
+        "append"
+            | "sort"
+            | "reverse"
+            | "remove"
+            | "clear"
+            | "extend"
+            | "insert"
+            | "pop"
+            | "popitem"
+    )
+}
 /// ## What it does
 /// Checks for mutation of the iterator of a loop in the loop's body
 ///
@@ -104,12 +114,12 @@ pub(crate) fn loop_iterator_mutation(checker: &mut Checker, stmt_for: &StmtFor) 
     for mutation in visitor.mutations {
         checker
             .diagnostics
-            .push(Diagnostic::new(LoopIteratorMutation {}, mutation.range()));
+            .push(Diagnostic::new(LoopIteratorMutation, mutation));
     }
 }
 struct LoopMutationsVisitor<'a> {
-    name: &'a String,
-    mutations: Vec<Box<dyn Ranged + 'a>>,
+    name: &'a str,
+    mutations: Vec<TextRange>,
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
@@ -138,7 +148,7 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                         }
                     }
                     if self.name.eq(&name) {
-                        self.mutations.push(Box::new(range));
+                        self.mutations.push(*range);
                     }
                 }
             }
@@ -150,30 +160,20 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
-            Expr::Name(ExprName { range: _, id, ctx }) => {
-                if self.name.eq(id) {
-                    match ctx {
-                        ExprContext::Del => {
-                            self.mutations.push(Box::new(expr));
-                        }
-                        _ => {}
-                    }
-                }
-            }
             Expr::Call(ExprCall {
                 range: _,
                 func,
                 arguments: _,
             }) => match func.as_ref() {
                 Expr::Attribute(ExprAttribute {
-                    range: _,
+                    range,
                     value,
                     attr,
                     ctx: _,
                 }) => {
                     let name = _to_name_str(value);
-                    if self.name.eq(&name) && MUTATING_FUNCTIONS.contains(&attr.as_str()) {
-                        self.mutations.push(Box::new(expr));
+                    if self.name.eq(&name) && is_mutating_function(&attr.as_str()) {
+                        self.mutations.push(*range);
                     }
                 }
                 _ => {}
