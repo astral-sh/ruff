@@ -5968,22 +5968,6 @@ impl<'a> AnyNodeRef<'a> {
         }
     }
 
-    pub const fn is_node_with_body(self) -> bool {
-        matches!(
-            self,
-            AnyNodeRef::StmtIf(_)
-                | AnyNodeRef::StmtFor(_)
-                | AnyNodeRef::StmtWhile(_)
-                | AnyNodeRef::StmtWith(_)
-                | AnyNodeRef::StmtMatch(_)
-                | AnyNodeRef::StmtFunctionDef(_)
-                | AnyNodeRef::StmtClassDef(_)
-                | AnyNodeRef::StmtTry(_)
-                | AnyNodeRef::ExceptHandlerExceptHandler(_)
-                | AnyNodeRef::ElifElseClause(_)
-        )
-    }
-
     /// In our AST, only some alternative branches are represented as a node. This has historical
     /// reasons, e.g. we added a node for elif/else in if statements which was not originally
     /// present in the parser.
