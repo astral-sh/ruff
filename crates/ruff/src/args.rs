@@ -540,13 +540,21 @@ impl ConfigArgs {
                         Configuration::from_options(overridden_option, &path_dedot::CWD)?,
                     );
                 }
-                ConfigOption::PathToConfigFile { path, arg, mut cmd } => {
+                ConfigOption::PathToConfigFile { path, arg, cmd } => {
                     if isolated {
-                        let error = cmd.error(
-                            clap::error::ErrorKind::ArgumentConflict,
-                            "Cannot specify `--isolated` and also specify a configuration file",
+                        let mut error = clap::Error::new(clap::error::ErrorKind::ArgumentConflict);
+                        error.insert(
+                            clap::error::ContextKind::InvalidArg,
+                            clap::error::ContextValue::String(format!(
+                                "--config={}",
+                                path.display()
+                            )),
                         );
-                        return Err(error.into());
+                        error.insert(
+                            clap::error::ContextKind::PriorArg,
+                            clap::error::ContextValue::String("--isolated".to_string()),
+                        );
+                        return Err(error.with_cmd(&cmd).into());
                     }
                     if let Some(ref config_file) = new.config_file {
                         let (first, second) = (config_file.display(), path.display());
