@@ -32,9 +32,9 @@ static MUTATING_FUNCTIONS: &'static [&'static str] = &[
 /// ## References
 /// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html#typesseq-mutable)
 #[violation]
-pub struct LoopIteratorMutated;
+pub struct LoopIteratorMutation;
 
-impl Violation for LoopIteratorMutated {
+impl Violation for LoopIteratorMutation {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("editing a loop's mutable iterable often leads to unexpected results/bugs")
@@ -73,7 +73,7 @@ fn _to_name_str(node: &Expr) -> String {
     }
 }
 // B038
-pub(crate) fn loop_iterator_mutated(checker: &mut Checker, stmt_for: &StmtFor) {
+pub(crate) fn loop_iterator_mutation(checker: &mut Checker, stmt_for: &StmtFor) {
     let StmtFor {
         target: _,
         iter,
@@ -104,7 +104,7 @@ pub(crate) fn loop_iterator_mutated(checker: &mut Checker, stmt_for: &StmtFor) {
     for mutation in visitor.mutations {
         checker
             .diagnostics
-            .push(Diagnostic::new(LoopIteratorMutated {}, mutation.range()));
+            .push(Diagnostic::new(LoopIteratorMutation {}, mutation.range()));
     }
 }
 struct LoopMutationsVisitor<'a> {
