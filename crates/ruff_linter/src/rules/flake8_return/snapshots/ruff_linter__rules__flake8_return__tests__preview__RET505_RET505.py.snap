@@ -184,4 +184,99 @@ RET505.py:99:5: RET505 [*] Unnecessary `else` after `return` statement
 105 104 | 
 106 105 | ###
 
+RET505.py:137:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+135 |     if True:
+136 |         return
+137 |     else:
+    |     ^^^^ RET505
+138 |         # comment
+139 |         pass
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+134 134 | def bar4(x):
+135 135 |     if True:
+136 136 |         return
+137     |-    else:
+138     |-        # comment
+139     |-        pass
+    137 |+    # comment
+    138 |+    pass
+140 139 | 
+141 140 | 
+142 141 | def bar5():
+
+RET505.py:145:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+143 |     if True:
+144 |         return
+145 |     else:  # comment
+    |     ^^^^ RET505
+146 |         pass
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+142 142 | def bar5():
+143 143 |     if True:
+144 144 |         return
+145     |-    else:  # comment
+146     |-        pass
+    145 |+    # comment
+    146 |+    pass
+147 147 | 
+148 148 | 
+149 149 | def bar6():
+
+RET505.py:152:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+150 |     if True:
+151 |         return
+152 |     else\
+    |     ^^^^ RET505
+153 |         :\
+154 |         # comment
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+149 149 | def bar6():
+150 150 |     if True:
+151 151 |         return
+152     |-    else\
+153     |-        :\
+154     |-        # comment
+155     |-        pass
+    152 |+    # comment
+    153 |+    pass
+156 154 | 
+157 155 | 
+158 156 | def bar7():
+
+RET505.py:161:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+159 |     if True:
+160 |         return
+161 |     else\
+    |     ^^^^ RET505
+162 |         :  # comment
+163 |         pass
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+158 158 | def bar7():
+159 159 |     if True:
+160 160 |         return
+161     |-    else\
+162     |-        :  # comment
+163     |-        pass
+    161 |+    # comment
+    162 |+    pass
+164 163 | 
+165 164 | x = 0
+166 165 | 
+
 

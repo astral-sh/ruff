@@ -13,7 +13,7 @@ use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::is_python_whitespace;
+use ruff_python_trivia::{is_python_whitespace, SimpleTokenKind, SimpleTokenizer};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
@@ -737,22 +737,55 @@ fn remove_else(checker: &mut Checker, elif_else: &ElifElseClause) -> Result<Fix>
             elif_else.start() + TextSize::from(2),
         )))
     } else {
-        let else_line_range = checker.locator().full_line_range(elif_else.start());
+        // the start of the line where the `else`` is
+        let else_line_start = checker.locator().line_start(elif_else.start());
 
+        // making a tokenizer to find the Colon for the `else`, not always on the same line!
+        let mut else_line_tokenizer =
+            SimpleTokenizer::starts_at(elif_else.start(), checker.locator().contents());
+
+        // find the Colon for the `else`
+        let Some(else_colon) =
+            else_line_tokenizer.find(|token| token.kind == SimpleTokenKind::Colon)
+        else {
+            return Err(anyhow::anyhow!("Cannot find `:` in `else` statement"));
+        };
+
+        // get the indentation of the `else`, since that is the indent level we want to end with
         let Some(desired_indentation) = indentation(checker.locator(), elif_else) else {
             return Err(anyhow::anyhow!("Compound statement cannot be inlined"));
         };
 
+        // we're deleting the `else`, and it's Colon, and the rest of the line(s) they're on,
+        // so here we get the last position of the line the Colon is on
+        let else_colon_end = checker.locator().full_line_end(else_colon.end());
+
+        // if there is a comment on the same line as the Colon, let's keep it
+        // and give it the proper indentation once we unindent it
+        let else_comment_after_colon = else_line_tokenizer
+            .find(|token| token.kind.is_comment())
+            .and_then(|token| {
+                if token.kind == SimpleTokenKind::Comment && token.start() < else_colon_end {
+                    return Some(format!(
+                        "{desired_indentation}{}{}",
+                        checker.locator().slice(token),
+                        checker.stylist().line_ending().as_str(),
+                    ));
+                }
+                None
+            })
+            .unwrap_or(String::new());
+
         let indented = adjust_indentation(
-            TextRange::new(else_line_range.end(), elif_else.end()),
+            TextRange::new(else_colon_end, elif_else.end()),
             desired_indentation,
             checker.locator(),
             checker.stylist(),
         )?;
 
         Ok(Fix::safe_edit(Edit::replacement(
-            indented,
-            else_line_range.start(),
+            format!("{else_comment_after_colon}{indented}"),
+            else_line_start,
             elif_else.end(),
         )))
     }
