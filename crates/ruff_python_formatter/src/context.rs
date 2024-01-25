@@ -99,6 +99,7 @@ impl<'a> PyFormatContext<'a> {
     }
 
     /// Returns `true` if preview mode is enabled.
+    #[allow(unused)]
     pub(crate) const fn is_preview(&self) -> bool {
         self.options.preview().is_enabled()
     }
