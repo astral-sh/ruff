@@ -91,6 +91,82 @@ fn format_warn_stdin_filename_with_files() {
 }
 
 #[test]
+fn nonexistent_config_file() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--config", "foo.toml", "."]), @r###"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        error: invalid value 'foo.toml' for '--config <CONFIG_OPTION>'
+
+          tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
+          tip: The path `foo.toml` does not exist on your filesystem
+
+        For more information, try '--help'.
+       "###);
+}
+
+#[test]
+fn too_many_config_files() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_dot_toml = tempdir.path().join("ruff.toml");
+    let ruff2_dot_toml = tempdir.path().join("ruff2.toml");
+    fs::File::create(&ruff_dot_toml)?;
+    fs::File::create(&ruff2_dot_toml)?;
+    let expected_stderr = format!(
+        "\
+error: invalid value '{}' for '--config <CONFIG_OPTION>'
+
+  tip: Cannot specify more than one configuration file on the command line
+  tip: Remove either `--config={}` or `--config={}`
+
+For more information, try '--help'.
+",
+        ruff2_dot_toml.display(),
+        ruff_dot_toml.display(),
+        ruff2_dot_toml.display(),
+    );
+    let cmd = Command::new(get_cargo_bin(BIN_NAME))
+        .arg("format")
+        .arg("--config")
+        .arg(&ruff_dot_toml)
+        .arg("--config")
+        .arg(&ruff2_dot_toml)
+        .arg(".")
+        .output()?;
+    let stderr = std::str::from_utf8(&cmd.stderr)?;
+    assert_eq!(stderr, expected_stderr);
+    Ok(())
+}
+
+#[test]
+fn config_file_and_isolated() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_dot_toml = tempdir.path().join("ruff.toml");
+    fs::File::create(&ruff_dot_toml)?;
+    let expected_stderr = format!(
+        "\
+error: the argument '--config={}' cannot be used with '--isolated'
+
+For more information, try '--help'.
+",
+        ruff_dot_toml.display(),
+    );
+    let cmd = Command::new(get_cargo_bin(BIN_NAME))
+        .arg("format")
+        .arg("--config")
+        .arg(&ruff_dot_toml)
+        .arg("--isolated")
+        .arg(".")
+        .output()?;
+    let stderr = std::str::from_utf8(&cmd.stderr)?;
+    assert_eq!(stderr, expected_stderr);
+    Ok(())
+}
+
+#[test]
 fn format_options() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_toml = tempdir.path().join("ruff.toml");

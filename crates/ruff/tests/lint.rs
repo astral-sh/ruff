@@ -441,9 +441,7 @@ ignore = ["D203", "D212"]
 fn nonexistent_config_file() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .arg("--config")
-        .arg("foo.toml")
-        .arg("."), @r###"
+        .args(["--config", "foo.toml", "."]), @r###"
         success: false
         exit_code: 2
         ----- stdout -----
@@ -465,7 +463,8 @@ fn too_many_config_files() -> Result<()> {
     let ruff2_dot_toml = tempdir.path().join("ruff2.toml");
     fs::File::create(&ruff_dot_toml)?;
     fs::File::create(&ruff2_dot_toml)?;
-    let expected_stderr = format!("\
+    let expected_stderr = format!(
+        "\
 error: invalid value '{}' for '--config <CONFIG_OPTION>'
 
   tip: Cannot specify more than one configuration file on the command line
@@ -495,7 +494,8 @@ fn config_file_and_isolated() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_dot_toml = tempdir.path().join("ruff.toml");
     fs::File::create(&ruff_dot_toml)?;
-    let expected_stderr = format!("\
+    let expected_stderr = format!(
+        "\
 error: the argument '--config={}' cannot be used with '--isolated'
 
 For more information, try '--help'.
