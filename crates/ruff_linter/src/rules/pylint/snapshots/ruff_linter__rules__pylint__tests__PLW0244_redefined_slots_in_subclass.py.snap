@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+redefined_slots_in_subclass.py:6:18: PLW0244 Redefined slots ['a'] in subclass
+  |
+5 | class Subclass(Base):
+6 |     __slots__ = ("a", "d")  # [redefined-slots-in-subclass]
+  |                  ^^^ PLW0244
+  |
+
+
