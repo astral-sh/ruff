@@ -163,34 +163,35 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
             .current_expression_parent()
             .is_some_and(|parent| matches!(parent, Expr::UnaryOp(ast::ExprUnaryOp { .. })));
 
-        // find the first ")" before our dunder method
-        let rparen = SimpleTokenizer::starts_at(value.as_ref().end(), checker.locator().contents())
-            .find(|token| token.kind == SimpleTokenKind::RParen);
-
-        // find the "." before our dunder method
-        let dot = SimpleTokenizer::starts_at(value.as_ref().end(), checker.locator().contents())
-            .find(|token| token.kind == SimpleTokenKind::Dot)
-            .unwrap();
-
         if is_in_unary {
-            if rparen.is_some() {
-                // if we're within parentheses with a unary, we're going to take
-                // the value operand, and insert the fix in its place within its
-                // existing parentheses.
-                // for example, `-(-a).__sub__(1)` -> `-(-a - 1)`
+            // find the first ")" before our dunder method
+            let rparen =
+                SimpleTokenizer::starts_at(value.as_ref().end(), checker.locator().contents())
+                    .find(|token| {
+                        token.kind == SimpleTokenKind::RParen && token.start() < call.end()
+                    });
 
-                diagnostic.set_fix(Fix::safe_edits(
-                    Edit::range_replacement(fixed, value.as_ref().range()),
-                    [Edit::deletion(dot.start(), call.end())],
-                ));
-            } else {
+            // find the "." before our dunder method
+            let dot =
+                SimpleTokenizer::starts_at(value.as_ref().end(), checker.locator().contents())
+                    .find(|token| token.kind == SimpleTokenKind::Dot && token.start() < call.end())
+                    .unwrap();
+
+            // if we're within parentheses with a unary, we're going to take
+            // the value operand, and insert the fix in its place within its
+            // existing parentheses. the existing "fixed" value is what we want.
+            // for example, `-(-a).__sub__(1)` -> `-(-a - 1)`
+            if rparen.is_none() {
+                // otherwise, we're going to wrap the fix in parentheses
+                // to maintain semantic integrity.
                 // `-a.__sub__(1)` -> `-(a - 1)`
                 fixed = format!("({fixed})");
-                diagnostic.set_fix(Fix::safe_edits(
-                    Edit::range_replacement(fixed, value.as_ref().range()),
-                    [Edit::deletion(dot.start(), call.end())],
-                ));
             }
+
+            diagnostic.set_fix(Fix::safe_edits(
+                Edit::range_replacement(fixed, value.as_ref().range()),
+                [Edit::deletion(dot.start(), call.end())],
+            ));
         } else {
             // `(3).__add__(1)` -> `3 + 1`
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(fixed, call.range())));
