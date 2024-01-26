@@ -1,12 +1,16 @@
-use ast::{ExprAttribute, ExprName, Keyword};
+use anyhow::Result;
+
+use ast::Keyword;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{any_over_expr, is_constant};
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall, ExprContext};
-use ruff_python_semantic::{BindingKind, SemanticModel};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::helpers::is_constant;
+use ruff_python_ast::{self as ast, Expr};
+use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::{remove_argument, Parentheses};
+use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
 /// Checks for incorrect usages of `default_factory` as a keyword argument when
@@ -29,6 +33,11 @@ use crate::checkers::ast::Checker;
 /// keyword argument is almost always a mistake, and one that type checkers
 /// can't reliably detect.
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as converting `default_factory` from a
+/// keyword to a positional argument will change the behavior of the code, even
+/// if the keyword argument was used erroneously.
+///
 /// ## Examples
 /// ```python
 /// defaultdict(default_factory=int)
@@ -42,7 +51,7 @@ use crate::checkers::ast::Checker;
 /// ```
 #[violation]
 pub struct DefaultFactoryKwarg {
-    callable_id: Option<String>,
+    default_factory: SourceCodeSnippet,
 }
 
 impl Violation for DefaultFactoryKwarg {
@@ -50,155 +59,59 @@ impl Violation for DefaultFactoryKwarg {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        if let Some(id) = self.callable_id.as_ref() {
-            format!(
-                "Prefer using `defaultdict({id})` instead of initializing with `default_factory` keyword argument"
-            )
-        } else {
-            format!(
-                "Prefer using `defaultdict(callable)` instead of initializing with `default_factory` keyword argument"
-            )
-        }
+        format!("`default_factory` is a positional-only argument to `defaultdict`")
     }
 
     fn fix_title(&self) -> Option<String> {
-        match self.callable_id {
-            Some(ref id) => Some(format!(
-                "Prefer using `defaultdict({id})` instead of initializing with `default_factory` keyword argument"
-            )),
-            None => Some(format!(
-                "Prefer using `defaultdict(callable)` instead of initializing with `default_factory` keyword argument"
-            )),
+        let DefaultFactoryKwarg { default_factory } = self;
+        if let Some(default_factory) = default_factory.full_display() {
+            Some(format!("Replace with `defaultdict({default_factory})`"))
+        } else {
+            Some("Use positional argument".to_string())
         }
     }
-}
-
-enum ValueKind<'a> {
-    Fixable(&'a str),
-    NonFixable,
-    NonCallable,
 }
 
 /// RUF026
-pub(crate) fn default_factory_kwarg(checker: &mut Checker, default_dict: &ast::ExprCall) {
-    let ExprCall {
-        func, arguments, ..
-    } = default_dict;
-
-    if !is_defaultdict(func.as_ref()) {
+pub(crate) fn default_factory_kwarg(checker: &mut Checker, call: &ast::ExprCall) {
+    // If the call isn't a `defaultdict` constructor, return.
+    if !checker
+        .semantic()
+        .resolve_call_path(call.func.as_ref())
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["collections", "defaultdict"]))
+    {
         return;
     }
 
-    if arguments.keywords.is_empty() {
+    // If the user provided a positional argument for `default_factory`, return.
+    if !call.arguments.args.is_empty() {
         return;
     }
 
-    let Some(keyword) = find_default_factory_keyword(arguments) else {
+    // If the user didn't provide a `default_factory` keyword argument, return.
+    let Some(keyword) = call.arguments.find_keyword("default_factory") else {
         return;
     };
 
-    match determine_kw_value_kind(keyword, checker.semantic()) {
-        ValueKind::Fixable(id) => {
-            let mut diagnostic = Diagnostic::new(
-                DefaultFactoryKwarg {
-                    callable_id: Some(id.to_string()),
-                },
-                default_dict.range(),
-            );
-
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                checker
-                    .generator()
-                    .expr(&fix_defaultdict_with_default_factory_as_kw_arg(
-                        &keyword.value,
-                    )),
-                default_dict.range(),
-            )));
-
-            checker.diagnostics.push(diagnostic);
-        }
-        ValueKind::NonFixable => {
-            let diagnostic = Diagnostic::new(
-                DefaultFactoryKwarg { callable_id: None },
-                default_dict.range(),
-            );
-
-            checker.diagnostics.push(diagnostic);
-        }
-        ValueKind::NonCallable => {}
-    }
-}
-
-fn is_defaultdict(func: &Expr) -> bool {
-    let id = match func {
-        Expr::Name(ExprName {
-            id,
-            ctx: _,
-            range: _,
-        }) => id,
-        Expr::Attribute(ExprAttribute { attr, .. }) => attr.as_str(),
-        _ => {
-            return false;
-        }
-    };
-    id == "defaultdict"
-}
-
-fn find_default_factory_keyword(arguments: &Arguments) -> Option<&ast::Keyword> {
-    arguments.keywords.iter().find(|&keyword| {
-        keyword
-            .arg
-            .as_ref()
-            .is_some_and(|arg| arg.as_str() == "default_factory")
-    })
-}
-
-fn determine_kw_value_kind<'a>(keyword: &'a Keyword, semantic: &'a SemanticModel) -> ValueKind<'a> {
-    if let Some(call_path) = semantic.resolve_call_path(&keyword.value) {
-        if let Some(&member) = call_path.last() {
-            if semantic.is_builtin(member) {
-                return ValueKind::Fixable(member);
-            }
-        }
-    }
-
-    if matches!(keyword.value, Expr::NoneLiteral(_)) {
-        return ValueKind::Fixable("None");
-    }
-
+    // If the value is definitively not callable, return.
     if is_non_callable_value(&keyword.value) {
-        return ValueKind::NonCallable;
+        return;
     }
 
-    match &keyword.value {
-        Expr::Name(ExprName {
-            id,
-            ctx: _,
-            range: _,
-        }) => {
-            let Some(binding_id) = semantic.lookup_symbol(id) else {
-                return ValueKind::NonFixable;
-            };
-            if matches!(
-                semantic.binding(binding_id).kind,
-                BindingKind::FunctionDefinition(_)
-            ) {
-                ValueKind::Fixable(id)
-            } else {
-                ValueKind::NonFixable
-            }
-        }
-
-        _ => ValueKind::NonFixable,
-    }
+    let mut diagnostic = Diagnostic::new(
+        DefaultFactoryKwarg {
+            default_factory: SourceCodeSnippet::from_str(checker.locator().slice(keyword)),
+        },
+        call.range(),
+    );
+    diagnostic.try_set_fix(|| convert_to_positional(call, keyword, checker.locator()));
+    checker.diagnostics.push(diagnostic);
 }
 
+/// Returns `true` if a value is definitively not callable (e.g., `1` or `[]`).
 fn is_non_callable_value(value: &Expr) -> bool {
-    if is_constant(value) {
-        return true;
-    }
-    any_over_expr(value, &|expr| {
-        matches!(expr, |Expr::List(_)| Expr::Dict(_)
+    is_constant(value)
+        || matches!(value, |Expr::List(_)| Expr::Dict(_)
             | Expr::Set(_)
             | Expr::Tuple(_)
             | Expr::Slice(_)
@@ -207,27 +120,44 @@ fn is_non_callable_value(value: &Expr) -> bool {
             | Expr::DictComp(_)
             | Expr::GeneratorExp(_)
             | Expr::FString(_))
-    })
 }
 
-/// Generate a [`Fix`] to replace `defaultdict(default_factory=callable)` with `defaultdict(callable)`.
+/// Generate an [`Expr`] to replace `defaultdict(default_factory=callable)` with
+/// `defaultdict(callable)`.
 ///
-/// For example:
-/// - Given `defaultdict(default_factory=list)`, generate `defaultdict(list)`.
-/// - Given `def foo(): pass` `defaultdict(default_factory=foo)`, generate `defaultdict(foo)`.
-fn fix_defaultdict_with_default_factory_as_kw_arg(value: &Expr) -> Expr {
-    let args = Arguments {
-        args: vec![value.clone()],
-        keywords: vec![],
-        range: TextRange::default(),
-    };
-    Expr::Call(ExprCall {
-        func: Box::new(Expr::Name(ExprName {
-            id: "defaultdict".into(),
-            ctx: ExprContext::Load,
-            range: TextRange::default(),
-        })),
-        arguments: args,
-        range: TextRange::default(),
-    })
+/// For example, given `defaultdict(default_factory=list)`, generate `defaultdict(list)`.
+fn convert_to_positional(
+    call: &ast::ExprCall,
+    default_factory: &Keyword,
+    locator: &Locator,
+) -> Result<Fix> {
+    if call.arguments.len() == 1 {
+        // Ex) `defaultdict(default_factory=list)`
+        Ok(Fix::unsafe_edit(Edit::range_replacement(
+            locator.slice(&default_factory.value).to_string(),
+            default_factory.range(),
+        )))
+    } else {
+        // Ex) `defaultdict(member=1, default_factory=list)`
+
+        // First, remove the `default_factory` keyword argument.
+        let removal_edit = remove_argument(
+            default_factory,
+            &call.arguments,
+            Parentheses::Preserve,
+            locator.contents(),
+        )?;
+
+        // Second, insert the value as the first positional argument.
+        let insertion_edit = Edit::insertion(
+            format!("{}, ", locator.slice(&default_factory.value)),
+            call.arguments
+                .arguments_source_order()
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("`default_factory` keyword argument not found"))?
+                .start(),
+        );
+
+        Ok(Fix::unsafe_edits(insertion_edit, [removal_edit]))
+    }
 }
