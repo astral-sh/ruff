@@ -131,8 +131,8 @@ impl<'src> Parser<'src> {
                 Associativity::Left,
             ),
             TokenKind::Vbar => (Precedence::BitOr, kind, Associativity::Left),
-            TokenKind::CircumFlex => (Precedence::BitAnd, kind, Associativity::Left),
-            TokenKind::Amper => (Precedence::BitXor, kind, Associativity::Left),
+            TokenKind::CircumFlex => (Precedence::BitXor, kind, Associativity::Left),
+            TokenKind::Amper => (Precedence::BitAnd, kind, Associativity::Left),
             TokenKind::LeftShift | TokenKind::RightShift => {
                 (Precedence::LeftRightShift, kind, Associativity::Left)
             }
@@ -1639,7 +1639,7 @@ enum Associativity {
 /// below are better handled in other parts of the parser.
 ///
 /// See: <https://docs.python.org/3/reference/expressions.html#operator-precedence>
-#[derive(Ord, Eq, PartialEq, PartialOrd, Copy, Clone)]
+#[derive(Debug, Ord, Eq, PartialEq, PartialOrd, Copy, Clone)]
 enum Precedence {
     /// Precedence for an unknown operator.
     Unknown,

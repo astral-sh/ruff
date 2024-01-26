@@ -602,7 +602,7 @@ impl<'src> Parser<'src> {
     fn is_current_token_postfix(&self) -> bool {
         matches!(
             self.current_kind(),
-            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Dot | TokenKind::Async | TokenKind::For
+            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Dot
         )
     }
 }
