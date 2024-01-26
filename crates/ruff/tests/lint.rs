@@ -598,8 +598,8 @@ x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssss
 fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", "extend-select=['F481']"])  // No such code as F481!
-        .arg("."), @r###"
+        .args([".", "--config", "extend-select=['F481']"]),  // No such code as F481!
+        @r###"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -615,6 +615,62 @@ fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
     1 | extend-select=['F481']
       | ^^^^^^^^^^^^^^^^^^^^^^
     Unknown rule selector: `F481`
+
+    For more information, try '--help'.
+    "###);
+}
+
+#[test]
+fn each_toml_option_requires_a_new_flag_1() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        // commas can't be used to delimit different config overrides;
+        // you need a new --config flag for each override
+        .args([".", "--config", "extend-select=['F841'], line-length=90"]),
+        @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'extend-select=['F841'], line-length=90' for '--config <CONFIG_OPTION>'
+
+      tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
+      tip: The following error occurred when attempting to parse `extend-select=['F841'], line-length=90` as TOML:
+
+    TOML parse error at line 1, column 23
+      |
+    1 | extend-select=['F841'], line-length=90
+      |                       ^
+    expected newline, `#`
+
+    For more information, try '--help'.
+    "###);
+}
+
+#[test]
+fn each_toml_option_requires_a_new_flag_2() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        // spaces *also* can't be used to delimit different config overrides;
+        // you need a new --config flag for each override
+        .args([".", "--config", "extend-select=['F841'] line-length=90"]),
+        @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'extend-select=['F841'] line-length=90' for '--config <CONFIG_OPTION>'
+
+      tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
+      tip: The following error occurred when attempting to parse `extend-select=['F841'] line-length=90` as TOML:
+
+    TOML parse error at line 1, column 24
+      |
+    1 | extend-select=['F841'] line-length=90
+      |                        ^
+    expected newline, `#`
 
     For more information, try '--help'.
     "###);
