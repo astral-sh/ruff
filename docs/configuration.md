@@ -449,11 +449,39 @@ Alternatively, pass the notebook file(s) to `ruff` on the command-line directly.
 
 ## Command-line interface
 
-Some configuration options can be provided via the command-line, such as those related to rule
-enablement and disablement, file discovery, logging level, and more:
+All configuration options can be provided or overridden via the command-line.
+Some of the most common have their own dedicated command-line flag.
+This includes the configuration options relating to rule enablement and disablement,
+file discovery, and logging level:
 
 ```shell
 ruff check path/to/code/ --select F401 --select F403 --quiet
+```
+
+Configuration options that do not have a dedicated flag can be set or
+overridden using the `--config` flag. The `--config` flag is most often
+used to point to the configuration file that you would like ruff to use,
+for example:
+
+```shell
+ruff check path/to/directory --config path/to/ruff.toml
+```
+
+However, the `--config` flag can also be used to provide arbitrary
+overrides of configuration options using TOML `<KEY> = <VALUE>` pairs.
+For example:
+
+```shell
+ruff check path/to/file --config path/to/ruff.toml --config "extend-select=['E501', 'F841']" --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
+```
+
+If a specific configuration option is simultaneously overridden by
+a dedicated flag and by the `--config` flag, the dedicated flag
+always takes priority. In this example, the maximum permitted line
+length will be set to 90, not 100:
+
+```shell
+ruff check path/to/file --line-length=90 --config "line-length=100"
 ```
 
 See `ruff help` for more on Ruff's top-level commands:
