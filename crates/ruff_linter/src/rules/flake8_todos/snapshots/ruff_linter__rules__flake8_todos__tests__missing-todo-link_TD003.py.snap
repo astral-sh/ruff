@@ -46,7 +46,15 @@ TD003.py:31:3: TD003 Missing issue link for this TODO
 31 | # TODO: here's a TODO on the last line with no link
    |   ^^^^ TD003
 32 | 
-33 | # TODO: https://github.com/astral-sh/ruff/issues/8061 This comment also has a link
+33 | # TODO: https://github.com/astral-sh/ruff/pull/9627 A todo with a link on the same line
+   |
+
+TD003.py:37:3: TD003 Missing issue link for this TODO
+   |
+35 | # TODO: #9627 A todo with a number on the same line
+36 | 
+37 | # TODO: A todo with a random number, 5431
+   |   ^^^^ TD003
    |
 
 

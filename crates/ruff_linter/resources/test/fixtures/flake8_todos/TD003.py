@@ -30,6 +30,9 @@ def foo(x):
 
 # TODO: here's a TODO on the last line with no link
 
-# TODO: https://github.com/astral-sh/ruff/issues/8061 This comment also has a link
+# TODO: https://github.com/astral-sh/ruff/pull/9627 A todo with a link on the same line
 
-# TODO: #31 This comment also has a number
+# TODO: #9627 A todo with a number on the same line
+
+# TODO: A todo with a random number, 5431
+

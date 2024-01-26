@@ -225,12 +225,19 @@ impl Violation for MissingSpaceAfterTodoColon {
 
 // TD003 will trigger if neither the TODO itself nor the following line
 // matches any of the patterns.
-static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
+static ISSUE_IDENTIFIER_ON_OWN_LINE_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     RegexSet::new([
-        r"^#.*(http|https)://.*", // issue link
-        r"^#.*#\d+",              // issue code - like "#003"
-        r"^#\s\d+",               // issue code - like "003"
-        r"^#\s[A-Z]{1,6}\-?\d+",  // issue code - like "TD003"
+        r"^#\s*(http|https)://.*", // issue link on its own line
+        r"^#\s*\d+$",              // issue code - like "003"
+        r"^#\s*[A-Z]{1,6}\-?\d+$", // issue code - like "TD003"
+    ])
+    .unwrap()
+});
+
+static ISSUE_IDENTIFIER_ON_TODO_LINE_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
+    RegexSet::new([
+        r"^#.*(http|https)://.+", // issue link
+        r"^#.*#\d+.*",            // issue code - like "#003"
     ])
     .unwrap()
 });
@@ -261,7 +268,7 @@ pub(crate) fn todos(
         let mut has_issue_link = false;
         let mut curr_range = range;
 
-        if ISSUE_LINK_REGEX_SET.is_match(content) {
+        if ISSUE_IDENTIFIER_ON_TODO_LINE_REGEX_SET.is_match(content) {
             has_issue_link = true;
         } else {
             for next_range in indexer
@@ -285,7 +292,7 @@ pub(crate) fn todos(
                     break;
                 }
 
-                if ISSUE_LINK_REGEX_SET.is_match(next_comment) {
+                if ISSUE_IDENTIFIER_ON_OWN_LINE_REGEX_SET.is_match(next_comment) {
                     has_issue_link = true;
                 }
 
