@@ -262,16 +262,16 @@ pub(crate) fn todos(
             continue;
         }
 
+        // If an issue link exists, we don't need to check the rest of the comment.
+        if ISSUE_IDENTIFIER_ON_TODO_LINE_REGEX_SET.is_match(content) {
+            continue;
+        }
+
         directive_errors(diagnostics, directive);
         static_errors(diagnostics, content, range, directive);
 
         let mut has_issue_link = false;
         let mut curr_range = range;
-
-        // If an issue link exists, we don't need to check the rest of the comment.
-        if ISSUE_IDENTIFIER_ON_TODO_LINE_REGEX_SET.is_match(content) {
-            continue;
-        }
 
         for next_range in indexer
             .comment_ranges()
