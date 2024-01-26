@@ -20,6 +20,7 @@ mod tests {
 
     #[test_case(Rule::BlankLineAfterLastSection, Path::new("sections.py"))]
     #[test_case(Rule::NoBlankLineAfterSection, Path::new("sections.py"))]
+    #[test_case(Rule::BlankLineAfterLastSection, Path::new("D413.py"))]
     #[test_case(Rule::BlankLineAfterSummary, Path::new("D.py"))]
     #[test_case(Rule::NoBlankLineBeforeSection, Path::new("sections.py"))]
     #[test_case(Rule::CapitalizeSectionName, Path::new("sections.py"))]
