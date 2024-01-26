@@ -126,7 +126,7 @@ where
     FormatParenthesized {
         left,
         comments: &[],
-        hug: None,
+        hug: false,
         content: Argument::new(content),
         right,
     }
@@ -135,7 +135,7 @@ where
 pub(crate) struct FormatParenthesized<'content, 'ast> {
     left: &'static str,
     comments: &'content [SourceComment],
-    hug: Option<HuggingStyle>,
+    hug: bool,
     content: Argument<'content, PyFormatContext<'ast>>,
     right: &'static str,
 }
@@ -158,10 +158,7 @@ impl<'content, 'ast> FormatParenthesized<'content, 'ast> {
     }
 
     /// Whether to indent the content within the parentheses.
-    pub(crate) fn with_hugging(
-        self,
-        hug: Option<HuggingStyle>,
-    ) -> FormatParenthesized<'content, 'ast> {
+    pub(crate) fn with_hugging(self, hug: bool) -> FormatParenthesized<'content, 'ast> {
         FormatParenthesized { hug, ..self }
     }
 }
@@ -173,30 +170,10 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
         let indented = format_with(|f| {
             let content = Arguments::from(&self.content);
             if self.comments.is_empty() {
-                match self.hug {
-                    None => group(&soft_block_indent(&content)).fmt(f),
-                    Some(HuggingStyle::Always) => content.fmt(f),
-                    Some(HuggingStyle::IfFirstLineFits) => {
-                        // It's not immediately obvious how the below IR works to only indent the content if the first line exceeds the configured line width.
-                        // The trick is the first group that doesn't wrap `self.content`.
-                        // * The group doesn't wrap `self.content` because we need to assume that `self.content`
-                        //   contains a hard line break and hard-line-breaks always expand the enclosing group.
-                        // * The printer decides that a group fits if its content (in this case a `soft_line_break` that has a width of 0 and is guaranteed to fit)
-                        //   and the content coming after the group in expanded mode (`self.content`) fits on the line.
-                        //   The content coming after fits if the content up to the first soft or hard line break (or the end of the document) fits.
-                        //
-                        // This happens to be right what we want. The first group should add an indent and a soft line break if the content of `self.content`
-                        // up to the first line break exceeds the configured line length, but not otherwise.
-                        let indented = f.group_id("indented_content");
-                        write!(
-                            f,
-                            [
-                                group(&indent(&soft_line_break())).with_group_id(Some(indented)),
-                                indent_if_group_breaks(&content, indented),
-                                if_group_breaks(&soft_line_break()).with_group_id(Some(indented))
-                            ]
-                        )
-                    }
+                if self.hug {
+                    content.fmt(f)
+                } else {
+                    group(&soft_block_indent(&content)).fmt(f)
                 }
             } else {
                 group(&format_args![
@@ -226,20 +203,6 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
 
         write!(f, [token(self.left), inner, token(self.right)])
     }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum HuggingStyle {
-    /// Always hug the content (never indent).
-    Always,
-
-    /// Hug the content if the content up to the first line break fits into the configured line length. Otherwise indent the content.
-    ///
-    /// This is different from [`HuggingStyle::Always`] in that it doesn't indent if the content contains a hard line break, and the content up to that hard line break fits into the configured line length.
-    ///
-    /// This style is used for formatting multiline strings that, by definition, always break. The idea is to
-    /// only hug a multiline string if its content up to the first line breaks exceeds the configured line length.
-    IfFirstLineFits,
 }
 
 /// Wraps an expression in parentheses only if it still does not fit after expanding all expressions that start or end with

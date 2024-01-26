@@ -131,6 +131,37 @@ def bar3(x, y, z):
     return None
 
 
+def bar4(x):
+    if True:
+        return
+    else:
+        # comment
+        pass
+
+
+def bar5():
+    if True:
+        return
+    else:  # comment
+        pass
+
+
+def bar6():
+    if True:
+        return
+    else\
+        :\
+        # comment
+        pass
+
+
+def bar7():
+    if True:
+        return
+    else\
+        :  # comment
+        pass
+
 x = 0
 
 if x == 1:

@@ -16,14 +16,11 @@ use crate::comments::{leading_comments, trailing_comments, LeadingDanglingTraili
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_generator_exp::is_generator_parenthesized;
 use crate::expression::parentheses::{
-    is_expression_parenthesized, optional_parentheses, parenthesized, HuggingStyle,
-    NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize,
+    is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
+    OptionalParentheses, Parentheses, Parenthesize,
 };
 use crate::prelude::*;
-use crate::preview::{
-    is_hug_parens_with_braces_and_square_brackets_enabled, is_multiline_string_handling_enabled,
-};
-use crate::string::AnyString;
+use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
 
 mod binary_like;
 pub(crate) mod expr_attribute;
@@ -446,7 +443,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             OptionalParentheses::Never => match parenthesize {
                 Parenthesize::IfBreaksOrIfRequired => {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
-                        .with_indent(is_expression_huggable(expression, f.context()).is_none())
+                        .with_indent(!is_expression_huggable(expression, f.context()))
                         .fmt(f)
                 }
 
@@ -1112,10 +1109,7 @@ pub(crate) fn has_own_parentheses(
 ///     ]
 /// )
 /// ```
-pub(crate) fn is_expression_huggable(
-    expr: &Expr,
-    context: &PyFormatContext,
-) -> Option<HuggingStyle> {
+pub(crate) fn is_expression_huggable(expr: &Expr, context: &PyFormatContext) -> bool {
     match expr {
         Expr::Tuple(_)
         | Expr::List(_)
@@ -1123,14 +1117,9 @@ pub(crate) fn is_expression_huggable(
         | Expr::Dict(_)
         | Expr::ListComp(_)
         | Expr::SetComp(_)
-        | Expr::DictComp(_) => is_hug_parens_with_braces_and_square_brackets_enabled(context)
-            .then_some(HuggingStyle::Always),
+        | Expr::DictComp(_) => is_hug_parens_with_braces_and_square_brackets_enabled(context),
 
         Expr::Starred(ast::ExprStarred { value, .. }) => is_expression_huggable(value, context),
-
-        Expr::StringLiteral(string) => is_huggable_string(AnyString::String(string), context),
-        Expr::BytesLiteral(bytes) => is_huggable_string(AnyString::Bytes(bytes), context),
-        Expr::FString(fstring) => is_huggable_string(AnyString::FString(fstring), context),
 
         Expr::BoolOp(_)
         | Expr::NamedExpr(_)
@@ -1152,20 +1141,10 @@ pub(crate) fn is_expression_huggable(
         | Expr::NumberLiteral(_)
         | Expr::BooleanLiteral(_)
         | Expr::NoneLiteral(_)
-        | Expr::EllipsisLiteral(_) => None,
-    }
-}
-
-/// Returns `true` if `string` is a multiline string that is not implicitly concatenated.
-fn is_huggable_string(string: AnyString, context: &PyFormatContext) -> Option<HuggingStyle> {
-    if !is_multiline_string_handling_enabled(context) {
-        return None;
-    }
-
-    if !string.is_implicit_concatenated() && string.is_multiline(context.source()) {
-        Some(HuggingStyle::IfFirstLineFits)
-    } else {
-        None
+        | Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::FString(_)
+        | Expr::EllipsisLiteral(_) => false,
     }
 }
 
