@@ -59,7 +59,7 @@ pub(super) fn has_default_copy_semantics(
     analyze::class::any_call_path(class_def, semantic, &|call_path| {
         matches!(
             call_path.as_slice(),
-            ["pydantic", "BaseModel" | "BaseSettings"]
+            ["pydantic", "BaseModel" | "BaseSettings" | "BaseConfig"]
                 | ["pydantic_settings", "BaseSettings"]
                 | ["msgspec", "Struct"]
         )
