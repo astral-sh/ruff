@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
@@ -30,14 +30,16 @@ use super::super::detection::comment_contains_code;
 #[violation]
 pub struct CommentedOutCode;
 
-impl AlwaysFixableViolation for CommentedOutCode {
+impl Violation for CommentedOutCode {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Found commented-out code")
     }
 
-    fn fix_title(&self) -> String {
-        "Remove commented-out code".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Remove commented-out code"))
     }
 }
 
@@ -65,7 +67,6 @@ pub(crate) fn commented_out_code(
         // Verify that the comment is on its own line, and that it contains code.
         if is_standalone_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
             let mut diagnostic = Diagnostic::new(CommentedOutCode, *range);
-
             diagnostic.set_fix(Fix::display_only_edit(Edit::range_deletion(
                 locator.full_lines_range(*range),
             )));
