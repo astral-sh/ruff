@@ -983,6 +983,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_extend_call(checker, call);
             }
+
+            if checker.enabled(Rule::DefaultFactoryKwarg) {
+                ruff::rules::default_factory_kwarg(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[
