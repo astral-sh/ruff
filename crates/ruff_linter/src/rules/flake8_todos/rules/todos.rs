@@ -268,39 +268,40 @@ pub(crate) fn todos(
         let mut has_issue_link = false;
         let mut curr_range = range;
 
+        // If an issue link exists, we don't need to check the rest of the comment.
         if ISSUE_IDENTIFIER_ON_TODO_LINE_REGEX_SET.is_match(content) {
-            has_issue_link = true;
-        } else {
-            for next_range in indexer
-                .comment_ranges()
-                .iter()
-                .skip(range_index + 1)
-                .copied()
+            continue;
+        }
+
+        for next_range in indexer
+            .comment_ranges()
+            .iter()
+            .skip(range_index + 1)
+            .copied()
+        {
+            // Ensure that next_comment_range is in the same multiline comment "block" as
+            // comment_range.
+            if !locator
+                .slice(TextRange::new(curr_range.end(), next_range.start()))
+                .chars()
+                .all(char::is_whitespace)
             {
-                // Ensure that next_comment_range is in the same multiline comment "block" as
-                // comment_range.
-                if !locator
-                    .slice(TextRange::new(curr_range.end(), next_range.start()))
-                    .chars()
-                    .all(char::is_whitespace)
-                {
-                    break;
-                }
-
-                let next_comment = locator.slice(next_range);
-                if TodoDirective::from_comment(next_comment, next_range).is_some() {
-                    break;
-                }
-
-                if ISSUE_IDENTIFIER_ON_OWN_LINE_REGEX_SET.is_match(next_comment) {
-                    has_issue_link = true;
-                }
-
-                // If the next_comment isn't a tag or an issue, it's worthles in the context of this
-                // linter. We can increment here instead of waiting for the next iteration of the outer
-                // loop.
-                curr_range = next_range;
+                break;
             }
+
+            let next_comment = locator.slice(next_range);
+            if TodoDirective::from_comment(next_comment, next_range).is_some() {
+                break;
+            }
+
+            if ISSUE_IDENTIFIER_ON_OWN_LINE_REGEX_SET.is_match(next_comment) {
+                has_issue_link = true;
+            }
+
+            // If the next_comment isn't a tag or an issue, it's worthles in the context of this
+            // linter. We can increment here instead of waiting for the next iteration of the outer
+            // loop.
+            curr_range = next_range;
         }
 
         if !has_issue_link {
