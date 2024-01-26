@@ -41,11 +41,11 @@ use crate::checkers::ast::Checker;
 /// defaultdict(list)
 /// ```
 #[violation]
-pub struct DefaultDictWithDefaultFactoryAsKwArg {
+pub struct DefaultFactoryKwarg {
     callable_id: Option<String>,
 }
 
-impl Violation for DefaultDictWithDefaultFactoryAsKwArg {
+impl Violation for DefaultFactoryKwarg {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -80,10 +80,7 @@ enum ValueKind<'a> {
 }
 
 /// RUF026
-pub(crate) fn default_dict_with_default_factory_as_kwarg(
-    checker: &mut Checker,
-    default_dict: &ast::ExprCall,
-) {
+pub(crate) fn default_factory_kwarg(checker: &mut Checker, default_dict: &ast::ExprCall) {
     let ExprCall {
         func, arguments, ..
     } = default_dict;
@@ -103,7 +100,7 @@ pub(crate) fn default_dict_with_default_factory_as_kwarg(
     match determine_kw_value_kind(keyword, checker.semantic()) {
         ValueKind::Fixable(id) => {
             let mut diagnostic = Diagnostic::new(
-                DefaultDictWithDefaultFactoryAsKwArg {
+                DefaultFactoryKwarg {
                     callable_id: Some(id.to_string()),
                 },
                 default_dict.range(),
@@ -122,7 +119,7 @@ pub(crate) fn default_dict_with_default_factory_as_kwarg(
         }
         ValueKind::NonFixable => {
             let diagnostic = Diagnostic::new(
-                DefaultDictWithDefaultFactoryAsKwArg { callable_id: None },
+                DefaultFactoryKwarg { callable_id: None },
                 default_dict.range(),
             );
 

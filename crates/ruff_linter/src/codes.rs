@@ -931,7 +931,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "023") => (RuleGroup::Preview, rules::ruff::rules::UnsortedDunderSlots),
         (Ruff, "024") => (RuleGroup::Preview, rules::ruff::rules::MutableFromkeysValue),
         (Ruff, "025") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryDictComprehensionForIterable),
-        (Ruff, "026") => (RuleGroup::Preview, rules::ruff::rules::DefaultDictWithDefaultFactoryAsKwArg),
+        (Ruff, "026") => (RuleGroup::Preview, rules::ruff::rules::DefaultFactoryKwarg),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
 
