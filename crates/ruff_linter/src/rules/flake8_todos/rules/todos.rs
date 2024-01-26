@@ -69,7 +69,8 @@ impl Violation for MissingTodoAuthor {
 }
 
 /// ## What it does
-/// Checks that a TODO comment is associated with a link or issue code.
+/// Checks that a TODO comment is associated with a link to a relevant issue
+/// or ticket.
 ///
 /// ## Why is this bad?
 /// Including an issue link near a TODO makes it easier for resolvers
