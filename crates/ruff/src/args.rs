@@ -780,10 +780,12 @@ impl TypedValueParser for ConfigOptionParser {
                 tips.push(format!("The path `{value}` does not exist on your filesystem").into());
             }
         } else if value.contains('=') {
-            let context = format!("\
+            let context = format!(
+                "\
 The following error occurred when attempting to parse `{value}` as TOML:
 
-{toml_parse_error}");
+{toml_parse_error}"
+            );
             let context = context.trim_end().to_string();
             tips.push(context.into());
         }
