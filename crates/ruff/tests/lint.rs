@@ -469,7 +469,14 @@ fn config_override_rejected_if_invalid_toml() {
     error: invalid value 'foo = bar' for '--config <CONFIG_OPTION>'
 
       tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
-      tip: The path `foo = bar` does not exist on your filesystem
+      tip: The following error occurred when attempting to parse `foo = bar` as TOML:
+
+    TOML parse error at line 1, column 7
+      |
+    1 | foo = bar
+      |       ^
+    invalid string
+    expected `"`, `'`
 
     For more information, try '--help'.
     "###);
@@ -570,7 +577,7 @@ x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssss
         .arg("--config")
         .arg(&ruff_toml)
         .args(["--config", "line-length=90"])
-        .args(["--config", "extend-select=['E501']"])
+        .args(["--config", "extend-select=['E501', 'F841']"])
         .args(["--config", "lint.isort.combine-as-imports = false"])
         .arg("-")
         .pass_stdin(fixture), @r###"
@@ -585,6 +592,32 @@ x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssss
     ----- stderr -----
     "###);
     Ok(())
+}
+
+#[test]
+fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", "extend-select=['F481']"])  // No such code as F481!
+        .arg("."), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'extend-select=['F481']' for '--config <CONFIG_OPTION>'
+
+      tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
+      tip: The following error occurred when attempting to parse `extend-select=['F481']` as TOML:
+
+    TOML parse error at line 1, column 1
+      |
+    1 | extend-select=['F481']
+      | ^^^^^^^^^^^^^^^^^^^^^^
+    Unknown rule selector: `F481`
+
+    For more information, try '--help'.
+    "###);
 }
 
 #[test]

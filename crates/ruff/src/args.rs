@@ -746,9 +746,10 @@ impl TypedValueParser for ConfigOptionParser {
                 cmd: cmd.clone(),
             });
         }
-        if let Ok(option) = toml::from_str(value) {
-            return Ok(ConfigOption::ConfigOverride(Arc::new(option)));
-        }
+        let toml_parse_error = match toml::from_str(value) {
+            Ok(option) => return Ok(ConfigOption::ConfigOverride(Arc::new(option))),
+            Err(toml_error) => toml_error,
+        };
         let mut new_error = clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
         if let Some(arg) = arg {
             new_error.insert(
@@ -760,17 +761,38 @@ impl TypedValueParser for ConfigOptionParser {
             clap::error::ContextKind::InvalidValue,
             clap::error::ContextValue::String(value.to_string()),
         );
-        let tips = vec![
-            "The `--config` flag must either be a path to a `.toml` \
+
+        let mut tips = vec!["\
+            The `--config` flag must either be a path to a `.toml` \
             configuration file or a TOML `<KEY> = <VALUE>` pair overriding \
             a specific config setting"
-                .into(),
-            format!("The path `{value}` does not exist on your filesystem").into(),
-        ];
+            .into()];
+
+        // Here we do some heuristics to try to figure out whether
+        // the user was trying to pass in a path to a config file
+        // or some inline TOML.
+        // We want to display the most helpful error to the user as possible.
+        if std::path::Path::new(value)
+            .extension()
+            .map_or(false, |ext| ext.eq_ignore_ascii_case("toml"))
+        {
+            if !value.contains('=') {
+                tips.push(format!("The path `{value}` does not exist on your filesystem").into());
+            }
+        } else if value.contains('=') {
+            let context = format!("\
+The following error occurred when attempting to parse `{value}` as TOML:
+
+{toml_parse_error}");
+            let context = context.trim_end().to_string();
+            tips.push(context.into());
+        }
+
         new_error.insert(
             clap::error::ContextKind::Suggested,
             clap::error::ContextValue::StyledStrs(tips),
         );
+
         Err(new_error)
     }
 }
