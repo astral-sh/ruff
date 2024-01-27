@@ -1073,6 +1073,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::If(if_ @ ast::StmtIf { test, .. }) => {
+            if checker.enabled(Rule::SimplifiableIfStatement) {
+                pylint::rules::simplifiable_if_statement(checker, if_);
+            }
             if checker.enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
