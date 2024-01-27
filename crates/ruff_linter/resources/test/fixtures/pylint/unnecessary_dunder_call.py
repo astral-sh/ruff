@@ -24,6 +24,19 @@ print((5 - a).__sub__(1))  # PLC2801
 print(-(5 - a).__sub__(1))  # PLC2801
 print(-(-5 - a).__sub__(1))  # PLC2801
 print(+-+-+-a.__sub__(1))  # PLC2801
+print(a.__rsub__(2 - 1))  # PLC2801
+print(a.__sub__(((((1))))))  # PLC2801
+print(a.__sub__(((((2 - 1))))))  # PLC2801
+print(a.__sub__(
+    3
+    +
+    4
+))
+print(a.__rsub__(
+    3
+    +
+    4
+))
 
 
 class Thing:

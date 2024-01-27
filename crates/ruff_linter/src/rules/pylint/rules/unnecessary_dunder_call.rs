@@ -125,21 +125,30 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
                 title = Some(message.to_string());
             }
             ([arg], DunderReplacement::Operator(replacement, message)) => {
-                fixed = Some(format!(
-                    "{} {} {}",
-                    checker.locator().slice(value.as_ref()),
-                    replacement,
-                    checker.locator().slice(arg),
-                ));
+                let value_slice = checker.locator().slice(value.as_ref());
+                let arg_slice = checker.locator().slice(arg);
+
+                if arg.is_attribute_expr() || arg.is_name_expr() || arg.is_literal_expr() {
+                    // if it's something that can reasonably be removed from parentheses,
+                    // we'll do that.
+                    fixed = Some(format!("{value_slice} {replacement} {arg_slice}"));
+                } else {
+                    fixed = Some(format!("{value_slice} {replacement} ({arg_slice})"));
+                }
+
                 title = Some(message.to_string());
             }
             ([arg], DunderReplacement::ROperator(replacement, message)) => {
-                fixed = Some(format!(
-                    "{} {} {}",
-                    checker.locator().slice(arg),
-                    replacement,
-                    checker.locator().slice(value.as_ref()),
-                ));
+                let value_slice = checker.locator().slice(value.as_ref());
+                let arg_slice = checker.locator().slice(arg);
+
+                if arg.is_attribute_expr() || arg.is_name_expr() || arg.is_literal_expr() {
+                    // if it's something that can reasonably be removed from parentheses,
+                    // we'll do that.
+                    fixed = Some(format!("{arg_slice} {replacement} {value_slice}"));
+                } else {
+                    fixed = Some(format!("({arg_slice}) {replacement} {value_slice}"));
+                }
                 title = Some(message.to_string());
             }
             (_, DunderReplacement::MessageOnly(message)) => {
@@ -158,43 +167,52 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
     );
 
     if let Some(mut fixed) = fixed {
+        // check if this attribute is preceded by a unary operator, e.g. `-a.__sub__(1)`
+        // if it is, the fix has to be handled differently to maintain semantics.
         let is_in_unary = checker
             .semantic()
             .current_expression_parent()
             .is_some_and(|parent| matches!(parent, Expr::UnaryOp(ast::ExprUnaryOp { .. })));
 
         if is_in_unary {
-            // find the first ")" before our dunder method
-            let rparen =
+            let mut tokenizer =
                 SimpleTokenizer::starts_at(value.as_ref().end(), checker.locator().contents())
-                    .find(|token| {
-                        token.kind == SimpleTokenKind::RParen && token.start() < call.end()
-                    });
+                    .skip_trivia();
 
-            // find the "." before our dunder method
-            let dot =
-                SimpleTokenizer::starts_at(value.as_ref().end(), checker.locator().contents())
-                    .find(|token| token.kind == SimpleTokenKind::Dot && token.start() < call.end())
-                    .unwrap();
+            let token = tokenizer.next().unwrap();
+            // we're going to start looking for the first immediate Right-Parentheses,
+            // and the first Dot token after that.
 
-            // if we're within parentheses with a unary, we're going to take
-            // the value operand, and insert the fix in its place within its
-            // existing parentheses. the existing "fixed" value is what we want.
-            // for example, `-(-a).__sub__(1)` -> `-(-a - 1)`
-            if rparen.is_none() {
-                // otherwise, we're going to wrap the fix in parentheses
+            // if our attribute is within parentheses with a unary, e.g. `-(-5).__sub__(1)`
+            // we have to add the fix within the existing parentheses, //     ^
+            // because `--5 - 1` is not the same as `-(-5 - 1)`
+            if token.kind != SimpleTokenKind::RParen {
+                // if we're not in parentheses, we're going to wrap the fix in parentheses
                 // to maintain semantic integrity.
                 // `-a.__sub__(1)` -> `-(a - 1)`
                 fixed = format!("({fixed})");
             }
 
-            diagnostic.set_fix(Fix::safe_edits(
+            // find the dot token for this call
+            let dot_start = if token.kind == SimpleTokenKind::Dot {
+                token.start()
+            } else {
+                tokenizer
+                    .find(|token| token.kind == SimpleTokenKind::Dot)
+                    .unwrap()
+                    .start()
+            };
+
+            diagnostic.set_fix(Fix::unsafe_edits(
                 Edit::range_replacement(fixed, value.as_ref().range()),
-                [Edit::deletion(dot.start(), call.end())],
+                [Edit::deletion(dot_start, call.end())],
             ));
         } else {
             // `(3).__add__(1)` -> `3 + 1`
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(fixed, call.range())));
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                fixed,
+                call.range(),
+            )));
         }
     };
 

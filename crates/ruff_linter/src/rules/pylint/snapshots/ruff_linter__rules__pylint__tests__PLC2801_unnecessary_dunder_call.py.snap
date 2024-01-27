@@ -11,7 +11,7 @@ unnecessary_dunder_call.py:4:7: PLC2801 [*] Unnecessary dunder call to `__add__`
   |
   = help: Use `+` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 1 1 | from typing import Any
 2 2 | 
 3 3 | a = 2
@@ -32,7 +32,7 @@ unnecessary_dunder_call.py:5:7: PLC2801 [*] Unnecessary dunder call to `__sub__`
   |
   = help: Use `-` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 2 2 | 
 3 3 | a = 2
 4 4 | print((3.0).__add__(4.0))  # PLC2801
@@ -53,7 +53,7 @@ unnecessary_dunder_call.py:6:7: PLC2801 [*] Unnecessary dunder call to `__mul__`
   |
   = help: Use `*` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 3 3 | a = 2
 4 4 | print((3.0).__add__(4.0))  # PLC2801
 5 5 | print((3.0).__sub__(4.0))  # PLC2801
@@ -74,7 +74,7 @@ unnecessary_dunder_call.py:7:7: PLC2801 [*] Unnecessary dunder call to `__truedi
   |
   = help: Use `/` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 4 4 | print((3.0).__add__(4.0))  # PLC2801
 5 5 | print((3.0).__sub__(4.0))  # PLC2801
 6 6 | print((3.0).__mul__(4.0))  # PLC2801
@@ -95,7 +95,7 @@ unnecessary_dunder_call.py:8:7: PLC2801 [*] Unnecessary dunder call to `__floord
    |
    = help: Use `//` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 5 5 | print((3.0).__sub__(4.0))  # PLC2801
 6 6 | print((3.0).__mul__(4.0))  # PLC2801
 7 7 | print((3.0).__truediv__(4.0))  # PLC2801
@@ -116,7 +116,7 @@ unnecessary_dunder_call.py:9:7: PLC2801 [*] Unnecessary dunder call to `__mod__`
    |
    = help: Use `%` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 6  6  | print((3.0).__mul__(4.0))  # PLC2801
 7  7  | print((3.0).__truediv__(4.0))  # PLC2801
 8  8  | print((3.0).__floordiv__(4.0))  # PLC2801
@@ -137,7 +137,7 @@ unnecessary_dunder_call.py:10:7: PLC2801 [*] Unnecessary dunder call to `__eq__`
    |
    = help: Use `==` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 7  7  | print((3.0).__truediv__(4.0))  # PLC2801
 8  8  | print((3.0).__floordiv__(4.0))  # PLC2801
 9  9  | print((3.0).__mod__(4.0))  # PLC2801
@@ -158,7 +158,7 @@ unnecessary_dunder_call.py:11:7: PLC2801 [*] Unnecessary dunder call to `__ne__`
    |
    = help: Use `!=` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 8  8  | print((3.0).__floordiv__(4.0))  # PLC2801
 9  9  | print((3.0).__mod__(4.0))  # PLC2801
 10 10 | print((3.0).__eq__(4.0))  # PLC2801
@@ -179,7 +179,7 @@ unnecessary_dunder_call.py:12:7: PLC2801 [*] Unnecessary dunder call to `__lt__`
    |
    = help: Use `<` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 9  9  | print((3.0).__mod__(4.0))  # PLC2801
 10 10 | print((3.0).__eq__(4.0))  # PLC2801
 11 11 | print((3.0).__ne__(4.0))  # PLC2801
@@ -200,7 +200,7 @@ unnecessary_dunder_call.py:13:7: PLC2801 [*] Unnecessary dunder call to `__le__`
    |
    = help: Use `<=` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 10 10 | print((3.0).__eq__(4.0))  # PLC2801
 11 11 | print((3.0).__ne__(4.0))  # PLC2801
 12 12 | print((3.0).__lt__(4.0))  # PLC2801
@@ -221,7 +221,7 @@ unnecessary_dunder_call.py:14:7: PLC2801 [*] Unnecessary dunder call to `__gt__`
    |
    = help: Use `>` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 11 11 | print((3.0).__ne__(4.0))  # PLC2801
 12 12 | print((3.0).__lt__(4.0))  # PLC2801
 13 13 | print((3.0).__le__(4.0))  # PLC2801
@@ -242,7 +242,7 @@ unnecessary_dunder_call.py:15:7: PLC2801 [*] Unnecessary dunder call to `__ge__`
    |
    = help: Use `>=` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 12 12 | print((3.0).__lt__(4.0))  # PLC2801
 13 13 | print((3.0).__le__(4.0))  # PLC2801
 14 14 | print((3.0).__gt__(4.0))  # PLC2801
@@ -263,7 +263,7 @@ unnecessary_dunder_call.py:16:7: PLC2801 [*] Unnecessary dunder call to `__str__
    |
    = help: Use `str()` builtin
 
-ℹ Safe fix
+ℹ Unsafe fix
 13 13 | print((3.0).__le__(4.0))  # PLC2801
 14 14 | print((3.0).__gt__(4.0))  # PLC2801
 15 15 | print((3.0).__ge__(4.0))  # PLC2801
@@ -284,7 +284,7 @@ unnecessary_dunder_call.py:17:7: PLC2801 [*] Unnecessary dunder call to `__repr_
    |
    = help: Use `repr()` builtin
 
-ℹ Safe fix
+ℹ Unsafe fix
 14 14 | print((3.0).__gt__(4.0))  # PLC2801
 15 15 | print((3.0).__ge__(4.0))  # PLC2801
 16 16 | print((3.0).__str__())  # PLC2801
@@ -305,7 +305,7 @@ unnecessary_dunder_call.py:18:7: PLC2801 [*] Unnecessary dunder call to `__len__
    |
    = help: Use `len()` builtin
 
-ℹ Safe fix
+ℹ Unsafe fix
 15 15 | print((3.0).__ge__(4.0))  # PLC2801
 16 16 | print((3.0).__str__())  # PLC2801
 17 17 | print((3.0).__repr__())  # PLC2801
@@ -337,7 +337,7 @@ unnecessary_dunder_call.py:20:8: PLC2801 [*] Unnecessary dunder call to `__sub__
    |
    = help: Use `-` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 17 17 | print((3.0).__repr__())  # PLC2801
 18 18 | print([1, 2, 3].__len__())  # PLC2801
 19 19 | print((1).__neg__())  # PLC2801
@@ -358,7 +358,7 @@ unnecessary_dunder_call.py:21:8: PLC2801 [*] Unnecessary dunder call to `__sub__
    |
    = help: Use `-` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 18 18 | print([1, 2, 3].__len__())  # PLC2801
 19 19 | print((1).__neg__())  # PLC2801
 20 20 | print(-a.__sub__(1))  # PLC2801
@@ -379,7 +379,7 @@ unnecessary_dunder_call.py:22:10: PLC2801 [*] Unnecessary dunder call to `__sub_
    |
    = help: Use `-` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 19 19 | print((1).__neg__())  # PLC2801
 20 20 | print(-a.__sub__(1))  # PLC2801
 21 21 | print(-(a).__sub__(1))  # PLC2801
@@ -400,7 +400,7 @@ unnecessary_dunder_call.py:23:7: PLC2801 [*] Unnecessary dunder call to `__sub__
    |
    = help: Use `-` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 20 20 | print(-a.__sub__(1))  # PLC2801
 21 21 | print(-(a).__sub__(1))  # PLC2801
 22 22 | print(-(-a.__sub__(1)))  # PLC2801
@@ -421,7 +421,7 @@ unnecessary_dunder_call.py:24:8: PLC2801 [*] Unnecessary dunder call to `__sub__
    |
    = help: Use `-` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 21 21 | print(-(a).__sub__(1))  # PLC2801
 22 22 | print(-(-a.__sub__(1)))  # PLC2801
 23 23 | print((5 - a).__sub__(1))  # PLC2801
@@ -429,7 +429,7 @@ unnecessary_dunder_call.py:24:8: PLC2801 [*] Unnecessary dunder call to `__sub__
    24 |+print(-(5 - a - 1))  # PLC2801
 25 25 | print(-(-5 - a).__sub__(1))  # PLC2801
 26 26 | print(+-+-+-a.__sub__(1))  # PLC2801
-27 27 | 
+27 27 | print(a.__rsub__(2 - 1))  # PLC2801
 
 unnecessary_dunder_call.py:25:8: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
    |
@@ -438,18 +438,19 @@ unnecessary_dunder_call.py:25:8: PLC2801 [*] Unnecessary dunder call to `__sub__
 25 | print(-(-5 - a).__sub__(1))  # PLC2801
    |        ^^^^^^^^^^^^^^^^^^^ PLC2801
 26 | print(+-+-+-a.__sub__(1))  # PLC2801
+27 | print(a.__rsub__(2 - 1))  # PLC2801
    |
    = help: Use `-` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 22 22 | print(-(-a.__sub__(1)))  # PLC2801
 23 23 | print((5 - a).__sub__(1))  # PLC2801
 24 24 | print(-(5 - a).__sub__(1))  # PLC2801
 25    |-print(-(-5 - a).__sub__(1))  # PLC2801
    25 |+print(-(-5 - a - 1))  # PLC2801
 26 26 | print(+-+-+-a.__sub__(1))  # PLC2801
-27 27 | 
-28 28 | 
+27 27 | print(a.__rsub__(2 - 1))  # PLC2801
+28 28 | print(a.__sub__(((((1))))))  # PLC2801
 
 unnecessary_dunder_call.py:26:13: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
    |
@@ -457,23 +458,148 @@ unnecessary_dunder_call.py:26:13: PLC2801 [*] Unnecessary dunder call to `__sub_
 25 | print(-(-5 - a).__sub__(1))  # PLC2801
 26 | print(+-+-+-a.__sub__(1))  # PLC2801
    |             ^^^^^^^^^^^^ PLC2801
+27 | print(a.__rsub__(2 - 1))  # PLC2801
+28 | print(a.__sub__(((((1))))))  # PLC2801
    |
    = help: Use `-` operator
 
-ℹ Safe fix
+ℹ Unsafe fix
 23 23 | print((5 - a).__sub__(1))  # PLC2801
 24 24 | print(-(5 - a).__sub__(1))  # PLC2801
 25 25 | print(-(-5 - a).__sub__(1))  # PLC2801
 26    |-print(+-+-+-a.__sub__(1))  # PLC2801
    26 |+print(+-+-+-(a - 1))  # PLC2801
-27 27 | 
-28 28 | 
-29 29 | class Thing:
+27 27 | print(a.__rsub__(2 - 1))  # PLC2801
+28 28 | print(a.__sub__(((((1))))))  # PLC2801
+29 29 | print(a.__sub__(((((2 - 1))))))  # PLC2801
 
-unnecessary_dunder_call.py:38:16: PLC2801 Unnecessary dunder call to `__getattribute__`. Access attribute directly or use getattr built-in function.
+unnecessary_dunder_call.py:27:7: PLC2801 [*] Unnecessary dunder call to `__rsub__`. Use `-` operator.
    |
-37 |     def do_thing(self, item):
-38 |         return object.__getattribute__(self, item)  # PLC2801
+25 | print(-(-5 - a).__sub__(1))  # PLC2801
+26 | print(+-+-+-a.__sub__(1))  # PLC2801
+27 | print(a.__rsub__(2 - 1))  # PLC2801
+   |       ^^^^^^^^^^^^^^^^^ PLC2801
+28 | print(a.__sub__(((((1))))))  # PLC2801
+29 | print(a.__sub__(((((2 - 1))))))  # PLC2801
+   |
+   = help: Use `-` operator
+
+ℹ Unsafe fix
+24 24 | print(-(5 - a).__sub__(1))  # PLC2801
+25 25 | print(-(-5 - a).__sub__(1))  # PLC2801
+26 26 | print(+-+-+-a.__sub__(1))  # PLC2801
+27    |-print(a.__rsub__(2 - 1))  # PLC2801
+   27 |+print((2 - 1) - a)  # PLC2801
+28 28 | print(a.__sub__(((((1))))))  # PLC2801
+29 29 | print(a.__sub__(((((2 - 1))))))  # PLC2801
+30 30 | print(a.__sub__(
+
+unnecessary_dunder_call.py:28:7: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
+   |
+26 | print(+-+-+-a.__sub__(1))  # PLC2801
+27 | print(a.__rsub__(2 - 1))  # PLC2801
+28 | print(a.__sub__(((((1))))))  # PLC2801
+   |       ^^^^^^^^^^^^^^^^^^^^ PLC2801
+29 | print(a.__sub__(((((2 - 1))))))  # PLC2801
+30 | print(a.__sub__(
+   |
+   = help: Use `-` operator
+
+ℹ Unsafe fix
+25 25 | print(-(-5 - a).__sub__(1))  # PLC2801
+26 26 | print(+-+-+-a.__sub__(1))  # PLC2801
+27 27 | print(a.__rsub__(2 - 1))  # PLC2801
+28    |-print(a.__sub__(((((1))))))  # PLC2801
+   28 |+print(a - 1)  # PLC2801
+29 29 | print(a.__sub__(((((2 - 1))))))  # PLC2801
+30 30 | print(a.__sub__(
+31 31 |     3
+
+unnecessary_dunder_call.py:29:7: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
+   |
+27 | print(a.__rsub__(2 - 1))  # PLC2801
+28 | print(a.__sub__(((((1))))))  # PLC2801
+29 | print(a.__sub__(((((2 - 1))))))  # PLC2801
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^ PLC2801
+30 | print(a.__sub__(
+31 |     3
+   |
+   = help: Use `-` operator
+
+ℹ Unsafe fix
+26 26 | print(+-+-+-a.__sub__(1))  # PLC2801
+27 27 | print(a.__rsub__(2 - 1))  # PLC2801
+28 28 | print(a.__sub__(((((1))))))  # PLC2801
+29    |-print(a.__sub__(((((2 - 1))))))  # PLC2801
+   29 |+print(a - (2 - 1))  # PLC2801
+30 30 | print(a.__sub__(
+31 31 |     3
+32 32 |     +
+
+unnecessary_dunder_call.py:30:7: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
+   |
+28 |   print(a.__sub__(((((1))))))  # PLC2801
+29 |   print(a.__sub__(((((2 - 1))))))  # PLC2801
+30 |   print(a.__sub__(
+   |  _______^
+31 | |     3
+32 | |     +
+33 | |     4
+34 | | ))
+   | |_^ PLC2801
+35 |   print(a.__rsub__(
+36 |       3
+   |
+   = help: Use `-` operator
+
+ℹ Unsafe fix
+27 27 | print(a.__rsub__(2 - 1))  # PLC2801
+28 28 | print(a.__sub__(((((1))))))  # PLC2801
+29 29 | print(a.__sub__(((((2 - 1))))))  # PLC2801
+30    |-print(a.__sub__(
+31    |-    3
+   30 |+print(a - (3
+32 31 |     +
+33    |-    4
+34    |-))
+   32 |+    4))
+35 33 | print(a.__rsub__(
+36 34 |     3
+37 35 |     +
+
+unnecessary_dunder_call.py:35:7: PLC2801 [*] Unnecessary dunder call to `__rsub__`. Use `-` operator.
+   |
+33 |       4
+34 |   ))
+35 |   print(a.__rsub__(
+   |  _______^
+36 | |     3
+37 | |     +
+38 | |     4
+39 | | ))
+   | |_^ PLC2801
+   |
+   = help: Use `-` operator
+
+ℹ Unsafe fix
+32 32 |     +
+33 33 |     4
+34 34 | ))
+35    |-print(a.__rsub__(
+36    |-    3
+   35 |+print((3
+37 36 |     +
+38    |-    4
+39    |-))
+   37 |+    4) - a)
+40 38 | 
+41 39 | 
+42 40 | class Thing:
+
+unnecessary_dunder_call.py:51:16: PLC2801 Unnecessary dunder call to `__getattribute__`. Access attribute directly or use getattr built-in function.
+   |
+50 |     def do_thing(self, item):
+51 |         return object.__getattribute__(self, item)  # PLC2801
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC2801
 32 | 
 33 |     def use_descriptor(self, item):
