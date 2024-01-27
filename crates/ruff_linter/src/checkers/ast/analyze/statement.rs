@@ -516,6 +516,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::BadDunderMethodName) {
                 pylint::rules::bad_dunder_method_name(checker, body);
             }
+            if checker.enabled(Rule::MetaClassABCMeta) {
+                refurb::rules::metaclass_abcmeta(checker, class_def);
+            }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
             if checker.enabled(Rule::MultipleImportsOnOneLine) {
