@@ -17,6 +17,7 @@ use crate::token_set::TokenSet;
 use crate::{FStringErrorType, Mode, ParseErrorType, Tok, TokenKind};
 
 /// Tokens that can appear after an expression.
+/// FIXME: this isn't exhaustive.
 const END_EXPR_SET: TokenSet = TokenSet::new([
     TokenKind::Newline,
     TokenKind::Semi,
@@ -33,6 +34,7 @@ const END_EXPR_SET: TokenSet = TokenSet::new([
     TokenKind::For,
     TokenKind::Async,
     TokenKind::In,
+    TokenKind::Equal,
 ]);
 
 impl<'src> Parser<'src> {
