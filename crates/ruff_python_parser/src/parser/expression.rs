@@ -593,8 +593,7 @@ impl<'src> Parser<'src> {
 
         let lower = if self.at_expr() {
             let lower = self.parse_named_expression_or_higher();
-
-            if !self.at(TokenKind::Colon) || lower.expr.is_named_expr_expr() {
+            if self.at_ts(NEWLINE_EOF_SET.union([TokenKind::Rsqb, TokenKind::Comma].into())) {
                 return lower.expr;
             }
 

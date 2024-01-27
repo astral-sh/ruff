@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
-expression: "parse(\"\nl[0]\nl[1:]\nl[1:2]\nl[:2]\nl[:2:]\nl[:2:3]\nl[1:2:3]\nl[:]\nl[::]\nl[0][0]\nl[0,1]\nl[0:,]\nl[0:,1]\nl[0:1, 2]\nl[0:1:2, 3, i:i + 1]\nx[a := b]\na[:, :11]\nl[1,2,3]\nx[~flag]\n\")"
+expression: "parse(\"\nl[0]\nl[1:]\nl[1:2]\nl[:2]\nl[:2:]\nl[:2:3]\nl[1:2:3]\nl[:]\nl[::]\nl[0][0]\nl[0,1]\nl[0:,]\nl[0:,1]\nl[0:1, 2]\nl[0:1:2, 3, i:i + 1]\nx[a := b]\na[:, :11]\nl[1,2,3]\nx[~flag]\nx[(a:=0):]\nx[(a:=0):y]\n\")"
 ---
 Program {
     ast: Module(
         ModModule {
-            range: 0..159,
+            range: 0..182,
             body: [
                 Expr(
                     StmtExpr {
@@ -843,6 +843,108 @@ Program {
                                                 ctx: Load,
                                             },
                                         ),
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 159..169,
+                        value: Subscript(
+                            ExprSubscript {
+                                range: 159..169,
+                                value: Name(
+                                    ExprName {
+                                        range: 159..160,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                slice: Slice(
+                                    ExprSlice {
+                                        range: 161..168,
+                                        lower: Some(
+                                            NamedExpr(
+                                                ExprNamedExpr {
+                                                    range: 162..166,
+                                                    target: Name(
+                                                        ExprName {
+                                                            range: 162..163,
+                                                            id: "a",
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 165..166,
+                                                            value: Int(
+                                                                0,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                        upper: None,
+                                        step: None,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 170..181,
+                        value: Subscript(
+                            ExprSubscript {
+                                range: 170..181,
+                                value: Name(
+                                    ExprName {
+                                        range: 170..171,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                slice: Slice(
+                                    ExprSlice {
+                                        range: 172..180,
+                                        lower: Some(
+                                            NamedExpr(
+                                                ExprNamedExpr {
+                                                    range: 173..177,
+                                                    target: Name(
+                                                        ExprName {
+                                                            range: 173..174,
+                                                            id: "a",
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 176..177,
+                                                            value: Int(
+                                                                0,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                        upper: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 179..180,
+                                                    id: "y",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                        step: None,
                                     },
                                 ),
                                 ctx: Load,
