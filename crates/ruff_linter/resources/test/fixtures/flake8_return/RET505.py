@@ -162,6 +162,20 @@ def bar7():
         :  # comment
         pass
 
+
+def bar8():
+    if True:
+        return
+    else: pass
+
+
+def bar9():
+    if True:
+        return
+    else:\
+        pass
+
+
 x = 0
 
 if x == 1:
