@@ -132,4 +132,23 @@ RET505.py:161:5: RET505 Unnecessary `else` after `return` statement
     |
     = help: Remove unnecessary `else`
 
+RET505.py:169:5: RET505 Unnecessary `else` after `return` statement
+    |
+167 |     if True:
+168 |         return
+169 |     else: pass
+    |     ^^^^ RET505
+    |
+    = help: Remove unnecessary `else`
+
+RET505.py:175:5: RET505 Unnecessary `else` after `return` statement
+    |
+173 |     if True:
+174 |         return
+175 |     else:\
+    |     ^^^^ RET505
+176 |         pass
+    |
+    = help: Remove unnecessary `else`
+
 

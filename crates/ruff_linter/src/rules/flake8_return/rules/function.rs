@@ -12,8 +12,11 @@ use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
+use ruff_python_codegen::Stylist;
+use ruff_python_index::Indexer;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{is_python_whitespace, SimpleTokenKind, SimpleTokenizer};
+use ruff_source_file::Locator;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
@@ -635,7 +638,14 @@ fn superfluous_else_node(
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 if checker.settings.preview.is_enabled() {
-                    diagnostic.try_set_fix(|| remove_else(checker, elif_else));
+                    diagnostic.try_set_fix(|| {
+                        remove_else(
+                            elif_else,
+                            checker.locator(),
+                            checker.indexer(),
+                            checker.stylist(),
+                        )
+                    });
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -648,7 +658,14 @@ fn superfluous_else_node(
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 if checker.settings.preview.is_enabled() {
-                    diagnostic.try_set_fix(|| remove_else(checker, elif_else));
+                    diagnostic.try_set_fix(|| {
+                        remove_else(
+                            elif_else,
+                            checker.locator(),
+                            checker.indexer(),
+                            checker.stylist(),
+                        )
+                    });
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -661,7 +678,14 @@ fn superfluous_else_node(
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 if checker.settings.preview.is_enabled() {
-                    diagnostic.try_set_fix(|| remove_else(checker, elif_else));
+                    diagnostic.try_set_fix(|| {
+                        remove_else(
+                            elif_else,
+                            checker.locator(),
+                            checker.indexer(),
+                            checker.stylist(),
+                        )
+                    });
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -674,7 +698,14 @@ fn superfluous_else_node(
             );
             if checker.enabled(diagnostic.kind.rule()) {
                 if checker.settings.preview.is_enabled() {
-                    diagnostic.try_set_fix(|| remove_else(checker, elif_else));
+                    diagnostic.try_set_fix(|| {
+                        remove_else(
+                            elif_else,
+                            checker.locator(),
+                            checker.indexer(),
+                            checker.stylist(),
+                        )
+                    });
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -754,22 +785,26 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
     }
 }
 
-fn remove_else(checker: &mut Checker, elif_else: &ElifElseClause) -> Result<Fix> {
+/// Generate a [`Fix`] to remove an `else` or `elif` clause.
+fn remove_else(
+    elif_else: &ElifElseClause,
+    locator: &Locator,
+    indexer: &Indexer,
+    stylist: &Stylist,
+) -> Result<Fix> {
     if elif_else.test.is_some() {
-        // it's an elif, so we can just make it an if
-
-        // delete "el" from "elif"
+        // Ex) `elif` -> `if`
         Ok(Fix::safe_edit(Edit::deletion(
             elif_else.start(),
             elif_else.start() + TextSize::from(2),
         )))
     } else {
         // the start of the line where the `else`` is
-        let else_line_start = checker.locator().line_start(elif_else.start());
+        let else_line_start = locator.line_start(elif_else.start());
 
         // making a tokenizer to find the Colon for the `else`, not always on the same line!
         let mut else_line_tokenizer =
-            SimpleTokenizer::starts_at(elif_else.start(), checker.locator().contents());
+            SimpleTokenizer::starts_at(elif_else.start(), locator.contents());
 
         // find the Colon for the `else`
         let Some(else_colon) =
@@ -779,13 +814,25 @@ fn remove_else(checker: &mut Checker, elif_else: &ElifElseClause) -> Result<Fix>
         };
 
         // get the indentation of the `else`, since that is the indent level we want to end with
-        let Some(desired_indentation) = indentation(checker.locator(), elif_else) else {
+        let Some(desired_indentation) = indentation(locator, elif_else) else {
             return Err(anyhow::anyhow!("Compound statement cannot be inlined"));
         };
 
+        // If the statement is on the same line as the `else`, just remove the `else: `.
+        // Ex) `else: return True` -> `return True`
+        let Some(first) = elif_else.body.first() else {
+            return Err(anyhow::anyhow!("`else` statement has no body"));
+        };
+        if indexer.in_multi_statement_line(first, locator) {
+            return Ok(Fix::safe_edit(Edit::deletion(
+                elif_else.start(),
+                first.start(),
+            )));
+        }
+
         // we're deleting the `else`, and it's Colon, and the rest of the line(s) they're on,
         // so here we get the last position of the line the Colon is on
-        let else_colon_end = checker.locator().full_line_end(else_colon.end());
+        let else_colon_end = locator.full_line_end(else_colon.end());
 
         // if there is a comment on the same line as the Colon, let's keep it
         // and give it the proper indentation once we unindent it
@@ -795,8 +842,8 @@ fn remove_else(checker: &mut Checker, elif_else: &ElifElseClause) -> Result<Fix>
                 if token.kind == SimpleTokenKind::Comment && token.start() < else_colon_end {
                     return Some(format!(
                         "{desired_indentation}{}{}",
-                        checker.locator().slice(token),
-                        checker.stylist().line_ending().as_str(),
+                        locator.slice(token),
+                        stylist.line_ending().as_str(),
                     ));
                 }
                 None
@@ -806,8 +853,8 @@ fn remove_else(checker: &mut Checker, elif_else: &ElifElseClause) -> Result<Fix>
         let indented = adjust_indentation(
             TextRange::new(else_colon_end, elif_else.end()),
             desired_indentation,
-            checker.locator(),
-            checker.stylist(),
+            locator,
+            stylist,
         )?;
 
         Ok(Fix::safe_edit(Edit::replacement(
