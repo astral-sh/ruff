@@ -298,6 +298,8 @@ bitflags! {
         /// (x, y) = 1, 2
         /// ```
         const UNPACKED_ASSIGNMENT = 1 << 8;
+
+        const INSTANCE_ATTRIBUTE = 1 << 9;
     }
 }
 
