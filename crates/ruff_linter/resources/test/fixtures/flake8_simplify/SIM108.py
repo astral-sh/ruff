@@ -143,3 +143,34 @@ if TYPE_CHECKING:
     x = 3
 else:
     x = 5
+
+
+# OK (line breaks in the if-value)
+if link:
+    response = problem(
+        status=exception.status,
+        title=exception.title,
+        detail=exception.detail,
+        type=link,
+        instance=exception.instance,
+        headers=exception.headers,
+        ext=exception.ext,
+    )
+else:
+    response = 42
+
+
+# OK (line breaks in the else-value)
+
+if link:
+    response = 42
+else:
+    response = problem(
+        status=exception.status,
+        title=exception.title,
+        detail=exception.detail,
+        type=link,
+        instance=exception.instance,
+        headers=exception.headers,
+        ext=exception.ext,
+    )

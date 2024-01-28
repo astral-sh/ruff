@@ -111,6 +111,17 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
         return;
     }
 
+    let locator = checker.locator();
+
+    // If the original expression has a line break
+    // in either the "if-value" or the "else-value",
+    // don't suggest to turn it into a ternary expression
+    if locator.contains_line_break(body_value.range())
+        || locator.contains_line_break(else_value.range())
+    {
+        return;
+    }
+
     // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
     if is_sys_version_block(stmt_if, checker.semantic()) {
         return;
@@ -120,8 +131,6 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
     if is_type_checking_block(stmt_if, checker.semantic()) {
         return;
     }
-
-    let locator = checker.locator();
 
     let possible_replacement = format!(
         "{} = {} if {} else {}",
