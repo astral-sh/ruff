@@ -3,6 +3,7 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, ExprContext, Identifier};
@@ -98,6 +99,17 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
         let Expr::Name(ast::ExprName { id: arg_name, .. }) = value.as_ref() else {
             continue;
         };
+
+        let Some(arg) = args.first() else {
+            continue;
+        };
+
+        // Check if the argument is a tuple of strings. If so, we will exclude it from the check.
+        // This is because we don't want to suggest merging a tuple of strings into a tuple.
+        // Which violates the conctract of startswith and endswith.
+        if matches_to_tuple_of_strs(arg, checker.semantic()) {
+            continue;
+        }
 
         duplicates
             .entry((attr.as_str(), arg_name.as_str()))
@@ -201,4 +213,35 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
             checker.diagnostics.push(diagnostic);
         }
     }
+}
+
+fn matches_to_tuple_of_strs(arg: &Expr, semantic: &SemanticModel) -> bool {
+    if is_tuple_of_strs(arg) {
+        return true;
+    }
+
+    let Expr::Name(ast::ExprName { id, .. }) = arg else {
+        return false;
+    };
+
+    let Some(binding_id) = semantic.lookup_symbol(id.as_str()) else {
+        return false;
+    };
+
+    if let Some(statement_id) = semantic.binding(binding_id).source {
+        let stmt = semantic.statement(statement_id);
+        if let ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) = stmt {
+            if targets.len() == 1 {
+                return is_tuple_of_strs(value);
+            }
+        }
+    }
+    false
+}
+
+fn is_tuple_of_strs(arg: &Expr) -> bool {
+    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = arg {
+        return elts.iter().all(|elt| matches!(elt, Expr::StringLiteral(_)));
+    }
+    false
 }
