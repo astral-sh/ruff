@@ -120,6 +120,14 @@ else:
     x = 5
 
 
+# SIM108
+# quoting style should be preserved here in the autofix:
+if 1:
+    a = f"# {"".join([])}"
+else:
+    a = ""
+
+
 # OK
 def f():
     if True:

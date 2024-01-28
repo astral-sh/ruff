@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
@@ -121,15 +121,21 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
         return;
     }
 
-    let target_var = &body_target;
-    let ternary = ternary(target_var, body_value, test, else_value);
-    let contents = checker.generator().stmt(&ternary);
+    let locator = checker.locator();
+
+    let possible_replacement = format!(
+        "{} = {} if {} else {}",
+        locator.slice(body_target),
+        locator.slice(&**body_value),
+        locator.slice(&**test),
+        locator.slice(&**else_value)
+    );
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     if !fits(
-        &contents,
+        &possible_replacement,
         stmt_if.into(),
-        checker.locator(),
+        locator,
         checker.settings.pycodestyle.max_line_length,
         checker.settings.tab_size,
     ) {
@@ -138,30 +144,15 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
 
     let mut diagnostic = Diagnostic::new(
         IfElseBlockInsteadOfIfExp {
-            contents: contents.clone(),
+            contents: possible_replacement.clone(),
         },
         stmt_if.range(),
     );
-    if !checker.indexer().has_comments(stmt_if, checker.locator()) {
+    if !checker.indexer().has_comments(stmt_if, locator) {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            contents,
+            possible_replacement,
             stmt_if.range(),
         )));
     }
     checker.diagnostics.push(diagnostic);
-}
-
-fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Expr) -> Stmt {
-    let node = ast::ExprIfExp {
-        test: Box::new(test.clone()),
-        body: Box::new(body_value.clone()),
-        orelse: Box::new(orelse_value.clone()),
-        range: TextRange::default(),
-    };
-    let node1 = ast::StmtAssign {
-        targets: vec![target_var.clone()],
-        value: Box::new(node.into()),
-        range: TextRange::default(),
-    };
-    node1.into()
 }

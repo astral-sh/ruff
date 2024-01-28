@@ -119,4 +119,29 @@ SIM108.py:117:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `
     |
     = help: Replace `if`-`else`-block with `x = 3 if True else 5`
 
+SIM108.py:125:1: SIM108 [*] Use ternary operator `a = f"# {"".join([])}" if 1 else ""` instead of `if`-`else`-block
+    |
+123 |   # SIM108
+124 |   # quoting style should be preserved here in the autofix:
+125 | / if 1:
+126 | |     a = f"# {"".join([])}"
+127 | | else:
+128 | |     a = ""
+    | |__________^ SIM108
+    |
+    = help: Replace `if`-`else`-block with `a = f"# {"".join([])}" if 1 else ""`
+
+ℹ Unsafe fix
+122 122 | 
+123 123 | # SIM108
+124 124 | # quoting style should be preserved here in the autofix:
+125     |-if 1:
+126     |-    a = f"# {"".join([])}"
+127     |-else:
+128     |-    a = ""
+    125 |+a = f"# {"".join([])}" if 1 else ""
+129 126 | 
+130 127 | 
+131 128 | # OK
+
 
