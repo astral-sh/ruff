@@ -26,7 +26,7 @@ use crate::reference::{
     UnresolvedReferenceFlags, UnresolvedReferences,
 };
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
-use crate::Imported;
+use crate::{Imported, UnresolvedAttribute, UnresolvedAttributes};
 
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
@@ -2356,33 +2356,5 @@ struct NameId(TextSize);
 impl From<&ast::ExprName> for NameId {
     fn from(name: &ast::ExprName) -> Self {
         Self(name.start())
-    }
-}
-
-/// A unique identifier for an [`ast::ExprName`]. No two names can even appear at the same location
-/// in the source code, so the starting offset is a cheap and sufficient unique identifier.
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub struct UnresolvedAttribute {
-    /// The range of the reference in the source code.
-    pub range: TextRange,
-
-    /// The scope in which the attribute is being resolved.
-    pub scope_id: ScopeId,
-}
-
-#[derive(Debug, Default)]
-pub(crate) struct UnresolvedAttributes(Vec<UnresolvedAttribute>);
-
-impl UnresolvedAttributes {
-    pub(crate) fn push(&mut self, range: TextRange, scope_id: ScopeId) {
-        self.0.push(UnresolvedAttribute { range, scope_id });
-    }
-}
-
-impl Deref for UnresolvedAttributes {
-    type Target = Vec<UnresolvedAttribute>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
