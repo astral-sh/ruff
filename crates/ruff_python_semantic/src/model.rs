@@ -1,5 +1,6 @@
 pub mod all;
 
+use std::ops::Deref;
 use std::path::Path;
 
 use bitflags::bitflags;
@@ -130,6 +131,7 @@ pub struct SemanticModel<'a> {
     /// Map from [`ast::ExprName`] node (represented as a [`NameId`]) to the [`Binding`] to which
     /// it resolved (represented as a [`BindingId`]).
     resolved_names: FxHashMap<NameId, BindingId>,
+    unresolved_attributes: UnresolvedAttributes,
 }
 
 impl<'a> SemanticModel<'a> {
@@ -156,6 +158,7 @@ impl<'a> SemanticModel<'a> {
             seen: Modules::empty(),
             handled_exceptions: Vec::default(),
             resolved_names: FxHashMap::default(),
+            unresolved_attributes: UnresolvedAttributes::default(),
         }
     }
 
@@ -1495,6 +1498,10 @@ impl<'a> SemanticModel<'a> {
         self.unresolved_references.iter()
     }
 
+    pub fn unresolved_attributes(&self) -> impl Iterator<Item = &UnresolvedAttribute> {
+        self.unresolved_attributes.iter()
+    }
+
     /// Return the union of all handled exceptions as an [`Exceptions`] bitflag.
     pub fn exceptions(&self) -> Exceptions {
         let mut exceptions = Exceptions::empty();
@@ -1771,6 +1778,26 @@ impl<'a> SemanticModel<'a> {
 
             None
         })
+    }
+
+    /// Similar to [`SemanticModel::lookup_attribute`], but does not resolve the scope.
+    /// If the attribute is not found in the current scope, it will be added to unresolved attributes.
+    pub fn resolve_load_attribute(&mut self, attr: &ast::Identifier, class_scope_id: ScopeId) {
+        let Some(class_scope) = self.scopes.get(class_scope_id) else {
+            return;
+        };
+        let Some(class_def) = class_scope.kind.as_class() else {
+            return;
+        };
+        if class_scope.has(attr) {
+            return;
+        }
+
+        // If class has base classes, the attribute might be defined in one of them.
+        // Since we don't want to recursively into the base classes, skip resolving.
+        if class_def.bases().is_empty() {
+            self.unresolved_attributes.push(attr.range(), self.scope_id);
+        }
     }
 }
 
@@ -2329,5 +2356,33 @@ struct NameId(TextSize);
 impl From<&ast::ExprName> for NameId {
     fn from(name: &ast::ExprName) -> Self {
         Self(name.start())
+    }
+}
+
+/// A unique identifier for an [`ast::ExprName`]. No two names can even appear at the same location
+/// in the source code, so the starting offset is a cheap and sufficient unique identifier.
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub struct UnresolvedAttribute {
+    /// The range of the reference in the source code.
+    pub range: TextRange,
+
+    /// The scope in which the attribute is being resolved.
+    pub scope_id: ScopeId,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct UnresolvedAttributes(Vec<UnresolvedAttribute>);
+
+impl UnresolvedAttributes {
+    pub(crate) fn push(&mut self, range: TextRange, scope_id: ScopeId) {
+        self.0.push(UnresolvedAttribute { range, scope_id });
+    }
+}
+
+impl Deref for UnresolvedAttributes {
+    type Target = Vec<UnresolvedAttribute>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

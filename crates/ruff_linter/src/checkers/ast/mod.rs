@@ -1153,13 +1153,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 ctx,
                 range,
             }) => {
-                if let Some((is_instance_attribute, _class_scope_id)) =
+                if let Some((is_instance_attribute, class_scope_id)) =
                     self.get_member_access_info(value)
                 {
                     if is_instance_attribute {
                         match ctx {
                             // behavior: load the x in self.x from the class scope
-                            ExprContext::Load => {}
+                            ExprContext::Load => {
+                                self.semantic.resolve_load_attribute(attr, class_scope_id);
+                            }
                             // behavior: store the x in self.x in the class scope
                             ExprContext::Store => {
                                 let bit_flags = BindingFlags::INSTANCE_ATTRIBUTE;
