@@ -138,7 +138,7 @@ PIE810.py:25:8: PIE810 [*] Call `startswith` once with a `tuple`
 23 23 |     msg = "hello world"
 24 24 | 
 25    |-    if msg.startswith(("h", "e", "l", "l", "o")) or msg.startswith("h") or msg.startswith("w"): # Error
-   25 |+    if msg.startswith(("h", "e", "l", "l", "o")) or msg.startswith(("h", "w")): # Error
+   25 |+    if msg.startswith(("h", "e", "l", "l", "o", "h", "w")): # Error
 26 26 |         print("yes") 
 27 27 | 
 28 28 | # ok

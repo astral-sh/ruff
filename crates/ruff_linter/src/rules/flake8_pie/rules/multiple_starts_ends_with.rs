@@ -3,7 +3,7 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{analyze, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, ExprContext, Identifier};
@@ -36,6 +36,14 @@ use crate::checkers::ast::Checker;
 /// if msg.startswith(("Hello", "Hi")):
 ///     print("Greetings!")
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is unsafe, as in some cases, it will be unable to determine
+/// whether the argument to an existing `.startswith` or `.endswith` call is a
+/// tuple. For example, given `msg.startswith(x) or msg.startswith(y)`, if `x`
+/// or `y` is a tuple, and the semantic model is unable to detect it as such,
+/// the rule will suggest `msg.startswith((x, y))`, which will error at
+/// runtime.
 ///
 /// ## References
 /// - [Python documentation: `str.startswith`](https://docs.python.org/3/library/stdtypes.html#str.startswith)
@@ -85,9 +93,13 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
             continue;
         };
 
-        if !(args.len() == 1 && keywords.is_empty()) {
+        if !keywords.is_empty() {
             continue;
         }
+
+        let [arg] = args.as_slice() else {
+            continue;
+        };
 
         let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
             continue;
@@ -100,14 +112,10 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
             continue;
         };
 
-        let Some(arg) = args.first() else {
-            continue;
-        };
-
-        // Check if the argument is a tuple of strings. If so, we will exclude it from the check.
-        // This is because we don't want to suggest merging a tuple of strings into a tuple.
-        // Which violates the conctract of startswith and endswith.
-        if matches_to_tuple_of_strs(arg, checker.semantic()) {
+        // If the argument is bound to a tuple, skip it, since we don't want to suggest
+        // `startswith((x, y))` where `x` or `y` are tuples. (Tuple literals are okay, since we
+        // inline them below.)
+        if is_bound_to_tuple(arg, checker.semantic()) {
             continue;
         }
 
@@ -161,7 +169,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                             Right(iter::once(*value))
                         }
                     })
-                    .map(Clone::clone)
+                    .cloned()
                     .collect(),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
@@ -215,11 +223,8 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
     }
 }
 
-fn matches_to_tuple_of_strs(arg: &Expr, semantic: &SemanticModel) -> bool {
-    if is_tuple_of_strs(arg) {
-        return true;
-    }
-
+/// Returns `true` if the expression definitively resolves to a tuple (e.g., `x` in `x = (1, 2)`).
+fn is_bound_to_tuple(arg: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Name(ast::ExprName { id, .. }) = arg else {
         return false;
     };
@@ -228,20 +233,7 @@ fn matches_to_tuple_of_strs(arg: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    if let Some(statement_id) = semantic.binding(binding_id).source {
-        let stmt = semantic.statement(statement_id);
-        if let ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) = stmt {
-            if targets.len() == 1 {
-                return is_tuple_of_strs(value);
-            }
-        }
-    }
-    false
-}
+    let binding = semantic.binding(binding_id);
 
-fn is_tuple_of_strs(arg: &Expr) -> bool {
-    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = arg {
-        return elts.iter().all(|elt| matches!(elt, Expr::StringLiteral(_)));
-    }
-    false
+    analyze::typing::is_tuple(binding, semantic)
 }
