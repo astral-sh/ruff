@@ -1,3 +1,4 @@
+pub(crate) use access_member_before_definition::*;
 pub(crate) use and_or_ternary::*;
 pub(crate) use assert_on_string_literal::*;
 pub(crate) use await_outside_async::*;
@@ -101,6 +102,7 @@ pub(crate) use useless_with_lock::*;
 pub(crate) use yield_from_in_async_function::*;
 pub(crate) use yield_in_init::*;
 
+mod access_member_before_definition;
 mod and_or_ternary;
 mod assert_on_string_literal;
 mod await_outside_async;

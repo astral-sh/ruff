@@ -239,6 +239,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E0116") => (RuleGroup::Stable, rules::pylint::rules::ContinueInFinally),
         (Pylint, "E0117") => (RuleGroup::Stable, rules::pylint::rules::NonlocalWithoutBinding),
         (Pylint, "E0118") => (RuleGroup::Stable, rules::pylint::rules::LoadBeforeGlobalDeclaration),
+        (Pylint, "E0203") => (RuleGroup::Preview, rules::pylint::rules::AccessMemberBeforeDefinition),
         (Pylint, "E0237") => (RuleGroup::Stable, rules::pylint::rules::NonSlotAssignment),
         (Pylint, "E0241") => (RuleGroup::Stable, rules::pylint::rules::DuplicateBases),
         (Pylint, "E0302") => (RuleGroup::Stable, rules::pylint::rules::UnexpectedSpecialMethodSignature),

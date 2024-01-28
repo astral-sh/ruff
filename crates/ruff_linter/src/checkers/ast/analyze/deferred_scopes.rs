@@ -45,6 +45,8 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::UnusedPrivateTypeVar,
         Rule::UnusedStaticMethodArgument,
         Rule::UnusedVariable,
+        Rule::SingledispatchMethod,
+        Rule::AccessMemberBeforeDefinition,
     ]) {
         return;
     }
@@ -434,6 +436,9 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                 Rule::InvalidFirstArgumentNameForMethod,
             ]) {
                 pep8_naming::rules::invalid_first_argument_name(checker, scope, &mut diagnostics);
+            }
+            if checker.enabled(Rule::AccessMemberBeforeDefinition) {
+                pylint::rules::access_member_before_definition(checker, scope_id, &mut diagnostics);
             }
         }
     }
