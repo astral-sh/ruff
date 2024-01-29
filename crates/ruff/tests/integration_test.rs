@@ -878,7 +878,7 @@ fn nursery_group_selector_preview_enabled() {
 
     ----- stderr -----
     ruff failed
-      Cause: The `NURSERY` selector was removed. Unstable rules should be selected by their respective group or individually.
+      Cause: The `NURSERY` selector was removed. Unstable rules should be selected individually or by their respective groups.
     "###);
 }
 

@@ -1356,51 +1356,6 @@ mod tests {
     use ruff_linter::RuleSelector;
     use std::str::FromStr;
 
-    const NURSERY_RULES: &[Rule] = &[
-        Rule::MissingCopyrightNotice,
-        Rule::IndentationWithInvalidMultiple,
-        Rule::NoIndentedBlock,
-        Rule::UnexpectedIndentation,
-        Rule::IndentationWithInvalidMultipleComment,
-        Rule::NoIndentedBlockComment,
-        Rule::UnexpectedIndentationComment,
-        Rule::OverIndented,
-        Rule::WhitespaceAfterOpenBracket,
-        Rule::WhitespaceBeforeCloseBracket,
-        Rule::WhitespaceBeforePunctuation,
-        Rule::WhitespaceBeforeParameters,
-        Rule::MultipleSpacesBeforeOperator,
-        Rule::MultipleSpacesAfterOperator,
-        Rule::TabBeforeOperator,
-        Rule::TabAfterOperator,
-        Rule::MissingWhitespaceAroundOperator,
-        Rule::MissingWhitespaceAroundArithmeticOperator,
-        Rule::MissingWhitespaceAroundBitwiseOrShiftOperator,
-        Rule::MissingWhitespaceAroundModuloOperator,
-        Rule::MissingWhitespace,
-        Rule::MultipleSpacesAfterComma,
-        Rule::TabAfterComma,
-        Rule::UnexpectedSpacesAroundKeywordParameterEquals,
-        Rule::MissingWhitespaceAroundParameterEquals,
-        Rule::TooFewSpacesBeforeInlineComment,
-        Rule::NoSpaceAfterInlineComment,
-        Rule::NoSpaceAfterBlockComment,
-        Rule::MultipleLeadingHashesForBlockComment,
-        Rule::MultipleSpacesAfterKeyword,
-        Rule::MultipleSpacesBeforeKeyword,
-        Rule::TabAfterKeyword,
-        Rule::TabBeforeKeyword,
-        Rule::MissingWhitespaceAfterKeyword,
-        Rule::CompareToEmptyString,
-        Rule::NoSelfUse,
-        Rule::EqWithoutHash,
-        Rule::BadDunderMethodName,
-        Rule::RepeatedAppend,
-        Rule::DeleteFullSlice,
-        Rule::CheckAndRemoveFromSet,
-        Rule::QuadraticListSummation,
-    ];
-
     const PREVIEW_RULES: &[Rule] = &[
         Rule::AndOrTernary,
         Rule::AssignmentInAssert,
@@ -1802,9 +1757,8 @@ mod tests {
 
     #[test]
     fn nursery_select_code() -> Result<()> {
-        // Backwards compatible behavior allows selection of nursery rules with their exact code
-        // when preview is disabled
-        let actual = resolve_rules(
+        // We do not allow selection of nursery rules when preview is disabled
+        assert!(resolve_rules(
             [RuleSelection {
                 select: Some(vec![Flake8Copyright::_001.into()]),
                 ..RuleSelection::default()
@@ -1813,9 +1767,8 @@ mod tests {
                 mode: PreviewMode::Disabled,
                 ..PreviewOptions::default()
             }),
-        )?;
-        let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
-        assert_eq!(actual, expected);
+        )
+        .is_err());
 
         let actual = resolve_rules(
             [RuleSelection {
@@ -1835,9 +1788,8 @@ mod tests {
     #[test]
     #[allow(deprecated)]
     fn select_nursery() -> Result<()> {
-        // Backwards compatible behavior allows selection of nursery rules with the nursery selector
-        // when preview is disabled
-        let actual = resolve_rules(
+        // We no longer allow use of the NURSERY selector and should error in both cases
+        assert!(resolve_rules(
             [RuleSelection {
                 select: Some(vec![RuleSelector::Nursery]),
                 ..RuleSelection::default()
@@ -1846,11 +1798,8 @@ mod tests {
                 mode: PreviewMode::Disabled,
                 ..PreviewOptions::default()
             }),
-        )?;
-        let expected = RuleSet::from_rules(NURSERY_RULES);
-        assert_eq!(actual, expected);
-
-        // When preview is enabled, use of NURSERY is banned
+        )
+        .is_err());
         assert!(resolve_rules(
             [RuleSelection {
                 select: Some(vec![RuleSelector::Nursery]),
