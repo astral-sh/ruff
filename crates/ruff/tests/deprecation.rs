@@ -2,7 +2,7 @@
 
 use std::process::Command;
 
-use insta_cmd::{assert_cmd_snapshot, get_cargo_bin, SpawnExt};
+use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 
 const BIN_NAME: &str = "ruff";
 
@@ -28,17 +28,59 @@ fn ruff_check(show_source: Option<bool>, output_format: Option<&str>) -> Command
 
 #[test]
 fn ensure_show_source_is_deprecated() {
-    assert_cmd_snapshot!(ruff_check(Some(true), None).pass_stdin(STDIN));
+    assert_cmd_snapshot!(ruff_check(Some(true), None).pass_stdin(STDIN), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `l`
+      |
+    1 | l = 1
+      | ^ E741
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    warning: The `--show-source` argument is deprecated and has been ignored in favor of `output-format=full`.
+    "###);
 }
 
 #[test]
 fn ensure_no_show_source_is_deprecated() {
-    assert_cmd_snapshot!(ruff_check(Some(false), None).pass_stdin(STDIN));
+    assert_cmd_snapshot!(ruff_check(Some(false), None).pass_stdin(STDIN), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `l`
+      |
+    1 | l = 1
+      | ^ E741
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    warning: The `--no-show-source` argument is deprecated and has been ignored in favor of `output-format=full`.
+    "###);
 }
 
 #[test]
 fn ensure_output_format_is_deprecated() {
-    assert_cmd_snapshot!(ruff_check(None, Some("text")).pass_stdin(STDIN));
+    assert_cmd_snapshot!(ruff_check(None, Some("text")).pass_stdin(STDIN), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `l`
+      |
+    1 | l = 1
+      | ^ E741
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    warning: `--output-format=text` is deprecated. Use `--output-format=full` or `--output-format=concise` instead. `text` will be treated as `full`.
+    "###);
 }
 
 #[test]
