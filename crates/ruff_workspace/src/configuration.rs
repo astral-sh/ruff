@@ -906,23 +906,20 @@ impl LintConfiguration {
             );
         }
 
-        match deprecated_nursery_selectors
-            .iter()
-            .collect::<Vec<_>>()
-            .as_slice()
-        {
+        let deprecated_nursery_selectors = deprecated_nursery_selectors.iter().collect::<Vec<_>>();
+        match deprecated_nursery_selectors.as_slice() {
             [] => (),
             [selection] => {
                 let (prefix, code) = selection.prefix_and_code();
                 return Err(anyhow!("Selection of unstable rule `{prefix}{code}` without the `--preview` flag is not allowed."));
             }
-            [selections @ ..] => {
+            [..] => {
                 let mut message = "Selection of unstable rules without the `--preview` flag is not allowed. Enable preview or remove selection of:".to_string();
-                for selection in selections {
+                for selection in deprecated_nursery_selectors {
                     let (prefix, code) = selection.prefix_and_code();
                     message.push_str("\n\t- ");
                     message.push_str(prefix);
-                    message.push_str(code)
+                    message.push_str(code);
                 }
                 message.push('\n');
                 return Err(anyhow!(message));
