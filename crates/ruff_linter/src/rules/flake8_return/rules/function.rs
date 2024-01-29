@@ -773,13 +773,7 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
         }
 
         if checker.enabled(Rule::UnnecessaryAssign) {
-            if let Some(index) = body.len().checked_sub(2) {
-                if let Some(previous_stmt) = body.get(index) {
-                    if !contains_exception_suppress(previous_stmt, checker.semantic()) {
-                        unnecessary_assign(checker, &stack);
-                    }
-                }
-            } else {
+            if should_analyze_unnecessary_assign(body, checker.semantic()) {
                 unnecessary_assign(checker, &stack);
             }
         }
@@ -871,6 +865,30 @@ fn remove_else(
             elif_else.end(),
         )))
     }
+}
+
+/// RET504
+/// If the last statement is a `return` statement, and the second-to-last statement is a
+/// `with` statement that suppresses an exception, then we should not analyze the `return`
+/// statement for unnecessary assignments. Otherwise we will suggest removing the assignment
+/// and the `with` statement, which would change the behavior of the code.
+///
+/// Example:
+/// ```python
+/// def foo(data):
+///    with suppress(JSONDecoderError):
+///       data = data.decode()
+///   return data
+
+fn should_analyze_unnecessary_assign(body: &[Stmt], semantic: &SemanticModel) -> bool {
+    if let Some(index) = body.len().checked_sub(2) {
+        if let Some(previous_stmt) = body.get(index) {
+            if contains_exception_suppress(previous_stmt, semantic) {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 fn contains_exception_suppress(stmt: &Stmt, semantic: &SemanticModel) -> bool {
