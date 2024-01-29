@@ -24,7 +24,7 @@ use super::super::detection::comment_contains_code;
 /// ```
 ///
 /// ## Options
-/// - `task-tags`
+/// - `lint.task-tags`
 ///
 /// [#4845]: https://github.com/astral-sh/ruff/issues/4845
 #[violation]
