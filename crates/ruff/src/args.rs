@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::ops::Deref;
 use std::sync::Arc;
 
 use clap::builder::{TypedValueParser, ValueParserFactory};
@@ -565,7 +566,7 @@ impl ConfigArguments {
             match option {
                 SingleConfigArgument::SettingsOverride(overridden_option) => {
                     let overridden_option = Arc::try_unwrap(overridden_option)
-                        .unwrap_or_else(|option| (*option).clone());
+                        .unwrap_or_else(|option| option.deref().clone());
                     new.overrides = new.overrides.combine(Configuration::from_options(
                         overridden_option,
                         &path_dedot::CWD,

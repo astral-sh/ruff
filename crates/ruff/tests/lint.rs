@@ -690,10 +690,13 @@ select=["E501"]
     let fixture = "x = 'longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss'";
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
+        // The --line-length flag takes priority over both the config file
+        // and the `--config="line-length=110"` flag,
+        // despite them both being specified after this flag on the command line:
+        .args(["--line-length", "90"])
         .arg("--config")
         .arg(&ruff_toml)
-        .args(["--config", "line-length=110"])  // This overrides the config file...
-        .args(["--line-length", "90"])  // ... but *this* takes priority over both "inline TOML" and the config file
+        .args(["--config", "line-length=110"])
         .arg("-")
         .pass_stdin(fixture), @r###"
     success: false

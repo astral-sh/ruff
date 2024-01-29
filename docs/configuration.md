@@ -449,27 +449,33 @@ Alternatively, pass the notebook file(s) to `ruff` on the command-line directly.
 
 ## Command-line interface
 
-All configuration options can be provided or overridden via the command-line.
-Some of the most common have their own dedicated command-line flag.
-This includes the configuration options relating to rule enablement and disablement,
-file discovery, and logging level:
+Some configuration options can be provided or overridden via dedicated flags on the command line.
+This includes those related to rule enablement and disablement,
+file discovery, logging level, and more:
 
 ```shell
 ruff check path/to/code/ --select F401 --select F403 --quiet
 ```
 
-Configuration options that do not have a dedicated flag can be set or
-overridden using the `--config` flag. The `--config` flag is most often
-used to point to the configuration file that you would like ruff to use,
-for example:
+### The `--config` CLI flag
+
+The `--config` flag has two uses. It is most often used to point to the
+configuration file that you would like ruff to use, for example:
 
 ```shell
 ruff check path/to/directory --config path/to/ruff.toml
 ```
 
 However, the `--config` flag can also be used to provide arbitrary
-overrides of configuration options using TOML `<KEY> = <VALUE>` pairs.
-For example:
+overrides of configuration settings using TOML `<KEY> = <VALUE>` pairs.
+This is mostly useful in situations where you wish to override a configuration setting
+that does not have a dedicated command-line flag.
+
+In the below example, the `--config` flag is the only way of overriding the
+`per-file-ignores` configuration setting from the command line,
+since this setting has no dedicated CLI flag. The `extend-select` setting
+could also have been overridden via the `--extend-select` dedicated flag,
+but using `--config` to override the setting is also fine:
 
 ```shell
 ruff check path/to/file --config path/to/ruff.toml --config "extend-select=['E501', 'F841']" --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
@@ -484,7 +490,18 @@ length will be set to 90, not 100:
 ruff check path/to/file --line-length=90 --config "line-length=100"
 ```
 
-See `ruff help` for more on Ruff's top-level commands:
+Specifying `--config "line-length=90"` will override the `line-length`
+setting from *all* configuration files detected by ruff,
+including configuration files discovered in subdirectories.
+In this respect, specifying `--config "line-length=90"` has
+the same effect as specifying `--line-length=90`,
+which will similarly override the `line-length` setting from
+all configuration files detected by ruff, regardless of where
+a specific configuration file is located.
+
+### Full command-line interface
+
+See `ruff help` for the full list of Ruff's top-level commands:
 
 <!-- Begin auto-generated command help. -->
 
