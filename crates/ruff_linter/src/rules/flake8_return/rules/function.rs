@@ -737,7 +737,7 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
 
     // Traverse the function body, to collect the stack.
     let stack = {
-        let mut visitor = ReturnVisitor::default();
+        let mut visitor = ReturnVisitor::new(checker.semantic());
         for stmt in body {
             visitor.visit_stmt(stmt);
         }
