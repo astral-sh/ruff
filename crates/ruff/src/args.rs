@@ -11,7 +11,7 @@ use ruff_linter::settings::types::{
     ExtensionPair, FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion,
     SerializationFormat, UnsafeFixes,
 };
-use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
+use ruff_linter::{warn_user, RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::PycodestyleOptions;
 use ruff_workspace::resolver::ConfigurationTransformer;
@@ -104,6 +104,7 @@ pub struct CheckCommand {
     no_unsafe_fixes: bool,
     /// Show violations with source code.
     /// Use `--no-show-source` to disable.
+    /// (Deprecated: use `--output-format=full` or `--output-format=concise` instead of `--show-source` and `--no-show-source`, respectively)
     #[arg(long, overrides_with("no_show_source"))]
     show_source: bool,
     #[clap(long, overrides_with("show_source"), hide = true)]
@@ -533,7 +534,6 @@ impl CheckCommand {
                     self.no_respect_gitignore,
                 ),
                 select: self.select,
-                show_source: resolve_bool_arg(self.show_source, self.no_show_source),
                 target_version: self.target_version,
                 unfixable: self.unfixable,
                 // TODO(charlie): Included in `pyproject.toml`, but not inherited.
@@ -543,7 +543,10 @@ impl CheckCommand {
                 unsafe_fixes: resolve_bool_arg(self.unsafe_fixes, self.no_unsafe_fixes)
                     .map(UnsafeFixes::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-                output_format: self.output_format,
+                output_format: resolve_output_format_with_possibly_deprecated_conflicting_arg(
+                    self.output_format,
+                    resolve_bool_arg(self.show_source, self.no_show_source),
+                ),
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
                 extension: self.extension,
             },
@@ -592,6 +595,38 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
         (false, false) => None,
         (..) => unreachable!("Clap should make this impossible"),
     }
+}
+
+fn resolve_output_format_with_possibly_deprecated_conflicting_arg(
+    output_format: Option<SerializationFormat>,
+    show_sources: Option<bool>,
+) -> Option<SerializationFormat> {
+    Some(match (output_format, show_sources) {
+        (Some(o), None) => o,
+        (Some(o), Some(true)) => {
+            warn_user!("The `--show-source` argument is deprecated and has been ignored in favor of `output-format={}`.", o);
+            o
+        }
+        (Some(o), Some(false)) => {
+            warn_user!("The `--no-show-source` argument is deprecated and has been ignored in favor of `output-format={}`.", o);
+            o
+        }
+        (None, Some(true)) => {
+            warn_user!("The `--show-source` argument is deprecated. Use `--output-format=full` instead.");
+            SerializationFormat::Full
+        }
+        (None, Some(false)) => {
+            warn_user!("The `--no-show-source` argument is deprecated. Use `--output-format=concise` instead.");
+            SerializationFormat::Concise
+        }
+        (None, None) => return None
+    }).map(|format| match format {
+        SerializationFormat::Text => {
+            warn_user!("`--output-format=text` is deprecated. Use `--output-format=full` or `--output-format=concise` instead.");
+            SerializationFormat::default()
+        },
+        other => other
+    })
 }
 
 /// CLI settings that are distinct from configuration (commands, lists of files,
@@ -648,7 +683,6 @@ pub struct CliOverrides {
     pub preview: Option<PreviewMode>,
     pub respect_gitignore: Option<bool>,
     pub select: Option<Vec<RuleSelector>>,
-    pub show_source: Option<bool>,
     pub target_version: Option<PythonVersion>,
     pub unfixable: Option<Vec<RuleSelector>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
@@ -734,9 +768,6 @@ impl ConfigurationTransformer for CliOverrides {
         }
         if let Some(respect_gitignore) = &self.respect_gitignore {
             config.respect_gitignore = Some(*respect_gitignore);
-        }
-        if let Some(show_source) = &self.show_source {
-            config.show_source = Some(*show_source);
         }
         if let Some(show_fixes) = &self.show_fixes {
             config.show_fixes = Some(*show_fixes);

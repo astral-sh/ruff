@@ -118,7 +118,6 @@ pub struct Configuration {
     pub required_version: Option<Version>,
     pub extension: Option<ExtensionMapping>,
     pub show_fixes: Option<bool>,
-    pub show_source: Option<bool>,
 
     // File resolver options
     pub exclude: Option<Vec<FilePattern>>,
@@ -223,7 +222,6 @@ impl Configuration {
             unsafe_fixes: self.unsafe_fixes.unwrap_or_default(),
             output_format: self.output_format.unwrap_or_default(),
             show_fixes: self.show_fixes.unwrap_or(false),
-            show_source: self.show_source.unwrap_or(false),
 
             file_resolver: FileResolverSettings {
                 exclude: FilePatternSet::try_from_iter(
@@ -417,6 +415,25 @@ impl Configuration {
             options.indent_width.or(options.tab_size)
         };
 
+        #[allow(deprecated)]
+        let output_format = {
+            if options.show_source.is_some() {
+                warn_user_once!(
+                    r#"The `show-source` option has been deprecated in favor of `output-format`'s "full" and "concise" variants. Please update your configuration to use `output-format = <full|concise>` instead."#
+                );
+            }
+
+            options
+                .output_format
+                .or(options.show_source.map(|show_source| {
+                    if show_source {
+                        SerializationFormat::Full
+                    } else {
+                        SerializationFormat::Concise
+                    }
+                }))
+        };
+
         Ok(Self {
             builtins: options.builtins,
             cache_dir: options
@@ -481,7 +498,7 @@ impl Configuration {
             fix: options.fix,
             fix_only: options.fix_only,
             unsafe_fixes: options.unsafe_fixes.map(UnsafeFixes::from),
-            output_format: options.output_format,
+            output_format,
             force_exclude: options.force_exclude,
             line_length: options.line_length,
             indent_width,
@@ -492,7 +509,6 @@ impl Configuration {
             preview: options.preview.map(PreviewMode::from),
             required_version: options.required_version,
             respect_gitignore: options.respect_gitignore,
-            show_source: options.show_source,
             show_fixes: options.show_fixes,
             src: options
                 .src
@@ -539,7 +555,6 @@ impl Configuration {
             namespace_packages: self.namespace_packages.or(config.namespace_packages),
             required_version: self.required_version.or(config.required_version),
             respect_gitignore: self.respect_gitignore.or(config.respect_gitignore),
-            show_source: self.show_source.or(config.show_source),
             show_fixes: self.show_fixes.or(config.show_fixes),
             src: self.src.or(config.src),
             target_version: self.target_version.or(config.target_version),

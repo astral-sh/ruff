@@ -31,8 +31,6 @@ pub struct Settings {
     pub output_format: SerializationFormat,
     #[cache_key(ignore)]
     pub show_fixes: bool,
-    #[cache_key(ignore)]
-    pub show_source: bool,
 
     pub file_resolver: FileResolverSettings,
     pub linter: LinterSettings,
@@ -48,7 +46,6 @@ impl Default for Settings {
             fix_only: false,
             output_format: SerializationFormat::default(),
             show_fixes: false,
-            show_source: false,
             unsafe_fixes: UnsafeFixes::default(),
             linter: LinterSettings::new(project_root),
             file_resolver: FileResolverSettings::new(project_root),
@@ -70,7 +67,6 @@ impl fmt::Display for Settings {
                 self.fix_only,
                 self.output_format,
                 self.show_fixes,
-                self.show_source,
                 self.unsafe_fixes,
                 self.file_resolver | nested,
                 self.linter        | nested,

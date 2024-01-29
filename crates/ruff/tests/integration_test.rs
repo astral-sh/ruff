@@ -743,8 +743,8 @@ fn stdin_parse_error() {
 }
 
 #[test]
-fn show_source() {
-    let mut cmd = RuffCheck::default().args(["--show-source"]).build();
+fn full_output_format() {
+    let mut cmd = RuffCheck::default().args(["--output-format=full"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("l = 1"), @r###"
     success: false

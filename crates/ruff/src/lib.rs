@@ -255,7 +255,6 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         unsafe_fixes,
         output_format,
         show_fixes,
-        show_source,
         ..
     } = pyproject_config.settings;
 
@@ -284,7 +283,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     if show_fixes {
         printer_flags |= PrinterFlags::SHOW_FIX_SUMMARY;
     }
-    if show_source {
+    if output_format == SerializationFormat::Full {
         printer_flags |= PrinterFlags::SHOW_SOURCE;
     }
     if cli.ecosystem_ci {
@@ -326,8 +325,8 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     );
 
     if cli.watch {
-        if output_format != SerializationFormat::Text {
-            warn_user!("`--output-format text` is always used in watch mode.");
+        if output_format != SerializationFormat::Full {
+            warn_user!("`--output-format full` is always used in watch mode.");
         }
 
         // Configure the file watcher.

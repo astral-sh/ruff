@@ -15,10 +15,10 @@ use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
     JsonEmitter, JsonLinesEmitter, JunitEmitter, PylintEmitter, SarifEmitter, TextEmitter,
 };
-use ruff_linter::notify_user;
 use ruff_linter::registry::{AsRule, Rule};
 use ruff_linter::settings::flags::{self};
 use ruff_linter::settings::types::{SerializationFormat, UnsafeFixes};
+use ruff_linter::{notify_user, warn_user};
 
 use crate::diagnostics::{Diagnostics, FixMap};
 
@@ -245,7 +245,9 @@ impl Printer {
             SerializationFormat::Junit => {
                 JunitEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Text => {
+            SerializationFormat::Concise
+            | SerializationFormat::Text
+            | SerializationFormat::Full => {
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
@@ -264,6 +266,9 @@ impl Printer {
                 self.write_summary_text(writer, diagnostics)?;
             }
             SerializationFormat::Grouped => {
+                if self.flags.intersects(Flags::SHOW_SOURCE) {
+                    warn_user!("`--show-source` with `--output-format=grouped` is deprecated. Source display will not be available for `--output-format=grouped` in future releases.");
+                }
                 GroupedEmitter::default()
                     .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
