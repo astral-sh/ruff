@@ -28,14 +28,14 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
-/// If [`flake8-type-checking.quote-annotations`] is set to `true`,
+/// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
 /// annotations will be wrapped in quotes if doing so would enable the
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// If a class _requires_ that type annotations be available at runtime (as is
 /// the case for Pydantic, SQLAlchemy, and other libraries), consider using
-/// the [`flake8-type-checking.runtime-evaluated-base-classes`] and
-/// [`flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
+/// the [`lint.flake8-type-checking.runtime-evaluated-base-classes`] and
+/// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
 ///
 /// ## Example
@@ -64,9 +64,9 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// ```
 ///
 /// ## Options
-/// - `flake8-type-checking.quote-annotations`
-/// - `flake8-type-checking.runtime-evaluated-base-classes`
-/// - `flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.flake8-type-checking.quote-annotations`
+/// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
+/// - `lint.flake8-type-checking.runtime-evaluated-decorators`
 ///
 /// ## References
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -101,14 +101,14 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
-/// If [`flake8-type-checking.quote-annotations`] is set to `true`,
+/// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
 /// annotations will be wrapped in quotes if doing so would enable the
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// If a class _requires_ that type annotations be available at runtime (as is
 /// the case for Pydantic, SQLAlchemy, and other libraries), consider using
-/// the [`flake8-type-checking.runtime-evaluated-base-classes`] and
-/// [`flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
+/// the [`lint.flake8-type-checking.runtime-evaluated-base-classes`] and
+/// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
 ///
 /// ## Example
@@ -137,9 +137,9 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// ```
 ///
 /// ## Options
-/// - `flake8-type-checking.quote-annotations`
-/// - `flake8-type-checking.runtime-evaluated-base-classes`
-/// - `flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.flake8-type-checking.quote-annotations`
+/// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
+/// - `lint.flake8-type-checking.runtime-evaluated-decorators`
 ///
 /// ## References
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -174,14 +174,14 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
-/// If [`flake8-type-checking.quote-annotations`] is set to `true`,
+/// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
 /// annotations will be wrapped in quotes if doing so would enable the
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// If a class _requires_ that type annotations be available at runtime (as is
 /// the case for Pydantic, SQLAlchemy, and other libraries), consider using
-/// the [`flake8-type-checking.runtime-evaluated-base-classes`] and
-/// [`flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
+/// the [`lint.flake8-type-checking.runtime-evaluated-base-classes`] and
+/// [`lint.flake8-type-checking.runtime-evaluated-decorators`] settings to mark them
 /// as such.
 ///
 /// ## Example
@@ -210,9 +210,9 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// ```
 ///
 /// ## Options
-/// - `flake8-type-checking.quote-annotations`
-/// - `flake8-type-checking.runtime-evaluated-base-classes`
-/// - `flake8-type-checking.runtime-evaluated-decorators`
+/// - `lint.flake8-type-checking.quote-annotations`
+/// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
+/// - `lint.flake8-type-checking.runtime-evaluated-decorators`
 ///
 /// ## References
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)

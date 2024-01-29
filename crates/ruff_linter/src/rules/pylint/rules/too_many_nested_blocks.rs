@@ -10,14 +10,14 @@ use crate::checkers::ast::Checker;
 /// Checks for functions or methods with too many nested blocks.
 ///
 /// By default, this rule allows up to five nested blocks.
-/// This can be configured using the [`pylint.max-nested-blocks`] option.
+/// This can be configured using the [`lint.pylint.max-nested-blocks`] option.
 ///
 /// ## Why is this bad?
 /// Functions or methods with too many nested blocks are harder to understand
 /// and maintain.
 ///
 /// ## Options
-/// - `pylint.max-nested-blocks`
+/// - `lint.pylint.max-nested-blocks`
 #[violation]
 pub struct TooManyNestedBlocks {
     nested_blocks: usize,
