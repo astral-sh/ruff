@@ -29,7 +29,7 @@ use ruff_text_size::Ranged;
 /// ```
 ///
 /// ## Options
-/// - `flake8-import-conventions.banned-aliases`
+/// - `lint.flake8-import-conventions.banned-aliases`
 #[violation]
 pub struct BannedImportAlias {
     name: String,

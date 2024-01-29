@@ -28,7 +28,7 @@ use crate::settings::LinterSettings;
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
 /// You can omit characters from being flagged as ambiguous via the
-/// [`allowed-confusables`] setting.
+/// [`lint.allowed-confusables`] setting.
 ///
 /// ## Example
 /// ```python
@@ -41,7 +41,7 @@ use crate::settings::LinterSettings;
 /// ```
 ///
 /// ## Options
-/// - `allowed-confusables`
+/// - `lint.allowed-confusables`
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
@@ -94,7 +94,7 @@ impl Violation for AmbiguousUnicodeCharacterString {
 /// ```
 ///
 /// ## Options
-/// - `allowed-confusables`
+/// - `lint.allowed-confusables`
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
@@ -147,7 +147,7 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 /// ```
 ///
 /// ## Options
-/// - `allowed-confusables`
+/// - `lint.allowed-confusables`
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]

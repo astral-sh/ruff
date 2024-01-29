@@ -23,11 +23,11 @@ use crate::checkers::ast::Checker;
 /// calls to the function, which can lead to unexpected behaviour.
 ///
 /// Calls can be marked as an exception to this rule with the
-/// [`flake8-bugbear.extend-immutable-calls`] configuration option.
+/// [`lint.flake8-bugbear.extend-immutable-calls`] configuration option.
 ///
 /// Arguments with immutable type annotations will be ignored by this rule.
 /// Types outside of the standard library can be marked as immutable with the
-/// [`flake8-bugbear.extend-immutable-calls`] configuration option as well.
+/// [`lint.flake8-bugbear.extend-immutable-calls`] configuration option as well.
 ///
 /// ## Example
 /// ```python
@@ -61,7 +61,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Options
-/// - `flake8-bugbear.extend-immutable-calls`
+/// - `lint.flake8-bugbear.extend-immutable-calls`
 #[violation]
 pub struct FunctionCallInDefaultArgument {
     name: Option<String>,

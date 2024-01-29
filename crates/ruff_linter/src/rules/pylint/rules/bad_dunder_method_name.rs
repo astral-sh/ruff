@@ -24,7 +24,7 @@ use crate::rules::pylint::helpers::is_known_dunder_method;
 /// `__init__`), as well as methods that are marked with `@override`.
 ///
 /// Additional dunder methods names can be allowed via the
-/// [`pylint.allow-dunder-method-names`] setting.
+/// [`lint.pylint.allow-dunder-method-names`] setting.
 ///
 /// ## Example
 /// ```python
@@ -41,7 +41,7 @@ use crate::rules::pylint::helpers::is_known_dunder_method;
 /// ```
 ///
 /// ## Options
-/// - `pylint.allow-dunder-method-names`
+/// - `lint.pylint.allow-dunder-method-names`
 #[violation]
 pub struct BadDunderMethodName {
     name: String,
