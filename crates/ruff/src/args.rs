@@ -507,16 +507,16 @@ impl From<&LogLevelArgs> for LogLevel {
 }
 
 #[derive(Default)]
-pub struct ConfigArgs {
+pub struct ConfigArguments {
     /// Path to a pyproject.toml or ruff.toml config file (etc.), if provided
     config_file: Option<PathBuf>,
     /// Overrides provided via the `--config FOO=BAR` option on the CLI
-    config_overrides: Configuration,
+    overrides: Configuration,
     /// Overrides provided via dedicated flags such as --line-length etc.
     per_flag_overrides: ExplicitConfigOverrides,
 }
 
-impl ConfigArgs {
+impl ConfigArguments {
     pub fn config_file(&self) -> Option<&PathBuf> {
         self.config_file.as_ref()
     }
@@ -535,10 +535,11 @@ impl ConfigArgs {
             match option {
                 ConfigOption::ConfigOverride(overridden_option) => {
                     let overridden_option = Arc::try_unwrap(overridden_option)
-                        .unwrap_or_else(|option| Options::clone(&option));
-                    new.config_overrides = new.config_overrides.combine(
-                        Configuration::from_options(overridden_option, &path_dedot::CWD)?,
-                    );
+                        .unwrap_or_else(|option| (*option).clone());
+                    new.overrides = new.overrides.combine(Configuration::from_options(
+                        overridden_option,
+                        &path_dedot::CWD,
+                    )?);
                 }
                 ConfigOption::PathToConfigFile { path, arg, cmd } => {
                     if isolated {
@@ -589,9 +590,9 @@ impl ConfigArgs {
     }
 }
 
-impl ConfigurationTransformer for ConfigArgs {
+impl ConfigurationTransformer for ConfigArguments {
     fn transform(&self, config: Configuration) -> Configuration {
-        let with_config_overrides = self.config_overrides.combine(config);
+        let with_config_overrides = self.overrides.transform(config);
         self.per_flag_overrides.transform(with_config_overrides)
     }
 }
@@ -599,7 +600,7 @@ impl ConfigurationTransformer for ConfigArgs {
 impl CheckCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(self) -> Result<(CheckArguments, ConfigArgs), anyhow::Error> {
+    pub fn partition(self) -> Result<(CheckArguments, ConfigArguments), anyhow::Error> {
         let check_arguments = CheckArguments {
             add_noqa: self.add_noqa,
             diff: self.diff,
@@ -649,7 +650,8 @@ impl CheckCommand {
             extension: self.extension,
         };
 
-        let config_args = ConfigArgs::from_cli_options(self.config, cli_overrides, self.isolated)?;
+        let config_args =
+            ConfigArguments::from_cli_options(self.config, cli_overrides, self.isolated)?;
         Ok((check_arguments, config_args))
     }
 }
@@ -657,7 +659,7 @@ impl CheckCommand {
 impl FormatCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(self) -> Result<(FormatArguments, ConfigArgs), anyhow::Error> {
+    pub fn partition(self) -> Result<(FormatArguments, ConfigArguments), anyhow::Error> {
         let format_args = FormatArguments {
             check: self.check,
             diff: self.diff,
@@ -681,7 +683,8 @@ impl FormatCommand {
             ..ExplicitConfigOverrides::default()
         };
 
-        let config_args = ConfigArgs::from_cli_options(self.config, cli_overrides, self.isolated)?;
+        let config_args =
+            ConfigArguments::from_cli_options(self.config, cli_overrides, self.isolated)?;
         Ok((format_args, config_args))
     }
 }
@@ -747,12 +750,12 @@ impl TypedValueParser for ConfigOptionParser {
         let value = value
             .to_str()
             .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
-        
+
         let toml_parse_error = match toml::from_str(value) {
             Ok(option) => return Ok(ConfigOption::ConfigOverride(Arc::new(option))),
             Err(toml_error) => toml_error,
         };
-        
+
         let mut new_error = clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
         if let Some(arg) = arg {
             new_error.insert(

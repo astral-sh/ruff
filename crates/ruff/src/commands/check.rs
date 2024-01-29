@@ -24,7 +24,7 @@ use ruff_workspace::resolver::{
     match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile,
 };
 
-use crate::args::ConfigArgs;
+use crate::args::ConfigArguments;
 use crate::cache::{Cache, PackageCacheMap, PackageCaches};
 use crate::diagnostics::Diagnostics;
 use crate::panic::catch_unwind;
@@ -34,7 +34,7 @@ use crate::panic::catch_unwind;
 pub(crate) fn check(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    overrides: &ConfigArgs,
+    overrides: &ConfigArguments,
     cache: flags::Cache,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
@@ -233,7 +233,7 @@ mod test {
     use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
     use ruff_workspace::Settings;
 
-    use crate::args::ConfigArgs;
+    use crate::args::ConfigArguments;
 
     use super::check;
 
@@ -272,7 +272,7 @@ mod test {
             // Notebooks are not included by default
             &[tempdir.path().to_path_buf(), notebook],
             &pyproject_config,
-            &ConfigArgs::default(),
+            &ConfigArguments::default(),
             flags::Cache::Disabled,
             flags::Noqa::Disabled,
             flags::FixMode::Generate,

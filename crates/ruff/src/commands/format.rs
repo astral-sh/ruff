@@ -28,7 +28,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::resolver::{match_exclusion, python_files_in_path, ResolvedFile, Resolver};
 use ruff_workspace::FormatterSettings;
 
-use crate::args::{ConfigArgs, FormatArguments};
+use crate::args::{ConfigArguments, FormatArguments};
 use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches};
 use crate::panic::{catch_unwind, PanicError};
 use crate::resolve::resolve;
@@ -59,7 +59,7 @@ impl FormatMode {
 /// Format a set of files, and return the exit status.
 pub(crate) fn format(
     cli: FormatArguments,
-    config_args: &ConfigArgs,
+    config_args: &ConfigArguments,
     log_level: LogLevel,
 ) -> Result<ExitStatus> {
     let pyproject_config = resolve(cli.isolated, config_args, cli.stdin_filename.as_deref())?;

@@ -11,13 +11,13 @@ use ruff_workspace::resolver::{
     Relativity,
 };
 
-use crate::args::ConfigArgs;
+use crate::args::ConfigArguments;
 
 /// Resolve the relevant settings strategy and defaults for the current
 /// invocation.
 pub fn resolve(
     isolated: bool,
-    config_args: &ConfigArgs,
+    config_args: &ConfigArguments,
     stdin_filename: Option<&Path>,
 ) -> Result<PyprojectConfig> {
     // First priority: if we're running in isolated mode, use the default settings.

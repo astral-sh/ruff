@@ -27,7 +27,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
-use ruff::args::{ConfigArgs, FormatArguments, FormatCommand, LogLevelArgs};
+use ruff::args::{ConfigArguments, FormatArguments, FormatCommand, LogLevelArgs};
 use ruff::resolve::resolve;
 use ruff_formatter::{FormatError, LineWidth, PrintError};
 use ruff_linter::logging::LogLevel;
@@ -38,7 +38,7 @@ use ruff_python_formatter::{
 use ruff_python_parser::ParseError;
 use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, ResolvedFile, Resolver};
 
-fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, ConfigArgs)> {
+fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, ConfigArguments)> {
     let args_matches = FormatCommand::command()
         .no_binary_name(true)
         .get_matches_from(dirs);
@@ -50,7 +50,7 @@ fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, ConfigArgs)> 
 /// Find the [`PyprojectConfig`] to use for formatting.
 fn find_pyproject_config(
     cli: &FormatArguments,
-    overrides: &ConfigArgs,
+    overrides: &ConfigArguments,
 ) -> anyhow::Result<PyprojectConfig> {
     let mut pyproject_config = resolve(cli.isolated, overrides, cli.stdin_filename.as_deref())?;
     // We don't want to format pyproject.toml
@@ -67,7 +67,7 @@ fn find_pyproject_config(
 fn ruff_check_paths<'a>(
     pyproject_config: &'a PyprojectConfig,
     cli: &FormatArguments,
-    overrides: &ConfigArgs,
+    overrides: &ConfigArguments,
 ) -> anyhow::Result<(Vec<Result<ResolvedFile, ignore::Error>>, Resolver<'a>)> {
     let (paths, resolver) = python_files_in_path(&cli.files, pyproject_config, overrides)?;
     Ok((paths, resolver))

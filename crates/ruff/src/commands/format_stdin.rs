@@ -9,7 +9,7 @@ use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{match_exclusion, python_file_at_path, Resolver};
 use ruff_workspace::FormatterSettings;
 
-use crate::args::{ConfigArgs, FormatArguments};
+use crate::args::{ConfigArguments, FormatArguments};
 use crate::commands::format::{
     format_source, warn_incompatible_formatter_settings, FormatCommandError, FormatMode,
     FormatResult, FormattedSource,
@@ -19,7 +19,10 @@ use crate::stdin::{parrot_stdin, read_from_stdin};
 use crate::ExitStatus;
 
 /// Run the formatter over a single file, read from `stdin`.
-pub(crate) fn format_stdin(cli: &FormatArguments, config_args: &ConfigArgs) -> Result<ExitStatus> {
+pub(crate) fn format_stdin(
+    cli: &FormatArguments,
+    config_args: &ConfigArguments,
+) -> Result<ExitStatus> {
     let pyproject_config = resolve(cli.isolated, config_args, cli.stdin_filename.as_deref())?;
 
     let mut resolver = Resolver::new(&pyproject_config);

@@ -6,13 +6,13 @@ use itertools::Itertools;
 
 use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, ResolvedFile};
 
-use crate::args::ConfigArgs;
+use crate::args::ConfigArguments;
 
 /// Print the user-facing configuration settings.
 pub(crate) fn show_settings(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    overrides: &ConfigArgs,
+    overrides: &ConfigArguments,
     writer: &mut impl Write,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
