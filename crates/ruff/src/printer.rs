@@ -218,7 +218,10 @@ impl Printer {
         if !self.flags.intersects(Flags::SHOW_VIOLATIONS) {
             if matches!(
                 self.format,
-                SerializationFormat::Text | SerializationFormat::Grouped
+                SerializationFormat::Text
+                    | SerializationFormat::Full
+                    | SerializationFormat::Concise
+                    | SerializationFormat::Grouped
             ) {
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
@@ -347,7 +350,9 @@ impl Printer {
         }
 
         match self.format {
-            SerializationFormat::Text => {
+            SerializationFormat::Text
+            | SerializationFormat::Full
+            | SerializationFormat::Concise => {
                 // Compute the maximum number of digits in the count and code, for all messages,
                 // to enable pretty-printing.
                 let count_width = num_digits(

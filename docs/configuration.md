@@ -510,7 +510,9 @@ Options:
           Include fixes that may not retain the original intent of the code.
           Use `--no-unsafe-fixes` to disable
       --show-source
-          Show violations with source code. Use `--no-show-source` to disable
+          Show violations with source code. Use `--no-show-source` to disable.
+          (Deprecated: use `--output-format=full` or `--output-format=concise`
+          instead of `--show-source` and `--no-show-source`, respectively)
       --show-fixes
           Show an enumeration of all fixed lint violations. Use
           `--no-show-fixes` to disable
@@ -527,8 +529,8 @@ Options:
           Ignore any `# noqa` comments
       --output-format <OUTPUT_FORMAT>
           Output serialization format for violations [env: RUFF_OUTPUT_FORMAT=]
-          [possible values: text, json, json-lines, junit, grouped, github,
-          gitlab, pylint, azure, sarif]
+          [possible values: text, concise, full, json, json-lines, junit,
+          grouped, github, gitlab, pylint, azure, sarif]
   -o, --output-file <OUTPUT_FILE>
           Specify file to write the linter output to (default: stdout)
       --target-version <TARGET_VERSION>

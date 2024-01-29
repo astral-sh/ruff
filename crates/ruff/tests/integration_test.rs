@@ -42,7 +42,7 @@ struct RuffCheck<'a> {
 impl<'a> Default for RuffCheck<'a> {
     fn default() -> RuffCheck<'a> {
         RuffCheck {
-            output_format: "text",
+            output_format: "full",
             config: None,
             filename: None,
             args: vec![],
@@ -121,6 +121,12 @@ fn stdin_error() {
     exit_code: 1
     ----- stdout -----
     -:1:8: F401 [*] `os` imported but unused
+      |
+    1 | import os
+      |        ^^ F401
+      |
+      = help: Remove unused import: `os`
+
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -139,6 +145,12 @@ fn stdin_filename() {
     exit_code: 1
     ----- stdout -----
     F401.py:1:8: F401 [*] `os` imported but unused
+      |
+    1 | import os
+      |        ^^ F401
+      |
+      = help: Remove unused import: `os`
+
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -168,7 +180,19 @@ import bar   # unused import
     exit_code: 1
     ----- stdout -----
     bar.py:2:8: F401 [*] `bar` imported but unused
+      |
+    2 | import bar   # unused import
+      |        ^^^ F401
+      |
+      = help: Remove unused import: `bar`
+
     foo.py:2:8: F401 [*] `foo` imported but unused
+      |
+    2 | import foo   # unused import
+      |        ^^^ F401
+      |
+      = help: Remove unused import: `foo`
+
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
 
@@ -190,6 +214,12 @@ fn check_warn_stdin_filename_with_files() {
     exit_code: 1
     ----- stdout -----
     F401.py:1:8: F401 [*] `os` imported but unused
+      |
+    1 | import os
+      |        ^^ F401
+      |
+      = help: Remove unused import: `os`
+
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -210,6 +240,12 @@ fn stdin_source_type_py() {
     exit_code: 1
     ----- stdout -----
     TCH.py:1:8: F401 [*] `os` imported but unused
+      |
+    1 | import os
+      |        ^^ F401
+      |
+      = help: Remove unused import: `os`
+
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -440,6 +476,11 @@ fn stdin_fix_jupyter() {
     }
     ----- stderr -----
     Jupyter.ipynb:cell 3:1:7: F821 Undefined name `x`
+      |
+    1 | print(x)
+      |       ^ F821
+      |
+
     Found 3 errors (2 fixed, 1 remaining).
     "###);
 }
@@ -533,7 +574,19 @@ fn stdin_override_parser_ipynb() {
     exit_code: 1
     ----- stdout -----
     Jupyter.py:cell 1:1:8: F401 [*] `os` imported but unused
+      |
+    1 | import os
+      |        ^^ F401
+      |
+      = help: Remove unused import: `os`
+
     Jupyter.py:cell 3:1:8: F401 [*] `sys` imported but unused
+      |
+    1 | import sys
+      |        ^^^ F401
+      |
+      = help: Remove unused import: `sys`
+
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
 
@@ -557,6 +610,12 @@ fn stdin_override_parser_py() {
     exit_code: 1
     ----- stdout -----
     F401.ipynb:1:8: F401 [*] `os` imported but unused
+      |
+    1 | import os
+      |        ^^ F401
+      |
+      = help: Remove unused import: `os`
+
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -579,6 +638,14 @@ fn stdin_fix_when_not_fixable_should_still_print_contents() {
 
     ----- stderr -----
     -:3:4: F634 If test is a tuple, which is always `True`
+      |
+    1 | import sys
+    2 | 
+    3 | if (1, 2):
+      |    ^^^^^^ F634
+    4 |      print(sys.version)
+      |
+
     Found 2 errors (1 fixed, 1 remaining).
     "###);
 }
@@ -735,6 +802,11 @@ fn stdin_parse_error() {
     exit_code: 1
     ----- stdout -----
     -:1:17: E999 SyntaxError: Unexpected token '='
+      |
+    1 | from foo import =
+      |                 ^ E999
+      |
+
     Found 1 error.
 
     ----- stderr -----
@@ -744,7 +816,7 @@ fn stdin_parse_error() {
 
 #[test]
 fn full_output_format() {
-    let mut cmd = RuffCheck::default().args(["--output-format=full"]).build();
+    let mut cmd = RuffCheck::default().output_format("full").build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("l = 1"), @r###"
     success: false
@@ -807,6 +879,11 @@ fn nursery_prefix() {
     exit_code: 1
     ----- stdout -----
     -:1:1: E741 Ambiguous variable name: `I`
+      |
+    1 | I=42
+      | ^ E741
+      |
+
     Found 1 error.
 
     ----- stderr -----
@@ -823,7 +900,17 @@ fn nursery_all() {
     exit_code: 1
     ----- stdout -----
     -:1:1: E741 Ambiguous variable name: `I`
+      |
+    1 | I=42
+      | ^ E741
+      |
+
     -:1:1: D100 Missing docstring in public module
+      |
+    1 | I=42
+      |  D100
+      |
+
     Found 2 errors.
 
     ----- stderr -----
@@ -842,6 +929,12 @@ fn nursery_direct() {
     exit_code: 1
     ----- stdout -----
     -:1:2: E225 [*] Missing whitespace around operator
+      |
+    1 | I=42
+      |  ^ E225
+      |
+      = help: Add missing whitespace
+
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -860,7 +953,18 @@ fn nursery_group_selector() {
     exit_code: 1
     ----- stdout -----
     -:1:1: CPY001 Missing copyright notice at top of file
+      |
+    1 | I=42
+      |  CPY001
+      |
+
     -:1:2: E225 [*] Missing whitespace around operator
+      |
+    1 | I=42
+      |  ^ E225
+      |
+      = help: Add missing whitespace
+
     Found 2 errors.
     [*] 1 fixable with the `--fix` option.
 
@@ -899,7 +1003,18 @@ fn preview_enabled_prefix() {
     exit_code: 1
     ----- stdout -----
     -:1:1: E741 Ambiguous variable name: `I`
+      |
+    1 | I=42
+      | ^ E741
+      |
+
     -:1:2: E225 [*] Missing whitespace around operator
+      |
+    1 | I=42
+      |  ^ E225
+      |
+      = help: Add missing whitespace
+
     Found 2 errors.
     [*] 1 fixable with the `--fix` option.
 
@@ -918,9 +1033,30 @@ fn preview_enabled_all() {
     exit_code: 1
     ----- stdout -----
     -:1:1: E741 Ambiguous variable name: `I`
+      |
+    1 | I=42
+      | ^ E741
+      |
+
     -:1:1: D100 Missing docstring in public module
+      |
+    1 | I=42
+      |  D100
+      |
+
     -:1:1: CPY001 Missing copyright notice at top of file
+      |
+    1 | I=42
+      |  CPY001
+      |
+
     -:1:2: E225 [*] Missing whitespace around operator
+      |
+    1 | I=42
+      |  ^ E225
+      |
+      = help: Add missing whitespace
+
     Found 4 errors.
     [*] 1 fixable with the `--fix` option.
 
@@ -942,6 +1078,12 @@ fn preview_enabled_direct() {
     exit_code: 1
     ----- stdout -----
     -:1:2: E225 [*] Missing whitespace around operator
+      |
+    1 | I=42
+      |  ^ E225
+      |
+      = help: Add missing whitespace
+
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -989,6 +1131,11 @@ fn preview_disabled_does_not_warn_for_empty_ignore_selections() {
     exit_code: 1
     ----- stdout -----
     -:1:1: E741 Ambiguous variable name: `I`
+      |
+    1 | I=42
+      | ^ E741
+      |
+
     Found 1 error.
 
     ----- stderr -----
@@ -1005,6 +1152,11 @@ fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
     exit_code: 1
     ----- stdout -----
     -:1:1: E741 Ambiguous variable name: `I`
+      |
+    1 | I=42
+      | ^ E741
+      |
+
     Found 1 error.
 
     ----- stderr -----
@@ -1137,6 +1289,12 @@ fn check_input_from_argfile() -> Result<()> {
         exit_code: 1
         ----- stdout -----
         /path/to/a.py:1:8: F401 [*] `os` imported but unused
+          |
+        1 | import os
+          |        ^^ F401
+          |
+          = help: Remove unused import: `os`
+
         Found 1 error.
         [*] 1 fixable with the `--fix` option.
 
@@ -1159,7 +1317,21 @@ fn check_hints_hidden_unsafe_fixes() {
     exit_code: 1
     ----- stdout -----
     -:1:14: F601 Dictionary key literal `'a'` repeated
+      |
+    1 | x = {'a': 1, 'a': 1}
+      |              ^^^ F601
+    2 | print(('foo'))
+      |
+      = help: Remove repeated key literal `'a'`
+
     -:2:7: UP034 [*] Avoid extraneous parentheses
+      |
+    1 | x = {'a': 1, 'a': 1}
+    2 | print(('foo'))
+      |       ^^^^^^^ UP034
+      |
+      = help: Remove extraneous parentheses
+
     Found 2 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1177,6 +1349,12 @@ fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
     exit_code: 1
     ----- stdout -----
     -:1:14: F601 Dictionary key literal `'a'` repeated
+      |
+    1 | x = {'a': 1, 'a': 1}
+      |              ^^^ F601
+      |
+      = help: Remove repeated key literal `'a'`
+
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1196,7 +1374,21 @@ fn check_no_hint_for_hidden_unsafe_fixes_when_disabled() {
     exit_code: 1
     ----- stdout -----
     -:1:14: F601 Dictionary key literal `'a'` repeated
+      |
+    1 | x = {'a': 1, 'a': 1}
+      |              ^^^ F601
+    2 | print(('foo'))
+      |
+      = help: Remove repeated key literal `'a'`
+
     -:2:7: UP034 [*] Avoid extraneous parentheses
+      |
+    1 | x = {'a': 1, 'a': 1}
+    2 | print(('foo'))
+      |       ^^^^^^^ UP034
+      |
+      = help: Remove extraneous parentheses
+
     Found 2 errors.
     [*] 1 fixable with the --fix option.
 
@@ -1216,6 +1408,12 @@ fn check_no_hint_for_hidden_unsafe_fixes_with_no_safe_fixes_when_disabled() {
     exit_code: 1
     ----- stdout -----
     -:1:14: F601 Dictionary key literal `'a'` repeated
+      |
+    1 | x = {'a': 1, 'a': 1}
+      |              ^^^ F601
+      |
+      = help: Remove repeated key literal `'a'`
+
     Found 1 error.
 
     ----- stderr -----
@@ -1234,7 +1432,21 @@ fn check_shows_unsafe_fixes_with_opt_in() {
     exit_code: 1
     ----- stdout -----
     -:1:14: F601 [*] Dictionary key literal `'a'` repeated
+      |
+    1 | x = {'a': 1, 'a': 1}
+      |              ^^^ F601
+    2 | print(('foo'))
+      |
+      = help: Remove repeated key literal `'a'`
+
     -:2:7: UP034 [*] Avoid extraneous parentheses
+      |
+    1 | x = {'a': 1, 'a': 1}
+    2 | print(('foo'))
+      |       ^^^^^^^ UP034
+      |
+      = help: Remove extraneous parentheses
+
     Found 2 errors.
     [*] 2 fixable with the --fix option.
 
@@ -1258,6 +1470,13 @@ fn fix_applies_safe_fixes_by_default() {
 
     ----- stderr -----
     -:1:14: F601 Dictionary key literal `'a'` repeated
+      |
+    1 | x = {'a': 1, 'a': 1}
+      |              ^^^ F601
+    2 | print('foo')
+      |
+      = help: Remove repeated key literal `'a'`
+
     Found 2 errors (1 fixed, 1 remaining).
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
     "###);
@@ -1296,6 +1515,12 @@ fn fix_does_not_apply_display_only_fixes() {
     def add_to_list(item, some_list=[]): ...
     ----- stderr -----
     -:1:33: B006 Do not use mutable data structures for argument defaults
+      |
+    1 | def add_to_list(item, some_list=[]): ...
+      |                                 ^^ B006
+      |
+      = help: Replace with `None`; initialize within function
+
     Found 1 error.
     "###);
 }
@@ -1314,6 +1539,12 @@ fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
     def add_to_list(item, some_list=[]): ...
     ----- stderr -----
     -:1:33: B006 Do not use mutable data structures for argument defaults
+      |
+    1 | def add_to_list(item, some_list=[]): ...
+      |                                 ^^ B006
+      |
+      = help: Replace with `None`; initialize within function
+
     Found 1 error.
     "###);
 }
@@ -1334,6 +1565,13 @@ fn fix_only_unsafe_fixes_available() {
 
     ----- stderr -----
     -:1:14: F601 Dictionary key literal `'a'` repeated
+      |
+    1 | x = {'a': 1, 'a': 1}
+      |              ^^^ F601
+    2 | print(('foo'))
+      |
+      = help: Remove repeated key literal `'a'`
+
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
     "###);
@@ -1481,7 +1719,21 @@ extend-unsafe-fixes = ["UP034"]
     exit_code: 1
     ----- stdout -----
     -:1:14: F601 Dictionary key literal `'a'` repeated
+      |
+    1 | x = {'a': 1, 'a': 1}
+      |              ^^^ F601
+    2 | print(('foo'))
+      |
+      = help: Remove repeated key literal `'a'`
+
     -:2:7: UP034 Avoid extraneous parentheses
+      |
+    1 | x = {'a': 1, 'a': 1}
+    2 | print(('foo'))
+      |       ^^^^^^^ UP034
+      |
+      = help: Remove extraneous parentheses
+
     Found 2 errors.
     No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
 
@@ -1514,7 +1766,21 @@ extend-safe-fixes = ["F601"]
     exit_code: 1
     ----- stdout -----
     -:1:14: F601 [*] Dictionary key literal `'a'` repeated
+      |
+    1 | x = {'a': 1, 'a': 1}
+      |              ^^^ F601
+    2 | print(('foo'))
+      |
+      = help: Remove repeated key literal `'a'`
+
     -:2:7: UP034 [*] Avoid extraneous parentheses
+      |
+    1 | x = {'a': 1, 'a': 1}
+    2 | print(('foo'))
+      |       ^^^^^^^ UP034
+      |
+      = help: Remove extraneous parentheses
+
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
 
@@ -1549,7 +1815,21 @@ extend-safe-fixes = ["UP034"]
     exit_code: 1
     ----- stdout -----
     -:1:14: F601 Dictionary key literal `'a'` repeated
+      |
+    1 | x = {'a': 1, 'a': 1}
+      |              ^^^ F601
+    2 | print(('foo'))
+      |
+      = help: Remove repeated key literal `'a'`
+
     -:2:7: UP034 Avoid extraneous parentheses
+      |
+    1 | x = {'a': 1, 'a': 1}
+    2 | print(('foo'))
+      |       ^^^^^^^ UP034
+      |
+      = help: Remove extraneous parentheses
+
     Found 2 errors.
     No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
 
@@ -1585,9 +1865,43 @@ extend-safe-fixes = ["UP03"]
     exit_code: 1
     ----- stdout -----
     -:1:14: F601 Dictionary key literal `'a'` repeated
+      |
+    1 | x = {'a': 1, 'a': 1}
+      |              ^^^ F601
+    2 | print(('foo'))
+    3 | print(str('foo'))
+      |
+      = help: Remove repeated key literal `'a'`
+
     -:2:7: UP034 Avoid extraneous parentheses
+      |
+    1 | x = {'a': 1, 'a': 1}
+    2 | print(('foo'))
+      |       ^^^^^^^ UP034
+    3 | print(str('foo'))
+    4 | isinstance(x, (int, str))
+      |
+      = help: Remove extraneous parentheses
+
     -:3:7: UP018 Unnecessary `str` call (rewrite as a literal)
+      |
+    1 | x = {'a': 1, 'a': 1}
+    2 | print(('foo'))
+    3 | print(str('foo'))
+      |       ^^^^^^^^^^ UP018
+    4 | isinstance(x, (int, str))
+      |
+      = help: Replace with string literal
+
     -:4:1: UP038 [*] Use `X | Y` in `isinstance` call instead of `(X, Y)`
+      |
+    2 | print(('foo'))
+    3 | print(str('foo'))
+    4 | isinstance(x, (int, str))
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^ UP038
+      |
+      = help: Convert to `X | Y`
+
     Found 4 errors.
     [*] 1 fixable with the `--fix` option (3 hidden fixes can be enabled with the `--unsafe-fixes` option).
 
@@ -1648,6 +1962,12 @@ def log(x, base) -> float:
     exit_code: 1
     ----- stdout -----
     -:2:5: D417 Missing argument description in the docstring for `log`: `base`
+      |
+    2 | def log(x, base) -> float:
+      |     ^^^ D417
+    3 |     """Calculate natural log of a value
+      |
+
     Found 1 error.
 
     ----- stderr -----
@@ -1678,6 +1998,14 @@ select = ["RUF017"]
     exit_code: 1
     ----- stdout -----
     -:3:1: RUF017 Avoid quadratic list summation
+      |
+    1 | x = [1, 2, 3]
+    2 | y = [4, 5, 6]
+    3 | sum([x, y], [])
+      | ^^^^^^^^^^^^^^^ RUF017
+      |
+      = help: Replace with `functools.reduce`
+
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1710,6 +2038,14 @@ unfixable = ["RUF"]
     exit_code: 1
     ----- stdout -----
     -:3:1: RUF017 Avoid quadratic list summation
+      |
+    1 | x = [1, 2, 3]
+    2 | y = [4, 5, 6]
+    3 | sum([x, y], [])
+      | ^^^^^^^^^^^^^^^ RUF017
+      |
+      = help: Replace with `functools.reduce`
+
     Found 1 error.
 
     ----- stderr -----
