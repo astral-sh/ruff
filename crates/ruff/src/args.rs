@@ -152,6 +152,9 @@ pub struct CheckCommand {
     no_preview: bool,
     /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
     /// or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting.
+    /// Overrides of individual settings always take precedence over all
+    /// configuration files. This includes configuration files that were also
+    /// specified using `--config`.
     #[arg(
         long,
         action = clap::ArgAction::Append,
@@ -291,13 +294,14 @@ pub struct CheckCommand {
     #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
     pub no_cache: bool,
     /// Ignore all configuration files.
-    #[arg(long, help_heading = "Miscellaneous")]
-    // Can't mark this as conflicting with `--config` here
+    //
+    // Note: We can't mark this as conflicting with `--config` here
     // as `--config` can be used for specifying config overrides as well as config files.
     // Specifying a config file conflicts with `--isolated`;
     // specifying a config override does not.
     // If a user specifies `ruff check --isolated --config=ruff.toml`,
     // we emit an error later on, after the initial parsing by clap.
+    #[arg(long, help_heading = "Miscellaneous")]
     pub isolated: bool,
     /// Path to the cache directory.
     #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]
@@ -392,6 +396,9 @@ pub struct FormatCommand {
     pub diff: bool,
     /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
     /// or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting.
+    /// Overrides of individual settings always take precedence over all
+    /// configuration files. This includes configuration files that were also
+    /// specified using `--config`.
     #[arg(
         long,
         action = clap::ArgAction::Append,
@@ -440,13 +447,14 @@ pub struct FormatCommand {
     #[arg(long, help_heading = "Format configuration")]
     pub line_length: Option<LineLength>,
     /// Ignore all configuration files.
-    #[arg(long, help_heading = "Miscellaneous")]
-    // Can't mark this as conflicting with `--config` here
+    //
+    // Note: We can't mark this as conflicting with `--config` here
     // as `--config` can be used for specifying config overrides as well as config files.
     // Specifying a config file conflicts with `--isolated`;
     // specifying a config override does not.
     // If a user specifies `ruff check --isolated --config=ruff.toml`,
     // we emit an error later on, after the initial parsing by clap.
+    #[arg(long, help_heading = "Miscellaneous")]
     pub isolated: bool,
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
