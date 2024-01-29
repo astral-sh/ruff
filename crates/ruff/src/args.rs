@@ -132,7 +132,7 @@ pub struct CheckCommand {
     ignore_noqa: bool,
 
     /// Output serialization format for violations.
-    /// The default serialization format is "full".
+    /// The default serialization format is "concise".
     #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
     pub output_format: Option<SerializationFormat>,
 
@@ -609,11 +609,11 @@ fn resolve_output_format(
             SerializationFormat::Grouped
         }
         (Some(fmt), Some(true)) => {
-            warn_user!("The `--show-source` argument is deprecated and has been ignored in favor of `output-format={fmt}`.");
+            warn_user!("The `--show-source` argument is deprecated and has been ignored in favor of `--output-format={fmt}`.");
             fmt
         }
         (Some(fmt), Some(false)) => {
-            warn_user!("The `--no-show-source` argument is deprecated and has been ignored in favor of `output-format={fmt}`.");
+            warn_user!("The `--no-show-source` argument is deprecated and has been ignored in favor of `--output-format={fmt}`.");
             fmt
         }
         (None, Some(true)) => {

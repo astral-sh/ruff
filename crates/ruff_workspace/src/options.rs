@@ -73,12 +73,12 @@ pub struct Options {
     pub extend: Option<String>,
 
     /// The style in which violation messages should be formatted: `"full"`
-    /// (default),`"concise"` (omits source display), `"grouped"` (group messages by file), `"json"`
+    /// (shows source),`"concise"` (default), `"grouped"` (group messages by file), `"json"`
     /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
     /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
     /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
     #[option(
-        default = r#""full""#,
+        default = r#""concise""#,
         value_type = r#""full" | "concise" | "grouped" | "json" | "junit" | "github" | "gitlab" | "pylint" | "azure""#,
         example = r#"
             # Group violations by containing file.

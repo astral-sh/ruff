@@ -492,8 +492,8 @@ impl FromIterator<ExtensionPair> for ExtensionMapping {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum SerializationFormat {
     Text,
-    Concise,
     #[default]
+    Concise,
     Full,
     Json,
     JsonLines,

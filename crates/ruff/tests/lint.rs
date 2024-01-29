@@ -11,7 +11,7 @@ use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 use tempfile::TempDir;
 
 const BIN_NAME: &str = "ruff";
-const STDIN_BASE_OPTIONS: &[&str] = &["--no-cache", "--output-format", "full"];
+const STDIN_BASE_OPTIONS: &[&str] = &["--no-cache", "--output-format", "concise"];
 
 #[test]
 fn top_level_options() -> Result<()> {
@@ -38,25 +38,8 @@ inline-quotes = "single"
     exit_code: 1
     ----- stdout -----
     test.py:1:5: Q000 [*] Double quotes found but single quotes preferred
-      |
-    1 | a = "abcba".strip("aba")
-      |     ^^^^^^^ Q000
-      |
-      = help: Replace double quotes with single quotes
-
     test.py:1:5: B005 Using `.strip()` with multi-character strings is misleading
-      |
-    1 | a = "abcba".strip("aba")
-      |     ^^^^^^^^^^^^^^^^^^^^ B005
-      |
-
     test.py:1:19: Q000 [*] Double quotes found but single quotes preferred
-      |
-    1 | a = "abcba".strip("aba")
-      |                   ^^^^^ Q000
-      |
-      = help: Replace double quotes with single quotes
-
     Found 3 errors.
     [*] 2 fixable with the `--fix` option.
 
@@ -95,25 +78,8 @@ inline-quotes = "single"
     exit_code: 1
     ----- stdout -----
     -:1:5: Q000 [*] Double quotes found but single quotes preferred
-      |
-    1 | a = "abcba".strip("aba")
-      |     ^^^^^^^ Q000
-      |
-      = help: Replace double quotes with single quotes
-
     -:1:5: B005 Using `.strip()` with multi-character strings is misleading
-      |
-    1 | a = "abcba".strip("aba")
-      |     ^^^^^^^^^^^^^^^^^^^^ B005
-      |
-
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
-      |
-    1 | a = "abcba".strip("aba")
-      |                   ^^^^^ Q000
-      |
-      = help: Replace double quotes with single quotes
-
     Found 3 errors.
     [*] 2 fixable with the `--fix` option.
 
@@ -147,25 +113,8 @@ inline-quotes = "single"
     exit_code: 1
     ----- stdout -----
     -:1:5: Q000 [*] Double quotes found but single quotes preferred
-      |
-    1 | a = "abcba".strip("aba")
-      |     ^^^^^^^ Q000
-      |
-      = help: Replace double quotes with single quotes
-
     -:1:5: B005 Using `.strip()` with multi-character strings is misleading
-      |
-    1 | a = "abcba".strip("aba")
-      |     ^^^^^^^^^^^^^^^^^^^^ B005
-      |
-
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
-      |
-    1 | a = "abcba".strip("aba")
-      |                   ^^^^^ Q000
-      |
-      = help: Replace double quotes with single quotes
-
     Found 3 errors.
     [*] 2 fixable with the `--fix` option.
 
@@ -207,25 +156,8 @@ inline-quotes = "single"
     exit_code: 1
     ----- stdout -----
     -:1:5: Q000 [*] Double quotes found but single quotes preferred
-      |
-    1 | a = "abcba".strip("aba")
-      |     ^^^^^^^ Q000
-      |
-      = help: Replace double quotes with single quotes
-
     -:1:5: B005 Using `.strip()` with multi-character strings is misleading
-      |
-    1 | a = "abcba".strip("aba")
-      |     ^^^^^^^^^^^^^^^^^^^^ B005
-      |
-
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
-      |
-    1 | a = "abcba".strip("aba")
-      |                   ^^^^^ Q000
-      |
-      = help: Replace double quotes with single quotes
-
     Found 3 errors.
     [*] 2 fixable with the `--fix` option.
 
@@ -303,31 +235,8 @@ OTHER = "OTHER"
     exit_code: 1
     ----- stdout -----
     main.py:4:16: Q000 [*] Double quotes found but single quotes preferred
-      |
-    2 | from test import say_hy
-    3 | 
-    4 | if __name__ == "__main__":
-      |                ^^^^^^^^^^ Q000
-    5 |     say_hy("dear Ruff contributor")
-      |
-      = help: Replace double quotes with single quotes
-
     main.py:5:12: Q000 [*] Double quotes found but single quotes preferred
-      |
-    4 | if __name__ == "__main__":
-    5 |     say_hy("dear Ruff contributor")
-      |            ^^^^^^^^^^^^^^^^^^^^^^^ Q000
-      |
-      = help: Replace double quotes with single quotes
-
     test.py:3:15: Q000 [*] Double quotes found but single quotes preferred
-      |
-    2 | def say_hy(name: str):
-    3 |         print(f"Hy {name}")
-      |               ^^^^^^^^^^^^ Q000
-      |
-      = help: Replace double quotes with single quotes
-
     Found 3 errors.
     [*] 3 fixable with the `--fix` option.
 
@@ -374,23 +283,7 @@ if __name__ == "__main__":
     exit_code: 1
     ----- stdout -----
     generated.py:4:16: Q000 [*] Double quotes found but single quotes preferred
-      |
-    2 | from test import say_hy
-    3 | 
-    4 | if __name__ == "__main__":
-      |                ^^^^^^^^^^ Q000
-    5 |     say_hy("dear Ruff contributor")
-      |
-      = help: Replace double quotes with single quotes
-
     generated.py:5:12: Q000 [*] Double quotes found but single quotes preferred
-      |
-    4 | if __name__ == "__main__":
-    5 |     say_hy("dear Ruff contributor")
-      |            ^^^^^^^^^^^^^^^^^^^^^^^ Q000
-      |
-      = help: Replace double quotes with single quotes
-
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
 
@@ -434,13 +327,6 @@ _ = "---------------------------------------------------------------------------
     exit_code: 1
     ----- stdout -----
     test.py:5:91: E501 Line too long (109 > 100)
-      |
-    3 | _ = "---------------------------------------------------------------------------亜亜亜亜亜亜"
-    4 | # longer than 100
-    5 | _ = "---------------------------------------------------------------------------亜亜亜亜亜亜亜亜亜亜亜亜亜亜"
-      |                                                                                                     ^^^^^^^^^ E501
-      |
-
     Found 1 error.
 
     ----- stderr -----
@@ -487,14 +373,6 @@ if __name__ == "__main__":
     exit_code: 1
     ----- stdout -----
     generated.py:2:8: F401 [*] `os` imported but unused
-      |
-    2 | import os
-      |        ^^ F401
-    3 | 
-    4 | from test import say_hy
-      |
-      = help: Remove unused import: `os`
-
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -541,14 +419,6 @@ if __name__ == "__main__":
     exit_code: 1
     ----- stdout -----
     generated.py:2:8: F401 [*] `os` imported but unused
-      |
-    2 | import os
-      |        ^^ F401
-    3 | 
-    4 | from test import say_hy
-      |
-      = help: Remove unused import: `os`
-
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
@@ -665,12 +535,6 @@ include = ["*.ipy"]
     exit_code: 1
     ----- stdout -----
     main.ipy:cell 1:1:8: F401 [*] `os` imported but unused
-      |
-    1 | import os
-      |        ^^ F401
-      |
-      = help: Remove unused import: `os`
-
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
