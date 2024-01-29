@@ -292,6 +292,12 @@ pub struct CheckCommand {
     pub no_cache: bool,
     /// Ignore all configuration files.
     #[arg(long, help_heading = "Miscellaneous")]
+    // Can't mark this as conflicting with `--config` here
+    // as `--config` can be used for specifying config overrides as well as config files.
+    // Specifying a config file conflicts with `--isolated`;
+    // specifying a config override does not.
+    // If a user specifies `ruff check --isolated --config=ruff.toml`,
+    // we emit an error later on, after the initial parsing by clap.
     pub isolated: bool,
     /// Path to the cache directory.
     #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]
@@ -435,6 +441,12 @@ pub struct FormatCommand {
     pub line_length: Option<LineLength>,
     /// Ignore all configuration files.
     #[arg(long, help_heading = "Miscellaneous")]
+    // Can't mark this as conflicting with `--config` here
+    // as `--config` can be used for specifying config overrides as well as config files.
+    // Specifying a config file conflicts with `--isolated`;
+    // specifying a config override does not.
+    // If a user specifies `ruff check --isolated --config=ruff.toml`,
+    // we emit an error later on, after the initial parsing by clap.
     pub isolated: bool,
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
@@ -660,7 +672,7 @@ impl FormatCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
     pub fn partition(self) -> Result<(FormatArguments, ConfigArguments), anyhow::Error> {
-        let format_args = FormatArguments {
+        let format_arguments = FormatArguments {
             check: self.check,
             diff: self.diff,
             files: self.files,
@@ -685,7 +697,7 @@ impl FormatCommand {
 
         let config_args =
             ConfigArguments::from_cli_options(self.config, cli_overrides, self.isolated)?;
-        Ok((format_args, config_args))
+        Ok((format_arguments, config_args))
     }
 }
 
