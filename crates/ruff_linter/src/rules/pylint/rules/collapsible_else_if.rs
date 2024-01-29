@@ -84,13 +84,8 @@ pub(crate) fn collapsible_else_if(checker: &mut Checker, stmt: &Stmt) {
         CollapsibleElseIf,
         TextRange::new(else_clause.start(), first.start()),
     );
-
-    if checker.settings.preview.is_enabled() {
-        diagnostic.try_set_fix(|| {
-            convert_to_elif(first, else_clause, checker.locator(), checker.stylist())
-        });
-    }
-
+    diagnostic
+        .try_set_fix(|| convert_to_elif(first, else_clause, checker.locator(), checker.stylist()));
     checker.diagnostics.push(diagnostic);
 }
 
