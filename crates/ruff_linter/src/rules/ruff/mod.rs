@@ -30,7 +30,6 @@ mod tests {
     #[test_case(Rule::MutableClassDefault, Path::new("RUF012.py"))]
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
     #[test_case(Rule::PairwiseOverZipped, Path::new("RUF007.py"))]
-    #[test_case(Rule::StaticKeyDictComprehension, Path::new("RUF011.py"))]
     #[test_case(
         Rule::UnnecessaryIterableAllocationForFirstElement,
         Path::new("RUF015.py")
