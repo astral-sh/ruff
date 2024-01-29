@@ -213,6 +213,8 @@ impl RuleSelector {
             || (preview_enabled && (matches!(self, RuleSelector::Rule { .. }) || !preview_require_explicit))
             // Deprecated rules are excluded in preview mode unless explicitly selected
             || (rule.is_deprecated() && (!preview_enabled || matches!(self, RuleSelector::Rule { .. })))
+            // Removed rules are included if explicitly selected but will error downstream
+            || (rule.is_removed() && matches!(self, RuleSelector::Rule { .. }))
         })
     }
 }

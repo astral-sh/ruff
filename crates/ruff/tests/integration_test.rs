@@ -1096,6 +1096,21 @@ fn preview_enabled_group_ignore() {
 }
 
 #[test]
+fn removed_direct() {
+    // Selection of a removed rule should fail
+    let mut cmd = RuffCheck::default().args(["--select", "PLR1706"]).build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Rule `PLR1706` was removed and cannot be selected.
+    "###);
+}
+
+#[test]
 fn deprecated_direct() {
     // Selection of a deprecated rule without preview enabled should still work
     // but a warning should be displayed

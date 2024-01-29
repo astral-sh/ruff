@@ -327,6 +327,10 @@ See also https://github.com/astral-sh/ruff/issues/2186.
             pub fn is_deprecated(&self) -> bool {
                 matches!(self.group(), RuleGroup::Deprecated)
             }
+
+            pub fn is_removed(&self) -> bool {
+                matches!(self.group(), RuleGroup::Removed)
+            }
         }
 
         impl Linter {
