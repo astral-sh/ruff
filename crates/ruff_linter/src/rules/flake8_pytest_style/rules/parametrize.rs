@@ -226,6 +226,10 @@ impl Violation for PytestParametrizeValuesWrongType {
 ///     ...
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as tests that rely on mutable global
+/// state may be affected by removing duplicate test cases.
+///
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[violation]
