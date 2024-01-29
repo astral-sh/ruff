@@ -45,7 +45,6 @@ use crate::options::{
     Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions, PydocstyleOptions, PyflakesOptions,
     PylintOptions,
 };
-use crate::resolver::ConfigurationTransformer;
 use crate::settings::{
     FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
 };
@@ -105,7 +104,7 @@ impl RuleSelection {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Configuration {
     // Global options
     pub cache_dir: Option<PathBuf>,
@@ -546,73 +545,6 @@ impl Configuration {
 
             lint: self.lint.combine(config.lint),
             format: self.format.combine(config.format),
-        }
-    }
-}
-
-impl ConfigurationTransformer for Configuration {
-    fn transform(&self, config: Configuration) -> Configuration {
-        Configuration {
-            fix: self.fix.or(config.fix),
-            fix_only: self.fix_only.or(config.fix_only),
-            unsafe_fixes: self.unsafe_fixes.or(config.unsafe_fixes),
-            output_format: self.output_format.or(config.output_format),
-            preview: self.preview.or(config.preview),
-            show_fixes: self.show_fixes.or(config.show_fixes),
-            show_source: self.show_source.or(config.show_source),
-            force_exclude: self.force_exclude.or(config.force_exclude),
-            respect_gitignore: self.respect_gitignore.or(config.respect_gitignore),
-            target_version: self.target_version.or(config.target_version),
-            line_length: self.line_length.or(config.line_length),
-            indent_width: self.indent_width.or(config.indent_width),
-
-            extend_exclude: config
-                .extend_exclude
-                .into_iter()
-                .chain(self.extend_exclude.iter().cloned())
-                .collect(),
-            extend_include: config
-                .extend_include
-                .into_iter()
-                .chain(self.extend_include.iter().cloned())
-                .collect(),
-
-            lint: self.lint.clone().combine(config.lint),
-            format: self.format.clone().combine(config.format),
-
-            cache_dir: self
-                .cache_dir
-                .as_ref()
-                .map_or(config.cache_dir, |dir| Some(dir.clone())),
-            extend: self
-                .extend
-                .as_ref()
-                .map_or(config.extend, |path| Some(path.clone())),
-            required_version: self
-                .required_version
-                .as_ref()
-                .map_or(config.required_version, |ver| Some(ver.clone())),
-            extension: self
-                .extension
-                .as_ref()
-                .map_or(config.extension, |ext| Some(ext.clone())),
-            exclude: self
-                .exclude
-                .as_ref()
-                .map_or(config.exclude, |excl| Some(excl.clone())),
-            include: self
-                .include
-                .as_ref()
-                .map_or(config.include, |inc| Some(inc.clone())),
-            builtins: self
-                .builtins
-                .as_ref()
-                .map_or(config.builtins, |bltns| Some(bltns.clone())),
-            namespace_packages: self
-                .namespace_packages
-                .as_ref()
-                .map_or(config.namespace_packages, |pkgs| Some(pkgs.clone())),
-            src: self.src.as_ref().map_or(config.src, |s| Some(s.clone())),
         }
     }
 }

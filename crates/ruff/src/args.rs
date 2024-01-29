@@ -612,7 +612,7 @@ impl ConfigArguments {
 
 impl ConfigurationTransformer for ConfigArguments {
     fn transform(&self, config: Configuration) -> Configuration {
-        let with_config_overrides = self.overrides.transform(config);
+        let with_config_overrides = self.overrides.clone().combine(config);
         self.per_flag_overrides.transform(with_config_overrides)
     }
 }
