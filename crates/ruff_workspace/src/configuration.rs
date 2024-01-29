@@ -860,13 +860,10 @@ impl LintConfiguration {
             for (kind, selector) in selection.selectors_by_kind() {
                 #[allow(deprecated)]
                 if matches!(selector, RuleSelector::Nursery) {
-                    let suggestion = if preview.mode.is_disabled() {
-                        " Use the `--preview` flag instead."
-                    } else {
-                        // We have no suggested alternative since there is intentionally no "PREVIEW" selector
-                        ""
-                    };
-                    warn_user_once!("The `NURSERY` selector has been deprecated.{suggestion}");
+                    if preview.mode.is_enabled() {
+                        return Err(anyhow!("The `NURSERY` selector is deprecated and cannot be used with preview mode enabled."));
+                    }
+                    warn_user_once!("The `NURSERY` selector has been deprecated. Use the `--preview` flag instead.");
                 };
 
                 // Only warn for the following selectors if used to enable rules
@@ -1638,7 +1635,8 @@ mod tests {
         let expected = RuleSet::from_rules(NURSERY_RULES);
         assert_eq!(actual, expected);
 
-        let actual = resolve_rules(
+        // When preview is enabled, use of NURSERY is banned
+        assert!(resolve_rules(
             [RuleSelection {
                 select: Some(vec![RuleSelector::Nursery]),
                 ..RuleSelection::default()
@@ -1647,9 +1645,9 @@ mod tests {
                 mode: PreviewMode::Enabled,
                 ..PreviewOptions::default()
             }),
-        )?;
-        let expected = RuleSet::from_rules(NURSERY_RULES);
-        assert_eq!(actual, expected);
+        )
+        .is_err());
+
         Ok(())
     }
 
