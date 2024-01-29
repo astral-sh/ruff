@@ -591,8 +591,8 @@ impl ConfigArgs {
 
 impl ConfigurationTransformer for ConfigArgs {
     fn transform(&self, config: Configuration) -> Configuration {
-        self.per_flag_overrides
-            .transform(self.config_overrides.transform(config))
+        let with_config_overrides = self.config_overrides.combine(config);
+        self.per_flag_overrides.transform(with_config_overrides)
     }
 }
 
@@ -735,9 +735,6 @@ impl TypedValueParser for ConfigOptionParser {
         arg: Option<&clap::Arg>,
         value: &std::ffi::OsStr,
     ) -> Result<Self::Value, clap::Error> {
-        let value = value
-            .to_str()
-            .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
         let path_to_config_file = PathBuf::from(value);
         if path_to_config_file.exists() {
             return Ok(ConfigOption::PathToConfigFile {
@@ -746,6 +743,11 @@ impl TypedValueParser for ConfigOptionParser {
                 cmd: cmd.clone(),
             });
         }
+
+        let value = value
+            .to_str()
+            .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
+        
         let toml_parse_error = match toml::from_str(value) {
             Ok(option) => return Ok(ConfigOption::ConfigOverride(Arc::new(option))),
             Err(toml_error) => toml_error,
