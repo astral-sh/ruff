@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use clap::builder::{TypedValueParser, ValueParserFactory};
@@ -529,8 +529,8 @@ pub struct ConfigArguments {
 }
 
 impl ConfigArguments {
-    pub fn config_file(&self) -> Option<&PathBuf> {
-        self.config_file.as_ref()
+    pub fn config_file(&self) -> Option<&Path> {
+        self.config_file.as_deref()
     }
 
     fn from_cli_options(
