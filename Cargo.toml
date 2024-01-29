@@ -78,7 +78,7 @@ seahash = { version ="4.1.0"}
 semver = { version = "1.0.21" }
 serde = { version = "1.0.195", features = ["derive"] }
 serde-wasm-bindgen = { version = "0.6.3" }
-serde_json = { version = "1.0.111" }
+serde_json = { version = "1.0.113" }
 serde_test = { version = "1.0.152" }
 serde_with = { version = "3.5.0", default-features = false, features = ["macros"] }
 shellexpand = { version = "3.0.0" }
