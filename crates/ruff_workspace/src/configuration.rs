@@ -1787,7 +1787,7 @@ mod tests {
 
     #[test]
     #[allow(deprecated)]
-    fn select_nursery() -> Result<()> {
+    fn select_nursery() {
         // We no longer allow use of the NURSERY selector and should error in both cases
         assert!(resolve_rules(
             [RuleSelection {
@@ -1811,8 +1811,6 @@ mod tests {
             }),
         )
         .is_err());
-
-        Ok(())
     }
 
     #[test]
