@@ -239,7 +239,7 @@ impl Configuration {
             },
 
             linter: LinterSettings {
-                rules: lint.as_rule_table(lint_preview),
+                rules: lint.as_rule_table(lint_preview)?,
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
                 extension: self.extension.unwrap_or_default(),
                 preview: lint_preview,
@@ -701,7 +701,7 @@ impl LintConfiguration {
         })
     }
 
-    fn as_rule_table(&self, preview: PreviewMode) -> RuleTable {
+    fn as_rule_table(&self, preview: PreviewMode) -> Result<RuleTable> {
         let preview = PreviewOptions {
             mode: preview,
             require_explicit: self.explicit_preview_rules.unwrap_or_default(),
@@ -946,7 +946,7 @@ impl LintConfiguration {
             }
         }
 
-        rules
+        Ok(rules)
     }
 
     #[must_use]
@@ -1136,6 +1136,7 @@ pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> 
 mod tests {
     use crate::configuration::{LintConfiguration, RuleSelection};
     use crate::options::PydocstyleOptions;
+    use anyhow::Result;
     use ruff_linter::codes::{Flake8Copyright, Pycodestyle, Refurb};
     use ruff_linter::registry::{Linter, Rule, RuleSet};
     use ruff_linter::rule_selector::PreviewOptions;
@@ -1209,26 +1210,26 @@ mod tests {
     fn resolve_rules(
         selections: impl IntoIterator<Item = RuleSelection>,
         preview: Option<PreviewOptions>,
-    ) -> RuleSet {
-        LintConfiguration {
+    ) -> Result<RuleSet> {
+        Ok(LintConfiguration {
             rule_selections: selections.into_iter().collect(),
             explicit_preview_rules: preview.as_ref().map(|preview| preview.require_explicit),
             ..LintConfiguration::default()
         }
-        .as_rule_table(preview.map(|preview| preview.mode).unwrap_or_default())
+        .as_rule_table(preview.map(|preview| preview.mode).unwrap_or_default())?
         .iter_enabled()
-        .collect()
+        .collect())
     }
 
     #[test]
-    fn select_linter() {
+    fn select_linter() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
                 select: Some(vec![Linter::Pycodestyle.into()]),
                 ..RuleSelection::default()
             }],
             None,
-        );
+        )?;
 
         let expected = RuleSet::from_rules(&[
             Rule::MixedSpacesAndTabs,
@@ -1258,17 +1259,19 @@ mod tests {
             Rule::InvalidEscapeSequence,
         ]);
         assert_eq!(actual, expected);
+
+        Ok(())
     }
 
     #[test]
-    fn select_one_char_prefix() {
+    fn select_one_char_prefix() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
                 select: Some(vec![Pycodestyle::W.into()]),
                 ..RuleSelection::default()
             }],
             None,
-        );
+        )?;
 
         let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
@@ -1279,23 +1282,25 @@ mod tests {
             Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
-    fn select_two_char_prefix() {
+    fn select_two_char_prefix() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
                 select: Some(vec![Pycodestyle::W6.into()]),
                 ..RuleSelection::default()
             }],
             None,
-        );
+        )?;
         let expected = RuleSet::from_rule(Rule::InvalidEscapeSequence);
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
-    fn select_prefix_ignore_code() {
+    fn select_prefix_ignore_code() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
                 select: Some(vec![Pycodestyle::W.into()]),
@@ -1303,7 +1308,7 @@ mod tests {
                 ..RuleSelection::default()
             }],
             None,
-        );
+        )?;
         let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
             Rule::BlankLineWithWhitespace,
@@ -1312,10 +1317,11 @@ mod tests {
             Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
-    fn select_code_ignore_prefix() {
+    fn select_code_ignore_prefix() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
                 select: Some(vec![Pycodestyle::W292.into()]),
@@ -1323,13 +1329,14 @@ mod tests {
                 ..RuleSelection::default()
             }],
             None,
-        );
+        )?;
         let expected = RuleSet::from_rule(Rule::MissingNewlineAtEndOfFile);
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
-    fn select_code_ignore_code() {
+    fn select_code_ignore_code() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
                 select: Some(vec![Pycodestyle::W605.into()]),
@@ -1337,13 +1344,14 @@ mod tests {
                 ..RuleSelection::default()
             }],
             None,
-        );
+        )?;
         let expected = RuleSet::empty();
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
-    fn select_prefix_ignore_code_then_extend_select_code() {
+    fn select_prefix_ignore_code_then_extend_select_code() -> Result<()> {
         let actual = resolve_rules(
             [
                 RuleSelection {
@@ -1357,7 +1365,7 @@ mod tests {
                 },
             ],
             None,
-        );
+        )?;
         let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
             Rule::MissingNewlineAtEndOfFile,
@@ -1367,10 +1375,11 @@ mod tests {
             Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
-    fn select_prefix_ignore_code_then_extend_select_code_ignore_prefix() {
+    fn select_prefix_ignore_code_then_extend_select_code_ignore_prefix() -> Result<()> {
         let actual = resolve_rules(
             [
                 RuleSelection {
@@ -1385,13 +1394,14 @@ mod tests {
                 },
             ],
             None,
-        );
+        )?;
         let expected = RuleSet::from_rule(Rule::MissingNewlineAtEndOfFile);
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
-    fn ignore_code_then_select_prefix() {
+    fn ignore_code_then_select_prefix() -> Result<()> {
         let actual = resolve_rules(
             [
                 RuleSelection {
@@ -1405,7 +1415,7 @@ mod tests {
                 },
             ],
             None,
-        );
+        )?;
         let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
             Rule::BlankLineWithWhitespace,
@@ -1414,10 +1424,11 @@ mod tests {
             Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
-    fn ignore_code_then_select_prefix_ignore_code() {
+    fn ignore_code_then_select_prefix_ignore_code() -> Result<()> {
         let actual = resolve_rules(
             [
                 RuleSelection {
@@ -1432,7 +1443,7 @@ mod tests {
                 },
             ],
             None,
-        );
+        )?;
         let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
             Rule::BlankLineWithWhitespace,
@@ -1440,10 +1451,11 @@ mod tests {
             Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
-    fn select_all_preview() {
+    fn select_all_preview() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
                 select: Some(vec![RuleSelector::All]),
@@ -1453,7 +1465,7 @@ mod tests {
                 mode: PreviewMode::Disabled,
                 ..PreviewOptions::default()
             }),
-        );
+        )?;
         assert!(!actual.intersects(&RuleSet::from_rules(PREVIEW_RULES)));
 
         let actual = resolve_rules(
@@ -1465,12 +1477,14 @@ mod tests {
                 mode: PreviewMode::Enabled,
                 ..PreviewOptions::default()
             }),
-        );
+        )?;
         assert!(actual.intersects(&RuleSet::from_rules(PREVIEW_RULES)));
+
+        Ok(())
     }
 
     #[test]
-    fn select_linter_preview() {
+    fn select_linter_preview() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
                 select: Some(vec![Linter::Flake8Copyright.into()]),
@@ -1480,7 +1494,7 @@ mod tests {
                 mode: PreviewMode::Disabled,
                 ..PreviewOptions::default()
             }),
-        );
+        )?;
         let expected = RuleSet::empty();
         assert_eq!(actual, expected);
 
@@ -1493,13 +1507,14 @@ mod tests {
                 mode: PreviewMode::Enabled,
                 ..PreviewOptions::default()
             }),
-        );
+        )?;
         let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
-    fn select_prefix_preview() {
+    fn select_prefix_preview() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
                 select: Some(vec![Flake8Copyright::_0.into()]),
@@ -1509,7 +1524,7 @@ mod tests {
                 mode: PreviewMode::Disabled,
                 ..PreviewOptions::default()
             }),
-        );
+        )?;
         let expected = RuleSet::empty();
         assert_eq!(actual, expected);
 
@@ -1522,13 +1537,14 @@ mod tests {
                 mode: PreviewMode::Enabled,
                 ..PreviewOptions::default()
             }),
-        );
+        )?;
         let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
-    fn select_rule_preview() {
+    fn select_rule_preview() -> Result<()> {
         // Test inclusion when toggling preview on and off
         let actual = resolve_rules(
             [RuleSelection {
@@ -1539,7 +1555,7 @@ mod tests {
                 mode: PreviewMode::Disabled,
                 ..PreviewOptions::default()
             }),
-        );
+        )?;
         let expected = RuleSet::empty();
         assert_eq!(actual, expected);
 
@@ -1552,7 +1568,7 @@ mod tests {
                 mode: PreviewMode::Enabled,
                 ..PreviewOptions::default()
             }),
-        );
+        )?;
         let expected = RuleSet::from_rule(Rule::SliceCopy);
         assert_eq!(actual, expected);
 
@@ -1566,13 +1582,14 @@ mod tests {
                 mode: PreviewMode::Enabled,
                 require_explicit: true,
             }),
-        );
+        )?;
         let expected = RuleSet::from_rule(Rule::SliceCopy);
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
-    fn nursery_select_code() {
+    fn nursery_select_code() -> Result<()> {
         // Backwards compatible behavior allows selection of nursery rules with their exact code
         // when preview is disabled
         let actual = resolve_rules(
@@ -1584,7 +1601,7 @@ mod tests {
                 mode: PreviewMode::Disabled,
                 ..PreviewOptions::default()
             }),
-        );
+        )?;
         let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
         assert_eq!(actual, expected);
 
@@ -1597,14 +1614,15 @@ mod tests {
                 mode: PreviewMode::Enabled,
                 ..PreviewOptions::default()
             }),
-        );
+        )?;
         let expected = RuleSet::from_rule(Rule::MissingCopyrightNotice);
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
     #[allow(deprecated)]
-    fn select_nursery() {
+    fn select_nursery() -> Result<()> {
         // Backwards compatible behavior allows selection of nursery rules with the nursery selector
         // when preview is disabled
         let actual = resolve_rules(
@@ -1616,7 +1634,7 @@ mod tests {
                 mode: PreviewMode::Disabled,
                 ..PreviewOptions::default()
             }),
-        );
+        )?;
         let expected = RuleSet::from_rules(NURSERY_RULES);
         assert_eq!(actual, expected);
 
@@ -1629,14 +1647,18 @@ mod tests {
                 mode: PreviewMode::Enabled,
                 ..PreviewOptions::default()
             }),
-        );
+        )?;
         let expected = RuleSet::from_rules(NURSERY_RULES);
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
-    fn select_docstring_convention_override() {
-        fn assert_override(rule_selections: Vec<RuleSelection>, should_be_overridden: bool) {
+    fn select_docstring_convention_override() -> Result<()> {
+        fn assert_override(
+            rule_selections: Vec<RuleSelection>,
+            should_be_overridden: bool,
+        ) -> Result<()> {
             use ruff_linter::rules::pydocstyle::settings::Convention;
 
             let config = LintConfiguration {
@@ -1661,11 +1683,12 @@ mod tests {
             }
             assert_eq!(
                 config
-                    .as_rule_table(PreviewMode::Disabled)
+                    .as_rule_table(PreviewMode::Disabled)?
                     .iter_enabled()
                     .collect::<RuleSet>(),
                 expected,
             );
+            Ok(())
         }
 
         let d41 = RuleSelector::from_str("D41").unwrap();
@@ -1678,7 +1701,7 @@ mod tests {
                 ..RuleSelection::default()
             }],
             false,
-        );
+        )?;
 
         // ...but does appear when specified directly.
         assert_override(
@@ -1687,7 +1710,7 @@ mod tests {
                 ..RuleSelection::default()
             }],
             true,
-        );
+        )?;
 
         // ...but disappears if there's a subsequent `--select`.
         assert_override(
@@ -1702,7 +1725,7 @@ mod tests {
                 },
             ],
             false,
-        );
+        )?;
 
         // ...although an `--extend-select` is fine.
         assert_override(
@@ -1717,6 +1740,8 @@ mod tests {
                 },
             ],
             true,
-        );
+        )?;
+
+        Ok(())
     }
 }
