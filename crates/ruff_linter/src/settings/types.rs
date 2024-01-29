@@ -486,13 +486,12 @@ impl FromIterator<ExtensionPair> for ExtensionMapping {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Default, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Hash)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum SerializationFormat {
     Text,
-    #[default]
     Concise,
     Full,
     Json,
@@ -521,6 +520,16 @@ impl Display for SerializationFormat {
             Self::Pylint => write!(f, "pylint"),
             Self::Azure => write!(f, "azure"),
             Self::Sarif => write!(f, "sarif"),
+        }
+    }
+}
+
+impl SerializationFormat {
+    pub fn default(preview: bool) -> Self {
+        if preview {
+            Self::Full
+        } else {
+            Self::Concise
         }
     }
 }

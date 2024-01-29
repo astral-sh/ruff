@@ -547,6 +547,7 @@ impl CheckCommand {
                 output_format: resolve_output_format(
                     self.output_format,
                     resolve_bool_arg(self.show_source, self.no_show_source),
+                    self.preview,
                 ),
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
                 extension: self.extension,
@@ -601,6 +602,7 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
 fn resolve_output_format(
     output_format: Option<SerializationFormat>,
     show_sources: Option<bool>,
+    preview: bool,
 ) -> Option<SerializationFormat> {
     Some(match (output_format, show_sources) {
         (Some(o), None) => o,
@@ -627,8 +629,8 @@ fn resolve_output_format(
         (None, None) => return None
     }).map(|format| match format {
         SerializationFormat::Text => {
-            warn_user!("`--output-format=text` is deprecated. Use `--output-format=full` or `--output-format=concise` instead. `text` will be treated as `{}`.", SerializationFormat::default());
-            SerializationFormat::default()
+            warn_user!("`--output-format=text` is deprecated. Use `--output-format=full` or `--output-format=concise` instead. `text` will be treated as `{}`.", SerializationFormat::default(preview));
+            SerializationFormat::default(preview)
         },
         other => other
     })

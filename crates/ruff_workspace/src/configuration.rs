@@ -220,7 +220,9 @@ impl Configuration {
             fix: self.fix.unwrap_or(false),
             fix_only: self.fix_only.unwrap_or(false),
             unsafe_fixes: self.unsafe_fixes.unwrap_or_default(),
-            output_format: self.output_format.unwrap_or_default(),
+            output_format: self
+                .output_format
+                .unwrap_or_else(|| SerializationFormat::default(global_preview.is_enabled())),
             show_fixes: self.show_fixes.unwrap_or(false),
 
             file_resolver: FileResolverSettings {
@@ -427,8 +429,8 @@ impl Configuration {
                 .output_format
                 .map(|format| match format {
                     SerializationFormat::Text => {
-                        warn_user!(r#"Setting `output_format` to "text" is deprecated. Use "full" or "concise" instead. "text" will be treated as "{}"."#, SerializationFormat::default());
-                        SerializationFormat::default()
+                        warn_user!(r#"Setting `output_format` to "text" is deprecated. Use "full" or "concise" instead. "text" will be treated as "{}"."#, SerializationFormat::default(options.preview.unwrap_or_default()));
+                        SerializationFormat::default(options.preview.unwrap_or_default())
                     },
                     other => other
                 })

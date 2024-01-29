@@ -43,7 +43,7 @@ struct RuffCheck<'a> {
 impl<'a> Default for RuffCheck<'a> {
     fn default() -> RuffCheck<'a> {
         RuffCheck {
-            output_format: format!("{}", SerializationFormat::default()),
+            output_format: format!("{}", SerializationFormat::default(false)),
             config: None,
             filename: None,
             args: vec![],
