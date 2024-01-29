@@ -360,20 +360,6 @@ S608.py:48:12: S608 Possible SQL injection vector through string-based query con
 54 |   def query38():
    |
 
-S608.py:55:12: S608 Possible SQL injection vector through string-based query construction
-   |
-54 |   def query38():
-55 |       return """
-   |  ____________^
-56 | |     SELECT *
-57 | |     FROM TABLE
-58 | |     WHERE var =
-59 | |     """ + var
-   | |_____________^ S608
-60 |   
-61 |   def query39():
-   |
-
 S608.py:62:12: S608 Possible SQL injection vector through string-based query construction
    |
 61 |   def query39():

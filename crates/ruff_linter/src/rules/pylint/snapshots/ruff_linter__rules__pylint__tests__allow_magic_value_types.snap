@@ -10,7 +10,7 @@ magic_value_comparison.py:59:22: PLR2004 Magic value used in comparison, conside
 60 |     pass
    |
 
-magic_value_comparison.py:65:21: PLR2004 Magic value used in comparison, consider replacing 3.141592653589793 with a constant variable
+magic_value_comparison.py:65:21: PLR2004 Magic value used in comparison, consider replacing 3.141592653589793238 with a constant variable
    |
 63 | pi_estimation = 3.14
 64 | 

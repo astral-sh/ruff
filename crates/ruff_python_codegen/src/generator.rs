@@ -10,7 +10,8 @@ use ruff_python_ast::{
 };
 use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
-use ruff_source_file::LineEnding;
+use ruff_source_file::{LineEnding, Locator};
+use ruff_text_size::{Ranged, TextRange};
 
 use super::stylist::{Indentation, Quote, Stylist};
 
@@ -61,6 +62,11 @@ mod precedence {
     pub(crate) const MAX: u8 = 63;
 }
 
+pub struct Verbatim<'a> {
+    locator: &'a Locator<'a>,
+    nodes: Vec<TextRange>,
+}
+
 pub struct Generator<'a> {
     /// The indentation style to use.
     indent: &'a Indentation,
@@ -72,6 +78,7 @@ pub struct Generator<'a> {
     indent_depth: usize,
     num_newlines: usize,
     initial: bool,
+    locator: Option<&'a Locator<'a>>,
 }
 
 impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
@@ -84,6 +91,7 @@ impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
             indent_depth: 0,
             num_newlines: 0,
             initial: true,
+            locator: None,
         }
     }
 }
@@ -100,6 +108,15 @@ impl<'a> Generator<'a> {
             indent_depth: 0,
             num_newlines: 0,
             initial: true,
+            locator: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_locator(self, locator: &'a Locator<'a>) -> Self {
+        Self {
+            locator: Some(locator),
+            ..self
         }
     }
 
@@ -796,6 +813,14 @@ impl<'a> Generator<'a> {
                 ret
             }};
         }
+
+        if let Some(locator) = &self.locator {
+            if !ast.range().is_empty() {
+                self.p(locator.slice(ast));
+                return;
+            }
+        }
+
         match ast {
             Expr::BoolOp(ast::ExprBoolOp {
                 op,

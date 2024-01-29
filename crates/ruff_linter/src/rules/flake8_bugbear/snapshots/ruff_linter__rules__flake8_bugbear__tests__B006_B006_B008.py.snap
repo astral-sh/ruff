@@ -79,14 +79,15 @@ B006_B008.py:77:31: B006 [*] Do not use mutable data structures for argument def
 75 75 | 
 76 76 | 
 77    |-def multiline_arg_wrong(value={
-78    |-
-79    |-}):
    77 |+def multiline_arg_wrong(value=None):
    78 |+    if value is None:
-   79 |+        value = {}
-80 80 |     ...
-81 81 | 
-82 82 | def single_line_func_wrong(value = {}): ...
+   79 |+        value = {
+78 80 | 
+79    |-}):
+   81 |+    }
+80 82 |     ...
+81 83 | 
+82 84 | def single_line_func_wrong(value = {}): ...
 
 B006_B008.py:82:36: B006 Do not use mutable data structures for argument defaults
    |
@@ -193,7 +194,7 @@ B006_B008.py:102:46: B006 [*] Do not use mutable data structures for argument de
 102     |-def list_comprehension_also_not_okay(default=[i**2 for i in range(3)]):
     102 |+def list_comprehension_also_not_okay(default=None):
     103 |+    if default is None:
-    104 |+        default = [i ** 2 for i in range(3)]
+    104 |+        default = [i**2 for i in range(3)]
 103 105 |     pass
 104 106 | 
 105 107 | 
@@ -213,7 +214,7 @@ B006_B008.py:106:46: B006 [*] Do not use mutable data structures for argument de
 106     |-def dict_comprehension_also_not_okay(default={i: i**2 for i in range(3)}):
     106 |+def dict_comprehension_also_not_okay(default=None):
     107 |+    if default is None:
-    108 |+        default = {i: i ** 2 for i in range(3)}
+    108 |+        default = {i: i**2 for i in range(3)}
 107 109 |     pass
 108 110 | 
 109 111 | 
@@ -233,7 +234,7 @@ B006_B008.py:110:45: B006 [*] Do not use mutable data structures for argument de
 110     |-def set_comprehension_also_not_okay(default={i**2 for i in range(3)}):
     110 |+def set_comprehension_also_not_okay(default=None):
     111 |+    if default is None:
-    112 |+        default = {i ** 2 for i in range(3)}
+    112 |+        default = {i**2 for i in range(3)}
 111 113 |     pass
 112 114 | 
 113 115 | 
@@ -486,10 +487,12 @@ B006_B008.py:302:52: B006 [*] Do not use mutable data structures for argument de
     302 |+def single_line_func_wrong(value: dict[str, str] = None):
 305 303 |     """Docstring"""
     304 |+    if value is None:
-    305 |+        value = {}
-306 306 | 
-307 307 | 
-308 308 | def single_line_func_wrong(value: dict[str, str] = {}) \
+    305 |+        value = {
+    306 |+        # This is a comment
+    307 |+    }
+306 308 | 
+307 309 | 
+308 310 | def single_line_func_wrong(value: dict[str, str] = {}) \
 
 B006_B008.py:308:52: B006 Do not use mutable data structures for argument defaults
     |

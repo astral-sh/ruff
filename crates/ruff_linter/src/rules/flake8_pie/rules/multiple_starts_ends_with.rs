@@ -195,7 +195,10 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
             });
             let bool_op = node;
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                checker.generator().expr(&bool_op),
+                checker
+                    .generator()
+                    .with_locator(checker.locator())
+                    .expr(&bool_op),
                 expr.range(),
             )));
             checker.diagnostics.push(diagnostic);

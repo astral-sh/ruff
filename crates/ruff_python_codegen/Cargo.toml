@@ -17,6 +17,7 @@ ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_literal = { path = "../ruff_python_literal" }
 ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_source_file = { path = "../ruff_source_file" }
+ruff_text_size = { path = "../ruff_text_size" }
 
 once_cell = { workspace = true }
 

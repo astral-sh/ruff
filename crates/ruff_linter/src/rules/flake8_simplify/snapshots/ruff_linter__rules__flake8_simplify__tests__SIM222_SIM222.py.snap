@@ -534,7 +534,7 @@ SIM222.py:85:6: SIM222 [*] Use `True` instead of `... or True`
 87 87 | a or (1,) or True or (2,)  # SIM222
 88 88 | 
 
-SIM222.py:87:6: SIM222 [*] Use `(1,)` instead of `(1,) or ...`
+SIM222.py:87:6: SIM222 [*] Use `((1,))` instead of `((1,)) or ...`
    |
 85 | a or tuple(()) or True  # SIM222
 86 | 
@@ -543,14 +543,14 @@ SIM222.py:87:6: SIM222 [*] Use `(1,)` instead of `(1,) or ...`
 88 | 
 89 | a or tuple((1,)) or True or tuple((2,))  # SIM222
    |
-   = help: Replace with `(1,)`
+   = help: Replace with `((1,))`
 
 ℹ Unsafe fix
 84 84 | 
 85 85 | a or tuple(()) or True  # SIM222
 86 86 | 
 87    |-a or (1,) or True or (2,)  # SIM222
-   87 |+a or (1,)  # SIM222
+   87 |+a or ((1,))  # SIM222
 88 88 | 
 89 89 | a or tuple((1,)) or True or tuple((2,))  # SIM222
 90 90 | 
@@ -1006,39 +1006,39 @@ SIM222.py:153:11: SIM222 [*] Use `[1]` instead of `[1] or ...`
 155 155 | 
 156 156 | # Regression test for: https://github.com/astral-sh/ruff/issues/7099
 
-SIM222.py:157:30: SIM222 [*] Use `(int, int, int)` instead of `(int, int, int) or ...`
+SIM222.py:157:30: SIM222 [*] Use `((int, int, int))` instead of `((int, int, int)) or ...`
     |
 156 | # Regression test for: https://github.com/astral-sh/ruff/issues/7099
 157 | def secondToTime(s0: int) -> (int, int, int) or str:
     |                              ^^^^^^^^^^^^^^^^^^^^^^ SIM222
 158 |     m, s = divmod(s0, 60)
     |
-    = help: Replace with `(int, int, int)`
+    = help: Replace with `((int, int, int))`
 
 ℹ Unsafe fix
 154 154 |     pass
 155 155 | 
 156 156 | # Regression test for: https://github.com/astral-sh/ruff/issues/7099
 157     |-def secondToTime(s0: int) -> (int, int, int) or str:
-    157 |+def secondToTime(s0: int) -> (int, int, int):
+    157 |+def secondToTime(s0: int) -> ((int, int, int)):
 158 158 |     m, s = divmod(s0, 60)
 159 159 | 
 160 160 | 
 
-SIM222.py:161:31: SIM222 [*] Use `(int, int, int)` instead of `(int, int, int) or ...`
+SIM222.py:161:31: SIM222 [*] Use `((int, int, int))` instead of `((int, int, int)) or ...`
     |
 161 | def secondToTime(s0: int) -> ((int, int, int) or str):
     |                               ^^^^^^^^^^^^^^^^^^^^^^ SIM222
 162 |     m, s = divmod(s0, 60)
     |
-    = help: Replace with `(int, int, int)`
+    = help: Replace with `((int, int, int))`
 
 ℹ Unsafe fix
 158 158 |     m, s = divmod(s0, 60)
 159 159 | 
 160 160 | 
 161     |-def secondToTime(s0: int) -> ((int, int, int) or str):
-    161 |+def secondToTime(s0: int) -> ((int, int, int)):
+    161 |+def secondToTime(s0: int) -> (((int, int, int))):
 162 162 |     m, s = divmod(s0, 60)
 163 163 | 
 164 164 | 

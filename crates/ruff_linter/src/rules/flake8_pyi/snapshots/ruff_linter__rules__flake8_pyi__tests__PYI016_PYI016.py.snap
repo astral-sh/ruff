@@ -382,7 +382,9 @@ PYI016.py:44:30: PYI016 [*] Duplicate union member `typing.Literal[1]`
 46 46 | # Shouldn't emit if in new parent type
 47 47 | field16: int | dict[int, str]  # OK
 
-PYI016.py:57:5: PYI016 Duplicate union member `set[int]`
+PYI016.py:57:5: PYI016 Duplicate union member `set[
+        int  # bar
+    ]`
    |
 55 |           int  # foo
 56 |       ],
@@ -393,7 +395,9 @@ PYI016.py:57:5: PYI016 Duplicate union member `set[int]`
    | |_____^ PYI016
 60 |   ]  # Error, newline and comment will not be emitted in message
    |
-   = help: Remove duplicate union member `set[int]`
+   = help: Remove duplicate union member `set[
+                   int  # bar
+               ]`
 
 PYI016.py:63:28: PYI016 Duplicate union member `int`
    |

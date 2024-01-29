@@ -241,7 +241,7 @@ redefined_loop_name.py:178:5: PLW2901 `for` loop variable `a.i` overwritten by a
 180 |     a.i = 2  # error
     |
 
-redefined_loop_name.py:180:5: PLW2901 `for` loop variable `a.i` overwritten by assignment target
+redefined_loop_name.py:180:5: PLW2901 `for` loop variable `a. i` overwritten by assignment target
     |
 178 |     a. i = 2  # error
 179 | for a. i in []:

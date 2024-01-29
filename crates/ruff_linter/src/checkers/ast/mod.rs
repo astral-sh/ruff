@@ -180,6 +180,7 @@ impl<'a> Checker<'a> {
             self.f_string_quote_style().unwrap_or(self.stylist.quote()),
             self.stylist.line_ending(),
         )
+        .with_locator(self.locator)
     }
 
     /// Returns the appropriate quoting for f-string by reversing the one used outside of

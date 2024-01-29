@@ -2287,6 +2287,7 @@ dependencies = [
  "ruff_python_literal",
  "ruff_python_parser",
  "ruff_source_file",
+ "ruff_text_size",
 ]
 
 [[package]]
