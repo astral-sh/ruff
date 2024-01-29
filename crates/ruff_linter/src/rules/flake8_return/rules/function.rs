@@ -773,7 +773,15 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
         }
 
         if checker.enabled(Rule::UnnecessaryAssign) {
-            unnecessary_assign(checker, &stack);
+            if let Some(index) = body.len().checked_sub(2) {
+                if let Some(previous_stmt) = body.get(index) {
+                    if !contains_exception_suppress(previous_stmt, checker.semantic()) {
+                        unnecessary_assign(checker, &stack);
+                    }
+                }
+            } else {
+                unnecessary_assign(checker, &stack);
+            }
         }
     } else {
         if checker.enabled(Rule::UnnecessaryReturnNone) {
@@ -863,4 +871,25 @@ fn remove_else(
             elif_else.end(),
         )))
     }
+}
+
+fn contains_exception_suppress(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+    let ast::Stmt::With(ast::StmtWith { items, .. }) = stmt else {
+        return false;
+    };
+    items.iter().any(|item| {
+        let ast::WithItem {
+            context_expr: Expr::Call(ast::ExprCall { func, .. }),
+            ..
+        } = item
+        else {
+            return false;
+        };
+        if let Some(call_path) = semantic.resolve_call_path(func) {
+            if call_path.as_slice() == ["contextlib", "suppress"] {
+                return true;
+            }
+        }
+        false
+    })
 }
