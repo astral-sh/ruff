@@ -398,3 +398,11 @@ def foo():
         x = 1
     y = y + 2
     return y  # RET504
+
+
+def foo():
+    y = 1
+    if y > 0:
+        with contextlib.suppress(Exception):
+            y = 2
+        return y

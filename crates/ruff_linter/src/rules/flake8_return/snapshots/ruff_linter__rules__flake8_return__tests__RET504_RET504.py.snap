@@ -237,5 +237,8 @@ RET504.py:400:12: RET504 [*] Unnecessary assignment to `y` before `return` state
 399     |-    y = y + 2
 400     |-    return y  # RET504
     399 |+    return y + 2
+401 400 | 
+402 401 | 
+403 402 | def foo():
 
 

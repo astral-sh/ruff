@@ -737,7 +737,7 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
 
     // Traverse the function body, to collect the stack.
     let stack = {
-        let mut visitor = ReturnVisitor::default();
+        let mut visitor = ReturnVisitor::new(checker.semantic());
         for stmt in body {
             visitor.visit_stmt(stmt);
         }
@@ -773,9 +773,7 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
         }
 
         if checker.enabled(Rule::UnnecessaryAssign) {
-            if should_analyze_unnecessary_assign(body, checker.semantic()) {
-                unnecessary_assign(checker, &stack);
-            }
+            unnecessary_assign(checker, &stack);
         }
     } else {
         if checker.enabled(Rule::UnnecessaryReturnNone) {
@@ -865,49 +863,4 @@ fn remove_else(
             elif_else.end(),
         )))
     }
-}
-
-/// RET504
-/// If the last statement is a `return` statement, and the second-to-last statement is a
-/// `with` statement that suppresses an exception, then we should not analyze the `return`
-/// statement for unnecessary assignments. Otherwise we will suggest removing the assignment
-/// and the `with` statement, which would change the behavior of the code.
-///
-/// Example:
-/// ```python
-/// def foo(data):
-///    with suppress(JSONDecoderError):
-///       data = data.decode()
-///   return data
-
-fn should_analyze_unnecessary_assign(body: &[Stmt], semantic: &SemanticModel) -> bool {
-    if let Some(index) = body.len().checked_sub(2) {
-        if let Some(previous_stmt) = body.get(index) {
-            if contains_exception_suppress(previous_stmt, semantic) {
-                return false;
-            }
-        }
-    }
-    true
-}
-
-fn contains_exception_suppress(stmt: &Stmt, semantic: &SemanticModel) -> bool {
-    let ast::Stmt::With(ast::StmtWith { items, .. }) = stmt else {
-        return false;
-    };
-    items.iter().any(|item| {
-        let ast::WithItem {
-            context_expr: Expr::Call(ast::ExprCall { func, .. }),
-            ..
-        } = item
-        else {
-            return false;
-        };
-        if let Some(call_path) = semantic.resolve_call_path(func) {
-            if call_path.as_slice() == ["contextlib", "suppress"] {
-                return true;
-            }
-        }
-        false
-    })
 }
