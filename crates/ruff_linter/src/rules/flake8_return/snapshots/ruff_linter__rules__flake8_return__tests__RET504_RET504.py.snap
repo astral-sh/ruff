@@ -207,8 +207,6 @@ RET504.py:365:12: RET504 [*] Unnecessary assignment to `D` before `return` state
 364 |     D=0.4853881 + 3.6006116*P - 0.0117368*(P-1.3822)**2
 365 |     return D
     |            ^ RET504
-366 | 
-367 | # contextlib suppress in with statement
     |
     = help: Remove unnecessary assignment
 
@@ -220,24 +218,24 @@ RET504.py:365:12: RET504 [*] Unnecessary assignment to `D` before `return` state
 365     |-    return D
     364 |+    return 0.4853881 + 3.6006116*P - 0.0117368*(P-1.3822)**2
 366 365 | 
-367 366 | # contextlib suppress in with statement
-368 367 | import contextlib
+367 366 | 
+368 367 | # contextlib suppress in with statement
 
-RET504.py:396:12: RET504 [*] Unnecessary assignment to `y` before `return` statement
+RET504.py:400:12: RET504 [*] Unnecessary assignment to `y` before `return` statement
     |
-394 |         x = 1
-395 |     y = y + 2
-396 |     return y # RET504
+398 |         x = 1
+399 |     y = y + 2
+400 |     return y  # RET504
     |            ^ RET504
     |
     = help: Remove unnecessary assignment
 
 ℹ Unsafe fix
-392 392 |     x = 2
-393 393 |     with contextlib.suppress(Exception):
-394 394 |         x = 1
-395     |-    y = y + 2
-396     |-    return y # RET504
-    395 |+    return y + 2
+396 396 |     x = 2
+397 397 |     with contextlib.suppress(Exception):
+398 398 |         x = 1
+399     |-    y = y + 2
+400     |-    return y  # RET504
+    399 |+    return y + 2
 
 
