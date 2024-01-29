@@ -839,14 +839,12 @@ fn nursery_direct() {
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
-    -:1:2: E225 [*] Missing whitespace around operator
-    Found 1 error.
-    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: Selection of nursery rule `E225` without the `--preview` flag is deprecated.
+    ruff failed
+      Cause: Selection of unstable rule `E225` without the `--preview` flag is not allowed.
     "###);
 }
 
@@ -857,15 +855,12 @@ fn nursery_group_selector() {
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
-    -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:2: E225 [*] Missing whitespace around operator
-    Found 2 errors.
-    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The `NURSERY` selector has been deprecated. Use the `--preview` flag instead.
+    ruff failed
+      Cause: The `NURSERY` selector was removed. Use the `--preview` flag instead.
     "###);
 }
 
@@ -883,7 +878,7 @@ fn nursery_group_selector_preview_enabled() {
 
     ----- stderr -----
     ruff failed
-      Cause: The `NURSERY` selector is deprecated and cannot be used with preview mode enabled.
+      Cause: The `NURSERY` selector was removed. Unstable rules should be selected by their respective group or individually.
     "###);
 }
 

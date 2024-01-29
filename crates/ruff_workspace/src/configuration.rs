@@ -863,10 +863,12 @@ impl LintConfiguration {
             for (kind, selector) in selection.selectors_by_kind() {
                 #[allow(deprecated)]
                 if matches!(selector, RuleSelector::Nursery) {
-                    if preview.mode.is_enabled() {
-                        return Err(anyhow!("The `NURSERY` selector is deprecated and cannot be used with preview mode enabled."));
-                    }
-                    warn_user_once!("The `NURSERY` selector has been deprecated. Use the `--preview` flag instead.");
+                    let suggestion = if preview.mode.is_disabled() {
+                        " Use the `--preview` flag instead."
+                    } else {
+                        " Unstable rules should be selected individually or by their respective groups."
+                    };
+                    return Err(anyhow!("The `NURSERY` selector was removed.{suggestion}"));
                 };
 
                 // Only warn for the following selectors if used to enable rules
@@ -904,9 +906,27 @@ impl LintConfiguration {
             );
         }
 
-        for selection in deprecated_nursery_selectors {
-            let (prefix, code) = selection.prefix_and_code();
-            warn_user!("Selection of nursery rule `{prefix}{code}` without the `--preview` flag is deprecated.",);
+        match deprecated_nursery_selectors
+            .iter()
+            .collect::<Vec<_>>()
+            .as_slice()
+        {
+            [] => (),
+            [selection] => {
+                let (prefix, code) = selection.prefix_and_code();
+                return Err(anyhow!("Selection of unstable rule `{prefix}{code}` without the `--preview` flag is not allowed."));
+            }
+            [selections @ ..] => {
+                let mut message = "Selection of unstable rules without the `--preview` flag is not allowed. Enable preview or remove selection of:".to_string();
+                for selection in selections {
+                    let (prefix, code) = selection.prefix_and_code();
+                    message.push_str("\n\t- ");
+                    message.push_str(prefix);
+                    message.push_str(code)
+                }
+                message.push('\n');
+                return Err(anyhow!(message));
+            }
         }
 
         for selection in ignored_preview_selectors {
