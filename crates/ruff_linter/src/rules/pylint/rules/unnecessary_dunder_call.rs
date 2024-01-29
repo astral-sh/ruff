@@ -2,7 +2,6 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -167,53 +166,24 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
     );
 
     if let Some(mut fixed) = fixed {
-        // check if this attribute is preceded by a unary operator, e.g. `-a.__sub__(1)`
-        // if it is, the fix has to be handled differently to maintain semantics.
-        let is_in_unary = checker
+        // by the looks of it, we don't need to wrap the expression in parens if
+        // it's the only argument to a call expression.
+        // being in any other kind of expression though, we *will* add parens.
+        // e.g. `print(a.__add__(3))` -> `print(a + 3)` instead of `print((a + 3))`
+        // a multiplication expression example: `x = 2 * a.__add__(3)` -> `x = 2 * (a + 3)`
+        let wrap_in_paren = checker
             .semantic()
             .current_expression_parent()
-            .is_some_and(|parent| matches!(parent, Expr::UnaryOp(ast::ExprUnaryOp { .. })));
+            .is_some_and(|parent| !parent.is_call_expr());
 
-        if is_in_unary {
-            let mut tokenizer =
-                SimpleTokenizer::starts_at(value.as_ref().end(), checker.locator().contents())
-                    .skip_trivia();
-
-            let token = tokenizer.next().unwrap();
-            // we're going to start looking for the first immediate Right-Parentheses,
-            // and the first Dot token after that.
-
-            // if our attribute is within parentheses with a unary, e.g. `-(-5).__sub__(1)`
-            // we have to add the fix within the existing parentheses, //     ^
-            // because `--5 - 1` is not the same as `-(-5 - 1)`
-            if token.kind != SimpleTokenKind::RParen {
-                // if we're not in parentheses, we're going to wrap the fix in parentheses
-                // to maintain semantic integrity.
-                // `-a.__sub__(1)` -> `-(a - 1)`
-                fixed = format!("({fixed})");
-            }
-
-            // find the dot token for this call
-            let dot_start = if token.kind == SimpleTokenKind::Dot {
-                token.start()
-            } else {
-                tokenizer
-                    .find(|token| token.kind == SimpleTokenKind::Dot)
-                    .unwrap()
-                    .start()
-            };
-
-            diagnostic.set_fix(Fix::unsafe_edits(
-                Edit::range_replacement(fixed, value.as_ref().range()),
-                [Edit::deletion(dot_start, call.end())],
-            ));
-        } else {
-            // `(3).__add__(1)` -> `3 + 1`
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                fixed,
-                call.range(),
-            )));
+        if wrap_in_paren {
+            fixed = format!("({fixed})");
         }
+
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            fixed,
+            call.range(),
+        )));
     };
 
     checker.diagnostics.push(diagnostic);

@@ -37,6 +37,13 @@ print(a.__rsub__(
     +
     4
 ))
+print(2 * a.__add__(3))  # PLC2801
+x = 2 * a.__add__(3)  # PLC2801
+x = 2 * -a.__add__(3)  # PLC2801
+x = a.__add__(3)  # PLC2801
+x = -a.__add__(3)  # PLC2801
+x = (-a).__add__(3)  # PLC2801
+x = -(-a).__add__(3)  # PLC2801
 
 
 class Thing:
