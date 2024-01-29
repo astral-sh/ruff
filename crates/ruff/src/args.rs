@@ -159,9 +159,9 @@ pub struct CheckCommand {
         long,
         action = clap::ArgAction::Append,
         value_name = "CONFIG_OPTION",
-        value_parser = ConfigOptionParser,
+        value_parser = ConfigArgumentParser,
     )]
-    pub config: Vec<ConfigOption>,
+    pub config: Vec<SingleConfigArgument>,
     /// Comma-separated list of rule codes to enable (or ALL, to enable all rules).
     #[arg(
         long,
@@ -403,9 +403,9 @@ pub struct FormatCommand {
         long,
         action = clap::ArgAction::Append,
         value_name = "CONFIG_OPTION",
-        value_parser = ConfigOptionParser,
+        value_parser = ConfigArgumentParser,
     )]
-    pub config: Vec<ConfigOption>,
+    pub config: Vec<SingleConfigArgument>,
 
     /// Disable cache reads.
     #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
@@ -541,8 +541,8 @@ impl ConfigArguments {
         self.config_file.as_deref()
     }
 
-    fn from_cli_options(
-        config_options: Vec<ConfigOption>,
+    fn from_cli_arguments(
+        config_options: Vec<SingleConfigArgument>,
         per_flag_overrides: ExplicitConfigOverrides,
         isolated: bool,
     ) -> Result<Self, anyhow::Error> {
@@ -553,7 +553,7 @@ impl ConfigArguments {
 
         for option in config_options {
             match option {
-                ConfigOption::ConfigOverride(overridden_option) => {
+                SingleConfigArgument::SettingsOverride(overridden_option) => {
                     let overridden_option = Arc::try_unwrap(overridden_option)
                         .unwrap_or_else(|option| (*option).clone());
                     new.overrides = new.overrides.combine(Configuration::from_options(
@@ -561,7 +561,7 @@ impl ConfigArguments {
                         &path_dedot::CWD,
                     )?);
                 }
-                ConfigOption::PathToConfigFile { path, arg, cmd } => {
+                SingleConfigArgument::FilePath { path, arg, cmd } => {
                     if isolated {
                         let mut error = clap::Error::new(clap::error::ErrorKind::ArgumentConflict);
                         error.insert(
@@ -671,7 +671,7 @@ impl CheckCommand {
         };
 
         let config_args =
-            ConfigArguments::from_cli_options(self.config, cli_overrides, self.isolated)?;
+            ConfigArguments::from_cli_arguments(self.config, cli_overrides, self.isolated)?;
         Ok((check_arguments, config_args))
     }
 }
@@ -704,7 +704,7 @@ impl FormatCommand {
         };
 
         let config_args =
-            ConfigArguments::from_cli_options(self.config, cli_overrides, self.isolated)?;
+            ConfigArguments::from_cli_arguments(self.config, cli_overrides, self.isolated)?;
         Ok((format_arguments, config_args))
     }
 }
@@ -718,39 +718,41 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
     }
 }
 
-/// `--config` arguments passed via the CLI.
+/// Enumeration to represent a single `--config` argument
+/// passed via the CLI.
 ///
-/// Users may pass 0 or 1 paths to a configuration file,
-/// and an arbitrary number of "inline TOML" options.
+/// Using the `--config` flag, users may pass 0 or 1 paths
+/// to configuration files and an arbitrary number of
+/// "inline TOML" overrides for specific settings.
 ///
 /// For example:
 ///
 /// ```sh
-/// ruff check --config "path/to/pyproject.toml" --config "max-line-length=90" --config "isort.case-sensitive=false"
+/// ruff check --config "path/to/ruff.toml" --config "extend-select=['E501', 'F841']" --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
 /// ```
 #[derive(Clone, Debug)]
-pub enum ConfigOption {
-    PathToConfigFile {
+pub enum SingleConfigArgument {
+    FilePath {
         path: PathBuf,
         arg: Option<String>,
         cmd: clap::Command,
     },
-    ConfigOverride(Arc<Options>),
+    SettingsOverride(Arc<Options>),
 }
 
 #[derive(Clone)]
-pub struct ConfigOptionParser;
+pub struct ConfigArgumentParser;
 
-impl ValueParserFactory for ConfigOption {
-    type Parser = ConfigOptionParser;
+impl ValueParserFactory for SingleConfigArgument {
+    type Parser = ConfigArgumentParser;
 
     fn value_parser() -> Self::Parser {
-        ConfigOptionParser
+        ConfigArgumentParser
     }
 }
 
-impl TypedValueParser for ConfigOptionParser {
-    type Value = ConfigOption;
+impl TypedValueParser for ConfigArgumentParser {
+    type Value = SingleConfigArgument;
 
     fn parse_ref(
         &self,
@@ -760,7 +762,7 @@ impl TypedValueParser for ConfigOptionParser {
     ) -> Result<Self::Value, clap::Error> {
         let path_to_config_file = PathBuf::from(value);
         if path_to_config_file.exists() {
-            return Ok(ConfigOption::PathToConfigFile {
+            return Ok(SingleConfigArgument::FilePath {
                 path: path_to_config_file,
                 arg: arg.map(clap::Arg::to_string),
                 cmd: cmd.clone(),
@@ -772,7 +774,7 @@ impl TypedValueParser for ConfigOptionParser {
             .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
 
         let toml_parse_error = match toml::from_str(value) {
-            Ok(option) => return Ok(ConfigOption::ConfigOverride(Arc::new(option))),
+            Ok(option) => return Ok(SingleConfigArgument::SettingsOverride(Arc::new(option))),
             Err(toml_error) => toml_error,
         };
 
