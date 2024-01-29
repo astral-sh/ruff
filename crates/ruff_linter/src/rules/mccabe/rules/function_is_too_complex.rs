@@ -44,7 +44,7 @@ use ruff_python_ast::identifier::Identifier;
 /// ```
 ///
 /// ## Options
-/// - `mccabe.max-complexity`
+/// - `lint.mccabe.max-complexity`
 #[violation]
 pub struct ComplexStructure {
     name: String,

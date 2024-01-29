@@ -22,7 +22,7 @@ use crate::fix::edits::delete_stmt;
 ///
 /// If a variable is intentionally defined-but-not-used, it should be
 /// prefixed with an underscore, or some other value that adheres to the
-/// [`dummy-variable-rgx`] pattern.
+/// [`lint.dummy-variable-rgx`] pattern.
 ///
 /// Under [preview mode](https://docs.astral.sh/ruff/preview), this rule also
 /// triggers on unused unpacked assignments (for example, `x, y = foo()`).
@@ -43,7 +43,7 @@ use crate::fix::edits::delete_stmt;
 /// ```
 ///
 /// ## Options
-/// - `dummy-variable-rgx`
+/// - `lint.dummy-variable-rgx`
 #[violation]
 pub struct UnusedVariable {
     pub name: String,
