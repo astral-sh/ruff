@@ -132,6 +132,7 @@ pub struct CheckCommand {
     ignore_noqa: bool,
 
     /// Output serialization format for violations.
+    /// The default serialization format is "full".
     #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
     pub output_format: Option<SerializationFormat>,
 
@@ -543,7 +544,7 @@ impl CheckCommand {
                 unsafe_fixes: resolve_bool_arg(self.unsafe_fixes, self.no_unsafe_fixes)
                     .map(UnsafeFixes::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-                output_format: resolve_output_format_with_possibly_deprecated_conflicting_arg(
+                output_format: resolve_output_format(
                     self.output_format,
                     resolve_bool_arg(self.show_source, self.no_show_source),
                 ),
@@ -597,19 +598,23 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
     }
 }
 
-fn resolve_output_format_with_possibly_deprecated_conflicting_arg(
+fn resolve_output_format(
     output_format: Option<SerializationFormat>,
     show_sources: Option<bool>,
 ) -> Option<SerializationFormat> {
     Some(match (output_format, show_sources) {
         (Some(o), None) => o,
-        (Some(o), Some(true)) => {
-            warn_user!("The `--show-source` argument is deprecated and has been ignored in favor of `output-format={}`.", o);
-            o
+        (Some(SerializationFormat::Grouped), Some(true)) => {
+            warn_user!("`--show-source` with `--output-format=grouped` is deprecated. Source display will not be available for `--output-format=grouped` in future releases.");
+            SerializationFormat::Grouped
         }
-        (Some(o), Some(false)) => {
-            warn_user!("The `--no-show-source` argument is deprecated and has been ignored in favor of `output-format={}`.", o);
-            o
+        (Some(fmt), Some(true)) => {
+            warn_user!("The `--show-source` argument is deprecated and has been ignored in favor of `output-format={fmt}`.");
+            fmt
+        }
+        (Some(fmt), Some(false)) => {
+            warn_user!("The `--no-show-source` argument is deprecated and has been ignored in favor of `output-format={fmt}`.");
+            fmt
         }
         (None, Some(true)) => {
             warn_user!("The `--show-source` argument is deprecated. Use `--output-format=full` instead.");

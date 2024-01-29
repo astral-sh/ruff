@@ -283,9 +283,6 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     if show_fixes {
         printer_flags |= PrinterFlags::SHOW_FIX_SUMMARY;
     }
-    if output_format == SerializationFormat::Full {
-        printer_flags |= PrinterFlags::SHOW_SOURCE;
-    }
     if cli.ecosystem_ci {
         warn_user!(
             "The formatting of fixes emitted by this option is a work-in-progress, subject to \

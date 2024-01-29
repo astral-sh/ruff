@@ -15,10 +15,10 @@ use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
     JsonEmitter, JsonLinesEmitter, JunitEmitter, PylintEmitter, SarifEmitter, TextEmitter,
 };
+use ruff_linter::notify_user;
 use ruff_linter::registry::{AsRule, Rule};
 use ruff_linter::settings::flags::{self};
 use ruff_linter::settings::types::{SerializationFormat, UnsafeFixes};
-use ruff_linter::{notify_user, warn_user};
 
 use crate::diagnostics::{Diagnostics, FixMap};
 
@@ -27,8 +27,6 @@ bitflags! {
     pub(crate) struct Flags: u8 {
         /// Whether to show violations when emitting diagnostics.
         const SHOW_VIOLATIONS = 0b0000_0001;
-        /// Whether to show the source code when emitting diagnostics.
-        const SHOW_SOURCE = 0b000_0010;
         /// Whether to show a summary of the fixed violations when emitting diagnostics.
         const SHOW_FIX_SUMMARY = 0b0000_0100;
         /// Whether to show a diff of each fixed violation when emitting diagnostics.
@@ -249,12 +247,11 @@ impl Printer {
                 JunitEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
             SerializationFormat::Concise
-            | SerializationFormat::Text
             | SerializationFormat::Full => {
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
-                    .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
+                    .with_show_source(self.format == SerializationFormat::Full)
                     .with_unsafe_fixes(self.unsafe_fixes)
                     .emit(writer, &diagnostics.messages, &context)?;
 
@@ -269,11 +266,7 @@ impl Printer {
                 self.write_summary_text(writer, diagnostics)?;
             }
             SerializationFormat::Grouped => {
-                if self.flags.intersects(Flags::SHOW_SOURCE) {
-                    warn_user!("`--show-source` with `--output-format=grouped` is deprecated. Source display will not be available for `--output-format=grouped` in future releases.");
-                }
                 GroupedEmitter::default()
-                    .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_unsafe_fixes(self.unsafe_fixes)
                     .emit(writer, &diagnostics.messages, &context)?;
@@ -302,6 +295,7 @@ impl Printer {
             SerializationFormat::Sarif => {
                 SarifEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
+            SerializationFormat::Text => unreachable!("Text is deprecated and should have been automatically converted to the default serialization format")
         }
 
         writer.flush()?;
@@ -440,7 +434,7 @@ impl Printer {
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
             TextEmitter::default()
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
+                .with_show_source(true)
                 .with_unsafe_fixes(self.unsafe_fixes)
                 .emit(writer, &diagnostics.messages, &context)?;
         }
