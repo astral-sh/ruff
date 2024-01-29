@@ -425,6 +425,13 @@ impl Configuration {
 
             options
                 .output_format
+                .map(|format| match format {
+                    SerializationFormat::Text => {
+                        warn_user!(r#"Setting `output_format` to "text" is deprecated. Use "full" or "concise" instead. "text" will be treated as "{}"."#, SerializationFormat::default());
+                        SerializationFormat::default()
+                    },
+                    other => other
+                })
                 .or(options.show_source.map(|show_source| {
                     if show_source {
                         SerializationFormat::Full

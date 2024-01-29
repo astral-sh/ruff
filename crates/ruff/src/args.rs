@@ -605,7 +605,7 @@ fn resolve_output_format(
     Some(match (output_format, show_sources) {
         (Some(o), None) => o,
         (Some(SerializationFormat::Grouped), Some(true)) => {
-            warn_user!("`--show-source` with `--output-format=grouped` is deprecated. Source display will not be available for `--output-format=grouped` in future releases.");
+            warn_user!("`--show-source` with `--output-format=grouped` is deprecated, and will not show source files. Use `--output-format=full` to show source information.");
             SerializationFormat::Grouped
         }
         (Some(fmt), Some(true)) => {
@@ -627,7 +627,7 @@ fn resolve_output_format(
         (None, None) => return None
     }).map(|format| match format {
         SerializationFormat::Text => {
-            warn_user!("`--output-format=text` is deprecated. Use `--output-format=full` or `--output-format=concise` instead.");
+            warn_user!("`--output-format=text` is deprecated. Use `--output-format=full` or `--output-format=concise` instead. `text` will be treated as `{}`.", SerializationFormat::default());
             SerializationFormat::default()
         },
         other => other
