@@ -24,7 +24,7 @@ use crate::rules::flake8_tidy_imports::matchers::NameMatchPolicy;
 /// automatic way.
 ///
 /// ## Options
-/// - `flake8-tidy-imports.banned-api`
+/// - `lint.flake8-tidy-imports.banned-api`
 #[violation]
 pub struct BannedApi {
     name: String,

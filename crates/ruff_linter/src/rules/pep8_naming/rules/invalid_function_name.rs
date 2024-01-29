@@ -20,10 +20,10 @@ use crate::settings::types::IdentifierPattern;
 /// > improve readability. mixedCase is allowed only in contexts where that’s already the
 /// > prevailing style (e.g. threading.py), to retain backwards compatibility.
 ///
-/// Names can be excluded from this rule using the [`pep8-naming.ignore-names`]
-/// or [`pep8-naming.extend-ignore-names`] configuration options. For example,
+/// Names can be excluded from this rule using the [`lint.pep8-naming.ignore-names`]
+/// or [`lint.pep8-naming.extend-ignore-names`] configuration options. For example,
 /// to ignore all functions starting with `test_` from this rule, set the
-/// [`pep8-naming.extend-ignore-names`] option to `["test_*"]`.
+/// [`lint.pep8-naming.extend-ignore-names`] option to `["test_*"]`.
 ///
 /// ## Example
 /// ```python
@@ -38,8 +38,8 @@ use crate::settings::types::IdentifierPattern;
 /// ```
 ///
 /// ## Options
-/// - `pep8-naming.ignore-names`
-/// - `pep8-naming.extend-ignore-names`
+/// - `lint.pep8-naming.ignore-names`
+/// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-variable-names
 #[violation]

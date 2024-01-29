@@ -42,7 +42,7 @@ use crate::rules::flake8_tidy_imports::settings::Strictness;
 /// ```
 ///
 /// ## Options
-/// - `flake8-tidy-imports.ban-relative-imports`
+/// - `lint.flake8-tidy-imports.ban-relative-imports`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[violation]
