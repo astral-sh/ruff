@@ -526,13 +526,23 @@ impl From<&LogLevelArgs> for LogLevel {
     }
 }
 
+/// Struct to encapsulate all configuration-related arguments passed via the CLI.
+///
+/// Three kinds of configuration arguments can be provided via the CLI;
+/// each kind is represented by a separate field on this struct.
 #[derive(Default)]
 pub struct ConfigArguments {
-    /// Path to a pyproject.toml or ruff.toml config file (etc.), if provided
+    /// Path to a pyproject.toml or ruff.toml config file (etc.).
+    /// Either 0 or 1 config file paths may be provided on the command line.
     config_file: Option<PathBuf>,
-    /// Overrides provided via the `--config FOO=BAR` option on the CLI
+    /// Overrides provided via the `--config "KEY=VALUE"` option.
+    /// An arbitrary number of these overrides may be provided on the command line.
+    /// These overrides take precedence over all configuration files,
+    /// even config files that were also specified using `--config`.
     overrides: Configuration,
     /// Overrides provided via dedicated flags such as --line-length etc.
+    /// These overrides take precedence over all configuration files,
+    /// and also over all overrides specified using any `--config "KEY=VALUE"` flags.
     per_flag_overrides: ExplicitConfigOverrides,
 }
 
