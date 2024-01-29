@@ -12,11 +12,11 @@ use crate::args::ConfigArguments;
 pub(crate) fn show_settings(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    overrides: &ConfigArguments,
+    config_arguments: &ConfigArguments,
     writer: &mut impl Write,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, resolver) = python_files_in_path(files, pyproject_config, overrides)?;
+    let (paths, resolver) = python_files_in_path(files, pyproject_config, config_arguments)?;
 
     // Print the list of files.
     let Some(path) = paths

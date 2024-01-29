@@ -13,11 +13,11 @@ use crate::args::ConfigArguments;
 pub(crate) fn show_files(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    overrides: &ConfigArguments,
+    config_arguments: &ConfigArguments,
     writer: &mut impl Write,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, _resolver) = python_files_in_path(files, pyproject_config, overrides)?;
+    let (paths, _resolver) = python_files_in_path(files, pyproject_config, config_arguments)?;
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");

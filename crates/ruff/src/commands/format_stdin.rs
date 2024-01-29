@@ -21,9 +21,13 @@ use crate::ExitStatus;
 /// Run the formatter over a single file, read from `stdin`.
 pub(crate) fn format_stdin(
     cli: &FormatArguments,
-    config_args: &ConfigArguments,
+    config_arguments: &ConfigArguments,
 ) -> Result<ExitStatus> {
-    let pyproject_config = resolve(cli.isolated, config_args, cli.stdin_filename.as_deref())?;
+    let pyproject_config = resolve(
+        cli.isolated,
+        config_arguments,
+        cli.stdin_filename.as_deref(),
+    )?;
 
     let mut resolver = Resolver::new(&pyproject_config);
     warn_incompatible_formatter_settings(&resolver);
@@ -32,7 +36,7 @@ pub(crate) fn format_stdin(
 
     if resolver.force_exclude() {
         if let Some(filename) = cli.stdin_filename.as_deref() {
-            if !python_file_at_path(filename, &mut resolver, config_args)? {
+            if !python_file_at_path(filename, &mut resolver, config_arguments)? {
                 if mode.is_write() {
                     parrot_stdin()?;
                 }

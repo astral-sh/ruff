@@ -43,16 +43,20 @@ fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, ConfigArgumen
         .no_binary_name(true)
         .get_matches_from(dirs);
     let arguments: FormatCommand = FormatCommand::from_arg_matches(&args_matches)?;
-    let (cli, overrides) = arguments.partition()?;
-    Ok((cli, overrides))
+    let (cli, config_arguments) = arguments.partition()?;
+    Ok((cli, config_arguments))
 }
 
 /// Find the [`PyprojectConfig`] to use for formatting.
 fn find_pyproject_config(
     cli: &FormatArguments,
-    overrides: &ConfigArguments,
+    config_arguments: &ConfigArguments,
 ) -> anyhow::Result<PyprojectConfig> {
-    let mut pyproject_config = resolve(cli.isolated, overrides, cli.stdin_filename.as_deref())?;
+    let mut pyproject_config = resolve(
+        cli.isolated,
+        config_arguments,
+        cli.stdin_filename.as_deref(),
+    )?;
     // We don't want to format pyproject.toml
     pyproject_config.settings.file_resolver.include = FilePatternSet::try_from_iter([
         FilePattern::Builtin("*.py"),
@@ -67,9 +71,9 @@ fn find_pyproject_config(
 fn ruff_check_paths<'a>(
     pyproject_config: &'a PyprojectConfig,
     cli: &FormatArguments,
-    overrides: &ConfigArguments,
+    config_arguments: &ConfigArguments,
 ) -> anyhow::Result<(Vec<Result<ResolvedFile, ignore::Error>>, Resolver<'a>)> {
-    let (paths, resolver) = python_files_in_path(&cli.files, pyproject_config, overrides)?;
+    let (paths, resolver) = python_files_in_path(&cli.files, pyproject_config, config_arguments)?;
     Ok((paths, resolver))
 }
 
