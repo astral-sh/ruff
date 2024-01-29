@@ -21,6 +21,12 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// 1 in {1, 2, 3}
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as the use of a `set` literal will
+/// error at runtime if the sequence contains unhashable elements (like lists
+/// or dictionaries).
+///
 /// ## References
 /// - [What’s New In Python 3.2](https://docs.python.org/3/whatsnew/3.2.html#optimizations)
 #[violation]
