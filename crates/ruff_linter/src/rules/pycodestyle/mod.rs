@@ -67,7 +67,6 @@ mod tests {
     }
 
     #[test_case(Rule::IsLiteral, Path::new("constant_literals.py"))]
-    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_0.py"))]
     #[test_case(Rule::TypeComparison, Path::new("E721.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
