@@ -878,15 +878,12 @@ fn nursery_group_selector_preview_enabled() {
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
-    -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:2: E225 [*] Missing whitespace around operator
-    Found 2 errors.
-    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The `NURSERY` selector has been deprecated.
+    ruff failed
+      Cause: The `NURSERY` selector is deprecated and cannot be used with preview mode enabled.
     "###);
 }
 
