@@ -68,6 +68,9 @@ def import_fixture(fixture: Path, fixture_set: str):
         options_path = fixture_path.with_suffix(".options.json")
 
         if len(options) > 0:
+            if extension == "pyi":
+                options["source_type"] = "Stub"
+
             with options_path.open("w") as options_file:
                 json.dump(options, options_file)
         elif os.path.exists(options_path):
