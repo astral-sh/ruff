@@ -721,6 +721,21 @@ where
                     AnnotationContext::RuntimeEvaluated => {
                         self.visit_runtime_evaluated_annotation(annotation);
                     }
+                    AnnotationContext::TypingOnly
+                        if flake8_type_checking::helpers::is_dataclass_meta_annotation(
+                            annotation,
+                            self.semantic(),
+                        ) =>
+                    {
+                        if let Expr::Subscript(subscript) = &**annotation {
+                            // Ex) `InitVar[str]`
+                            self.visit_runtime_required_annotation(&subscript.value);
+                            self.visit_annotation(&subscript.slice);
+                        } else {
+                            // Ex) `InitVar`
+                            self.visit_runtime_required_annotation(annotation);
+                        }
+                    }
                     AnnotationContext::TypingOnly => self.visit_annotation(annotation),
                 }
 
