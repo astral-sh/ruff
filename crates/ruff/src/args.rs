@@ -752,6 +752,7 @@ impl TypedValueParser for ConfigOptionParser {
             Ok(option) => return Ok(ConfigOption::ConfigOverride(Arc::new(option))),
             Err(toml_error) => toml_error,
         };
+        
         let mut new_error = clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
         if let Some(arg) = arg {
             new_error.insert(
