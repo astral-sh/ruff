@@ -971,15 +971,16 @@ impl LintConfiguration {
                 );
             }
         } else {
-            match deprecated_selectors.iter().collect::<Vec<_>>().as_slice() {
+            let deprecated_selectors = deprecated_selectors.iter().collect::<Vec<_>>();
+            match deprecated_selectors.as_slice() {
                 [] => (),
                 [selection] => {
                     let (prefix, code) = selection.prefix_and_code();
                     return Err(anyhow!("Selection of deprecated rule `{prefix}{code}` is not allowed when preview mode is enabled."));
                 }
-                [selections @ ..] => {
+                [..] => {
                     let mut message = "Selection of deprecated rules is not allowed when preview mode is enabled. Remove selection of:".to_string();
-                    for selection in selections {
+                    for selection in deprecated_selectors {
                         let (prefix, code) = selection.prefix_and_code();
                         message.push_str("\n\t- ");
                         message.push_str(prefix);
