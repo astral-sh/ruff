@@ -20,7 +20,7 @@ assert_cmd = { version = "2.0.13" }
 bincode = { version = "1.3.3" }
 bitflags = { version = "2.4.1" }
 cachedir = { version = "0.3.1" }
-chrono = { version = "0.4.31", default-features = false, features = ["clock"] }
+chrono = { version = "0.4.33", default-features = false, features = ["clock"] }
 clap = { version = "4.4.13", features = ["derive"] }
 clap_complete_command = { version = "0.5.1" }
 clearscreen = { version = "2.0.0" }
