@@ -51,17 +51,6 @@ pub fn main() -> ExitCode {
         Err(err) => {
             #[allow(clippy::print_stderr)]
             {
-                // First check whether this error has a clap error in its causes.
-                //
-                // If it's a clap error, it will already be nicely formatted,
-                // and it relates to argument parsing,
-                // so don't apply any special formatting to it:
-                for cause in err.chain() {
-                    if let Some(clap_error) = cause.downcast_ref::<clap::error::Error>() {
-                        clap_error.exit();
-                    }
-                }
-
                 // This communicates that this isn't a linter error but ruff itself hard-errored for
                 // some reason (e.g. failed to resolve the configuration)
                 eprintln!("{}", "ruff failed".red().bold());

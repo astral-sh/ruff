@@ -2,6 +2,7 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use anyhow::bail;
 use clap::builder::{TypedValueParser, ValueParserFactory};
 use clap::{command, Parser};
 use path_absolutize::path_dedot;
@@ -556,7 +557,7 @@ impl ConfigArguments {
         config_options: Vec<SingleConfigArgument>,
         per_flag_overrides: ExplicitConfigOverrides,
         isolated: bool,
-    ) -> Result<Self, anyhow::Error> {
+    ) -> anyhow::Result<Self> {
         let mut new = Self {
             per_flag_overrides,
             ..Self::default()
@@ -572,46 +573,29 @@ impl ConfigArguments {
                         &path_dedot::CWD,
                     )?);
                 }
-                SingleConfigArgument::FilePath { path, arg, cmd } => {
+                SingleConfigArgument::FilePath(path) => {
                     if isolated {
-                        let mut error = clap::Error::new(clap::error::ErrorKind::ArgumentConflict);
-                        error.insert(
-                            clap::error::ContextKind::InvalidArg,
-                            clap::error::ContextValue::String(format!(
-                                "--config={}",
-                                path.display()
-                            )),
+                        bail!(
+                            "\
+The argument `--config={}` cannot be used with `--isolated`
+
+  tip: You cannot specify a configuration file and also specify `--isolated`,
+       as `--isolated` causes ruff to ignore all configuration files.
+       For more information, try `--help`.
+",
+                            path.display()
                         );
-                        error.insert(
-                            clap::error::ContextKind::PriorArg,
-                            clap::error::ContextValue::String("--isolated".to_string()),
-                        );
-                        return Err(error.with_cmd(&cmd).into());
                     }
                     if let Some(ref config_file) = new.config_file {
                         let (first, second) = (config_file.display(), path.display());
-                        let mut error = clap::Error::new(clap::error::ErrorKind::ValueValidation);
-                        if let Some(arg) = arg {
-                            error.insert(
-                                clap::error::ContextKind::InvalidArg,
-                                clap::error::ContextValue::String(arg),
-                            );
-                        }
-                        error.insert(
-                            clap::error::ContextKind::InvalidValue,
-                            clap::error::ContextValue::String(second.to_string()),
+                        bail!(
+                            "\
+You cannot specify more than one configuration file on the command line.
+
+  tip: remove either `--config={first}` or `--config={second}`.
+       For more information, try `--help`.
+"
                         );
-                        let tips = vec![
-                            "Cannot specify more than one configuration file on the command line"
-                                .into(),
-                            format!("Remove either `--config={first}` or `--config={second}`")
-                                .into(),
-                        ];
-                        error.insert(
-                            clap::error::ContextKind::Suggested,
-                            clap::error::ContextValue::StyledStrs(tips),
-                        );
-                        return Err(error.with_cmd(&cmd).into());
                     }
                     new.config_file = Some(path);
                 }
@@ -631,7 +615,7 @@ impl ConfigurationTransformer for ConfigArguments {
 impl CheckCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(self) -> Result<(CheckArguments, ConfigArguments), anyhow::Error> {
+    pub fn partition(self) -> anyhow::Result<(CheckArguments, ConfigArguments)> {
         let check_arguments = CheckArguments {
             add_noqa: self.add_noqa,
             diff: self.diff,
@@ -690,7 +674,7 @@ impl CheckCommand {
 impl FormatCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(self) -> Result<(FormatArguments, ConfigArguments), anyhow::Error> {
+    pub fn partition(self) -> anyhow::Result<(FormatArguments, ConfigArguments)> {
         let format_arguments = FormatArguments {
             check: self.check,
             diff: self.diff,
@@ -743,11 +727,7 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
 /// ```
 #[derive(Clone, Debug)]
 pub enum SingleConfigArgument {
-    FilePath {
-        path: PathBuf,
-        arg: Option<String>,
-        cmd: clap::Command,
-    },
+    FilePath(PathBuf),
     SettingsOverride(Arc<Options>),
 }
 
@@ -773,11 +753,7 @@ impl TypedValueParser for ConfigArgumentParser {
     ) -> Result<Self::Value, clap::Error> {
         let path_to_config_file = PathBuf::from(value);
         if path_to_config_file.exists() {
-            return Ok(SingleConfigArgument::FilePath {
-                path: path_to_config_file,
-                arg: arg.map(clap::Arg::to_string),
-                cmd: cmd.clone(),
-            });
+            return Ok(SingleConfigArgument::FilePath(path_to_config_file));
         }
 
         let value = value

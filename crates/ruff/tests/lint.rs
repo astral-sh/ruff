@@ -491,14 +491,13 @@ fn too_many_config_files() -> Result<()> {
     fs::File::create(&ruff2_dot_toml)?;
     let expected_stderr = format!(
         "\
-error: invalid value '{}' for '--config <CONFIG_OPTION>'
+ruff failed
+  Cause: You cannot specify more than one configuration file on the command line.
 
-  tip: Cannot specify more than one configuration file on the command line
-  tip: Remove either `--config={}` or `--config={}`
+  tip: remove either `--config={}` or `--config={}`.
+       For more information, try `--help`.
 
-For more information, try '--help'.
 ",
-        ruff2_dot_toml.display(),
         ruff_dot_toml.display(),
         ruff2_dot_toml.display(),
     );
@@ -522,9 +521,13 @@ fn config_file_and_isolated() -> Result<()> {
     fs::File::create(&ruff_dot_toml)?;
     let expected_stderr = format!(
         "\
-error: the argument '--config={}' cannot be used with '--isolated'
+ruff failed
+  Cause: The argument `--config={}` cannot be used with `--isolated`
 
-For more information, try '--help'.
+  tip: You cannot specify a configuration file and also specify `--isolated`,
+       as `--isolated` causes ruff to ignore all configuration files.
+       For more information, try `--help`.
+
 ",
         ruff_dot_toml.display(),
     );
