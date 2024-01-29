@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
 use std::ops::Deref;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use clap::builder::{TypedValueParser, ValueParserFactory};
