@@ -8,10 +8,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for lambdas that can be replaced with the `list` builtin.
-///
-/// In [preview], this rule will also flag lambdas that can be replaced with
-/// the `dict` builtin.
+/// Checks for lambdas that can be replaced with the `list` or `dict` builtins.
 ///
 /// ## Why is this bad?
 /// Using container builtins are more succinct and idiomatic than wrapping
@@ -40,8 +37,6 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `list`](https://docs.python.org/3/library/functions.html#func-list)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct ReimplementedContainerBuiltin {
     container: Container,
@@ -73,11 +68,7 @@ pub(crate) fn reimplemented_container_builtin(checker: &mut Checker, expr: &Expr
     if parameters.is_none() {
         let container = match body.as_ref() {
             Expr::List(ast::ExprList { elts, .. }) if elts.is_empty() => Some(Container::List),
-            Expr::Dict(ast::ExprDict { values, .. })
-                if values.is_empty() & checker.settings.preview.is_enabled() =>
-            {
-                Some(Container::Dict)
-            }
+            Expr::Dict(ast::ExprDict { values, .. }) if values.is_empty() => Some(Container::Dict),
             _ => None,
         };
         if let Some(container) = container {
