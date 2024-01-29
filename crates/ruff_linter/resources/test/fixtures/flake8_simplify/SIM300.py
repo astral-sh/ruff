@@ -14,8 +14,14 @@ JediOrder.YODA == age  # SIM300
 0 < (number - 100)  # SIM300
 B<A[0][0]or B
 B or(B)<A[0][0]
+
+# Errors in preview
 ['upper'] == UPPER_LIST
 {} == DummyHandler.CONFIG
+
+# Errors in stable
+UPPER_LIST == ['upper']
+DummyHandler.CONFIG == {}
 
 # OK
 compare == "yoda"
