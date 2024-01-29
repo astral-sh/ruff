@@ -98,14 +98,10 @@ pub(crate) fn use_pep585_annotation(
                 if checker.semantic().is_builtin(name) {
                     diagnostic.set_fix(Fix::applicable_edit(
                         Edit::range_replacement((*name).to_string(), expr.range()),
-                        if checker.settings.preview.is_enabled() {
-                            if checker.settings.target_version >= PythonVersion::Py310 {
-                                Applicability::Safe
-                            } else {
-                                Applicability::Unsafe
-                            }
-                        } else {
+                        if checker.settings.target_version >= PythonVersion::Py310 {
                             Applicability::Safe
+                        } else {
+                            Applicability::Unsafe
                         },
                     ));
                 }
@@ -122,12 +118,8 @@ pub(crate) fn use_pep585_annotation(
                     Ok(Fix::applicable_edits(
                         import_edit,
                         [reference_edit],
-                        if checker.settings.preview.is_enabled() {
-                            if checker.settings.target_version >= PythonVersion::Py310 {
-                                Applicability::Safe
-                            } else {
-                                Applicability::Unsafe
-                            }
+                        if checker.settings.target_version >= PythonVersion::Py310 {
+                            Applicability::Safe
                         } else {
                             Applicability::Unsafe
                         },

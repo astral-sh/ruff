@@ -75,19 +75,15 @@ pub(crate) fn useless_else_on_loop(
     let else_range = identifier::else_(stmt, checker.locator().contents()).expect("else clause");
 
     let mut diagnostic = Diagnostic::new(UselessElseOnLoop, else_range);
-
-    if checker.settings.preview.is_enabled() {
-        diagnostic.try_set_fix(|| {
-            remove_else(
-                stmt,
-                orelse,
-                else_range,
-                checker.locator(),
-                checker.stylist(),
-            )
-        });
-    }
-
+    diagnostic.try_set_fix(|| {
+        remove_else(
+            stmt,
+            orelse,
+            else_range,
+            checker.locator(),
+            checker.stylist(),
+        )
+    });
     checker.diagnostics.push(diagnostic);
 }
 

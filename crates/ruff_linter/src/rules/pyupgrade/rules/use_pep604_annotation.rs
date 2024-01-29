@@ -78,12 +78,8 @@ pub(crate) fn use_pep604_annotation(
         && !checker.semantic().in_complex_string_type_definition()
         && is_allowed_value(slice);
 
-    let applicability = if checker.settings.preview.is_enabled() {
-        if checker.settings.target_version >= PythonVersion::Py310 {
-            Applicability::Safe
-        } else {
-            Applicability::Unsafe
-        }
+    let applicability = if checker.settings.target_version >= PythonVersion::Py310 {
+        Applicability::Safe
     } else {
         Applicability::Unsafe
     };
