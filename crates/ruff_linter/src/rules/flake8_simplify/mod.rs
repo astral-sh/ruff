@@ -57,7 +57,6 @@ mod tests {
     }
 
     #[test_case(Rule::YodaConditions, Path::new("SIM300.py"))]
-    #[test_case(Rule::IfElseBlockInsteadOfDictGet, Path::new("SIM401.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

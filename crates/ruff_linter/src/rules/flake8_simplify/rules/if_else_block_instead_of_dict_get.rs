@@ -224,10 +224,6 @@ pub(crate) fn if_exp_instead_of_dict_get(
     body: &Expr,
     orelse: &Expr,
 ) {
-    if checker.settings.preview.is_disabled() {
-        return;
-    }
-
     let Expr::Compare(ast::ExprCompare {
         left: test_key,
         ops,
