@@ -52,6 +52,9 @@ pub enum RuleGroup {
     Stable,
     /// The rule is unstable, and preview mode must be enabled for usage.
     Preview,
+    /// The rule has been deprecated, warnings will be displayed during selection in stable
+    /// and errors will be raised if used with preview mode enabled.
+    Deprecated,
     /// Legacy category for unstable rules, supports backwards compatible selection.
     #[deprecated(note = "Use `RuleGroup::Preview` for new rules instead")]
     Nursery,
@@ -424,8 +427,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Annotations, "001") => (RuleGroup::Stable, rules::flake8_annotations::rules::MissingTypeFunctionArgument),
         (Flake8Annotations, "002") => (RuleGroup::Stable, rules::flake8_annotations::rules::MissingTypeArgs),
         (Flake8Annotations, "003") => (RuleGroup::Stable, rules::flake8_annotations::rules::MissingTypeKwargs),
-        (Flake8Annotations, "101") => (RuleGroup::Stable, rules::flake8_annotations::rules::MissingTypeSelf),
-        (Flake8Annotations, "102") => (RuleGroup::Stable, rules::flake8_annotations::rules::MissingTypeCls),
+        (Flake8Annotations, "101") => (RuleGroup::Deprecated, rules::flake8_annotations::rules::MissingTypeSelf),
+        (Flake8Annotations, "102") => (RuleGroup::Deprecated, rules::flake8_annotations::rules::MissingTypeCls),
         (Flake8Annotations, "201") => (RuleGroup::Stable, rules::flake8_annotations::rules::MissingReturnTypeUndocumentedPublicFunction),
         (Flake8Annotations, "202") => (RuleGroup::Stable, rules::flake8_annotations::rules::MissingReturnTypePrivateFunction),
         (Flake8Annotations, "204") => (RuleGroup::Stable, rules::flake8_annotations::rules::MissingReturnTypeSpecialMethod),
@@ -842,7 +845,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Tryceratops, "002") => (RuleGroup::Stable, rules::tryceratops::rules::RaiseVanillaClass),
         (Tryceratops, "003") => (RuleGroup::Stable, rules::tryceratops::rules::RaiseVanillaArgs),
         (Tryceratops, "004") => (RuleGroup::Stable, rules::tryceratops::rules::TypeCheckWithoutTypeError),
-        (Tryceratops, "200") => (RuleGroup::Stable, rules::tryceratops::rules::ReraiseNoCause),
+        (Tryceratops, "200") => (RuleGroup::Deprecated, rules::tryceratops::rules::ReraiseNoCause),
         (Tryceratops, "201") => (RuleGroup::Stable, rules::tryceratops::rules::VerboseRaise),
         (Tryceratops, "300") => (RuleGroup::Stable, rules::tryceratops::rules::TryConsiderElse),
         (Tryceratops, "301") => (RuleGroup::Stable, rules::tryceratops::rules::RaiseWithinTry),

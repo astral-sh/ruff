@@ -755,6 +755,7 @@ impl LintConfiguration {
         // Store selectors for displaying warnings
         let mut redirects = FxHashMap::default();
         let mut deprecated_nursery_selectors = FxHashSet::default();
+        let mut deprecated_selectors = FxHashSet::default();
         let mut ignored_preview_selectors = FxHashSet::default();
 
         // Track which docstring rules are specifically enabled
@@ -895,8 +896,10 @@ impl LintConfiguration {
                     return Err(anyhow!("The `NURSERY` selector was removed.{suggestion}"));
                 };
 
-                // Only warn for the following selectors if used to enable rules
-                // e.g. use with `--ignore` or `--fixable` is okay
+                // Some of these checks are only for `Kind::Enable` which means only `--select` will warn
+                // and use with, e.g., `--ignore` or `--fixable` is okay
+
+                // Unstable rules
                 if preview.mode.is_disabled() && kind.is_enable() {
                     if let RuleSelector::Rule { prefix, .. } = selector {
                         if prefix.rules().any(|rule| rule.is_nursery()) {
@@ -910,6 +913,16 @@ impl LintConfiguration {
                     }
                 }
 
+                // Deprecated rules
+                if kind.is_enable() {
+                    if let RuleSelector::Rule { prefix, .. } = selector {
+                        if prefix.rules().any(|rule| rule.is_deprecated()) {
+                            deprecated_selectors.insert(selector);
+                        }
+                    }
+                }
+
+                // Redirected rules
                 if let RuleSelector::Prefix {
                     prefix,
                     redirected_from: Some(redirect_from),
@@ -947,6 +960,34 @@ impl LintConfiguration {
                 }
                 message.push('\n');
                 return Err(anyhow!(message));
+            }
+        }
+
+        if preview.mode.is_disabled() {
+            for selection in deprecated_selectors {
+                let (prefix, code) = selection.prefix_and_code();
+                warn_user!(
+                    "Rule `{prefix}{code}` is deprecated and will be removed in a future release.",
+                );
+            }
+        } else {
+            match deprecated_selectors.iter().collect::<Vec<_>>().as_slice() {
+                [] => (),
+                [selection] => {
+                    let (prefix, code) = selection.prefix_and_code();
+                    return Err(anyhow!("Selection of deprecated rule `{prefix}{code}` is not allowed when preview mode is enabled."));
+                }
+                [selections @ ..] => {
+                    let mut message = "Selection of deprecated rules is not allowed when preview mode is enabled. Remove selection of:".to_string();
+                    for selection in selections {
+                        let (prefix, code) = selection.prefix_and_code();
+                        message.push_str("\n\t- ");
+                        message.push_str(prefix);
+                        message.push_str(code);
+                    }
+                    message.push('\n');
+                    return Err(anyhow!(message));
+                }
             }
         }
 
