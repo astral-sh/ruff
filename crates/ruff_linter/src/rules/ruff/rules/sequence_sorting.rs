@@ -434,6 +434,13 @@ impl MultilineStringSequenceValue {
             locator,
         );
 
+        // We only add a trailing comma to the last item in the sequence
+        // if both the following are true:
+        //
+        // (1) The last item in the original sequence had a trailing comma; AND,
+        // (2) The first "semantically significant" token in the postlude is not a comma
+        //     (if the first semantically significant token *is* a comma, and we add another comma,
+        //     we'll end up with two commas after the final item, which would be invalid syntax)
         let needs_trailing_comma = self.ends_with_trailing_comma
             && first_non_trivia_token(TextSize::new(0), &postlude)
                 .map_or(true, |tok| tok.kind() != SimpleTokenKind::Comma);
