@@ -45,7 +45,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 output.push('\n');
             }
 
-            if rule.is_deprecated() {
+            if rule.is_removed() {
                 output.push_str(
                     r"**Warning: This rule has been removed and its documentation is only available for historical reasons.**",
                 );
