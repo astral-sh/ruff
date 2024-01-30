@@ -207,7 +207,7 @@ class CheckOptions(CommandOptions):
             "--no-cache",
             "--exit-zero",
             "--output-format",
-            "concise",
+            "text",  # TODO(jane): switch to "concise" after the release of 0.2.0
             f"--{'' if self.preview else 'no-'}preview",
         ]
         if self.select:
