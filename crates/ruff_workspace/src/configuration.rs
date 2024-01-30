@@ -756,6 +756,7 @@ impl LintConfiguration {
         let mut redirects = FxHashMap::default();
         let mut deprecated_nursery_selectors = FxHashSet::default();
         let mut deprecated_selectors = FxHashSet::default();
+        let mut deprecated_rules = FxHashSet::default();
         let mut deprecated_redirected_selectors = FxHashSet::default();
         let mut removed_selectors = FxHashSet::default();
         let mut ignored_preview_selectors = FxHashSet::default();
@@ -916,16 +917,26 @@ impl LintConfiguration {
                 }
 
                 // Deprecated rules
-                if kind.is_enable() && selector.is_exact() {
-                    if selector.all_rules().all(|rule| rule.is_deprecated()) {
-                        deprecated_selectors.insert(selector.clone());
-                    }
-                    if let Some(redirected_selector) = selector.redirected_from() {
-                        if redirected_selector
-                            .all_rules()
-                            .all(|rule| rule.is_deprecated())
-                        {
-                            deprecated_redirected_selectors.insert((redirected_selector, selector));
+                if kind.is_enable() {
+                    if selector.is_exact() {
+                        if selector.all_rules().all(|rule| rule.is_deprecated()) {
+                            deprecated_selectors.insert(selector.clone());
+                        }
+                        if let Some(redirected_selector) = selector.redirected_from() {
+                            if redirected_selector
+                                .all_rules()
+                                .all(|rule| rule.is_deprecated())
+                            {
+                                deprecated_redirected_selectors
+                                    .insert((redirected_selector, selector));
+                            }
+                        }
+                    } else {
+                        // For non-exact selections note all of the deprecated rules that have been renamed
+                        for rule in selector.rules(&preview) {
+                            if rule.is_deprecated() {
+                                deprecated_rules.insert((rule, selector));
+                            }
                         }
                     }
                 }
@@ -1057,6 +1068,15 @@ impl LintConfiguration {
                     return Err(anyhow!(message));
                 }
             }
+        }
+
+        for (rule, selection) in deprecated_rules {
+            let (prefix, code) = selection.prefix_and_code();
+            let rule_code = rule.noqa_code();
+            // TODO(zanieb): Determine if we should warn here
+            // warn_user!(
+            //     "Selection `{prefix}{code}` includes deprecated rule `{rule_code}` which will be removed in a future release.",
+            // );
         }
 
         for selection in ignored_preview_selectors {

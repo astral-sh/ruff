@@ -1225,6 +1225,31 @@ x = eval(input("Enter a number: "))
 }
 
 #[test]
+fn deprecated_indirect_redirect() {
+    // e.g. `PGH001` is deprecated and redirected, we see a violation in stable
+    // without any warnings
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "PGH", "--preview"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(r###"
+x = eval(input("Enter a number: "))
+"###), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:2:5: PGH001 No builtin `eval()` allowed
+      |
+    2 | x = eval(input("Enter a number: "))
+      |     ^^^^ PGH001
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+}
+#[test]
 fn deprecated_direct_preview_enabled() {
     // Direct selection of a deprecated rule in preview should fail
     let mut cmd = RuffCheck::default()
@@ -1267,6 +1292,7 @@ x = eval(input("Enter a number: "))
       Cause: Selection of deprecated rule `PGH001` is not allowed when preview is enabled. Use `S307` instead.
     "###);
 }
+
 #[test]
 fn deprecated_indirect_preview_enabled() {
     // `TRY200` is deprecated and should be off by default in preview.
