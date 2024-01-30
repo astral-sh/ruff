@@ -373,6 +373,11 @@ We have several ways of benchmarking and profiling Ruff:
 - Microbenchmarks which run the linter or the formatter on individual files. These run on pull requests.
 - Profiling the linter on either the microbenchmarks or entire projects
 
+> [!NOTE]
+> When running benchmarks, make sure your CPU is otherwise idle, e.g. close background applications
+> if necessary. Check the settings of your CPU governor, you might need to switch to performance
+> mode for reliable results esp. for short running processes.
+
 ### CPython Benchmark
 
 First, clone [CPython](https://github.com/python/cpython). It's a large and diverse Python codebase,
