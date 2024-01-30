@@ -955,7 +955,7 @@ impl LintConfiguration {
                     "The following rules have been removed and cannot be selected:".to_string();
                 for selection in removed_selectors {
                     let (prefix, code) = selection.prefix_and_code();
-                    message.push_str("\n\t- ");
+                    message.push_str("\n    - ");
                     message.push_str(prefix);
                     message.push_str(code);
                 }
