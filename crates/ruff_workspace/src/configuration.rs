@@ -756,6 +756,7 @@ impl LintConfiguration {
         let mut redirects = FxHashMap::default();
         let mut deprecated_nursery_selectors = FxHashSet::default();
         let mut deprecated_selectors = FxHashSet::default();
+        let mut removed_selectors = FxHashSet::default();
         let mut ignored_preview_selectors = FxHashSet::default();
 
         // Track which docstring rules are specifically enabled
@@ -922,6 +923,13 @@ impl LintConfiguration {
                     }
                 }
 
+                // Removed rules
+                if let RuleSelector::Rule { prefix, .. } = selector {
+                    if prefix.rules().any(|rule| rule.is_removed()) {
+                        removed_selectors.insert(selector);
+                    }
+                }
+
                 // Redirected rules
                 if let RuleSelector::Prefix {
                     prefix,
@@ -930,6 +938,29 @@ impl LintConfiguration {
                 {
                     redirects.insert(redirect_from, prefix);
                 }
+            }
+        }
+
+        let removed_selectors = removed_selectors.iter().collect::<Vec<_>>();
+        match removed_selectors.as_slice() {
+            [] => (),
+            [selection] => {
+                let (prefix, code) = selection.prefix_and_code();
+                return Err(anyhow!(
+                    "Rule `{prefix}{code}` was removed and cannot be selected."
+                ));
+            }
+            [..] => {
+                let mut message =
+                    "The following rules have been removed and cannot be selected:".to_string();
+                for selection in removed_selectors {
+                    let (prefix, code) = selection.prefix_and_code();
+                    message.push_str("\n    - ");
+                    message.push_str(prefix);
+                    message.push_str(code);
+                }
+                message.push('\n');
+                return Err(anyhow!(message));
             }
         }
 
@@ -1423,7 +1454,6 @@ mod tests {
     use std::str::FromStr;
 
     const PREVIEW_RULES: &[Rule] = &[
-        Rule::AndOrTernary,
         Rule::AssignmentInAssert,
         Rule::DirectLoggerInstantiation,
         Rule::InvalidGetLoggerArgument,
