@@ -818,8 +818,7 @@ fn remove_else(
             return Err(anyhow::anyhow!("Compound statement cannot be inlined"));
         };
 
-        // If the statement is on the same line as the `else`,
-        // or is the only statement in the body, just remove the `else: `.
+        // If the statement is on the same line as the `else`, just remove the `else: `.
         // Ex) `else: return True` -> `return True`
         if let [first] = elif_else.body.as_slice() {
             if indexer.in_multi_statement_line(first, locator) {
