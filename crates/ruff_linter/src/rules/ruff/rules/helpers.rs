@@ -1,6 +1,9 @@
+use ast::Keyword;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::{self as ast, Expr};
+use ruff_python_parser::parse_expression;
 use ruff_python_semantic::{analyze, BindingKind, SemanticModel};
+use rustc_hash::FxHashSet;
 
 /// Return `true` if the given [`Expr`] is a special class attribute, like `__slots__`.
 ///
@@ -83,4 +86,73 @@ pub(super) fn is_descriptor_class(func: &Expr, semantic: &SemanticModel) -> bool
                 .is_some_and(|id| semantic.binding(id).kind.is_function_definition())
         })
     })
+}
+
+// fast check to disqualify any string literal that doesn't
+// have opening and closing brackets
+#[inline]
+fn has_brackets(possible_fstring: &str) -> bool {
+    let mut opening = false;
+    let mut closing = false;
+    for c in possible_fstring.chars() {
+        match c {
+            '{' => opening = true,
+            '}' => closing = true,
+            _ => {}
+        }
+    }
+    opening && closing
+}
+
+/// Returns `true`` if `source` is valid f-string syntax with qualified, bound variables.
+/// `kwargs` should be the keyword arguments that were passed to function if the string literal is also
+/// being passed to the same function.
+/// If a identifier from `kwargs` is used in `source`'s formatting, this will return `false`,
+/// since it's possible the function could be formatting the literal in question.
+pub(super) fn should_be_fstring(
+    source: &str,
+    kwargs: Option<&Vec<Keyword>>,
+    semantic: &SemanticModel,
+) -> bool {
+    if !has_brackets(source) {
+        return false;
+    }
+
+    let Ok(Expr::FString(ast::ExprFString { value, .. })) =
+        parse_expression(&format!("f\"{source}\""))
+    else {
+        return false;
+    };
+
+    let kw_idents: FxHashSet<String> = kwargs
+        .map(|keywords| {
+            keywords
+                .into_iter()
+                .flat_map(|k| k.arg.clone())
+                .map(|ident| ident.into())
+                .collect()
+        })
+        .unwrap_or_default();
+
+    for f_string in value.f_strings() {
+        let mut has_name = false;
+        for element in &f_string.elements {
+            let Some(ast::FStringExpressionElement { expression, .. }) = element.as_expression()
+            else {
+                continue;
+            };
+
+            if let Expr::Name(ast::ExprName { id, .. }) = expression.as_ref() {
+                if kw_idents.contains(id) || semantic.lookup_symbol(id.as_str()).is_none() {
+                    return false;
+                }
+                has_name = true;
+            }
+        }
+        if !has_name {
+            return false;
+        }
+    }
+
+    true
 }

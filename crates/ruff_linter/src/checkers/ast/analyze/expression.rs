@@ -1313,11 +1313,19 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::math_constant(checker, number_literal);
             }
         }
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+        Expr::StringLiteral(ast::ExprStringLiteral { value, range: _ }) => {
             if checker.enabled(Rule::UnicodeKindPrefix) {
                 for string_part in value {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_part);
                 }
+            }
+            if checker.enabled(Rule::MissingFStringSyntax) {
+                ruff::rules::missing_fstring_syntax(
+                    &mut checker.diagnostics,
+                    value,
+                    checker.locator,
+                    &checker.semantic,
+                );
             }
         }
         Expr::IfExp(
