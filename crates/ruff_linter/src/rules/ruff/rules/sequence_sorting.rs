@@ -2,7 +2,7 @@
 ///
 /// Examples where these are useful:
 /// - Sorting `__all__` in the global scope,
-/// - Sorting `__slots__` or `__match_args__` in a class scope
+/// - Sorting `__slots__` in a class scope
 use std::borrow::Cow;
 use std::cmp::Ordering;
 

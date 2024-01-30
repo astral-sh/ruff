@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::fmt::Display;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -17,14 +16,12 @@ use crate::rules::ruff::rules::sequence_sorting::{
 use itertools::izip;
 
 /// ## What it does
-/// Checks for `__slots__` and `__match_args__`
-/// definitions that are not ordered according to a
+/// Checks for `__slots__` definitions that are not ordered according to a
 /// [natural sort](https://en.wikipedia.org/wiki/Natural_sort_order).
 ///
 /// ## Why is this bad?
-/// Consistency is good. Use a common convention for
-/// these special variables to make your code more
-/// readable and idiomatic.
+/// Consistency is good. Use a common convention for this special variable
+/// to make your code more readable and idiomatic.
 ///
 /// ## Example
 /// ```python
@@ -40,7 +37,6 @@ use itertools::izip;
 #[violation]
 pub struct UnsortedDunderSlots {
     class_name: String,
-    class_variable: SpecialClassDunder,
 }
 
 impl Violation for UnsortedDunderSlots {
@@ -48,43 +44,18 @@ impl Violation for UnsortedDunderSlots {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnsortedDunderSlots {
-            class_name,
-            class_variable,
-        } = self;
-        format!("`{class_name}.{class_variable}` is not sorted")
+        format!("`{}.__slots__` is not sorted", self.class_name)
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UnsortedDunderSlots {
-            class_name,
-            class_variable,
-        } = self;
         Some(format!(
-            "Apply a natural sort to `{class_name}.{class_variable}`"
+            "Apply a natural sort to `{}.__slots__`",
+            self.class_name
         ))
     }
 }
 
-/// Enumeration of the two special class dunders
-/// that we're interested in for this rule: `__match_args__` and `__slots__`
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-enum SpecialClassDunder {
-    Slots,
-    MatchArgs,
-}
-
-impl Display for SpecialClassDunder {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string = match self {
-            Self::MatchArgs => "__match_args__",
-            Self::Slots => "__slots__",
-        };
-        write!(f, "{string}")
-    }
-}
-
-/// Sort a `__slots__`/`__match_args__` definition
+/// Sort a `__slots__` definition
 /// represented by a `StmtAssign` AST node.
 /// For example: `__slots__ = ["b", "c", "a"]`.
 pub(crate) fn sort_dunder_slots_assign(
@@ -96,7 +67,7 @@ pub(crate) fn sort_dunder_slots_assign(
     }
 }
 
-/// Sort a `__slots__`/`__match_args__` definition
+/// Sort a `__slots__` definition
 /// represented by a `StmtAnnAssign` AST node.
 /// For example: `__slots__: list[str] = ["b", "c", "a"]`.
 pub(crate) fn sort_dunder_slots_ann_assign(checker: &mut Checker, node: &ast::StmtAnnAssign) {
@@ -107,8 +78,7 @@ pub(crate) fn sort_dunder_slots_ann_assign(checker: &mut Checker, node: &ast::St
 
 const SORTING_STYLE: SortingStyle = SortingStyle::Natural;
 
-/// Sort a tuple, list, dict or set that defines `__slots__`
-/// or `__match_args__` in a class scope.
+/// Sort a tuple, list, dict or set that defines `__slots__` in a class scope.
 ///
 /// This routine checks whether the display is sorted, and emits a
 /// violation if it is not sorted. If the tuple/list/set was not sorted,
@@ -118,13 +88,11 @@ fn sort_dunder_slots(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr
         return;
     };
 
-    let dunder_kind = match id.as_str() {
-        "__slots__" => SpecialClassDunder::Slots,
-        "__match_args__" => SpecialClassDunder::MatchArgs,
-        _ => return,
-    };
+    if id != "__slots__" {
+        return;
+    }
 
-    // We're only interested in `__slots__`/`__match_args__` in the class scope
+    // We're only interested in `__slots__` in the class scope
     let ScopeKind::Class(ast::StmtClassDef {
         name: class_name, ..
     }) = checker.semantic().current_scope().kind
@@ -132,7 +100,7 @@ fn sort_dunder_slots(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr
         return;
     };
 
-    let Some(display) = StringLiteralDisplay::new(node, dunder_kind) else {
+    let Some(display) = StringLiteralDisplay::new(node) else {
         return;
     };
 
@@ -144,7 +112,6 @@ fn sort_dunder_slots(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr
     let mut diagnostic = Diagnostic::new(
         UnsortedDunderSlots {
             class_name: class_name.to_string(),
-            class_variable: dunder_kind,
         },
         display.range,
     );
@@ -179,9 +146,9 @@ impl Ranged for StringLiteralDisplay<'_> {
 }
 
 impl<'a> StringLiteralDisplay<'a> {
-    fn new(node: &'a ast::Expr, dunder_kind: SpecialClassDunder) -> Option<Self> {
-        let result = match (dunder_kind, node) {
-            (_, ast::Expr::List(ast::ExprList { elts, range, .. })) => {
+    fn new(node: &'a ast::Expr) -> Option<Self> {
+        let result = match node {
+            ast::Expr::List(ast::ExprList { elts, range, .. }) => {
                 let display_kind = DisplayKind::Sequence(SequenceKind::List);
                 Self {
                     elts: Cow::Borrowed(elts),
@@ -189,7 +156,7 @@ impl<'a> StringLiteralDisplay<'a> {
                     display_kind,
                 }
             }
-            (_, ast::Expr::Tuple(tuple_node @ ast::ExprTuple { elts, range, .. })) => {
+            ast::Expr::Tuple(tuple_node @ ast::ExprTuple { elts, range, .. }) => {
                 let display_kind = DisplayKind::Sequence(SequenceKind::Tuple(tuple_node));
                 Self {
                     elts: Cow::Borrowed(elts),
@@ -197,7 +164,7 @@ impl<'a> StringLiteralDisplay<'a> {
                     display_kind,
                 }
             }
-            (SpecialClassDunder::Slots, ast::Expr::Set(ast::ExprSet { elts, range })) => {
+            ast::Expr::Set(ast::ExprSet { elts, range }) => {
                 let display_kind = DisplayKind::Sequence(SequenceKind::Set);
                 Self {
                     elts: Cow::Borrowed(elts),
@@ -205,21 +172,16 @@ impl<'a> StringLiteralDisplay<'a> {
                     display_kind,
                 }
             }
-            (
-                SpecialClassDunder::Slots,
-                ast::Expr::Dict(ast::ExprDict {
-                    keys,
-                    values,
-                    range,
-                }),
-            ) => {
+            ast::Expr::Dict(ast::ExprDict {
+                keys,
+                values,
+                range,
+            }) => {
                 let mut narrowed_keys = Vec::with_capacity(values.len());
                 for key in keys {
                     if let Some(key) = key {
                         // This is somewhat unfortunate,
-                        // *but* only `__slots__` can be a dict out of
-                        // `__all__`, `__slots__` and `__match_args__`,
-                        // and even for `__slots__`, using a dict is very rare
+                        // *but* using a dict for __slots__ is very rare
                         narrowed_keys.push(key.to_owned());
                     } else {
                         return None;

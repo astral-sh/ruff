@@ -6,7 +6,7 @@ RUF023.py:6:17: RUF023 [*] `Klass.__slots__` is not sorted
 5 | class Klass:
 6 |     __slots__ = ["d", "c", "b", "a"]  # a comment that is untouched
   |                 ^^^^^^^^^^^^^^^^^^^^ RUF023
-7 |     __match_args__ = ("d", "c", "b", "a")
+7 |     __slots__ = ("d", "c", "b", "a")
   |
   = help: Apply a natural sort to `Klass.__slots__`
 
@@ -16,27 +16,27 @@ RUF023.py:6:17: RUF023 [*] `Klass.__slots__` is not sorted
 5 5 | class Klass:
 6   |-    __slots__ = ["d", "c", "b", "a"]  # a comment that is untouched
   6 |+    __slots__ = ["a", "b", "c", "d"]  # a comment that is untouched
-7 7 |     __match_args__ = ("d", "c", "b", "a")
+7 7 |     __slots__ = ("d", "c", "b", "a")
 8 8 | 
 9 9 |     # Quoting style is retained,
 
-RUF023.py:7:22: RUF023 [*] `Klass.__match_args__` is not sorted
+RUF023.py:7:17: RUF023 [*] `Klass.__slots__` is not sorted
   |
 5 | class Klass:
 6 |     __slots__ = ["d", "c", "b", "a"]  # a comment that is untouched
-7 |     __match_args__ = ("d", "c", "b", "a")
-  |                      ^^^^^^^^^^^^^^^^^^^^ RUF023
+7 |     __slots__ = ("d", "c", "b", "a")
+  |                 ^^^^^^^^^^^^^^^^^^^^ RUF023
 8 | 
 9 |     # Quoting style is retained,
   |
-  = help: Apply a natural sort to `Klass.__match_args__`
+  = help: Apply a natural sort to `Klass.__slots__`
 
 ℹ Safe fix
 4 4 | 
 5 5 | class Klass:
 6 6 |     __slots__ = ["d", "c", "b", "a"]  # a comment that is untouched
-7   |-    __match_args__ = ("d", "c", "b", "a")
-  7 |+    __match_args__ = ("a", "b", "c", "d")
+7   |-    __slots__ = ("d", "c", "b", "a")
+  7 |+    __slots__ = ("a", "b", "c", "d")
 8 8 | 
 9 9 |     # Quoting style is retained,
 10 10 |     # but unnecessary parens are not
@@ -60,25 +60,25 @@ RUF023.py:11:22: RUF023 [*] `Klass.__slots__` is not sorted
    11 |+    __slots__: set = {'a', 'b', "c"}
 12 12 |     # Trailing commas are also not retained for single-line definitions
 13 13 |     # (but they are in multiline definitions)
-14 14 |     __match_args__: tuple = ("b", "c", "a",)
+14 14 |     __slots__: tuple = ("b", "c", "a",)
 
-RUF023.py:14:29: RUF023 [*] `Klass.__match_args__` is not sorted
+RUF023.py:14:24: RUF023 [*] `Klass.__slots__` is not sorted
    |
 12 |     # Trailing commas are also not retained for single-line definitions
 13 |     # (but they are in multiline definitions)
-14 |     __match_args__: tuple = ("b", "c", "a",)
-   |                             ^^^^^^^^^^^^^^^^ RUF023
+14 |     __slots__: tuple = ("b", "c", "a",)
+   |                        ^^^^^^^^^^^^^^^^ RUF023
 15 | 
 16 | class Klass2:
    |
-   = help: Apply a natural sort to `Klass.__match_args__`
+   = help: Apply a natural sort to `Klass.__slots__`
 
 ℹ Safe fix
 11 11 |     __slots__: set = {'b', "c", ((('a')))}
 12 12 |     # Trailing commas are also not retained for single-line definitions
 13 13 |     # (but they are in multiline definitions)
-14    |-    __match_args__: tuple = ("b", "c", "a",)
-   14 |+    __match_args__: tuple = ("a", "b", "c")
+14    |-    __slots__: tuple = ("b", "c", "a",)
+   14 |+    __slots__: tuple = ("a", "b", "c")
 15 15 | 
 16 16 | class Klass2:
 17 17 |     if bool():
@@ -111,7 +111,7 @@ RUF023.py:20:21: RUF023 [*] `Klass2.__slots__` is not sorted
 20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
    |                     ^^^^^^^^^^^^^^^^^^^^^^ RUF023
 21 | 
-22 |     __match_args__: list[str] = ["the", "three", "little", "pigs"]
+22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
    |
    = help: Apply a natural sort to `Klass2.__slots__`
 
@@ -122,33 +122,33 @@ RUF023.py:20:21: RUF023 [*] `Klass2.__slots__` is not sorted
 20    |-        __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
    20 |+        __slots__ = "foo1", "foo2", "foo3"  # NB: an implicit tuple (without parens)
 21 21 | 
-22 22 |     __match_args__: list[str] = ["the", "three", "little", "pigs"]
+22 22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
 23 23 |     __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
 
-RUF023.py:22:33: RUF023 [*] `Klass2.__match_args__` is not sorted
+RUF023.py:22:28: RUF023 [*] `Klass2.__slots__` is not sorted
    |
 20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
 21 | 
-22 |     __match_args__: list[str] = ["the", "three", "little", "pigs"]
-   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023
+22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023
 23 |     __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
 24 |     # we use natural sort,
    |
-   = help: Apply a natural sort to `Klass2.__match_args__`
+   = help: Apply a natural sort to `Klass2.__slots__`
 
 ℹ Safe fix
 19 19 |     else:
 20 20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
 21 21 | 
-22    |-    __match_args__: list[str] = ["the", "three", "little", "pigs"]
-   22 |+    __match_args__: list[str] = ["little", "pigs", "the", "three"]
+22    |-    __slots__: list[str] = ["the", "three", "little", "pigs"]
+   22 |+    __slots__: list[str] = ["little", "pigs", "the", "three"]
 23 23 |     __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
 24 24 |     # we use natural sort,
 25 25 |     # not alphabetical sort or "isort-style" sort
 
 RUF023.py:23:17: RUF023 [*] `Klass2.__slots__` is not sorted
    |
-22 |     __match_args__: list[str] = ["the", "three", "little", "pigs"]
+22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
 23 |     __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023
 24 |     # we use natural sort,
@@ -159,7 +159,7 @@ RUF023.py:23:17: RUF023 [*] `Klass2.__slots__` is not sorted
 ℹ Safe fix
 20 20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
 21 21 | 
-22 22 |     __match_args__: list[str] = ["the", "three", "little", "pigs"]
+22 22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
 23    |-    __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
    23 |+    __slots__ = "an_unparenthesized_tuple", "in", "parenthesized_item"
 24 24 |     # we use natural sort,
@@ -199,7 +199,7 @@ RUF023.py:33:17: RUF023 [*] `Klass3.__slots__` is not sorted
 38 | |         "a0"
 39 | |     )
    | |_____^ RUF023
-40 |       __match_args__ = [
+40 |       __slots__ = [
 41 |           "d",
    |
    = help: Apply a natural sort to `Klass3.__slots__`
@@ -218,15 +218,15 @@ RUF023.py:33:17: RUF023 [*] `Klass3.__slots__` is not sorted
 38    |-        "a0"
    38 |+        "d0"
 39 39 |     )
-40 40 |     __match_args__ = [
+40 40 |     __slots__ = [
 41 41 |         "d",
 
-RUF023.py:40:22: RUF023 [*] `Klass3.__match_args__` is not sorted
+RUF023.py:40:17: RUF023 [*] `Klass3.__slots__` is not sorted
    |
 38 |           "a0"
 39 |       )
-40 |       __match_args__ = [
-   |  ______________________^
+40 |       __slots__ = [
+   |  _________________^
 41 | |         "d",
 42 | |         "c",  # a comment regarding 'c'
 43 | |         "b",
@@ -237,12 +237,12 @@ RUF023.py:40:22: RUF023 [*] `Klass3.__match_args__` is not sorted
 47 |   
 48 |   ##################################
    |
-   = help: Apply a natural sort to `Klass3.__match_args__`
+   = help: Apply a natural sort to `Klass3.__slots__`
 
 ℹ Safe fix
 38 38 |         "a0"
 39 39 |     )
-40 40 |     __match_args__ = [
+40 40 |     __slots__ = [
 41    |-        "d",
    41 |+        # a comment regarding 'a':
    42 |+        "a",
@@ -296,12 +296,12 @@ RUF023.py:54:17: RUF023 [*] `Klass4.__slots__` is not sorted
 61 64 |     )  # comment6
 62 65 |     # comment7
 
-RUF023.py:64:22: RUF023 [*] `Klass4.__match_args__` is not sorted
+RUF023.py:64:17: RUF023 [*] `Klass4.__slots__` is not sorted
    |
 62 |       # comment7
 63 |   
-64 |       __match_args__ = [  # comment0
-   |  ______________________^
+64 |       __slots__ = [  # comment0
+   |  _________________^
 65 | |         # comment1
 66 | |         # comment2
 67 | |         "dx", "cx", "bx", "ax"  # comment3
@@ -313,12 +313,12 @@ RUF023.py:64:22: RUF023 [*] `Klass4.__match_args__` is not sorted
 72 |   
 73 |   # from cpython/Lib/pathlib/__init__.py
    |
-   = help: Apply a natural sort to `Klass4.__match_args__`
+   = help: Apply a natural sort to `Klass4.__slots__`
 
 ℹ Safe fix
 62 62 |     # comment7
 63 63 | 
-64 64 |     __match_args__ = [  # comment0
+64 64 |     __slots__ = [  # comment0
    65 |+        "ax",
    66 |+        "bx",
    67 |+        "cx",
@@ -499,11 +499,11 @@ RUF023.py:138:17: RUF023 `SlotUser.__slots__` is not sorted
     |
     = help: Apply a natural sort to `SlotUser.__slots__`
 
-RUF023.py:142:22: RUF023 `Klass5.__match_args__` is not sorted
+RUF023.py:142:17: RUF023 `Klass5.__slots__` is not sorted
     |
 141 |   class Klass5:
-142 |       __match_args__ = (
-    |  ______________________^
+142 |       __slots__ = (
+    |  _________________^
 143 | |         "look",
 144 | |         (
 145 | |             "a_veeeeeeeeeeeeeeeeeeery_long_parenthesized_item"
@@ -513,7 +513,7 @@ RUF023.py:142:22: RUF023 `Klass5.__match_args__` is not sorted
 148 |       __slots__ = (
 149 |           "b",
     |
-    = help: Apply a natural sort to `Klass5.__match_args__`
+    = help: Apply a natural sort to `Klass5.__slots__`
 
 RUF023.py:148:17: RUF023 `Klass5.__slots__` is not sorted
     |
