@@ -1069,10 +1069,9 @@ impl LintConfiguration {
                         if let Some(redirect) = redirect {
                             let (redirect_prefix, redirect_code) =
                                 (redirect.linter().common_prefix(), redirect.short_code());
-                            message.push_str(
-                                format!(" (use `{redirect_prefix}{redirect_code}` instead)")
-                                    .as_str(),
-                            )
+                            message.push_str(&format!(
+                                " (use `{redirect_prefix}{redirect_code}` instead)"
+                            ));
                         }
                     }
                     message.push('\n');
