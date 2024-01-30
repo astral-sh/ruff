@@ -37,6 +37,6 @@ impl Violation for AndOrTernary {
     }
 
     fn message_formats() -> &'static [&'static str] {
-        &[""]
+        &["Consider using if-else expression"]
     }
 }
