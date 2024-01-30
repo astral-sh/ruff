@@ -932,8 +932,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "024") => (RuleGroup::Preview, rules::ruff::rules::MutableFromkeysValue),
         (Ruff, "025") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryDictComprehensionForIterable),
         (Ruff, "026") => (RuleGroup::Preview, rules::ruff::rules::DefaultFactoryKwarg),
+        (Ruff, "027") => (RuleGroup::Stable, rules::ruff::rules::InconsistentNoqaCapitalisation),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
-        (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
+        (Ruff, "200") => (RuleGroup::Preview, rules::ruff::rules::InvalidPyprojectToml),
 
         // flake8-django
         (Flake8Django, "001") => (RuleGroup::Stable, rules::flake8_django::rules::DjangoNullableModelStringField),

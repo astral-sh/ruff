@@ -13,6 +13,7 @@ use crate::rules::pycodestyle::rules::{
     trailing_whitespace,
 };
 use crate::rules::pylint;
+use crate::rules::ruff::rules::consistent_noqa_capitalisation;
 use crate::settings::LinterSettings;
 
 pub(crate) fn check_physical_lines(
@@ -33,6 +34,7 @@ pub(crate) fn check_physical_lines(
     let enforce_blank_line_contains_whitespace =
         settings.rules.enabled(Rule::BlankLineWithWhitespace);
     let enforce_copyright_notice = settings.rules.enabled(Rule::MissingCopyrightNotice);
+    let enforce_noqa_capitalisation = settings.rules.enabled(Rule::InconsistentNoqaCapitalisation);
 
     let mut doc_lines_iter = doc_lines.iter().peekable();
 
@@ -66,6 +68,14 @@ pub(crate) fn check_physical_lines(
 
         if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
             if let Some(diagnostic) = trailing_whitespace(&line, locator, indexer, settings) {
+                diagnostics.push(diagnostic);
+            }
+        }
+
+        if enforce_noqa_capitalisation {
+            if let Some(diagnostic) =
+                consistent_noqa_capitalisation(&line, locator, indexer, settings)
+            {
                 diagnostics.push(diagnostic);
             }
         }
