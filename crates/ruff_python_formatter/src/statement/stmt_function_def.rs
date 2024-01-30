@@ -1,5 +1,5 @@
 use ruff_formatter::write;
-use ruff_python_ast::StmtFunctionDef;
+use ruff_python_ast::{NodeKind, StmtFunctionDef};
 
 use crate::comments::format::{
     empty_lines_after_leading_comments, empty_lines_before_trailing_comments,
@@ -87,7 +87,8 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         //
         // # comment
         // ```
-        empty_lines_before_trailing_comments(f, comments.trailing(item)).fmt(f)
+        empty_lines_before_trailing_comments(f, comments.trailing(item), NodeKind::StmtFunctionDef)
+            .fmt(f)
     }
 
     fn fmt_dangling_comments(

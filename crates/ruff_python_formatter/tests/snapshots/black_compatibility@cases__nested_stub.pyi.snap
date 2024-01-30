@@ -42,17 +42,15 @@ class TopLevel:
 ```diff
 --- Black
 +++ Ruff
-@@ -3,33 +3,27 @@
+@@ -3,7 +3,6 @@
  class Outer:
      class InnerStub: ...
      outer_attr_after_inner_stub: int
 -
      class Inner:
          inner_attr: int
--
-     outer_attr: int
  
- if sys.version_info > (3, 7):
+@@ -13,12 +12,10 @@
      if sys.platform == "win32":
          assignment = 1
          def function_definition(self): ...
@@ -65,17 +63,6 @@ class TopLevel:
      def f2(self) -> str: ...
  
  class TopLevel:
-     class Nested1:
-         foo: int
-         def bar(self): ...
--
-     field = 1
- 
-     class Nested2:
-         def bar(self): ...
-         foo: int
--
-     field = 1
 ```
 
 ## Ruff Output
@@ -88,6 +75,7 @@ class Outer:
     outer_attr_after_inner_stub: int
     class Inner:
         inner_attr: int
+
     outer_attr: int
 
 if sys.version_info > (3, 7):
@@ -104,11 +92,13 @@ class TopLevel:
     class Nested1:
         foo: int
         def bar(self): ...
+
     field = 1
 
     class Nested2:
         def bar(self): ...
         foo: int
+
     field = 1
 ```
 
