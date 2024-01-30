@@ -1235,16 +1235,9 @@ fn deprecated_indirect_redirect() {
         .pass_stdin(r###"
 x = eval(input("Enter a number: "))
 "###), @r###"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
-    -:2:5: PGH001 No builtin `eval()` allowed
-      |
-    2 | x = eval(input("Enter a number: "))
-      |     ^^^^ PGH001
-      |
-
-    Found 1 error.
 
     ----- stderr -----
     "###);
@@ -1325,16 +1318,9 @@ fn deprecated_indirect_redirect_preview_enabled() {
         .pass_stdin(r###"
 x = eval(input("Enter a number: "))
 "###), @r###"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
-    -:2:5: PGH001 No builtin `eval()` allowed
-      |
-    2 | x = eval(input("Enter a number: "))
-      |     ^^^^ PGH001
-      |
-
-    Found 1 error.
 
     ----- stderr -----
     "###);
