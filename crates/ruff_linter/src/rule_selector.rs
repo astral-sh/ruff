@@ -172,7 +172,7 @@ impl Visitor<'_> for SelectorVisitor {
 }
 
 impl RuleSelector {
-    /// Return all matching rules, regardless of whether they're in preview.
+    /// Return all matching rules, regardless of rule group filters like preview and deprecated.
     pub fn all_rules(&self) -> impl Iterator<Item = Rule> + '_ {
         match self {
             RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
@@ -198,7 +198,7 @@ impl RuleSelector {
         }
     }
 
-    /// Returns rules matching the selector, taking into account preview options enabled.
+    /// Returns rules matching the selector, taking into account rule groups like preview and deprecated.
     pub fn rules<'a>(&'a self, preview: &PreviewOptions) -> impl Iterator<Item = Rule> + 'a {
         let preview_enabled = preview.mode.is_enabled();
         let preview_require_explicit = preview.require_explicit;
@@ -210,7 +210,7 @@ impl RuleSelector {
             || ((matches!(self, RuleSelector::Rule { .. }) || matches!(self, RuleSelector::Nursery { .. })) && rule.is_nursery())
             // Enabling preview includes all preview or nursery rules unless explicit selection
             // is turned on
-            || (preview_enabled && (matches!(self, RuleSelector::Rule { .. }) || !preview_require_explicit))
+            || ((rule.is_preview() || rule.is_nursery()) && preview_enabled && (self.is_exact() || !preview_require_explicit))
             // Deprecated rules are excluded in preview mode unless explicitly selected
             || (rule.is_deprecated() && (!preview_enabled || matches!(self, RuleSelector::Rule { .. })))
             // Removed rules are included if explicitly selected but will error downstream
