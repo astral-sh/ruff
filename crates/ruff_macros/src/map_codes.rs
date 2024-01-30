@@ -317,9 +317,17 @@ See also https://github.com/astral-sh/ruff/issues/2186.
                 matches!(self.group(), RuleGroup::Preview)
             }
 
+            pub fn is_stable(&self) -> bool {
+                matches!(self.group(), RuleGroup::Stable)
+            }
+
             #[allow(deprecated)]
             pub fn is_nursery(&self) -> bool {
                 matches!(self.group(), RuleGroup::Nursery)
+            }
+
+            pub fn is_deprecated(&self) -> bool {
+                matches!(self.group(), RuleGroup::Deprecated)
             }
         }
 
