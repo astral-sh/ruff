@@ -1,0 +1,38 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/regressions.py
+---
+## Input
+```python
+class Event:
+    event_name: ClassVar[str]
+
+    @staticmethod
+    def cls_for(event_name: str) -> type[Event]:
+        event_cls = _CONCRETE_EVENT_CLASSES.get(event_name)
+        if event_cls is not None:
+            <RANGE_START>
+            <RANGE_END>
+            return event_cls
+        else:
+            raise ValueError(f"unknown event name '{event_name}'")
+```
+
+## Output
+```python
+class Event:
+    event_name: ClassVar[str]
+
+    @staticmethod
+    def cls_for(event_name: str) -> type[Event]:
+        event_cls = _CONCRETE_EVENT_CLASSES.get(event_name)
+        if event_cls is not None:
+            
+            
+            return event_cls
+        else:
+            raise ValueError(f"unknown event name '{event_name}'")
+```
+
+
+
