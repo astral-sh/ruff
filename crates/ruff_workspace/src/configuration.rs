@@ -1454,9 +1454,6 @@ mod tests {
     use std::str::FromStr;
 
     const PREVIEW_RULES: &[Rule] = &[
-        Rule::AssignmentInAssert,
-        Rule::DirectLoggerInstantiation,
-        Rule::InvalidGetLoggerArgument,
         Rule::IsinstanceTypeNone,
         Rule::IfExprMinMax,
         Rule::ManualDictComprehension,
@@ -1464,7 +1461,6 @@ mod tests {
         Rule::SliceCopy,
         Rule::TooManyPublicMethods,
         Rule::TooManyPublicMethods,
-        Rule::UndocumentedWarn,
         Rule::UnnecessaryEnumerate,
         Rule::MathConstant,
     ];
