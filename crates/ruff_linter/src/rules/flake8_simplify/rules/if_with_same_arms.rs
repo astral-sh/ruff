@@ -94,17 +94,15 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt_if: &ast::StmtIf) {
             TextRange::new(current_branch.start(), following_branch.end()),
         );
 
-        if checker.settings.preview.is_enabled() {
-            diagnostic.try_set_fix(|| {
-                merge_branches(
-                    stmt_if,
-                    &current_branch,
-                    following_branch,
-                    checker.locator(),
-                    checker.indexer(),
-                )
-            });
-        }
+        diagnostic.try_set_fix(|| {
+            merge_branches(
+                stmt_if,
+                &current_branch,
+                following_branch,
+                checker.locator(),
+                checker.indexer(),
+            )
+        });
 
         checker.diagnostics.push(diagnostic);
     }
