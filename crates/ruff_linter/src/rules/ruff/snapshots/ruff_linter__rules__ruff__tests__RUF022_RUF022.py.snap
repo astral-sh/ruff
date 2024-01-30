@@ -968,7 +968,7 @@ RUF022.py:233:11: RUF022 [*] `__all__` is not sorted
 241 | |                 ]
     | |_________________^ RUF022
 242 |   
-243 |   ###################################
+243 |   __all__ = (
     |
     = help: Apply an isort-style sorting to `__all__`
 
@@ -985,5 +985,40 @@ RUF022.py:233:11: RUF022 [*] `__all__` is not sorted
 235 237 | 
 236 238 |                 # very strangely placed comment
 237 239 | 
+
+RUF022.py:243:11: RUF022 [*] `__all__` is not sorted
+    |
+241 |                   ]
+242 |   
+243 |   __all__ = (
+    |  ___________^
+244 | |     "foo"
+245 | |     # strange comment 1
+246 | |     ,
+247 | |     # comment about bar
+248 | |     "bar"
+249 | |     # strange comment 2
+250 | |     ,
+251 | | )
+    | |_^ RUF022
+252 |   
+253 |   ###################################
+    |
+    = help: Apply an isort-style sorting to `__all__`
+
+ℹ Safe fix
+241 241 |                 ]
+242 242 | 
+243 243 | __all__ = (
+244     |-    "foo"
+245 244 |     # strange comment 1
+246     |-    ,
+247 245 |     # comment about bar
+248     |-    "bar"
+    246 |+    "bar",
+    247 |+    "foo"
+249 248 |     # strange comment 2
+250 249 |     ,
+251 250 | )
 
 

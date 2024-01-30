@@ -577,7 +577,7 @@ RUF023.py:166:17: RUF023 [*] `BezierBuilder2.__slots__` is not sorted
 167 | |                  'canvas'      ,          }
     | |___________________________________________^ RUF023
 168 |   
-169 |   class BezierBuilder:
+169 |   class BezierBuilder3:
     |
     = help: Apply a natural sort to `BezierBuilder2.__slots__`
 
@@ -592,12 +592,12 @@ RUF023.py:166:17: RUF023 [*] `BezierBuilder2.__slots__` is not sorted
     168 |+        'xp',
     169 |+        'yp'      ,          }
 168 170 | 
-169 171 | class BezierBuilder:
+169 171 | class BezierBuilder3:
 170 172 |     __slots__ = ['xp', 'yp',
 
-RUF023.py:170:17: RUF023 [*] `BezierBuilder.__slots__` is not sorted
+RUF023.py:170:17: RUF023 [*] `BezierBuilder3.__slots__` is not sorted
     |
-169 |   class BezierBuilder:
+169 |   class BezierBuilder3:
 170 |       __slots__ = ['xp', 'yp',
     |  _________________^
 171 | |                  'canvas'
@@ -610,14 +610,14 @@ RUF023.py:170:17: RUF023 [*] `BezierBuilder.__slots__` is not sorted
 178 | |                  ]
     | |__________________^ RUF023
 179 |   
-180 |   ###################################
+180 |   class BezierBuilder4:
     |
-    = help: Apply a natural sort to `BezierBuilder.__slots__`
+    = help: Apply a natural sort to `BezierBuilder3.__slots__`
 
 ℹ Safe fix
 167 167 |                  'canvas'      ,          }
 168 168 | 
-169 169 | class BezierBuilder:
+169 169 | class BezierBuilder3:
 170     |-    __slots__ = ['xp', 'yp',
 171     |-                 'canvas'
     170 |+    __slots__ = [
@@ -627,5 +627,39 @@ RUF023.py:170:17: RUF023 [*] `BezierBuilder.__slots__` is not sorted
 172 174 | 
 173 175 |                  # very strangely placed comment
 174 176 | 
+
+RUF023.py:181:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
+    |
+180 |   class BezierBuilder4:
+181 |       __slots__ = (
+    |  _________________^
+182 | |         "foo"
+183 | |         # strange comment 1
+184 | |         ,
+185 | |         # comment about bar
+186 | |         "bar"
+187 | |         # strange comment 2
+188 | |         ,
+189 | |     )
+    | |_____^ RUF023
+190 |   
+191 |   ###################################
+    |
+    = help: Apply a natural sort to `BezierBuilder4.__slots__`
+
+ℹ Safe fix
+179 179 | 
+180 180 | class BezierBuilder4:
+181 181 |     __slots__ = (
+182     |-        "foo"
+183 182 |         # strange comment 1
+184     |-        ,
+185 183 |         # comment about bar
+186     |-        "bar"
+    184 |+        "bar",
+    185 |+        "foo"
+187 186 |         # strange comment 2
+188 187 |         ,
+189 188 |     )
 
 

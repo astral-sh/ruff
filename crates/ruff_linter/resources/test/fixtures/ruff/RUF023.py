@@ -166,7 +166,7 @@ class BezierBuilder2:
     __slots__ = {'xp', 'yp',
                  'canvas'      ,          }
 
-class BezierBuilder:
+class BezierBuilder3:
     __slots__ = ['xp', 'yp',
                  'canvas'
 
@@ -176,6 +176,17 @@ class BezierBuilder:
 
                  # another strangely placed comment
                  ]
+
+class BezierBuilder4:
+    __slots__ = (
+        "foo"
+        # strange comment 1
+        ,
+        # comment about bar
+        "bar"
+        # strange comment 2
+        ,
+    )
 
 ###################################
 # These should all not get flagged:

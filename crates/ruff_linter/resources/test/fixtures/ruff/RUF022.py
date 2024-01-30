@@ -240,6 +240,16 @@ __all__ = ['xp', 'yp',
                 # another strangely placed comment
                 ]
 
+__all__ = (
+    "foo"
+    # strange comment 1
+    ,
+    # comment about bar
+    "bar"
+    # strange comment 2
+    ,
+)
+
 ###################################
 # These should all not get flagged:
 ###################################
