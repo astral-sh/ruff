@@ -10,7 +10,7 @@ use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{lexer, Mode, Tok, TokenKind};
 use ruff_python_stdlib::str::is_cased_uppercase;
-use ruff_python_trivia::{leading_indentation, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{first_non_trivia_token, leading_indentation, SimpleTokenKind};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -434,11 +434,8 @@ impl MultilineStringSequenceValue {
             locator,
         );
 
-        let mut postlude_tokens =
-            SimpleTokenizer::starts_at(TextSize::new(0), &postlude).skip_trivia();
         let needs_trailing_comma = self.ends_with_trailing_comma
-            && postlude_tokens
-                .next()
+            && first_non_trivia_token(TextSize::new(0), &postlude)
                 .map_or(true, |tok| tok.kind() != SimpleTokenKind::Comma);
 
         self.items
