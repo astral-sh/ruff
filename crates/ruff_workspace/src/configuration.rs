@@ -917,41 +917,45 @@ impl LintConfiguration {
 
                 // Deprecated rules
                 if kind.is_enable() {
-                    if let RuleSelector::Linter(linter) = selector {
-                        if linter.rules().all(|rule| rule.is_deprecated()) {
-                            deprecated_selectors.insert(selector.clone());
+                    match selector {
+                        // Deprecated linter
+                        RuleSelector::Linter(linter) => {
+                            if linter.rules().all(|rule| rule.is_deprecated()) {
+                                deprecated_selectors.insert(selector.clone());
+                            }
                         }
-                    }
-                    if let RuleSelector::Rule {
-                        prefix,
-                        redirected_from: None,
-                    }
-                    | RuleSelector::Prefix {
-                        prefix,
-                        redirected_from: _,
-                    } = selector
-                    {
-                        if prefix.rules().all(|rule| rule.is_deprecated()) {
-                            deprecated_selectors.insert(selector.clone());
+                        // Deprecated rule without redirect or prefix with only deprecated rules
+                        RuleSelector::Rule {
+                            prefix,
+                            redirected_from: None,
                         }
-                    }
-                    if let RuleSelector::Rule {
-                        prefix: redirected_to,
-                        redirected_from: Some(redirected_from),
-                    } = selector
-                    {
-                        if let Ok(redirected_selector) =
-                            RuleSelector::from_str_no_redirect(redirected_from)
-                        {
-                            if let RuleSelector::Rule { ref prefix, .. }
-                            | RuleSelector::Prefix { ref prefix, .. } = redirected_selector
+                        | RuleSelector::Prefix {
+                            prefix,
+                            redirected_from: _,
+                        } => {
+                            if prefix.rules().all(|rule| rule.is_deprecated()) {
+                                deprecated_selectors.insert(selector.clone());
+                            }
+                        }
+                        // Deprecated rule with redirect
+                        RuleSelector::Rule {
+                            prefix: redirected_to,
+                            redirected_from: Some(redirected_from),
+                        } => {
+                            if let Ok(redirected_selector) =
+                                RuleSelector::from_str_no_redirect(redirected_from)
                             {
-                                if prefix.rules().all(|rule| rule.is_deprecated()) {
-                                    deprecated_redirected_selectors
-                                        .insert((redirected_selector, redirected_to));
+                                if let RuleSelector::Rule { ref prefix, .. }
+                                | RuleSelector::Prefix { ref prefix, .. } = redirected_selector
+                                {
+                                    if prefix.rules().all(|rule| rule.is_deprecated()) {
+                                        deprecated_redirected_selectors
+                                            .insert((redirected_selector, redirected_to));
+                                    }
                                 }
                             }
                         }
+                        _ => (),
                     }
                 }
 
