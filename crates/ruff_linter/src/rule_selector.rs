@@ -161,6 +161,16 @@ impl RuleSelector {
             }
         }
     }
+
+    pub fn display_kind(&self) -> &'static str {
+        match self {
+            #[allow(deprecated)]
+            Self::All | Self::T | Self::Nursery | Self::C => "rule selector",
+            Self::Rule { .. } => "rule",
+            Self::Prefix { .. } => "rule prefix",
+            Self::Linter(_) => "rule category",
+        }
+    }
 }
 
 impl Serialize for RuleSelector {

@@ -917,12 +917,21 @@ impl LintConfiguration {
 
                 // Deprecated rules
                 if kind.is_enable() {
+                    if let RuleSelector::Linter(linter) = selector {
+                        if linter.rules().all(|rule| rule.is_deprecated()) {
+                            deprecated_selectors.insert(selector.clone());
+                        }
+                    }
                     if let RuleSelector::Rule {
                         prefix,
                         redirected_from: None,
+                    }
+                    | RuleSelector::Prefix {
+                        prefix,
+                        redirected_from: _,
                     } = selector
                     {
-                        if prefix.rules().any(|rule| rule.is_deprecated()) {
+                        if prefix.rules().all(|rule| rule.is_deprecated()) {
                             deprecated_selectors.insert(selector.clone());
                         }
                     }
@@ -1019,19 +1028,21 @@ impl LintConfiguration {
 
         if preview.mode.is_disabled() {
             for selection in deprecated_selectors {
+                let kind = selection.display_kind();
                 let (prefix, code) = selection.prefix_and_code();
                 warn_user!(
-                    "Rule `{prefix}{code}` is deprecated and will be removed in a future release.",
+                    "The {kind} `{prefix}{code}` is deprecated and will be removed in a future release.",
                 );
             }
             for (selection, redirected_to) in deprecated_redirected_selectors {
+                let kind = selection.display_kind();
                 let (prefix, code) = selection.prefix_and_code();
                 let (redirect_prefix, redirect_code) = (
                     redirected_to.linter().common_prefix(),
                     redirected_to.short_code(),
                 );
                 warn_user!(
-                    "Rule `{prefix}{code}` is deprecated and will be removed in a future release. Use `{redirect_prefix}{redirect_code}` instead.",
+                    "The {kind} `{prefix}{code}` is deprecated and will be removed in a future release. Use `{redirect_prefix}{redirect_code}` instead.",
                 );
             }
         } else {
@@ -1049,13 +1060,14 @@ impl LintConfiguration {
             match deprecated_selectors.as_slice() {
                 [] => (),
                 [(selection, redirect)] => {
+                    let kind = selection.display_kind();
                     let (prefix, code) = selection.prefix_and_code();
                     let err = if let Some(redirect) = redirect {
                         let (redirect_prefix, redirect_code) =
                             (redirect.linter().common_prefix(), redirect.short_code());
-                        anyhow!("Selection of deprecated rule `{prefix}{code}` is not allowed when preview mode is enabled. Use `{redirect_prefix}{redirect_code}` instead.")
+                        anyhow!("Selection of deprecated {kind} `{prefix}{code}` is not allowed when preview mode is enabled. Use `{redirect_prefix}{redirect_code}` instead.")
                     } else {
-                        anyhow!("Selection of deprecated rule `{prefix}{code}` is not allowed when preview mode is enabled.")
+                        anyhow!("Selection of deprecated {kind} `{prefix}{code}` is not allowed when preview mode is enabled.")
                     };
                     return Err(err);
                 }
@@ -1267,6 +1279,7 @@ impl FormatConfiguration {
         }
     }
 }
+
 pub(crate) trait CombinePluginOptions {
     #[must_use]
     fn combine(self, other: Self) -> Self;

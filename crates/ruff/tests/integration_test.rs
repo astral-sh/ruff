@@ -1146,7 +1146,7 @@ def reciprocal(n):
     ----- stdout -----
 
     ----- stderr -----
-    warning: Rule `TRY200` is deprecated and will be removed in a future release.
+    warning: The rule `TRY200` is deprecated and will be removed in a future release.
     "###);
 }
 
@@ -1173,8 +1173,8 @@ class Foo:
     Found 2 errors.
 
     ----- stderr -----
-    warning: Rule `ANN102` is deprecated and will be removed in a future release.
-    warning: Rule `ANN101` is deprecated and will be removed in a future release.
+    warning: The rule `ANN102` is deprecated and will be removed in a future release.
+    warning: The rule `ANN101` is deprecated and will be removed in a future release.
     "###);
 }
 
@@ -1182,6 +1182,34 @@ class Foo:
 fn deprecated_indirect() {
     // `ANN` includes deprecated rules `ANN101` and `ANN102` but should not warn
     // since it is not a "direct" selection
+    let mut cmd = RuffCheck::default().args(["--select", "ANN"]).build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(r###"
+class Foo:
+    def a(self):
+        pass
+    
+    @classmethod
+    def b(cls):
+        pass
+"###), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:3:9: ANN201 Missing return type annotation for public function `a`
+    -:3:11: ANN101 Missing type annotation for `self` in method
+    -:7:9: ANN206 Missing return type annotation for classmethod `b`
+    -:7:11: ANN102 Missing type annotation for `cls` in classmethod
+    Found 4 errors.
+    No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn deprecated_prefix() {
+    // `ANN1` only includes deprecated rules `ANN101` and `ANN102` so it should warn
     let mut cmd = RuffCheck::default().args(["--select", "ANN1"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin(r###"
@@ -1201,6 +1229,7 @@ class Foo:
     Found 2 errors.
 
     ----- stderr -----
+    warning: The rule prefix `ANN1` is deprecated and will be removed in a future release.
     "###);
 }
 
@@ -1220,7 +1249,7 @@ x = eval(input("Enter a number: "))
     Found 1 error.
 
     ----- stderr -----
-    warning: Rule `PGH001` is deprecated and will be removed in a future release. Use `S307` instead.
+    warning: The rule `PGH001` is deprecated and will be removed in a future release. Use `S307` instead.
     "###);
 }
 
@@ -1290,8 +1319,8 @@ def reciprocal(n):
 }
 
 #[test]
-fn deprecated_indirect_redirect_preview_enabled() {
-    // e.g. `PGH001` is deprecated and redirected and should be off by default in preview.
+fn deprecated_linter_preview_enabled() {
+    // e.g. all the rules in `PGH` are and should fail in preview
     let mut cmd = RuffCheck::default()
         .args(["--select", "PGH", "--preview"])
         .build();
@@ -1299,11 +1328,13 @@ fn deprecated_indirect_redirect_preview_enabled() {
         .pass_stdin(r###"
 x = eval(input("Enter a number: "))
 "###), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
+    ruff failed
+      Cause: Selection of deprecated rule category `PGH` is not allowed when preview mode is enabled.
     "###);
 }
 
