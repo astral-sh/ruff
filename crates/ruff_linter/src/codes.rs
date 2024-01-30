@@ -311,11 +311,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Async, "102") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingOsCallInAsyncFunction),
 
         // flake8-trio
-        (Flake8Trio, "100") => (RuleGroup::Preview, rules::flake8_trio::rules::TrioTimeoutWithoutAwait),
-        (Flake8Trio, "105") => (RuleGroup::Preview, rules::flake8_trio::rules::TrioSyncCall),
-        (Flake8Trio, "109") => (RuleGroup::Preview, rules::flake8_trio::rules::TrioAsyncFunctionWithTimeout),
-        (Flake8Trio, "110") => (RuleGroup::Preview, rules::flake8_trio::rules::TrioUnneededSleep),
-        (Flake8Trio, "115") => (RuleGroup::Preview, rules::flake8_trio::rules::TrioZeroSleepCall),
+        (Flake8Trio, "100") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioTimeoutWithoutAwait),
+        (Flake8Trio, "105") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioSyncCall),
+        (Flake8Trio, "109") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioAsyncFunctionWithTimeout),
+        (Flake8Trio, "110") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioUnneededSleep),
+        (Flake8Trio, "115") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioZeroSleepCall),
 
         // flake8-builtins
         (Flake8Builtins, "001") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinVariableShadowing),
@@ -423,7 +423,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Quotes, "001") => (RuleGroup::Stable, rules::flake8_quotes::rules::BadQuotesMultilineString),
         (Flake8Quotes, "002") => (RuleGroup::Stable, rules::flake8_quotes::rules::BadQuotesDocstring),
         (Flake8Quotes, "003") => (RuleGroup::Stable, rules::flake8_quotes::rules::AvoidableEscapedQuote),
-        (Flake8Quotes, "004") => (RuleGroup::Preview, rules::flake8_quotes::rules::UnnecessaryEscapedQuote),
+        (Flake8Quotes, "004") => (RuleGroup::Stable, rules::flake8_quotes::rules::UnnecessaryEscapedQuote),
 
         // flake8-annotations
         (Flake8Annotations, "001") => (RuleGroup::Stable, rules::flake8_annotations::rules::MissingTypeFunctionArgument),
@@ -464,7 +464,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Simplify, "109") => (RuleGroup::Stable, rules::flake8_simplify::rules::CompareWithTuple),
         (Flake8Simplify, "110") => (RuleGroup::Stable, rules::flake8_simplify::rules::ReimplementedBuiltin),
         (Flake8Simplify, "112") => (RuleGroup::Stable, rules::flake8_simplify::rules::UncapitalizedEnvironmentVariables),
-        (Flake8Simplify, "113") => (RuleGroup::Preview, rules::flake8_simplify::rules::EnumerateForLoop),
+        (Flake8Simplify, "113") => (RuleGroup::Stable, rules::flake8_simplify::rules::EnumerateForLoop),
         (Flake8Simplify, "114") => (RuleGroup::Stable, rules::flake8_simplify::rules::IfWithSameArms),
         (Flake8Simplify, "115") => (RuleGroup::Stable, rules::flake8_simplify::rules::OpenFileWithContextHandler),
         (Flake8Simplify, "116") => (RuleGroup::Stable, rules::flake8_simplify::rules::IfElseBlockInsteadOfDictLookup),
@@ -483,7 +483,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Simplify, "300") => (RuleGroup::Stable, rules::flake8_simplify::rules::YodaConditions),
         (Flake8Simplify, "401") => (RuleGroup::Stable, rules::flake8_simplify::rules::IfElseBlockInsteadOfDictGet),
         (Flake8Simplify, "910") => (RuleGroup::Stable, rules::flake8_simplify::rules::DictGetWithNoneDefault),
-        (Flake8Simplify, "911") => (RuleGroup::Preview, rules::flake8_simplify::rules::ZipDictKeysAndValues),
+        (Flake8Simplify, "911") => (RuleGroup::Stable, rules::flake8_simplify::rules::ZipDictKeysAndValues),
 
         // flake8-copyright
         #[allow(deprecated)]
@@ -528,7 +528,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "038") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP604Isinstance),
         (Pyupgrade, "039") => (RuleGroup::Stable, rules::pyupgrade::rules::UnnecessaryClassParentheses),
         (Pyupgrade, "040") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP695TypeAlias),
-        (Pyupgrade, "041") => (RuleGroup::Preview, rules::pyupgrade::rules::TimeoutErrorAlias),
+        (Pyupgrade, "041") => (RuleGroup::Stable, rules::pyupgrade::rules::TimeoutErrorAlias),
 
         // pydocstyle
         (Pydocstyle, "100") => (RuleGroup::Stable, rules::pydocstyle::rules::UndocumentedPublicModule),
@@ -615,8 +615,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "110") => (RuleGroup::Stable, rules::flake8_bandit::rules::TryExceptPass),
         (Flake8Bandit, "112") => (RuleGroup::Stable, rules::flake8_bandit::rules::TryExceptContinue),
         (Flake8Bandit, "113") => (RuleGroup::Stable, rules::flake8_bandit::rules::RequestWithoutTimeout),
-        (Flake8Bandit, "201") => (RuleGroup::Preview, rules::flake8_bandit::rules::FlaskDebugTrue),
-        (Flake8Bandit, "202") => (RuleGroup::Preview, rules::flake8_bandit::rules::TarfileUnsafeMembers),
+        (Flake8Bandit, "201") => (RuleGroup::Stable, rules::flake8_bandit::rules::FlaskDebugTrue),
+        (Flake8Bandit, "202") => (RuleGroup::Stable, rules::flake8_bandit::rules::TarfileUnsafeMembers),
         (Flake8Bandit, "301") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousPickleUsage),
         (Flake8Bandit, "302") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousMarshalUsage),
         (Flake8Bandit, "303") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousInsecureHashUsage),
@@ -654,12 +654,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "413") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousPycryptoImport),
         (Flake8Bandit, "415") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousPyghmiImport),
         (Flake8Bandit, "501") => (RuleGroup::Stable, rules::flake8_bandit::rules::RequestWithNoCertValidation),
-        (Flake8Bandit, "502") => (RuleGroup::Preview, rules::flake8_bandit::rules::SslInsecureVersion),
-        (Flake8Bandit, "503") => (RuleGroup::Preview, rules::flake8_bandit::rules::SslWithBadDefaults),
-        (Flake8Bandit, "504") => (RuleGroup::Preview, rules::flake8_bandit::rules::SslWithNoVersion),
-        (Flake8Bandit, "505") => (RuleGroup::Preview, rules::flake8_bandit::rules::WeakCryptographicKey),
+        (Flake8Bandit, "502") => (RuleGroup::Stable, rules::flake8_bandit::rules::SslInsecureVersion),
+        (Flake8Bandit, "503") => (RuleGroup::Stable, rules::flake8_bandit::rules::SslWithBadDefaults),
+        (Flake8Bandit, "504") => (RuleGroup::Stable, rules::flake8_bandit::rules::SslWithNoVersion),
+        (Flake8Bandit, "505") => (RuleGroup::Stable, rules::flake8_bandit::rules::WeakCryptographicKey),
         (Flake8Bandit, "506") => (RuleGroup::Stable, rules::flake8_bandit::rules::UnsafeYAMLLoad),
-        (Flake8Bandit, "507") => (RuleGroup::Preview, rules::flake8_bandit::rules::SSHNoHostKeyVerification),
+        (Flake8Bandit, "507") => (RuleGroup::Stable, rules::flake8_bandit::rules::SSHNoHostKeyVerification),
         (Flake8Bandit, "508") => (RuleGroup::Stable, rules::flake8_bandit::rules::SnmpInsecureVersion),
         (Flake8Bandit, "509") => (RuleGroup::Stable, rules::flake8_bandit::rules::SnmpWeakCryptography),
         (Flake8Bandit, "601") => (RuleGroup::Stable, rules::flake8_bandit::rules::ParamikoCall),
@@ -671,10 +671,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "607") => (RuleGroup::Stable, rules::flake8_bandit::rules::StartProcessWithPartialPath),
         (Flake8Bandit, "608") => (RuleGroup::Stable, rules::flake8_bandit::rules::HardcodedSQLExpression),
         (Flake8Bandit, "609") => (RuleGroup::Stable, rules::flake8_bandit::rules::UnixCommandWildcardInjection),
-        (Flake8Bandit, "611") => (RuleGroup::Preview, rules::flake8_bandit::rules::DjangoRawSql),
+        (Flake8Bandit, "611") => (RuleGroup::Stable, rules::flake8_bandit::rules::DjangoRawSql),
         (Flake8Bandit, "612") => (RuleGroup::Stable, rules::flake8_bandit::rules::LoggingConfigInsecureListen),
         (Flake8Bandit, "701") => (RuleGroup::Stable, rules::flake8_bandit::rules::Jinja2AutoescapeFalse),
-        (Flake8Bandit, "702") => (RuleGroup::Preview, rules::flake8_bandit::rules::MakoTemplates),
+        (Flake8Bandit, "702") => (RuleGroup::Stable, rules::flake8_bandit::rules::MakoTemplates),
 
         // flake8-boolean-trap
         (Flake8BooleanTrap, "001") => (RuleGroup::Stable, rules::flake8_boolean_trap::rules::BooleanTypeHintPositionalArgument),
@@ -779,7 +779,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "053") => (RuleGroup::Stable, rules::flake8_pyi::rules::StringOrBytesTooLong),
         (Flake8Pyi, "055") => (RuleGroup::Stable, rules::flake8_pyi::rules::UnnecessaryTypeUnion),
         (Flake8Pyi, "056") => (RuleGroup::Stable, rules::flake8_pyi::rules::UnsupportedMethodCallOnAll),
-        (Flake8Pyi, "058") => (RuleGroup::Preview, rules::flake8_pyi::rules::GeneratorReturnFromIterMethod),
+        (Flake8Pyi, "058") => (RuleGroup::Stable, rules::flake8_pyi::rules::GeneratorReturnFromIterMethod),
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle),
@@ -841,7 +841,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8TypeChecking, "003") => (RuleGroup::Stable, rules::flake8_type_checking::rules::TypingOnlyStandardLibraryImport),
         (Flake8TypeChecking, "004") => (RuleGroup::Stable, rules::flake8_type_checking::rules::RuntimeImportInTypeCheckingBlock),
         (Flake8TypeChecking, "005") => (RuleGroup::Stable, rules::flake8_type_checking::rules::EmptyTypeCheckingBlock),
-        (Flake8TypeChecking, "006") => (RuleGroup::Preview, rules::flake8_type_checking::rules::RuntimeStringUnion),
+        (Flake8TypeChecking, "006") => (RuleGroup::Stable, rules::flake8_type_checking::rules::RuntimeStringUnion),
 
         // tryceratops
         (Tryceratops, "002") => (RuleGroup::Stable, rules::tryceratops::rules::RaiseVanillaClass),
@@ -910,7 +910,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Numpy, "001") => (RuleGroup::Stable, rules::numpy::rules::NumpyDeprecatedTypeAlias),
         (Numpy, "002") => (RuleGroup::Stable, rules::numpy::rules::NumpyLegacyRandom),
         (Numpy, "003") => (RuleGroup::Stable, rules::numpy::rules::NumpyDeprecatedFunction),
-        (Numpy, "201") => (RuleGroup::Preview, rules::numpy::rules::Numpy2Deprecation),
+        (Numpy, "201") => (RuleGroup::Stable, rules::numpy::rules::Numpy2Deprecation),
 
         // ruff
         (Ruff, "001") => (RuleGroup::Stable, rules::ruff::rules::AmbiguousUnicodeCharacterString),
@@ -926,11 +926,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "013") => (RuleGroup::Stable, rules::ruff::rules::ImplicitOptional),
         (Ruff, "015") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryIterableAllocationForFirstElement),
         (Ruff, "016") => (RuleGroup::Stable, rules::ruff::rules::InvalidIndexType),
-        #[allow(deprecated)]
-        (Ruff, "017") => (RuleGroup::Nursery, rules::ruff::rules::QuadraticListSummation),
-        (Ruff, "018") => (RuleGroup::Preview, rules::ruff::rules::AssignmentInAssert),
-        (Ruff, "019") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryKeyCheck),
-        (Ruff, "020") => (RuleGroup::Preview, rules::ruff::rules::NeverUnion),
+        (Ruff, "017") => (RuleGroup::Stable, rules::ruff::rules::QuadraticListSummation),
+        (Ruff, "018") => (RuleGroup::Stable, rules::ruff::rules::AssignmentInAssert),
+        (Ruff, "019") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryKeyCheck),
+        (Ruff, "020") => (RuleGroup::Stable, rules::ruff::rules::NeverUnion),
         (Ruff, "021") => (RuleGroup::Preview, rules::ruff::rules::ParenthesizeChainedOperators),
         (Ruff, "022") => (RuleGroup::Preview, rules::ruff::rules::UnsortedDunderAll),
         (Ruff, "023") => (RuleGroup::Preview, rules::ruff::rules::UnsortedDunderSlots),
@@ -1009,10 +1008,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "181") => (RuleGroup::Preview, rules::refurb::rules::HashlibDigestHex),
 
         // flake8-logging
-        (Flake8Logging, "001") => (RuleGroup::Preview, rules::flake8_logging::rules::DirectLoggerInstantiation),
-        (Flake8Logging, "002") => (RuleGroup::Preview, rules::flake8_logging::rules::InvalidGetLoggerArgument),
-        (Flake8Logging, "007") => (RuleGroup::Preview, rules::flake8_logging::rules::ExceptionWithoutExcInfo),
-        (Flake8Logging, "009") => (RuleGroup::Preview, rules::flake8_logging::rules::UndocumentedWarn),
+        (Flake8Logging, "001") => (RuleGroup::Stable, rules::flake8_logging::rules::DirectLoggerInstantiation),
+        (Flake8Logging, "002") => (RuleGroup::Stable, rules::flake8_logging::rules::InvalidGetLoggerArgument),
+        (Flake8Logging, "007") => (RuleGroup::Stable, rules::flake8_logging::rules::ExceptionWithoutExcInfo),
+        (Flake8Logging, "009") => (RuleGroup::Stable, rules::flake8_logging::rules::UndocumentedWarn),
 
         _ => return None,
     })
