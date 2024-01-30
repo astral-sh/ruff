@@ -15,6 +15,7 @@ use ruff_workspace::options_base::OptionsMetadata;
 
 const FIX_SYMBOL: &str = "🛠️";
 const PREVIEW_SYMBOL: &str = "🧪";
+const REMOVED_SYMBOL: &str = "❌";
 const WARNING_SYMBOL: &str = "⚠️";
 const STABLE_SYMBOL: &str = "✔️";
 const SPACER: &str = "&nbsp;&nbsp;&nbsp;&nbsp;";
@@ -26,6 +27,9 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
     table_out.push('\n');
     for rule in rules {
         let status_token = match rule.group() {
+            RuleGroup::Removed => {
+                format!("<span title='Rule has been removed'>{REMOVED_SYMBOL}</span>")
+            }
             RuleGroup::Deprecated => {
                 format!("<span title='Rule has been deprecated'>{WARNING_SYMBOL}</span>")
             }
@@ -62,9 +66,20 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
             Cow::Borrowed(message)
         };
 
+        // Start and end of style spans
+        let mut ss = "";
+        let mut se = "";
+        if rule.is_removed() {
+            ss = "<span style='opacity: 0.5', title='This rule has been removed'>";
+            se = "</span>";
+        } else if rule.is_deprecated() {
+            ss = "<span style='opacity: 0.8', title='This rule has been deprecated'>";
+            se = "</span>";
+        }
+
         #[allow(clippy::or_fun_call)]
         table_out.push_str(&format!(
-            "| {0}{1} {{ #{0}{1} }} | {2} | {3} | {4} |",
+            "| {ss}{0}{1}{se} {{ #{0}{1} }} | {ss}{2}{se} | {ss}{3}{se} | {ss}{4}{se} |",
             linter.common_prefix(),
             linter.code_for_rule(rule).unwrap(),
             rule.explanation()
@@ -98,6 +113,11 @@ pub(crate) fn generate() -> String {
 
     table_out.push_str(&format!(
         "{SPACER}{WARNING_SYMBOL}{SPACER} The rule has been deprecated and will be removed in a future release."
+    ));
+    table_out.push_str("<br />");
+
+    table_out.push_str(&format!(
+        "{SPACER}{REMOVED_SYMBOL}{SPACER} The rule has been removed only the documentation is available."
     ));
     table_out.push_str("<br />");
 

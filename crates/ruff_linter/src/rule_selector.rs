@@ -213,6 +213,8 @@ impl RuleSelector {
             || (preview_enabled && (matches!(self, RuleSelector::Rule { .. }) || !preview_require_explicit))
             // Deprecated rules are excluded in preview mode unless explicitly selected
             || (rule.is_deprecated() && (!preview_enabled || matches!(self, RuleSelector::Rule { .. })))
+            // Removed rules are included if explicitly selected but will error downstream
+            || (rule.is_removed() && matches!(self, RuleSelector::Rule { .. }))
         })
     }
 }
@@ -247,6 +249,8 @@ pub struct PreviewOptions {
 
 #[cfg(feature = "schemars")]
 mod schema {
+    use std::str::FromStr;
+
     use itertools::Itertools;
     use schemars::JsonSchema;
     use schemars::_serde_json::Value;
@@ -290,6 +294,16 @@ mod schema {
                                 (!prefix.is_empty()).then(|| prefix.to_string())
                             })),
                     )
+                    .filter(|p| {
+                        // Exclude any prefixes where all of the rules are removed
+                        if let Ok(Self::Rule { prefix, .. } | Self::Prefix { prefix, .. }) =
+                            RuleSelector::from_str(p)
+                        {
+                            !prefix.rules().all(|rule| rule.is_removed())
+                        } else {
+                            true
+                        }
+                    })
                     .sorted()
                     .map(Value::String)
                     .collect(),
