@@ -247,4 +247,13 @@ SIM114.py:144:1: SIM114 Combine `if` branches using logical `or` operator
     |
     = help: Combine `if` branches
 
+SIM114.py:148:1: SIM114 Combine `if` branches using logical `or` operator
+    |
+148 | / if(x > 200): pass
+149 | | elif(100 < x and x < 200 and 300 < y and y < 800):
+150 | |     pass
+    | |________^ SIM114
+    |
+    = help: Combine `if` branches
+
 
