@@ -1005,10 +1005,10 @@ impl LintConfiguration {
                 [] => (),
                 [selection] => {
                     let (prefix, code) = selection.prefix_and_code();
-                    return Err(anyhow!("Selection of deprecated rule `{prefix}{code}` is not allowed when preview mode is enabled."));
+                    return Err(anyhow!("Selection of deprecated rule `{prefix}{code}` is not allowed when preview is enabled."));
                 }
                 [..] => {
-                    let mut message = "Selection of deprecated rules is not allowed when preview mode is enabled. Remove selection of:".to_string();
+                    let mut message = "Selection of deprecated rules is not allowed when preview is enabled. Remove selection of:".to_string();
                     for selection in deprecated_selectors {
                         let (prefix, code) = selection.prefix_and_code();
                         message.push_str("\n\t- ");
@@ -1023,9 +1023,7 @@ impl LintConfiguration {
 
         for selection in ignored_preview_selectors {
             let (prefix, code) = selection.prefix_and_code();
-            warn_user!(
-                "Selection `{prefix}{code}` has no effect because the `--preview` flag was not included.",
-            );
+            warn_user!("Selection `{prefix}{code}` has no effect because preview is not enabled.",);
         }
 
         let mut rules = RuleTable::empty();
