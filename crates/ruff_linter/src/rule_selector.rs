@@ -267,7 +267,6 @@ mod schema {
                     [
                         // Include the non-standard "ALL" and "NURSERY" selectors.
                         "ALL".to_string(),
-                        "NURSERY".to_string(),
                         // Include the legacy "C" and "T" selectors.
                         "C".to_string(),
                         "T".to_string(),
