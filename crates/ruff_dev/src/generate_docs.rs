@@ -26,13 +26,21 @@ pub(crate) fn main(args: &Args) -> Result<()> {
     for rule in Rule::iter() {
         if let Some(explanation) = rule.explanation() {
             let mut output = String::new();
+
             output.push_str(&format!("# {} ({})", rule.as_ref(), rule.noqa_code()));
-            output.push('\n');
             output.push('\n');
 
             let (linter, _) = Linter::parse_code(&rule.noqa_code().to_string()).unwrap();
             if linter.url().is_some() {
                 output.push_str(&format!("Derived from the **{}** linter.", linter.name()));
+                output.push('\n');
+                output.push('\n');
+            }
+
+            if rule.is_deprecated() {
+                output.push_str(
+                    r"**Warning: This rule is deprecated and will be removed in a future release.**",
+                );
                 output.push('\n');
                 output.push('\n');
             }

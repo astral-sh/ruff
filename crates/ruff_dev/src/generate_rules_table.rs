@@ -3,6 +3,7 @@
 //! Used for <https://docs.astral.sh/ruff/rules/>.
 
 use itertools::Itertools;
+use ruff_linter::codes::RuleGroup;
 use std::borrow::Cow;
 use strum::IntoEnumIterator;
 
@@ -14,6 +15,9 @@ use ruff_workspace::options_base::OptionsMetadata;
 
 const FIX_SYMBOL: &str = "🛠️";
 const PREVIEW_SYMBOL: &str = "🧪";
+const WARNING_SYMBOL: &str = "⚠️";
+const STABLE_SYMBOL: &str = "✔️";
+const SPACER: &str = "&nbsp;&nbsp;&nbsp;&nbsp;";
 
 fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>, linter: &Linter) {
     table_out.push_str("| Code | Name | Message | |");
@@ -21,20 +25,30 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
     table_out.push_str("| ---- | ---- | ------- | ------: |");
     table_out.push('\n');
     for rule in rules {
+        let status_token = match rule.group() {
+            RuleGroup::Deprecated => {
+                format!("<span title='Rule has been deprecated'>{WARNING_SYMBOL}</span>")
+            }
+            #[allow(deprecated)]
+            RuleGroup::Preview | RuleGroup::Nursery => {
+                format!("<span title='Rule is in preview'>{PREVIEW_SYMBOL}</span>")
+            }
+            RuleGroup::Stable => {
+                // A full opacity checkmark is a bit aggressive for indicating stable
+                format!("<span title='Rule is stable' style='opacity: 0.6'>{STABLE_SYMBOL}</span>")
+            }
+        };
+
         let fix_token = match rule.fixable() {
             FixAvailability::Always | FixAvailability::Sometimes => {
                 format!("<span title='Automatic fix available'>{FIX_SYMBOL}</span>")
             }
             FixAvailability::None => {
-                format!("<span style='opacity: 0.1' aria-hidden='true'>{FIX_SYMBOL}</span>")
+                format!("<span title='Automatic fix not available' style='opacity: 0.1' aria-hidden='true'>{FIX_SYMBOL}</span>")
             }
         };
-        let preview_token = if rule.is_preview() || rule.is_nursery() {
-            format!("<span title='Rule is in preview'>{PREVIEW_SYMBOL}</span>")
-        } else {
-            format!("<span style='opacity: 0.1' aria-hidden='true'>{PREVIEW_SYMBOL}</span>")
-        };
-        let status_token = format!("{fix_token} {preview_token}");
+
+        let tokens = format!("{status_token} {fix_token}");
 
         let rule_name = rule.as_ref();
 
@@ -58,7 +72,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
                 .then_some(format_args!("[{rule_name}](rules/{rule_name}.md)"))
                 .unwrap_or(format_args!("{rule_name}")),
             message,
-            status_token,
+            tokens,
         ));
         table_out.push('\n');
     }
@@ -69,15 +83,28 @@ pub(crate) fn generate() -> String {
     // Generate the table string.
     let mut table_out = String::new();
 
-    table_out.push_str(&format!(
-        "The {FIX_SYMBOL} emoji indicates that a rule is automatically fixable by the `--fix` command-line option."));
-    table_out.push('\n');
+    table_out.push_str("### Legend");
     table_out.push('\n');
 
     table_out.push_str(&format!(
-        "The {PREVIEW_SYMBOL} emoji indicates that a rule is in [\"preview\"](faq.md#what-is-preview)."
+        "{SPACER}{STABLE_SYMBOL}{SPACER} The rule is stable."
     ));
-    table_out.push('\n');
+    table_out.push_str("<br />");
+
+    table_out.push_str(&format!(
+        "{SPACER}{PREVIEW_SYMBOL}{SPACER} The rule is unstable and is in [\"preview\"](faq.md#what-is-preview)."
+    ));
+    table_out.push_str("<br />");
+
+    table_out.push_str(&format!(
+        "{SPACER}{WARNING_SYMBOL}{SPACER} The rule has been deprecated and will be removed in a future release."
+    ));
+    table_out.push_str("<br />");
+
+    table_out.push_str(&format!(
+        "{SPACER}{FIX_SYMBOL}{SPACER} The rule is automatically fixable by the `--fix` command-line option."
+    ));
+    table_out.push_str("<br />");
     table_out.push('\n');
 
     for linter in Linter::iter() {
