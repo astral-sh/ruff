@@ -45,8 +45,6 @@
 - \[`pylint`\] Document `literal-membership` fix safety conditions ([#9677](https://github.com/astral-sh/ruff/pull/9677))
 - \[`isort`\] Fix reference to `isort` rule code ([#9598](https://github.com/astral-sh/ruff/pull/9598))
 
-### Other changes
-
 ## 0.1.14
 
 ### Preview features
