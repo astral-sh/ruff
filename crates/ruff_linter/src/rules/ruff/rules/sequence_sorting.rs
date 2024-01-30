@@ -10,7 +10,7 @@ use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{lexer, Mode, Tok, TokenKind};
 use ruff_python_stdlib::str::is_cased_uppercase;
-use ruff_python_trivia::leading_indentation;
+use ruff_python_trivia::{first_non_trivia_token, leading_indentation, SimpleTokenKind};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -434,6 +434,18 @@ impl MultilineStringSequenceValue {
             locator,
         );
 
+        // We only add a trailing comma to the last item in the sequence
+        // as part of `join_multiline_string_sequence_items()`
+        // if both the following are true:
+        //
+        // (1) The last item in the original sequence had a trailing comma; AND,
+        // (2) The first "semantically significant" token in the postlude is not a comma
+        //     (if the first semantically significant token *is* a comma, and we add another comma,
+        //     we'll end up with two commas after the final item, which would be invalid syntax)
+        let needs_trailing_comma = self.ends_with_trailing_comma
+            && first_non_trivia_token(TextSize::new(0), &postlude)
+                .map_or(true, |tok| tok.kind() != SimpleTokenKind::Comma);
+
         self.items
             .sort_by(|a, b| sorting_style.compare(&a.value, &b.value));
         let joined_items = join_multiline_string_sequence_items(
@@ -441,7 +453,7 @@ impl MultilineStringSequenceValue {
             locator,
             &item_indent,
             newline,
-            self.ends_with_trailing_comma,
+            needs_trailing_comma,
         );
 
         format!("{prelude}{joined_items}{postlude}")
