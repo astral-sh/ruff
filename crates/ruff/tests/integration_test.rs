@@ -1111,6 +1111,24 @@ fn removed_direct() {
 }
 
 #[test]
+fn removed_indirect() {
+    // Selection _including_ a removed rule without matching should not fail
+    // nor should the rule be used
+    let mut cmd = RuffCheck::default().args(["--select", "PLR"]).build();
+    assert_cmd_snapshot!(cmd.pass_stdin(r###"
+# This would have been a PLR1706 violation
+x, y = 1, 2
+maximum = x >= y and x or y
+"""###), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
 fn deprecated_direct() {
     // Selection of a deprecated rule without preview enabled should still work
     // but a warning should be displayed
