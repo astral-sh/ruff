@@ -206,6 +206,8 @@ class CheckOptions(CommandOptions):
             "check",
             "--no-cache",
             "--exit-zero",
+            "--output-format",
+            "concise",
             f"--{'' if self.preview else 'no-'}preview",
         ]
         if self.select:
