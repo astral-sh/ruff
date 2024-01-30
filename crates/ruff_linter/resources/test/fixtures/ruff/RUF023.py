@@ -45,9 +45,9 @@ class Klass3:
         "a"
     ]
 
-##########################################
-# Messier multiline __all__ definitions...
-##########################################
+##################################
+# Messier multiline definitions...
+##################################
 
 class Klass4:
     # comment0
@@ -153,6 +153,29 @@ class Klass5:
         "a"
     )
     __slots__ = ("don't" "care" "about", "__slots__" "with", "concatenated" "strings")
+
+############################################################
+# Trailing-comma edge cases that should be flagged and fixed
+############################################################
+
+class BezierBuilder:
+    __slots__ = ('xp', 'yp',
+                 'canvas',)
+
+class BezierBuilder2:
+    __slots__ = {'xp', 'yp',
+                 'canvas'      ,          }
+
+class BezierBuilder:
+    __slots__ = ['xp', 'yp',
+                 'canvas'
+
+                 # very strangely placed comment
+
+                 ,
+
+                 # another strangely placed comment
+                 ]
 
 ###################################
 # These should all not get flagged:

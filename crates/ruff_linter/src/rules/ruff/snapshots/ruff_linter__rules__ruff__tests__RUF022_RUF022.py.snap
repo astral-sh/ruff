@@ -896,8 +896,94 @@ RUF022.py:219:11: RUF022 `__all__` is not sorted
 219 | __all__ = ("don't" "care" "about", "__all__" "with", "concatenated" "strings")
     |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF022
 220 | 
-221 | ###################################
+221 | ############################################################
     |
     = help: Apply an isort-style sorting to `__all__`
+
+RUF022.py:225:11: RUF022 [*] `__all__` is not sorted
+    |
+223 |   ############################################################
+224 |   
+225 |   __all__ = (
+    |  ___________^
+226 | |     "loads",
+227 | |     "dumps",)
+    | |_____________^ RUF022
+228 |   
+229 |   __all__ = [
+    |
+    = help: Apply an isort-style sorting to `__all__`
+
+ℹ Safe fix
+223 223 | ############################################################
+224 224 | 
+225 225 | __all__ = (
+226     |-    "loads",
+227     |-    "dumps",)
+    226 |+    "dumps",
+    227 |+    "loads",)
+228 228 | 
+229 229 | __all__ = [
+230 230 |     "loads",
+
+RUF022.py:229:11: RUF022 [*] `__all__` is not sorted
+    |
+227 |       "dumps",)
+228 |   
+229 |   __all__ = [
+    |  ___________^
+230 | |     "loads",
+231 | |     "dumps"       ,     ]
+    | |_________________________^ RUF022
+232 |   
+233 |   __all__ = ['xp', 'yp',
+    |
+    = help: Apply an isort-style sorting to `__all__`
+
+ℹ Safe fix
+227 227 |     "dumps",)
+228 228 | 
+229 229 | __all__ = [
+230     |-    "loads",
+231     |-    "dumps"       ,     ]
+    230 |+    "dumps",
+    231 |+    "loads"       ,     ]
+232 232 | 
+233 233 | __all__ = ['xp', 'yp',
+234 234 |                 'canvas'
+
+RUF022.py:233:11: RUF022 [*] `__all__` is not sorted
+    |
+231 |       "dumps"       ,     ]
+232 |   
+233 |   __all__ = ['xp', 'yp',
+    |  ___________^
+234 | |                 'canvas'
+235 | | 
+236 | |                 # very strangely placed comment
+237 | | 
+238 | |                 ,
+239 | | 
+240 | |                 # another strangely placed comment
+241 | |                 ]
+    | |_________________^ RUF022
+242 |   
+243 |   ###################################
+    |
+    = help: Apply an isort-style sorting to `__all__`
+
+ℹ Safe fix
+230 230 |     "loads",
+231 231 |     "dumps"       ,     ]
+232 232 | 
+233     |-__all__ = ['xp', 'yp',
+234     |-                'canvas'
+    233 |+__all__ = [
+    234 |+    'canvas',
+    235 |+    'xp',
+    236 |+    'yp'
+235 237 | 
+236 238 |                 # very strangely placed comment
+237 239 | 
 
 
