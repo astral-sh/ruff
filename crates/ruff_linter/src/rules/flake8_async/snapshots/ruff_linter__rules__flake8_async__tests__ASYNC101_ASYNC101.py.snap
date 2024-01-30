@@ -1,46 +1,82 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
 ---
-ASYNC101.py:7:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+ASYNC101.py:9:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
   |
-6 | async def foo():
-7 |     open("foo")
+8 | async def foo():
+9 |     open("foo")
   |     ^^^^ ASYNC101
   |
 
-ASYNC101.py:11:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+ASYNC101.py:13:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
    |
-10 | async def foo():
-11 |     time.sleep(1)
+12 | async def foo():
+13 |     time.sleep(1)
    |     ^^^^^^^^^^ ASYNC101
    |
 
-ASYNC101.py:15:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+ASYNC101.py:17:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
    |
-14 | async def foo():
-15 |     subprocess.run("foo")
+16 | async def foo():
+17 |     subprocess.run("foo")
    |     ^^^^^^^^^^^^^^ ASYNC101
    |
 
-ASYNC101.py:19:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+ASYNC101.py:21:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
    |
-18 | async def foo():
-19 |     subprocess.call("foo")
+20 | async def foo():
+21 |     subprocess.call("foo")
    |     ^^^^^^^^^^^^^^^ ASYNC101
    |
 
-ASYNC101.py:27:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+ASYNC101.py:29:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
    |
-26 | async def foo():
-27 |     os.wait4(10)
+28 | async def foo():
+29 |     os.wait4(10)
    |     ^^^^^^^^ ASYNC101
    |
 
-ASYNC101.py:31:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+ASYNC101.py:33:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
    |
-30 | async def foo():
-31 |     os.wait(12)
+32 | async def foo():
+33 |     os.wait(12)
    |     ^^^^^^^ ASYNC101
+34 | 
+35 | # Violation cases for pathlib:
+   |
+
+ASYNC101.py:38:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+   |
+37 | async def foo():
+38 |     Path("foo").open() # ASYNC101
+   |     ^^^^^^^^^^^^^^^^ ASYNC101
+39 | 
+40 | async def foo():
+   |
+
+ASYNC101.py:42:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+   |
+40 | async def foo():
+41 |     p = Path("foo")
+42 |     p.open() # ASYNC101
+   |     ^^^^^^ ASYNC101
+43 | 
+44 | async def foo():
+   |
+
+ASYNC101.py:45:10: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+   |
+44 | async def foo():
+45 |     with Path("foo").open() as f: # ASYNC101
+   |          ^^^^^^^^^^^^^^^^ ASYNC101
+46 |         pass
+   |
+
+ASYNC101.py:53:9: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+   |
+52 |     async def bar():
+53 |         p.open() # ASYNC101
+   |         ^^^^^^ ASYNC101
    |
 
 
