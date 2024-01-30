@@ -15,6 +15,7 @@ use ruff_workspace::options_base::OptionsMetadata;
 
 const FIX_SYMBOL: &str = "🛠️";
 const PREVIEW_SYMBOL: &str = "🧪";
+const REMOVED_SYMBOL: &str = "❌";
 const WARNING_SYMBOL: &str = "⚠️";
 const STABLE_SYMBOL: &str = "✔️";
 const SPACER: &str = "&nbsp;&nbsp;&nbsp;&nbsp;";
@@ -26,6 +27,9 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
     table_out.push('\n');
     for rule in rules {
         let status_token = match rule.group() {
+            RuleGroup::Removed => {
+                format!("<span title='Rule has been removed'>{REMOVED_SYMBOL}</span>")
+            }
             RuleGroup::Deprecated => {
                 format!("<span title='Rule has been deprecated'>{WARNING_SYMBOL}</span>")
             }
@@ -98,6 +102,11 @@ pub(crate) fn generate() -> String {
 
     table_out.push_str(&format!(
         "{SPACER}{WARNING_SYMBOL}{SPACER} The rule has been deprecated and will be removed in a future release."
+    ));
+    table_out.push_str("<br />");
+
+    table_out.push_str(&format!(
+        "{SPACER}{REMOVED_SYMBOL}{SPACER} The rule has been removed only the documentation is available."
     ));
     table_out.push_str("<br />");
 
