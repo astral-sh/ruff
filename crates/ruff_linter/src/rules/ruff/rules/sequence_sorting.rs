@@ -435,6 +435,7 @@ impl MultilineStringSequenceValue {
         );
 
         // We only add a trailing comma to the last item in the sequence
+        // as part of `join_multiline_string_sequence_items()`
         // if both the following are true:
         //
         // (1) The last item in the original sequence had a trailing comma; AND,
