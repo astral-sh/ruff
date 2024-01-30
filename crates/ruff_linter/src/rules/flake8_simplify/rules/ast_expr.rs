@@ -266,10 +266,6 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     match value.as_ref() {
         Expr::Dict(_) | Expr::DictComp(_) => {}
         Expr::Name(name) => {
-            if checker.settings.preview.is_disabled() {
-                return;
-            }
-
             let Some(binding) = checker
                 .semantic()
                 .only_binding(name)

@@ -127,7 +127,7 @@ fn key_in_dict(
     {
         // The fix is only safe if we know the expression is a dictionary, since other types
         // can define a `.keys()` method.
-        let applicability = if checker.settings.preview.is_enabled() {
+        let applicability = {
             let is_dict = value.as_name_expr().is_some_and(|name| {
                 let Some(binding) = checker
                     .semantic()
@@ -143,8 +143,6 @@ fn key_in_dict(
             } else {
                 Applicability::Unsafe
             }
-        } else {
-            Applicability::Unsafe
         };
 
         // If the `.keys()` is followed by (e.g.) a keyword, we need to insert a space,

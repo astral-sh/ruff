@@ -81,27 +81,27 @@ pub(crate) fn deprecated_log_warn(checker: &mut Checker, call: &ast::ExprCall) {
     }
 
     let mut diagnostic = Diagnostic::new(DeprecatedLogWarn, call.func.range());
-    if checker.settings.preview.is_enabled() {
-        match call.func.as_ref() {
-            Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    "warning".to_string(),
-                    attr.range(),
-                )));
-            }
-            Expr::Name(_) => {
-                diagnostic.try_set_fix(|| {
-                    let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                        &ImportRequest::import("logging", "warning"),
-                        call.start(),
-                        checker.semantic(),
-                    )?;
-                    let name_edit = Edit::range_replacement(binding, call.func.range());
-                    Ok(Fix::safe_edits(import_edit, [name_edit]))
-                });
-            }
-            _ => {}
+
+    match call.func.as_ref() {
+        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "warning".to_string(),
+                attr.range(),
+            )));
         }
+        Expr::Name(_) => {
+            diagnostic.try_set_fix(|| {
+                let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                    &ImportRequest::import("logging", "warning"),
+                    call.start(),
+                    checker.semantic(),
+                )?;
+                let name_edit = Edit::range_replacement(binding, call.func.range());
+                Ok(Fix::safe_edits(import_edit, [name_edit]))
+            });
+        }
+        _ => {}
     }
+
     checker.diagnostics.push(diagnostic);
 }
