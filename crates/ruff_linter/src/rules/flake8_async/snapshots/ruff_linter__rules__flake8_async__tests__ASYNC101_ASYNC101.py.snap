@@ -1,82 +1,84 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
 ---
-ASYNC101.py:9:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
-  |
-8 | async def foo():
-9 |     open("foo")
-  |     ^^^^ ASYNC101
-  |
-
-ASYNC101.py:13:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+ASYNC101.py:10:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
    |
-12 | async def foo():
-13 |     time.sleep(1)
+ 9 | async def func():
+10 |     open("foo")
+   |     ^^^^ ASYNC101
+   |
+
+ASYNC101.py:14:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+   |
+13 | async def func():
+14 |     time.sleep(1)
    |     ^^^^^^^^^^ ASYNC101
    |
 
-ASYNC101.py:17:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+ASYNC101.py:18:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
    |
-16 | async def foo():
-17 |     subprocess.run("foo")
+17 | async def func():
+18 |     subprocess.run("foo")
    |     ^^^^^^^^^^^^^^ ASYNC101
    |
 
-ASYNC101.py:21:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+ASYNC101.py:22:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
    |
-20 | async def foo():
-21 |     subprocess.call("foo")
+21 | async def func():
+22 |     subprocess.call("foo")
    |     ^^^^^^^^^^^^^^^ ASYNC101
    |
 
-ASYNC101.py:29:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+ASYNC101.py:30:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
    |
-28 | async def foo():
-29 |     os.wait4(10)
+29 | async def func():
+30 |     os.wait4(10)
    |     ^^^^^^^^ ASYNC101
    |
 
-ASYNC101.py:33:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+ASYNC101.py:34:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
    |
-32 | async def foo():
-33 |     os.wait(12)
+33 | async def func():
+34 |     os.wait(12)
    |     ^^^^^^^ ASYNC101
-34 | 
-35 | # Violation cases for pathlib:
    |
 
-ASYNC101.py:38:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+ASYNC101.py:41:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
    |
-37 | async def foo():
-38 |     Path("foo").open() # ASYNC101
+40 | async def func():
+41 |     Path("foo").open()  # ASYNC101
    |     ^^^^^^^^^^^^^^^^ ASYNC101
-39 | 
-40 | async def foo():
    |
 
-ASYNC101.py:42:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+ASYNC101.py:46:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
    |
-40 | async def foo():
-41 |     p = Path("foo")
-42 |     p.open() # ASYNC101
+44 | async def func():
+45 |     p = Path("foo")
+46 |     p.open()  # ASYNC101
    |     ^^^^^^ ASYNC101
-43 | 
-44 | async def foo():
    |
 
-ASYNC101.py:45:10: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+ASYNC101.py:50:10: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
    |
-44 | async def foo():
-45 |     with Path("foo").open() as f: # ASYNC101
+49 | async def func():
+50 |     with Path("foo").open() as f:  # ASYNC101
    |          ^^^^^^^^^^^^^^^^ ASYNC101
-46 |         pass
+51 |         pass
    |
 
-ASYNC101.py:53:9: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+ASYNC101.py:58:9: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
    |
-52 |     async def bar():
-53 |         p.open() # ASYNC101
+57 |     async def bar():
+58 |         p.open()  # ASYNC101
    |         ^^^^^^ ASYNC101
+   |
+
+ASYNC101.py:64:5: ASYNC101 Async functions should not call `open`, `time.sleep`, or `subprocess` methods
+   |
+62 |     (p1, p2) = (Path("foo"), Path("bar"))
+63 | 
+64 |     p1.open()  # ASYNC101
+   |     ^^^^^^^ ASYNC101
    |
 
 

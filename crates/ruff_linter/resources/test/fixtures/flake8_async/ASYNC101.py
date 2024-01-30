@@ -5,69 +5,83 @@ from pathlib import Path
 
 # Violation cases:
 
-async def foo():
+
+async def func():
     open("foo")
 
 
-async def foo():
+async def func():
     time.sleep(1)
 
 
-async def foo():
+async def func():
     subprocess.run("foo")
 
 
-async def foo():
+async def func():
     subprocess.call("foo")
 
 
-async def foo():
+async def func():
     subprocess.foo(0)
 
 
-async def foo():
+async def func():
     os.wait4(10)
 
 
-async def foo():
+async def func():
     os.wait(12)
 
+
 # Violation cases for pathlib:
-    
-async def foo():
-    Path("foo").open() # ASYNC101
 
-async def foo():
+
+async def func():
+    Path("foo").open()  # ASYNC101
+
+
+async def func():
     p = Path("foo")
-    p.open() # ASYNC101
+    p.open()  # ASYNC101
 
-async def foo():
-    with Path("foo").open() as f: # ASYNC101
+
+async def func():
+    with Path("foo").open() as f:  # ASYNC101
         pass
 
 
-async def foo() -> None:
+async def func() -> None:
     p = Path("foo")
 
     async def bar():
-        p.open() # ASYNC101
+        p.open()  # ASYNC101
+
+
+async def func() -> None:
+    (p1, p2) = (Path("foo"), Path("bar"))
+
+    p1.open()  # ASYNC101
 
 
 # Non-violation cases for pathlib:
-    
+
 
 class Foo:
     def open(self):
         pass
 
-async def foo():
-    Foo().open() # OK
+
+async def func():
+    Foo().open()  # OK
 
 
-async def foo():
+async def func():
     def open():
         pass
-    open() # OK
 
-def foo():
-    Path("foo").open() # OK
+    open()  # OK
+
+
+def func():
+    Path("foo").open()  # OK

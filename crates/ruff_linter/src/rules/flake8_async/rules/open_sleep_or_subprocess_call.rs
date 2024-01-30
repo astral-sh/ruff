@@ -1,9 +1,7 @@
-use ruff_python_ast::{Expr, ExprAttribute, ExprCall, ExprName, Stmt, StmtAssign};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::CallPath;
-use ruff_python_semantic::SemanticModel;
+use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::{analyze, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -42,50 +40,47 @@ impl Violation for OpenSleepOrSubprocessInAsyncFunction {
 }
 
 /// ASYNC101
-pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, call: &ExprCall) {
-    let should_add_to_diagnostics = if checker.semantic().in_async_context() {
-        if let Some(call_path) = checker.semantic().resolve_call_path(call.func.as_ref()) {
-            is_open_sleep_or_subprocess_call(&call_path)
-                || is_open_call_from_pathlib(call.func.as_ref(), checker.semantic())
-        } else {
-            is_open_call_from_pathlib(call.func.as_ref(), checker.semantic())
-        }
-    } else {
-        false
-    };
-
-    if !should_add_to_diagnostics {
+pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, call: &ast::ExprCall) {
+    if !checker.semantic().in_async_context() {
         return;
     }
-    checker.diagnostics.push(Diagnostic::new(
-        OpenSleepOrSubprocessInAsyncFunction,
-        call.func.range(),
-    ));
+
+    if is_open_sleep_or_subprocess_call(&call.func, checker.semantic())
+        || is_open_call_from_pathlib(call.func.as_ref(), checker.semantic())
+    {
+        checker.diagnostics.push(Diagnostic::new(
+            OpenSleepOrSubprocessInAsyncFunction,
+            call.func.range(),
+        ));
+    }
 }
 
-fn is_open_sleep_or_subprocess_call(call_path: &CallPath) -> bool {
-    matches!(
-        call_path.as_slice(),
-        ["", "open"]
-            | ["time", "sleep"]
-            | [
-                "subprocess",
-                "run"
-                    | "Popen"
-                    | "call"
-                    | "check_call"
-                    | "check_output"
-                    | "getoutput"
-                    | "getstatusoutput"
-            ]
-            | ["os", "wait" | "wait3" | "wait4" | "waitid" | "waitpid"]
-    )
+/// Returns `true` if the expression resolves to a blocking call, like `time.sleep` or
+/// `subprocess.run`.
+fn is_open_sleep_or_subprocess_call(func: &Expr, semantic: &SemanticModel) -> bool {
+    semantic.resolve_call_path(func).is_some_and(|call_path| {
+        matches!(
+            call_path.as_slice(),
+            ["", "open"]
+                | ["time", "sleep"]
+                | [
+                    "subprocess",
+                    "run"
+                        | "Popen"
+                        | "call"
+                        | "check_call"
+                        | "check_output"
+                        | "getoutput"
+                        | "getstatusoutput"
+                ]
+                | ["os", "wait" | "wait3" | "wait4" | "waitid" | "waitpid"]
+        )
+    })
 }
 
-/// Analyze if the open call is from `pathlib.Path`
-/// PTH123 (builtin-open) suggests to use `pathlib.Path.open` instead of `open`
+/// Returns `true` if an expression resolves to a call to `pathlib.Path.open`.
 fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = func else {
+    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
         return false;
     };
 
@@ -93,10 +88,10 @@ fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     }
 
-    // Check first if the call is from `pathlib.Path.open`:
+    // First: is this an inlined call to `pathlib.Path.open`?
     // ```python
-    //  from pathlib import Path
-    //  Path("foo").open()
+    // from pathlib import Path
+    // Path("foo").open()
     // ```
     if let Expr::Call(call) = value.as_ref() {
         let Some(call_path) = semantic.resolve_call_path(call.func.as_ref()) else {
@@ -107,35 +102,28 @@ fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -> bool {
         }
     }
 
-    // Otherwise, check if Path.open call is bind to a variable:
+    // Second, is this a call to `pathlib.Path.open` via a variable?
     // ```python
-    //  from pathlib import Path
-    //  p = Path("foo")
-    //  p.open()
-    //
-    let Expr::Name(ExprName { id, .. }) = value.as_ref() else {
+    // from pathlib import Path
+    // path = Path("foo")
+    // path.open()
+    // ```
+    let Expr::Name(name) = value.as_ref() else {
         return false;
     };
 
-    let Some(binding_id) = semantic.lookup_symbol(id) else {
+    let Some(binding_id) = semantic.resolve_name(name) else {
         return false;
     };
 
-    let Some(node_id) = semantic.binding(binding_id).source else {
+    let binding = semantic.binding(binding_id);
+
+    let Some(Expr::Call(call)) = analyze::typing::find_binding_value(&name.id, binding, semantic)
+    else {
         return false;
     };
 
-    let Stmt::Assign(StmtAssign { value, .. }) = semantic.statement(node_id) else {
-        return false;
-    };
-
-    if let Expr::Call(call) = value.as_ref() {
-        let Some(call_path) = semantic.resolve_call_path(call.func.as_ref()) else {
-            return false;
-        };
-        if call_path.as_slice() == ["pathlib", "Path"] {
-            return true;
-        }
-    }
-    false
+    semantic
+        .resolve_call_path(call.func.as_ref())
+        .is_some_and(|call_path| call_path.as_slice() == ["pathlib", "Path"])
 }
