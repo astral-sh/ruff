@@ -916,32 +916,16 @@ impl LintConfiguration {
                 }
 
                 // Deprecated rules
-                if kind.is_enable() {
-                    if let RuleSelector::Rule {
-                        prefix,
-                        redirected_from: None,
-                    } = selector
-                    {
-                        if prefix.rules().any(|rule| rule.is_deprecated()) {
-                            deprecated_selectors.insert(selector.clone());
-                        }
+                if kind.is_enable() && selector.is_exact() {
+                    if selector.all_rules().all(|rule| rule.is_deprecated()) {
+                        deprecated_selectors.insert(selector.clone());
                     }
-                    if let RuleSelector::Rule {
-                        prefix: redirected_to,
-                        redirected_from: Some(redirected_from),
-                    } = selector
-                    {
-                        if let Ok(redirected_selector) =
-                            RuleSelector::from_str_no_redirect(redirected_from)
+                    if let Some(redirected_selector) = selector.redirected_from() {
+                        if redirected_selector
+                            .all_rules()
+                            .all(|rule| rule.is_deprecated())
                         {
-                            if let RuleSelector::Rule { ref prefix, .. }
-                            | RuleSelector::Prefix { ref prefix, .. } = redirected_selector
-                            {
-                                if prefix.rules().all(|rule| rule.is_deprecated()) {
-                                    deprecated_redirected_selectors
-                                        .insert((redirected_selector, redirected_to));
-                                }
-                            }
+                            deprecated_redirected_selectors.insert((redirected_selector, selector));
                         }
                     }
                 }
@@ -1026,10 +1010,7 @@ impl LintConfiguration {
             }
             for (selection, redirected_to) in deprecated_redirected_selectors {
                 let (prefix, code) = selection.prefix_and_code();
-                let (redirect_prefix, redirect_code) = (
-                    redirected_to.linter().common_prefix(),
-                    redirected_to.short_code(),
-                );
+                let (redirect_prefix, redirect_code) = redirected_to.prefix_and_code();
                 warn_user!(
                     "Rule `{prefix}{code}` is deprecated and will be removed in a future release. Use `{redirect_prefix}{redirect_code}` instead.",
                 );
@@ -1051,8 +1032,7 @@ impl LintConfiguration {
                 [(selection, redirect)] => {
                     let (prefix, code) = selection.prefix_and_code();
                     let err = if let Some(redirect) = redirect {
-                        let (redirect_prefix, redirect_code) =
-                            (redirect.linter().common_prefix(), redirect.short_code());
+                        let (redirect_prefix, redirect_code) = redirect.prefix_and_code();
                         anyhow!("Selection of deprecated rule `{prefix}{code}` is not allowed when preview mode is enabled. Use `{redirect_prefix}{redirect_code}` instead.")
                     } else {
                         anyhow!("Selection of deprecated rule `{prefix}{code}` is not allowed when preview mode is enabled.")
@@ -1067,8 +1047,7 @@ impl LintConfiguration {
                         message.push_str(prefix);
                         message.push_str(code);
                         if let Some(redirect) = redirect {
-                            let (redirect_prefix, redirect_code) =
-                                (redirect.linter().common_prefix(), redirect.short_code());
+                            let (redirect_prefix, redirect_code) = redirect.prefix_and_code();
                             message.push_str(&format!(
                                 " (use `{redirect_prefix}{redirect_code}` instead)"
                             ));

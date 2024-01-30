@@ -242,15 +242,42 @@ impl RuleSelector {
             // Always include stable rules
             rule.is_stable()
             // Backwards compatibility allows selection of nursery rules by exact code or dedicated group
-            || ((matches!(self, RuleSelector::Rule { .. }) || matches!(self, RuleSelector::Nursery { .. })) && rule.is_nursery())
+            || ((self.is_exact() || matches!(self, RuleSelector::Nursery { .. })) && rule.is_nursery())
             // Enabling preview includes all preview or nursery rules unless explicit selection
             // is turned on
-            || (preview_enabled && (matches!(self, RuleSelector::Rule { .. }) || !preview_require_explicit))
+            || (preview_enabled && (self.is_exact() || !preview_require_explicit))
             // Deprecated rules are excluded in preview mode unless explicitly selected
-            || (rule.is_deprecated() && (!preview_enabled || matches!(self, RuleSelector::Rule { .. })))
+            || (rule.is_deprecated() && (!preview_enabled || self.is_exact()))
             // Removed rules are included if explicitly selected but will error downstream
-            || (rule.is_removed() && matches!(self, RuleSelector::Rule { .. }))
+            || (rule.is_removed() && self.is_exact())
         })
+    }
+
+    /// Returns the selector string that this selector is a redirect of (if any)
+    ///
+    /// # Panics
+    ///
+    /// If a redirect is not a valid rule selector
+    pub fn redirected_from(&self) -> Option<RuleSelector> {
+        match self {
+            Self::Rule {
+                prefix: _,
+                redirected_from,
+            }
+            | Self::Prefix {
+                prefix: _,
+                redirected_from,
+            } => redirected_from.map(|literal| {
+                RuleSelector::from_str_no_redirect(literal)
+                    .expect("Redirects should always be valid selectors")
+            }),
+            _ => None,
+        }
+    }
+
+    /// Returns true if this selector is exact i.e. selects a single rule by code
+    pub fn is_exact(&self) -> bool {
+        matches!(self, Self::Rule { .. })
     }
 }
 
