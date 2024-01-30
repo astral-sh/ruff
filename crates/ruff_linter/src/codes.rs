@@ -55,6 +55,8 @@ pub enum RuleGroup {
     /// The rule has been deprecated, warnings will be displayed during selection in stable
     /// and errors will be raised if used with preview mode enabled.
     Deprecated,
+    /// The rule has been removed, errors will be displayed on use.
+    Removed,
     /// Legacy category for unstable rules, supports backwards compatible selection.
     #[deprecated(note = "Use `RuleGroup::Preview` for new rules instead")]
     Nursery,
@@ -268,7 +270,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R1704") => (RuleGroup::Preview, rules::pylint::rules::RedefinedArgumentFromLocal),
         (Pylint, "R1711") => (RuleGroup::Stable, rules::pylint::rules::UselessReturn),
         (Pylint, "R1714") => (RuleGroup::Stable, rules::pylint::rules::RepeatedEqualityComparison),
-        (Pylint, "R1706") => (RuleGroup::Preview, rules::pylint::rules::AndOrTernary),
+        (Pylint, "R1706") => (RuleGroup::Removed, rules::pylint::rules::AndOrTernary),
         (Pylint, "R1722") => (RuleGroup::Stable, rules::pylint::rules::SysExitAlias),
         (Pylint, "R1733") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryDictIndexLookup),
         (Pylint, "R1736") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryListIndexLookup),
