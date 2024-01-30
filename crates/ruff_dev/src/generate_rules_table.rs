@@ -59,16 +59,31 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
         // If the message ends in a bracketed expression (like: "Use {replacement}"), escape the
         // brackets. Otherwise, it'll be interpreted as an HTML attribute via the `attr_list`
         // plugin. (Above, we'd convert to "Use {replacement\}".)
-        let message = rule.message_formats()[0];
-        let message = if let Some(prefix) = message.strip_suffix('}') {
-            Cow::Owned(format!("{prefix}\\}}"))
+        let message = if rule.is_removed() {
+            Cow::Owned("_This rule has been removed_".to_string())
         } else {
-            Cow::Borrowed(message)
+            let message = rule.message_formats()[0];
+            if let Some(prefix) = message.strip_suffix('}') {
+                Cow::Owned(format!("{prefix}\\}}"))
+            } else {
+                Cow::Borrowed(message)
+            }
         };
+
+        // Start and end of style spans
+        let mut ss = "";
+        let mut se = "";
+        if rule.is_removed() {
+            ss = "<span style='opacity: 0.5', title='This rule has been removed'>";
+            se = "</span>";
+        } else if rule.is_deprecated() {
+            ss = "<span style='opacity: 0.8', title='This rule has been deprecated'>";
+            se = "</span>";
+        }
 
         #[allow(clippy::or_fun_call)]
         table_out.push_str(&format!(
-            "| {0}{1} {{ #{0}{1} }} | {2} | {3} | {4} |",
+            "|{ss}{0}{1}{se} {{ #{0}{1} }} | {ss}{2}{se} | {ss}{3}{se} | {ss}{4}{se} |",
             linter.common_prefix(),
             linter.code_for_rule(rule).unwrap(),
             rule.explanation()
