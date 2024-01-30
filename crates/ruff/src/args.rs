@@ -133,6 +133,7 @@ pub struct CheckCommand {
 
     /// Output serialization format for violations.
     /// The default serialization format is "concise".
+    /// In preview mode, the default serialization format is "full".
     #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
     pub output_format: Option<SerializationFormat>,
 
@@ -547,7 +548,7 @@ impl CheckCommand {
                 output_format: resolve_output_format(
                     self.output_format,
                     resolve_bool_arg(self.show_source, self.no_show_source),
-                    self.preview,
+                    resolve_bool_arg(self.preview, self.no_preview).unwrap_or_default(),
                 ),
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
                 extension: self.extension,

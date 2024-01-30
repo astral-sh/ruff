@@ -17,7 +17,6 @@ use clap::Parser;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 #[cfg(unix)]
 use path_absolutize::path_dedot;
-use ruff_linter::settings::types::SerializationFormat;
 use tempfile::TempDir;
 
 #[cfg(unix)]
@@ -34,7 +33,7 @@ fn ruff_cmd() -> Command {
 /// Builder for `ruff check` commands.
 #[derive(Debug)]
 struct RuffCheck<'a> {
-    output_format: String,
+    output_format: Option<&'a str>,
     config: Option<&'a Path>,
     filename: Option<&'a str>,
     args: Vec<&'a str>,
@@ -43,7 +42,7 @@ struct RuffCheck<'a> {
 impl<'a> Default for RuffCheck<'a> {
     fn default() -> RuffCheck<'a> {
         RuffCheck {
-            output_format: format!("{}", SerializationFormat::default(false)),
+            output_format: None,
             config: None,
             filename: None,
             args: vec![],
@@ -62,7 +61,7 @@ impl<'a> RuffCheck<'a> {
     /// Set the `--output-format` option.
     #[must_use]
     fn output_format(mut self, format: &'a str) -> Self {
-        self.output_format = format.to_string();
+        self.output_format = Some(format);
         self
     }
 
@@ -83,8 +82,9 @@ impl<'a> RuffCheck<'a> {
     /// Generate a [`Command`] for the `ruff check` command.
     fn build(self) -> Command {
         let mut cmd = ruff_cmd();
-        cmd.arg("--output-format");
-        cmd.arg(self.output_format);
+        if let Some(output_format) = self.output_format {
+            cmd.args(["--output-format", output_format]);
+        }
         cmd.arg("--no-cache");
 
         if let Some(path) = self.config {
@@ -747,6 +747,26 @@ fn stdin_parse_error() {
 }
 
 #[test]
+fn full_output_preview() {
+    let mut cmd = RuffCheck::default().args(["--preview"]).build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("l = 1"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `l`
+      |
+    1 | l = 1
+      | ^ E741
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
 fn full_output_format() {
     let mut cmd = RuffCheck::default().output_format("full").build();
     assert_cmd_snapshot!(cmd
@@ -903,7 +923,18 @@ fn preview_enabled_prefix() {
     exit_code: 1
     ----- stdout -----
     -:1:1: E741 Ambiguous variable name: `I`
+      |
+    1 | I=42
+      | ^ E741
+      |
+
     -:1:2: E225 [*] Missing whitespace around operator
+      |
+    1 | I=42
+      |  ^ E225
+      |
+      = help: Add missing whitespace
+
     Found 2 errors.
     [*] 1 fixable with the `--fix` option.
 
@@ -922,9 +953,30 @@ fn preview_enabled_all() {
     exit_code: 1
     ----- stdout -----
     -:1:1: E741 Ambiguous variable name: `I`
+      |
+    1 | I=42
+      | ^ E741
+      |
+
     -:1:1: D100 Missing docstring in public module
+      |
+    1 | I=42
+      |  D100
+      |
+
     -:1:1: CPY001 Missing copyright notice at top of file
+      |
+    1 | I=42
+      |  CPY001
+      |
+
     -:1:2: E225 [*] Missing whitespace around operator
+      |
+    1 | I=42
+      |  ^ E225
+      |
+      = help: Add missing whitespace
+
     Found 4 errors.
     [*] 1 fixable with the `--fix` option.
 
@@ -946,6 +998,12 @@ fn preview_enabled_direct() {
     exit_code: 1
     ----- stdout -----
     -:1:2: E225 [*] Missing whitespace around operator
+      |
+    1 | I=42
+      |  ^ E225
+      |
+      = help: Add missing whitespace
+
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 
