@@ -1,5 +1,10 @@
 use ruff_diagnostics::Violation;
 use ruff_macros::violation;
+
+/// ## Removal
+/// This rule was removed from Ruff because it was common for it to introduce behavioral changes.
+/// See [#9007](https://github.com/astral-sh/ruff/issues/9007) for more information.
+///
 /// ## What it does
 /// Checks for uses of the known pre-Python 2.5 ternary syntax.
 ///
