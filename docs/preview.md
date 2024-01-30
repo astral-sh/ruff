@@ -143,3 +143,8 @@ In our previous example, `--select` with `ALL` `HYP`, `HYP0`, or `HYP00` would n
 rule will need to be selected with its exact code, e.g. `--select ALL,HYP001`.
 
 If preview mode is not enabled, this setting has no effect.
+
+## Deprecated rules
+
+When preview mode is enabled, deprecated rules will be disabled. If a deprecated rule is selected explicitly, an
+error will be raised. Deprecated rules will not be included if selected via a rule category or prefix.

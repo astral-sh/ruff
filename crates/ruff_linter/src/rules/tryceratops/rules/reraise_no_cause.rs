@@ -7,6 +7,9 @@ use ruff_python_ast::statement_visitor::StatementVisitor;
 
 use crate::checkers::ast::Checker;
 
+/// ## Deprecation
+/// This rule is identical to [B904] which should be used instead.
+///
 /// ## What it does
 /// Checks for exceptions that are re-raised without specifying the cause via
 /// the `from` keyword.
@@ -36,6 +39,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: Exception context](https://docs.python.org/3/library/exceptions.html#exception-context)
+///
+/// [B904]: https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
 #[violation]
 pub struct ReraiseNoCause;
 
