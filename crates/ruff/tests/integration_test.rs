@@ -1095,6 +1095,156 @@ fn preview_enabled_group_ignore() {
     "###);
 }
 
+#[test]
+fn deprecated_direct() {
+    // Selection of a deprecated rule without preview enabled should still work
+    // but a warning should be displayed
+    let mut cmd = RuffCheck::default().args(["--select", "TRY200"]).build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(r###"
+def reciprocal(n):
+    try:
+        return 1 / n
+    except ZeroDivisionError:
+        raise ValueError
+"###), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: Rule `TRY200` is deprecated and will be removed in a future release.
+    "###);
+}
+
+#[test]
+fn deprecated_multiple_direct() {
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "ANN101", "--select", "ANN102"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(r###"
+class Foo:
+    def a(self):
+        pass
+    
+    @classmethod
+    def b(cls):
+        pass
+"###), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:3:11: ANN101 Missing type annotation for `self` in method
+    -:7:11: ANN102 Missing type annotation for `cls` in classmethod
+    Found 2 errors.
+
+    ----- stderr -----
+    warning: Rule `ANN102` is deprecated and will be removed in a future release.
+    warning: Rule `ANN101` is deprecated and will be removed in a future release.
+    "###);
+}
+
+#[test]
+fn deprecated_indirect() {
+    // `ANN` includes deprecated rules `ANN101` and `ANN102` but should not warn
+    // since it is not a "direct" selection
+    let mut cmd = RuffCheck::default().args(["--select", "ANN1"]).build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(r###"
+class Foo:
+    def a(self):
+        pass
+    
+    @classmethod
+    def b(cls):
+        pass
+"###), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:3:11: ANN101 Missing type annotation for `self` in method
+    -:7:11: ANN102 Missing type annotation for `cls` in classmethod
+    Found 2 errors.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn deprecated_direct_preview_enabled() {
+    // Direct selection of a deprecated rule in preview should fail
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "TRY200", "--preview"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(r###"
+def reciprocal(n):
+    try:
+        return 1 / n
+    except ZeroDivisionError:
+        raise ValueError
+"###), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Selection of deprecated rule `TRY200` is not allowed when preview mode is enabled.
+    "###);
+}
+
+#[test]
+fn deprecated_indirect_preview_enabled() {
+    // `TRY200` is deprecated and should be off by default in preview.
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "TRY", "--preview"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(r###"
+def reciprocal(n):
+    try:
+        return 1 / n
+    except ZeroDivisionError:
+        raise ValueError
+"###), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn deprecated_multiple_direct_preview_enabled() {
+    // Direct selection of the deprecated rules in preview should fail with
+    // a message listing all of the rule codes
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "ANN101", "--select", "ANN102", "--preview"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(r###"
+def reciprocal(n):
+    try:
+        return 1 / n
+    except ZeroDivisionError:
+        raise ValueError
+"###), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Selection of deprecated rules is not allowed when preview mode is enabled. Remove selection of:
+    	- ANN102
+    	- ANN101
+
+    "###);
+}
+
 /// An unreadable pyproject.toml in non-isolated mode causes ruff to hard-error trying to build up
 /// configuration globs
 #[cfg(unix)]
