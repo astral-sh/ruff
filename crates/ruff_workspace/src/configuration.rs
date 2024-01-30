@@ -903,8 +903,8 @@ impl LintConfiguration {
 
                 // Unstable rules
                 if preview.mode.is_disabled() && kind.is_enable() {
-                    if let RuleSelector::Rule { prefix, .. } = selector {
-                        if prefix.rules().any(|rule| rule.is_nursery()) {
+                    if selector.is_exact() {
+                        if selector.all_rules().all(|rule| rule.is_nursery()) {
                             deprecated_nursery_selectors.insert(selector);
                         }
                     }
@@ -931,8 +931,8 @@ impl LintConfiguration {
                 }
 
                 // Removed rules
-                if let RuleSelector::Rule { prefix, .. } = selector {
-                    if prefix.rules().any(|rule| rule.is_removed()) {
+                if selector.is_exact() {
+                    if selector.all_rules().all(|rule| rule.is_removed()) {
                         removed_selectors.insert(selector);
                     }
                 }
