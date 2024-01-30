@@ -52,7 +52,7 @@ impl Violation for MagicValueComparison {
     fn message(&self) -> String {
         let MagicValueComparison { value } = self;
         format!(
-            "Magic value used in comparison, consider replacing {value} with a constant variable"
+            "Magic value used in comparison, consider replacing `{value}` with a constant variable"
         )
     }
 }
@@ -111,7 +111,7 @@ pub(crate) fn magic_value_comparison(checker: &mut Checker, left: &Expr, compara
             if is_magic_value(value, &checker.settings.pylint.allow_magic_value_types) {
                 checker.diagnostics.push(Diagnostic::new(
                     MagicValueComparison {
-                        value: checker.generator().expr(comparison_expr),
+                        value: checker.locator().slice(comparison_expr).to_string(),
                     },
                     comparison_expr.range(),
                 ));
