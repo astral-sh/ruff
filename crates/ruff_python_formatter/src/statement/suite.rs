@@ -1,4 +1,6 @@
-use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
+use ruff_formatter::{
+    write, FormatContext, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions,
+};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt, Suite};
@@ -470,12 +472,11 @@ fn stub_file_empty_lines(
     let empty_line_condition = preceding_comments.has_trailing()
         || following_comments.has_leading()
         || !stub_suite_can_omit_empty_line(preceding, following, f);
-    let require_empty_line = is_blank_line_after_nested_stub_class_enabled(f.context())
-        && should_insert_blank_line_after_class_in_stub_file(
-            preceding.into(),
-            Some(following.into()),
-            f.context().comments(),
-        );
+    let require_empty_line = should_insert_blank_line_after_class_in_stub_file(
+        preceding.into(),
+        Some(following.into()),
+        f.context(),
+    );
     match kind {
         SuiteKind::TopLevel => {
             if empty_line_condition || require_empty_line {
@@ -497,18 +498,25 @@ fn stub_file_empty_lines(
     }
 }
 
-/// Checks if an empty line should be inserted between the preceding and, optionally,
-/// the following node according to the [`blank_line_after_nested_stub_class`](https://github.com/astral-sh/ruff/issues/8891)
-/// preview style rules.
+/// Checks if an empty line should be inserted after a class definition.
+///
+/// This is only valid if the [`blank_line_after_nested_stub_class`](https://github.com/astral-sh/ruff/issues/8891)
+/// preview rule is enabled and the source to be formatted is a stub file.
 ///
 /// If `following` is `None`, then the preceding node is the last one in a suite. The
 /// caller needs to make sure that the suite which the preceding node is part of is
-/// followed by an alternate branch.
+/// followed by an alternate branch and shouldn't be a top-level suite.
 pub(crate) fn should_insert_blank_line_after_class_in_stub_file(
     preceding: AnyNodeRef<'_>,
     following: Option<AnyNodeRef<'_>>,
-    comments: &Comments<'_>,
+    context: &PyFormatContext,
 ) -> bool {
+    if !(is_blank_line_after_nested_stub_class_enabled(context)
+        && context.options().source_type().is_stub())
+    {
+        return false;
+    }
+    let comments = context.comments();
     match preceding.as_stmt_class_def() {
         Some(class) if contains_only_an_ellipsis(&class.body, comments) => {
             let Some(following) = following else {
