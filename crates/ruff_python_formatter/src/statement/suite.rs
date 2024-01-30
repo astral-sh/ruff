@@ -140,7 +140,13 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     SuiteChildStatement::Other(first)
                 }
             }
-            SuiteKind::TopLevel => SuiteChildStatement::Other(first),
+            SuiteKind::TopLevel => {
+                if let Some(docstring) = DocstringStmt::try_from_statement(first, self.kind) {
+                    SuiteChildStatement::Docstring(docstring)
+                } else {
+                    SuiteChildStatement::Other(first)
+                }
+            }
         };
 
         let first_comments = comments.leading_dangling_trailing(first);
