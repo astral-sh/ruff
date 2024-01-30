@@ -72,14 +72,14 @@ pub struct Options {
     )]
     pub extend: Option<String>,
 
-    /// The style in which violation messages should be formatted: `"text"`
-    /// (default), `"grouped"` (group messages by file), `"json"`
+    /// The style in which violation messages should be formatted: `"full"`
+    /// (shows source),`"concise"` (default), `"grouped"` (group messages by file), `"json"`
     /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
     /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
     /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
     #[option(
-        default = r#""text""#,
-        value_type = r#""text" | "json" | "junit" | "github" | "gitlab" | "pylint" | "azure""#,
+        default = r#""concise""#,
+        value_type = r#""full" | "concise" | "grouped" | "json" | "junit" | "github" | "gitlab" | "pylint" | "azure""#,
         example = r#"
             # Group violations by containing file.
             output-format = "grouped"
@@ -116,6 +116,9 @@ pub struct Options {
             # By default, always show source code snippets.
             show-source = true
         "#
+    )]
+    #[deprecated(
+        note = "`show_source` is deprecated and is now part of `output_format` in the form of `full` or `concise` options. Please update your configuration."
     )]
     pub show_source: Option<bool>,
 
