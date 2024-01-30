@@ -31,23 +31,12 @@ fn ruff_cmd() -> Command {
 }
 
 /// Builder for `ruff check` commands.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct RuffCheck<'a> {
     output_format: Option<&'a str>,
     config: Option<&'a Path>,
     filename: Option<&'a str>,
     args: Vec<&'a str>,
-}
-
-impl<'a> Default for RuffCheck<'a> {
-    fn default() -> RuffCheck<'a> {
-        RuffCheck {
-            output_format: None,
-            config: None,
-            filename: None,
-            args: vec![],
-        }
-    }
 }
 
 impl<'a> RuffCheck<'a> {
