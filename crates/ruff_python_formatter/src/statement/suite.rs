@@ -470,16 +470,15 @@ fn stub_file_empty_lines(
     let empty_line_condition = preceding_comments.has_trailing()
         || following_comments.has_leading()
         || !stub_suite_can_omit_empty_line(preceding, following, f);
+    let require_empty_line = is_blank_line_after_nested_stub_class_enabled(f.context())
+        && should_insert_blank_line_after_class_in_stub_file(
+            preceding.into(),
+            Some(following.into()),
+            f.context().comments(),
+        );
     match kind {
         SuiteKind::TopLevel => {
-            if empty_line_condition
-                || (is_blank_line_after_nested_stub_class_enabled(f.context())
-                    && blank_line_after_nested_stub_class_condition(
-                        preceding.into(),
-                        Some(following.into()),
-                        f,
-                    ))
-            {
+            if empty_line_condition || require_empty_line {
                 empty_line().fmt(f)
             } else {
                 hard_line_break().fmt(f)
@@ -488,12 +487,7 @@ fn stub_file_empty_lines(
         SuiteKind::Class | SuiteKind::Other | SuiteKind::Function => {
             if (empty_line_condition
                 && lines_after_ignoring_end_of_line_trivia(preceding.end(), source) > 1)
-                || (is_blank_line_after_nested_stub_class_enabled(f.context())
-                    && blank_line_after_nested_stub_class_condition(
-                        preceding.into(),
-                        Some(following.into()),
-                        f,
-                    ))
+                || require_empty_line
             {
                 empty_line().fmt(f)
             } else {
@@ -505,35 +499,110 @@ fn stub_file_empty_lines(
 
 /// Checks if an empty line should be inserted between the preceding and, optionally,
 /// the following node according to the [`blank_line_after_nested_stub_class`](https://github.com/astral-sh/ruff/issues/8891)
-/// preview style.
+/// preview style rules.
 ///
-/// If `following` is `None`, then the preceding node is the last node in the suite.
-pub(crate) fn blank_line_after_nested_stub_class_condition(
+/// If `following` is `None`, then the preceding node is the last one in a suite. The
+/// caller needs to make sure that the suite which the preceding node is part of is
+/// followed by an alternate branch.
+pub(crate) fn should_insert_blank_line_after_class_in_stub_file(
     preceding: AnyNodeRef<'_>,
     following: Option<AnyNodeRef<'_>>,
-    f: &PyFormatter,
+    comments: &Comments<'_>,
 ) -> bool {
-    let comments = f.context().comments();
     match preceding.as_stmt_class_def() {
         Some(class) if contains_only_an_ellipsis(&class.body, comments) => {
-            !class.decorator_list.is_empty()
-                || match following {
-                    Some(AnyNodeRef::StmtClassDef(ast::StmtClassDef {
-                        body,
-                        decorator_list,
-                        ..
-                    })) => !contains_only_an_ellipsis(body, comments) || !decorator_list.is_empty(),
-                    Some(AnyNodeRef::StmtFunctionDef(_)) | None => true,
-                    _ => false,
-                }
+            let Some(following) = following else {
+                // The formatter is at the start of an alternate branch such as
+                // an `else` block.
+                //
+                // ```python
+                // if foo:
+                //     class Nested:
+                //         pass
+                // else:
+                //     pass
+                // ```
+                //
+                // In the above code, the preceding node is the `Nested` class
+                // which has no following node.
+                return true;
+            };
+
+            // If the preceding class has decorators, then we need to add an empty
+            // line even if it only contains ellipsis.
+            //
+            // ```python
+            // class Top:
+            //     @decorator
+            //     class Nested1: ...
+            //     foo = 1
+            // ```
+            let preceding_has_decorators = !class.decorator_list.is_empty();
+
+            // If the following statement is a class definition, then an empty line
+            // should be inserted if it (1) doesn't just contain ellipsis, or (2) has decorators.
+            //
+            // ```python
+            // class Top:
+            //     class Nested1: ...
+            //     class Nested2:
+            //         pass
+            //
+            // class Top:
+            //     class Nested1: ...
+            //     @decorator
+            //     class Nested2: ...
+            // ```
+            //
+            // Both of the above examples should add a blank line in between.
+            let following_is_class_without_only_ellipsis_or_has_decorators =
+                following.as_stmt_class_def().is_some_and(|following| {
+                    !contains_only_an_ellipsis(&following.body, comments)
+                        || !following.decorator_list.is_empty()
+                });
+
+            preceding_has_decorators
+                || following_is_class_without_only_ellipsis_or_has_decorators
+                || following.is_stmt_function_def()
         }
-        Some(_) => !comments.has_trailing_own_line(preceding),
-        None => std::iter::successors(
-            preceding.last_child_in_body(),
-            AnyNodeRef::last_child_in_body,
-        )
-        .take_while(|last_child| !comments.has_trailing_own_line(*last_child))
-        .any(|last_child| last_child.is_stmt_class_def()),
+        Some(_) => {
+            // Preceding statement is a class definition whose body isn't only an ellipsis.
+            // Here, we should only add a blank line if the class doesn't have a trailing
+            // own line comment as that's handled by the class formatting itself.
+            !comments.has_trailing_own_line(preceding)
+        }
+        None => {
+            // If preceding isn't a class definition, let's check if the last statement
+            // in the body, going all the way down, is a class definition.
+            //
+            // ```python
+            // if foo:
+            //     if bar:
+            //         class Nested:
+            //             pass
+            // if other:
+            //     pass
+            // ```
+            //
+            // But, if it contained a trailing own line comment, then it's handled
+            // by the class formatting itself.
+            //
+            // ```python
+            // if foo:
+            //     if bar:
+            //         class Nested:
+            //             pass
+            //         # comment
+            // if other:
+            //     pass
+            // ```
+            std::iter::successors(
+                preceding.last_child_in_body(),
+                AnyNodeRef::last_child_in_body,
+            )
+            .take_while(|last_child| !comments.has_trailing_own_line(*last_child))
+            .any(|last_child| last_child.is_stmt_class_def())
+        }
     }
 }
 

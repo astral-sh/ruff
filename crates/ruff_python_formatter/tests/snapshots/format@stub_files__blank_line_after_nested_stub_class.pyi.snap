@@ -202,6 +202,7 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Enabled
 target_version             = Py38
+source_type                = Stub
 ```
 
 ```python
