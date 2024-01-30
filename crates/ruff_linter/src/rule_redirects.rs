@@ -21,6 +21,9 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         ("C9", "C90"),
         ("T1", "T10"),
         ("T2", "T20"),
+        // The PGH category is deprecated
+        ("PGH001", "S307"),
+        ("PGH002", "G010"),
         // TODO(charlie): Remove by 2023-02-01.
         ("R", "RET"),
         ("R5", "RET5"),

@@ -756,6 +756,7 @@ impl LintConfiguration {
         let mut redirects = FxHashMap::default();
         let mut deprecated_nursery_selectors = FxHashSet::default();
         let mut deprecated_selectors = FxHashSet::default();
+        let mut deprecated_redirected_selectors = FxHashSet::default();
         let mut removed_selectors = FxHashSet::default();
         let mut ignored_preview_selectors = FxHashSet::default();
 
@@ -916,9 +917,31 @@ impl LintConfiguration {
 
                 // Deprecated rules
                 if kind.is_enable() {
-                    if let RuleSelector::Rule { prefix, .. } = selector {
+                    if let RuleSelector::Rule {
+                        prefix,
+                        redirected_from: None,
+                    } = selector
+                    {
                         if prefix.rules().any(|rule| rule.is_deprecated()) {
-                            deprecated_selectors.insert(selector);
+                            deprecated_selectors.insert(selector.clone());
+                        }
+                    }
+                    if let RuleSelector::Rule {
+                        prefix: redirected_to,
+                        redirected_from: Some(redirected_from),
+                    } = selector
+                    {
+                        if let Ok(redirected_selector) =
+                            RuleSelector::from_str_no_redirect(redirected_from)
+                        {
+                            if let RuleSelector::Rule { ref prefix, .. }
+                            | RuleSelector::Prefix { ref prefix, .. } = redirected_selector
+                            {
+                                if prefix.rules().all(|rule| rule.is_deprecated()) {
+                                    deprecated_redirected_selectors
+                                        .insert((redirected_selector, redirected_to));
+                                }
+                            }
                         }
                     }
                 }
@@ -1001,21 +1024,56 @@ impl LintConfiguration {
                     "Rule `{prefix}{code}` is deprecated and will be removed in a future release.",
                 );
             }
+            for (selection, redirected_to) in deprecated_redirected_selectors {
+                let (prefix, code) = selection.prefix_and_code();
+                let (redirect_prefix, redirect_code) = (
+                    redirected_to.linter().common_prefix(),
+                    redirected_to.short_code(),
+                );
+                warn_user!(
+                    "Rule `{prefix}{code}` is deprecated and will be removed in a future release. Use `{redirect_prefix}{redirect_code}` instead.",
+                );
+            }
         } else {
-            let deprecated_selectors = deprecated_selectors.iter().collect::<Vec<_>>();
+            // Combine the deprecated selectors and those that have been redirected
+            let deprecated_selectors = deprecated_selectors
+                .iter()
+                .map(|selector| (selector, None))
+                .chain(
+                    deprecated_redirected_selectors
+                        .iter()
+                        .map(|(selector, redirect)| (selector, Some(redirect))),
+                )
+                .collect::<Vec<_>>();
+
             match deprecated_selectors.as_slice() {
                 [] => (),
-                [selection] => {
+                [(selection, redirect)] => {
                     let (prefix, code) = selection.prefix_and_code();
-                    return Err(anyhow!("Selection of deprecated rule `{prefix}{code}` is not allowed when preview mode is enabled."));
+                    let err = if let Some(redirect) = redirect {
+                        let (redirect_prefix, redirect_code) =
+                            (redirect.linter().common_prefix(), redirect.short_code());
+                        anyhow!("Selection of deprecated rule `{prefix}{code}` is not allowed when preview mode is enabled. Use `{redirect_prefix}{redirect_code}` instead.")
+                    } else {
+                        anyhow!("Selection of deprecated rule `{prefix}{code}` is not allowed when preview mode is enabled.")
+                    };
+                    return Err(err);
                 }
                 [..] => {
                     let mut message = "Selection of deprecated rules is not allowed when preview mode is enabled. Remove selection of:".to_string();
-                    for selection in deprecated_selectors {
+                    for (selection, redirect) in deprecated_selectors {
                         let (prefix, code) = selection.prefix_and_code();
                         message.push_str("\n\t- ");
                         message.push_str(prefix);
                         message.push_str(code);
+                        if let Some(redirect) = redirect {
+                            let (redirect_prefix, redirect_code) =
+                                (redirect.linter().common_prefix(), redirect.short_code());
+                            message.push_str(
+                                format!(" (use `{redirect_prefix}{redirect_code}` instead)")
+                                    .as_str(),
+                            )
+                        }
                     }
                     message.push('\n');
                     return Err(anyhow!(message));

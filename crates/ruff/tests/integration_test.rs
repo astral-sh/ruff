@@ -1205,6 +1205,26 @@ class Foo:
 }
 
 #[test]
+fn deprecated_redirected() {
+    // Selection of a redirected deprecated rule without preview enabled should still work
+    // but a warning should be displayed
+    let mut cmd = RuffCheck::default().args(["--select", "PGH001"]).build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(r###"
+x = eval(input("Enter a number: "))
+"###), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:2:5: S307 Use of possibly insecure function; consider using `ast.literal_eval`
+    Found 1 error.
+
+    ----- stderr -----
+    warning: Rule `PGH001` is deprecated and will be removed in a future release. Use `S307` instead.
+    "###);
+}
+
+#[test]
 fn deprecated_direct_preview_enabled() {
     // Direct selection of a deprecated rule in preview should fail
     let mut cmd = RuffCheck::default()
@@ -1229,6 +1249,25 @@ def reciprocal(n):
 }
 
 #[test]
+fn deprecated_redirect_preview_enabled() {
+    // Direct selection of a deprecated rule in preview should fail
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "PGH001", "--preview"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(r###"
+x = eval(input("Enter a number: "))
+"###), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Selection of deprecated rule `PGH001` is not allowed when preview mode is enabled. Use `S307` instead.
+    "###);
+}
+#[test]
 fn deprecated_indirect_preview_enabled() {
     // `TRY200` is deprecated and should be off by default in preview.
     let mut cmd = RuffCheck::default()
@@ -1241,6 +1280,24 @@ def reciprocal(n):
         return 1 / n
     except ZeroDivisionError:
         raise ValueError
+"###), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn deprecated_indirect_redirect_preview_enabled() {
+    // e.g. `PGH001` is deprecated and redirected and should be off by default in preview.
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "PGH", "--preview"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(r###"
+x = eval(input("Enter a number: "))
 "###), @r###"
     success: true
     exit_code: 0
@@ -1274,6 +1331,46 @@ def reciprocal(n):
       Cause: Selection of deprecated rules is not allowed when preview mode is enabled. Remove selection of:
     	- ANN102
     	- ANN101
+
+    "###);
+}
+
+#[test]
+fn deprecated_multiple_direct_and_redirected_preview_enabled() {
+    // Direct selection of the deprecated rules in preview should fail with
+    // a message listing all of the rule codes
+    // The redirected rules should include an alternative
+    let mut cmd = RuffCheck::default()
+        .args([
+            "--select",
+            "ANN101",
+            "--select",
+            "ANN102",
+            "--select",
+            "PGH001",
+            "--preview",
+        ])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(r###"
+x = eval(input("Enter a number: "))
+
+def reciprocal(n):
+    try:
+        return 1 / n
+    except ZeroDivisionError:
+        raise ValueError
+"###), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Selection of deprecated rules is not allowed when preview mode is enabled. Remove selection of:
+    	- ANN102
+    	- ANN101
+    	- PGH001 (use `S307` instead)
 
     "###);
 }

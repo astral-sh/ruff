@@ -126,6 +126,41 @@ impl RuleSelector {
             RuleSelector::Linter(l) => (l.common_prefix(), ""),
         }
     }
+
+    /// Parse [`RuleSelector`] from a string; but do not follow redirects.
+    pub fn from_str_no_redirect(s: &str) -> Result<Self, ParseError> {
+        match s {
+            "ALL" => Ok(Self::All),
+            #[allow(deprecated)]
+            "NURSERY" => Ok(Self::Nursery),
+            "C" => Ok(Self::C),
+            "T" => Ok(Self::T),
+            _ => {
+                let (linter, code) =
+                    Linter::parse_code(s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
+
+                if code.is_empty() {
+                    return Ok(Self::Linter(linter));
+                }
+
+                // Does the selector select a single rule?
+                let prefix = RuleCodePrefix::parse(&linter, code)
+                    .map_err(|_| ParseError::Unknown(s.to_string()))?;
+
+                if is_single_rule_selector(&prefix) {
+                    Ok(Self::Rule {
+                        prefix,
+                        redirected_from: None,
+                    })
+                } else {
+                    Ok(Self::Prefix {
+                        prefix,
+                        redirected_from: None,
+                    })
+                }
+            }
+        }
+    }
 }
 
 impl Serialize for RuleSelector {
