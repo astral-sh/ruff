@@ -33,7 +33,6 @@ mod tests {
     }
 
     #[test_case(Rule::UnnecessaryPlaceholder, Path::new("PIE790.py"))]
-    #[test_case(Rule::UnnecessarySpread, Path::new("PIE800.py"))]
     #[test_case(Rule::ReimplementedContainerBuiltin, Path::new("PIE807.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
