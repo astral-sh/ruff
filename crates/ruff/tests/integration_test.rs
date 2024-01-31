@@ -1139,11 +1139,13 @@ def reciprocal(n):
     try:
         return 1 / n
     except ZeroDivisionError:
-        raise ValueError
+        raise ValueError()
 "###), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
+    -:6:9: TRY200 Use `raise from` to specify exception cause
+    Found 1 error.
 
     ----- stderr -----
     warning: Rule `TRY200` is deprecated and will be removed in a future release.
@@ -1216,7 +1218,7 @@ def reciprocal(n):
     try:
         return 1 / n
     except ZeroDivisionError:
-        raise ValueError
+        raise ValueError()
 "###), @r###"
     success: false
     exit_code: 2
@@ -1240,7 +1242,7 @@ def reciprocal(n):
     try:
         return 1 / n
     except ZeroDivisionError:
-        raise ValueError
+        raise ValueError()
 "###), @r###"
     success: true
     exit_code: 0
@@ -1263,7 +1265,7 @@ def reciprocal(n):
     try:
         return 1 / n
     except ZeroDivisionError:
-        raise ValueError
+        raise ValueError()
 "###), @r###"
     success: false
     exit_code: 2
