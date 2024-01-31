@@ -8,6 +8,17 @@ use itertools::Itertools;
 use log::error;
 use rustc_hash::FxHashMap;
 
+use ruff_diagnostics::Diagnostic;
+use ruff_notebook::Notebook;
+use ruff_python_ast::imports::ImportMap;
+use ruff_python_ast::{PySourceType, Suite};
+use ruff_python_codegen::Stylist;
+use ruff_python_index::Indexer;
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::{AsMode, ParseError};
+use ruff_source_file::{Locator, SourceFileBuilder};
+use ruff_text_size::Ranged;
+
 use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
@@ -28,16 +39,6 @@ use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
 use crate::source_kind::SourceKind;
 use crate::{directives, fs};
-use ruff_diagnostics::Diagnostic;
-use ruff_notebook::Notebook;
-use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::{PySourceType, Suite};
-use ruff_python_codegen::Stylist;
-use ruff_python_index::Indexer;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{AsMode, ParseError};
-use ruff_source_file::{Locator, SourceFileBuilder};
-use ruff_text_size::Ranged;
 
 /// A [`Result`]-like type that returns both data and an error. Used to return
 /// diagnostics even in the face of parse errors, since many diagnostics can be
