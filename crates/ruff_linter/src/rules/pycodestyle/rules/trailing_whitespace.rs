@@ -101,15 +101,14 @@ pub(crate) fn trailing_whitespace(
                 return Some(diagnostic);
             }
         } else if settings.rules.enabled(Rule::TrailingWhitespace) {
-            // Removing trailing whitespace is not safe inside multiline strings.
-            let safe = !indexer.multiline_ranges().intersects(range);
             let mut diagnostic = Diagnostic::new(TrailingWhitespace, range);
             diagnostic.set_fix(Fix::applicable_edit(
                 Edit::range_deletion(range),
-                if safe {
-                    Applicability::Safe
-                } else {
+                // Removing trailing whitespace is not safe inside multiline strings.
+                if indexer.multiline_ranges().intersects(range) {
                     Applicability::Unsafe
+                } else {
+                    Applicability::Safe
                 },
             ));
             return Some(diagnostic);
