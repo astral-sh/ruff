@@ -56,8 +56,7 @@ pub(crate) fn invalid_envvar_default(checker: &mut Checker, call: &ast::ExprCall
         if matches!(
             ResolvedPythonType::from(expr),
             ResolvedPythonType::Unknown
-                | ResolvedPythonType::Atom(PythonType::String)
-                | ResolvedPythonType::Atom(PythonType::None)
+                | ResolvedPythonType::Atom(PythonType::String | PythonType::None)
         ) {
             return;
         }
