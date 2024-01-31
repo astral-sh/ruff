@@ -80,10 +80,11 @@ impl Cell {
         // ```
         //
         // See: https://ipython.readthedocs.io/en/stable/interactive/magics.html
-        if lines
-            .peek()
-            .and_then(|line| line.split_whitespace().next())
-            .is_some_and(|token| {
+        if let Some(line) = lines.peek() {
+            let mut tokens = line.split_whitespace();
+
+            // The first token must be an automagic, like `load_exit`.
+            if tokens.next().is_some_and(|token| {
                 matches!(
                     token,
                     "alias"
@@ -164,9 +165,19 @@ impl Cell {
                         | "xdel"
                         | "xmode"
                 )
-            })
-        {
-            return true;
+            }) {
+                // The second token must _not_ be an operator, like `=` (to avoid false positives).
+                // The assignment operators can never follow an automagic. Some binary operators
+                // _can_, though (e.g., `cd -` is valid), so we omit them.
+                if !tokens.next().is_some_and(|token| {
+                    matches!(
+                        token,
+                        "=" | "+=" | "-=" | "*=" | "/=" | "//=" | "%=" | "**=" | "&=" | "|=" | "^="
+                    )
+                }) {
+                    return true;
+                }
+            }
         }
 
         // Detect cell magics (which operate on multiple lines).

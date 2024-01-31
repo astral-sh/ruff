@@ -1,7 +1,8 @@
 use std::fmt;
 use std::fmt::{Debug, Formatter};
-use std::num::NonZeroUsize;
+use std::num::{NonZeroUsize, ParseIntError};
 use std::ops::Deref;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -322,6 +323,13 @@ const fn unwrap<T: Copy>(option: Option<T>) -> T {
     match option {
         Some(value) => value,
         None => panic!("unwrapping None"),
+    }
+}
+
+impl FromStr for OneIndexed {
+    type Err = ParseIntError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(OneIndexed(NonZeroUsize::from_str(s)?))
     }
 }
 

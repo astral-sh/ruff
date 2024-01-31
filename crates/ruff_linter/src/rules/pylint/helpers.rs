@@ -280,6 +280,7 @@ pub(super) fn is_known_dunder_method(method: &str) -> bool {
             | "__missing__"
             | "__mod__"
             | "__module__"
+            | "__mro_entries__"
             | "__mul__"
             | "__ne__"
             | "__neg__"

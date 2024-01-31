@@ -52,6 +52,7 @@ mod tests {
     #[test_case(Rule::SyntaxError, Path::new("E999.py"))]
     #[test_case(Rule::TabIndentation, Path::new("W19.py"))]
     #[test_case(Rule::TrailingWhitespace, Path::new("W29.py"))]
+    #[test_case(Rule::TrailingWhitespace, Path::new("W291.py"))]
     #[test_case(Rule::TrueFalseComparison, Path::new("E712.py"))]
     #[test_case(Rule::TypeComparison, Path::new("E721.py"))]
     #[test_case(Rule::UselessSemicolon, Path::new("E70.py"))]

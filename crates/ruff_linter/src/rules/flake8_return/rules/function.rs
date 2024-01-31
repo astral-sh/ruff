@@ -737,7 +737,7 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
 
     // Traverse the function body, to collect the stack.
     let stack = {
-        let mut visitor = ReturnVisitor::default();
+        let mut visitor = ReturnVisitor::new(checker.semantic());
         for stmt in body {
             visitor.visit_stmt(stmt);
         }
@@ -820,14 +820,13 @@ fn remove_else(
 
         // If the statement is on the same line as the `else`, just remove the `else: `.
         // Ex) `else: return True` -> `return True`
-        let Some(first) = elif_else.body.first() else {
-            return Err(anyhow::anyhow!("`else` statement has no body"));
-        };
-        if indexer.in_multi_statement_line(first, locator) {
-            return Ok(Fix::safe_edit(Edit::deletion(
-                elif_else.start(),
-                first.start(),
-            )));
+        if let [first] = elif_else.body.as_slice() {
+            if indexer.in_multi_statement_line(first, locator) {
+                return Ok(Fix::safe_edit(Edit::deletion(
+                    elif_else.start(),
+                    first.start(),
+                )));
+            }
         }
 
         // we're deleting the `else`, and it's Colon, and the rest of the line(s) they're on,

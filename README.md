@@ -150,7 +150,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.14
+  rev: v0.1.15
   hooks:
     # Run the linter.
     - id: ruff
@@ -402,6 +402,7 @@ Ruff is used by a number of major open-source projects and companies, including:
     [Diffusers](https://github.com/huggingface/diffusers))
 - ING Bank ([popmon](https://github.com/ing-bank/popmon), [probatus](https://github.com/ing-bank/probatus))
 - [Ibis](https://github.com/ibis-project/ibis)
+- [ivy](https://github.com/unifyai/ivy)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
 - [LangChain](https://github.com/hwchase17/langchain)
 - [Litestar](https://litestar.dev/)

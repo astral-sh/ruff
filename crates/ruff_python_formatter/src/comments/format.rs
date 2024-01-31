@@ -1,8 +1,7 @@
 use std::borrow::Cow;
 
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
-use ruff_python_ast::PySourceType;
-use ruff_python_ast::{AnyNodeRef, AstNode};
+use ruff_python_ast::{AnyNodeRef, AstNode, NodeKind, PySourceType};
 use ruff_python_trivia::{
     is_pragma_comment, lines_after, lines_after_ignoring_trivia, lines_before,
 };
@@ -11,6 +10,8 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 use crate::comments::{CommentLinePosition, SourceComment};
 use crate::context::NodeLevel;
 use crate::prelude::*;
+use crate::preview::is_blank_line_after_nested_stub_class_enabled;
+use crate::statement::suite::should_insert_blank_line_after_class_in_stub_file;
 
 /// Formats the leading comments of a node.
 pub(crate) fn leading_node_comments<T>(node: &T) -> FormatLeadingComments
@@ -85,7 +86,11 @@ pub(crate) struct FormatLeadingAlternateBranchComments<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        if let Some(first_leading) = self.comments.first() {
+        if self.last_node.map_or(false, |preceding| {
+            should_insert_blank_line_after_class_in_stub_file(preceding, None, f.context())
+        }) {
+            write!(f, [empty_line(), leading_comments(self.comments)])?;
+        } else if let Some(first_leading) = self.comments.first() {
             // Leading comments only preserves the lines after the comment but not before.
             // Insert the necessary lines.
             write!(
@@ -427,7 +432,17 @@ impl Format<PyFormatContext<'_>> for FormatNormalizedComment<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
         match self.comment {
             Cow::Borrowed(borrowed) => {
-                source_text_slice(TextRange::at(self.range.start(), borrowed.text_len())).fmt(f)
+                source_text_slice(TextRange::at(self.range.start(), borrowed.text_len())).fmt(f)?;
+
+                // Write the end position if the borrowed comment is shorter than the original comment
+                // So that we still can map back the end of a comment to the formatted code.
+                if f.options().source_map_generation().is_enabled()
+                    && self.range.len() != borrowed.text_len()
+                {
+                    source_position(self.range.end()).fmt(f)?;
+                }
+
+                Ok(())
             }
 
             Cow::Owned(ref owned) => {
@@ -513,14 +528,32 @@ fn strip_comment_prefix(comment_text: &str) -> FormatResult<&str> {
 /// ```
 ///
 /// This builder will insert two empty lines before the comment.
+///
+/// # Preview
+///
+/// For preview style, this builder will insert a single empty line after a
+/// class definition in a stub file.
+///
+/// For example, given:
+/// ```python
+/// class Foo:
+///     pass
+/// # comment
+/// ```
+///
+/// This builder will insert a single empty line before the comment.
 pub(crate) fn empty_lines_before_trailing_comments<'a>(
     f: &PyFormatter,
     comments: &'a [SourceComment],
+    node_kind: NodeKind,
 ) -> FormatEmptyLinesBeforeTrailingComments<'a> {
     // Black has different rules for stub vs. non-stub and top level vs. indented
     let empty_lines = match (f.options().source_type(), f.context().node_level()) {
         (PySourceType::Stub, NodeLevel::TopLevel(_)) => 1,
-        (PySourceType::Stub, _) => 0,
+        (PySourceType::Stub, _) => u32::from(
+            is_blank_line_after_nested_stub_class_enabled(f.context())
+                && node_kind == NodeKind::StmtClassDef,
+        ),
         (_, NodeLevel::TopLevel(_)) => 2,
         (_, _) => 1,
     };
