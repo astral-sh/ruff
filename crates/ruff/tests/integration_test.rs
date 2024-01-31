@@ -1252,13 +1252,12 @@ fn fix_applies_safe_fixes_by_default() {
     success: false
     exit_code: 1
     ----- stdout -----
-    # safe insertion
+    # fix from stable-test-rule-safe-fix
 
     ----- stderr -----
-    -:1:1: RUF901 Hey this is a stable test rule with a safe fix.
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    Found 3 errors (1 fixed, 2 remaining).
-    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+    Found 2 errors (1 fixed, 1 remaining).
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
     "###);
 }
 
@@ -1269,17 +1268,14 @@ fn fix_applies_unsafe_fixes_with_opt_in() {
         .build();
     assert_cmd_snapshot!(cmd,
         @r###"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
-    # unsafe insertion
-    # safe insertion
+    # fix from stable-test-rule-unsafe-fix
+    # fix from stable-test-rule-safe-fix
 
     ----- stderr -----
-    -:1:1: RUF901 Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    Found 4 errors (2 fixed, 2 remaining).
-    [*] 2 fixable with the --fix option.
+    Found 2 errors (2 fixed, 0 remaining).
     "###);
 }
 
@@ -1326,15 +1322,13 @@ fn fix_only_unsafe_fixes_available() {
         .build();
     assert_cmd_snapshot!(cmd,
         @r###"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
-    # safe insertion
+    # fix from stable-test-rule-safe-fix
 
     ----- stderr -----
-    -:1:1: RUF901 Hey this is a stable test rule with a safe fix.
-    Found 2 errors (1 fixed, 1 remaining).
-    [*] 1 fixable with the `--fix` option.
+    Found 1 error (1 fixed, 0 remaining).
     "###);
 }
 
@@ -1348,7 +1342,7 @@ fn fix_only_flag_applies_safe_fixes_by_default() {
     success: true
     exit_code: 0
     ----- stdout -----
-    # safe insertion
+    # fix from stable-test-rule-safe-fix
 
     ----- stderr -----
     Fixed 1 error (1 additional fix available with `--unsafe-fixes`).
@@ -1365,8 +1359,8 @@ fn fix_only_flag_applies_unsafe_fixes_with_opt_in() {
     success: true
     exit_code: 0
     ----- stdout -----
-    # unsafe insertion
-    # safe insertion
+    # fix from stable-test-rule-unsafe-fix
+    # fix from stable-test-rule-safe-fix
 
     ----- stderr -----
     Fixed 2 errors.
@@ -1384,7 +1378,7 @@ fn diff_shows_safe_fixes_by_default() {
     exit_code: 1
     ----- stdout -----
     @@ -0,0 +1 @@
-    +# safe insertion
+    +# fix from stable-test-rule-safe-fix
 
 
     ----- stderr -----
@@ -1404,8 +1398,8 @@ fn diff_shows_unsafe_fixes_with_opt_in() {
     exit_code: 1
     ----- stdout -----
     @@ -0,0 +1,2 @@
-    +# unsafe insertion
-    +# safe insertion
+    +# fix from stable-test-rule-unsafe-fix
+    +# fix from stable-test-rule-safe-fix
 
 
     ----- stderr -----

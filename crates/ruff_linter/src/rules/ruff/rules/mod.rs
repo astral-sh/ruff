@@ -48,7 +48,7 @@ mod sort_dunder_all;
 mod sort_dunder_slots;
 mod static_key_dict_comprehension;
 #[cfg(feature = "test-rules")]
-mod test_rules;
+pub(crate) mod test_rules;
 mod unnecessary_dict_comprehension_for_iterable;
 mod unnecessary_iterable_allocation_for_first_element;
 mod unnecessary_key_check;
