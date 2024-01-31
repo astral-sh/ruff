@@ -1001,6 +1001,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "169") => (RuleGroup::Preview, rules::refurb::rules::TypeNoneComparison),
         (Refurb, "171") => (RuleGroup::Preview, rules::refurb::rules::SingleItemMembershipTest),
         (Refurb, "177") => (RuleGroup::Preview, rules::refurb::rules::ImplicitCwd),
+        (Refurb, "180") => (RuleGroup::Preview, rules::refurb::rules::MetaClassABCMeta),
         (Refurb, "181") => (RuleGroup::Preview, rules::refurb::rules::HashlibDigestHex),
 
         // flake8-logging
