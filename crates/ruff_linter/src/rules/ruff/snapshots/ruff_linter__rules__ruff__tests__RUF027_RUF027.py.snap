@@ -143,7 +143,7 @@ RUF027.py:30:33: RUF027 [*] `"{a}"` may be a formatting string without an `f` pr
    30 |+    print(do_nothing(do_nothing(f"{a}"))) # RUF027
 31 31 |     do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
 32 32 | 
-33 33 | 
+33 33 | def tripledquoted():
 
 RUF027.py:31:39: RUF027 [*] `"{a}"` may be a formatting string without an `f` prefix
    |
@@ -151,6 +151,8 @@ RUF027.py:31:39: RUF027 [*] `"{a}"` may be a formatting string without an `f` pr
 30 |     print(do_nothing(do_nothing("{a}"))) # RUF027
 31 |     do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
    |                                       ^^^^^ RUF027
+32 | 
+33 | def tripledquoted():
    |
    = help: Add an `f` prefix to the formatting string
 
@@ -161,44 +163,68 @@ RUF027.py:31:39: RUF027 [*] `"{a}"` may be a formatting string without an `f` pr
 31    |-    do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
    31 |+    do_nothing_with_kwargs(do_nothing(f"{a}"), a = 5) # RUF027
 32 32 | 
-33 33 | 
-34 34 | def alternative_formatter(src, **kwargs):
+33 33 | def tripledquoted():
+34 34 |     a = 4
 
-RUF027.py:46:12: RUF027 [*] `"{ positive: false }"` may be a formatting string without an `f` prefix
+RUF027.py:36:19: RUF027 [*] `""" {a} """` may be a formatting string without an `f` prefix
    |
-44 |     d = "bad variable: {invalid}"
-45 |     e = "incorrect syntax: {}"
-46 |     json = "{ positive: false }"
-   |            ^^^^^^^^^^^^^^^^^^^^^ RUF027
-47 |     json2 = "{ 'positive': false }"
-48 |     json3 = "{ 'positive': 'false' }"
+34 |     a = 4
+35 |     c = a
+36 |     single_line = """ {a} """
+   |                   ^^^^^^^^^^^ RUF027
+37 |     multi_line = a = """b { # comment
+38 |     c}  d
    |
    = help: Add an `f` prefix to the formatting string
 
 ℹ Unsafe fix
-43 43 |     c = """  {b} """
-44 44 |     d = "bad variable: {invalid}"
-45 45 |     e = "incorrect syntax: {}"
-46    |-    json = "{ positive: false }"
-   46 |+    json = f"{ positive: false }"
-47 47 |     json2 = "{ 'positive': false }"
-48 48 |     json3 = "{ 'positive': 'false' }"
-49 49 |     alternative_formatter("{a}", a = 5)
+33 33 | def tripledquoted():
+34 34 |     a = 4
+35 35 |     c = a
+36    |-    single_line = """ {a} """
+   36 |+    single_line = f""" {a} """
+37 37 |     multi_line = a = """b { # comment
+38 38 |     c}  d
+39 39 |     """ 
 
-RUF027.py:58:7: RUF027 [*] `"but don't ignore this: {val}"` may be a formatting string without an `f` prefix
+RUF027.py:37:22: RUF027 [*] `"""b { # comment
+    c}  d
+    """` may be a formatting string without an `f` prefix
    |
-56 | "always ignore this: {a}"
-57 | 
-58 | print("but don't ignore this: {val}")
+35 |       c = a
+36 |       single_line = """ {a} """
+37 |       multi_line = a = """b { # comment
+   |  ______________________^
+38 | |     c}  d
+39 | |     """ 
+   | |_______^ RUF027
+   |
+   = help: Add an `f` prefix to the formatting string
+
+ℹ Unsafe fix
+34 34 |     a = 4
+35 35 |     c = a
+36 36 |     single_line = """ {a} """
+37    |-    multi_line = a = """b { # comment
+   37 |+    multi_line = a = f"""b { # comment
+38 38 |     c}  d
+39 39 |     """ 
+40 40 |     
+
+RUF027.py:67:7: RUF027 [*] `"but don't ignore this: {val}"` may be a formatting string without an `f` prefix
+   |
+65 | "always ignore this: {a}"
+66 | 
+67 | print("but don't ignore this: {val}")
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
    |
    = help: Add an `f` prefix to the formatting string
 
 ℹ Unsafe fix
-55 55 | 
-56 56 | "always ignore this: {a}"
-57 57 | 
-58    |-print("but don't ignore this: {val}")
-   58 |+print(f"but don't ignore this: {val}")
+64 64 | 
+65 65 | "always ignore this: {a}"
+66 66 | 
+67    |-print("but don't ignore this: {val}")
+   67 |+print(f"but don't ignore this: {val}")
 
 

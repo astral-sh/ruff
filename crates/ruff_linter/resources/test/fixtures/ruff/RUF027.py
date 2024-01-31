@@ -30,6 +30,15 @@ def nested_funcs():
     print(do_nothing(do_nothing("{a}"))) # RUF027
     do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
 
+def tripledquoted():
+    a = 4
+    c = a
+    single_line = """ {a} """
+    multi_line = a = """b { # comment
+    c}  d
+    """
+    
+
 
 def alternative_formatter(src, **kwargs):
     src.format(**kwargs)
