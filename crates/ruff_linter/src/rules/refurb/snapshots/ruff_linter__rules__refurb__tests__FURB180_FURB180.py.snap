@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB180.py:7:10: FURB180 [*] Use of metaclass=abc.ABCMeta to define Abstract Base Class
+FURB180.py:7:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
   |
 5 | # Errors
 6 | 
@@ -10,7 +10,7 @@ FURB180.py:7:10: FURB180 [*] Use of metaclass=abc.ABCMeta to define Abstract Bas
 8 |     @abstractmethod
 9 |     def foo(self): pass
   |
-  = help: Replace with abc.ABC
+  = help: Replace with `abc.ABC`
 
 ℹ Safe fix
 4 4 | 
@@ -22,14 +22,14 @@ FURB180.py:7:10: FURB180 [*] Use of metaclass=abc.ABCMeta to define Abstract Bas
 9 9 |     def foo(self): pass
 10 10 | 
 
-FURB180.py:12:10: FURB180 [*] Use of metaclass=abc.ABCMeta to define Abstract Base Class
+FURB180.py:12:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 12 | class A1(metaclass=ABCMeta):
    |          ^^^^^^^^^^^^^^^^^ FURB180
 13 |     @abstractmethod
 14 |     def foo(self): pass
    |
-   = help: Replace with abc.ABC
+   = help: Replace with `abc.ABC`
 
 ℹ Safe fix
 9  9  |     def foo(self): pass
@@ -41,14 +41,14 @@ FURB180.py:12:10: FURB180 [*] Use of metaclass=abc.ABCMeta to define Abstract Ba
 14 14 |     def foo(self): pass
 15 15 | 
 
-FURB180.py:26:18: FURB180 [*] Use of metaclass=abc.ABCMeta to define Abstract Base Class
+FURB180.py:26:18: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 26 | class A2(B0, B1, metaclass=ABCMeta):
    |                  ^^^^^^^^^^^^^^^^^ FURB180
 27 |     @abstractmethod
 28 |     def foo(self): pass
    |
-   = help: Replace with abc.ABC
+   = help: Replace with `abc.ABC`
 
 ℹ Safe fix
 23 23 |     pass
@@ -60,13 +60,13 @@ FURB180.py:26:18: FURB180 [*] Use of metaclass=abc.ABCMeta to define Abstract Ba
 28 28 |     def foo(self): pass
 29 29 | 
 
-FURB180.py:31:34: FURB180 [*] Use of metaclass=abc.ABCMeta to define Abstract Base Class
+FURB180.py:31:34: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 31 | class A3(B0, before_metaclass=1, metaclass=abc.ABCMeta):
    |                                  ^^^^^^^^^^^^^^^^^^^^^ FURB180
 32 |     pass
    |
-   = help: Replace with abc.ABC
+   = help: Replace with `abc.ABC`
 
 ℹ Safe fix
 28 28 |     def foo(self): pass
