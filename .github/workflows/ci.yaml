@@ -35,7 +35,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: tj-actions/changed-files@v41
+      - uses: tj-actions/changed-files@v42
         id: changed
         with:
           files_yaml: |
@@ -382,7 +382,7 @@ jobs:
       - name: "Install pre-commit"
         run: pip install pre-commit
       - name: "Cache pre-commit"
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
