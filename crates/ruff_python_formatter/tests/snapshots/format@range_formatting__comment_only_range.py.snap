@@ -17,7 +17,7 @@ def test  ():
 def test  ():
     # Some leading comment
     # that spans multiple lines
-    
+
     print("Do not format this" )
 
 ```

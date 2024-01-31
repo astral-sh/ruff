@@ -4,6 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_form
 ---
 ## Input
 ```python
+# Don't collapse the ellipsis if only formatting the ellipsis line.
 class Test:
     <RANGE_START>...<RANGE_END>
 
@@ -15,6 +16,10 @@ class Test4:
     # leading comment
     <RANGE_START>...<RANGE_END>
     # trailing comment
+
+
+class Test4:
+<RANGE_START>    ...<RANGE_END>
 ```
 
 ## Outputs
@@ -34,7 +39,9 @@ source_type                = Stub
 ```
 
 ```python
-class Test: ...
+# Don't collapse the ellipsis if only formatting the ellipsis line.
+class Test:
+    ...
 
 class Test2:
     pass
@@ -45,6 +52,9 @@ class Test4:
     # leading comment
     ...
     # trailing comment
+
+
+class Test4: ...
 ```
 
 

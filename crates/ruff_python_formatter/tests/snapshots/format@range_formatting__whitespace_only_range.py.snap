@@ -15,8 +15,7 @@ def  test_formatted(): pass
 ## Output
 ```python
 def  test():
-    pass  
-
+    pass
 
 
 def  test_formatted(): pass

@@ -88,7 +88,7 @@ source_type                = Python
 ```python
 # Formats the entire function with tab or 4 space indentation
 # because the statement indentations don't match the preferred indentation.
-def test():
+def test  ():
     print("before")
     1 + 2
     if True:
@@ -99,7 +99,7 @@ def test():
 
 print("not formatted" )
 
-def test2():
+def test2  ():
     print("before")
     1 + 2
     (3 + 2)
@@ -109,7 +109,7 @@ def test2():
 
 print("not formatted" )
 
-def test3():
+def test3  ():
     print("before")
     1 + 2
     """A Multiline string
@@ -121,7 +121,7 @@ that starts at the beginning of the line and we need to preserve the leading spa
     print("Done")
 
 
-def test4():
+def test4  ():
     print("before")
     1 + 2
     """A Multiline string
@@ -129,7 +129,7 @@ def test4():
 
     print("Done")
 
-def test5():
+def test5 ():
     print("before")
     if True:
         print("Format to fix indentation")
@@ -143,7 +143,6 @@ def test5():
 
 
 def test6 ():
-    
     print("Format")
     print(3 + 4)
     print("Format to fix indentation" )
@@ -168,7 +167,7 @@ source_type                = Python
 ```python
 # Formats the entire function with tab or 4 space indentation
 # because the statement indentations don't match the preferred indentation.
-def test():
+def test  ():
 	print("before")
 	1 + 2
 	if True:
@@ -179,7 +178,7 @@ def test():
 
 print("not formatted" )
 
-def test2():
+def test2  ():
 	print("before")
 	1 + 2
 	(3 + 2)
@@ -189,7 +188,7 @@ def test2():
 
 print("not formatted" )
 
-def test3():
+def test3  ():
 	print("before")
 	1 + 2
 	"""A Multiline string
@@ -201,7 +200,7 @@ that starts at the beginning of the line and we need to preserve the leading spa
 	print("Done")
 
 
-def test4():
+def test4  ():
 	print("before")
 	1 + 2
 	"""A Multiline string
@@ -209,7 +208,7 @@ def test4():
 
 	print("Done")
 
-def test5():
+def test5 ():
 	print("before")
 	if True:
 		print("Format to fix indentation")
@@ -222,7 +221,7 @@ def test5():
 	pass
 
 
-def test6():
+def test6 ():
 	print("Format")
 	print(3 + 4)
 	print("Format to fix indentation")
@@ -301,7 +300,7 @@ def test5 ():
   pass
 
 
-def test6():
+def test6 ():
   print("Format")
   print(3 + 4)
   print("Format to fix indentation")

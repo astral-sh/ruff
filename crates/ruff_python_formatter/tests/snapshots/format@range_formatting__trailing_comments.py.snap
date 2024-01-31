@@ -57,7 +57,7 @@ def test3 ():
     1 + 2  # trailing comment
 
     # trailing section comment
-    
+
 
 def test3 ():
     print("hellO" )
@@ -65,7 +65,7 @@ def test3 ():
     1 + 2  # trailing comment
     print("more")  # trailing comment 2
     # trailing section comment
-    
+
 
 print( "world" )
 ```

@@ -90,7 +90,7 @@ def test4(a):
 
 
 if a + b:  # trailing clause header comment
-    print("Not formatted")
+    print("Not formatted"  )
 
 
 if b + c:              # trailing clause header comment

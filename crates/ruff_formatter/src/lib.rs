@@ -441,12 +441,8 @@ impl Printed {
     /// the range's offsets.
     ///
     /// Returns the entire document if the source map is empty.
-    ///
-    /// ## Indentation
-    /// The `source_range` is extended to include any leading whitespace. This is to use the formatter generated
-    /// indentation over the indentation in the source document.
     #[must_use]
-    pub fn slice_range(self, source_range: TextRange, source: &str) -> PrintedRange {
+    pub fn slice_range(self, source_range: TextRange) -> PrintedRange {
         let mut start_marker: Option<SourceMarker> = None;
         let mut end_marker: Option<SourceMarker> = None;
 
@@ -457,61 +453,33 @@ impl Printed {
         // * `token("foo")`
         // * `source_position(284)`
         // The printer uses the source position 276 for both the tokens `def` and `foo` because that's the only position it knows of.
+        //
+        // Warning: Source markers are often emitted sorted by their source position but it's not guaranteed.
+        // They are only guaranteed to be sorted in increasing order by their destination position.
         for marker in self.sourcemap {
             // Take the closest start marker, but skip over start_markers that have the same start.
             if marker.source <= source_range.start()
-                && !start_marker.is_some_and(|start| start.source == marker.source)
+                && !start_marker.is_some_and(|existing| existing.source >= marker.source)
             {
                 start_marker = Some(marker);
             }
 
-            if marker.source >= source_range.end() {
-                // Take the closest marker to the end range. Override succeeding markers that have the same source
-                // to get the *ultimate* destination position.
-                end_marker = Some(match end_marker {
-                    Some(end) if end.source == marker.source => marker,
-                    None => marker,
-                    Some(_) => break,
-                });
+            if marker.source >= source_range.end()
+                && !end_marker.is_some_and(|existing| existing.source <= marker.source)
+            {
+                end_marker = Some(marker);
             }
         }
 
         let start = start_marker.map(|marker| marker.dest).unwrap_or_default();
         let end = end_marker.map_or_else(|| self.code.text_len(), |marker| marker.dest);
-
-        // Extend the formatted range and the source range to both cover any leading whitespace.
-        // Extending the ranges is necessary because the source map positions point to the start of the node's, which is after any indentation.
-        // Copying over the indentation is important when the indent in the source document doesn't match the
-        // indent produced by the formatter, in which case we want to use the indent produced by the formatter.
-        let source_range = extend_range_to_include_indent(source_range, source);
-        let code_range = extend_range_to_include_indent(TextRange::new(start, end), &self.code);
-
-        let code = &self.code[code_range];
-
-        // Trim any trailing whitespace because some statements insert newlines.
-        // Keeping the new lines would lead to new-newlines after each range formatting.
-        let code = code.trim_end_matches(|c: char| c.is_ascii_whitespace());
+        let code_range = TextRange::new(start, end);
 
         PrintedRange {
-            code: code.into(),
+            code: self.code[code_range].to_string(),
             source_range,
         }
     }
-}
-
-/// Extends `range` backwards (by reducing `range.start`) to include any directly preceding whitespace (`\t` or ` `).
-///
-/// # Panics
-/// If `range.start` is out of `source`'s bounds.
-fn extend_range_to_include_indent(range: TextRange, source: &str) -> TextRange {
-    let whitespace_len: TextSize = source[..usize::from(range.start())]
-        .chars()
-        .rev()
-        .take_while(|c| matches!(c, ' ' | '\t'))
-        .map(TextLen::text_len)
-        .sum();
-
-    TextRange::new(range.start() - whitespace_len, range.end())
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

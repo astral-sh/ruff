@@ -53,7 +53,7 @@ class MyClass:
 
     def formatted(self):
         pass
-    
+
     def outside_formatting_range (self): pass
 
 ```

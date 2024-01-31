@@ -9,12 +9,20 @@ def  test():
     print("before" )
 
     @<RANGE_START> decorator( aa)
+
     <RANGE_END>def  func ():
-        pass
+        print("Do not format this" )
 
 
 <RANGE_START>@ decorator(  a)
 def  test(   a):<RANGE_END>
+    print(  "body")
+
+print("after" )
+
+
+<RANGE_START>@ decorator(  a)<RANGE_END>
+def  test(   a):
     print(  "body")
 
 print("after" )
@@ -28,12 +36,19 @@ def  test():
     print("before" )
 
     @decorator(aa)
-    def  func ():
-        pass
+    def func():
+        print("Do not format this" )
 
 
 @decorator(a)
 def test(a):
+    print(  "body")
+
+print("after" )
+
+
+@decorator(a)
+def  test(   a):
     print(  "body")
 
 print("after" )
