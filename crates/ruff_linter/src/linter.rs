@@ -220,31 +220,30 @@ pub fn check_path(
     #[cfg(feature = "test-rules")]
     {
         for test_rule in TEST_RULES {
-            if settings.rules.enabled(*test_rule) {
-                let diagnostic = match test_rule {
-                    Rule::StableTestRule => {
-                        test_rules::StableTestRule::diagnostic(&locator, &indexer)
-                    }
-                    Rule::StableTestRuleSafeFix => {
-                        test_rules::StableTestRuleSafeFix::diagnostic(&locator, &indexer)
-                    }
-                    Rule::StableTestRuleUnsafeFix => {
-                        test_rules::StableTestRuleUnsafeFix::diagnostic(&locator, &indexer)
-                    }
-                    Rule::StableTestRuleDisplayOnlyFix => {
-                        test_rules::StableTestRuleDisplayOnlyFix::diagnostic(&locator, &indexer)
-                    }
-                    Rule::NurseryTestRule => {
-                        test_rules::NurseryTestRule::diagnostic(&locator, &indexer)
-                    }
-                    Rule::PreviewTestRule => {
-                        test_rules::PreviewTestRule::diagnostic(&locator, &indexer)
-                    }
-                    _ => unreachable!("All test rules must have an implementation"),
-                };
-                if let Some(diagnostic) = diagnostic {
-                    diagnostics.push(diagnostic);
+            if !settings.rules.enabled(*test_rule) {
+                continue;
+            }
+            let diagnostic = match test_rule {
+                Rule::StableTestRule => test_rules::StableTestRule::diagnostic(&locator, &indexer),
+                Rule::StableTestRuleSafeFix => {
+                    test_rules::StableTestRuleSafeFix::diagnostic(&locator, &indexer)
                 }
+                Rule::StableTestRuleUnsafeFix => {
+                    test_rules::StableTestRuleUnsafeFix::diagnostic(&locator, &indexer)
+                }
+                Rule::StableTestRuleDisplayOnlyFix => {
+                    test_rules::StableTestRuleDisplayOnlyFix::diagnostic(&locator, &indexer)
+                }
+                Rule::NurseryTestRule => {
+                    test_rules::NurseryTestRule::diagnostic(&locator, &indexer)
+                }
+                Rule::PreviewTestRule => {
+                    test_rules::PreviewTestRule::diagnostic(&locator, &indexer)
+                }
+                _ => unreachable!("All test rules must have an implementation"),
+            };
+            if let Some(diagnostic) = diagnostic {
+                diagnostics.push(diagnostic);
             }
         }
     }
