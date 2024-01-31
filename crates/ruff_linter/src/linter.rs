@@ -6,8 +6,6 @@ use anyhow::{anyhow, Result};
 use colored::Colorize;
 use itertools::Itertools;
 use log::error;
-use rustc_hash::FxHashMap;
-
 use ruff_diagnostics::Diagnostic;
 use ruff_notebook::Notebook;
 use ruff_python_ast::imports::ImportMap;
@@ -18,6 +16,9 @@ use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::{AsMode, ParseError};
 use ruff_source_file::{Locator, SourceFileBuilder};
 use ruff_text_size::Ranged;
+use rustc_hash::FxHashMap;
+#[cfg(feature = "test-rules")]
+use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
@@ -33,6 +34,8 @@ use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rules::pycodestyle;
+#[cfg(feature = "test-rules")]
+use crate::rules::ruff::rules::TEST_RULES;
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
 use crate::source_kind::SourceKind;
@@ -212,6 +215,63 @@ pub fn check_path(
         diagnostics.extend(check_physical_lines(
             locator, stylist, indexer, &doc_lines, settings,
         ));
+    }
+
+    // Raise violations for internal test rules
+    #[cfg(feature = "test-rules")]
+    {
+        if settings.rules.enabled(Rule::StableTestRule) {
+            diagnostics.push(Diagnostic::new(
+                crate::rules::ruff::rules::StableTestRule,
+                ruff_text_size::TextRange::default(),
+            ));
+        }
+
+        // Applying the fix must "resolve" the diagnostic or we will not converge
+        // So only raise the diagnostics on the "first" iteration
+        if settings.rules.enabled(Rule::StableTestRuleSafeFix) {
+            diagnostics.push(
+                Diagnostic::new(
+                    crate::rules::ruff::rules::StableTestRuleSafeFix,
+                    ruff_text_size::TextRange::default(),
+                )
+                .with_fix(crate::rules::ruff::rules::StableTestRuleSafeFix::fix()),
+            );
+        }
+
+        if settings.rules.enabled(Rule::StableTestRuleUnsafeFix) {
+            diagnostics.push(
+                Diagnostic::new(
+                    crate::rules::ruff::rules::StableTestRuleUnsafeFix,
+                    ruff_text_size::TextRange::default(),
+                )
+                .with_fix(crate::rules::ruff::rules::StableTestRuleUnsafeFix::fix()),
+            );
+        }
+
+        if settings.rules.enabled(Rule::StableTestRuleDisplayOnlyFix) {
+            diagnostics.push(
+                Diagnostic::new(
+                    crate::rules::ruff::rules::StableTestRuleDisplayOnlyFix,
+                    ruff_text_size::TextRange::default(),
+                )
+                .with_fix(crate::rules::ruff::rules::StableTestRuleDisplayOnlyFix::fix()),
+            );
+        }
+
+        if settings.rules.enabled(Rule::PreviewTestRule) {
+            diagnostics.push(Diagnostic::new(
+                crate::rules::ruff::rules::PreviewTestRule,
+                ruff_text_size::TextRange::default(),
+            ));
+        }
+
+        if settings.rules.enabled(Rule::NurseryTestRule) {
+            diagnostics.push(Diagnostic::new(
+                crate::rules::ruff::rules::NurseryTestRule,
+                ruff_text_size::TextRange::default(),
+            ));
+        }
     }
 
     // Ignore diagnostics based on per-file-ignores.
@@ -460,6 +520,11 @@ pub fn lint_fix<'a>(
     // Track the number of fixed errors across iterations.
     let mut fixed = FxHashMap::default();
 
+    // Track the applied fixes when using test rules
+    // So we can filter them out after "fixing" them
+    #[cfg(feature = "test-rules")]
+    let mut applied_test_fixes = FxHashSet::default();
+
     // As an escape hatch, bail after 100 iterations.
     let mut iterations = 0;
 
@@ -521,16 +586,39 @@ pub fn lint_fix<'a>(
             }
         }
 
+        #[cfg(not(feature = "test-rules"))]
+        let diagnostics = &result.data.0;
+
+        // HACK(zanieb): We cannot raise violations for "fixed" test diagnostics
+        //               or we will never converge since they raise unconditionally
+        //               so we filter them out here
+        #[cfg(feature = "test-rules")]
+        let filtered_diagnostics = result
+            .data
+            .0
+            .iter()
+            .filter(|diagnostic| !applied_test_fixes.contains(&diagnostic.kind.rule()))
+            .cloned()
+            .collect::<Vec<_>>();
+        #[cfg(feature = "test-rules")]
+        let diagnostics = filtered_diagnostics.as_slice();
+
         // Apply fix.
         if let Some(FixResult {
             code: fixed_contents,
             fixes: applied,
             source_map,
-        }) = fix_file(&result.data.0, &locator, unsafe_fixes)
+        }) = fix_file(diagnostics, &locator, unsafe_fixes)
         {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
                 for (rule, count) in applied {
+                    // Track which test rule fixes are applied
+                    #[cfg(feature = "test-rules")]
+                    if TEST_RULES.contains(&rule) {
+                        applied_test_fixes.insert(rule.clone());
+                    }
+
                     *fixed.entry(rule).or_default() += count;
                 }
 
@@ -539,11 +627,11 @@ pub fn lint_fix<'a>(
                 // Increment the iteration count.
                 iterations += 1;
 
-                // Re-run the linter pass (by avoiding the break).
+                // Re-run the linter pass (by avoiding the return).
                 continue;
             }
 
-            report_failed_to_converge_error(path, transformed.source_code(), &result.data.0);
+            report_failed_to_converge_error(path, transformed.source_code(), diagnostics);
         }
 
         return Ok(FixerResult {

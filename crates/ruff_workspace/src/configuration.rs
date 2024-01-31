@@ -1184,6 +1184,7 @@ mod tests {
         Rule::DeleteFullSlice,
         Rule::CheckAndRemoveFromSet,
         Rule::QuadraticListSummation,
+        Rule::NurseryTestRule,
     ];
 
     const PREVIEW_RULES: &[Rule] = &[
@@ -1201,6 +1202,7 @@ mod tests {
         Rule::UndocumentedWarn,
         Rule::UnnecessaryEnumerate,
         Rule::MathConstant,
+        Rule::PreviewTestRule,
     ];
 
     #[allow(clippy::needless_pass_by_value)]

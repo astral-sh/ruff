@@ -289,6 +289,8 @@ mod schema {
                                 (!prefix.is_empty()).then(|| prefix.to_string())
                             })),
                     )
+                    // Strip the test rules from the schema
+                    .filter(|code| !code.starts_with("RUF9"))
                     .sorted()
                     .map(Value::String)
                     .collect(),

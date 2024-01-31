@@ -54,6 +54,8 @@ walkdir = { workspace = true }
 wild = { workspace = true }
 
 [dev-dependencies]
+# Enable test rules during development
+ruff_linter = { path = "../ruff_linter", features = ["clap", "test-rules"] }
 assert_cmd = { workspace = true }
 # Avoid writing colored snapshots when running tests from the terminal
 colored = { workspace = true, features = ["no-color"]}
