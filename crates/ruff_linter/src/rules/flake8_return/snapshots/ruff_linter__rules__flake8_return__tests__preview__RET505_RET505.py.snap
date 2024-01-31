@@ -343,4 +343,20 @@ RET505.py:183:5: RET505 [*] Unnecessary `else` after `return` statement
 186 185 | 
 187 186 | x = 0
 
+RET505.py:200:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+198 | def sb(self):
+199 |     if self._sb is not None: return self._sb
+200 |     else: self._sb = '\033[01;%dm'; self._sa = '\033[0;0m';
+    |     ^^^^ RET505
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+197 197 | # Regression test for: https://github.com/astral-sh/ruff/issues/9732
+198 198 | def sb(self):
+199 199 |     if self._sb is not None: return self._sb
+200     |-    else: self._sb = '\033[01;%dm'; self._sa = '\033[0;0m';
+    200 |+    self._sb = '\033[01;%dm'; self._sa = '\033[0;0m';
+
 

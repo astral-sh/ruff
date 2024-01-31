@@ -820,8 +820,8 @@ fn remove_else(
 
         // If the statement is on the same line as the `else`, just remove the `else: `.
         // Ex) `else: return True` -> `return True`
-        if let [first] = elif_else.body.as_slice() {
-            if indexer.in_multi_statement_line(first, locator) {
+        if let Some(first) = elif_else.body.first() {
+            if indexer.preceded_by_multi_statement_line(first, locator) {
                 return Ok(Fix::safe_edit(Edit::deletion(
                     elif_else.start(),
                     first.start(),
