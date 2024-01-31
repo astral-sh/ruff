@@ -616,7 +616,7 @@ pub fn lint_fix<'a>(
                     // Track which test rule fixes are applied
                     #[cfg(feature = "test-rules")]
                     if TEST_RULES.contains(&rule) {
-                        applied_test_fixes.insert(rule.clone());
+                        applied_test_fixes.insert(rule);
                     }
 
                     *fixed.entry(rule).or_default() += count;
