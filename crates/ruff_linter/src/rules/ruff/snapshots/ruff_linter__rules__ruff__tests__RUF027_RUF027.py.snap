@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF027.py:5:9: RUF027 [*] `"{a}"` may be a formatting string without an `f` prefix.
+RUF027.py:5:9: RUF027 [*] `"{a}"` may be a formatting string without an `f` prefix
   |
 3 | def simple_cases():
 4 |     a = 4
@@ -22,7 +22,7 @@ RUF027.py:5:9: RUF027 [*] `"{a}"` may be a formatting string without an `f` pref
 7 7 |     uppercase = "{a}".to_upper() # RUF027
 8 8 | 
 
-RUF027.py:6:9: RUF027 [*] `"{a} {b} f'{val}' "` may be a formatting string without an `f` prefix.
+RUF027.py:6:9: RUF027 [*] `"{a} {b} f'{val}' "` may be a formatting string without an `f` prefix
   |
 4 |     a = 4
 5 |     b = "{a}" # RUF027
@@ -42,7 +42,7 @@ RUF027.py:6:9: RUF027 [*] `"{a} {b} f'{val}' "` may be a formatting string witho
 8 8 | 
 9 9 | def escaped_string():
 
-RUF027.py:7:17: RUF027 [*] `"{a}"` may be a formatting string without an `f` prefix.
+RUF027.py:7:17: RUF027 [*] `"{a}"` may be a formatting string without an `f` prefix
   |
 5 |     b = "{a}" # RUF027
 6 |     c = "{a} {b} f'{val}' " # RUF027
@@ -63,7 +63,7 @@ RUF027.py:7:17: RUF027 [*] `"{a}"` may be a formatting string without an `f` pre
 9 9 | def escaped_string():
 10 10 |     a = 4
 
-RUF027.py:15:9: RUF027 [*] `r"raw string with formatting: {a}"` may be a formatting string without an `f` prefix.
+RUF027.py:15:9: RUF027 [*] `r"raw string with formatting: {a}"` may be a formatting string without an `f` prefix
    |
 13 | def raw_string():
 14 |     a = 4
@@ -84,7 +84,7 @@ RUF027.py:15:9: RUF027 [*] `r"raw string with formatting: {a}"` may be a formatt
 17 17 | def print_name(name: str):
 18 18 |     a = 4
 
-RUF027.py:19:11: RUF027 [*] `"Hello, {name}!"` may be a formatting string without an `f` prefix.
+RUF027.py:19:11: RUF027 [*] `"Hello, {name}!"` may be a formatting string without an `f` prefix
    |
 17 | def print_name(name: str):
 18 |     a = 4
@@ -104,7 +104,7 @@ RUF027.py:19:11: RUF027 [*] `"Hello, {name}!"` may be a formatting string withou
 21 21 | 
 22 22 | def do_nothing(a):
 
-RUF027.py:20:11: RUF027 [*] `"The test value we're using today is {a}"` may be a formatting string without an `f` prefix.
+RUF027.py:20:11: RUF027 [*] `"The test value we're using today is {a}"` may be a formatting string without an `f` prefix
    |
 18 |     a = 4
 19 |     print("Hello, {name}!") # RUF027
@@ -125,7 +125,7 @@ RUF027.py:20:11: RUF027 [*] `"The test value we're using today is {a}"` may be a
 22 22 | def do_nothing(a):
 23 23 |     return a
 
-RUF027.py:30:33: RUF027 [*] `"{a}"` may be a formatting string without an `f` prefix.
+RUF027.py:30:33: RUF027 [*] `"{a}"` may be a formatting string without an `f` prefix
    |
 28 | def nested_funcs():
 29 |     a = 4
@@ -145,7 +145,7 @@ RUF027.py:30:33: RUF027 [*] `"{a}"` may be a formatting string without an `f` pr
 32 32 | 
 33 33 | 
 
-RUF027.py:31:39: RUF027 [*] `"{a}"` may be a formatting string without an `f` prefix.
+RUF027.py:31:39: RUF027 [*] `"{a}"` may be a formatting string without an `f` prefix
    |
 29 |     a = 4
 30 |     print(do_nothing(do_nothing("{a}"))) # RUF027
@@ -164,7 +164,28 @@ RUF027.py:31:39: RUF027 [*] `"{a}"` may be a formatting string without an `f` pr
 33 33 | 
 34 34 | def alternative_formatter(src, **kwargs):
 
-RUF027.py:58:7: RUF027 [*] `"but don't ignore this: {val}"` may be a formatting string without an `f` prefix.
+RUF027.py:46:12: RUF027 [*] `"{ positive: false }"` may be a formatting string without an `f` prefix
+   |
+44 |     d = "bad variable: {invalid}"
+45 |     e = "incorrect syntax: {}"
+46 |     json = "{ positive: false }"
+   |            ^^^^^^^^^^^^^^^^^^^^^ RUF027
+47 |     json2 = "{ 'positive': false }"
+48 |     json3 = "{ 'positive': 'false' }"
+   |
+   = help: Add an `f` prefix to the formatting string
+
+ℹ Unsafe fix
+43 43 |     c = """  {b} """
+44 44 |     d = "bad variable: {invalid}"
+45 45 |     e = "incorrect syntax: {}"
+46    |-    json = "{ positive: false }"
+   46 |+    json = f"{ positive: false }"
+47 47 |     json2 = "{ 'positive': false }"
+48 48 |     json3 = "{ 'positive': 'false' }"
+49 49 |     alternative_formatter("{a}", a = 5)
+
+RUF027.py:58:7: RUF027 [*] `"but don't ignore this: {val}"` may be a formatting string without an `f` prefix
    |
 56 | "always ignore this: {a}"
 57 | 

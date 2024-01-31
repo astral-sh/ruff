@@ -1,12 +1,12 @@
+use memchr::memchr2_iter;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{
-    Arguments, Expr, ExprCall, Keyword, Stmt, StmtExpr, StringLiteral, StringLiteralValue,
-};
+use ruff_python_ast::{self as ast};
+use ruff_python_parser::parse_expression;
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
-
-use super::helpers::should_be_fstring;
+use ruff_text_size::Ranged;
+use rustc_hash::FxHashSet;
 
 /// # What it does
 /// Checks for strings that contain f-string syntax but are not f-strings.
@@ -38,7 +38,7 @@ impl AlwaysFixableViolation for MissingFStringSyntax {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { literal } = &self;
-        format!(r#"`{literal}` may be a formatting string without an `f` prefix."#)
+        format!(r#"`{literal}` may be a formatting string without an `f` prefix"#)
     }
 
     fn fix_title(&self) -> String {
@@ -48,12 +48,12 @@ impl AlwaysFixableViolation for MissingFStringSyntax {
 
 pub(crate) fn missing_fstring_syntax(
     diagnostics: &mut Vec<Diagnostic>,
-    value: &StringLiteralValue,
+    value: &ast::StringLiteralValue,
     locator: &Locator,
     semantic: &SemanticModel,
 ) {
-    if let Stmt::Expr(StmtExpr { value, .. }) = semantic.current_statement() {
-        if let Expr::StringLiteral(_) = value.as_ref() {
+    if let ast::Stmt::Expr(ast::StmtExpr { value, .. }) = semantic.current_statement() {
+        if let ast::Expr::StringLiteral(_) = value.as_ref() {
             return;
         }
     }
@@ -61,20 +61,81 @@ pub(crate) fn missing_fstring_syntax(
     let kwargs = get_func_keywords(semantic);
 
     for literal in value.as_slice() {
-        if should_be_fstring(&literal.value, kwargs, semantic) {
-            let mut diagnostic = Diagnostic::new(
+        if should_be_fstring(literal, kwargs, locator, semantic) {
+            let diagnostic = Diagnostic::new(
                 MissingFStringSyntax {
                     literal: locator.slice(literal.range).to_string(),
                 },
                 literal.range,
-            );
-            diagnostic.set_fix(fix_fstring_syntax(literal, locator));
+            )
+            .with_fix(fix_fstring_syntax(literal));
             diagnostics.push(diagnostic);
         }
     }
 }
 
-fn get_func_keywords<'a>(semantic: &'a SemanticModel) -> Option<&'a Vec<Keyword>> {
+/// Returns `true` if `source` is valid f-string syntax with qualified, bound variables.
+/// `kwargs` should be the keyword arguments that were passed to function if the string literal is also
+/// being passed to the same function.
+/// If a identifier from `kwargs` is used in `source`'s formatting, this will return `false`,
+/// since it's possible the function could be formatting the literal in question.
+pub(super) fn should_be_fstring(
+    source: &ast::StringLiteral,
+    kwargs: Option<&[ast::Keyword]>,
+    locator: &Locator,
+    semantic: &SemanticModel,
+) -> bool {
+    if !has_brackets(&source.value) {
+        return false;
+    }
+
+    let Ok(ast::Expr::FString(ast::ExprFString { value, .. })) =
+        parse_expression(&format!("f{}", locator.slice(source.range)))
+    else {
+        return false;
+    };
+
+    let kw_idents: FxHashSet<&str> = kwargs
+        .map(|keywords| {
+            keywords
+                .iter()
+                .filter_map(|k| k.arg.as_ref())
+                .map(ast::Identifier::as_str)
+                .collect()
+        })
+        .unwrap_or_default();
+
+    for f_string in value.f_strings() {
+        let mut has_name = false;
+        for element in f_string
+            .elements
+            .iter()
+            .filter_map(|element| element.as_expression())
+        {
+            if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
+                if kw_idents.contains(id.as_str()) || semantic.lookup_symbol(id).is_none() {
+                    return false;
+                }
+                has_name = true;
+            }
+        }
+        if !has_name {
+            return false;
+        }
+    }
+
+    true
+}
+
+// fast check to disqualify any string literal without brackets
+#[inline]
+fn has_brackets(possible_fstring: &str) -> bool {
+    // this qualifies rare false positives like "{ unclosed bracket"
+    // but it's faster in the general case
+    memchr2_iter(b'{', b'}', possible_fstring.as_bytes()).count() > 1
+}
+
+fn get_func_keywords<'a>(semantic: &'a SemanticModel) -> Option<&'a [ast::Keyword]> {
     for expr in [
         semantic.current_expression_parent(),
         semantic.current_expression_grandparent(),
@@ -83,8 +144,8 @@ fn get_func_keywords<'a>(semantic: &'a SemanticModel) -> Option<&'a Vec<Keyword>
     .flatten()
     {
         match expr {
-            Expr::Call(ExprCall {
-                arguments: Arguments { keywords, .. },
+            ast::Expr::Call(ast::ExprCall {
+                arguments: ast::Arguments { keywords, .. },
                 ..
             }) => return Some(keywords),
             _ => continue,
@@ -93,11 +154,6 @@ fn get_func_keywords<'a>(semantic: &'a SemanticModel) -> Option<&'a Vec<Keyword>
     None
 }
 
-fn fix_fstring_syntax(literal: &StringLiteral, locator: &Locator) -> Fix {
-    let content = format!(r#"f{}"#, locator.slice(literal.range));
-    Fix::unsafe_edit(Edit::replacement(
-        content,
-        literal.range.start(),
-        literal.range.end(),
-    ))
+fn fix_fstring_syntax(literal: &ast::StringLiteral) -> Fix {
+    Fix::unsafe_edit(Edit::insertion("f".into(), literal.start()))
 }
