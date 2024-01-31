@@ -31,17 +31,16 @@ pub(crate) struct MultilineRangesBuilder {
 
 impl MultilineRangesBuilder {
     pub(crate) fn visit_token(&mut self, token: &Tok, range: TextRange) {
-        match token {
-            Tok::String { triple_quoted, .. } => {
-                if *triple_quoted {
-                    self.ranges.push(range)
-                }
+        if let Tok::String { triple_quoted, .. } = token {
+            if *triple_quoted {
+                self.ranges.push(range);
             }
-            _ => {}
         }
     }
 
     pub(crate) fn finish(self) -> MultilineRanges {
-        MultilineRanges { ranges: self.ranges }
+        MultilineRanges {
+            ranges: self.ranges,
+        }
     }
 }

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
 use ruff_source_file::{Line, Locator};
@@ -104,13 +104,14 @@ pub(crate) fn trailing_whitespace(
             // Removing trailing whitespace is not safe inside multiline strings.
             let safe = !indexer.multiline_ranges().intersects(range);
             let mut diagnostic = Diagnostic::new(TrailingWhitespace, range);
-            let edit = Edit::range_deletion(range);
-            let fix = if safe {
-                Fix::safe_edit(edit)
-            } else {
-                Fix::unsafe_edit(edit)
-            };
-            diagnostic.set_fix(fix);
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_deletion(range),
+                if safe {
+                    Applicability::Safe
+                } else {
+                    Applicability::Unsafe
+                },
+            ));
             return Some(diagnostic);
         }
     }
