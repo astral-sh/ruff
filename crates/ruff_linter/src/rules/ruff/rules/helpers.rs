@@ -104,7 +104,7 @@ fn has_brackets(possible_fstring: &str) -> bool {
     opening && closing
 }
 
-/// Returns `true`` if `source` is valid f-string syntax with qualified, bound variables.
+/// Returns `true` if `source` is valid f-string syntax with qualified, bound variables.
 /// `kwargs` should be the keyword arguments that were passed to function if the string literal is also
 /// being passed to the same function.
 /// If a identifier from `kwargs` is used in `source`'s formatting, this will return `false`,
@@ -127,9 +127,9 @@ pub(super) fn should_be_fstring(
     let kw_idents: FxHashSet<String> = kwargs
         .map(|keywords| {
             keywords
-                .into_iter()
-                .flat_map(|k| k.arg.clone())
-                .map(|ident| ident.into())
+                .iter()
+                .filter_map(|k| k.arg.clone())
+                .map(Into::into)
                 .collect()
         })
         .unwrap_or_default();

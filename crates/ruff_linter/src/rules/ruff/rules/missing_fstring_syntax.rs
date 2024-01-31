@@ -52,12 +52,10 @@ pub(crate) fn missing_fstring_syntax(
     locator: &Locator,
     semantic: &SemanticModel,
 ) {
-    match semantic.current_statement() {
-        Stmt::Expr(StmtExpr { value, .. }) => match value.as_ref() {
-            Expr::StringLiteral(_) => return,
-            _ => {}
-        },
-        _ => {}
+    if let Stmt::Expr(StmtExpr { value, .. }) = semantic.current_statement() {
+        if let Expr::StringLiteral(_) = value.as_ref() {
+            return;
+        }
     }
 
     let kwargs = get_func_keywords(semantic);
@@ -82,7 +80,7 @@ fn get_func_keywords<'a>(semantic: &'a SemanticModel) -> Option<&'a Vec<Keyword>
         semantic.current_expression_grandparent(),
     ]
     .into_iter()
-    .filter_map(|e| e)
+    .flatten()
     {
         match expr {
             Expr::Call(ExprCall {
