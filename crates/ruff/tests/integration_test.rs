@@ -799,7 +799,7 @@ fn show_statistics() {
 
 #[test]
 fn nursery_prefix() {
-    // Should only detect RUF900, but not the unstable test rules
+    // Should only detect RUF90X, but not the unstable test rules
     let mut cmd = RuffCheck::default().args(["--select", "RUF9"]).build();
     assert_cmd_snapshot!(cmd, @r###"
     success: false
@@ -818,7 +818,7 @@ fn nursery_prefix() {
 
 #[test]
 fn nursery_all() {
-    // Should detect RUF900, but not the unstable test rules
+    // Should detect RUF90X, but not the unstable test rules
     let mut cmd = RuffCheck::default().args(["--select", "ALL"]).build();
     assert_cmd_snapshot!(cmd, @r###"
     success: false
