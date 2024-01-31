@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use std::path::PathBuf;
 
 use clap::{command, Parser};
@@ -12,6 +13,7 @@ use ruff_linter::settings::types::{
     SerializationFormat, UnsafeFixes,
 };
 use ruff_linter::{warn_user, RuleParser, RuleSelector, RuleSelectorParser};
+use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::PycodestyleOptions;
 use ruff_workspace::resolver::ConfigurationTransformer;
@@ -440,6 +442,28 @@ pub struct FormatCommand {
     preview: bool,
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
+
+    /// Format code starting at the given character offset (zero based).
+    ///
+    /// When specified, Ruff will try to only format the code after the specified offset but
+    /// it might be necessary to extend the start backwards, e.g. to the start of the logical line.
+    ///
+    /// Defaults to the start of the document.
+    ///
+    /// The option can only be used when formatting a single file. Range formatting of notebooks is unsupported.
+    #[arg(long)]
+    pub range_start: Option<usize>,
+
+    /// Format code ending (exclusive) at the given character offset (zero based).
+    ///
+    /// When specified, Ruff will try to only format the code coming before the specified offset but
+    /// it might be necessary to extend the forward, e.g. to the end of the logical line.
+    ///
+    /// Defaults to the end of the document.
+    ///
+    /// The option can only be used when formatting a single file. Range formatting of notebooks is unsupported.
+    #[arg(long)]
+    pub range_end: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
@@ -560,8 +584,19 @@ impl CheckCommand {
 impl FormatCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(self) -> (FormatArguments, CliOverrides) {
-        (
+    pub fn partition(self) -> anyhow::Result<(FormatArguments, CliOverrides)> {
+        if let (Some(start), Some(end)) = (self.range_start, self.range_end) {
+            if start > end {
+                return Err(anyhow!(
+                    r#"The range `--range-start` must be smaller or equal to `--range-end`, but {start} > {end}.
+  Hint: Try switching the range's start and end values: `--range-start={end} --range-end={start}`"#,
+                ));
+            }
+        }
+
+        let range = CharRange::new(self.range_start, self.range_end);
+
+        Ok((
             FormatArguments {
                 check: self.check,
                 diff: self.diff,
@@ -570,6 +605,7 @@ impl FormatCommand {
                 isolated: self.isolated,
                 no_cache: self.no_cache,
                 stdin_filename: self.stdin_filename,
+                range,
             },
             CliOverrides {
                 line_length: self.line_length,
@@ -587,7 +623,7 @@ impl FormatCommand {
                 // Unsupported on the formatter CLI, but required on `Overrides`.
                 ..CliOverrides::default()
             },
-        )
+        ))
     }
 }
 
@@ -670,6 +706,76 @@ pub struct FormatArguments {
     pub files: Vec<PathBuf>,
     pub isolated: bool,
     pub stdin_filename: Option<PathBuf>,
+    pub range: Option<CharRange>,
+}
+
+/// A text range specified in character offsets.
+#[derive(Copy, Clone, Debug)]
+pub enum CharRange {
+    /// A range that covers the content from the given start character offset up to the end of the file.
+    StartsAt(usize),
+
+    /// A range that covers the content from the start of the file up to, but excluding the given end character offset.
+    EndsAt(usize),
+
+    /// Range that covers the content between the given start and end character offsets.
+    Between(usize, usize),
+}
+
+impl CharRange {
+    /// Creates a new [`CharRange`] from the given start and end character offsets.
+    ///
+    /// Returns `None` if both `start` and `end` are `None`.
+    ///
+    /// # Panics
+    ///
+    /// If both `start` and `end` are `Some` and `start` is greater than `end`.
+    pub(super) fn new(start: Option<usize>, end: Option<usize>) -> Option<Self> {
+        match (start, end) {
+            (Some(start), Some(end)) => {
+                assert!(start <= end);
+
+                Some(CharRange::Between(start, end))
+            }
+            (Some(start), None) => Some(CharRange::StartsAt(start)),
+            (None, Some(end)) => Some(CharRange::EndsAt(end)),
+            (None, None) => None,
+        }
+    }
+
+    /// Converts the range specified in character offsets to a byte offsets specific for `source`.
+    ///
+    /// Returns an empty range starting at `source.len()` if `start` is passed the end of `source`.
+    ///
+    /// # Panics
+    ///
+    /// If either the start or end offset point to a byte offset larger than `u32::MAX`.
+    pub(super) fn to_text_range(self, source: &str) -> TextRange {
+        let (start_char, end_char) = match self {
+            CharRange::StartsAt(offset) => (offset, None),
+            CharRange::EndsAt(offset) => (0usize, Some(offset)),
+            CharRange::Between(start, end) => (start, Some(end)),
+        };
+
+        let start_offset = source
+            .char_indices()
+            .nth(start_char)
+            .map_or(source.len(), |(offset, _)| offset);
+
+        let end_offset = end_char
+            .and_then(|end_char| {
+                source[start_offset..]
+                    .char_indices()
+                    .nth(end_char - start_char)
+                    .map(|(relative_offset, _)| start_offset + relative_offset)
+            })
+            .unwrap_or(source.len());
+
+        TextRange::new(
+            TextSize::try_from(start_offset).unwrap(),
+            TextSize::try_from(end_offset).unwrap(),
+        )
+    }
 }
 
 /// CLI settings that function as configuration overrides.

@@ -204,7 +204,7 @@ pub fn run(
 }
 
 fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    let (cli, overrides) = args.partition();
+    let (cli, overrides) = args.partition()?;
 
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
         commands::format_stdin::format_stdin(&cli, &overrides)

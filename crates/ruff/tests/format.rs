@@ -1544,3 +1544,163 @@ include = ["*.ipy"]
     "###);
     Ok(())
 }
+
+#[test]
+fn range_formatting() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range-start=8", "--range-end=15"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Shouldn't format this" )
+
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    def foo(
+        arg1,
+        arg2,
+    ):
+        print("Shouldn't format this" )
+
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn range_formatting_multiple_files() -> std::io::Result<()> {
+    let tempdir = TempDir::new()?;
+    let file1 = tempdir.path().join("file1.py");
+
+    fs::write(
+        &file1,
+        r#"
+def file1(arg1, arg2,):
+    print("Shouldn't format this" )
+
+"#,
+    )?;
+
+    let file2 = tempdir.path().join("file2.py");
+
+    fs::write(
+        &file2,
+        r#"
+def file2(arg1, arg2,):
+    print("Shouldn't format this" )
+
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--range-start=8", "--range-end=15"])
+        .arg(file1)
+        .arg(file2),  @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: The `--range` option is only supported when formatting a single file but the specified paths resolve to 2 files.
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn range_formatting_out_of_bounds() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range-start=100", "--range-end=200"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Shouldn't format this" )
+
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    def foo(arg1, arg2,):
+        print("Shouldn't format this" )
+
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn range_start_larger_than_end() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range-start=50", "--range-end=10"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Shouldn't format this" )
+
+"#), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: The range `--range-start` must be smaller or equal to `--range-end`, but 50 > 10.
+      Hint: Try switching the range's start and end values: `--range-start=10 --range-end=50`
+    "###);
+}
+
+#[test]
+fn range_formatting_notebook() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--no-cache", "--stdin-filename", "main.ipynb", "--range-start=8", "--range-end=15"])
+        .arg("-")
+        .pass_stdin(r#"
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "ad6f36d9-4b7d-4562-8d00-f15a0f1fbb6d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "x=1"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+"#), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Failed to format main.ipynb: Range formatting isn't supported for notebooks.
+    "###);
+}
