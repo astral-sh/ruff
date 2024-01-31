@@ -5978,9 +5978,10 @@ impl<'a> AnyNodeRef<'a> {
         )
     }
 
-    pub fn visit_preorder<'b, V>(&'b self, visitor: &mut V)
+    pub fn visit_preorder<'b, V>(self, visitor: &mut V)
     where
         V: PreorderVisitor<'b> + ?Sized,
+        'a: 'b,
     {
         match self {
             AnyNodeRef::ModModule(node) => node.visit_preorder(visitor),

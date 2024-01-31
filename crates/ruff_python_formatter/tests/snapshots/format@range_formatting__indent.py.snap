@@ -1,0 +1,310 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/indent.py
+---
+## Input
+```python
+# Formats the entire function with tab or 4 space indentation
+# because the statement indentations don't match the preferred indentation.
+def test  ():
+  print("before" )
+  <RANGE_START>1 +  2
+  if   True:
+      pass
+  print("Done" )<RANGE_END>
+
+  print("formatted" )
+
+print("not formatted" )
+
+def test2  ():
+  print("before" )
+  <RANGE_START>1 +  2
+  (
+3 + 2
+  )
+  print("Done" )<RANGE_END>
+
+  print("formatted" )
+
+print("not formatted" )
+
+def test3  ():
+  print("before" )
+  <RANGE_START>1 +  2
+  """A Multiline string
+that starts at the beginning of the line and we need to preserve the leading spaces"""
+
+  """A Multiline string
+  that has some indentation on the second line and we need to preserve the leading spaces"""
+
+  print("Done" )<RANGE_END>
+
+
+def test4  ():
+  print("before" )
+  <RANGE_START>1 +  2
+  """A Multiline string
+    that uses the same indentation as the formatted code will. This should not be dedented."""
+
+  print("Done" )<RANGE_END>
+
+def test5 ():
+  print("before" )
+  if True:
+      print("Format to fix indentation" )
+      print(<RANGE_START>1 +  2)
+
+  else:
+      print(3 +  4)<RANGE_END>
+      print("Format to fix indentation" )
+
+  pass
+
+
+def test6 ():
+    <RANGE_START>
+    print("Format" )
+    print(3 +  4)<RANGE_END>
+    print("Format to fix indentation" )
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
+source_type                = Python
+```
+
+```python
+# Formats the entire function with tab or 4 space indentation
+# because the statement indentations don't match the preferred indentation.
+def test  ():
+    print("before")
+    1 + 2
+    if True:
+        pass
+    print("Done")
+
+    print("formatted")
+
+print("not formatted" )
+
+def test2  ():
+    print("before")
+    1 + 2
+    (3 + 2)
+    print("Done")
+
+    print("formatted")
+
+print("not formatted" )
+
+def test3  ():
+    print("before")
+    1 + 2
+    """A Multiline string
+that starts at the beginning of the line and we need to preserve the leading spaces"""
+
+    """A Multiline string
+  that has some indentation on the second line and we need to preserve the leading spaces"""
+
+    print("Done")
+
+
+def test4  ():
+    print("before")
+    1 + 2
+    """A Multiline string
+    that uses the same indentation as the formatted code will. This should not be dedented."""
+
+    print("Done")
+
+def test5 ():
+    print("before")
+    if True:
+        print("Format to fix indentation")
+        print(1 + 2)
+
+    else:
+        print(3 + 4)
+        print("Format to fix indentation")
+
+    pass
+
+
+def test6 ():
+    print("Format")
+    print(3 + 4)
+    print("Format to fix indentation" )
+```
+
+
+### Output 2
+```
+indent-style               = tab
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
+source_type                = Python
+```
+
+```python
+# Formats the entire function with tab or 4 space indentation
+# because the statement indentations don't match the preferred indentation.
+def test  ():
+	print("before")
+	1 + 2
+	if True:
+		pass
+	print("Done")
+
+	print("formatted")
+
+print("not formatted" )
+
+def test2  ():
+	print("before")
+	1 + 2
+	(3 + 2)
+	print("Done")
+
+	print("formatted")
+
+print("not formatted" )
+
+def test3  ():
+	print("before")
+	1 + 2
+	"""A Multiline string
+that starts at the beginning of the line and we need to preserve the leading spaces"""
+
+	"""A Multiline string
+  that has some indentation on the second line and we need to preserve the leading spaces"""
+
+	print("Done")
+
+
+def test4  ():
+	print("before")
+	1 + 2
+	"""A Multiline string
+    that uses the same indentation as the formatted code will. This should not be dedented."""
+
+	print("Done")
+
+def test5 ():
+	print("before")
+	if True:
+		print("Format to fix indentation")
+		print(1 + 2)
+
+	else:
+		print(3 + 4)
+		print("Format to fix indentation")
+
+	pass
+
+
+def test6 ():
+	print("Format")
+	print(3 + 4)
+	print("Format to fix indentation")
+```
+
+
+### Output 3
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 2
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
+source_type                = Python
+```
+
+```python
+# Formats the entire function with tab or 4 space indentation
+# because the statement indentations don't match the preferred indentation.
+def test  ():
+  print("before" )
+  1 + 2
+  if True:
+    pass
+  print("Done")
+
+  print("formatted" )
+
+print("not formatted" )
+
+def test2  ():
+  print("before" )
+  1 + 2
+  (3 + 2)
+  print("Done")
+
+  print("formatted" )
+
+print("not formatted" )
+
+def test3  ():
+  print("before" )
+  1 + 2
+  """A Multiline string
+that starts at the beginning of the line and we need to preserve the leading spaces"""
+
+  """A Multiline string
+  that has some indentation on the second line and we need to preserve the leading spaces"""
+
+  print("Done")
+
+
+def test4  ():
+  print("before" )
+  1 + 2
+  """A Multiline string
+    that uses the same indentation as the formatted code will. This should not be dedented."""
+
+  print("Done")
+
+def test5 ():
+  print("before" )
+  if True:
+    print("Format to fix indentation")
+    print(1 + 2)
+
+  else:
+    print(3 + 4)
+    print("Format to fix indentation")
+
+  pass
+
+
+def test6 ():
+  print("Format")
+  print(3 + 4)
+  print("Format to fix indentation")
+```
+
+
+

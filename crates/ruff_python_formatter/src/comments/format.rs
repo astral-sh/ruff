@@ -432,7 +432,17 @@ impl Format<PyFormatContext<'_>> for FormatNormalizedComment<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
         match self.comment {
             Cow::Borrowed(borrowed) => {
-                source_text_slice(TextRange::at(self.range.start(), borrowed.text_len())).fmt(f)
+                source_text_slice(TextRange::at(self.range.start(), borrowed.text_len())).fmt(f)?;
+
+                // Write the end position if the borrowed comment is shorter than the original comment
+                // So that we still can map back the end of a comment to the formatted code.
+                if f.options().source_map_generation().is_enabled()
+                    && self.range.len() != borrowed.text_len()
+                {
+                    source_position(self.range.end()).fmt(f)?;
+                }
+
+                Ok(())
             }
 
             Cow::Owned(ref owned) => {

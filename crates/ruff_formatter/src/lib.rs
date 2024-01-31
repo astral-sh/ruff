@@ -53,7 +53,7 @@ pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, Pri
 pub use format_element::{normalize_newlines, FormatElement, LINE_TERMINATORS};
 pub use group_id::GroupId;
 use ruff_macros::CacheKey;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash, CacheKey)]
 #[cfg_attr(
@@ -431,6 +431,90 @@ impl Printed {
     /// Takes the ranges of nodes that have been formatted as verbatim, replacing them with an empty list.
     pub fn take_verbatim_ranges(&mut self) -> Vec<TextRange> {
         std::mem::take(&mut self.verbatim_ranges)
+    }
+
+    /// Slices the formatted code to the sub-slices that covers the passed `source_range`.
+    ///
+    /// The implementation uses the source map generated during formatting to find the closest range
+    /// in the formatted document that covers `source_range` or more. The returned slice
+    /// matches the `source_range` exactly (except indent, see below) if the formatter emits [`FormatElement::SourcePosition`] for
+    /// the range's offsets.
+    ///
+    /// Returns the entire document if the source map is empty.
+    #[must_use]
+    pub fn slice_range(self, source_range: TextRange) -> PrintedRange {
+        let mut start_marker: Option<SourceMarker> = None;
+        let mut end_marker: Option<SourceMarker> = None;
+
+        // Note: The printer can generate multiple source map entries for the same source position.
+        // For example if you have:
+        // * `source_position(276)`
+        // * `token("def")`
+        // * `token("foo")`
+        // * `source_position(284)`
+        // The printer uses the source position 276 for both the tokens `def` and `foo` because that's the only position it knows of.
+        //
+        // Warning: Source markers are often emitted sorted by their source position but it's not guaranteed.
+        // They are only guaranteed to be sorted in increasing order by their destination position.
+        for marker in self.sourcemap {
+            // Take the closest start marker, but skip over start_markers that have the same start.
+            if marker.source <= source_range.start()
+                && !start_marker.is_some_and(|existing| existing.source >= marker.source)
+            {
+                start_marker = Some(marker);
+            }
+
+            if marker.source >= source_range.end()
+                && !end_marker.is_some_and(|existing| existing.source <= marker.source)
+            {
+                end_marker = Some(marker);
+            }
+        }
+
+        let start = start_marker.map(|marker| marker.dest).unwrap_or_default();
+        let end = end_marker.map_or_else(|| self.code.text_len(), |marker| marker.dest);
+        let code_range = TextRange::new(start, end);
+
+        PrintedRange {
+            code: self.code[code_range].to_string(),
+            source_range,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct PrintedRange {
+    code: String,
+    source_range: TextRange,
+}
+
+impl PrintedRange {
+    pub fn new(code: String, source_range: TextRange) -> Self {
+        Self { code, source_range }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            code: String::new(),
+            source_range: TextRange::default(),
+        }
+    }
+
+    /// The formatted code.
+    pub fn as_code(&self) -> &str {
+        &self.code
+    }
+
+    /// The range the formatted code corresponds to in the source document.
+    pub fn source_range(&self) -> TextRange {
+        self.source_range
+    }
+
+    #[must_use]
+    pub fn with_code(self, code: String) -> Self {
+        Self { code, ..self }
     }
 }
 

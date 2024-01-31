@@ -357,8 +357,20 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatClauseHeader<'_, 'ast> {
         if SuppressionKind::has_skip_comment(self.trailing_colon_comment, f.context().source()) {
             write_suppressed_clause_header(self.header, f)?;
         } else {
-            f.write_fmt(Arguments::from(&self.formatter))?;
-            token(":").fmt(f)?;
+            // Write a source map entry for the colon for range formatting to support formatting the clause header without
+            // the clause body. Avoid computing `self.header.range()` otherwise because it's somewhat involved.
+            let clause_end = if f.options().source_map_generation().is_enabled() {
+                Some(source_position(
+                    self.header.range(f.context().source())?.end(),
+                ))
+            } else {
+                None
+            };
+
+            write!(
+                f,
+                [Arguments::from(&self.formatter), token(":"), clause_end]
+            )?;
         }
 
         trailing_comments(self.trailing_colon_comment).fmt(f)
@@ -458,7 +470,12 @@ fn find_keyword(
 fn colon_range(after_keyword_or_condition: TextSize, source: &str) -> FormatResult<TextRange> {
     let mut tokenizer = SimpleTokenizer::starts_at(after_keyword_or_condition, source)
         .skip_trivia()
-        .skip_while(|token| token.kind() == SimpleTokenKind::RParen);
+        .skip_while(|token| {
+            matches!(
+                token.kind(),
+                SimpleTokenKind::RParen | SimpleTokenKind::Comma
+            )
+        });
 
     match tokenizer.next() {
         Some(SimpleToken {

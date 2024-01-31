@@ -25,16 +25,14 @@ print ( "format me" )
 ```diff
 --- Black
 +++ Ruff
-@@ -6,7 +6,8 @@
- # This can be fixed in the future if we use a better diffing algorithm, or make Black
- # perform formatting in a single pass.
- 
--print ( "format me" )
+@@ -9,5 +9,5 @@
+ print ( "format me" )
  print("format me")
  print("format me")
- print("format me")
- print("format me")
-+print("format me")
+-print("format me")
+-print("format me")
++print ( "format me" )
++print ( "format me" )
 ```
 
 ## Ruff Output
@@ -48,11 +46,11 @@ print ( "format me" )
 # This can be fixed in the future if we use a better diffing algorithm, or make Black
 # perform formatting in a single pass.
 
+print ( "format me" )
 print("format me")
 print("format me")
-print("format me")
-print("format me")
-print("format me")
+print ( "format me" )
+print ( "format me" )
 ```
 
 ## Black Output

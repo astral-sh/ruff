@@ -24,7 +24,7 @@ pub(crate) fn collect_comments<'a>(
     comment_ranges: &'a CommentRanges,
 ) -> Vec<DecoratedComment<'a>> {
     let mut collector = CommentsVecBuilder::default();
-    CommentsVisitor::new(source_code, comment_ranges, &mut collector).visit(root);
+    CommentsVisitor::new(source_code, comment_ranges, &mut collector).visit(AnyNodeRef::from(root));
     collector.comments
 }
 
@@ -52,8 +52,12 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
         }
     }
 
-    pub(super) fn visit(mut self, root: &'a Mod) {
-        self.visit_mod(root);
+    pub(super) fn visit(mut self, root: AnyNodeRef<'a>) {
+        if self.enter_node(root).is_traverse() {
+            root.visit_preorder(&mut self);
+        }
+
+        self.leave_node(root);
     }
 
     // Try to skip the subtree if
