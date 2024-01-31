@@ -192,3 +192,9 @@ elif x == 2:
     y = "b"
 else:
     y = "c"
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/9732
+def sb(self):
+    if self._sb is not None: return self._sb
+    else: self._sb = '\033[01;%dm'; self._sa = '\033[0;0m';
