@@ -1208,7 +1208,7 @@ fn check_no_hint_for_hidden_unsafe_fixes_when_disabled() {
 #[test]
 fn check_no_hint_for_hidden_unsafe_fixes_with_no_safe_fixes_when_disabled() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "RUF901", "--no-unsafe-fixes"])
+        .args(["--select", "RUF902", "--no-unsafe-fixes"])
         .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\n"),
@@ -1216,9 +1216,8 @@ fn check_no_hint_for_hidden_unsafe_fixes_with_no_safe_fixes_when_disabled() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
     Found 1 error.
-    [*] 1 fixable with the --fix option.
 
     ----- stderr -----
     "###);
