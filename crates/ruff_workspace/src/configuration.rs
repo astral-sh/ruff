@@ -22,6 +22,7 @@ use ruff_formatter::IndentStyle;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
+use ruff_linter::rule_redirects::get_redirect_target;
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
 use ruff_linter::rules::pycodestyle;
 use ruff_linter::settings::rule_table::RuleTable;
@@ -756,7 +757,7 @@ impl LintConfiguration {
         let mut redirects = FxHashMap::default();
         let mut deprecated_nursery_selectors = FxHashSet::default();
         let mut deprecated_selectors = FxHashSet::default();
-        let mut deprecated_rules = FxHashSet::default();
+        let mut deprecated_redirected_rules = FxHashSet::default();
         let mut deprecated_redirected_selectors = FxHashSet::default();
         let mut removed_selectors = FxHashSet::default();
         let mut ignored_preview_selectors = FxHashSet::default();
@@ -790,7 +791,15 @@ impl LintConfiguration {
                     .chain(selection.extend_select.iter())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector.rules(&preview) {
+                    for rule in selector.rules(&preview).map(|rule| {
+                        let code = &rule.noqa_code().to_string();
+                        if let Some(target) = get_redirect_target(code) {
+                            Rule::from_code(target)
+                                .expect("Redirect targets must be valid rule codes")
+                        } else {
+                            rule
+                        }
+                    }) {
                         select_map_updates.insert(rule, true);
 
                         if spec == Specificity::Rule {
@@ -931,11 +940,16 @@ impl LintConfiguration {
                                     .insert((redirected_selector, selector));
                             }
                         }
-                    } else {
+                    } else if !matches!(selector, RuleSelector::All) {
                         // For non-exact selections note all of the deprecated rules that have been renamed
+                        // Unless it is ALL, in which case this is a bit overzealous
                         for rule in selector.rules(&preview) {
                             if rule.is_deprecated() {
-                                deprecated_rules.insert((rule, selector));
+                                if let Some(target) =
+                                    get_redirect_target(&rule.noqa_code().to_string())
+                                {
+                                    deprecated_redirected_rules.insert((rule, target, selector));
+                                }
                             }
                         }
                     }
@@ -1070,13 +1084,30 @@ impl LintConfiguration {
             }
         }
 
-        for (rule, selection) in deprecated_rules {
-            let (prefix, code) = selection.prefix_and_code();
+        for (rule, redirected_to, from_selection) in deprecated_redirected_rules
+            .iter()
+            .sorted_by_key(|(rule, ..)| rule)
+        {
+            let (prefix, code) = from_selection.prefix_and_code();
             let rule_code = rule.noqa_code();
-            // TODO(zanieb): Determine if we should warn here
-            // warn_user!(
-            //     "Selection `{prefix}{code}` includes deprecated rule `{rule_code}` which will be removed in a future release.",
-            // );
+            let redirected_to_rule = Rule::from_code(redirected_to)
+                .expect("Redirected rules should always be valid codes");
+
+            // if !(select_set.contains(*rule) || select_set.contains(redirected_to_rule)) {
+            //     continue;
+            // }
+
+            // If the user has selected the new rule as well, do not warn
+            // Due to limitations in our redirection infrastructure, we also must remove the deprecated rule from
+            // the selection or the user will see a violation for both the new and old rule.
+            // if select_set.contains(redirected_to_rule) {
+            //     select_set.remove(*rule);
+            //     continue;
+            // }
+
+            warn_user!(
+                "Selection `{prefix}{code}` includes deprecated rule `{rule_code}` and will be removed in a future release; use `{redirected_to}` instead.",
+            );
         }
 
         for selection in ignored_preview_selectors {

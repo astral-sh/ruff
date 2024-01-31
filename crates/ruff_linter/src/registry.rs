@@ -31,7 +31,7 @@ pub enum FromCodeError {
     Unknown,
 }
 
-#[derive(EnumIter, Debug, PartialEq, Eq, Clone, Hash, RuleNamespace)]
+#[derive(EnumIter, Debug, PartialEq, Eq, Clone, Hash, Copy, RuleNamespace)]
 pub enum Linter {
     /// [Pyflakes](https://pypi.org/project/pyflakes/)
     #[prefix = "F"]

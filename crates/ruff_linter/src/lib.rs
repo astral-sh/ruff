@@ -34,7 +34,7 @@ pub mod packaging;
 pub mod pyproject_toml;
 pub mod registry;
 mod renamer;
-mod rule_redirects;
+pub mod rule_redirects;
 pub mod rule_selector;
 pub mod rules;
 pub mod settings;

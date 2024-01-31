@@ -1228,8 +1228,50 @@ x = eval(input("Enter a number: "))
 fn deprecated_indirect_redirect() {
     // e.g. `PGH001` is deprecated and redirected, we see a violation in stable
     // without any warnings
+    let mut cmd = RuffCheck::default().args(["--select", "PGH"]).build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(r###"
+x = eval(input("Enter a number: "))
+"###), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:2:5: S307 Use of possibly insecure function; consider using `ast.literal_eval`
+    Found 1 error.
+
+    ----- stderr -----
+    warning: Selection `PGH` includes deprecated rule `PGH001` and will be removed in a future release; use `S307` instead.
+    warning: Selection `PGH` includes deprecated rule `PGH002` and will be removed in a future release; use `G010` instead.
+    "###);
+}
+
+#[test]
+fn deprecated_indirect_redirect_select_new_code() {
+    // e.g. `PGH001` is deprecated and redirected
+    //      but the user has moved to the new code so we should not see a warning
     let mut cmd = RuffCheck::default()
-        .args(["--select", "PGH", "--preview"])
+        .args(["--select", "PGH", "--select", "S307"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(r###"
+x = eval(input("Enter a number: "))
+"###), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:2:5: S307 Use of possibly insecure function; consider using `ast.literal_eval`
+    Found 1 error.
+
+    ----- stderr -----
+    warning: Selection `PGH` includes deprecated rule `PGH001` and will be removed in a future release; use `S307` instead.
+    warning: Selection `PGH` includes deprecated rule `PGH002` and will be removed in a future release; use `G010` instead.
+    "###);
+}
+
+#[test]
+fn deprecated_indirect_redirect_ignore_new_code() {
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "PGH", "--ignore", "S307"])
         .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin(r###"
@@ -1240,8 +1282,30 @@ x = eval(input("Enter a number: "))
     ----- stdout -----
 
     ----- stderr -----
+    warning: Selection `PGH` includes deprecated rule `PGH001` and will be removed in a future release; use `S307` instead.
+    warning: Selection `PGH` includes deprecated rule `PGH002` and will be removed in a future release; use `G010` instead.
     "###);
 }
+
+#[test]
+fn deprecated_indirect_redirect_ignore_old_code() {
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "PGH", "--ignore", "PGH001"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(r###"
+x = eval(input("Enter a number: "))
+"###), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: Selection `PGH` includes deprecated rule `PGH001` and will be removed in a future release; use `S307` instead.
+    warning: Selection `PGH` includes deprecated rule `PGH002` and will be removed in a future release; use `G010` instead.
+    "###);
+}
+
 #[test]
 fn deprecated_direct_preview_enabled() {
     // Direct selection of a deprecated rule in preview should fail
