@@ -207,7 +207,8 @@ class CheckOptions(CommandOptions):
             "--no-cache",
             "--exit-zero",
             # Ignore internal test rules
-            "--ignore RUF9",
+            "--ignore",
+            "RUF9",
             f"--{'' if self.preview else 'no-'}preview",
         ]
         if self.select:
