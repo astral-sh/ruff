@@ -1318,17 +1318,18 @@ fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
 #[test]
 fn fix_only_unsafe_fixes_available() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "RUF901", "--fix"])
+        .args(["--select", "RUF902", "--fix"])
         .build();
     assert_cmd_snapshot!(cmd,
         @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
-    # fix from stable-test-rule-safe-fix
 
     ----- stderr -----
-    Found 1 error (1 fixed, 0 remaining).
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    Found 1 error.
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
     "###);
 }
 
