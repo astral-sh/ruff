@@ -45,6 +45,8 @@ mod parenthesize_logical_operators;
 mod sequence_sorting;
 mod sort_dunder_all;
 mod sort_dunder_slots;
+pub(crate) use static_key_dict_comprehension::*;
+mod static_key_dict_comprehension;
 #[cfg(feature = "test-rules")]
 pub(crate) mod test_rules;
 mod unnecessary_dict_comprehension_for_iterable;
