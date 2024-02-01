@@ -98,5 +98,6 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         ("T002", "FIX002"),
         ("T003", "FIX003"),
         ("T004", "FIX004"),
+        ("RUF011", "B035"),
     ])
 });
