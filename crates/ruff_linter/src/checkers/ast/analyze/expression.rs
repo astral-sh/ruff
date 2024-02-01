@@ -1446,7 +1446,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::StaticKeyDictComprehension) {
-                ruff::rules::static_key_dict_comprehension(checker, dict_comp);
+                flake8_bugbear::rules::static_key_dict_comprehension(checker, dict_comp);
             }
         }
         Expr::GeneratorExp(

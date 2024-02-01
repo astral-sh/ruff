@@ -17,7 +17,6 @@ pub(crate) use parenthesize_logical_operators::*;
 pub(crate) use quadratic_list_summation::*;
 pub(crate) use sort_dunder_all::*;
 pub(crate) use sort_dunder_slots::*;
-pub(crate) use static_key_dict_comprehension::*;
 #[cfg(feature = "test-rules")]
 pub(crate) use test_rules::*;
 pub(crate) use unnecessary_dict_comprehension_for_iterable::*;
@@ -46,7 +45,6 @@ mod parenthesize_logical_operators;
 mod sequence_sorting;
 mod sort_dunder_all;
 mod sort_dunder_slots;
-mod static_key_dict_comprehension;
 #[cfg(feature = "test-rules")]
 pub(crate) mod test_rules;
 mod unnecessary_dict_comprehension_for_iterable;
