@@ -47,14 +47,6 @@ impl AlwaysFixableViolation for TrioZeroSleepCall {
 
 /// TRIO115
 pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
-    if !checker
-        .semantic()
-        .resolve_call_path(call.func.as_ref())
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["trio", "sleep"]))
-    {
-        return;
-    }
-
     if call.arguments.len() != 1 {
         return;
     }
@@ -62,6 +54,14 @@ pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
     let Some(arg) = call.arguments.find_argument("seconds", 0) else {
         return;
     };
+
+    if !checker
+        .semantic()
+        .resolve_call_path(call.func.as_ref())
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["trio", "sleep"]))
+    {
+        return;
+    }
 
     match arg {
         Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
