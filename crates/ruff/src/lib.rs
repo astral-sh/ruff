@@ -321,7 +321,11 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         printer_flags,
     );
 
-    let preview = overrides.preview.unwrap_or_default().is_enabled();
+    // the settings should already be combined with the CLI overrides at this point
+    // TODO(jane): let's make this `PreviewMode`
+    // TODO: this should reference the global preview mode once https://github.com/astral-sh/ruff/issues/8232
+    //   is resolved.
+    let preview = pyproject_config.settings.linter.preview.is_enabled();
 
     if cli.watch {
         if output_format != SerializationFormat::default(preview) {
