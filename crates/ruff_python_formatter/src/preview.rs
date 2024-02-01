@@ -76,7 +76,7 @@ pub(crate) const fn is_multiline_string_handling_enabled(context: &PyFormatConte
 }
 
 /// Returns `true` if the [`multiline_string_handling`](https://github.com/astral-sh/ruff/pull/9725) preview style is enabled.
-/// Black does not format docstrings https://github.com/psf/black/issues/3493 so we keep this
+/// Black does not [`format docstrings`](https://github.com/psf/black/issues/3493) so we keep this
 /// preview for compatibility with Black.
 pub(crate) const fn is_format_module_docstring_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()

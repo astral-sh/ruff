@@ -1,5 +1,19 @@
 """
 Black's `Preview.module_docstring_newlines`
+
+
+A code black to format
+.. code-block:: python
+
+    from bokeh.events import ButtonClick
+    from bokeh.models import Button
+
+    button = Button()
+
+    def callback(event         ):
+        print('Python:Click')
+
+    button.on_event(ButtonClick, callback)
 """
 first_stmt_after_module_level_docstring = 1
 

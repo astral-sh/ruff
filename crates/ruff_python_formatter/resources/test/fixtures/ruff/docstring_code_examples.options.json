@@ -50,11 +50,5 @@
     "docstring_code_line_width": "dynamic",
     "indent_style": "space",
     "indent_width": 4
-  },
-  {
-    "docstring_code": "enabled",
-    "preview": "enabled",
-    "indent_style": "space",
-    "indent_width": 4
   }
 ]
