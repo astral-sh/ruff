@@ -106,18 +106,9 @@ pub(crate) fn intersection_all<'a, T: PartialEq>(
         for item in slice {
             intersection.push(item);
         }
-        // Then remove all of the items that are not present in each of the
-        // remaining slices
+        // Then only keep items that are present in each of the remaining slices
         for slice in slices {
-            let mut mismatches = Vec::with_capacity(slice.len());
-            for (idx, item) in intersection.iter().enumerate() {
-                if !slice.contains(item) {
-                    mismatches.push(idx);
-                }
-            }
-            for idx in mismatches {
-                intersection.remove(idx);
-            }
+            intersection.retain(|item| slice.contains(item));
         }
         intersection
     } else {
