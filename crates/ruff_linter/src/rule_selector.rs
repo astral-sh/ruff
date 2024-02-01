@@ -48,6 +48,7 @@ impl FromStr for RuleSelector {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // **Changes should be reflected in `parse_no_redirect` as well**
         match s {
             "ALL" => Ok(Self::All),
             #[allow(deprecated)]
@@ -67,7 +68,6 @@ impl FromStr for RuleSelector {
                     return Ok(Self::Linter(linter));
                 }
 
-                // Does the selector select a single rule?
                 let prefix = RuleCodePrefix::parse(&linter, code)
                     .map_err(|_| ParseError::Unknown(s.to_string()))?;
 
@@ -254,8 +254,6 @@ pub struct PreviewOptions {
 
 #[cfg(feature = "schemars")]
 mod schema {
-    use std::str::FromStr;
-
     use itertools::Itertools;
     use schemars::JsonSchema;
     use schemars::_serde_json::Value;
@@ -302,7 +300,7 @@ mod schema {
                     .filter(|p| {
                         // Exclude any prefixes where all of the rules are removed
                         if let Ok(Self::Rule { prefix, .. } | Self::Prefix { prefix, .. }) =
-                            RuleSelector::from_str(p)
+                            RuleSelector::parse_no_redirect(p)
                         {
                             !prefix.rules().all(|rule| rule.is_removed())
                         } else {
@@ -337,6 +335,41 @@ impl RuleSelector {
                     3 => Specificity::Prefix3Chars,
                     4 => Specificity::Prefix4Chars,
                     _ => panic!("RuleSelector::specificity doesn't yet support codes with so many characters"),
+                }
+            }
+        }
+    }
+
+    /// Parse [`RuleSelector`] from a string; but do not follow redirects.
+    pub fn parse_no_redirect(s: &str) -> Result<Self, ParseError> {
+        // **Changes should be reflected in `from_str` as well**
+        match s {
+            "ALL" => Ok(Self::All),
+            #[allow(deprecated)]
+            "NURSERY" => Ok(Self::Nursery),
+            "C" => Ok(Self::C),
+            "T" => Ok(Self::T),
+            _ => {
+                let (linter, code) =
+                    Linter::parse_code(s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
+
+                if code.is_empty() {
+                    return Ok(Self::Linter(linter));
+                }
+
+                let prefix = RuleCodePrefix::parse(&linter, code)
+                    .map_err(|_| ParseError::Unknown(s.to_string()))?;
+
+                if is_single_rule_selector(&prefix) {
+                    Ok(Self::Rule {
+                        prefix,
+                        redirected_from: None,
+                    })
+                } else {
+                    Ok(Self::Prefix {
+                        prefix,
+                        redirected_from: None,
+                    })
                 }
             }
         }
