@@ -331,7 +331,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         printer_flags,
     );
 
-    let preview = overrides.preview.unwrap_or_default().is_enabled();
+    let preview = config_arguments.preview.unwrap_or_default().is_enabled();
 
     if cli.watch {
         if output_format != SerializationFormat::default(preview) {

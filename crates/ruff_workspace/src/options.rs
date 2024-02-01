@@ -482,7 +482,7 @@ pub struct LintOptions {
 }
 
 /// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
-#[derive(Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct DeprecatedTopLevelLintOptions(pub LintCommonOptions);
 

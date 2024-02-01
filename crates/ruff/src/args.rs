@@ -820,6 +820,7 @@ The following error occurred when attempting to parse `{value}` as a `ruff.toml`
 
         Err(new_error)
     }
+}
 
 fn resolve_output_format(
     output_format: Option<SerializationFormat>,
