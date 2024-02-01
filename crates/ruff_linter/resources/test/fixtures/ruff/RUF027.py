@@ -13,6 +13,7 @@ def escaped_string():
 def raw_string():
     a = 4
     b = r"raw string with formatting: {a}" # RUF027
+    c = r"raw string with \backslashes\ and \"escaped quotes\": {a}"
 
 def print_name(name: str):
     a = 4
@@ -30,7 +31,7 @@ def nested_funcs():
     print(do_nothing(do_nothing("{a}"))) # RUF027
     do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
 
-def tripledquoted():
+def tripled_quoted():
     a = 4
     c = a
     single_line = """ {a} """
@@ -38,7 +39,19 @@ def tripledquoted():
     c}  d
     """
     
+def single_quoted_multi_line():
+    a = 4
+    b = " {\
+    a} \
+    "
 
+def implicit_concat():
+    a = 4
+    b = "{a}" "+" "{b}" r" \\ " # RUF027 for the first part only
+
+def escaped_chars():
+    a = 4
+    b = "\"escaped:\" \'{a}\' \"not escaped:\": \'{{c}}\'"
 
 def alternative_formatter(src, **kwargs):
     src.format(**kwargs)

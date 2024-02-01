@@ -8,12 +8,19 @@ use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
 
-/// # What it does
+/// ## What it does
 /// Checks for strings that contain f-string syntax but are not f-strings.
 ///
 /// ## Why is this bad?
 /// An f-string missing an `f` at the beginning won't format anything, and instead
 /// treat the interpolation syntax as literal.
+/// 
+/// Since there are many possible string literals which contain syntax similar to f-strings yet are not intended to be,
+/// this lint applies the following criteria to the string literal:
+/// 1. The string literal is not a standalone expression: it needs to be part of an assignment, function call, and so on.
+/// 2. If it's an argument in a function call that takes keyword arguments, no keywords can be used as identifiers within the formatting syntax.
+/// 3. Every identifier in a {...} section needs to be a valid, in-scope reference, and the string should have at least one identifier.
+/// 4. All format specifiers should be valid.
 ///
 /// ## Example
 ///
@@ -30,19 +37,16 @@ use rustc_hash::FxHashSet;
 /// msg = f"Hello {name}! It is {dayofweek} today!"
 /// ```
 #[violation]
-pub struct MissingFStringSyntax {
-    literal: String,
-}
+pub struct MissingFStringSyntax;
 
 impl AlwaysFixableViolation for MissingFStringSyntax {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Self { literal } = &self;
-        format!(r#"`{literal}` may be a formatting string without an `f` prefix"#)
+        format!(r#"Possible f-string without an `f` prefix"#)
     }
 
     fn fix_title(&self) -> String {
-        "Add an `f` prefix to the formatting string".into()
+        "Add an `f` prefix to the f-string".into()
     }
 }
 
@@ -63,9 +67,7 @@ pub(crate) fn missing_fstring_syntax(
     for literal in value.as_slice() {
         if should_be_fstring(literal, kwargs, locator, semantic) {
             let diagnostic = Diagnostic::new(
-                MissingFStringSyntax {
-                    literal: locator.slice(literal.range).to_string(),
-                },
+                MissingFStringSyntax,
                 literal.range,
             )
             .with_fix(fix_fstring_syntax(literal));

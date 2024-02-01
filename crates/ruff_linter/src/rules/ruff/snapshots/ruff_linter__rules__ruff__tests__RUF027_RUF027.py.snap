@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF027.py:5:9: RUF027 [*] `"{a}"` may be a formatting string without an `f` prefix
+RUF027.py:5:9: RUF027 [*] Possible f-string without an `f` prefix
   |
 3 | def simple_cases():
 4 |     a = 4
@@ -10,7 +10,7 @@ RUF027.py:5:9: RUF027 [*] `"{a}"` may be a formatting string without an `f` pref
 6 |     c = "{a} {b} f'{val}' " # RUF027
 7 |     uppercase = "{a}".to_upper() # RUF027
   |
-  = help: Add an `f` prefix to the formatting string
+  = help: Add an `f` prefix to the f-string
 
 ℹ Unsafe fix
 2 2 | 
@@ -22,7 +22,7 @@ RUF027.py:5:9: RUF027 [*] `"{a}"` may be a formatting string without an `f` pref
 7 7 |     uppercase = "{a}".to_upper() # RUF027
 8 8 | 
 
-RUF027.py:6:9: RUF027 [*] `"{a} {b} f'{val}' "` may be a formatting string without an `f` prefix
+RUF027.py:6:9: RUF027 [*] Possible f-string without an `f` prefix
   |
 4 |     a = 4
 5 |     b = "{a}" # RUF027
@@ -30,7 +30,7 @@ RUF027.py:6:9: RUF027 [*] `"{a} {b} f'{val}' "` may be a formatting string witho
   |         ^^^^^^^^^^^^^^^^^^^ RUF027
 7 |     uppercase = "{a}".to_upper() # RUF027
   |
-  = help: Add an `f` prefix to the formatting string
+  = help: Add an `f` prefix to the f-string
 
 ℹ Unsafe fix
 3 3 | def simple_cases():
@@ -42,7 +42,7 @@ RUF027.py:6:9: RUF027 [*] `"{a} {b} f'{val}' "` may be a formatting string witho
 8 8 | 
 9 9 | def escaped_string():
 
-RUF027.py:7:17: RUF027 [*] `"{a}"` may be a formatting string without an `f` prefix
+RUF027.py:7:17: RUF027 [*] Possible f-string without an `f` prefix
   |
 5 |     b = "{a}" # RUF027
 6 |     c = "{a} {b} f'{val}' " # RUF027
@@ -51,7 +51,7 @@ RUF027.py:7:17: RUF027 [*] `"{a}"` may be a formatting string without an `f` pre
 8 | 
 9 | def escaped_string():
   |
-  = help: Add an `f` prefix to the formatting string
+  = help: Add an `f` prefix to the f-string
 
 ℹ Unsafe fix
 4 4 |     a = 4
@@ -63,16 +63,15 @@ RUF027.py:7:17: RUF027 [*] `"{a}"` may be a formatting string without an `f` pre
 9 9 | def escaped_string():
 10 10 |     a = 4
 
-RUF027.py:15:9: RUF027 [*] `r"raw string with formatting: {a}"` may be a formatting string without an `f` prefix
+RUF027.py:15:9: RUF027 [*] Possible f-string without an `f` prefix
    |
 13 | def raw_string():
 14 |     a = 4
 15 |     b = r"raw string with formatting: {a}" # RUF027
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
-16 | 
-17 | def print_name(name: str):
+16 |     c = r"raw string with \backslashes\ and \"escaped quotes\": {a}"
    |
-   = help: Add an `f` prefix to the formatting string
+   = help: Add an `f` prefix to the f-string
 
 ℹ Unsafe fix
 12 12 | 
@@ -80,151 +79,238 @@ RUF027.py:15:9: RUF027 [*] `r"raw string with formatting: {a}"` may be a formatt
 14 14 |     a = 4
 15    |-    b = r"raw string with formatting: {a}" # RUF027
    15 |+    b = fr"raw string with formatting: {a}" # RUF027
-16 16 | 
-17 17 | def print_name(name: str):
-18 18 |     a = 4
+16 16 |     c = r"raw string with \backslashes\ and \"escaped quotes\": {a}"
+17 17 | 
+18 18 | def print_name(name: str):
 
-RUF027.py:19:11: RUF027 [*] `"Hello, {name}!"` may be a formatting string without an `f` prefix
+RUF027.py:16:9: RUF027 [*] Possible f-string without an `f` prefix
    |
-17 | def print_name(name: str):
-18 |     a = 4
-19 |     print("Hello, {name}!") # RUF027
+14 |     a = 4
+15 |     b = r"raw string with formatting: {a}" # RUF027
+16 |     c = r"raw string with \backslashes\ and \"escaped quotes\": {a}"
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
+17 | 
+18 | def print_name(name: str):
+   |
+   = help: Add an `f` prefix to the f-string
+
+ℹ Unsafe fix
+13 13 | def raw_string():
+14 14 |     a = 4
+15 15 |     b = r"raw string with formatting: {a}" # RUF027
+16    |-    c = r"raw string with \backslashes\ and \"escaped quotes\": {a}"
+   16 |+    c = fr"raw string with \backslashes\ and \"escaped quotes\": {a}"
+17 17 | 
+18 18 | def print_name(name: str):
+19 19 |     a = 4
+
+RUF027.py:20:11: RUF027 [*] Possible f-string without an `f` prefix
+   |
+18 | def print_name(name: str):
+19 |     a = 4
+20 |     print("Hello, {name}!") # RUF027
    |           ^^^^^^^^^^^^^^^^ RUF027
-20 |     print("The test value we're using today is {a}") # RUF027
+21 |     print("The test value we're using today is {a}") # RUF027
    |
-   = help: Add an `f` prefix to the formatting string
+   = help: Add an `f` prefix to the f-string
 
 ℹ Unsafe fix
-16 16 | 
-17 17 | def print_name(name: str):
-18 18 |     a = 4
-19    |-    print("Hello, {name}!") # RUF027
-   19 |+    print(f"Hello, {name}!") # RUF027
-20 20 |     print("The test value we're using today is {a}") # RUF027
-21 21 | 
-22 22 | def do_nothing(a):
+17 17 | 
+18 18 | def print_name(name: str):
+19 19 |     a = 4
+20    |-    print("Hello, {name}!") # RUF027
+   20 |+    print(f"Hello, {name}!") # RUF027
+21 21 |     print("The test value we're using today is {a}") # RUF027
+22 22 | 
+23 23 | def do_nothing(a):
 
-RUF027.py:20:11: RUF027 [*] `"The test value we're using today is {a}"` may be a formatting string without an `f` prefix
+RUF027.py:21:11: RUF027 [*] Possible f-string without an `f` prefix
    |
-18 |     a = 4
-19 |     print("Hello, {name}!") # RUF027
-20 |     print("The test value we're using today is {a}") # RUF027
+19 |     a = 4
+20 |     print("Hello, {name}!") # RUF027
+21 |     print("The test value we're using today is {a}") # RUF027
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
-21 | 
-22 | def do_nothing(a):
+22 | 
+23 | def do_nothing(a):
    |
-   = help: Add an `f` prefix to the formatting string
+   = help: Add an `f` prefix to the f-string
 
 ℹ Unsafe fix
-17 17 | def print_name(name: str):
-18 18 |     a = 4
-19 19 |     print("Hello, {name}!") # RUF027
-20    |-    print("The test value we're using today is {a}") # RUF027
-   20 |+    print(f"The test value we're using today is {a}") # RUF027
-21 21 | 
-22 22 | def do_nothing(a):
-23 23 |     return a
+18 18 | def print_name(name: str):
+19 19 |     a = 4
+20 20 |     print("Hello, {name}!") # RUF027
+21    |-    print("The test value we're using today is {a}") # RUF027
+   21 |+    print(f"The test value we're using today is {a}") # RUF027
+22 22 | 
+23 23 | def do_nothing(a):
+24 24 |     return a
 
-RUF027.py:30:33: RUF027 [*] `"{a}"` may be a formatting string without an `f` prefix
+RUF027.py:31:33: RUF027 [*] Possible f-string without an `f` prefix
    |
-28 | def nested_funcs():
-29 |     a = 4
-30 |     print(do_nothing(do_nothing("{a}"))) # RUF027
+29 | def nested_funcs():
+30 |     a = 4
+31 |     print(do_nothing(do_nothing("{a}"))) # RUF027
    |                                 ^^^^^ RUF027
-31 |     do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
+32 |     do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
    |
-   = help: Add an `f` prefix to the formatting string
+   = help: Add an `f` prefix to the f-string
 
 ℹ Unsafe fix
-27 27 | 
-28 28 | def nested_funcs():
-29 29 |     a = 4
-30    |-    print(do_nothing(do_nothing("{a}"))) # RUF027
-   30 |+    print(do_nothing(do_nothing(f"{a}"))) # RUF027
-31 31 |     do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
-32 32 | 
-33 33 | def tripledquoted():
+28 28 | 
+29 29 | def nested_funcs():
+30 30 |     a = 4
+31    |-    print(do_nothing(do_nothing("{a}"))) # RUF027
+   31 |+    print(do_nothing(do_nothing(f"{a}"))) # RUF027
+32 32 |     do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
+33 33 | 
+34 34 | def tripled_quoted():
 
-RUF027.py:31:39: RUF027 [*] `"{a}"` may be a formatting string without an `f` prefix
+RUF027.py:32:39: RUF027 [*] Possible f-string without an `f` prefix
    |
-29 |     a = 4
-30 |     print(do_nothing(do_nothing("{a}"))) # RUF027
-31 |     do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
+30 |     a = 4
+31 |     print(do_nothing(do_nothing("{a}"))) # RUF027
+32 |     do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
    |                                       ^^^^^ RUF027
-32 | 
-33 | def tripledquoted():
+33 | 
+34 | def tripled_quoted():
    |
-   = help: Add an `f` prefix to the formatting string
+   = help: Add an `f` prefix to the f-string
 
 ℹ Unsafe fix
-28 28 | def nested_funcs():
-29 29 |     a = 4
-30 30 |     print(do_nothing(do_nothing("{a}"))) # RUF027
-31    |-    do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
-   31 |+    do_nothing_with_kwargs(do_nothing(f"{a}"), a = 5) # RUF027
-32 32 | 
-33 33 | def tripledquoted():
-34 34 |     a = 4
+29 29 | def nested_funcs():
+30 30 |     a = 4
+31 31 |     print(do_nothing(do_nothing("{a}"))) # RUF027
+32    |-    do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
+   32 |+    do_nothing_with_kwargs(do_nothing(f"{a}"), a = 5) # RUF027
+33 33 | 
+34 34 | def tripled_quoted():
+35 35 |     a = 4
 
-RUF027.py:36:19: RUF027 [*] `""" {a} """` may be a formatting string without an `f` prefix
+RUF027.py:37:19: RUF027 [*] Possible f-string without an `f` prefix
    |
-34 |     a = 4
-35 |     c = a
-36 |     single_line = """ {a} """
+35 |     a = 4
+36 |     c = a
+37 |     single_line = """ {a} """
    |                   ^^^^^^^^^^^ RUF027
-37 |     multi_line = a = """b { # comment
-38 |     c}  d
+38 |     multi_line = a = """b { # comment
+39 |     c}  d
    |
-   = help: Add an `f` prefix to the formatting string
+   = help: Add an `f` prefix to the f-string
 
 ℹ Unsafe fix
-33 33 | def tripledquoted():
-34 34 |     a = 4
-35 35 |     c = a
-36    |-    single_line = """ {a} """
-   36 |+    single_line = f""" {a} """
-37 37 |     multi_line = a = """b { # comment
-38 38 |     c}  d
-39 39 |     """ 
+34 34 | def tripled_quoted():
+35 35 |     a = 4
+36 36 |     c = a
+37    |-    single_line = """ {a} """
+   37 |+    single_line = f""" {a} """
+38 38 |     multi_line = a = """b { # comment
+39 39 |     c}  d
+40 40 |     """
 
-RUF027.py:37:22: RUF027 [*] `"""b { # comment
-    c}  d
-    """` may be a formatting string without an `f` prefix
+RUF027.py:38:22: RUF027 [*] Possible f-string without an `f` prefix
    |
-35 |       c = a
-36 |       single_line = """ {a} """
-37 |       multi_line = a = """b { # comment
+36 |       c = a
+37 |       single_line = """ {a} """
+38 |       multi_line = a = """b { # comment
    |  ______________________^
-38 | |     c}  d
-39 | |     """ 
+39 | |     c}  d
+40 | |     """
    | |_______^ RUF027
+41 |       
+42 |   def single_quoted_multi_line():
    |
-   = help: Add an `f` prefix to the formatting string
+   = help: Add an `f` prefix to the f-string
 
 ℹ Unsafe fix
-34 34 |     a = 4
-35 35 |     c = a
-36 36 |     single_line = """ {a} """
-37    |-    multi_line = a = """b { # comment
-   37 |+    multi_line = a = f"""b { # comment
-38 38 |     c}  d
-39 39 |     """ 
-40 40 |     
+35 35 |     a = 4
+36 36 |     c = a
+37 37 |     single_line = """ {a} """
+38    |-    multi_line = a = """b { # comment
+   38 |+    multi_line = a = f"""b { # comment
+39 39 |     c}  d
+40 40 |     """
+41 41 |     
 
-RUF027.py:67:7: RUF027 [*] `"but don't ignore this: {val}"` may be a formatting string without an `f` prefix
+RUF027.py:44:9: RUF027 [*] Possible f-string without an `f` prefix
    |
-65 | "always ignore this: {a}"
-66 | 
-67 | print("but don't ignore this: {val}")
+42 |   def single_quoted_multi_line():
+43 |       a = 4
+44 |       b = " {\
+   |  _________^
+45 | |     a} \
+46 | |     "
+   | |_____^ RUF027
+47 |   
+48 |   def implicit_concat():
+   |
+   = help: Add an `f` prefix to the f-string
+
+ℹ Unsafe fix
+41 41 |     
+42 42 | def single_quoted_multi_line():
+43 43 |     a = 4
+44    |-    b = " {\
+   44 |+    b = f" {\
+45 45 |     a} \
+46 46 |     "
+47 47 | 
+
+RUF027.py:50:9: RUF027 [*] Possible f-string without an `f` prefix
+   |
+48 | def implicit_concat():
+49 |     a = 4
+50 |     b = "{a}" "+" "{b}" r" \\ " # RUF027 for the first part only
+   |         ^^^^^ RUF027
+51 | 
+52 | def escaped_chars():
+   |
+   = help: Add an `f` prefix to the f-string
+
+ℹ Unsafe fix
+47 47 | 
+48 48 | def implicit_concat():
+49 49 |     a = 4
+50    |-    b = "{a}" "+" "{b}" r" \\ " # RUF027 for the first part only
+   50 |+    b = f"{a}" "+" "{b}" r" \\ " # RUF027 for the first part only
+51 51 | 
+52 52 | def escaped_chars():
+53 53 |     a = 4
+
+RUF027.py:54:9: RUF027 [*] Possible f-string without an `f` prefix
+   |
+52 | def escaped_chars():
+53 |     a = 4
+54 |     b = "\"escaped:\" \'{a}\' \"not escaped:\": \'{{c}}\'"
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
+55 | 
+56 | def alternative_formatter(src, **kwargs):
+   |
+   = help: Add an `f` prefix to the f-string
+
+ℹ Unsafe fix
+51 51 | 
+52 52 | def escaped_chars():
+53 53 |     a = 4
+54    |-    b = "\"escaped:\" \'{a}\' \"not escaped:\": \'{{c}}\'"
+   54 |+    b = f"\"escaped:\" \'{a}\' \"not escaped:\": \'{{c}}\'"
+55 55 | 
+56 56 | def alternative_formatter(src, **kwargs):
+57 57 |     src.format(**kwargs)
+
+RUF027.py:80:7: RUF027 [*] Possible f-string without an `f` prefix
+   |
+78 | "always ignore this: {a}"
+79 | 
+80 | print("but don't ignore this: {val}")
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
    |
-   = help: Add an `f` prefix to the formatting string
+   = help: Add an `f` prefix to the f-string
 
 ℹ Unsafe fix
-64 64 | 
-65 65 | "always ignore this: {a}"
-66 66 | 
-67    |-print("but don't ignore this: {val}")
-   67 |+print(f"but don't ignore this: {val}")
+77 77 | 
+78 78 | "always ignore this: {a}"
+79 79 | 
+80    |-print("but don't ignore this: {val}")
+   80 |+print(f"but don't ignore this: {val}")
 
 
