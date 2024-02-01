@@ -42,6 +42,8 @@ strum = { workspace = true }
 toml = { workspace = true }
 
 [dev-dependencies]
+# Enable test rules during development
+ruff_linter = { path = "../ruff_linter", features = ["clap", "test-rules"] }
 tempfile = { workspace = true }
 
 [features]

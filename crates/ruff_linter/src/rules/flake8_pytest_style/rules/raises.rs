@@ -64,8 +64,8 @@ impl Violation for PytestRaisesWithMultipleStatements {
 /// unrelated to the code under test. To avoid this, `pytest.raises` should be
 /// called with a `match` parameter. The exception names that require a `match`
 /// parameter can be configured via the
-/// `flake8-pytest-style.raises-require-match-for` and
-/// `flake8-pytest-style.raises-extend-require-match-for` settings.
+/// [`lint.flake8-pytest-style.raises-require-match-for`] and
+/// [`lint.flake8-pytest-style.raises-extend-require-match-for`] settings.
 ///
 /// ## Example
 /// ```python
@@ -92,8 +92,8 @@ impl Violation for PytestRaisesWithMultipleStatements {
 /// ```
 ///
 /// ## Options
-/// - `flake8-pytest-style.raises-require-match-for`
-/// - `flake8-pytest-style.raises-extend-require-match-for`
+/// - `lint.flake8-pytest-style.raises-require-match-for`
+/// - `lint.flake8-pytest-style.raises-extend-require-match-for`
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)

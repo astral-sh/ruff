@@ -264,7 +264,6 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         unsafe_fixes,
         output_format,
         show_fixes,
-        show_source,
         ..
     } = pyproject_config.settings;
 
@@ -292,9 +291,6 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     }
     if show_fixes {
         printer_flags |= PrinterFlags::SHOW_FIX_SUMMARY;
-    }
-    if show_source {
-        printer_flags |= PrinterFlags::SHOW_SOURCE;
     }
     if cli.ecosystem_ci {
         warn_user!(
@@ -335,9 +331,14 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         printer_flags,
     );
 
+    let preview = overrides.preview.unwrap_or_default().is_enabled();
+
     if cli.watch {
-        if output_format != SerializationFormat::Text {
-            warn_user!("`--output-format text` is always used in watch mode.");
+        if output_format != SerializationFormat::default(preview) {
+            warn_user!(
+                "`--output-format {}` is always used in watch mode.",
+                SerializationFormat::default(preview)
+            );
         }
 
         // Configure the file watcher.
@@ -363,7 +364,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             fix_mode,
             unsafe_fixes,
         )?;
-        printer.write_continuously(&mut writer, &messages)?;
+        printer.write_continuously(&mut writer, &messages, preview)?;
 
         // In watch mode, we may need to re-resolve the configuration.
         // TODO(charlie): Re-compute other derivative values, like the `printer`.
@@ -395,7 +396,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                         fix_mode,
                         unsafe_fixes,
                     )?;
-                    printer.write_continuously(&mut writer, &messages)?;
+                    printer.write_continuously(&mut writer, &messages, preview)?;
                 }
                 Err(err) => return Err(err.into()),
             }

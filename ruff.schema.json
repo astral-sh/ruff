@@ -5,6 +5,7 @@
   "properties": {
     "allowed-confusables": {
       "description": "A list of allowed \"confusable\" Unicode characters to ignore when enforcing `RUF001`, `RUF002`, and `RUF003`.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -34,6 +35,7 @@
     },
     "dummy-variable-rgx": {
       "description": "A regular expression used to identify \"dummy\" variables, or those which should be ignored when enforcing (e.g.) unused-variable rules. The default expression matches `_`, `__`, and `_var`, but not `_var_`.",
+      "deprecated": true,
       "type": [
         "string",
         "null"
@@ -51,6 +53,7 @@
     },
     "explicit-preview-rules": {
       "description": "Whether to require exact codes to select preview rules. When enabled, preview rules will not be selected by prefixes — the full code of each preview rule will be required to enable the rule.",
+      "deprecated": true,
       "type": [
         "boolean",
         "null"
@@ -75,6 +78,7 @@
     },
     "extend-fixable": {
       "description": "A list of rule codes or prefixes to consider fixable, in addition to those specified by `fixable`.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -106,6 +110,7 @@
     },
     "extend-per-file-ignores": {
       "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, in addition to any rules excluded by `per-file-ignores`.",
+      "deprecated": true,
       "type": [
         "object",
         "null"
@@ -119,6 +124,7 @@
     },
     "extend-safe-fixes": {
       "description": "A list of rule codes or prefixes for which unsafe fixes should be considered safe.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -129,6 +135,7 @@
     },
     "extend-select": {
       "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -150,6 +157,7 @@
     },
     "extend-unsafe-fixes": {
       "description": "A list of rule codes or prefixes for which safe fixes should be considered unsafe.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -160,6 +168,7 @@
     },
     "external": {
       "description": "A list of rule codes or prefixes that are unsupported by Ruff, but should be preserved when (e.g.) validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not yet implemented by Ruff.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -184,6 +193,7 @@
     },
     "fixable": {
       "description": "A list of rule codes or prefixes to consider fixable. By default, all rules are considered fixable.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -194,6 +204,7 @@
     },
     "flake8-annotations": {
       "description": "Options for the `flake8-annotations` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8AnnotationsOptions"
@@ -205,6 +216,7 @@
     },
     "flake8-bandit": {
       "description": "Options for the `flake8-bandit` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8BanditOptions"
@@ -216,6 +228,7 @@
     },
     "flake8-bugbear": {
       "description": "Options for the `flake8-bugbear` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8BugbearOptions"
@@ -227,6 +240,7 @@
     },
     "flake8-builtins": {
       "description": "Options for the `flake8-builtins` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8BuiltinsOptions"
@@ -238,6 +252,7 @@
     },
     "flake8-comprehensions": {
       "description": "Options for the `flake8-comprehensions` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8ComprehensionsOptions"
@@ -249,6 +264,7 @@
     },
     "flake8-copyright": {
       "description": "Options for the `flake8-copyright` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8CopyrightOptions"
@@ -260,6 +276,7 @@
     },
     "flake8-errmsg": {
       "description": "Options for the `flake8-errmsg` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8ErrMsgOptions"
@@ -271,6 +288,7 @@
     },
     "flake8-gettext": {
       "description": "Options for the `flake8-gettext` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8GetTextOptions"
@@ -282,6 +300,7 @@
     },
     "flake8-implicit-str-concat": {
       "description": "Options for the `flake8-implicit-str-concat` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8ImplicitStrConcatOptions"
@@ -293,6 +312,7 @@
     },
     "flake8-import-conventions": {
       "description": "Options for the `flake8-import-conventions` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8ImportConventionsOptions"
@@ -304,6 +324,7 @@
     },
     "flake8-pytest-style": {
       "description": "Options for the `flake8-pytest-style` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8PytestStyleOptions"
@@ -315,6 +336,7 @@
     },
     "flake8-quotes": {
       "description": "Options for the `flake8-quotes` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8QuotesOptions"
@@ -326,6 +348,7 @@
     },
     "flake8-self": {
       "description": "Options for the `flake8_self` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8SelfOptions"
@@ -337,6 +360,7 @@
     },
     "flake8-tidy-imports": {
       "description": "Options for the `flake8-tidy-imports` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8TidyImportsOptions"
@@ -348,6 +372,7 @@
     },
     "flake8-type-checking": {
       "description": "Options for the `flake8-type-checking` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8TypeCheckingOptions"
@@ -359,6 +384,7 @@
     },
     "flake8-unused-arguments": {
       "description": "Options for the `flake8-unused-arguments` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8UnusedArgumentsOptions"
@@ -388,6 +414,7 @@
     },
     "ignore": {
       "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -398,6 +425,7 @@
     },
     "ignore-init-module-imports": {
       "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).",
+      "deprecated": true,
       "type": [
         "boolean",
         "null"
@@ -426,6 +454,7 @@
     },
     "isort": {
       "description": "Options for the `isort` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/IsortOptions"
@@ -458,6 +487,7 @@
     },
     "logger-objects": {
       "description": "A list of objects that should be treated equivalently to a `logging.Logger` object.\n\nThis is useful for ensuring proper diagnostics (e.g., to identify `logging` deprecations and other best-practices) for projects that re-export a `logging.Logger` object from a common module.\n\nFor example, if you have a module `logging_setup.py` with the following contents: ```python import logging\n\nlogger = logging.getLogger(__name__) ```\n\nAdding `\"logging_setup.logger\"` to `logger-objects` will ensure that `logging_setup.logger` is treated as a `logging.Logger` object when imported from other modules (e.g., `from logging_setup import logger`).",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -468,6 +498,7 @@
     },
     "mccabe": {
       "description": "Options for the `mccabe` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/McCabeOptions"
@@ -488,7 +519,7 @@
       }
     },
     "output-format": {
-      "description": "The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).",
+      "description": "The style in which violation messages should be formatted: `\"full\"` (shows source),`\"concise\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).",
       "anyOf": [
         {
           "$ref": "#/definitions/SerializationFormat"
@@ -500,6 +531,7 @@
     },
     "pep8-naming": {
       "description": "Options for the `pep8-naming` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Pep8NamingOptions"
@@ -511,6 +543,7 @@
     },
     "per-file-ignores": {
       "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, when considering any matching files.",
+      "deprecated": true,
       "type": [
         "object",
         "null"
@@ -531,6 +564,7 @@
     },
     "pycodestyle": {
       "description": "Options for the `pycodestyle` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/PycodestyleOptions"
@@ -542,6 +576,7 @@
     },
     "pydocstyle": {
       "description": "Options for the `pydocstyle` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/PydocstyleOptions"
@@ -553,6 +588,7 @@
     },
     "pyflakes": {
       "description": "Options for the `pyflakes` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/PyflakesOptions"
@@ -564,6 +600,7 @@
     },
     "pylint": {
       "description": "Options for the `pylint` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/PylintOptions"
@@ -575,6 +612,7 @@
     },
     "pyupgrade": {
       "description": "Options for the `pyupgrade` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/PyUpgradeOptions"
@@ -604,6 +642,7 @@
     },
     "select": {
       "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -621,6 +660,7 @@
     },
     "show-source": {
       "description": "Whether to show source code snippets when reporting lint violations (overridden by the `--show-source` command-line flag).",
+      "deprecated": true,
       "type": [
         "boolean",
         "null"
@@ -661,6 +701,7 @@
     },
     "task-tags": {
       "description": "A list of task tags to recognize (e.g., \"TODO\", \"FIXME\", \"XXX\").\n\nComments starting with these tags will be ignored by commented-out code detection (`ERA`), and skipped by line-length rules (`E501`) if `ignore-overlong-task-comments` is set to `true`.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -671,6 +712,7 @@
     },
     "typing-modules": {
       "description": "A list of modules whose exports should be treated equivalently to members of the `typing` module.\n\nThis is useful for ensuring proper type annotation inference for projects that re-export `typing` and `typing_extensions` members from a compatibility module. If omitted, any members imported from modules apart from `typing` and `typing_extensions` will be treated as ordinary Python objects.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -681,6 +723,7 @@
     },
     "unfixable": {
       "description": "A list of rule codes or prefixes to consider non-fixable.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -1269,7 +1312,7 @@
       "additionalProperties": false
     },
     "FormatOptions": {
-      "description": "Experimental: Configures how `ruff format` formats your code.\n\nPlease provide feedback in [this discussion](https://github.com/astral-sh/ruff/discussions/7310).",
+      "description": "Configures the way ruff formats your code.",
       "type": "object",
       "properties": {
         "docstring-code-format": {
@@ -1701,7 +1744,7 @@
       "minimum": 1.0
     },
     "LintOptions": {
-      "description": "Experimental section to configure Ruff's linting. This new section will eventually replace the top-level linting options.\n\nOptions specified in the `lint` section take precedence over the top-level settings.",
+      "description": "Configures how ruff checks your code.\n\nOptions specified in the `lint` section take precedence over the deprecated top-level settings.",
       "type": "object",
       "properties": {
         "allowed-confusables": {
@@ -2623,6 +2666,7 @@
         "B032",
         "B033",
         "B034",
+        "B035",
         "B9",
         "B90",
         "B904",
@@ -3039,7 +3083,6 @@
         "NPY2",
         "NPY20",
         "NPY201",
-        "NURSERY",
         "PD",
         "PD0",
         "PD00",
@@ -3077,8 +3120,6 @@
         "PGH",
         "PGH0",
         "PGH00",
-        "PGH001",
-        "PGH002",
         "PGH003",
         "PGH004",
         "PGH005",
@@ -3224,7 +3265,6 @@
         "PLR1701",
         "PLR1702",
         "PLR1704",
-        "PLR1706",
         "PLR171",
         "PLR1711",
         "PLR1714",
@@ -3464,7 +3504,6 @@
         "RUF009",
         "RUF01",
         "RUF010",
-        "RUF011",
         "RUF012",
         "RUF013",
         "RUF015",
@@ -3646,7 +3685,8 @@
         "TCH003",
         "TCH004",
         "TCH005",
-        "TCH006",
+        "TCH01",
+        "TCH010",
         "TD",
         "TD0",
         "TD00",
@@ -3680,7 +3720,6 @@
         "TRY004",
         "TRY2",
         "TRY20",
-        "TRY200",
         "TRY201",
         "TRY3",
         "TRY30",
@@ -3775,6 +3814,8 @@
       "type": "string",
       "enum": [
         "text",
+        "concise",
+        "full",
         "json",
         "json-lines",
         "junit",

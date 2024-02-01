@@ -85,6 +85,8 @@ tempfile = { workspace = true }
 [features]
 default = []
 schemars = ["dep:schemars"]
+# Enables rules for internal integration tests
+test-rules = []
 
 [lints]
 workspace = true

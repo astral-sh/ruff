@@ -144,11 +144,7 @@ rule will need to be selected with its exact code, e.g. `--select ALL,HYP001`.
 
 If preview mode is not enabled, this setting has no effect.
 
-## Legacy behavior
+## Deprecated rules
 
-Before the preview mode was introduced, new rules were added in a "nursery" category that required selection of
-rules with their exact codes — similar to if `explicit-preview-rules` is enabled.
-
-The nursery category has been deprecated and all rules in the nursery are now considered to be in preview.
-For backwards compatibility, nursery rules are selectable with their exact codes without enabling preview mode.
-However, this behavior will display a warning and support will be removed in a future release.
+When preview mode is enabled, deprecated rules will be disabled. If a deprecated rule is selected explicitly, an
+error will be raised. Deprecated rules will not be included if selected via a rule category or prefix.

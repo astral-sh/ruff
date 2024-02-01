@@ -26,7 +26,7 @@ use super::helpers::{is_pytest_parametrize, split_names};
 /// The `argnames` argument of `pytest.mark.parametrize` takes a string or
 /// a sequence of strings. For a single parameter, it's preferable to use a
 /// string. For multiple parameters, it's preferable to use the style
-/// configured via the [`flake8-pytest-style.parametrize-names-type`] setting.
+/// configured via the [`lint.flake8-pytest-style.parametrize-names-type`] setting.
 ///
 /// ## Example
 /// ```python
@@ -67,7 +67,7 @@ use super::helpers::{is_pytest_parametrize, split_names};
 /// ```
 ///
 /// ## Options
-/// - `flake8-pytest-style.parametrize-names-type`
+/// - `lint.flake8-pytest-style.parametrize-names-type`
 ///
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
@@ -103,17 +103,17 @@ impl Violation for PytestParametrizeNamesWrongType {
 /// of values.
 ///
 /// The style for the list of values rows can be configured via the
-/// the [`flake8-pytest-style.parametrize-values-type`] setting, while the
+/// the [`lint.flake8-pytest-style.parametrize-values-type`] setting, while the
 /// style for each row of values can be configured via the
-/// the [`flake8-pytest-style.parametrize-values-row-type`] setting.
+/// the [`lint.flake8-pytest-style.parametrize-values-row-type`] setting.
 ///
-/// For example, [`flake8-pytest-style.parametrize-values-type`] will lead to
+/// For example, [`lint.flake8-pytest-style.parametrize-values-type`] will lead to
 /// the following expectations:
 ///
 /// - `tuple`: `@pytest.mark.parametrize("value", ("a", "b", "c"))`
 /// - `list`: `@pytest.mark.parametrize("value", ["a", "b", "c"])`
 ///
-/// Similarly, [`flake8-pytest-style.parametrize-values-row-type`] will lead to
+/// Similarly, [`lint.flake8-pytest-style.parametrize-values-row-type`] will lead to
 /// the following expectations:
 ///
 /// - `tuple`: `@pytest.mark.parametrize(("key", "value"), [("a", "b"), ("c", "d")])`
@@ -170,8 +170,8 @@ impl Violation for PytestParametrizeNamesWrongType {
 /// ```
 ///
 /// ## Options
-/// - `flake8-pytest-style.parametrize-values-type`
-/// - `flake8-pytest-style.parametrize-values-row-type`
+/// - `lint.flake8-pytest-style.parametrize-values-type`
+/// - `lint.flake8-pytest-style.parametrize-values-row-type`
 ///
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)

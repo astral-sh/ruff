@@ -321,16 +321,16 @@ leading to [`line-too-long`](rules/line-too-long.md) (`E501`) errors.
 
 None of the above are included in Ruff's default configuration. However, if you've enabled
 any of these rules or their parent categories (like `Q`), we recommend disabling them via the
-linter's [`ignore`](settings.md#ignore) setting.
+linter's [`lint.ignore`](settings.md#lint_ignore) setting.
 
 Similarly, we recommend avoiding the following isort settings, which are incompatible with the
 formatter's treatment of import statements when set to non-default values:
 
-- [`force-single-line`](settings.md#isort-force-single-line)
-- [`force-wrap-aliases`](settings.md#isort-force-wrap-aliases)
-- [`lines-after-imports`](settings.md#isort-lines-after-imports)
-- [`lines-between-types`](settings.md#isort-lines-between-types)
-- [`split-on-trailing-comma`](settings.md#isort-split-on-trailing-comma)
+- [`force-single-line`](settings.md#lint_isort_force-single-line)
+- [`force-wrap-aliases`](settings.md#lint_isort_force-wrap-aliases)
+- [`lines-after-imports`](settings.md#lint_isort_lines-after-imports)
+- [`lines-between-types`](settings.md#lint_isort_lines-between-types)
+- [`split-on-trailing-comma`](settings.md#lint_isort_split-on-trailing-comma)
 
 If you've configured any of these settings to take on non-default values, we recommend removing
 them from your Ruff configuration.

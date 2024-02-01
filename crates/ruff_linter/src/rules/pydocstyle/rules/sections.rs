@@ -76,7 +76,7 @@ use crate::rules::pydocstyle::settings::Convention;
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -175,7 +175,7 @@ impl AlwaysFixableViolation for SectionNotOverIndented {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -253,7 +253,7 @@ impl AlwaysFixableViolation for SectionUnderlineNotOverIndented {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -350,7 +350,7 @@ impl AlwaysFixableViolation for CapitalizeSectionName {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -446,7 +446,7 @@ impl AlwaysFixableViolation for NewLineAfterSectionName {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -548,7 +548,7 @@ impl AlwaysFixableViolation for DashedUnderlineAfterSection {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -647,7 +647,7 @@ impl AlwaysFixableViolation for SectionUnderlineAfterName {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -741,7 +741,7 @@ impl AlwaysFixableViolation for SectionUnderlineMatchesSectionLength {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -835,7 +835,7 @@ impl AlwaysFixableViolation for NoBlankLineAfterSection {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -931,7 +931,7 @@ impl AlwaysFixableViolation for NoBlankLineBeforeSection {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -1021,7 +1021,7 @@ impl AlwaysFixableViolation for BlankLineAfterLastSection {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -1098,7 +1098,7 @@ impl Violation for EmptyDocstringSection {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -1180,7 +1180,7 @@ impl AlwaysFixableViolation for SectionNameEndsInColon {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -1264,7 +1264,7 @@ impl Violation for UndocumentedParam {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)

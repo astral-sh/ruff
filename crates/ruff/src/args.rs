@@ -17,7 +17,7 @@ use ruff_linter::settings::types::{
     ExtensionPair, FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion,
     SerializationFormat, UnsafeFixes,
 };
-use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
+use ruff_linter::{warn_user, RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
 use ruff_workspace::resolver::ConfigurationTransformer;
@@ -110,6 +110,7 @@ pub struct CheckCommand {
     no_unsafe_fixes: bool,
     /// Show violations with source code.
     /// Use `--no-show-source` to disable.
+    /// (Deprecated: use `--output-format=full` or `--output-format=concise` instead of `--show-source` and `--no-show-source`, respectively)
     #[arg(long, overrides_with("no_show_source"))]
     show_source: bool,
     #[clap(long, overrides_with("show_source"), hide = true)]
@@ -137,6 +138,8 @@ pub struct CheckCommand {
     ignore_noqa: bool,
 
     /// Output serialization format for violations.
+    /// The default serialization format is "concise".
+    /// In preview mode, the default serialization format is "full".
     #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
     pub output_format: Option<SerializationFormat>,
 
@@ -652,7 +655,6 @@ impl CheckCommand {
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
             respect_gitignore: resolve_bool_arg(self.respect_gitignore, self.no_respect_gitignore),
             select: self.select,
-            show_source: resolve_bool_arg(self.show_source, self.no_show_source),
             target_version: self.target_version,
             unfixable: self.unfixable,
             // TODO(charlie): Included in `pyproject.toml`, but not inherited.
@@ -662,7 +664,11 @@ impl CheckCommand {
             unsafe_fixes: resolve_bool_arg(self.unsafe_fixes, self.no_unsafe_fixes)
                 .map(UnsafeFixes::from),
             force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-            output_format: self.output_format,
+            output_format: resolve_output_format(
+                self.output_format,
+                resolve_bool_arg(self.show_source, self.no_show_source),
+                resolve_bool_arg(self.preview, self.no_preview).unwrap_or_default(),
+            ),
             show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
             extension: self.extension,
         };
@@ -814,6 +820,42 @@ The following error occurred when attempting to parse `{value}` as a `ruff.toml`
 
         Err(new_error)
     }
+
+fn resolve_output_format(
+    output_format: Option<SerializationFormat>,
+    show_sources: Option<bool>,
+    preview: bool,
+) -> Option<SerializationFormat> {
+    Some(match (output_format, show_sources) {
+        (Some(o), None) => o,
+        (Some(SerializationFormat::Grouped), Some(true)) => {
+            warn_user!("`--show-source` with `--output-format=grouped` is deprecated, and will not show source files. Use `--output-format=full` to show source information.");
+            SerializationFormat::Grouped
+        }
+        (Some(fmt), Some(true)) => {
+            warn_user!("The `--show-source` argument is deprecated and has been ignored in favor of `--output-format={fmt}`.");
+            fmt
+        }
+        (Some(fmt), Some(false)) => {
+            warn_user!("The `--no-show-source` argument is deprecated and has been ignored in favor of `--output-format={fmt}`.");
+            fmt
+        }
+        (None, Some(true)) => {
+            warn_user!("The `--show-source` argument is deprecated. Use `--output-format=full` instead.");
+            SerializationFormat::Full
+        }
+        (None, Some(false)) => {
+            warn_user!("The `--no-show-source` argument is deprecated. Use `--output-format=concise` instead.");
+            SerializationFormat::Concise
+        }
+        (None, None) => return None
+    }).map(|format| match format {
+        SerializationFormat::Text => {
+            warn_user!("`--output-format=text` is deprecated. Use `--output-format=full` or `--output-format=concise` instead. `text` will be treated as `{}`.", SerializationFormat::default(preview));
+            SerializationFormat::default(preview)
+        },
+        other => other
+    })
 }
 
 /// CLI settings that are distinct from configuration (commands, lists of files,
@@ -869,7 +911,6 @@ struct ExplicitConfigOverrides {
     preview: Option<PreviewMode>,
     respect_gitignore: Option<bool>,
     select: Option<Vec<RuleSelector>>,
-    show_source: Option<bool>,
     target_version: Option<PythonVersion>,
     unfixable: Option<Vec<RuleSelector>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
@@ -955,9 +996,6 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
         }
         if let Some(respect_gitignore) = &self.respect_gitignore {
             config.respect_gitignore = Some(*respect_gitignore);
-        }
-        if let Some(show_source) = &self.show_source {
-            config.show_source = Some(*show_source);
         }
         if let Some(show_fixes) = &self.show_fixes {
             config.show_fixes = Some(*show_fixes);

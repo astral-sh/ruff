@@ -11,7 +11,7 @@ use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 use tempfile::TempDir;
 
 const BIN_NAME: &str = "ruff";
-const STDIN_BASE_OPTIONS: &[&str] = &["--no-cache", "--output-format", "text"];
+const STDIN_BASE_OPTIONS: &[&str] = &["--no-cache", "--output-format", "concise"];
 
 #[test]
 fn top_level_options() -> Result<()> {
@@ -44,6 +44,11 @@ inline-quotes = "single"
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
+      - 'extend-select' -> 'lint.extend-select'
+      - 'flake8-quotes' -> 'lint.flake8-quotes'
+
+
     "###);
     Ok(())
 }
@@ -114,6 +119,10 @@ inline-quotes = "single"
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
+      - 'extend-select' -> 'lint.extend-select'
+
+
     "###);
     Ok(())
 }
@@ -153,6 +162,10 @@ inline-quotes = "single"
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
+      - 'flake8-quotes' -> 'lint.flake8-quotes'
+
+
     "###);
     Ok(())
 }
@@ -228,6 +241,10 @@ OTHER = "OTHER"
     [*] 3 fixable with the `--fix` option.
 
     ----- stderr -----
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
+      - 'extend-select' -> 'lint.extend-select'
+
+
     "###);
     Ok(())
 }
@@ -271,6 +288,10 @@ if __name__ == "__main__":
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
+      - 'extend-select' -> 'lint.extend-select'
+
+
     "###);
     Ok(())
 }
@@ -309,6 +330,11 @@ _ = "---------------------------------------------------------------------------
     Found 1 error.
 
     ----- stderr -----
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
+      - 'select' -> 'lint.select'
+      - 'pycodestyle' -> 'lint.pycodestyle'
+
+
     "###);
     Ok(())
 }
@@ -351,6 +377,10 @@ if __name__ == "__main__":
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
+      - 'extend-select' -> 'lint.extend-select'
+
+
     "###);
     Ok(())
 }
@@ -393,6 +423,10 @@ if __name__ == "__main__":
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
+      - 'extend-select' -> 'lint.extend-select'
+
+
     "###);
     Ok(())
 }
