@@ -8,6 +8,7 @@ use fern;
 use log::Level;
 use once_cell::sync::Lazy;
 use ruff_python_parser::{ParseError, ParseErrorType};
+use rustc_hash::FxHashSet;
 
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode, SourceLocation};
 
@@ -15,7 +16,7 @@ use crate::fs;
 use crate::source_kind::SourceKind;
 use ruff_notebook::Notebook;
 
-pub static WARNINGS: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(Mutex::default);
+pub static IDENTIFIERS: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(Mutex::default);
 
 /// Warn a user once, with uniqueness determined by the given ID.
 #[macro_export]
@@ -24,11 +25,31 @@ macro_rules! warn_user_once_by_id {
         use colored::Colorize;
         use log::warn;
 
-        if let Ok(mut states) = $crate::logging::WARNINGS.lock() {
+        if let Ok(mut states) = $crate::logging::IDENTIFIERS.lock() {
             if !states.contains(&$id) {
                 let message = format!("{}", format_args!($($arg)*));
                 warn!("{}", message.bold());
                 states.push($id);
+            }
+        }
+    };
+}
+
+pub static MESSAGES: Lazy<Mutex<FxHashSet<String>>> = Lazy::new(Mutex::default);
+
+/// Warn a user once, if warnings are enabled, with uniqueness determined by the content of the
+/// message.
+#[macro_export]
+macro_rules! warn_user_once_by_message {
+    ($($arg:tt)*) => {
+        use colored::Colorize;
+        use log::warn;
+
+        if let Ok(mut states) = $crate::logging::MESSAGES.lock() {
+            let message = format!("{}", format_args!($($arg)*));
+            if !states.contains(&message) {
+                warn!("{}", message.bold());
+                states.insert(message);
             }
         }
     };

@@ -508,11 +508,9 @@ if __name__ == '__main__':
         say_hy("dear Ruff contributor")
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
       - 'ignore' -> 'lint.ignore'
-
-
     "###);
     Ok(())
 }
@@ -551,11 +549,9 @@ if __name__ == '__main__':
         say_hy("dear Ruff contributor")
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
       - 'ignore' -> 'lint.ignore'
-
-
     "###);
     Ok(())
 }
