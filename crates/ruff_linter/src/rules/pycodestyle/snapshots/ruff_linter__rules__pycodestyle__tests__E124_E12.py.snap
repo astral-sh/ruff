@@ -1,0 +1,114 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E12.py:118:15: E124 Closing bracket not matching its corresponding opening bracket's visual indentation.
+    |
+116 | print ("E124", ("visual",
+117 |                "indent_two"
+118 |               ))
+    |               ^ E124
+119 | 
+120 | #: E124 E128
+    |
+
+E12.py:123:1: E124 Closing bracket not matching its corresponding opening bracket's visual indentation.
+    |
+121 | print ("E124", ("visual",
+122 |                "indent_five"
+123 | ))
+    | ^ E124
+124 | 
+125 | #: E124
+    |
+
+E12.py:127:1: E124 Closing bracket not matching its corresponding opening bracket's visual indentation.
+    |
+125 | #: E124
+126 | a = (123,
+127 | )
+    | ^ E124
+128 | 
+129 | #: E124
+    |
+
+E12.py:132:1: E124 Closing bracket not matching its corresponding opening bracket's visual indentation.
+    |
+130 | my_list = [1, 2, 3,
+131 |            4, 5, 6,
+132 | ]
+    | ^ E124
+133 | 
+134 | #: E124
+    |
+
+E12.py:137:20: E124 Closing bracket not matching its corresponding opening bracket's visual indentation.
+    |
+135 | my_list = [1, 2, 3,
+136 |            4, 5, 6,
+137 |                    ]
+    |                    ^ E124
+138 | #: E124
+139 | result = some_function_that_takes_arguments('a', 'b', 'c',
+    |
+
+E12.py:141:1: E124 Closing bracket not matching its corresponding opening bracket's visual indentation.
+    |
+139 | result = some_function_that_takes_arguments('a', 'b', 'c',
+140 |                                             'd', 'e', 'f',
+141 | )
+    | ^ E124
+142 | 
+143 | #: E124
+    |
+
+E12.py:149:1: E124 Closing bracket not matching its corresponding opening bracket's visual indentation.
+    |
+147 |           dadd
+148 |       ), fff,
+149 | )
+    | ^ E124
+150 | 
+151 | #: E124
+    |
+
+E12.py:158:1: E124 Closing bracket not matching its corresponding opening bracket's visual indentation.
+    |
+156 |       ),
+157 |       fff,
+158 | )
+    | ^ E124
+159 | 
+160 | #: E124
+    |
+
+E12.py:164:15: E124 Closing bracket not matching its corresponding opening bracket's visual indentation.
+    |
+162 |          help="exclude files or directories which match these "
+163 |               "comma separated patterns (default: %s)" % DEFAULT_EXCLUDE
+164 |               )
+    |               ^ E124
+165 | 
+166 | #: E124 E128 E128
+    |
+
+E12.py:171:9: E124 Closing bracket not matching its corresponding opening bracket's visual indentation.
+    |
+169 |         name="Removing the option for contract",
+170 |         description="contract line has been removed",
+171 |         )
+    |         ^ E124
+172 | 
+173 | #: E124 E127 E127
+    |
+
+E12.py:178:17: E124 Closing bracket not matching its corresponding opening bracket's visual indentation.
+    |
+176 |                 name="Removing the option for contract",
+177 |                 description="contract line has been removed",
+178 |                 )
+    |                 ^ E124
+179 | 
+180 | #: E125
+    |
+
+

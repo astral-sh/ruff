@@ -1,0 +1,168 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E12.py:117:16: E128 Continuation line under indented for visual indent.
+    |
+115 | #: E124 E128
+116 | print ("E124", ("visual",
+117 |                "indent_two"
+    |                ^^^^^^^^^^^^ E128
+118 |               ))
+    |
+
+E12.py:122:16: E128 Continuation line under indented for visual indent.
+    |
+120 | #: E124 E128
+121 | print ("E124", ("visual",
+122 |                "indent_five"
+    |                ^^^^^^^^^^^^^ E128
+123 | ))
+    |
+
+E12.py:169:9: E128 Continuation line under indented for visual indent.
+    |
+167 | if line_removed:
+168 |     self.event(cr, uid,
+169 |         name="Removing the option for contract",
+    |         ^^^^ E128
+170 |         description="contract line has been removed",
+171 |         )
+    |
+
+E12.py:170:9: E128 Continuation line under indented for visual indent.
+    |
+168 |     self.event(cr, uid,
+169 |         name="Removing the option for contract",
+170 |         description="contract line has been removed",
+    |         ^^^^^^^^^^^ E128
+171 |         )
+    |
+
+E12.py:366:1: E128 Continuation line under indented for visual indent.
+    |
+364 | #: E128:5:1
+365 | print(a
+366 | , end=' ')
+    | ^ E128
+367 | 
+368 | #: E128 E128
+    |
+
+E12.py:371:15: E128 Continuation line under indented for visual indent.
+    |
+369 | if line_removed:
+370 |     self.event(cr, uid,
+371 |               name="Removing the option for contract",
+    |               ^^^^ E128
+372 |               description="contract line has been removed",
+373 |                )
+    |
+
+E12.py:372:15: E128 Continuation line under indented for visual indent.
+    |
+370 |     self.event(cr, uid,
+371 |               name="Removing the option for contract",
+372 |               description="contract line has been removed",
+    |               ^^^^^^^^^^^ E128
+373 |                )
+    |
+
+E12.py:377:5: E128 Continuation line under indented for visual indent.
+    |
+375 | #: E128
+376 | print ("abcd", ("visual",
+377 |     "hanging"))
+    |     ^^^^^^^^^ E128
+378 | 
+379 | #: E128
+    |
+
+E12.py:381:15: E128 Continuation line under indented for visual indent.
+    |
+379 | #: E128
+380 | print ("abcd", ("under-",
+381 |               "under-indent"))
+    |               ^^^^^^^^^^^^^^ E128
+382 | 
+383 | #: E128
+    |
+
+E12.py:386:5: E128 Continuation line under indented for visual indent.
+    |
+384 | # Arguments on first line forbidden when not using vertical alignment
+385 | foo = long_function_name(var_one, var_two,
+386 |     var_three, var_four)
+    |     ^^^^^^^^^ E128
+387 | 
+388 | #: E128
+    |
+
+E12.py:390:5: E128 Continuation line under indented for visual indent.
+    |
+388 | #: E128
+389 | print('l.%s\t%s\t%s\t%r' %
+390 |     (token[2][0], pos, tokenize.tok_name[token[0]], token[1]))
+    |     ^ E128
+391 | 
+392 | #: E128
+    |
+
+E12.py:394:9: E128 Continuation line under indented for visual indent.
+    |
+392 | #: E128
+393 | def qualify_by_address(self, cr, uid, ids, context=None,
+394 |         params_to_check=frozenset(QUALIF_BY_ADDRESS_PARAM)):
+    |         ^^^^^^^^^^^^^^^ E128
+395 |     """ This gets called by the web server """
+    |
+
+E12.py:400:1: E128 Continuation line under indented for visual indent.
+    |
+399 | foo(1, 2, 3,
+400 | 4, 5, 6)
+    | ^ E128
+401 | 
+402 | #: E128
+    |
+
+E12.py:404:2: E128 Continuation line under indented for visual indent.
+    |
+402 | #: E128
+403 | foo(1, 2, 3,
+404 |  4, 5, 6)
+    |  ^ E128
+405 | 
+406 | #: E128
+    |
+
+E12.py:408:3: E128 Continuation line under indented for visual indent.
+    |
+406 | #: E128
+407 | foo(1, 2, 3,
+408 |   4, 5, 6)
+    |   ^ E128
+409 | 
+410 | #: E128
+    |
+
+E12.py:412:4: E128 Continuation line under indented for visual indent.
+    |
+410 | #: E128
+411 | foo(1, 2, 3,
+412 |    4, 5, 6)
+    |    ^ E128
+413 | 
+414 | #: E128 W503
+    |
+
+E12.py:417:18: E128 Continuation line under indented for visual indent.
+    |
+415 | rv.update(d=('a' + 'b', 'c'),
+416 |           e=42, f=(42
+417 |                  + 42))
+    |                  ^ E128
+418 | 
+419 | #: E129 W503
+    |
+
+
