@@ -69,10 +69,6 @@ impl Violation for UncapitalizedEnvironmentVariables {
 /// `None` is the default value for `dict.get()`, so it is redundant to pass it
 /// explicitly.
 ///
-/// In [preview], this rule applies to variables that are inferred to be
-/// dictionaries; in stable, it's limited to dictionary literals (e.g.,
-/// `{"foo": 1}.get("foo", None)`).
-///
 /// ## Example
 /// ```python
 /// ages = {"Tom": 23, "Maria": 23, "Dog": 11}
@@ -87,8 +83,6 @@ impl Violation for UncapitalizedEnvironmentVariables {
 ///
 /// ## References
 /// - [Python documentation: `dict.get`](https://docs.python.org/3/library/stdtypes.html#dict.get)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct DictGetWithNoneDefault {
     expected: SourceCodeSnippet,
