@@ -17,6 +17,7 @@ pub(crate) use parenthesize_logical_operators::*;
 pub(crate) use quadratic_list_summation::*;
 pub(crate) use sort_dunder_all::*;
 pub(crate) use sort_dunder_slots::*;
+pub(crate) use static_key_dict_comprehension::*;
 #[cfg(feature = "test-rules")]
 pub(crate) use test_rules::*;
 pub(crate) use unnecessary_dict_comprehension_for_iterable::*;
@@ -42,10 +43,10 @@ mod mutable_fromkeys_value;
 mod never_union;
 mod pairwise_over_zipped;
 mod parenthesize_logical_operators;
+mod quadratic_list_summation;
 mod sequence_sorting;
 mod sort_dunder_all;
 mod sort_dunder_slots;
-pub(crate) use static_key_dict_comprehension::*;
 mod static_key_dict_comprehension;
 #[cfg(feature = "test-rules")]
 pub(crate) mod test_rules;
@@ -60,5 +61,3 @@ pub(crate) enum Context {
     Docstring,
     Comment,
 }
-
-mod quadratic_list_summation;
