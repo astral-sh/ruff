@@ -143,12 +143,3 @@ In our previous example, `--select` with `ALL` `HYP`, `HYP0`, or `HYP00` would n
 rule will need to be selected with its exact code, e.g. `--select ALL,HYP001`.
 
 If preview mode is not enabled, this setting has no effect.
-
-## Legacy behavior
-
-Before the preview mode was introduced, new rules were added in a "nursery" category that required selection of
-rules with their exact codes — similar to if `explicit-preview-rules` is enabled.
-
-The nursery category has been deprecated and all rules in the nursery are now considered to be in preview.
-For backwards compatibility, nursery rules are selectable with their exact codes without enabling preview mode.
-However, this behavior will display a warning and support will be removed in a future release.
