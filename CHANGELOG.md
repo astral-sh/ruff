@@ -74,8 +74,8 @@ The following settings have moved and the previous name is deprecated:
 The following rules have been remapped to new codes:
 
 - [`raise-without-from-inside-except`](https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/): `TRY200` to `B904`
-- [`suspicious-eval-usage`](https://docs.astral.sh/ruff/rules/suspicious-eval-usage/): `PHG001` to `S307`
-- [`logging-warn`](https://docs.astral.sh/ruff/rules/logging-warn/): `PHG002` to `G010`
+- [`suspicious-eval-usage`](https://docs.astral.sh/ruff/rules/suspicious-eval-usage/): `PGH001` to `S307`
+- [`logging-warn`](https://docs.astral.sh/ruff/rules/logging-warn/): `PGH002` to `G010`
 - [`static-key-dict-comprehension`](https://docs.astral.sh/ruff/rules/static-key-dict-comprehension): `RUF011` to `B035`
 - [`runtime-string-union`](https://docs.astral.sh/ruff/rules/runtime-string-union): `TCH006` to `TCH010`
 

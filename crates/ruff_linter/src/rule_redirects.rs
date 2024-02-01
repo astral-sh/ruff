@@ -102,7 +102,7 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         ("TCH006", "TCH010"),
         ("TRY200", "B904"),
         ("PGH001", "S307"),
-        ("PHG002", "G010"),
+        ("PGH002", "G010"),
         // Test redirect by exact code
         #[cfg(feature = "test-rules")]
         ("RUF940", "RUF950"),
