@@ -11,7 +11,7 @@ use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 use tempfile::TempDir;
 
 const BIN_NAME: &str = "ruff";
-const STDIN_BASE_OPTIONS: &[&str] = &["--no-cache", "--output-format", "text"];
+const STDIN_BASE_OPTIONS: &[&str] = &["--no-cache", "--output-format", "concise"];
 
 #[test]
 fn top_level_options() -> Result<()> {

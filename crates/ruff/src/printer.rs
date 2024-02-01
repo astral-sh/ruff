@@ -27,8 +27,6 @@ bitflags! {
     pub(crate) struct Flags: u8 {
         /// Whether to show violations when emitting diagnostics.
         const SHOW_VIOLATIONS = 0b0000_0001;
-        /// Whether to show the source code when emitting diagnostics.
-        const SHOW_SOURCE = 0b000_0010;
         /// Whether to show a summary of the fixed violations when emitting diagnostics.
         const SHOW_FIX_SUMMARY = 0b0000_0100;
         /// Whether to show a diff of each fixed violation when emitting diagnostics.
@@ -218,7 +216,10 @@ impl Printer {
         if !self.flags.intersects(Flags::SHOW_VIOLATIONS) {
             if matches!(
                 self.format,
-                SerializationFormat::Text | SerializationFormat::Grouped
+                SerializationFormat::Text
+                    | SerializationFormat::Full
+                    | SerializationFormat::Concise
+                    | SerializationFormat::Grouped
             ) {
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
@@ -245,11 +246,12 @@ impl Printer {
             SerializationFormat::Junit => {
                 JunitEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Text => {
+            SerializationFormat::Concise
+            | SerializationFormat::Full => {
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
-                    .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
+                    .with_show_source(self.format == SerializationFormat::Full)
                     .with_unsafe_fixes(self.unsafe_fixes)
                     .emit(writer, &diagnostics.messages, &context)?;
 
@@ -265,7 +267,6 @@ impl Printer {
             }
             SerializationFormat::Grouped => {
                 GroupedEmitter::default()
-                    .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_unsafe_fixes(self.unsafe_fixes)
                     .emit(writer, &diagnostics.messages, &context)?;
@@ -294,6 +295,7 @@ impl Printer {
             SerializationFormat::Sarif => {
                 SarifEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
+            SerializationFormat::Text => unreachable!("Text is deprecated and should have been automatically converted to the default serialization format")
         }
 
         writer.flush()?;
@@ -342,7 +344,9 @@ impl Printer {
         }
 
         match self.format {
-            SerializationFormat::Text => {
+            SerializationFormat::Text
+            | SerializationFormat::Full
+            | SerializationFormat::Concise => {
                 // Compute the maximum number of digits in the count and code, for all messages,
                 // to enable pretty-printing.
                 let count_width = num_digits(
@@ -403,6 +407,7 @@ impl Printer {
         &self,
         writer: &mut dyn Write,
         diagnostics: &Diagnostics,
+        preview: bool,
     ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
@@ -430,7 +435,7 @@ impl Printer {
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
             TextEmitter::default()
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
+                .with_show_source(preview)
                 .with_unsafe_fixes(self.unsafe_fixes)
                 .emit(writer, &diagnostics.messages, &context)?;
         }
