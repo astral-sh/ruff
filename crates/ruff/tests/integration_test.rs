@@ -857,45 +857,44 @@ fn nursery_all() {
 
 #[test]
 fn nursery_direct() {
-    // Should warn that the nursery rule is selected without preview flag but still
-    // include the diagnostic
+    // Should fail when a nursery rule is selected without the preview flag
+    // Before Ruff v0.2.0 this would warn
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF912", "--output-format=concise"])
         .build();
     assert_cmd_snapshot!(cmd, @r###"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
-    -:1:1: RUF912 Hey this is a nursery test rule.
-    Found 1 error.
 
     ----- stderr -----
-    warning: Selection of nursery rule `RUF912` without the `--preview` flag is deprecated.
+    ruff failed
+      Cause: Selection of unstable rule `RUF912` without the `--preview` flag is not allowed.
     "###);
 }
 
 #[test]
 fn nursery_group_selector() {
-    // Only nursery rules should be detected e.g. RUF912
+    // The NURSERY selector is removed but parses in the CLI for a nicer error message
+    // Before Ruff v0.2.0 this would warn
     let mut cmd = RuffCheck::default()
         .args(["--select", "NURSERY", "--output-format=concise"])
         .build();
     assert_cmd_snapshot!(cmd, @r###"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
-    -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:1: RUF912 Hey this is a nursery test rule.
-    Found 2 errors.
 
     ----- stderr -----
-    warning: The `NURSERY` selector has been deprecated. Use the `--preview` flag instead.
+    ruff failed
+      Cause: The `NURSERY` selector was removed. Use the `--preview` flag instead.
     "###);
 }
 
 #[test]
 fn nursery_group_selector_preview_enabled() {
-    // A warning should be displayed due to deprecated selector usage
+    // When preview mode is enabled, we shouldn't suggest using the `--preview` flag.
+    // Before Ruff v0.2.0 this would warn
     let mut cmd = RuffCheck::default()
         .args(["--select", "NURSERY", "--preview"])
         .build();
@@ -906,7 +905,7 @@ fn nursery_group_selector_preview_enabled() {
 
     ----- stderr -----
     ruff failed
-      Cause: The `NURSERY` selector is deprecated and cannot be used with preview mode enabled.
+      Cause: The `NURSERY` selector was removed. Unstable rules should be selected individually or by their respective groups.
     "###);
 }
 
