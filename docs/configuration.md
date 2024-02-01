@@ -472,14 +472,21 @@ This is mostly useful in situations where you wish to override a configuration s
 that does not have a dedicated command-line flag.
 
 In the below example, the `--config` flag is the only way of overriding the
-`per-file-ignores` configuration setting from the command line,
-since this setting has no dedicated CLI flag. The `extend-select` setting
-could also have been overridden via the `--extend-select` dedicated flag,
+`dummy-variable-rgx` configuration setting from the command line,
+since this setting has no dedicated CLI flag. The `per-file-ignores` setting
+could also have been overridden via the `--per-file-ignores` dedicated flag,
 but using `--config` to override the setting is also fine:
 
 ```shell
-ruff check path/to/file --config path/to/ruff.toml --config "extend-select=['E501', 'F841']" --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
+ruff check path/to/file --config path/to/ruff.toml --config "lint.dummy-variable-rgx = '__.*'" --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
 ```
+
+Configuration options passed to `--config` are parsed in the same way
+as configuration options in a `ruff.toml` file.
+As such, options specific to the ruff linter need to be prefixed with `lint.`
+(`--config "lint.dummy-variable-rgx = '__.*'"` rather than simply
+`--config "dummy-variable-rgx = '__.*'"`), and options specific to the ruff formatter
+need to be prefixed with `format.`.
 
 If a specific configuration option is simultaneously overridden by
 a dedicated flag and by the `--config` flag, the dedicated flag
@@ -487,7 +494,7 @@ always takes priority. In this example, the maximum permitted line
 length will be set to 90, not 100:
 
 ```shell
-ruff check path/to/file --line-length=90 --config "line-length=100"
+ruff format path/to/file --line-length=90 --config "line-length=100"
 ```
 
 Specifying `--config "line-length=90"` will override the `line-length`
@@ -584,9 +591,10 @@ Options:
           Use `--no-preview` to disable
       --config <CONFIG_OPTION>
           Either a path to a TOML configuration file (`pyproject.toml` or
-          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair overriding a specific
-          config setting. Overrides of individual settings always take
-          precedence over all configuration files. This includes configuration
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` config file) overriding a specific config
+          setting. Overrides of individual settings using this option always
+          take precedence over all configuration files, including configuration
           files that were also specified using `--config`
       --extension <EXTENSION>
           List of mappings from file extension to language (one of ["python",
@@ -686,9 +694,10 @@ Options:
           formatted file would look like
       --config <CONFIG_OPTION>
           Either a path to a TOML configuration file (`pyproject.toml` or
-          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair overriding a specific
-          config setting. Overrides of individual settings always take
-          precedence over all configuration files. This includes configuration
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` config file) overriding a specific config
+          setting. Overrides of individual settings using this option always
+          take precedence over all configuration files, including configuration
           files that were also specified using `--config`
       --extension <EXTENSION>
           List of mappings from file extension to language (one of ["python",

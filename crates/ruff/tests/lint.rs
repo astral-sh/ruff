@@ -469,7 +469,7 @@ fn config_override_rejected_if_invalid_toml() {
     error: invalid value 'foo = bar' for '--config <CONFIG_OPTION>'
 
       tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
-      tip: The following error occurred when attempting to parse `foo = bar` as TOML:
+      tip: The following error occurred when attempting to parse `foo = bar` as a `ruff.toml` config option:
 
     TOML parse error at line 1, column 7
       |
@@ -611,7 +611,7 @@ fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
     error: invalid value 'extend-select=['F481']' for '--config <CONFIG_OPTION>'
 
       tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
-      tip: The following error occurred when attempting to parse `extend-select=['F481']` as TOML:
+      tip: The following error occurred when attempting to parse `extend-select=['F481']` as a `ruff.toml` config option:
 
     TOML parse error at line 1, column 1
       |
@@ -639,7 +639,7 @@ fn each_toml_option_requires_a_new_flag_1() {
     error: invalid value 'extend-select=['F841'], line-length=90' for '--config <CONFIG_OPTION>'
 
       tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
-      tip: The following error occurred when attempting to parse `extend-select=['F841'], line-length=90` as TOML:
+      tip: The following error occurred when attempting to parse `extend-select=['F841'], line-length=90` as a `ruff.toml` config option:
 
     TOML parse error at line 1, column 23
       |
@@ -667,7 +667,7 @@ fn each_toml_option_requires_a_new_flag_2() {
     error: invalid value 'extend-select=['F841'] line-length=90' for '--config <CONFIG_OPTION>'
 
       tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
-      tip: The following error occurred when attempting to parse `extend-select=['F841'] line-length=90` as TOML:
+      tip: The following error occurred when attempting to parse `extend-select=['F841'] line-length=90` as a `ruff.toml` config option:
 
     TOML parse error at line 1, column 24
       |

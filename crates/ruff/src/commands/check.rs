@@ -34,7 +34,7 @@ use crate::panic::catch_unwind;
 pub(crate) fn check(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    overrides: &ConfigArguments,
+    config_arguments: &ConfigArguments,
     cache: flags::Cache,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
@@ -42,7 +42,7 @@ pub(crate) fn check(
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
-    let (paths, resolver) = python_files_in_path(files, pyproject_config, overrides)?;
+    let (paths, resolver) = python_files_in_path(files, pyproject_config, config_arguments)?;
     debug!("Identified files to lint in: {:?}", start.elapsed());
 
     if paths.is_empty() {

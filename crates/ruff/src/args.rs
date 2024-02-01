@@ -153,9 +153,10 @@ pub struct CheckCommand {
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
     /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
-    /// or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting.
-    /// Overrides of individual settings always take precedence over all
-    /// configuration files. This includes configuration files that were also
+    /// or a TOML `<KEY> = <VALUE>` pair (such as you might find in a `ruff.toml` config file)
+    /// overriding a specific config setting.
+    /// Overrides of individual settings using this option always take precedence
+    /// over all configuration files, including configuration files that were also
     /// specified using `--config`.
     #[arg(
         long,
@@ -397,9 +398,10 @@ pub struct FormatCommand {
     #[arg(long)]
     pub diff: bool,
     /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
-    /// or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting.
-    /// Overrides of individual settings always take precedence over all
-    /// configuration files. This includes configuration files that were also
+    /// or a TOML `<KEY> = <VALUE>` pair (such as you might find in a `ruff.toml` config file)
+    /// overriding a specific config setting.
+    /// Overrides of individual settings using this option always take precedence
+    /// over all configuration files, including configuration files that were also
     /// specified using `--config`.
     #[arg(
         long,
@@ -797,7 +799,7 @@ impl TypedValueParser for ConfigArgumentParser {
         } else if value.contains('=') {
             let context = format!(
                 "\
-The following error occurred when attempting to parse `{value}` as TOML:
+The following error occurred when attempting to parse `{value}` as a `ruff.toml` config option:
 
 {toml_parse_error}"
             );

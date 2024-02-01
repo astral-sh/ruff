@@ -18,11 +18,11 @@ use crate::args::ConfigArguments;
 pub(crate) fn add_noqa(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    cli_config_arguments: &ConfigArguments,
+    config_arguments: &ConfigArguments,
 ) -> Result<usize> {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = python_files_in_path(files, pyproject_config, cli_config_arguments)?;
+    let (paths, resolver) = python_files_in_path(files, pyproject_config, config_arguments)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 

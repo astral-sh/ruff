@@ -120,7 +120,7 @@ fn config_override_rejected_if_invalid_toml() {
     error: invalid value 'foo = bar' for '--config <CONFIG_OPTION>'
 
       tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
-      tip: The following error occurred when attempting to parse `foo = bar` as TOML:
+      tip: The following error occurred when attempting to parse `foo = bar` as a `ruff.toml` config option:
 
     TOML parse error at line 1, column 7
       |
