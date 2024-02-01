@@ -117,14 +117,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     let mut lines = docstring.lines().peekable();
 
     // Start the string
-    write!(
-        f,
-        [
-            normalized.prefix,
-            normalized.quotes,
-            source_position(normalized.start()),
-        ]
-    )?;
+    write!(f, [normalized.prefix, normalized.quotes])?;
     // We track where in the source docstring we are (in source code byte offsets)
     let mut offset = normalized.start();
 
@@ -206,7 +199,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
         space().fmt(f)?;
     }
 
-    write!(f, [source_position(normalized.end()), normalized.quotes])
+    write!(f, [normalized.quotes])
 }
 
 fn contains_unescaped_newline(haystack: &str) -> bool {
