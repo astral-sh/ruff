@@ -2,6 +2,7 @@
 
 #![cfg(not(target_family = "wasm"))]
 
+use regex::escape;
 use std::fs;
 use std::process::Command;
 use std::str;
@@ -12,6 +13,10 @@ use tempfile::TempDir;
 
 const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["--no-cache", "--output-format", "concise"];
+
+fn tempdir_filter(tempdir: &TempDir) -> String {
+    format!(r"{}\\?/?", escape(tempdir.path().to_str().unwrap()))
+}
 
 #[test]
 fn top_level_options() -> Result<()> {
@@ -28,7 +33,7 @@ inline-quotes = "single"
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir.path().to_str().unwrap(), "[TMP]")]
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
     }, {
         assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
             .args(STDIN_BASE_OPTIONS)
@@ -72,7 +77,7 @@ inline-quotes = "single"
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir.path().to_str().unwrap(), "[TMP]")]
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
@@ -112,7 +117,7 @@ inline-quotes = "single"
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir.path().to_str().unwrap(), "[TMP]")]
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
@@ -158,7 +163,7 @@ inline-quotes = "single"
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir.path().to_str().unwrap(), "[TMP]")]
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
@@ -237,7 +242,7 @@ OTHER = "OTHER"
     fs::write(out_dir.join("a.py"), r#"a = "a""#)?;
 
     insta::with_settings!({
-        filters => vec![(tempdir.path().to_str().unwrap(), "[TMP]")]
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
@@ -284,7 +289,7 @@ inline-quotes = "single"
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir.path().to_str().unwrap(), "[TMP]")]
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
@@ -332,7 +337,7 @@ max-line-length = 100
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir.path().to_str().unwrap(), "[TMP]")]
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
@@ -377,7 +382,7 @@ inline-quotes = "single"
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir.path().to_str().unwrap(), "[TMP]")]
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
@@ -426,7 +431,7 @@ inline-quotes = "single"
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir.path().to_str().unwrap(), "[TMP]")]
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
@@ -486,7 +491,7 @@ ignore = ["D203", "D212"]
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir.path().to_str().unwrap(), "[TMP]")]
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(sub_dir)
@@ -559,7 +564,7 @@ include = ["*.ipy"]
     )?;
 
     insta::with_settings!({
-        filters => vec![(tempdir.path().to_str().unwrap(), "[TMP]")]
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
