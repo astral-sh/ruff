@@ -39,6 +39,10 @@ pub(crate) const TEST_RULES: &[Rule] = &[
     Rule::StableTestRuleDisplayOnlyFix,
     Rule::PreviewTestRule,
     Rule::NurseryTestRule,
+    Rule::DeprecatedTestRule,
+    Rule::AnotherDeprecatedTestRule,
+    Rule::RemovedTestRule,
+    Rule::AnotherRemovedTestRule,
 ];
 
 pub(crate) trait TestRule {
