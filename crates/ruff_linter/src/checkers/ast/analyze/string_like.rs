@@ -2,7 +2,7 @@ use ruff_python_ast::StringLike;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::rules::{flake8_bandit, flake8_pyi};
+use crate::rules::{flake8_bandit, flake8_pyi, ruff};
 
 /// Run lint rules over a [`StringLike`] syntax nodes.
 pub(crate) fn string_like(string_like: StringLike, checker: &mut Checker) {
@@ -16,5 +16,13 @@ pub(crate) fn string_like(string_like: StringLike, checker: &mut Checker) {
         if checker.enabled(Rule::StringOrBytesTooLong) {
             flake8_pyi::rules::string_or_bytes_too_long(checker, string_like);
         }
+    }
+    if checker.enabled(Rule::MissingFStringSyntax) {
+        ruff::rules::missing_fstring_syntax(
+            &mut checker.diagnostics,
+            string_like,
+            checker.locator,
+            &checker.semantic,
+        );
     }
 }

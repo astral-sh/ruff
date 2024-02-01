@@ -1319,14 +1319,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_part);
                 }
             }
-            if checker.enabled(Rule::MissingFStringSyntax) {
-                ruff::rules::missing_fstring_syntax(
-                    &mut checker.diagnostics,
-                    value,
-                    checker.locator,
-                    &checker.semantic,
-                );
-            }
         }
         Expr::IfExp(
             if_exp @ ast::ExprIfExp {
