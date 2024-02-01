@@ -25,7 +25,7 @@ use crate::checkers::ast::Checker;
 ///     try:
 ///         return 1 / n
 ///     except ZeroDivisionError:
-///         raise ValueError
+///         raise ValueError()
 /// ```
 ///
 /// Use instead:
@@ -34,7 +34,7 @@ use crate::checkers::ast::Checker;
 ///     try:
 ///         return 1 / n
 ///     except ZeroDivisionError as exc:
-///         raise ValueError from exc
+///         raise ValueError() from exc
 /// ```
 ///
 /// ## References

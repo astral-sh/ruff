@@ -977,7 +977,7 @@ fn preview_enabled_direct() {
 
 #[test]
 fn preview_disabled_direct() {
-    // RUFF911 is preview not nursery so the selection should be empty
+    // RUFF911 is preview so we should warn without selecting
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF911", "--output-format=concise"])
         .build();
@@ -987,7 +987,7 @@ fn preview_disabled_direct() {
     ----- stdout -----
 
     ----- stderr -----
-    warning: Selection `RUF911` has no effect because the `--preview` flag was not included.
+    warning: Selection `RUF911` has no effect because preview is not enabled.
     "###);
 }
 
@@ -1003,7 +1003,7 @@ fn preview_disabled_prefix_empty() {
     ----- stdout -----
 
     ----- stderr -----
-    warning: Selection `RUF91` has no effect because the `--preview` flag was not included.
+    warning: Selection `RUF91` has no effect because preview is not enabled.
     "###);
 }
 
@@ -1135,11 +1135,13 @@ def reciprocal(n):
     try:
         return 1 / n
     except ZeroDivisionError:
-        raise ValueError
+        raise ValueError()
 "###), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
+    -:6:9: TRY200 Use `raise from` to specify exception cause
+    Found 1 error.
 
     ----- stderr -----
     warning: Rule `TRY200` is deprecated and will be removed in a future release.
@@ -1212,7 +1214,7 @@ def reciprocal(n):
     try:
         return 1 / n
     except ZeroDivisionError:
-        raise ValueError
+        raise ValueError()
 "###), @r###"
     success: false
     exit_code: 2
@@ -1220,7 +1222,7 @@ def reciprocal(n):
 
     ----- stderr -----
     ruff failed
-      Cause: Selection of deprecated rule `TRY200` is not allowed when preview mode is enabled.
+      Cause: Selection of deprecated rule `TRY200` is not allowed when preview is enabled.
     "###);
 }
 
@@ -1236,7 +1238,7 @@ def reciprocal(n):
     try:
         return 1 / n
     except ZeroDivisionError:
-        raise ValueError
+        raise ValueError()
 "###), @r###"
     success: true
     exit_code: 0
@@ -1259,7 +1261,7 @@ def reciprocal(n):
     try:
         return 1 / n
     except ZeroDivisionError:
-        raise ValueError
+        raise ValueError()
 "###), @r###"
     success: false
     exit_code: 2
@@ -1267,7 +1269,7 @@ def reciprocal(n):
 
     ----- stderr -----
     ruff failed
-      Cause: Selection of deprecated rules is not allowed when preview mode is enabled. Remove selection of:
+      Cause: Selection of deprecated rules is not allowed when preview is enabled. Remove selection of:
     	- ANN102
     	- ANN101
 
