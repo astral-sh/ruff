@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.2.0
+
+### Preview features
+
+- \[`refurb`\] Implement `metaclass_abcmeta` (`FURB180`) ([#9658](https://github.com/astral-sh/ruff/pull/9658))
+- Implement `blank_line_after_nested_stub_class` preview style ([#9155](https://github.com/astral-sh/ruff/pull/9155))
+
+### Bug fixes
+
+- \[`flake8-async`\] Take `pathlib.Path` into account when analyzing async functions ([#9703](https://github.com/astral-sh/ruff/pull/9703))
+- \[`flake8-return`\] - fix indentation syntax error (`RET505`) ([#9705](https://github.com/astral-sh/ruff/pull/9705))
+- Detect multi-statement lines in else removal ([#9748](https://github.com/astral-sh/ruff/pull/9748))
+- RUF022, RUF023: never add two trailing commas to the end of a sequence ([#9698](https://github.com/astral-sh/ruff/pull/9698))
+- RUF023: Don't sort `__match_args__`, only `__slots__` ([#9724](https://github.com/astral-sh/ruff/pull/9724))
+- \[`flake8-simplify`\] - Fix syntax error in autofix (`SIM114`) ([#9704](https://github.com/astral-sh/ruff/pull/9704))
+- \[`pylint`\] Show verbatim constant in `magic-value-comparison` (`PLR2004`) ([#9694](https://github.com/astral-sh/ruff/pull/9694))
+- Removing trailing whitespace inside multiline strings is unsafe ([#9744](https://github.com/astral-sh/ruff/pull/9744))
+- Support `IfExp` with dual string arms in `invalid-envvar-default` ([#9734](https://github.com/astral-sh/ruff/pull/9734))
+- \[`pylint`\] Add `__mro_entries__` to known dunder methods (`PLW3201`) ([#9706](https://github.com/astral-sh/ruff/pull/9706))
+
+### Documentation
+
+- Update README.md by adding `ivy` repository to the who's using Ruff section ([#9735](https://github.com/astral-sh/ruff/pull/9735))
+
+### Other changes
+
+- Add internal hidden rules for testing ([#9747](https://github.com/astral-sh/ruff/pull/9747))
+- Release v0.2.0 ([#9680](https://github.com/astral-sh/ruff/pull/9680))
+- Use publicly available Apple Silicon runners ([#9726](https://github.com/astral-sh/ruff/pull/9726))
+
 ## 0.1.15
 
 ### Preview features
