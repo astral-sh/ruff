@@ -1138,7 +1138,6 @@ fn removed_indirect() {
     ----- stdout -----
 
     ----- stderr -----
-    warning: Selection `RUF93` has no effect because preview is not enabled.
     "###);
 }
 
