@@ -309,4 +309,27 @@ class ComplexStatements:
 ```
 
 
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -110,6 +110,7 @@
+ 
+     class InnerClass5:
+         def a(self): ...
++
+     field1 = 1
+ 
+     class InnerClass6:
+@@ -119,6 +120,7 @@
+ 
+     class InnerClass7:
+         def a(self): ...
++
+     print("hi")
+ 
+     class InnerClass8:
+```
+
+
 

@@ -218,6 +218,38 @@ __all__ = (
 
 __all__ = ("don't" "care" "about", "__all__" "with", "concatenated" "strings")
 
+############################################################
+# Trailing-comma edge cases that should be flagged and fixed
+############################################################
+
+__all__ = (
+    "loads",
+    "dumps",)
+
+__all__ = [
+    "loads",
+    "dumps"       ,     ]
+
+__all__ = ['xp', 'yp',
+                'canvas'
+
+                # very strangely placed comment
+
+                ,
+
+                # another strangely placed comment
+                ]
+
+__all__ = (
+    "foo"
+    # strange comment 1
+    ,
+    # comment about bar
+    "bar"
+    # strange comment 2
+    ,
+)
+
 ###################################
 # These should all not get flagged:
 ###################################

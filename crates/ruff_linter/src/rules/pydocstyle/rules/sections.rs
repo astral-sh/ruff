@@ -1632,9 +1632,13 @@ fn common_section(
     }
 
     let line_end = checker.stylist().line_ending().as_str();
-    let last_line = context.following_lines().last();
-    if last_line.map_or(true, |line| !line.trim().is_empty()) {
-        if let Some(next) = next {
+
+    if let Some(next) = next {
+        if context
+            .following_lines()
+            .last()
+            .map_or(true, |line| !line.trim().is_empty())
+        {
             if checker.enabled(Rule::NoBlankLineAfterSection) {
                 let mut diagnostic = Diagnostic::new(
                     NoBlankLineAfterSection {
@@ -1649,7 +1653,16 @@ fn common_section(
                 )));
                 checker.diagnostics.push(diagnostic);
             }
-        } else {
+        }
+    } else {
+        // The first blank line is the line containing the closing triple quotes, so we need at
+        // least two.
+        let num_blank_lines = context
+            .following_lines()
+            .rev()
+            .take_while(|line| line.trim().is_empty())
+            .count();
+        if num_blank_lines < 2 {
             if checker.enabled(Rule::BlankLineAfterLastSection) {
                 let mut diagnostic = Diagnostic::new(
                     BlankLineAfterLastSection {
@@ -1659,7 +1672,11 @@ fn common_section(
                 );
                 // Add a newline after the section.
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    format!("{}{}", line_end, docstring.indentation),
+                    format!(
+                        "{}{}",
+                        line_end.repeat(2 - num_blank_lines),
+                        docstring.indentation
+                    ),
                     context.end(),
                 )));
                 checker.diagnostics.push(diagnostic);

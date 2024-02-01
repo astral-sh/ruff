@@ -796,6 +796,23 @@ mod tests {
     }
 
     #[test]
+    fn test_undefined_name() -> Result<(), NotebookError> {
+        let actual = notebook_path("undefined_name.ipynb");
+        let expected = notebook_path("undefined_name.ipynb");
+        let TestedNotebook {
+            messages,
+            source_notebook,
+            ..
+        } = assert_notebook_path(
+            &actual,
+            expected,
+            &settings::LinterSettings::for_rule(Rule::UndefinedName),
+        )?;
+        assert_messages!(messages, actual, source_notebook);
+        Ok(())
+    }
+
+    #[test]
     fn test_json_consistency() -> Result<()> {
         let actual_path = notebook_path("before_fix.ipynb");
         let expected_path = notebook_path("after_fix.ipynb");

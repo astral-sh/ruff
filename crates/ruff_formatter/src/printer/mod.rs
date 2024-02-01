@@ -60,7 +60,10 @@ impl<'a> Printer<'a> {
         document: &'a Document,
         indent: u16,
     ) -> PrintResult<Printed> {
-        let mut stack = PrintCallStack::new(PrintElementArgs::new(Indention::Level(indent)));
+        let indentation = Indention::Level(indent);
+        self.state.pending_indent = indentation;
+
+        let mut stack = PrintCallStack::new(PrintElementArgs::new(indentation));
         let mut queue: PrintQueue<'a> = PrintQueue::new(document.as_ref());
 
         loop {
@@ -143,7 +146,13 @@ impl<'a> Printer<'a> {
 
             FormatElement::SourcePosition(position) => {
                 self.state.source_position = *position;
-                self.push_marker();
+                // The printer defers printing indents until the next text
+                // is printed. Pushing the marker now would mean that the
+                // mapped range includes the indent range, which we don't want.
+                // Only add a marker if we're not in an indented context, e.g. at the end of the file.
+                if self.state.pending_indent.is_empty() {
+                    self.push_marker();
+                }
             }
 
             FormatElement::LineSuffixBoundary => {
@@ -511,11 +520,12 @@ impl<'a> Printer<'a> {
             dest: self.state.buffer.text_len(),
         };
 
-        if let Some(last) = self.state.source_markers.last() {
-            if last != &marker {
-                self.state.source_markers.push(marker);
-            }
-        } else {
+        if self
+            .state
+            .source_markers
+            .last()
+            .map_or(true, |last| last != &marker)
+        {
             self.state.source_markers.push(marker);
         }
     }

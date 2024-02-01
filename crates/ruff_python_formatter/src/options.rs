@@ -203,6 +203,12 @@ impl PyFormatOptions {
         self.preview = preview;
         self
     }
+
+    #[must_use]
+    pub fn with_source_map_generation(mut self, source_map: SourceMapGeneration) -> Self {
+        self.source_map_generation = source_map;
+        self
+    }
 }
 
 impl FormatOptions for PyFormatOptions {

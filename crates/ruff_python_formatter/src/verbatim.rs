@@ -19,6 +19,40 @@ use crate::statement::clause::ClauseHeader;
 use crate::statement::suite::SuiteChildStatement;
 use crate::statement::trailing_semicolon;
 
+/// Returns `true` if the statements coming after `leading_or_trailing_comments` are suppressed.
+///
+/// The result is only correct if called for statement comments in a non-suppressed range.
+///
+/// # Panics
+/// If `leading_or_trailing_comments` contain any range that's outside of `source`.
+pub(crate) fn starts_suppression(
+    leading_or_trailing_comments: &[SourceComment],
+    source: &str,
+) -> bool {
+    let mut iter = CommentRangeIter::outside_suppression(leading_or_trailing_comments, source);
+    // Move the iter to the last element.
+    let _ = iter.by_ref().last();
+
+    matches!(iter.in_suppression, InSuppression::Yes)
+}
+
+/// Returns `true` if the statements coming after `leading_or_trailing_comments` are no longer suppressed.
+///
+/// The result is only correct if called for statement comments in a suppressed range.
+///
+/// # Panics
+/// If `leading_or_trailing_comments` contain any range that's outside of `source`.
+pub(crate) fn ends_suppression(
+    leading_or_trailing_comments: &[SourceComment],
+    source: &str,
+) -> bool {
+    let mut iter = CommentRangeIter::in_suppression(leading_or_trailing_comments, source);
+    // Move the iter to the last element.
+    let _ = iter.by_ref().last();
+
+    !matches!(iter.in_suppression, InSuppression::Yes)
+}
+
 /// Disables formatting for all statements between the `first_suppressed` that has a leading `fmt: off` comment
 /// and the first trailing or leading `fmt: on` comment. The statements are formatted as they appear in the source code.
 ///
@@ -855,7 +889,7 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
 
         match normalize_newlines(f.context().locator().slice(self.verbatim_range), ['\r']) {
             Cow::Borrowed(_) => {
-                write!(f, [source_text_slice(self.verbatim_range,)])?;
+                write!(f, [source_text_slice(self.verbatim_range)])?;
             }
             Cow::Owned(cleaned) => {
                 write!(

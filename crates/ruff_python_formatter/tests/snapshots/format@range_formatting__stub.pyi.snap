@@ -1,0 +1,61 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/stub.pyi
+---
+## Input
+```python
+# Don't collapse the ellipsis if only formatting the ellipsis line.
+class Test:
+    <RANGE_START>...<RANGE_END>
+
+class Test2: <RANGE_START>pass<RANGE_END>
+
+class Test3:    <RANGE_START>...<RANGE_END>
+
+class Test4:
+    # leading comment
+    <RANGE_START>...<RANGE_END>
+    # trailing comment
+
+
+class Test4:
+<RANGE_START>    ...<RANGE_END>
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Enabled
+target_version             = Py38
+source_type                = Stub
+```
+
+```python
+# Don't collapse the ellipsis if only formatting the ellipsis line.
+class Test:
+    ...
+
+class Test2:
+    pass
+
+class Test3: ...
+
+class Test4:
+    # leading comment
+    ...
+    # trailing comment
+
+
+class Test4: ...
+```
+
+
+

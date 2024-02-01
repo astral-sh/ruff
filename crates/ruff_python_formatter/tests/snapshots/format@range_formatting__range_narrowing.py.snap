@@ -1,0 +1,30 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/range_narrowing.py
+---
+## Input
+```python
+def test ():
+    <RANGE_START>if True:
+        print(  "format")
+    elif False:
+        print (   "and this")<RANGE_END>
+        print("not this"   )
+
+    print("nor this" )
+```
+
+## Output
+```python
+def test ():
+    if True:
+        print("format")
+    elif False:
+        print("and this")
+        print("not this"   )
+
+    print("nor this" )
+```
+
+
+

@@ -1,0 +1,17 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+W291.py:1:23: W291 [*] Trailing whitespace
+  |
+1 | '''trailing whitespace 
+  |                       ^ W291
+2 | inside a multiline string'''
+  |
+  = help: Remove trailing whitespace
+
+ℹ Unsafe fix
+1   |-'''trailing whitespace 
+  1 |+'''trailing whitespace
+2 2 | inside a multiline string'''
+
+
