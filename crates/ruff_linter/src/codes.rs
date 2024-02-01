@@ -951,6 +951,14 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         #[cfg(feature = "test-rules")]
         #[allow(deprecated)]
         (Ruff, "912") => (RuleGroup::Nursery, rules::ruff::rules::NurseryTestRule),
+        #[cfg(feature = "test-rules")]
+        (Ruff, "920") => (RuleGroup::Deprecated, rules::ruff::rules::DeprecatedTestRule),
+        #[cfg(feature = "test-rules")]
+        (Ruff, "921") => (RuleGroup::Deprecated, rules::ruff::rules::AnotherDeprecatedTestRule),
+        #[cfg(feature = "test-rules")]
+        (Ruff, "930") => (RuleGroup::Removed, rules::ruff::rules::RemovedTestRule),
+        #[cfg(feature = "test-rules")]
+        (Ruff, "931") => (RuleGroup::Removed, rules::ruff::rules::AnotherRemovedTestRule),
 
 
         // flake8-django

@@ -236,6 +236,16 @@ pub fn check_path(
                 }
                 Rule::NurseryTestRule => test_rules::NurseryTestRule::diagnostic(locator, indexer),
                 Rule::PreviewTestRule => test_rules::PreviewTestRule::diagnostic(locator, indexer),
+                Rule::DeprecatedTestRule => {
+                    test_rules::DeprecatedTestRule::diagnostic(locator, indexer)
+                }
+                Rule::AnotherDeprecatedTestRule => {
+                    test_rules::AnotherDeprecatedTestRule::diagnostic(locator, indexer)
+                }
+                Rule::RemovedTestRule => test_rules::RemovedTestRule::diagnostic(locator, indexer),
+                Rule::AnotherRemovedTestRule => {
+                    test_rules::AnotherRemovedTestRule::diagnostic(locator, indexer)
+                }
                 _ => unreachable!("All test rules must have an implementation"),
             };
             if let Some(diagnostic) = diagnostic {

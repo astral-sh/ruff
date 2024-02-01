@@ -909,7 +909,15 @@ impl LintConfiguration {
                     }
 
                     // Check if the selector is empty because preview mode is disabled
-                    if selector.rules(&PreviewOptions::default()).next().is_none() {
+                    if selector.rules(&preview).next().is_none()
+                        && selector
+                            .rules(&PreviewOptions {
+                                mode: PreviewMode::Enabled,
+                                require_explicit: preview.require_explicit,
+                            })
+                            .next()
+                            .is_some()
+                    {
                         ignored_preview_selectors.insert(selector);
                     }
                 }
