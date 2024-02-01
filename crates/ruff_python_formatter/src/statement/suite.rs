@@ -15,7 +15,8 @@ use crate::expression::expr_string_literal::ExprStringLiteralKind;
 use crate::prelude::*;
 use crate::preview::{
     is_blank_line_after_nested_stub_class_enabled, is_dummy_implementations_enabled,
-    is_module_docstring_newlines_enabled, is_no_blank_line_before_class_docstring_enabled,
+    is_format_module_docstring_enabled, is_module_docstring_newlines_enabled,
+    is_no_blank_line_before_class_docstring_enabled,
 };
 use crate::statement::stmt_expr::FormatStmtExpr;
 use crate::verbatim::{
@@ -141,8 +142,12 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 }
             }
             SuiteKind::TopLevel => {
-                if let Some(docstring) = DocstringStmt::try_from_statement(first, self.kind) {
-                    SuiteChildStatement::Docstring(docstring)
+                if is_format_module_docstring_enabled(f.context()) {
+                    if let Some(docstring) = DocstringStmt::try_from_statement(first, self.kind) {
+                        SuiteChildStatement::Docstring(docstring)
+                    } else {
+                        SuiteChildStatement::Other(first)
+                    }
                 } else {
                     SuiteChildStatement::Other(first)
                 }
