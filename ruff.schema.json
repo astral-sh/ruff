@@ -519,7 +519,7 @@
       }
     },
     "output-format": {
-      "description": "The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).",
+      "description": "The style in which violation messages should be formatted: `\"full\"` (shows source),`\"concise\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).",
       "anyOf": [
         {
           "$ref": "#/definitions/SerializationFormat"
@@ -660,6 +660,7 @@
     },
     "show-source": {
       "description": "Whether to show source code snippets when reporting lint violations (overridden by the `--show-source` command-line flag).",
+      "deprecated": true,
       "type": [
         "boolean",
         "null"
@@ -3817,6 +3818,8 @@
       "type": "string",
       "enum": [
         "text",
+        "concise",
+        "full",
         "json",
         "json-lines",
         "junit",

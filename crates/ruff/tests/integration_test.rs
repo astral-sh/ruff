@@ -31,23 +31,12 @@ fn ruff_cmd() -> Command {
 }
 
 /// Builder for `ruff check` commands.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct RuffCheck<'a> {
-    output_format: &'a str,
+    output_format: Option<&'a str>,
     config: Option<&'a Path>,
     filename: Option<&'a str>,
     args: Vec<&'a str>,
-}
-
-impl<'a> Default for RuffCheck<'a> {
-    fn default() -> RuffCheck<'a> {
-        RuffCheck {
-            output_format: "text",
-            config: None,
-            filename: None,
-            args: vec![],
-        }
-    }
 }
 
 impl<'a> RuffCheck<'a> {
@@ -61,7 +50,7 @@ impl<'a> RuffCheck<'a> {
     /// Set the `--output-format` option.
     #[must_use]
     fn output_format(mut self, format: &'a str) -> Self {
-        self.output_format = format;
+        self.output_format = Some(format);
         self
     }
 
@@ -82,7 +71,11 @@ impl<'a> RuffCheck<'a> {
     /// Generate a [`Command`] for the `ruff check` command.
     fn build(self) -> Command {
         let mut cmd = ruff_cmd();
-        cmd.args(["--output-format", self.output_format, "--no-cache"]);
+        if let Some(output_format) = self.output_format {
+            cmd.args(["--output-format", output_format]);
+        }
+        cmd.arg("--no-cache");
+
         if let Some(path) = self.config {
             cmd.arg("--config");
             cmd.arg(path);
@@ -743,8 +736,28 @@ fn stdin_parse_error() {
 }
 
 #[test]
-fn show_source() {
-    let mut cmd = RuffCheck::default().args(["--show-source"]).build();
+fn full_output_preview() {
+    let mut cmd = RuffCheck::default().args(["--preview"]).build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("l = 1"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `l`
+      |
+    1 | l = 1
+      | ^ E741
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn full_output_format() {
+    let mut cmd = RuffCheck::default().output_format("full").build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("l = 1"), @r###"
     success: false
@@ -800,7 +813,9 @@ fn show_statistics() {
 #[test]
 fn nursery_prefix() {
     // Should only detect RUF90X, but not the unstable test rules
-    let mut cmd = RuffCheck::default().args(["--select", "RUF9"]).build();
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "RUF9", "--output-format=concise"])
+        .build();
     assert_cmd_snapshot!(cmd, @r###"
     success: false
     exit_code: 1
@@ -819,7 +834,9 @@ fn nursery_prefix() {
 #[test]
 fn nursery_all() {
     // Should detect RUF90X, but not the unstable test rules
-    let mut cmd = RuffCheck::default().args(["--select", "ALL"]).build();
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "ALL", "--output-format=concise"])
+        .build();
     assert_cmd_snapshot!(cmd, @r###"
     success: false
     exit_code: 1
@@ -842,7 +859,9 @@ fn nursery_all() {
 fn nursery_direct() {
     // Should warn that the nursery rule is selected without preview flag but still
     // include the diagnostic
-    let mut cmd = RuffCheck::default().args(["--select", "RUF912"]).build();
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "RUF912", "--output-format=concise"])
+        .build();
     assert_cmd_snapshot!(cmd, @r###"
     success: false
     exit_code: 1
@@ -858,7 +877,9 @@ fn nursery_direct() {
 #[test]
 fn nursery_group_selector() {
     // Only nursery rules should be detected e.g. RUF912
-    let mut cmd = RuffCheck::default().args(["--select", "NURSERY"]).build();
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "NURSERY", "--output-format=concise"])
+        .build();
     assert_cmd_snapshot!(cmd, @r###"
     success: false
     exit_code: 1
@@ -893,7 +914,7 @@ fn nursery_group_selector_preview_enabled() {
 fn preview_enabled_prefix() {
     // All the RUF9XX test rules should be triggered
     let mut cmd = RuffCheck::default()
-        .args(["--select", "RUF9", "--preview"])
+        .args(["--select", "RUF9", "--output-format=concise", "--preview"])
         .build();
     assert_cmd_snapshot!(cmd, @r###"
     success: false
@@ -915,7 +936,7 @@ fn preview_enabled_prefix() {
 #[test]
 fn preview_enabled_all() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "ALL", "--preview"])
+        .args(["--select", "ALL", "--output-format=concise", "--preview"])
         .build();
     assert_cmd_snapshot!(cmd, @r###"
     success: false
@@ -942,7 +963,7 @@ fn preview_enabled_all() {
 fn preview_enabled_direct() {
     // Should be enabled without warning
     let mut cmd = RuffCheck::default()
-        .args(["--select", "RUF911", "--preview"])
+        .args(["--select", "RUF911", "--output-format=concise", "--preview"])
         .build();
     assert_cmd_snapshot!(cmd, @r###"
     success: false
@@ -958,7 +979,9 @@ fn preview_enabled_direct() {
 #[test]
 fn preview_disabled_direct() {
     // RUFF911 is preview not nursery so the selection should be empty
-    let mut cmd = RuffCheck::default().args(["--select", "RUF911"]).build();
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "RUF911", "--output-format=concise"])
+        .build();
     assert_cmd_snapshot!(cmd, @r###"
     success: true
     exit_code: 0
@@ -972,7 +995,9 @@ fn preview_disabled_direct() {
 #[test]
 fn preview_disabled_prefix_empty() {
     // Warns that the selection is empty since all of the RUF91 rules are in preview
-    let mut cmd = RuffCheck::default().args(["--select", "RUF91"]).build();
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "RUF91", "--output-format=concise"])
+        .build();
     assert_cmd_snapshot!(cmd, @r###"
     success: true
     exit_code: 0
@@ -986,7 +1011,9 @@ fn preview_disabled_prefix_empty() {
 #[test]
 fn preview_disabled_does_not_warn_for_empty_ignore_selections() {
     // Does not warn that the selection is empty since the user is not trying to enable the rule
-    let mut cmd = RuffCheck::default().args(["--ignore", "RUF9"]).build();
+    let mut cmd = RuffCheck::default()
+        .args(["--ignore", "RUF9", "--output-format=concise"])
+        .build();
     assert_cmd_snapshot!(cmd, @r###"
     success: true
     exit_code: 0
@@ -999,7 +1026,9 @@ fn preview_disabled_does_not_warn_for_empty_ignore_selections() {
 #[test]
 fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
     // Does not warn that the selection is empty since the user is not trying to enable the rule
-    let mut cmd = RuffCheck::default().args(["--fixable", "RUF9"]).build();
+    let mut cmd = RuffCheck::default()
+        .args(["--fixable", "RUF9", "--output-format=concise"])
+        .build();
     assert_cmd_snapshot!(cmd, @r###"
     success: true
     exit_code: 0
@@ -1013,7 +1042,12 @@ fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
 fn preview_group_selector() {
     // `--select PREVIEW` should error (selector was removed)
     let mut cmd = RuffCheck::default()
-        .args(["--select", "PREVIEW", "--preview"])
+        .args([
+            "--select",
+            "PREVIEW",
+            "--preview",
+            "--output-format=concise",
+        ])
         .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
@@ -1032,10 +1066,16 @@ fn preview_group_selector() {
 fn preview_enabled_group_ignore() {
     // Should detect stable and unstable rules, RUF9 is more specific than RUF so ignore has no effect
     let mut cmd = RuffCheck::default()
-        .args(["--select", "RUF9", "--ignore", "RUF", "--preview"])
+        .args([
+            "--select",
+            "RUF9",
+            "--ignore",
+            "RUF",
+            "--preview",
+            "--output-format=concise",
+        ])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("I=42\n"), @r###"
+    assert_cmd_snapshot!(cmd, @r###"
     success: false
     exit_code: 1
     ----- stdout -----

@@ -17,9 +17,8 @@ Settings path: "[BASEPATH]/pyproject.toml"
 cache_dir = "[BASEPATH]/.ruff_cache"
 fix = false
 fix_only = false
-output_format = text
+output_format = concise
 show_fixes = false
-show_source = false
 unsafe_fixes = hint
 
 # File Resolver Settings
