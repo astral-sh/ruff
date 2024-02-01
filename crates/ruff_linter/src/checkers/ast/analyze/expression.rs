@@ -16,8 +16,7 @@ use crate::rules::{
     flake8_future_annotations, flake8_gettext, flake8_implicit_str_concat, flake8_logging,
     flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_self,
     flake8_simplify, flake8_tidy_imports, flake8_trio, flake8_type_checking, flake8_use_pathlib,
-    flynt, numpy, pandas_vet, pep8_naming, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade,
-    refurb, ruff,
+    flynt, numpy, pandas_vet, pep8_naming, pycodestyle, pyflakes, pylint, pyupgrade, refurb, ruff,
 };
 use crate::settings::types::PythonVersion;
 
@@ -772,12 +771,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::CallDateFromtimestamp) {
                 flake8_datetimez::rules::call_date_fromtimestamp(checker, func, expr.range());
-            }
-            if checker.enabled(Rule::Eval) {
-                pygrep_hooks::rules::no_eval(checker, func);
-            }
-            if checker.enabled(Rule::DeprecatedLogWarn) {
-                pygrep_hooks::rules::deprecated_log_warn(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryDirectLambdaCall) {
                 pylint::rules::unnecessary_direct_lambda_call(checker, expr, func);
