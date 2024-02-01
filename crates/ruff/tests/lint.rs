@@ -614,7 +614,7 @@ x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssss
         .arg("--config")
         .arg(&ruff_toml)
         .args(["--config", "line-length=90"])
-        .args(["--config", "extend-select=['E501', 'F841']"])
+        .args(["--config", "lint.extend-select=['E501', 'F841']"])
         .args(["--config", "lint.isort.combine-as-imports = false"])
         .arg("-")
         .pass_stdin(fixture), @r###"
@@ -721,6 +721,8 @@ fn config_doubly_overridden_via_cli() -> Result<()> {
         &ruff_toml,
         r#"
 line-length = 100
+
+[lint]
 select=["E501"]
 "#,
     )?;
@@ -751,7 +753,7 @@ select=["E501"]
 fn complex_config_setting_overridden_via_cli() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_toml = tempdir.path().join("ruff.toml");
-    fs::write(&ruff_toml, "select = ['N801']")?;
+    fs::write(&ruff_toml, "lint.select = ['N801']")?;
     let fixture = "class violates_n801: pass";
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
