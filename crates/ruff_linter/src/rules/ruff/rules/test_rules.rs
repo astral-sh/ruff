@@ -254,6 +254,7 @@ impl TestRule for PreviewTestRule {
         ))
     }
 }
+
 /// ## What it does
 /// Fake rule for testing.
 ///
@@ -285,6 +286,150 @@ impl TestRule for NurseryTestRule {
     fn diagnostic(_locator: &Locator, _indexer: &Indexer) -> Option<Diagnostic> {
         Some(Diagnostic::new(
             NurseryTestRule,
+            ruff_text_size::TextRange::default(),
+        ))
+    }
+}
+
+/// ## What it does
+/// Fake rule for testing.
+///
+/// ## Why is this bad?
+/// Tests must pass!
+///
+/// ## Example
+/// ```python
+/// foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bar
+/// ```
+#[violation]
+pub struct DeprecatedTestRule;
+
+impl Violation for DeprecatedTestRule {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Hey this is a deprecated test rule.")
+    }
+}
+
+impl TestRule for DeprecatedTestRule {
+    fn diagnostic(_locator: &Locator, _indexer: &Indexer) -> Option<Diagnostic> {
+        Some(Diagnostic::new(
+            DeprecatedTestRule,
+            ruff_text_size::TextRange::default(),
+        ))
+    }
+}
+
+/// ## What it does
+/// Fake rule for testing.
+///
+/// ## Why is this bad?
+/// Tests must pass!
+///
+/// ## Example
+/// ```python
+/// foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bar
+/// ```
+#[violation]
+pub struct AnotherDeprecatedTestRule;
+
+impl Violation for AnotherDeprecatedTestRule {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Hey this is another deprecated test rule.")
+    }
+}
+
+impl TestRule for AnotherDeprecatedTestRule {
+    fn diagnostic(_locator: &Locator, _indexer: &Indexer) -> Option<Diagnostic> {
+        Some(Diagnostic::new(
+            AnotherDeprecatedTestRule,
+            ruff_text_size::TextRange::default(),
+        ))
+    }
+}
+
+/// ## What it does
+/// Fake rule for testing.
+///
+/// ## Why is this bad?
+/// Tests must pass!
+///
+/// ## Example
+/// ```python
+/// foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bar
+/// ```
+#[violation]
+pub struct RemovedTestRule;
+
+impl Violation for RemovedTestRule {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Hey this is a removed test rule.")
+    }
+}
+
+impl TestRule for RemovedTestRule {
+    fn diagnostic(_locator: &Locator, _indexer: &Indexer) -> Option<Diagnostic> {
+        Some(Diagnostic::new(
+            RemovedTestRule,
+            ruff_text_size::TextRange::default(),
+        ))
+    }
+}
+
+/// ## What it does
+/// Fake rule for testing.
+///
+/// ## Why is this bad?
+/// Tests must pass!
+///
+/// ## Example
+/// ```python
+/// foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bar
+/// ```
+#[violation]
+pub struct AnotherRemovedTestRule;
+
+impl Violation for AnotherRemovedTestRule {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Hey this is a another removed test rule.")
+    }
+}
+
+impl TestRule for AnotherRemovedTestRule {
+    fn diagnostic(_locator: &Locator, _indexer: &Indexer) -> Option<Diagnostic> {
+        Some(Diagnostic::new(
+            AnotherRemovedTestRule,
             ruff_text_size::TextRange::default(),
         ))
     }
