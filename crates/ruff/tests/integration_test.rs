@@ -826,7 +826,8 @@ fn nursery_prefix() {
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     -:1:1: RUF920 Hey this is a deprecated test rule.
     -:1:1: RUF921 Hey this is another deprecated test rule.
-    Found 6 errors.
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    Found 7 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
@@ -850,7 +851,8 @@ fn nursery_all() {
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     -:1:1: RUF920 Hey this is a deprecated test rule.
     -:1:1: RUF921 Hey this is another deprecated test rule.
-    Found 7 errors.
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    Found 8 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
@@ -929,7 +931,8 @@ fn preview_enabled_prefix() {
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     -:1:1: RUF911 Hey this is a preview test rule.
     -:1:1: RUF912 Hey this is a nursery test rule.
-    Found 6 errors.
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    Found 7 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
@@ -953,7 +956,8 @@ fn preview_enabled_all() {
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     -:1:1: RUF911 Hey this is a preview test rule.
     -:1:1: RUF912 Hey this is a nursery test rule.
-    Found 8 errors.
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    Found 9 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
@@ -1088,7 +1092,8 @@ fn preview_enabled_group_ignore() {
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     -:1:1: RUF911 Hey this is a preview test rule.
     -:1:1: RUF912 Hey this is a nursery test rule.
-    Found 6 errors.
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    Found 7 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
@@ -1142,6 +1147,53 @@ fn removed_indirect() {
     ----- stdout -----
 
     ----- stderr -----
+    "###);
+}
+
+#[test]
+fn redirect_direct() {
+    // Selection of a redirected rule directly should use the new rule and warn
+    let mut cmd = RuffCheck::default().args(["--select", "RUF940"]).build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    Found 1 error.
+
+    ----- stderr -----
+    warning: `RUF940` has been remapped to `RUF950`.
+    "###);
+}
+
+#[test]
+fn redirect_indirect() {
+    // Selection _including_ a redirected rule without matching should not fail
+    // nor should the rule be used
+    let mut cmd = RuffCheck::default().args(["--select", "RUF94"]).build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn redirect_prefix() {
+    // Selection using a redirected prefix should switch to all rules in the
+    // new prefix
+    let mut cmd = RuffCheck::default().args(["--select", "RUF96"]).build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    Found 1 error.
+
+    ----- stderr -----
+    warning: `RUF96` has been remapped to `RUF95`.
     "###);
 }
 
@@ -1770,7 +1822,8 @@ extend-safe-fixes = ["RUF9"]
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     -:1:1: RUF920 Hey this is a deprecated test rule.
     -:1:1: RUF921 Hey this is another deprecated test rule.
-    Found 6 errors.
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    Found 7 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
