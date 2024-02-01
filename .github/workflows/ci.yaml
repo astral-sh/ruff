@@ -117,7 +117,10 @@ jobs:
           tool: cargo-insta
       - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
-        run: cargo insta test --all --all-features --unreferenced reject
+        run: cargo insta test --all --exclude ruff_dev --all-features --unreferenced reject
+      - name: "Run dev tests"
+        # e.g. generating the schema — these should not run with all features enabled
+        run: cargo insta test -p ruff_dev --unreferenced reject
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
@@ -146,7 +149,7 @@ jobs:
       - name: "Run tests"
         shell: bash
         # We can't reject unreferenced snapshots on windows because flake8_executable can't run on windows
-        run: cargo insta test --all --all-features
+        run: cargo insta test --all --exclude ruff_dev --all-features
 
   cargo-test-wasm:
     name: "cargo test (wasm)"

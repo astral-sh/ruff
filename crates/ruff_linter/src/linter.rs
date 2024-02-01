@@ -33,6 +33,8 @@ use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rules::pycodestyle;
+#[cfg(feature = "test-rules")]
+use crate::rules::ruff::rules::test_rules::{self, TestRule, TEST_RULES};
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
 use crate::source_kind::SourceKind;
@@ -212,6 +214,34 @@ pub fn check_path(
         diagnostics.extend(check_physical_lines(
             locator, stylist, indexer, &doc_lines, settings,
         ));
+    }
+
+    // Raise violations for internal test rules
+    #[cfg(feature = "test-rules")]
+    {
+        for test_rule in TEST_RULES {
+            if !settings.rules.enabled(*test_rule) {
+                continue;
+            }
+            let diagnostic = match test_rule {
+                Rule::StableTestRule => test_rules::StableTestRule::diagnostic(locator, indexer),
+                Rule::StableTestRuleSafeFix => {
+                    test_rules::StableTestRuleSafeFix::diagnostic(locator, indexer)
+                }
+                Rule::StableTestRuleUnsafeFix => {
+                    test_rules::StableTestRuleUnsafeFix::diagnostic(locator, indexer)
+                }
+                Rule::StableTestRuleDisplayOnlyFix => {
+                    test_rules::StableTestRuleDisplayOnlyFix::diagnostic(locator, indexer)
+                }
+                Rule::NurseryTestRule => test_rules::NurseryTestRule::diagnostic(locator, indexer),
+                Rule::PreviewTestRule => test_rules::PreviewTestRule::diagnostic(locator, indexer),
+                _ => unreachable!("All test rules must have an implementation"),
+            };
+            if let Some(diagnostic) = diagnostic {
+                diagnostics.push(diagnostic);
+            }
+        }
     }
 
     // Ignore diagnostics based on per-file-ignores.
@@ -539,7 +569,7 @@ pub fn lint_fix<'a>(
                 // Increment the iteration count.
                 iterations += 1;
 
-                // Re-run the linter pass (by avoiding the break).
+                // Re-run the linter pass (by avoiding the return).
                 continue;
             }
 

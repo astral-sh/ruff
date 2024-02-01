@@ -1,0 +1,291 @@
+/// Fake rules for testing Ruff's behavior
+///
+/// All of these rules should be assigned to the RUF9XX codes.
+///
+/// Implementing a new test rule involves:
+///
+/// - Writing an empty struct for the rule
+/// - Adding to the rule registry
+/// - Adding to the `TEST_RULES` constant
+/// - Implementing `Violation` for the rule
+/// - Implementing `TestRule` for the rule
+/// - Adding a match arm in `linter::check_path`
+///
+/// Rules that provide a fix _must_ not raise unconditionally or the linter
+/// will not converge.
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_index::Indexer;
+use ruff_source_file::Locator;
+use ruff_text_size::TextSize;
+
+use crate::registry::Rule;
+
+/// Check if a comment exists anywhere in a the given file
+fn comment_exists(text: &str, locator: &Locator, indexer: &Indexer) -> bool {
+    for range in indexer.comment_ranges() {
+        let comment_text = locator.slice(range);
+        if text.trim_end() == comment_text {
+            return true;
+        }
+    }
+    false
+}
+
+pub(crate) const TEST_RULES: &[Rule] = &[
+    Rule::StableTestRule,
+    Rule::StableTestRuleSafeFix,
+    Rule::StableTestRuleUnsafeFix,
+    Rule::StableTestRuleDisplayOnlyFix,
+    Rule::PreviewTestRule,
+    Rule::NurseryTestRule,
+];
+
+pub(crate) trait TestRule {
+    fn diagnostic(locator: &Locator, indexer: &Indexer) -> Option<Diagnostic>;
+}
+
+/// ## What it does
+/// Fake rule for testing.
+///
+/// ## Why is this bad?
+/// Tests must pass!
+///
+/// ## Example
+/// ```python
+/// foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bar
+/// ```
+#[violation]
+pub struct StableTestRule;
+
+impl Violation for StableTestRule {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Hey this is a stable test rule.")
+    }
+}
+
+impl TestRule for StableTestRule {
+    fn diagnostic(_locator: &Locator, _indexer: &Indexer) -> Option<Diagnostic> {
+        Some(Diagnostic::new(
+            StableTestRule,
+            ruff_text_size::TextRange::default(),
+        ))
+    }
+}
+
+/// ## What it does
+/// Fake rule for testing.
+///
+/// ## Why is this bad?
+/// Tests must pass!
+///
+/// ## Example
+/// ```python
+/// foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bar
+/// ```
+#[violation]
+pub struct StableTestRuleSafeFix;
+
+impl Violation for StableTestRuleSafeFix {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Hey this is a stable test rule with a safe fix.")
+    }
+}
+
+impl TestRule for StableTestRuleSafeFix {
+    fn diagnostic(locator: &Locator, indexer: &Indexer) -> Option<Diagnostic> {
+        let comment = format!("# fix from stable-test-rule-safe-fix\n");
+        if comment_exists(&comment, locator, indexer) {
+            None
+        } else {
+            Some(
+                Diagnostic::new(StableTestRuleSafeFix, ruff_text_size::TextRange::default())
+                    .with_fix(Fix::safe_edit(Edit::insertion(
+                        comment.to_string(),
+                        TextSize::new(0),
+                    ))),
+            )
+        }
+    }
+}
+
+/// ## What it does
+/// Fake rule for testing.
+///
+/// ## Why is this bad?
+/// Tests must pass!
+///
+/// ## Example
+/// ```python
+/// foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bar
+/// ```
+#[violation]
+pub struct StableTestRuleUnsafeFix;
+
+impl Violation for StableTestRuleUnsafeFix {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Hey this is a stable test rule with an unsafe fix.")
+    }
+}
+
+impl TestRule for StableTestRuleUnsafeFix {
+    fn diagnostic(locator: &Locator, indexer: &Indexer) -> Option<Diagnostic> {
+        let comment = format!("# fix from stable-test-rule-unsafe-fix\n");
+        if comment_exists(&comment, locator, indexer) {
+            None
+        } else {
+            Some(
+                Diagnostic::new(
+                    StableTestRuleUnsafeFix,
+                    ruff_text_size::TextRange::default(),
+                )
+                .with_fix(Fix::unsafe_edit(Edit::insertion(
+                    comment.to_string(),
+                    TextSize::new(0),
+                ))),
+            )
+        }
+    }
+}
+
+/// ## What it does
+/// Fake rule for testing.
+///
+/// ## Why is this bad?
+/// Tests must pass!
+///
+/// ## Example
+/// ```python
+/// foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bar
+/// ```
+#[violation]
+pub struct StableTestRuleDisplayOnlyFix;
+
+impl Violation for StableTestRuleDisplayOnlyFix {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Hey this is a stable test rule with a display only fix.")
+    }
+}
+
+impl TestRule for StableTestRuleDisplayOnlyFix {
+    fn diagnostic(locator: &Locator, indexer: &Indexer) -> Option<Diagnostic> {
+        let comment = format!("# fix from stable-test-rule-display-only-fix\n");
+        if comment_exists(&comment, locator, indexer) {
+            None
+        } else {
+            Some(
+                Diagnostic::new(
+                    StableTestRuleDisplayOnlyFix,
+                    ruff_text_size::TextRange::default(),
+                )
+                .with_fix(Fix::display_only_edit(Edit::insertion(
+                    comment.to_string(),
+                    TextSize::new(0),
+                ))),
+            )
+        }
+    }
+}
+
+/// ## What it does
+/// Fake rule for testing.
+///
+/// ## Why is this bad?
+/// Tests must pass!
+///
+/// ## Example
+/// ```python
+/// foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bar
+/// ```
+#[violation]
+pub struct PreviewTestRule;
+
+impl Violation for PreviewTestRule {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Hey this is a preview test rule.")
+    }
+}
+
+impl TestRule for PreviewTestRule {
+    fn diagnostic(_locator: &Locator, _indexer: &Indexer) -> Option<Diagnostic> {
+        Some(Diagnostic::new(
+            PreviewTestRule,
+            ruff_text_size::TextRange::default(),
+        ))
+    }
+}
+/// ## What it does
+/// Fake rule for testing.
+///
+/// ## Why is this bad?
+/// Tests must pass!
+///
+/// ## Example
+/// ```python
+/// foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bar
+/// ```
+#[violation]
+pub struct NurseryTestRule;
+
+impl Violation for NurseryTestRule {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Hey this is a nursery test rule.")
+    }
+}
+
+impl TestRule for NurseryTestRule {
+    fn diagnostic(_locator: &Locator, _indexer: &Indexer) -> Option<Diagnostic> {
+        Some(Diagnostic::new(
+            NurseryTestRule,
+            ruff_text_size::TextRange::default(),
+        ))
+    }
+}

@@ -934,6 +934,20 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "026") => (RuleGroup::Preview, rules::ruff::rules::DefaultFactoryKwarg),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
+        #[cfg(feature = "test-rules")]
+        (Ruff, "900") => (RuleGroup::Stable, rules::ruff::rules::StableTestRule),
+        #[cfg(feature = "test-rules")]
+        (Ruff, "901") => (RuleGroup::Stable, rules::ruff::rules::StableTestRuleSafeFix),
+        #[cfg(feature = "test-rules")]
+        (Ruff, "902") => (RuleGroup::Stable, rules::ruff::rules::StableTestRuleUnsafeFix),
+        #[cfg(feature = "test-rules")]
+        (Ruff, "903") => (RuleGroup::Stable, rules::ruff::rules::StableTestRuleDisplayOnlyFix),
+        #[cfg(feature = "test-rules")]
+        (Ruff, "911") => (RuleGroup::Preview, rules::ruff::rules::PreviewTestRule),
+        #[cfg(feature = "test-rules")]
+        #[allow(deprecated)]
+        (Ruff, "912") => (RuleGroup::Nursery, rules::ruff::rules::NurseryTestRule),
+
 
         // flake8-django
         (Flake8Django, "001") => (RuleGroup::Stable, rules::flake8_django::rules::DjangoNullableModelStringField),
