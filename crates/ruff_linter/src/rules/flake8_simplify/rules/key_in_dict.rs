@@ -31,11 +31,9 @@ use crate::checkers::ast::Checker;
 /// ## Fix safety
 /// Given `key in obj.keys()`, `obj` _could_ be a dictionary, or it could be
 /// another type that defines a `.keys()` method. In the latter case, removing
-/// the `.keys()` attribute could lead to a runtime error.
-///
-/// As such, this rule's fixes are marked as unsafe. In [preview], though,
-/// fixes are marked as safe when Ruff can determine that `obj` is a
-/// dictionary.
+/// the `.keys()` attribute could lead to a runtime error. The fix is marked
+/// as safe when the type of `obj` is known to be a dictionary; otherwise, it
+/// is marked as unsafe.
 ///
 /// ## References
 /// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
