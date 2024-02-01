@@ -1162,6 +1162,7 @@ fn redirect_direct() {
     Found 1 error.
 
     ----- stderr -----
+    warning: `RUF940` has been remapped to `RUF950`.
     "###);
 }
 

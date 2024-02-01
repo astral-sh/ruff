@@ -940,6 +940,10 @@ impl LintConfiguration {
                 if let RuleSelector::Prefix {
                     prefix,
                     redirected_from: Some(redirect_from),
+                }
+                | RuleSelector::Rule {
+                    prefix,
+                    redirected_from: Some(redirect_from),
                 } = selector
                 {
                     redirects.insert(redirect_from, prefix);
