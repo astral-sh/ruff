@@ -756,8 +756,8 @@ fn full_output_preview() {
 }
 
 #[test]
-fn full_output_preview_config() {
-    let tempdir = TempDir::new().unwrap();
+fn full_output_preview_config() -> Result<()> {
+    let tempdir = TempDir::new()?;
     let pyproject_toml = tempdir.path().join("pyproject.toml");
     fs::write(
         &pyproject_toml,
@@ -765,8 +765,7 @@ fn full_output_preview_config() {
 [tool.ruff]
 preview = true
 "#,
-    )
-    .unwrap();
+    )?;
     let mut cmd = RuffCheck::default().config(&pyproject_toml).build();
     assert_cmd_snapshot!(cmd.pass_stdin("l = 1"), @r###"
     success: false
@@ -782,6 +781,7 @@ preview = true
 
     ----- stderr -----
     "###);
+    Ok(())
 }
 
 #[test]
