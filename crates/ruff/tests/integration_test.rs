@@ -1181,6 +1181,23 @@ fn redirect_indirect() {
 }
 
 #[test]
+fn redirect_prefix() {
+    // Selection using a redirected prefix should switch to all rules in the
+    // new prefix
+    let mut cmd = RuffCheck::default().args(["--select", "RUF96"]).build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    Found 1 error.
+
+    ----- stderr -----
+    warning: `RUF96` has been remapped to `RUF95`.
+    "###);
+}
+
+#[test]
 fn deprecated_direct() {
     // Selection of a deprecated rule without preview enabled should still work
     // but a warning should be displayed

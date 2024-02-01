@@ -252,6 +252,9 @@ pub fn check_path(
                 Rule::RedirectedFromTestRule => {
                     test_rules::RedirectedFromTestRule::diagnostic(locator, indexer)
                 }
+                Rule::RedirectedFromPrefixTestRule => {
+                    test_rules::RedirectedFromPrefixTestRule::diagnostic(locator, indexer)
+                }
                 _ => unreachable!("All test rules must have an implementation"),
             };
             if let Some(diagnostic) = diagnostic {

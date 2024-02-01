@@ -45,6 +45,7 @@ pub(crate) const TEST_RULES: &[Rule] = &[
     Rule::AnotherRemovedTestRule,
     Rule::RedirectedFromTestRule,
     Rule::RedirectedToTestRule,
+    Rule::RedirectedFromPrefixTestRule,
 ];
 
 pub(crate) trait TestRule {
@@ -508,6 +509,42 @@ impl TestRule for RedirectedToTestRule {
     fn diagnostic(_locator: &Locator, _indexer: &Indexer) -> Option<Diagnostic> {
         Some(Diagnostic::new(
             RedirectedToTestRule,
+            ruff_text_size::TextRange::default(),
+        ))
+    }
+}
+
+/// ## What it does
+/// Fake rule for testing.
+///
+/// ## Why is this bad?
+/// Tests must pass!
+///
+/// ## Example
+/// ```python
+/// foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bar
+/// ```
+#[violation]
+pub struct RedirectedFromPrefixTestRule;
+
+impl Violation for RedirectedFromPrefixTestRule {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Hey this is a test rule that was redirected to another by prefix.")
+    }
+}
+
+impl TestRule for RedirectedFromPrefixTestRule {
+    fn diagnostic(_locator: &Locator, _indexer: &Indexer) -> Option<Diagnostic> {
+        Some(Diagnostic::new(
+            RedirectedFromPrefixTestRule,
             ruff_text_size::TextRange::default(),
         ))
     }
