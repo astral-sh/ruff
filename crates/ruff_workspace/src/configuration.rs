@@ -951,7 +951,7 @@ impl LintConfiguration {
             }
         }
 
-        let removed_selectors = removed_selectors.iter().collect::<Vec<_>>();
+        let removed_selectors = removed_selectors.iter().sorted().collect::<Vec<_>>();
         match removed_selectors.as_slice() {
             [] => (),
             [selection] => {
@@ -974,7 +974,7 @@ impl LintConfiguration {
             }
         }
 
-        for (from, target) in redirects {
+        for (from, target) in redirects.iter().sorted_by_key(|item| item.0) {
             // TODO(martin): This belongs into the ruff crate.
             warn_user_once_by_id!(
                 from,
@@ -984,7 +984,10 @@ impl LintConfiguration {
             );
         }
 
-        let deprecated_nursery_selectors = deprecated_nursery_selectors.iter().collect::<Vec<_>>();
+        let deprecated_nursery_selectors = deprecated_nursery_selectors
+            .iter()
+            .sorted()
+            .collect::<Vec<_>>();
         match deprecated_nursery_selectors.as_slice() {
             [] => (),
             [selection] => {
@@ -1005,14 +1008,14 @@ impl LintConfiguration {
         }
 
         if preview.mode.is_disabled() {
-            for selection in deprecated_selectors {
+            for selection in deprecated_selectors.iter().sorted() {
                 let (prefix, code) = selection.prefix_and_code();
                 warn_user!(
                     "Rule `{prefix}{code}` is deprecated and will be removed in a future release.",
                 );
             }
         } else {
-            let deprecated_selectors = deprecated_selectors.iter().collect::<Vec<_>>();
+            let deprecated_selectors = deprecated_selectors.iter().sorted().collect::<Vec<_>>();
             match deprecated_selectors.as_slice() {
                 [] => (),
                 [selection] => {
@@ -1033,7 +1036,7 @@ impl LintConfiguration {
             }
         }
 
-        for selection in ignored_preview_selectors {
+        for selection in ignored_preview_selectors.iter().sorted() {
             let (prefix, code) = selection.prefix_and_code();
             warn_user!("Selection `{prefix}{code}` has no effect because preview is not enabled.",);
         }

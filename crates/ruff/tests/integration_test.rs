@@ -1228,8 +1228,8 @@ fn deprecated_multiple_direct() {
     Found 2 errors.
 
     ----- stderr -----
-    warning: Rule `RUF921` is deprecated and will be removed in a future release.
     warning: Rule `RUF920` is deprecated and will be removed in a future release.
+    warning: Rule `RUF921` is deprecated and will be removed in a future release.
     "###);
 }
 
@@ -1297,8 +1297,8 @@ fn deprecated_multiple_direct_preview_enabled() {
     ----- stderr -----
     ruff failed
       Cause: Selection of deprecated rules is not allowed when preview is enabled. Remove selection of:
-    	- RUF921
     	- RUF920
+    	- RUF921
 
     "###);
 }

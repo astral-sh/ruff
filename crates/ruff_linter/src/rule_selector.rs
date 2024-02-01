@@ -44,6 +44,20 @@ impl From<Linter> for RuleSelector {
     }
 }
 
+impl Ord for RuleSelector {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // TODO(zanieb): We ought to put "ALL" and "Linter" selectors
+        // above those that are rule specific but it's not critical for now
+        self.prefix_and_code().cmp(&other.prefix_and_code())
+    }
+}
+
+impl PartialOrd for RuleSelector {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl FromStr for RuleSelector {
     type Err = ParseError;
 

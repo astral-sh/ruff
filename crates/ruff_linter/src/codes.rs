@@ -922,6 +922,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "008") => (RuleGroup::Stable, rules::ruff::rules::MutableDataclassDefault),
         (Ruff, "009") => (RuleGroup::Stable, rules::ruff::rules::FunctionCallInDataclassDefaultArgument),
         (Ruff, "010") => (RuleGroup::Stable, rules::ruff::rules::ExplicitFStringTypeConversion),
+        (Ruff, "011") => (RuleGroup::Removed, rules::ruff::rules::RuffStaticKeyDictComprehension),
         (Ruff, "012") => (RuleGroup::Stable, rules::ruff::rules::MutableClassDefault),
         (Ruff, "013") => (RuleGroup::Stable, rules::ruff::rules::ImplicitOptional),
         (Ruff, "015") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryIterableAllocationForFirstElement),
