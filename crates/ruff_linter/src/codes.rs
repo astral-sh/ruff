@@ -959,6 +959,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "930") => (RuleGroup::Removed, rules::ruff::rules::RemovedTestRule),
         #[cfg(feature = "test-rules")]
         (Ruff, "931") => (RuleGroup::Removed, rules::ruff::rules::AnotherRemovedTestRule),
+        #[cfg(feature = "test-rules")]
+        (Ruff, "940") => (RuleGroup::Removed, rules::ruff::rules::RedirectedFromTestRule),
+        #[cfg(feature = "test-rules")]
+        (Ruff, "950") => (RuleGroup::Stable, rules::ruff::rules::RedirectedToTestRule),
 
 
         // flake8-django

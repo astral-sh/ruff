@@ -43,6 +43,8 @@ pub(crate) const TEST_RULES: &[Rule] = &[
     Rule::AnotherDeprecatedTestRule,
     Rule::RemovedTestRule,
     Rule::AnotherRemovedTestRule,
+    Rule::RedirectedFromTestRule,
+    Rule::RedirectedToTestRule,
 ];
 
 pub(crate) trait TestRule {
@@ -434,6 +436,78 @@ impl TestRule for AnotherRemovedTestRule {
     fn diagnostic(_locator: &Locator, _indexer: &Indexer) -> Option<Diagnostic> {
         Some(Diagnostic::new(
             AnotherRemovedTestRule,
+            ruff_text_size::TextRange::default(),
+        ))
+    }
+}
+
+/// ## What it does
+/// Fake rule for testing.
+///
+/// ## Why is this bad?
+/// Tests must pass!
+///
+/// ## Example
+/// ```python
+/// foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bar
+/// ```
+#[violation]
+pub struct RedirectedFromTestRule;
+
+impl Violation for RedirectedFromTestRule {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Hey this is a test rule that was redirected to another.")
+    }
+}
+
+impl TestRule for RedirectedFromTestRule {
+    fn diagnostic(_locator: &Locator, _indexer: &Indexer) -> Option<Diagnostic> {
+        Some(Diagnostic::new(
+            RedirectedFromTestRule,
+            ruff_text_size::TextRange::default(),
+        ))
+    }
+}
+
+/// ## What it does
+/// Fake rule for testing.
+///
+/// ## Why is this bad?
+/// Tests must pass!
+///
+/// ## Example
+/// ```python
+/// foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bar
+/// ```
+#[violation]
+pub struct RedirectedToTestRule;
+
+impl Violation for RedirectedToTestRule {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Hey this is a test rule that was redirected from another.")
+    }
+}
+
+impl TestRule for RedirectedToTestRule {
+    fn diagnostic(_locator: &Locator, _indexer: &Indexer) -> Option<Diagnostic> {
+        Some(Diagnostic::new(
+            RedirectedToTestRule,
             ruff_text_size::TextRange::default(),
         ))
     }

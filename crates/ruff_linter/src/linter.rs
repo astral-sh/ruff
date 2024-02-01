@@ -246,6 +246,12 @@ pub fn check_path(
                 Rule::AnotherRemovedTestRule => {
                     test_rules::AnotherRemovedTestRule::diagnostic(locator, indexer)
                 }
+                Rule::RedirectedToTestRule => {
+                    test_rules::RedirectedToTestRule::diagnostic(locator, indexer)
+                }
+                Rule::RedirectedFromTestRule => {
+                    test_rules::RedirectedFromTestRule::diagnostic(locator, indexer)
+                }
                 _ => unreachable!("All test rules must have an implementation"),
             };
             if let Some(diagnostic) = diagnostic {
