@@ -54,7 +54,7 @@ impl Ord for RuleSelector {
 
 impl PartialOrd for RuleSelector {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.prefix_and_code().partial_cmp(&other.prefix_and_code())
+        Some(self.cmp(other))
     }
 }
 
