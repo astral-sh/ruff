@@ -108,11 +108,11 @@ pub(crate) fn intersection_all<'a, T: PartialEq>(
         }
         // Then remove all of the items that are not present in each of the
         // remaining slices
-        while let Some(slice) = slices.next() {
+        for slice in slices {
             let mut mismatches = Vec::with_capacity(slice.len());
             for (idx, item) in intersection.iter().enumerate() {
                 if !slice.contains(item) {
-                    mismatches.push(idx)
+                    mismatches.push(idx);
                 }
             }
             for idx in mismatches {
