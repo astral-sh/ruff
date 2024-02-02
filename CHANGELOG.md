@@ -13,8 +13,8 @@ See also, the "Remapped rules" section which may result in disabled rules.
 
 The following rules are now deprecated:
 
-- [`missing-type-function-argument`](https://docs.astral.sh/ruff/rules/missing-type-function-argument/) (`ANN001`)
-- [`missing-type-args`](https://docs.astral.sh/ruff/rules/missing-type-args/) (`ANN002`)
+- [`missing-type-self`](https://docs.astral.sh/ruff/rules/missing-type-self/) (`ANN101`)
+- [`missing-type-cls`](https://docs.astral.sh/ruff/rules/missing-type-cls/) (`ANN102`)
 
 The following command line options are now deprecated:
 
