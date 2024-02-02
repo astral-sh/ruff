@@ -564,10 +564,11 @@ RUF023.py:162:17: RUF023 [*] `BezierBuilder.__slots__` is not sorted
     162 |+    __slots__ = (
     163 |+        'canvas',
     164 |+        'xp',
-    165 |+        'yp',)
-164 166 | 
-165 167 | class BezierBuilder2:
-166 168 |     __slots__ = {'xp', 'yp',
+    165 |+        'yp',
+    166 |+    )
+164 167 | 
+165 168 | class BezierBuilder2:
+166 169 |     __slots__ = {'xp', 'yp',
 
 RUF023.py:166:17: RUF023 [*] `BezierBuilder2.__slots__` is not sorted
     |

@@ -922,7 +922,16 @@ fn multiline_string_sequence_postlude<'a>(
     // ```
     let newline_chars = ['\r', '\n'];
     if !postlude.starts_with(newline_chars) {
-        return Cow::Borrowed(postlude);
+        // Special-case a few common situations so we can get formatting for the closing
+        // parenthesis that is similar to what the formatter would produce
+        return match postlude {
+            ")" | "]" | "}" => Cow::Owned(format!("{newline}{leading_indent}{postlude}")),
+            ",)" | ",]" | ",}" => {
+                let closing_paren = postlude.chars().last().unwrap();
+                Cow::Owned(format!(",{newline}{leading_indent}{closing_paren}"))
+            }
+            _ => Cow::Borrowed(postlude),
+        };
     }
     if TextSize::of(leading_indentation(
         postlude.trim_start_matches(newline_chars),
