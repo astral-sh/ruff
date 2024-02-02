@@ -340,18 +340,18 @@ impl<Context> Format<Context> for SourcePosition {
     }
 }
 
-/// Creates a text from a dynamic string with its optional start-position in the source document.
+/// Creates a text from a dynamic string.
+///
 /// This is done by allocating a new string internally.
-pub fn text(text: &str, position: Option<TextSize>) -> Text {
+pub fn text(text: &str) -> Text {
     debug_assert_no_newlines(text);
 
-    Text { text, position }
+    Text { text }
 }
 
 #[derive(Eq, PartialEq)]
 pub struct Text<'a> {
     text: &'a str,
-    position: Option<TextSize>,
 }
 
 impl<Context> Format<Context> for Text<'_>
@@ -359,10 +359,6 @@ where
     Context: FormatContext,
 {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        if let Some(position) = self.position {
-            source_position(position).fmt(f)?;
-        }
-
         f.write_element(FormatElement::Text {
             text: self.text.to_string().into_boxed_str(),
             text_width: TextWidth::from_text(self.text, f.options().indent_width()),

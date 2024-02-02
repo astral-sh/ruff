@@ -4,7 +4,7 @@ use drop_bomb::DebugDropBomb;
 use unicode_width::UnicodeWidthChar;
 
 pub use printer_options::*;
-use ruff_text_size::{Ranged, TextLen, TextSize};
+use ruff_text_size::{TextLen, TextSize};
 
 use crate::format_element::document::Document;
 use crate::format_element::tag::{Condition, GroupMode};
@@ -76,6 +76,9 @@ impl<'a> Printer<'a> {
             }
         }
 
+        // Push any pending marker
+        self.push_marker();
+
         Ok(Printed::new(
             self.state.buffer,
             None,
@@ -97,42 +100,38 @@ impl<'a> Printer<'a> {
         let args = stack.top();
 
         match element {
-            FormatElement::Space => self.print_text(Text::Token(" "), None),
-            FormatElement::Token { text } => self.print_text(Text::Token(text), None),
-            FormatElement::Text { text, text_width } => self.print_text(
-                Text::Text {
-                    text,
-                    text_width: *text_width,
-                },
-                None,
-            ),
+            FormatElement::Space => self.print_text(Text::Token(" ")),
+            FormatElement::Token { text } => self.print_text(Text::Token(text)),
+            FormatElement::Text { text, text_width } => self.print_text(Text::Text {
+                text,
+                text_width: *text_width,
+            }),
             FormatElement::SourceCodeSlice { slice, text_width } => {
                 let text = slice.text(self.source_code);
-                self.print_text(
-                    Text::Text {
-                        text,
-                        text_width: *text_width,
-                    },
-                    Some(slice.range()),
-                );
+                self.print_text(Text::Text {
+                    text,
+                    text_width: *text_width,
+                });
             }
             FormatElement::Line(line_mode) => {
                 if args.mode().is_flat()
                     && matches!(line_mode, LineMode::Soft | LineMode::SoftOrSpace)
                 {
                     if line_mode == &LineMode::SoftOrSpace {
-                        self.print_text(Text::Token(" "), None);
+                        self.print_text(Text::Token(" "));
                     }
                 } else if self.state.line_suffixes.has_pending() {
                     self.flush_line_suffixes(queue, stack, Some(element));
                 } else {
                     // Only print a newline if the current line isn't already empty
                     if self.state.line_width > 0 {
+                        self.push_marker();
                         self.print_char('\n');
                     }
 
                     // Print a second line break if this is an empty line
                     if line_mode == &LineMode::Empty {
+                        self.push_marker();
                         self.print_char('\n');
                     }
 
@@ -145,14 +144,11 @@ impl<'a> Printer<'a> {
             }
 
             FormatElement::SourcePosition(position) => {
-                self.state.source_position = *position;
                 // The printer defers printing indents until the next text
                 // is printed. Pushing the marker now would mean that the
                 // mapped range includes the indent range, which we don't want.
-                // Only add a marker if we're not in an indented context, e.g. at the end of the file.
-                if self.state.pending_indent.is_empty() {
-                    self.push_marker();
-                }
+                // Queue the source map position and emit it when printing the next character
+                self.state.pending_source_position = Some(*position);
             }
 
             FormatElement::LineSuffixBoundary => {
@@ -444,7 +440,7 @@ impl<'a> Printer<'a> {
         Ok(print_mode)
     }
 
-    fn print_text(&mut self, text: Text, source_range: Option<TextRange>) {
+    fn print_text(&mut self, text: Text) {
         if !self.state.pending_indent.is_empty() {
             let (indent_char, repeat_count) = match self.options.indent_style() {
                 IndentStyle::Tab => ('\t', 1),
@@ -465,19 +461,6 @@ impl<'a> Printer<'a> {
             for _ in 0..indent.align() {
                 self.print_char(' ');
             }
-        }
-
-        // Insert source map markers before and after the token
-        //
-        // If the token has source position information the start marker
-        // will use the start position of the original token, and the end
-        // marker will use that position + the text length of the token
-        //
-        // If the token has no source position (was created by the formatter)
-        // both the start and end marker will use the last known position
-        // in the input source (from state.source_position)
-        if let Some(range) = source_range {
-            self.state.source_position = range.start();
         }
 
         self.push_marker();
@@ -502,21 +485,15 @@ impl<'a> Printer<'a> {
                 }
             }
         }
-
-        if let Some(range) = source_range {
-            self.state.source_position = range.end();
-        }
-
-        self.push_marker();
     }
 
     fn push_marker(&mut self) {
-        if self.options.source_map_generation.is_disabled() {
+        let Some(source_position) = self.state.pending_source_position.take() else {
             return;
-        }
+        };
 
         let marker = SourceMarker {
-            source: self.state.source_position,
+            source: source_position,
             dest: self.state.buffer.text_len(),
         };
 
@@ -897,7 +874,7 @@ enum FillPairLayout {
 struct PrinterState<'a> {
     buffer: String,
     source_markers: Vec<SourceMarker>,
-    source_position: TextSize,
+    pending_source_position: Option<TextSize>,
     pending_indent: Indention,
     measured_group_fits: bool,
     line_width: u32,

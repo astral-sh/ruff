@@ -752,7 +752,14 @@ impl Format<PyFormatContext<'_>> for FormatVerbatimStatementRange {
                 }
             } else {
                 // Non empty line, write the text of the line
-                verbatim_text(trimmed_line_range).fmt(f)?;
+                write!(
+                    f,
+                    [
+                        source_position(trimmed_line_range.start()),
+                        verbatim_text(trimmed_line_range),
+                        source_position(trimmed_line_range.end())
+                    ]
+                )?;
 
                 // Write the line separator that terminates the line, except if it is the last line (that isn't separated by a hard line break).
                 if logical_line.has_trailing_newline {
@@ -892,13 +899,7 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
                 write!(f, [source_text_slice(self.verbatim_range)])?;
             }
             Cow::Owned(cleaned) => {
-                write!(
-                    f,
-                    [
-                        text(&cleaned, Some(self.verbatim_range.start())),
-                        source_position(self.verbatim_range.end())
-                    ]
-                )?;
+                text(&cleaned).fmt(f)?;
             }
         }
 
@@ -957,7 +958,9 @@ impl Format<PyFormatContext<'_>> for FormatSuppressedNode<'_> {
             f,
             [
                 leading_comments(node_comments.leading),
+                source_position(verbatim_range.start()),
                 verbatim_text(verbatim_range),
+                source_position(verbatim_range.end()),
                 trailing_comments(node_comments.trailing)
             ]
         )
@@ -969,8 +972,17 @@ pub(crate) fn write_suppressed_clause_header(
     header: ClauseHeader,
     f: &mut PyFormatter,
 ) -> FormatResult<()> {
+    let range = header.range(f.context().source())?;
+
     // Write the outer comments and format the node as verbatim
-    write!(f, [verbatim_text(header.range(f.context().source())?)])?;
+    write!(
+        f,
+        [
+            source_position(range.start()),
+            verbatim_text(range),
+            source_position(range.end())
+        ]
+    )?;
 
     let comments = f.context().comments();
     header.visit(&mut |child| {

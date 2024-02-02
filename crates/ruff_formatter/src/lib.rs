@@ -41,7 +41,7 @@ use std::marker::PhantomData;
 use std::num::{NonZeroU16, NonZeroU8, TryFromIntError};
 
 use crate::format_element::document::Document;
-use crate::printer::{Printer, PrinterOptions, SourceMapGeneration};
+use crate::printer::{Printer, PrinterOptions};
 pub use arguments::{Argument, Arguments};
 pub use buffer::{
     Buffer, BufferExtensions, BufferSnapshot, Inspect, RemoveSoftLinesBuffer, VecBuffer,
@@ -269,7 +269,6 @@ impl FormatOptions for SimpleFormatOptions {
             line_width: self.line_width,
             indent_style: self.indent_style,
             indent_width: self.indent_width,
-            source_map_generation: SourceMapGeneration::Enabled,
             ..PrinterOptions::default()
         }
     }

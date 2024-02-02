@@ -300,7 +300,7 @@ def main() -> None:
                     while let Some(word) = words.next() {
                         let is_last = words.peek().is_none();
                         let format_word = format_with(|f| {
-                            write!(f, [text(word, None)])?;
+                            write!(f, [text(word)])?;
 
                             if is_last {
                                 write!(f, [token("\"")])?;

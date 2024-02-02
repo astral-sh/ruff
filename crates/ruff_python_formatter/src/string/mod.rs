@@ -417,7 +417,7 @@ impl Format<PyFormatContext<'_>> for NormalizedString<'_> {
                 source_text_slice(self.range()).fmt(f)?;
             }
             Cow::Owned(normalized) => {
-                text(normalized, Some(self.start())).fmt(f)?;
+                text(normalized).fmt(f)?;
             }
         }
         self.quotes.fmt(f)
