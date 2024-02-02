@@ -654,7 +654,10 @@ Options:
           Enable preview mode; enables unstable formatting. Use `--no-preview`
           to disable
       --range <RANGE>
-          Format code in the given <RANGE>
+          Formats code in the specified range. When specified, Ruff will try to
+          only format the code in the given range but it might be necessary to
+          extend the start backwards or the end forwards, e.g. to the start or
+          end of the logical line
   -h, --help
           Print help (see more with '--help')
 
