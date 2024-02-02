@@ -13,7 +13,7 @@ def escaped_string():
 def raw_string():
     a = 4
     b = r"raw string with formatting: {a}" # RUF027
-    c = r"raw string with \backslashes\ and \"escaped quotes\": {a}"
+    c = r"raw string with \backslashes\ and \"escaped quotes\": {a}" # RUF027
 
 def print_name(name: str):
     a = 4
@@ -46,10 +46,11 @@ def single_quoted_multi_line():
 def implicit_concat():
     a = 4
     b = "{a}" "+" "{b}" r" \\ " # RUF027 for the first part only
+    print(f"{a}" "{a}" f"{b}") # RUF027
 
 def escaped_chars():
     a = 4
-    b = "\"escaped:\" \'{a}\' \"not escaped:\": \'{{c}}\'" # RUF027
+    b = "\"not escaped:\" \'{a}\' \"escaped:\": \'{{c}}\'" # RUF027
 
 def alternative_formatter(src, **kwargs):
     src.format(**kwargs)

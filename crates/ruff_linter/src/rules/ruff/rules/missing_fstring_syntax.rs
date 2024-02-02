@@ -52,7 +52,7 @@ impl AlwaysFixableViolation for MissingFStringSyntax {
 
 pub(crate) fn missing_fstring_syntax(
     diagnostics: &mut Vec<Diagnostic>,
-    string_like: ast::StringLike,
+    literal: &ast::StringLiteral,
     locator: &Locator,
     semantic: &SemanticModel,
 ) {
@@ -65,27 +65,10 @@ pub(crate) fn missing_fstring_syntax(
         }
     }
 
-    let mut check = |source, range: TextRange| {
-        if should_be_fstring(source, range, locator, semantic) {
-            let diagnostic =
-                Diagnostic::new(MissingFStringSyntax, range).with_fix(fix_fstring_syntax(range));
-            diagnostics.push(diagnostic);
-        }
-    };
-
-    match string_like {
-        ast::StringLike::StringLiteral(string_literal) => {
-            for literal in string_literal.value.as_slice() {
-                check(&literal.value, literal.range());
-            }
-        }
-        ast::StringLike::BytesLiteral(_) => {}
-        ast::StringLike::FStringLiteral(fstring_literal_element) => {
-            check(
-                &fstring_literal_element.value,
-                fstring_literal_element.range(),
-            );
-        }
+    if should_be_fstring(literal, locator, semantic) {
+        let diagnostic = Diagnostic::new(MissingFStringSyntax, literal.range())
+            .with_fix(fix_fstring_syntax(literal.range()));
+        diagnostics.push(diagnostic);
     }
 }
 
@@ -107,17 +90,16 @@ pub(crate) fn missing_fstring_syntax(
 /// that literal should return `false`.
 /// ```
 pub(super) fn should_be_fstring(
-    source: &str,
-    range: TextRange,
+    literal: &ast::StringLiteral,
     locator: &Locator,
     semantic: &SemanticModel,
 ) -> bool {
-    if !has_brackets(source) {
+    if !has_brackets(&literal.value) {
         return false;
     }
 
     let Ok(ast::Expr::FString(ast::ExprFString { value, .. })) =
-        parse_expression(&format!("f{}", locator.slice(range)))
+        parse_expression(&format!("f{}", locator.slice(literal.range())))
     else {
         return false;
     };
