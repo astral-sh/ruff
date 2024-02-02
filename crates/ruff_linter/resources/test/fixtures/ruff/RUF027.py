@@ -4,7 +4,6 @@ def simple_cases():
     a = 4
     b = "{a}" # RUF027
     c = "{a} {b} f'{val}' " # RUF027
-    uppercase = "{a}".to_upper() # RUF027
 
 def escaped_string():
     a = 4
@@ -55,6 +54,9 @@ def escaped_chars():
 def alternative_formatter(src, **kwargs):
     src.format(**kwargs)
 
+def format2(src, *args):
+    pass
+
 # These should not cause an RUF027 message
 def negative_cases():
     a = 4
@@ -72,10 +74,12 @@ def negative_cases():
     print(do_nothing("{a}".format(a=3)))
     print(do_nothing(alternative_formatter("{a}", a = 5)))
     print(format(do_nothing("{a}"), a = 5))
+    print("{a}".to_upper())
     print(do_nothing("{a}").format(a = "Test"))
+    print(do_nothing("{a}").format2(a))
 
 a = 4
 
 "always ignore this: {a}"
 
-print("but don't ignore this: {val}")
+print("but don't ignore this: {val}") # RUF027

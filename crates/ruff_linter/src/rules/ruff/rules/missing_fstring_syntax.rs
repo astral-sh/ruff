@@ -112,12 +112,13 @@ fn should_be_fstring(
         match expr {
             ast::Expr::Call(ast::ExprCall {
                 arguments: ast::Arguments { keywords, .. },
+                func,
                 ..
-            }) => kwargs.extend(keywords.iter()),
-            ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => {
-                if let ast::Expr::Call(ast::ExprCall { .. }) = value.as_ref() {
+            }) => {
+                if let ast::Expr::Attribute(ast::ExprAttribute { .. }) = func.as_ref() {
                     return false;
                 }
+                kwargs.extend(keywords.iter());
             }
             _ => continue,
         }
