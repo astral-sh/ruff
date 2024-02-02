@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -45,6 +45,10 @@ impl Violation for DjangoLocalsInRenderFunction {
 
 /// DJ003
 pub(crate) fn locals_in_render_function(checker: &mut Checker, call: &ast::ExprCall) {
+    if !checker.semantic().seen_module(Modules::DJANGO) {
+        return;
+    }
+
     if !checker
         .semantic()
         .resolve_call_path(&call.func)

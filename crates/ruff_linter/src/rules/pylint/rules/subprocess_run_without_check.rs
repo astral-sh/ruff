@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -60,6 +61,10 @@ impl AlwaysFixableViolation for SubprocessRunWithoutCheck {
 
 /// PLW1510
 pub(crate) fn subprocess_run_without_check(checker: &mut Checker, call: &ast::ExprCall) {
+    if !checker.semantic().seen_module(Modules::SUBPROCESS) {
+        return;
+    }
+
     if checker
         .semantic()
         .resolve_call_path(&call.func)

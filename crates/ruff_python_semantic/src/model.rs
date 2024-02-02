@@ -120,6 +120,9 @@ pub struct SemanticModel<'a> {
     /// Flags for the semantic model.
     pub flags: SemanticModelFlags,
 
+    /// Modules that have been seen by the semantic model.
+    pub seen: Modules,
+
     /// Exceptions that have been handled by the current scope.
     pub handled_exceptions: Vec<Exceptions>,
 
@@ -149,6 +152,7 @@ impl<'a> SemanticModel<'a> {
             delayed_annotations: FxHashMap::default(),
             rebinding_scopes: FxHashMap::default(),
             flags: SemanticModelFlags::new(path),
+            seen: Modules::empty(),
             handled_exceptions: Vec::default(),
             resolved_names: FxHashMap::default(),
         }
@@ -1080,6 +1084,40 @@ impl<'a> SemanticModel<'a> {
             .filter_map(move |id| self.nodes[id].as_expression())
     }
 
+    /// Mark a Python module as "seen" by the semantic model. Future callers can quickly discount
+    /// the need to resolve symbols from these modules if they haven't been seen.
+    pub fn add_module(&mut self, module: &str) {
+        match module {
+            "trio" => self.seen.insert(Modules::TRIO),
+            "numpy" => self.seen.insert(Modules::NUMPY),
+            "pandas" => self.seen.insert(Modules::PANDAS),
+            "pytest" => self.seen.insert(Modules::PYTEST),
+            "django" => self.seen.insert(Modules::DJANGO),
+            "six" => self.seen.insert(Modules::SIX),
+            "logging" => self.seen.insert(Modules::LOGGING),
+            "typing" => self.seen.insert(Modules::TYPING),
+            "typing_extensions" => self.seen.insert(Modules::TYPING_EXTENSIONS),
+            "tarfile" => self.seen.insert(Modules::TARFILE),
+            "re" => self.seen.insert(Modules::RE),
+            "collections" => self.seen.insert(Modules::COLLECTIONS),
+            "mock" => self.seen.insert(Modules::MOCK),
+            "os" => self.seen.insert(Modules::OS),
+            "datetime" => self.seen.insert(Modules::DATETIME),
+            "subprocess" => self.seen.insert(Modules::SUBPROCESS),
+            _ => {}
+        }
+    }
+
+    /// Return `true` if the [`Module`] was "seen" anywhere in the semantic model. This is used as
+    /// a fast path to avoid unnecessary work when resolving symbols.
+    ///
+    /// Callers should still verify that the module is available in the current scope, as visiting
+    /// an import of the relevant module _anywhere_ in the file will cause this method to return
+    /// `true`.
+    pub fn seen_module(&self, module: Modules) -> bool {
+        self.seen.intersects(module)
+    }
+
     /// Set the [`Globals`] for the current [`Scope`].
     pub fn set_globals(&mut self, globals: Globals<'a>) {
         // If any global bindings don't already exist in the global scope, add them.
@@ -1295,16 +1333,6 @@ impl<'a> SemanticModel<'a> {
             exceptions.insert(*exception);
         }
         exceptions
-    }
-
-    /// Return `true` if the module at the given path was seen anywhere in the semantic model.
-    /// This includes both direct imports (`import trio`) and member imports (`from trio import
-    /// TrioTask`).
-    pub fn seen(&self, module: &[&str]) -> bool {
-        self.bindings
-            .iter()
-            .filter_map(Binding::as_any_import)
-            .any(|import| import.call_path().starts_with(module))
     }
 
     /// Generate a [`Snapshot`] of the current semantic model.
@@ -1529,6 +1557,29 @@ impl ShadowedBinding {
 
     pub const fn same_scope(&self) -> bool {
         self.same_scope
+    }
+}
+
+bitflags! {
+    /// A select list of Python modules that the semantic model can explicitly track.
+    #[derive(Debug)]
+    pub struct Modules: u16 {
+        const COLLECTIONS = 1 << 0;
+        const DATETIME = 1 << 1;
+        const DJANGO = 1 << 2;
+        const LOGGING = 1 << 3;
+        const MOCK = 1 << 4;
+        const NUMPY = 1 << 5;
+        const OS = 1 << 6;
+        const PANDAS = 1 << 7;
+        const PYTEST = 1 << 8;
+        const RE = 1 << 9;
+        const SIX = 1 << 10;
+        const SUBPROCESS = 1 << 11;
+        const TARFILE = 1 << 12;
+        const TRIO = 1 << 13;
+        const TYPING = 1 << 14;
+        const TYPING_EXTENSIONS = 1 << 15;
     }
 }
 

@@ -2,6 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, ExprCall, Int, Number};
 use ruff_python_semantic::analyze::typing::find_assigned_value;
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -47,6 +48,10 @@ impl AlwaysFixableViolation for TrioZeroSleepCall {
 
 /// TRIO115
 pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
+    if !checker.semantic().seen_module(Modules::TRIO) {
+        return;
+    }
+
     if call.arguments.len() != 1 {
         return;
     }
