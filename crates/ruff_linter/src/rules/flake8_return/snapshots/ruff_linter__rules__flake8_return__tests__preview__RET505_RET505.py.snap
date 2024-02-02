@@ -383,5 +383,82 @@ RET505.py:207:5: RET505 [*] Unnecessary `else` after `return` statement
 210     |-        return z
     208 |+    c = 3
     209 |+    return z
+211 210 | 
+212 211 | 
+213 212 | def indent(x, y, w, z):
+
+RET505.py:217:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+215 |         a = 1
+216 |         return y
+217 |     else:
+    |     ^^^^ RET505
+218 |         # comment
+219 |         c = 3
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+214 214 |     if x:  # [no-else-return]
+215 215 |         a = 1
+216 216 |         return y
+217     |-    else:
+218     |-        # comment
+219     |-        c = 3
+220     |-        return z
+    217 |+    # comment
+    218 |+    c = 3
+    219 |+    return z
+221 220 | 
+222 221 | 
+223 222 | def indent(x, y, w, z):
+
+RET505.py:227:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+225 |         a = 1
+226 |         return y
+227 |     else:
+    |     ^^^^ RET505
+228 |           # comment
+229 |         c = 3
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+224 224 |     if x:  # [no-else-return]
+225 225 |         a = 1
+226 226 |         return y
+227     |-    else:
+228     |-          # comment
+229     |-        c = 3
+230     |-        return z
+    227 |+      # comment
+    228 |+    c = 3
+    229 |+    return z
+231 230 | 
+232 231 | 
+233 232 | def indent(x, y, w, z):
+
+RET505.py:237:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+235 |         a = 1
+236 |         return y
+237 |     else:
+    |     ^^^^ RET505
+238 |   # comment
+239 |         c = 3
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+234 234 |     if x:  # [no-else-return]
+235 235 |         a = 1
+236 236 |         return y
+237     |-    else:
+238 237 |   # comment
+239     |-        c = 3
+240     |-        return z
+    238 |+    c = 3
+    239 |+    return z
 
 

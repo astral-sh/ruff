@@ -208,3 +208,33 @@ def indent(x, y, w, z):
 
         c = 3
         return z
+
+
+def indent(x, y, w, z):
+    if x:  # [no-else-return]
+        a = 1
+        return y
+    else:
+        # comment
+        c = 3
+        return z
+
+
+def indent(x, y, w, z):
+    if x:  # [no-else-return]
+        a = 1
+        return y
+    else:
+          # comment
+        c = 3
+        return z
+
+
+def indent(x, y, w, z):
+    if x:  # [no-else-return]
+        a = 1
+        return y
+    else:
+  # comment
+        c = 3
+        return z

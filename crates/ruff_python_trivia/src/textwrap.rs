@@ -143,7 +143,7 @@ pub fn dedent_to(text: &str, indent: &str) -> String {
         .universal_newlines()
         .find_map(|line| {
             let trimmed = line.trim_whitespace_start();
-            if trimmed.is_empty() {
+            if trimmed.is_empty() || trimmed.starts_with('#') {
                 None
             } else {
                 Some(line.len() - trimmed.len())
