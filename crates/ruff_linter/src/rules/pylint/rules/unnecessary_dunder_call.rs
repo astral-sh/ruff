@@ -292,7 +292,6 @@ impl DunderReplacement {
                 "Use `format` builtin, format string method, or f-string",
             )),
             "__fspath__" => Some(Self::MessageOnly("Use `os.fspath` function")),
-            "__get__" => Some(Self::MessageOnly("Use `get` method")),
             "__getattr__" => Some(Self::MessageOnly(
                 "Access attribute directly or use getattr built-in function",
             )),
@@ -308,7 +307,6 @@ impl DunderReplacement {
             "__pow__" => Some(Self::MessageOnly("Use ** operator or `pow()` builtin")),
             "__rdivmod__" => Some(Self::MessageOnly("Use `divmod()` builtin")),
             "__rpow__" => Some(Self::MessageOnly("Use ** operator or `pow()` builtin")),
-            "__set__" => Some(Self::MessageOnly("Use subscript assignment")),
             "__setattr__" => Some(Self::MessageOnly(
                 "Mutate attribute directly or use setattr built-in function",
             )),
