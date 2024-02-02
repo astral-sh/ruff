@@ -267,7 +267,7 @@ pub(crate) fn format_path(
     };
 
     // Don't write back to the cache if formatting a range.
-    let write_cache = cache.filter(|_| range.is_none());
+    let cache = cache.filter(|_| range.is_none());
 
     // Format the source.
     let format_result = match format_source(&unformatted, source_type, Some(path), settings, range)?
@@ -281,7 +281,7 @@ pub(crate) fn format_path(
                     .write(&mut writer)
                     .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
 
-                if let Some(cache) = write_cache {
+                if let Some(cache) = cache {
                     if let Ok(cache_key) = FileCacheKey::from_path(path) {
                         let relative_path = cache
                             .relative_path(path)
@@ -299,7 +299,7 @@ pub(crate) fn format_path(
             },
         },
         FormattedSource::Unchanged => {
-            if let Some(cache) = write_cache {
+            if let Some(cache) = cache {
                 if let Ok(cache_key) = FileCacheKey::from_path(path) {
                     let relative_path = cache
                         .relative_path(path)
