@@ -464,7 +464,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 
 ### Show Your Support
 
-If you're using Ruff, consider adding the Ruff badge to project's `README.md`:
+If you're using Ruff, consider adding the Ruff badge to your project's `README.md`:
 
 ```md
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -490,6 +490,6 @@ MIT
 
 <div align="center">
   <a target="_blank" href="https://astral.sh" style="background:none">
-    <img src="https://raw.githubusercontent.com/astral-sh/ruff/main/assets/svg/Astral.svg">
+    <img src="https://raw.githubusercontent.com/astral-sh/ruff/main/assets/svg/Astral.svg" alt="Made by Astral">
   </a>
 </div>
