@@ -197,7 +197,7 @@ impl<'a> Checker<'a> {
         let trailing_quote = trailing_quote(self.locator.slice(string_range))?;
 
         // Invert the quote character, if it's a single quote.
-        match *trailing_quote {
+        match trailing_quote {
             "'" => Some(Quote::Double),
             "\"" => Some(Quote::Single),
             _ => None,
