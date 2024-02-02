@@ -308,11 +308,8 @@ impl std::fmt::Debug for Token {
 /// assert_eq!(printed.as_code(), r#""Hello 'Ruff'""#);
 /// assert_eq!(printed.sourcemap(), [
 ///     SourceMarker { source: TextSize::new(0), dest: TextSize::new(0) },
-///     SourceMarker { source: TextSize::new(0), dest: TextSize::new(7) },
 ///     SourceMarker { source: TextSize::new(8), dest: TextSize::new(7) },
-///     SourceMarker { source: TextSize::new(8), dest: TextSize::new(13) },
 ///     SourceMarker { source: TextSize::new(14), dest: TextSize::new(13) },
-///     SourceMarker { source: TextSize::new(14), dest: TextSize::new(14) },
 ///     SourceMarker { source: TextSize::new(20), dest: TextSize::new(14) },
 /// ]);
 ///
@@ -2288,7 +2285,7 @@ impl<Context, T> std::fmt::Debug for FormatWith<Context, T> {
 ///                 let mut join = f.join_with(&separator);
 ///
 ///                 for item in &self.items {
-///                     join.entry(&format_with(|f| write!(f, [text(item, None)])));
+///                     join.entry(&format_with(|f| write!(f, [text(item)])));
 ///                 }
 ///                 join.finish()
 ///             })),
@@ -2373,7 +2370,7 @@ where
 /// let mut count = 0;
 ///
 /// let value = format_once(|f| {
-///     write!(f, [text(&std::format!("Formatted {count}."), None)])
+///     write!(f, [text(&std::format!("Formatted {count}."))])
 /// });
 ///
 /// format!(SimpleFormatContext::default(), [value]).expect("Formatting once works fine");

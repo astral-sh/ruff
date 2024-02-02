@@ -1729,7 +1729,7 @@ a",
         let result = format_with_options(
             &format_args![
                 token("function main() {"),
-                block_indent(&text("let x = `This is a multiline\nstring`;", None)),
+                block_indent(&text("let x = `This is a multiline\nstring`;")),
                 token("}"),
                 hard_line_break()
             ],
@@ -1746,7 +1746,7 @@ a",
     fn it_breaks_a_group_if_a_string_contains_a_newline() {
         let result = format(&FormatArrayElements {
             items: vec![
-                &text("`This is a string spanning\ntwo lines`", None),
+                &text("`This is a string spanning\ntwo lines`"),
                 &token("\"b\""),
             ],
         });

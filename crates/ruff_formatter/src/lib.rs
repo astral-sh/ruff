@@ -575,7 +575,7 @@ pub type FormatResult<F> = Result<F, FormatError>;
 /// impl Format<SimpleFormatContext> for Paragraph {
 ///     fn fmt(&self, f: &mut Formatter<SimpleFormatContext>) -> FormatResult<()> {
 ///         write!(f, [
-///             text(&self.0, None),
+///             text(&self.0),
 ///             hard_line_break(),
 ///         ])
 ///     }
