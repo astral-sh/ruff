@@ -65,10 +65,8 @@ pub(crate) fn missing_fstring_syntax(
         }
     }
 
-    let kwargs = get_func_keywords(semantic);
-
     let mut check = |source, range: TextRange| {
-        if should_be_fstring(source, range, kwargs, locator, semantic) {
+        if should_be_fstring(source, range, locator, semantic) {
             let diagnostic =
                 Diagnostic::new(MissingFStringSyntax, range).with_fix(fix_fstring_syntax(range));
             diagnostics.push(diagnostic);
@@ -111,7 +109,6 @@ pub(crate) fn missing_fstring_syntax(
 pub(super) fn should_be_fstring(
     source: &str,
     range: TextRange,
-    kwargs: Option<&[ast::Keyword]>,
     locator: &Locator,
     semantic: &SemanticModel,
 ) -> bool {
@@ -125,15 +122,13 @@ pub(super) fn should_be_fstring(
         return false;
     };
 
+    let kwargs = get_func_keywords(semantic);
+
     let kw_idents: FxHashSet<&str> = kwargs
-        .map(|keywords| {
-            keywords
-                .iter()
-                .filter_map(|k| k.arg.as_ref())
-                .map(ast::Identifier::as_str)
-                .collect()
-        })
-        .unwrap_or_default();
+        .iter()
+        .filter_map(|k| k.arg.as_ref())
+        .map(ast::Identifier::as_str)
+        .collect();
 
     for f_string in value.f_strings() {
         let mut has_name = false;
@@ -165,23 +160,27 @@ fn has_brackets(possible_fstring: &str) -> bool {
     memchr2_iter(b'{', b'}', possible_fstring.as_bytes()).count() > 1
 }
 
-fn get_func_keywords<'a>(semantic: &'a SemanticModel) -> Option<&'a [ast::Keyword]> {
-    for expr in [
-        semantic.current_expression_parent(),
-        semantic.current_expression_grandparent(),
-    ]
-    .into_iter()
-    .flatten()
-    {
+fn get_func_keywords<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Keyword> {
+    let mut total_keywords = vec![];
+    for expr in semantic.current_expressions() {
         match expr {
             ast::Expr::Call(ast::ExprCall {
                 arguments: ast::Arguments { keywords, .. },
                 ..
-            }) => return Some(keywords),
+            }) => total_keywords.extend(keywords.iter()),
+            ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => {
+                if let ast::Expr::Call(ast::ExprCall {
+                    arguments: ast::Arguments { keywords, .. },
+                    ..
+                }) = value.as_ref()
+                {
+                    total_keywords.extend(keywords.iter());
+                }
+            }
             _ => continue,
         }
     }
-    None
+    total_keywords
 }
 
 fn fix_fstring_syntax(range: TextRange) -> Fix {

@@ -145,157 +145,137 @@ RUF027.py:21:11: RUF027 [*] Possible f-string without an `f` prefix
 23 23 | def do_nothing(a):
 24 24 |     return a
 
-RUF027.py:31:33: RUF027 [*] Possible f-string without an `f` prefix
+RUF027.py:28:33: RUF027 [*] Possible f-string without an `f` prefix
    |
-29 | def nested_funcs():
-30 |     a = 4
-31 |     print(do_nothing(do_nothing("{a}"))) # RUF027
+26 | def nested_funcs():
+27 |     a = 4
+28 |     print(do_nothing(do_nothing("{a}"))) # RUF027
    |                                 ^^^^^ RUF027
-32 |     do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
+29 | 
+30 | def tripled_quoted():
    |
    = help: Add an `f` prefix to the f-string
 
 ℹ Unsafe fix
-28 28 | 
-29 29 | def nested_funcs():
-30 30 |     a = 4
-31    |-    print(do_nothing(do_nothing("{a}"))) # RUF027
-   31 |+    print(do_nothing(do_nothing(f"{a}"))) # RUF027
-32 32 |     do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
-33 33 | 
-34 34 | def tripled_quoted():
+25 25 | 
+26 26 | def nested_funcs():
+27 27 |     a = 4
+28    |-    print(do_nothing(do_nothing("{a}"))) # RUF027
+   28 |+    print(do_nothing(do_nothing(f"{a}"))) # RUF027
+29 29 | 
+30 30 | def tripled_quoted():
+31 31 |     a = 4
 
-RUF027.py:32:39: RUF027 [*] Possible f-string without an `f` prefix
+RUF027.py:33:19: RUF027 [*] Possible f-string without an `f` prefix
    |
-30 |     a = 4
-31 |     print(do_nothing(do_nothing("{a}"))) # RUF027
-32 |     do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
-   |                                       ^^^^^ RUF027
-33 | 
-34 | def tripled_quoted():
-   |
-   = help: Add an `f` prefix to the f-string
-
-ℹ Unsafe fix
-29 29 | def nested_funcs():
-30 30 |     a = 4
-31 31 |     print(do_nothing(do_nothing("{a}"))) # RUF027
-32    |-    do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
-   32 |+    do_nothing_with_kwargs(do_nothing(f"{a}"), a = 5) # RUF027
-33 33 | 
-34 34 | def tripled_quoted():
-35 35 |     a = 4
-
-RUF027.py:37:19: RUF027 [*] Possible f-string without an `f` prefix
-   |
-35 |     a = 4
-36 |     c = a
-37 |     single_line = """ {a} """
+31 |     a = 4
+32 |     c = a
+33 |     single_line = """ {a} """ # RUF027
    |                   ^^^^^^^^^^^ RUF027
-38 |     multi_line = a = """b { # comment
-39 |     c}  d
+34 |     # RUF027
+35 |     multi_line = a = """b { # comment
    |
    = help: Add an `f` prefix to the f-string
 
 ℹ Unsafe fix
-34 34 | def tripled_quoted():
-35 35 |     a = 4
-36 36 |     c = a
-37    |-    single_line = """ {a} """
-   37 |+    single_line = f""" {a} """
-38 38 |     multi_line = a = """b { # comment
-39 39 |     c}  d
-40 40 |     """
+30 30 | def tripled_quoted():
+31 31 |     a = 4
+32 32 |     c = a
+33    |-    single_line = """ {a} """ # RUF027
+   33 |+    single_line = f""" {a} """ # RUF027
+34 34 |     # RUF027
+35 35 |     multi_line = a = """b { # comment
+36 36 |     c}  d
 
-RUF027.py:38:22: RUF027 [*] Possible f-string without an `f` prefix
+RUF027.py:35:22: RUF027 [*] Possible f-string without an `f` prefix
    |
-36 |       c = a
-37 |       single_line = """ {a} """
-38 |       multi_line = a = """b { # comment
+33 |       single_line = """ {a} """ # RUF027
+34 |       # RUF027
+35 |       multi_line = a = """b { # comment
    |  ______________________^
-39 | |     c}  d
-40 | |     """
+36 | |     c}  d
+37 | |     """
    | |_______^ RUF027
-41 |       
-42 |   def single_quoted_multi_line():
+38 |       
+39 |   def single_quoted_multi_line():
    |
    = help: Add an `f` prefix to the f-string
 
 ℹ Unsafe fix
-35 35 |     a = 4
-36 36 |     c = a
-37 37 |     single_line = """ {a} """
-38    |-    multi_line = a = """b { # comment
-   38 |+    multi_line = a = f"""b { # comment
-39 39 |     c}  d
-40 40 |     """
-41 41 |     
+32 32 |     c = a
+33 33 |     single_line = """ {a} """ # RUF027
+34 34 |     # RUF027
+35    |-    multi_line = a = """b { # comment
+   35 |+    multi_line = a = f"""b { # comment
+36 36 |     c}  d
+37 37 |     """
+38 38 |     
 
-RUF027.py:44:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027.py:42:9: RUF027 [*] Possible f-string without an `f` prefix
    |
-42 |   def single_quoted_multi_line():
-43 |       a = 4
-44 |       b = " {\
+40 |       a = 4
+41 |       # RUF027
+42 |       b = " {\
    |  _________^
-45 | |     a} \
-46 | |     "
+43 | |     a} \
+44 | |     "
    | |_____^ RUF027
-47 |   
-48 |   def implicit_concat():
+45 |   
+46 |   def implicit_concat():
    |
    = help: Add an `f` prefix to the f-string
 
 ℹ Unsafe fix
-41 41 |     
-42 42 | def single_quoted_multi_line():
-43 43 |     a = 4
-44    |-    b = " {\
-   44 |+    b = f" {\
-45 45 |     a} \
-46 46 |     "
-47 47 | 
+39 39 | def single_quoted_multi_line():
+40 40 |     a = 4
+41 41 |     # RUF027
+42    |-    b = " {\
+   42 |+    b = f" {\
+43 43 |     a} \
+44 44 |     "
+45 45 | 
 
-RUF027.py:50:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027.py:48:9: RUF027 [*] Possible f-string without an `f` prefix
    |
-48 | def implicit_concat():
-49 |     a = 4
-50 |     b = "{a}" "+" "{b}" r" \\ " # RUF027 for the first part only
+46 | def implicit_concat():
+47 |     a = 4
+48 |     b = "{a}" "+" "{b}" r" \\ " # RUF027 for the first part only
    |         ^^^^^ RUF027
-51 | 
-52 | def escaped_chars():
+49 | 
+50 | def escaped_chars():
    |
    = help: Add an `f` prefix to the f-string
 
 ℹ Unsafe fix
-47 47 | 
-48 48 | def implicit_concat():
-49 49 |     a = 4
-50    |-    b = "{a}" "+" "{b}" r" \\ " # RUF027 for the first part only
-   50 |+    b = f"{a}" "+" "{b}" r" \\ " # RUF027 for the first part only
-51 51 | 
-52 52 | def escaped_chars():
-53 53 |     a = 4
+45 45 | 
+46 46 | def implicit_concat():
+47 47 |     a = 4
+48    |-    b = "{a}" "+" "{b}" r" \\ " # RUF027 for the first part only
+   48 |+    b = f"{a}" "+" "{b}" r" \\ " # RUF027 for the first part only
+49 49 | 
+50 50 | def escaped_chars():
+51 51 |     a = 4
 
-RUF027.py:54:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027.py:52:9: RUF027 [*] Possible f-string without an `f` prefix
    |
-52 | def escaped_chars():
-53 |     a = 4
-54 |     b = "\"escaped:\" \'{a}\' \"not escaped:\": \'{{c}}\'"
+50 | def escaped_chars():
+51 |     a = 4
+52 |     b = "\"escaped:\" \'{a}\' \"not escaped:\": \'{{c}}\'" # RUF027
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
-55 | 
-56 | def alternative_formatter(src, **kwargs):
+53 | 
+54 | def alternative_formatter(src, **kwargs):
    |
    = help: Add an `f` prefix to the f-string
 
 ℹ Unsafe fix
-51 51 | 
-52 52 | def escaped_chars():
-53 53 |     a = 4
-54    |-    b = "\"escaped:\" \'{a}\' \"not escaped:\": \'{{c}}\'"
-   54 |+    b = f"\"escaped:\" \'{a}\' \"not escaped:\": \'{{c}}\'"
-55 55 | 
-56 56 | def alternative_formatter(src, **kwargs):
-57 57 |     src.format(**kwargs)
+49 49 | 
+50 50 | def escaped_chars():
+51 51 |     a = 4
+52    |-    b = "\"escaped:\" \'{a}\' \"not escaped:\": \'{{c}}\'" # RUF027
+   52 |+    b = f"\"escaped:\" \'{a}\' \"not escaped:\": \'{{c}}\'" # RUF027
+53 53 | 
+54 54 | def alternative_formatter(src, **kwargs):
+55 55 |     src.format(**kwargs)
 
 RUF027.py:80:7: RUF027 [*] Possible f-string without an `f` prefix
    |

@@ -23,24 +23,22 @@ def print_name(name: str):
 def do_nothing(a):
     return a
 
-def do_nothing_with_kwargs(a, **kwargs):
-    return a, kwargs
-
 def nested_funcs():
     a = 4
     print(do_nothing(do_nothing("{a}"))) # RUF027
-    do_nothing_with_kwargs(do_nothing("{a}"), a = 5) # RUF027
 
 def tripled_quoted():
     a = 4
     c = a
-    single_line = """ {a} """
+    single_line = """ {a} """ # RUF027
+    # RUF027
     multi_line = a = """b { # comment
     c}  d
     """
     
 def single_quoted_multi_line():
     a = 4
+    # RUF027
     b = " {\
     a} \
     "
@@ -51,7 +49,7 @@ def implicit_concat():
 
 def escaped_chars():
     a = 4
-    b = "\"escaped:\" \'{a}\' \"not escaped:\": \'{{c}}\'"
+    b = "\"escaped:\" \'{a}\' \"not escaped:\": \'{{c}}\'" # RUF027
 
 def alternative_formatter(src, **kwargs):
     src.format(**kwargs)
@@ -72,6 +70,8 @@ def negative_cases():
     formatted = "{a}".fmt(a = 7)
     print(do_nothing("{a}".format(a=3)))
     print(do_nothing(alternative_formatter("{a}", a = 5)))
+    print(format(do_nothing("{a}"), a = 5))
+    print(do_nothing("{a}").format(a = "Test"))
 
 a = 4
 
