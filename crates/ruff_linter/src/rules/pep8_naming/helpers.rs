@@ -39,6 +39,10 @@ pub(super) fn is_named_tuple_assignment(stmt: &Stmt, semantic: &SemanticModel) -
 
 /// Returns `true` if the statement is an assignment to a `TypedDict`.
 pub(super) fn is_typed_dict_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_typing() {
+        return false;
+    }
+
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
@@ -50,6 +54,10 @@ pub(super) fn is_typed_dict_assignment(stmt: &Stmt, semantic: &SemanticModel) ->
 
 /// Returns `true` if the statement is an assignment to a `TypeVar` or `NewType`.
 pub(super) fn is_type_var_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_typing() {
+        return false;
+    }
+
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
@@ -75,6 +83,10 @@ pub(super) fn is_type_alias_assignment(stmt: &Stmt, semantic: &SemanticModel) ->
 
 /// Returns `true` if the statement is an assignment to a `TypedDict`.
 pub(super) fn is_typed_dict_class(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_typing() {
+        return false;
+    }
+
     arguments.is_some_and(|arguments| {
         arguments
             .args

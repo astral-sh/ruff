@@ -161,6 +161,11 @@ pub fn to_pep604_operator(
         }
     }
 
+    // If the typing modules were never imported, we'll never match below.
+    if !semantic.seen_typing() {
+        return None;
+    }
+
     // If the slice is a forward reference (e.g., `Optional["Foo"]`), it can only be rewritten
     // if we're in a typing-only context.
     //
