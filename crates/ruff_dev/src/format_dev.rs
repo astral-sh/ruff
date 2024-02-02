@@ -42,7 +42,9 @@ fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, CliOverrides)
     let args_matches = FormatCommand::command()
         .no_binary_name(true)
         .get_matches_from(dirs);
-    Ok(FormatCommand::from_arg_matches(&args_matches)?.partition())
+    let arguments: FormatCommand = FormatCommand::from_arg_matches(&args_matches)?;
+    let (cli, overrides) = arguments.partition();
+    Ok((cli, overrides))
 }
 
 /// Find the [`PyprojectConfig`] to use for formatting.
