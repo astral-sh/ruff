@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -48,6 +49,10 @@ impl Violation for DjangoAllWithModelForm {
 
 /// DJ007
 pub(crate) fn all_with_model_form(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+    if !checker.semantic().seen_module(Modules::DJANGO) {
+        return;
+    }
+
     if !is_model_form(class_def, checker.semantic()) {
         return;
     }

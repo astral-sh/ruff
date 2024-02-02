@@ -53,6 +53,10 @@ impl Violation for NonLowercaseVariableInFunction {
 
 /// N806
 pub(crate) fn non_lowercase_variable_in_function(checker: &mut Checker, expr: &Expr, name: &str) {
+    if str::is_lowercase(name) {
+        return;
+    }
+
     // Ignore globals.
     if checker
         .semantic()
@@ -62,6 +66,7 @@ pub(crate) fn non_lowercase_variable_in_function(checker: &mut Checker, expr: &E
         return;
     }
 
+    // Ignore explicitly-allowed names.
     if checker
         .settings
         .pep8_naming
@@ -69,10 +74,6 @@ pub(crate) fn non_lowercase_variable_in_function(checker: &mut Checker, expr: &E
         .iter()
         .any(|ignore_name| ignore_name.matches(name))
     {
-        return;
-    }
-
-    if str::is_lowercase(name) {
         return;
     }
 
