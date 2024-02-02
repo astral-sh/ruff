@@ -2264,10 +2264,12 @@ dependencies = [
 name = "ruff_python_ast"
 version = "0.0.0"
 dependencies = [
+ "aho-corasick",
  "bitflags 2.4.1",
  "insta",
  "is-macro",
  "itertools 0.12.0",
+ "once_cell",
  "ruff_python_parser",
  "ruff_python_trivia",
  "ruff_source_file",
