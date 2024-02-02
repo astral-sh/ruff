@@ -24,11 +24,12 @@ use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module_source, format_range, FormatModuleError, QuoteStyle};
+use ruff_source_file::LineIndex;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::resolver::{match_exclusion, python_files_in_path, ResolvedFile, Resolver};
 use ruff_workspace::FormatterSettings;
 
-use crate::args::{CharRange, CliOverrides, FormatArguments};
+use crate::args::{CliOverrides, FormatArguments, FormatRange};
 use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches};
 use crate::panic::{catch_unwind, PanicError};
 use crate::resolve::resolve;
@@ -240,7 +241,7 @@ pub(crate) fn format_path(
     settings: &FormatterSettings,
     source_type: PySourceType,
     mode: FormatMode,
-    range: Option<CharRange>,
+    range: Option<FormatRange>,
     cache: Option<&Cache>,
 ) -> Result<FormatResult, FormatCommandError> {
     if let Some(cache) = cache {
@@ -338,14 +339,15 @@ pub(crate) fn format_source(
     source_type: PySourceType,
     path: Option<&Path>,
     settings: &FormatterSettings,
-    range: Option<CharRange>,
+    range: Option<FormatRange>,
 ) -> Result<FormattedSource, FormatCommandError> {
     match &source_kind {
         SourceKind::Python(unformatted) => {
             let options = settings.to_format_options(source_type, unformatted);
 
             let formatted = if let Some(range) = range {
-                let byte_range = range.to_text_range(unformatted);
+                let line_index = LineIndex::from_source_text(unformatted);
+                let byte_range = range.to_text_range(unformatted, &line_index);
                 format_range(unformatted, byte_range, options).map(|formatted_range| {
                     let mut formatted = unformatted.to_string();
                     formatted.replace_range(

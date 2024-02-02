@@ -1548,7 +1548,7 @@ include = ["*.ipy"]
 #[test]
 fn range_formatting() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range-start=8", "--range-end=15"])
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=2:8-2:14"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -1596,7 +1596,7 @@ def file2(arg1, arg2,):
     )?;
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--range-start=8", "--range-end=15"])
+        .args(["format", "--isolated", "--range=1:8-1:15"])
         .arg(file1)
         .arg(file2),  @r###"
     success: false
@@ -1614,7 +1614,7 @@ def file2(arg1, arg2,):
 #[test]
 fn range_formatting_out_of_bounds() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range-start=100", "--range-end=200"])
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=100:40-200:1"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -1636,7 +1636,7 @@ def foo(arg1, arg2,):
 #[test]
 fn range_start_larger_than_end() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range-start=50", "--range-end=10"])
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=90-50"])
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
@@ -1648,16 +1648,156 @@ def foo(arg1, arg2,):
     ----- stdout -----
 
     ----- stderr -----
-    ruff failed
-      Cause: The range `--range-start` must be smaller or equal to `--range-end`, but 50 > 10.
-      Hint: Try switching the range's start and end values: `--range-start=10 --range-end=50`
+    error: invalid value '90-50' for '--range <RANGE>': the start position '90:1' is greater than the end position '50:1'.
+        tip: Try switching start and end: '50:1-90:1'
+
+    For more information, try '--help'.
+    "###);
+}
+
+#[test]
+fn range_line_numbers_only() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=2-3"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Shouldn't format this" )
+
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    def foo(
+        arg1,
+        arg2,
+    ):
+        print("Shouldn't format this" )
+
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn range_start_only() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=3"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Should format this" )
+
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    def foo(arg1, arg2,):
+        print("Should format this")
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn range_end_only() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=-3"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Should format this" )
+
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    def foo(
+        arg1,
+        arg2,
+    ):
+        print("Should format this" )
+
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn range_missing_line() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=1-:20"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Should format this" )
+
+"#), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value '1-:20' for '--range <RANGE>': the end line is not a valid number (cannot parse integer from empty string)
+      tip: The format is 'line:column'.
+
+    For more information, try '--help'.
+    "###);
+}
+
+#[test]
+fn zero_line_number() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=0:2"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Should format this" )
+
+"#), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value '0:2' for '--range <RANGE>': the start line is 0, but it should be 1 or greater.
+      tip: The line numbers start at 1.
+      tip: Try 1:2 instead.
+
+    For more information, try '--help'.
+    "###);
+}
+
+#[test]
+fn column_and_line_zero() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=0:0"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1, arg2,):
+    print("Should format this" )
+
+"#), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value '0:0' for '--range <RANGE>': the start line and column are both 0, but they should be 1 or greater.
+      tip: The line and column numbers start at 1.
+      tip: Try 1:1 instead.
+
+    For more information, try '--help'.
     "###);
 }
 
 #[test]
 fn range_formatting_notebook() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--isolated", "--no-cache", "--stdin-filename", "main.ipynb", "--range-start=8", "--range-end=15"])
+        .args(["format", "--isolated", "--no-cache", "--stdin-filename", "main.ipynb", "--range=1-2"])
         .arg("-")
         .pass_stdin(r#"
 {

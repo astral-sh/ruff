@@ -1,7 +1,10 @@
-use anyhow::anyhow;
+use std::cmp::Ordering;
+use std::fmt::Formatter;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use clap::{command, Parser};
+use colored::Colorize;
 use regex::Regex;
 use rustc_hash::FxHashMap;
 
@@ -13,7 +16,8 @@ use ruff_linter::settings::types::{
     SerializationFormat, UnsafeFixes,
 };
 use ruff_linter::{warn_user, RuleParser, RuleSelector, RuleSelectorParser};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_source_file::{LineIndex, OneIndexed};
+use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::PycodestyleOptions;
 use ruff_workspace::resolver::ConfigurationTransformer;
@@ -443,27 +447,22 @@ pub struct FormatCommand {
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
 
-    /// Format code starting at the given character offset (zero based).
+    /// Format code in the given <RANGE>.
     ///
-    /// When specified, Ruff will try to only format the code after the specified offset but
-    /// it might be necessary to extend the start backwards, e.g. to the start of the logical line.
+    /// The <RANGE> uses the format `<start_line>:<start_column>-<end_line><end_column>`.
     ///
-    /// Defaults to the start of the document.
+    /// * The end position is exclusive.
+    /// * The line and column numbers start at 1.
+    /// * The column numbers are optional, so you can write `--range=1-2` instead of `--range=1:1-2:1`
+    /// * The end position is optional, so you can write `--range=2` to format the entire document starting from the second line.
+    /// * The start position is optional, so you can write `--range=-3` to format the first three lines of the document.
     ///
-    /// The option can only be used when formatting a single file. Range formatting of notebooks is unsupported.
-    #[arg(long)]
-    pub range_start: Option<usize>,
-
-    /// Format code ending (exclusive) at the given character offset (zero based).
-    ///
-    /// When specified, Ruff will try to only format the code coming before the specified offset but
-    /// it might be necessary to extend the forward, e.g. to the end of the logical line.
-    ///
-    /// Defaults to the end of the document.
+    /// When specified, Ruff will try to only format the code in the given range but
+    /// it might be necessary to extend the start backwards or the end forwards, e.g. to the start or end of the logical line.
     ///
     /// The option can only be used when formatting a single file. Range formatting of notebooks is unsupported.
     #[arg(long)]
-    pub range_end: Option<usize>,
+    pub range: Option<FormatRange>,
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
@@ -584,19 +583,8 @@ impl CheckCommand {
 impl FormatCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(self) -> anyhow::Result<(FormatArguments, CliOverrides)> {
-        if let (Some(start), Some(end)) = (self.range_start, self.range_end) {
-            if start > end {
-                return Err(anyhow!(
-                    r#"The range `--range-start` must be smaller or equal to `--range-end`, but {start} > {end}.
-  Hint: Try switching the range's start and end values: `--range-start={end} --range-end={start}`"#,
-                ));
-            }
-        }
-
-        let range = CharRange::new(self.range_start, self.range_end);
-
-        Ok((
+    pub fn partition(self) -> (FormatArguments, CliOverrides) {
+        (
             FormatArguments {
                 check: self.check,
                 diff: self.diff,
@@ -605,7 +593,7 @@ impl FormatCommand {
                 isolated: self.isolated,
                 no_cache: self.no_cache,
                 stdin_filename: self.stdin_filename,
-                range,
+                range: self.range,
             },
             CliOverrides {
                 line_length: self.line_length,
@@ -623,7 +611,7 @@ impl FormatCommand {
                 // Unsupported on the formatter CLI, but required on `Overrides`.
                 ..CliOverrides::default()
             },
-        ))
+        )
     }
 }
 
@@ -706,75 +694,195 @@ pub struct FormatArguments {
     pub files: Vec<PathBuf>,
     pub isolated: bool,
     pub stdin_filename: Option<PathBuf>,
-    pub range: Option<CharRange>,
+    pub range: Option<FormatRange>,
 }
 
-/// A text range specified in character offsets.
+/// A text range specified by line and column numbers.
 #[derive(Copy, Clone, Debug)]
-pub enum CharRange {
-    /// A range that covers the content from the given start character offset up to the end of the file.
-    StartsAt(usize),
-
-    /// A range that covers the content from the start of the file up to, but excluding the given end character offset.
-    EndsAt(usize),
-
-    /// Range that covers the content between the given start and end character offsets.
-    Between(usize, usize),
+pub struct FormatRange {
+    start: LineColumn,
+    end: LineColumn,
 }
 
-impl CharRange {
-    /// Creates a new [`CharRange`] from the given start and end character offsets.
+impl FormatRange {
+    /// Converts the line:column range to a byte offset range specific for `source`.
     ///
-    /// Returns `None` if both `start` and `end` are `None`.
-    ///
-    /// # Panics
-    ///
-    /// If both `start` and `end` are `Some` and `start` is greater than `end`.
-    pub(super) fn new(start: Option<usize>, end: Option<usize>) -> Option<Self> {
-        match (start, end) {
-            (Some(start), Some(end)) => {
-                assert!(start <= end);
+    /// Returns an empty range if the start range is past the end of `source`.
+    pub(super) fn to_text_range(self, source: &str, line_index: &LineIndex) -> TextRange {
+        let start_byte_offset = line_index.offset(self.start.line, self.start.column, source);
+        let end_byte_offset = line_index.offset(self.end.line, self.end.column, source);
 
-                Some(CharRange::Between(start, end))
-            }
-            (Some(start), None) => Some(CharRange::StartsAt(start)),
-            (None, Some(end)) => Some(CharRange::EndsAt(end)),
-            (None, None) => None,
-        }
+        TextRange::new(start_byte_offset, end_byte_offset)
     }
+}
 
-    /// Converts the range specified in character offsets to a byte offsets specific for `source`.
-    ///
-    /// Returns an empty range starting at `source.len()` if `start` is passed the end of `source`.
-    ///
-    /// # Panics
-    ///
-    /// If either the start or end offset point to a byte offset larger than `u32::MAX`.
-    pub(super) fn to_text_range(self, source: &str) -> TextRange {
-        let (start_char, end_char) = match self {
-            CharRange::StartsAt(offset) => (offset, None),
-            CharRange::EndsAt(offset) => (0usize, Some(offset)),
-            CharRange::Between(start, end) => (start, Some(end)),
+impl FromStr for FormatRange {
+    type Err = FormatRangeParseError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let (start, end) = value.split_once('-').unwrap_or((value, ""));
+
+        let start = if start.is_empty() {
+            LineColumn::default()
+        } else {
+            start.parse().map_err(FormatRangeParseError::InvalidStart)?
         };
 
-        let start_offset = source
-            .char_indices()
-            .nth(start_char)
-            .map_or(source.len(), |(offset, _)| offset);
+        let end = if end.is_empty() {
+            LineColumn {
+                line: OneIndexed::MAX,
+                column: OneIndexed::MAX,
+            }
+        } else {
+            end.parse().map_err(FormatRangeParseError::InvalidEnd)?
+        };
 
-        let end_offset = end_char
-            .and_then(|end_char| {
-                source[start_offset..]
-                    .char_indices()
-                    .nth(end_char - start_char)
-                    .map(|(relative_offset, _)| start_offset + relative_offset)
-            })
-            .unwrap_or(source.len());
+        if start > end {
+            return Err(FormatRangeParseError::StartGreaterThanEnd(start, end));
+        }
 
-        TextRange::new(
-            TextSize::try_from(start_offset).unwrap(),
-            TextSize::try_from(end_offset).unwrap(),
-        )
+        Ok(FormatRange { start, end })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum FormatRangeParseError {
+    InvalidStart(LineColumnParseError),
+    InvalidEnd(LineColumnParseError),
+
+    StartGreaterThanEnd(LineColumn, LineColumn),
+}
+
+impl std::fmt::Display for FormatRangeParseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let tip = "  tip:".bold().green();
+        match self {
+            FormatRangeParseError::StartGreaterThanEnd(start, end) => {
+                write!(
+                    f,
+                    "the start position '{start_invalid}' is greater than the end position '{end_invalid}'.\n  {tip} Try switching start and end: '{end}-{start}'",
+                    start_invalid=start.to_string().bold().yellow(),
+                    end_invalid=end.to_string().bold().yellow(),
+                    start=start.to_string().green().bold(),
+                    end=end.to_string().green().bold()
+                )
+            }
+            FormatRangeParseError::InvalidStart(inner) => inner.write(f, true),
+            FormatRangeParseError::InvalidEnd(inner) => inner.write(f, false),
+        }
+    }
+}
+
+impl std::error::Error for FormatRangeParseError {}
+
+#[derive(Copy, Clone, Debug)]
+pub struct LineColumn {
+    pub line: OneIndexed,
+    pub column: OneIndexed,
+}
+
+impl std::fmt::Display for LineColumn {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{line}:{column}", line = self.line, column = self.column)
+    }
+}
+
+impl Default for LineColumn {
+    fn default() -> Self {
+        LineColumn {
+            line: OneIndexed::MIN,
+            column: OneIndexed::MIN,
+        }
+    }
+}
+
+impl PartialOrd for LineColumn {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for LineColumn {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.line
+            .cmp(&other.line)
+            .then(self.column.cmp(&other.column))
+    }
+}
+
+impl PartialEq for LineColumn {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for LineColumn {}
+
+impl FromStr for LineColumn {
+    type Err = LineColumnParseError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let (line, column) = value.split_once(':').unwrap_or((value, "1"));
+
+        let line: usize = line.parse().map_err(LineColumnParseError::LineParseError)?;
+        let column: usize = column
+            .parse()
+            .map_err(LineColumnParseError::ColumnParseError)?;
+
+        match (OneIndexed::new(line), OneIndexed::new(column)) {
+            (Some(line), Some(column)) => Ok(LineColumn { line, column }),
+            (Some(line), None) => Err(LineColumnParseError::ZeroColumnIndex { line }),
+            (None, Some(column)) => Err(LineColumnParseError::ZeroLineIndex { column }),
+            (None, None) => Err(LineColumnParseError::ZeroLineAndColumnIndex),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum LineColumnParseError {
+    ZeroLineIndex { column: OneIndexed },
+    ZeroColumnIndex { line: OneIndexed },
+    ZeroLineAndColumnIndex,
+    LineParseError(std::num::ParseIntError),
+    ColumnParseError(std::num::ParseIntError),
+}
+
+impl LineColumnParseError {
+    fn write(&self, f: &mut std::fmt::Formatter, start_range: bool) -> std::fmt::Result {
+        let tip = "tip:".bold().green();
+
+        let range = if start_range { "start" } else { "end" };
+
+        match self {
+            LineColumnParseError::ColumnParseError(inner) => {
+                write!(f, "the {range}s column is not a valid number ({inner})'\n  {tip} The format is 'line:column'.")
+            }
+            LineColumnParseError::LineParseError(inner) => {
+                write!(f, "the {range} line is not a valid number ({inner})\n  {tip} The format is 'line:column'.")
+            }
+            LineColumnParseError::ZeroColumnIndex { line } => {
+                write!(
+                    f,
+                    "the {range} column is 0, but it should be 1 or greater.\n  {tip} The column numbers start at 1.\n  {tip} Try {suggestion} instead.",
+                    suggestion=format!("{line}:1").green().bold()
+                )
+            }
+            LineColumnParseError::ZeroLineIndex { column } => {
+                write!(
+                    f,
+                    "the {range} line is 0, but it should be 1 or greater.\n  {tip} The line numbers start at 1.\n  {tip} Try {suggestion} instead.",
+                    suggestion=format!("1:{column}").green().bold()
+                )
+            }
+            LineColumnParseError::ZeroLineAndColumnIndex => {
+                write!(
+                    f,
+                    "the {range} line and column are both 0, but they should be 1 or greater.\n  {tip} The line and column numbers start at 1.\n  {tip} Try {suggestion} instead.",
+                    suggestion="1:1".to_string().green().bold()
+                )
+            }
+        }
     }
 }
 

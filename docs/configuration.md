@@ -653,11 +653,8 @@ Options:
       --preview
           Enable preview mode; enables unstable formatting. Use `--no-preview`
           to disable
-      --range-start <RANGE_START>
-          Format code starting at the given character offset (zero based)
-      --range-end <RANGE_END>
-          Format code ending (exclusive) at the given character offset (zero
-          based)
+      --range <RANGE>
+          Format code in the given <RANGE>
   -h, --help
           Print help (see more with '--help')
 

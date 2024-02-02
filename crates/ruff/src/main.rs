@@ -44,7 +44,10 @@ pub fn main() -> ExitCode {
         }
     }
 
-    let args = Args::parse_from(args);
+    let args = match Args::try_parse_from(args) {
+        Ok(args) => args,
+        Err(err) => err.exit(),
+    };
 
     match run(args) {
         Ok(code) => code.into(),
