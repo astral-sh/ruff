@@ -10,7 +10,7 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::rules::pyupgrade::fixes::adjust_indentation;
+use crate::fix::edits::adjust_indentation;
 
 /// ## What it does
 /// Checks for `else` clauses on loops without a `break` statement.

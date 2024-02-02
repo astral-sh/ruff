@@ -15,7 +15,9 @@ use ruff_python_trivia::{
 use ruff_source_file::{Locator, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::cst::matchers::{match_function_def, match_indented_block, match_statement};
 use crate::fix::codemods;
+use crate::fix::codemods::CodegenStylist;
 use crate::line_width::{IndentWidth, LineLength, LineWidthBuilder};
 
 /// Return the `Fix` to use when deleting a `Stmt`.
@@ -164,6 +166,32 @@ pub(crate) fn add_argument(
         // Case 2: no arguments. Add argument, without any trailing comma.
         Edit::insertion(argument.to_string(), arguments.start() + TextSize::from(1))
     }
+}
+
+/// Safely adjust the indentation of the indented block at [`TextRange`].
+pub(crate) fn adjust_indentation(
+    range: TextRange,
+    indentation: &str,
+    locator: &Locator,
+    stylist: &Stylist,
+) -> Result<String> {
+    let contents = locator.slice(range);
+
+    let module_text = format!("def f():{}{contents}", stylist.line_ending().as_str());
+
+    let mut tree = match_statement(&module_text)?;
+
+    let embedding = match_function_def(&mut tree)?;
+
+    let indented_block = match_indented_block(&mut embedding.body)?;
+    indented_block.indent = Some(indentation);
+
+    let module_text = indented_block.codegen_stylist(stylist);
+    let module_text = module_text
+        .strip_prefix(stylist.line_ending().as_str())
+        .unwrap()
+        .to_string();
+    Ok(module_text)
 }
 
 /// Determine if a vector contains only one, specific element.
