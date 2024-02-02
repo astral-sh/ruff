@@ -170,6 +170,15 @@ pub(crate) fn add_argument(
 }
 
 /// Safely adjust the indentation of the indented block at [`TextRange`].
+///
+/// The [`TextRange`] is assumed to represent an entire indented block, including the leading
+/// indentation of that block. For example, to dedent the body here:
+/// ```python
+/// if True:
+///     print("Hello, world!")
+/// ```
+///
+/// The range would be the entirety of `    print("Hello, world!")`.
 pub(crate) fn adjust_indentation(
     range: TextRange,
     indentation: &str,

@@ -14,12 +14,12 @@ pub struct FStringRanges {
 }
 
 impl FStringRanges {
-    /// Returns `true` if the given range contains an f-string.
+    /// Returns `true` if the given range intersects with any f-string range.
     pub fn intersects(&self, target: TextRange) -> bool {
         self.raw
             .values()
             .take_while(|range| range.start() < target.end())
-            .any(|range| target.contains_range(*range))
+            .any(|range| target.intersect(*range).is_some())
     }
 
     /// Return the [`TextRange`] of the innermost f-string at the given offset.
