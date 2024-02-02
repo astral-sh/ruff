@@ -66,17 +66,6 @@ pub(crate) fn non_lowercase_variable_in_function(checker: &mut Checker, expr: &E
         return;
     }
 
-    // Ignore explicitly-allowed names.
-    if checker
-        .settings
-        .pep8_naming
-        .ignore_names
-        .iter()
-        .any(|ignore_name| ignore_name.matches(name))
-    {
-        return;
-    }
-
     let parent = checker.semantic().current_statement();
     if helpers::is_named_tuple_assignment(parent, checker.semantic())
         || helpers::is_typed_dict_assignment(parent, checker.semantic())
@@ -84,6 +73,11 @@ pub(crate) fn non_lowercase_variable_in_function(checker: &mut Checker, expr: &E
         || helpers::is_type_alias_assignment(parent, checker.semantic())
         || helpers::is_django_model_import(name, parent, checker.semantic())
     {
+        return;
+    }
+
+    // Ignore explicitly-allowed names.
+    if checker.settings.pep8_naming.ignore_names.matches(name) {
         return;
     }
 

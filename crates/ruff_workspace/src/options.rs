@@ -15,6 +15,7 @@ use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
 use ruff_linter::rules::isort::settings::RelativeImportsOrder;
 use ruff_linter::rules::isort::{ImportSection, ImportType};
+use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
 use ruff_linter::rules::pydocstyle::settings::Convention;
 use ruff_linter::rules::pylint::settings::ConstantType;
 use ruff_linter::rules::{
@@ -2511,16 +2512,7 @@ impl Pep8NamingOptions {
         self,
     ) -> Result<pep8_naming::settings::Settings, pep8_naming::settings::SettingsError> {
         Ok(pep8_naming::settings::Settings {
-            ignore_names: self
-                .ignore_names
-                .unwrap_or_else(pep8_naming::settings::default_ignore_names)
-                .into_iter()
-                .chain(self.extend_ignore_names.unwrap_or_default())
-                .map(|name| {
-                    IdentifierPattern::new(&name)
-                        .map_err(pep8_naming::settings::SettingsError::InvalidIgnoreName)
-                })
-                .collect::<Result<Vec<_>, pep8_naming::settings::SettingsError>>()?,
+            ignore_names: IgnoreNames::from_options(self.ignore_names, self.extend_ignore_names)?,
             classmethod_decorators: self.classmethod_decorators.unwrap_or_default(),
             staticmethod_decorators: self.staticmethod_decorators.unwrap_or_default(),
         })
