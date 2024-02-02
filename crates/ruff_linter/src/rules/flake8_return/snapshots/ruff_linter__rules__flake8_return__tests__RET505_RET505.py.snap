@@ -171,4 +171,15 @@ RET505.py:200:5: RET505 Unnecessary `else` after `return` statement
     |
     = help: Remove unnecessary `else`
 
+RET505.py:207:5: RET505 Unnecessary `else` after `return` statement
+    |
+205 |         a = 1
+206 |         return y
+207 |     else:
+    |     ^^^^ RET505
+208 | 
+209 |         c = 3
+    |
+    = help: Remove unnecessary `else`
+
 

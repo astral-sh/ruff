@@ -138,11 +138,18 @@ pub fn dedent(text: &str) -> Cow<'_, str> {
 /// # Panics
 /// If the first line is indented by less than the provided indent.
 pub fn dedent_to(text: &str, indent: &str) -> String {
-    // Look at the indentation of the first line, to determine the "baseline" indentation.
+    // Look at the indentation of the first non-empty line, to determine the "baseline" indentation.
     let existing_indent_len = text
         .universal_newlines()
-        .next()
-        .map_or(0, |line| line.len() - line.trim_start().len());
+        .find_map(|line| {
+            let trimmed = line.trim_whitespace_start();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(line.len() - trimmed.len())
+            }
+        })
+        .unwrap_or_default();
 
     // Determine the amount of indentation to remove.
     let dedent_len = existing_indent_len - indent.len();

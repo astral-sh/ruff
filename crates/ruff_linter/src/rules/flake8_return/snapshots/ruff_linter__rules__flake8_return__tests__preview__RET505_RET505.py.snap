@@ -358,5 +358,30 @@ RET505.py:200:5: RET505 [*] Unnecessary `else` after `return` statement
 199 199 |     if self._sb is not None: return self._sb
 200     |-    else: self._sb = '\033[01;%dm'; self._sa = '\033[0;0m';
     200 |+    self._sb = '\033[01;%dm'; self._sa = '\033[0;0m';
+201 201 | 
+202 202 | 
+203 203 | def indent(x, y, w, z):
+
+RET505.py:207:5: RET505 [*] Unnecessary `else` after `return` statement
+    |
+205 |         a = 1
+206 |         return y
+207 |     else:
+    |     ^^^^ RET505
+208 | 
+209 |         c = 3
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+204 204 |     if x:  # [no-else-return]
+205 205 |         a = 1
+206 206 |         return y
+207     |-    else:
+208 207 | 
+209     |-        c = 3
+210     |-        return z
+    208 |+    c = 3
+    209 |+    return z
 
 
