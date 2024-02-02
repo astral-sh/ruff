@@ -10,7 +10,7 @@ RUF027.py:5:9: RUF027 [*] Possible f-string without an `f` prefix
 6 |     c = "{a} {b} f'{val}' " # RUF027
 7 |     uppercase = "{a}".to_upper() # RUF027
   |
-  = help: Add an `f` prefix to the f-string
+  = help: Add `f` prefix
 
 ℹ Unsafe fix
 2 2 | 
@@ -30,7 +30,7 @@ RUF027.py:6:9: RUF027 [*] Possible f-string without an `f` prefix
   |         ^^^^^^^^^^^^^^^^^^^ RUF027
 7 |     uppercase = "{a}".to_upper() # RUF027
   |
-  = help: Add an `f` prefix to the f-string
+  = help: Add `f` prefix
 
 ℹ Unsafe fix
 3 3 | def simple_cases():
@@ -51,7 +51,7 @@ RUF027.py:7:17: RUF027 [*] Possible f-string without an `f` prefix
 8 | 
 9 | def escaped_string():
   |
-  = help: Add an `f` prefix to the f-string
+  = help: Add `f` prefix
 
 ℹ Unsafe fix
 4 4 |     a = 4
@@ -71,7 +71,7 @@ RUF027.py:15:9: RUF027 [*] Possible f-string without an `f` prefix
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
 16 |     c = r"raw string with \backslashes\ and \"escaped quotes\": {a}" # RUF027
    |
-   = help: Add an `f` prefix to the f-string
+   = help: Add `f` prefix
 
 ℹ Unsafe fix
 12 12 | 
@@ -92,7 +92,7 @@ RUF027.py:16:9: RUF027 [*] Possible f-string without an `f` prefix
 17 | 
 18 | def print_name(name: str):
    |
-   = help: Add an `f` prefix to the f-string
+   = help: Add `f` prefix
 
 ℹ Unsafe fix
 13 13 | def raw_string():
@@ -112,7 +112,7 @@ RUF027.py:20:11: RUF027 [*] Possible f-string without an `f` prefix
    |           ^^^^^^^^^^^^^^^^ RUF027
 21 |     print("The test value we're using today is {a}") # RUF027
    |
-   = help: Add an `f` prefix to the f-string
+   = help: Add `f` prefix
 
 ℹ Unsafe fix
 17 17 | 
@@ -133,7 +133,7 @@ RUF027.py:21:11: RUF027 [*] Possible f-string without an `f` prefix
 22 | 
 23 | def do_nothing(a):
    |
-   = help: Add an `f` prefix to the f-string
+   = help: Add `f` prefix
 
 ℹ Unsafe fix
 18 18 | def print_name(name: str):
@@ -154,7 +154,7 @@ RUF027.py:28:33: RUF027 [*] Possible f-string without an `f` prefix
 29 | 
 30 | def tripled_quoted():
    |
-   = help: Add an `f` prefix to the f-string
+   = help: Add `f` prefix
 
 ℹ Unsafe fix
 25 25 | 
@@ -175,7 +175,7 @@ RUF027.py:33:19: RUF027 [*] Possible f-string without an `f` prefix
 34 |     # RUF027
 35 |     multi_line = a = """b { # comment
    |
-   = help: Add an `f` prefix to the f-string
+   = help: Add `f` prefix
 
 ℹ Unsafe fix
 30 30 | def tripled_quoted():
@@ -199,7 +199,7 @@ RUF027.py:35:22: RUF027 [*] Possible f-string without an `f` prefix
 38 |       
 39 |   def single_quoted_multi_line():
    |
-   = help: Add an `f` prefix to the f-string
+   = help: Add `f` prefix
 
 ℹ Unsafe fix
 32 32 |     c = a
@@ -223,7 +223,7 @@ RUF027.py:42:9: RUF027 [*] Possible f-string without an `f` prefix
 45 |   
 46 |   def implicit_concat():
    |
-   = help: Add an `f` prefix to the f-string
+   = help: Add `f` prefix
 
 ℹ Unsafe fix
 39 39 | def single_quoted_multi_line():
@@ -243,7 +243,7 @@ RUF027.py:48:9: RUF027 [*] Possible f-string without an `f` prefix
    |         ^^^^^ RUF027
 49 |     print(f"{a}" "{a}" f"{b}") # RUF027
    |
-   = help: Add an `f` prefix to the f-string
+   = help: Add `f` prefix
 
 ℹ Unsafe fix
 45 45 | 
@@ -264,7 +264,7 @@ RUF027.py:49:18: RUF027 [*] Possible f-string without an `f` prefix
 50 | 
 51 | def escaped_chars():
    |
-   = help: Add an `f` prefix to the f-string
+   = help: Add `f` prefix
 
 ℹ Unsafe fix
 46 46 | def implicit_concat():
@@ -285,7 +285,7 @@ RUF027.py:53:9: RUF027 [*] Possible f-string without an `f` prefix
 54 | 
 55 | def alternative_formatter(src, **kwargs):
    |
-   = help: Add an `f` prefix to the f-string
+   = help: Add `f` prefix
 
 ℹ Unsafe fix
 50 50 | 
@@ -304,7 +304,7 @@ RUF027.py:81:7: RUF027 [*] Possible f-string without an `f` prefix
 81 | print("but don't ignore this: {val}")
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
    |
-   = help: Add an `f` prefix to the f-string
+   = help: Add `f` prefix
 
 ℹ Unsafe fix
 78 78 | 
