@@ -51,6 +51,7 @@ LINK_REWRITES: dict[str, str] = {
     "https://docs.astral.sh/ruff/installation/": "installation.md",
     "https://docs.astral.sh/ruff/rules/": "rules.md",
     "https://docs.astral.sh/ruff/settings/": "settings.md",
+    "#whos-using-ruff": "https://github.com/astral-sh/ruff#whos-using-ruff",
 }
 
 
