@@ -433,6 +433,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [PyInstaller](https://github.com/pyinstaller/pyinstaller)
 - [PyMC](https://github.com/pymc-devs/pymc/)
 - [PyMC-Marketing](https://github.com/pymc-labs/pymc-marketing)
+- [pytest](https://github.com/pytest-dev/pytest)
 - [PyTorch](https://github.com/pytorch/pytorch)
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Pylint](https://github.com/PyCQA/pylint)
