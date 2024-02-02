@@ -241,7 +241,7 @@ RUF027.py:48:9: RUF027 [*] Possible f-string without an `f` prefix
 47 |     a = 4
 48 |     b = "{a}" "+" "{b}" r" \\ " # RUF027 for the first part only
    |         ^^^^^ RUF027
-49 |     print(f"{a}" "{a}" f"{b}")
+49 |     print(f"{a}" "{a}" f"{b}") # RUF027
    |
    = help: Add an `f` prefix to the f-string
 
@@ -251,7 +251,7 @@ RUF027.py:48:9: RUF027 [*] Possible f-string without an `f` prefix
 47 47 |     a = 4
 48    |-    b = "{a}" "+" "{b}" r" \\ " # RUF027 for the first part only
    48 |+    b = f"{a}" "+" "{b}" r" \\ " # RUF027 for the first part only
-49 49 |     print(f"{a}" "{a}" f"{b}")
+49 49 |     print(f"{a}" "{a}" f"{b}") # RUF027
 50 50 | 
 51 51 | def escaped_chars():
 
@@ -259,7 +259,7 @@ RUF027.py:49:18: RUF027 [*] Possible f-string without an `f` prefix
    |
 47 |     a = 4
 48 |     b = "{a}" "+" "{b}" r" \\ " # RUF027 for the first part only
-49 |     print(f"{a}" "{a}" f"{b}")
+49 |     print(f"{a}" "{a}" f"{b}") # RUF027
    |                  ^^^^^ RUF027
 50 | 
 51 | def escaped_chars():
@@ -270,8 +270,8 @@ RUF027.py:49:18: RUF027 [*] Possible f-string without an `f` prefix
 46 46 | def implicit_concat():
 47 47 |     a = 4
 48 48 |     b = "{a}" "+" "{b}" r" \\ " # RUF027 for the first part only
-49    |-    print(f"{a}" "{a}" f"{b}")
-   49 |+    print(f"{a}" f"{a}" f"{b}")
+49    |-    print(f"{a}" "{a}" f"{b}") # RUF027
+   49 |+    print(f"{a}" f"{a}" f"{b}") # RUF027
 50 50 | 
 51 51 | def escaped_chars():
 52 52 |     a = 4

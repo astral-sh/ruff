@@ -2,6 +2,7 @@ use memchr::memchr2_iter;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast};
+use ruff_python_literal::format::FormatSpec;
 use ruff_python_parser::parse_expression;
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
@@ -124,6 +125,12 @@ pub(super) fn should_be_fstring(
                     return false;
                 }
                 has_name = true;
+            }
+            if let Some(spec) = &element.format_spec {
+                let spec = locator.slice(spec.range());
+                if FormatSpec::parse(spec).is_err() {
+                    return false;
+                }
             }
         }
         if !has_name {
