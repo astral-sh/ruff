@@ -31,7 +31,7 @@ use rustc_hash::FxHashSet;
 /// msg = "Hello {name}! It is {dayofweek} today!"
 /// ```
 ///
-/// It should instead be:
+/// Use instead:
 /// ```python
 /// name = "Sarah"
 /// dayofweek = "Tuesday"
@@ -47,10 +47,11 @@ impl AlwaysFixableViolation for MissingFStringSyntax {
     }
 
     fn fix_title(&self) -> String {
-        "Add an `f` prefix to the f-string".into()
+        "Add `f` prefix".into()
     }
 }
 
+/// RUF027
 pub(crate) fn missing_fstring_syntax(
     diagnostics: &mut Vec<Diagnostic>,
     literal: &ast::StringLiteral,
@@ -89,8 +90,9 @@ pub(crate) fn missing_fstring_syntax(
 /// In general, if the literal is passed to a function which is also being
 /// passed at least one keyword argument with an identifier that also exists in the literal,
 /// that literal should return `false`.
-/// ```
-pub(super) fn should_be_fstring(
+/// Additionally, if the literal is immediately part of a method call, or a parent expression is part of a method call,
+/// we ignore it.
+fn should_be_fstring(
     literal: &ast::StringLiteral,
     locator: &Locator,
     semantic: &SemanticModel,
@@ -105,7 +107,21 @@ pub(super) fn should_be_fstring(
         return false;
     };
 
-    let kwargs = get_func_keywords(semantic);
+    let mut kwargs = vec![];
+    for expr in semantic.current_expressions() {
+        match expr {
+            ast::Expr::Call(ast::ExprCall {
+                arguments: ast::Arguments { keywords, .. },
+                ..
+            }) => kwargs.extend(keywords.iter()),
+            ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => {
+                if let ast::Expr::Call(ast::ExprCall { .. }) = value.as_ref() {
+                    return false;
+                }
+            }
+            _ => continue,
+        }
+    }
 
     let kw_idents: FxHashSet<&str> = kwargs
         .iter()
@@ -147,29 +163,6 @@ fn has_brackets(possible_fstring: &str) -> bool {
     // this qualifies rare false positives like "{ unclosed bracket"
     // but it's faster in the general case
     memchr2_iter(b'{', b'}', possible_fstring.as_bytes()).count() > 1
-}
-
-fn get_func_keywords<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Keyword> {
-    let mut total_keywords = vec![];
-    for expr in semantic.current_expressions() {
-        match expr {
-            ast::Expr::Call(ast::ExprCall {
-                arguments: ast::Arguments { keywords, .. },
-                ..
-            }) => total_keywords.extend(keywords.iter()),
-            ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => {
-                if let ast::Expr::Call(ast::ExprCall {
-                    arguments: ast::Arguments { keywords, .. },
-                    ..
-                }) = value.as_ref()
-                {
-                    total_keywords.extend(keywords.iter());
-                }
-            }
-            _ => continue,
-        }
-    }
-    total_keywords
 }
 
 fn fix_fstring_syntax(range: TextRange) -> Fix {
