@@ -772,9 +772,17 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
                 f,
                 [
                     leading_comments(node_comments.leading),
+                    f.options()
+                        .source_map_generation()
+                        .is_enabled()
+                        .then_some(source_position(self.docstring.start())),
                     string_literal
                         .format()
                         .with_options(ExprStringLiteralKind::Docstring),
+                    f.options()
+                        .source_map_generation()
+                        .is_enabled()
+                        .then_some(source_position(self.docstring.end())),
                 ]
             )?;
 

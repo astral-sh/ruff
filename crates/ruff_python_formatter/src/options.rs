@@ -230,7 +230,6 @@ impl FormatOptions for PyFormatOptions {
             line_width: self.line_width,
             line_ending: self.line_ending,
             indent_style: self.indent_style,
-            source_map_generation: self.source_map_generation,
         }
     }
 }

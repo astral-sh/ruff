@@ -118,7 +118,7 @@ pub fn format_range(
     )?;
 
     let printed = formatted.print_with_indent(base_indent)?;
-    Ok(printed.slice_range(narrowed_range))
+    Ok(printed.slice_range(narrowed_range, source))
 }
 
 /// Finds the node with the minimum covering range of `range`.
@@ -420,8 +420,13 @@ impl PreorderVisitor<'_> for NarrowRange<'_> {
         // Find the end offset of the closest node to the end offset of the formatting range.
         // We do this by iterating over end positions that we know generate source map entries end pick the end
         // that ends closest or after the searched range's end.
-        let trailing_comments = self.context.comments().trailing(node);
-        self.narrow(trailing_comments);
+        self.narrow(
+            self.context
+                .comments()
+                .trailing(node)
+                .iter()
+                .filter(|comment| comment.line_position().is_own_line()),
+        );
     }
 
     fn visit_body(&mut self, body: &'_ [Stmt]) {
@@ -552,7 +557,7 @@ impl NarrowRange<'_> {
     }
 }
 
-const fn is_logical_line(node: AnyNodeRef) -> bool {
+pub(crate) const fn is_logical_line(node: AnyNodeRef) -> bool {
     // Make sure to update [`FormatEnclosingLine`] when changing this.
     node.is_statement()
         || node.is_decorator()
