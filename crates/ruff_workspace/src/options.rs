@@ -2763,7 +2763,11 @@ pub struct PylintOptions {
     /// (see: `PLR0917`).
     ///
     /// If not specified, defaults to the value of `max-args`.
-    #[option(default = r"3", value_type = "int", example = r"max-pos-args = 3")]
+    #[option(
+        default = r"3",
+        value_type = "int",
+        example = r"max-positional-args = 3"
+    )]
     pub max_positional_args: Option<usize>,
 
     /// Maximum number of local variables allowed for a function or method body (see:
