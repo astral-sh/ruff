@@ -9,10 +9,25 @@ pub struct MultilineRanges {
 
 impl MultilineRanges {
     /// Returns `true` if the given range is inside a multiline string.
-    pub fn intersects(&self, target: TextRange) -> bool {
+    pub fn contains(&self, target: TextRange) -> bool {
         self.ranges
             .binary_search_by(|range| {
                 if range.contains_range(target) {
+                    std::cmp::Ordering::Equal
+                } else if range.end() < target.start() {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Greater
+                }
+            })
+            .is_ok()
+    }
+
+    /// Returns `true` if the given range contains a multiline string.
+    pub fn intersects(&self, target: TextRange) -> bool {
+        self.ranges
+            .binary_search_by(|range| {
+                if target.contains_range(*range) {
                     std::cmp::Ordering::Equal
                 } else if range.end() < target.start() {
                     std::cmp::Ordering::Less

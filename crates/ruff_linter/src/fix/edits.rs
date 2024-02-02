@@ -8,6 +8,7 @@ use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Stmt};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_python_trivia::textwrap::dedent_to;
 use ruff_python_trivia::{
     has_leading_content, is_python_whitespace, CommentRanges, PythonWhitespace, SimpleTokenKind,
     SimpleTokenizer,
@@ -173,25 +174,34 @@ pub(crate) fn adjust_indentation(
     range: TextRange,
     indentation: &str,
     locator: &Locator,
+    indexer: &Indexer,
     stylist: &Stylist,
 ) -> Result<String> {
-    let contents = locator.slice(range);
+    // If the range includes a multi-line string, use LibCST to ensure that we don't adjust the
+    // whitespace _within_ the string.
+    if indexer.multiline_ranges().intersects(range) || indexer.fstring_ranges().intersects(range) {
+        let contents = locator.slice(range);
 
-    let module_text = format!("def f():{}{contents}", stylist.line_ending().as_str());
+        let module_text = format!("def f():{}{contents}", stylist.line_ending().as_str());
 
-    let mut tree = match_statement(&module_text)?;
+        let mut tree = match_statement(&module_text)?;
 
-    let embedding = match_function_def(&mut tree)?;
+        let embedding = match_function_def(&mut tree)?;
 
-    let indented_block = match_indented_block(&mut embedding.body)?;
-    indented_block.indent = Some(indentation);
+        let indented_block = match_indented_block(&mut embedding.body)?;
+        indented_block.indent = Some(indentation);
 
-    let module_text = indented_block.codegen_stylist(stylist);
-    let module_text = module_text
-        .strip_prefix(stylist.line_ending().as_str())
-        .unwrap()
-        .to_string();
-    Ok(module_text)
+        let module_text = indented_block.codegen_stylist(stylist);
+        let module_text = module_text
+            .strip_prefix(stylist.line_ending().as_str())
+            .unwrap()
+            .to_string();
+        Ok(module_text)
+    } else {
+        // Otherwise, we can do a simple adjustment ourselves.
+        let contents = locator.slice(range);
+        Ok(dedent_to(contents, indentation))
+    }
 }
 
 /// Determine if a vector contains only one, specific element.

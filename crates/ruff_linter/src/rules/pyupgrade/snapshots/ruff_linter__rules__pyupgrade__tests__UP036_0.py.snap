@@ -774,4 +774,32 @@ UP036_0.py:210:4: UP036 [*] Version block is outdated for minimum Python version
 213 212 | if sys.version_info[:2] > (3,13):
 214 213 |     print("py3")
 
+UP036_0.py:219:4: UP036 [*] Version block is outdated for minimum Python version
+    |
+217 |     print("py3")
+218 | 
+219 | if sys.version_info > (3,0):
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+220 |     f"this is\
+221 |     allowed too"
+    |
+    = help: Remove outdated version block
+
+ℹ Unsafe fix
+216 216 | if sys.version_info[:3] > (3,13):
+217 217 |     print("py3")
+218 218 | 
+219     |-if sys.version_info > (3,0):
+220     |-    f"this is\
+    219 |+f"this is\
+221 220 |     allowed too"
+222 221 | 
+223     |-    f"""the indentation on
+    222 |+f"""the indentation on
+224 223 |     this line is significant"""
+225 224 | 
+226     |-    "this is\
+    225 |+"this is\
+227 226 |     allowed too"
+
 

@@ -105,7 +105,7 @@ pub(crate) fn trailing_whitespace(
             diagnostic.set_fix(Fix::applicable_edit(
                 Edit::range_deletion(range),
                 // Removing trailing whitespace is not safe inside multiline strings.
-                if indexer.multiline_ranges().intersects(range) {
+                if indexer.multiline_ranges().contains(range) {
                     Applicability::Unsafe
                 } else {
                     Applicability::Safe
