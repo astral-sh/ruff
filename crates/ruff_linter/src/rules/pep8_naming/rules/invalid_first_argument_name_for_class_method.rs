@@ -91,13 +91,7 @@ pub(crate) fn invalid_first_argument_name_for_class_method(
         .or_else(|| parameters.args.first())
     {
         if &parameter.name != "cls" {
-            if checker
-                .settings
-                .pep8_naming
-                .ignore_names
-                .iter()
-                .any(|ignore_name| ignore_name.matches(name))
-            {
+            if checker.settings.pep8_naming.ignore_names.matches(name) {
                 return None;
             }
             return Some(Diagnostic::new(

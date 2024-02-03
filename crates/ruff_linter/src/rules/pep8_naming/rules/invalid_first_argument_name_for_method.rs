@@ -86,13 +86,7 @@ pub(crate) fn invalid_first_argument_name_for_method(
     if &arg.parameter.name == "self" {
         return None;
     }
-    if checker
-        .settings
-        .pep8_naming
-        .ignore_names
-        .iter()
-        .any(|ignore_name| ignore_name.matches(name))
-    {
+    if checker.settings.pep8_naming.ignore_names.matches(name) {
         return None;
     }
     Some(Diagnostic::new(
