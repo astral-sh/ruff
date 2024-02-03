@@ -84,4 +84,20 @@ def trivial():
         assert_eq!(get_cognitive_complexity_number(&stmts, 0), 0);
         Ok(())
     }
+
+    #[test]
+    fn if_elif_else() -> Result<()> {
+        let source = r#"
+def if_elif_else(n):
+    if n == 3:
+        return "three"
+    elif n == 4:
+        return "four"
+    else:
+        return "something else"
+"#;
+        let stmts = parse_suite(source)?;
+        assert_eq!(get_cognitive_complexity_number(&stmts, 0), 3);
+        Ok(())
+    }
 }
