@@ -45,3 +45,23 @@ pub(crate) fn function_is_too_cognitive_complex(
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+
+    use ruff_python_parser::parse_suite;
+
+    use super::get_cognitive_complexity_number;
+
+    #[test]
+    fn trivial() -> Result<()> {
+        let source = r"
+def trivial():
+    pass
+";
+        let stmts = parse_suite(source)?;
+        assert_eq!(get_cognitive_complexity_number(&stmts), 1);
+        Ok(())
+    }
+}
