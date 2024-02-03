@@ -33,11 +33,21 @@ fn get_cognitive_complexity_number(stmts: &[Stmt], nesting: usize) -> usize {
                 complexity += 1 + nesting;
                 complexity += get_cognitive_complexity_number(body, nesting + 1);
                 for clause in elif_else_clauses {
-                    if clause.test.is_some() {
-                        complexity += 1;
-                    }
+                    complexity += 1 + nesting;
+
                     complexity += get_cognitive_complexity_number(&clause.body, nesting + 1);
                 }
+            }
+            Stmt::For(ast::StmtFor { body, orelse, .. }) => {
+                complexity += 1 + nesting;
+                complexity += get_cognitive_complexity_number(body, nesting + 1);
+                complexity += get_cognitive_complexity_number(orelse, nesting + 1);
+            }
+            Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
+                complexity += get_cognitive_complexity_number(body, nesting);
+            }
+            Stmt::ClassDef(ast::StmtClassDef { body, .. }) => {
+                complexity += get_cognitive_complexity_number(body, nesting);
             }
             _ => {}
         }
@@ -98,6 +108,67 @@ def if_elif_else(n):
 "#;
         let stmts = parse_suite(source)?;
         assert_eq!(get_cognitive_complexity_number(&stmts, 0), 3);
+        Ok(())
+    }
+
+    #[test]
+    fn if_elif_elif_else() -> Result<()> {
+        let source = r#"
+def if_elif_elif_else(n):
+    if n == 3:
+        return "three"
+    elif n == 4:
+        return "four"
+    elif n == 5:
+        return "five"
+    else:
+        return "something else"
+"#;
+        let stmts = parse_suite(source)?;
+        assert_eq!(get_cognitive_complexity_number(&stmts, 0), 4);
+        Ok(())
+    }
+
+    #[test]
+    fn for_loop_if_else() -> Result<()> {
+        let source = r#"
+def for_loop_if_else():
+    for i in range(10):
+        if i == 7:
+            print("seven")
+        else:
+            print("something else")
+"#;
+        let stmts = parse_suite(source)?;
+        assert_eq!(get_cognitive_complexity_number(&stmts, 0), 5);
+        Ok(())
+    }
+
+    #[test]
+    fn for_for_if_else() -> Result<()> {
+        let source = r#"
+def for_for_if_else():
+    for i in range(10):
+        for j in range(10):
+            if i == j:
+                print("i = j")
+            else:
+                print("i != j")
+"#;
+        let stmts = parse_suite(source)?;
+        assert_eq!(get_cognitive_complexity_number(&stmts, 0), 9);
+        Ok(())
+    }
+
+    #[test]
+    fn for_loop() -> Result<()> {
+        let source = r"
+def for_loop():
+    for i in range(10):
+        print(i)
+";
+        let stmts = parse_suite(source)?;
+        assert_eq!(get_cognitive_complexity_number(&stmts, 0), 1);
         Ok(())
     }
 }
