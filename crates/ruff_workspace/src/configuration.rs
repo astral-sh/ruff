@@ -40,9 +40,10 @@ use ruff_python_formatter::{
 
 use crate::options::{
     Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BugbearOptions, Flake8BuiltinsOptions,
-    Flake8ComprehensionsOptions, Flake8CopyrightOptions, Flake8ErrMsgOptions, Flake8GetTextOptions,
-    Flake8ImplicitStrConcatOptions, Flake8ImportConventionsOptions, Flake8PytestStyleOptions,
-    Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
+    Flake8CognitiveComplexityOptions, Flake8ComprehensionsOptions, Flake8CopyrightOptions,
+    Flake8ErrMsgOptions, Flake8GetTextOptions, Flake8ImplicitStrConcatOptions,
+    Flake8ImportConventionsOptions, Flake8PytestStyleOptions, Flake8QuotesOptions,
+    Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
     Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
     McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
     PydocstyleOptions, PyflakesOptions, PylintOptions,
@@ -301,6 +302,10 @@ impl Configuration {
                 flake8_builtins: lint
                     .flake8_builtins
                     .map(Flake8BuiltinsOptions::into_settings)
+                    .unwrap_or_default(),
+                flake8_cognitive_complexity: lint
+                    .flake8_cognitive_complexity
+                    .map(Flake8CognitiveComplexityOptions::into_settings)
                     .unwrap_or_default(),
                 flake8_comprehensions: lint
                     .flake8_comprehensions
@@ -607,6 +612,7 @@ pub struct LintConfiguration {
     pub flake8_bandit: Option<Flake8BanditOptions>,
     pub flake8_bugbear: Option<Flake8BugbearOptions>,
     pub flake8_builtins: Option<Flake8BuiltinsOptions>,
+    pub flake8_cognitive_complexity: Option<Flake8CognitiveComplexityOptions>,
     pub flake8_comprehensions: Option<Flake8ComprehensionsOptions>,
     pub flake8_copyright: Option<Flake8CopyrightOptions>,
     pub flake8_errmsg: Option<Flake8ErrMsgOptions>,
@@ -707,6 +713,7 @@ impl LintConfiguration {
             flake8_bandit: options.common.flake8_bandit,
             flake8_bugbear: options.common.flake8_bugbear,
             flake8_builtins: options.common.flake8_builtins,
+            flake8_cognitive_complexity: options.common.flake8_cognitive_complexity,
             flake8_comprehensions: options.common.flake8_comprehensions,
             flake8_copyright: options.common.flake8_copyright,
             flake8_errmsg: options.common.flake8_errmsg,
@@ -1121,6 +1128,9 @@ impl LintConfiguration {
             flake8_bandit: self.flake8_bandit.combine(config.flake8_bandit),
             flake8_bugbear: self.flake8_bugbear.combine(config.flake8_bugbear),
             flake8_builtins: self.flake8_builtins.combine(config.flake8_builtins),
+            flake8_cognitive_complexity: self
+                .flake8_cognitive_complexity
+                .combine(config.flake8_cognitive_complexity),
             flake8_comprehensions: self
                 .flake8_comprehensions
                 .combine(config.flake8_comprehensions),

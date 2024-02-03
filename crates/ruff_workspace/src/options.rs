@@ -18,10 +18,10 @@ use ruff_linter::rules::isort::{ImportSection, ImportType};
 use ruff_linter::rules::pydocstyle::settings::Convention;
 use ruff_linter::rules::pylint::settings::ConstantType;
 use ruff_linter::rules::{
-    flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
-    flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
-    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
+    flake8_cognitive_complexity, flake8_copyright, flake8_errmsg, flake8_gettext,
+    flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
+    flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
+    pep8_naming, pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use ruff_linter::settings::types::{
     IdentifierPattern, PythonVersion, SerializationFormat, Version,
@@ -807,6 +807,10 @@ pub struct LintCommonOptions {
     #[option_group]
     pub flake8_builtins: Option<Flake8BuiltinsOptions>,
 
+    /// Options for the `flake8-cognitive-complexity` plugin.
+    #[option_group]
+    pub flake8_cognitive_complexity: Option<Flake8CognitiveComplexityOptions>,
+
     /// Options for the `flake8-comprehensions` plugin.
     #[option_group]
     pub flake8_comprehensions: Option<Flake8ComprehensionsOptions>,
@@ -1088,6 +1092,35 @@ impl Flake8BuiltinsOptions {
         }
     }
 }
+
+#[derive(
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct Flake8CognitiveComplexityOptions {
+    /// The maximum cognitive complexity to allow before triggering `CCR001` errors.
+    #[option(
+        default = "7",
+        value_type = "int",
+        example = r#"
+            # Flag errors (`CCR001`) whenever the complexity level exceeds 5.
+            max-cognetive-complexity = 5
+        "#
+    )]
+    pub max_cognitive_complexity: Option<usize>,
+}
+
+impl Flake8CognitiveComplexityOptions {
+    pub fn into_settings(self) -> flake8_cognitive_complexity::settings::Settings {
+        flake8_cognitive_complexity::settings::Settings {
+            max_cognitive_complexity: self
+                .max_cognitive_complexity
+                .unwrap_or(flake8_cognitive_complexity::settings::DEFAULT_MAX_COGNITIVE_COMPLEXITY),
+        }
+    }
+}
+
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]

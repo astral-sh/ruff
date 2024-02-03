@@ -251,7 +251,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         stmt,
                         name,
                         body,
-                        checker.settings.mccabe.max_complexity,
+                        checker
+                            .settings
+                            .flake8_cognitive_complexity
+                            .max_cognitive_complexity,
                     )
                 {
                     checker.diagnostics.push(diagnostic);
