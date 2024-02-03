@@ -1042,6 +1042,16 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_literal);
                 }
             }
+            if checker.enabled(Rule::MissingFStringSyntax) {
+                for string_literal in value.literals() {
+                    ruff::rules::missing_fstring_syntax(
+                        &mut checker.diagnostics,
+                        string_literal,
+                        checker.locator,
+                        &checker.semantic,
+                    );
+                }
+            }
         }
         Expr::BinOp(ast::ExprBinOp {
             left,
@@ -1313,10 +1323,20 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::math_constant(checker, number_literal);
             }
         }
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+        Expr::StringLiteral(ast::ExprStringLiteral { value, range: _ }) => {
             if checker.enabled(Rule::UnicodeKindPrefix) {
                 for string_part in value {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_part);
+                }
+            }
+            if checker.enabled(Rule::MissingFStringSyntax) {
+                for string_literal in value.as_slice() {
+                    ruff::rules::missing_fstring_syntax(
+                        &mut checker.diagnostics,
+                        string_literal,
+                        checker.locator,
+                        &checker.semantic,
+                    );
                 }
             }
         }
