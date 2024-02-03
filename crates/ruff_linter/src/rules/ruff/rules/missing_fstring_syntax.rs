@@ -17,11 +17,13 @@ use rustc_hash::FxHashSet;
 /// treat the interpolation syntax as literal.
 ///
 /// Since there are many possible string literals which contain syntax similar to f-strings yet are not intended to be,
-/// this lint applies the following criteria to the string literal:
-/// 1. The string literal is not a standalone expression: it needs to be part of an assignment, function call, and so on.
-/// 2. If it's an argument in a function call that takes keyword arguments, no keywords can be used as identifiers within the formatting syntax.
-/// 3. Every identifier in a {...} section needs to be a valid, in-scope reference, and the string should have at least one identifier.
-/// 4. All format specifiers should be valid.
+/// this lint will disqualify any literal that satisfies any of the following conditions:
+/// 1. The string literal is a standalone expression. For example, a docstring.
+/// 2. The literal is part of a function call with keyword arguments that match at least one variable (for example: `format("Message: {value}", value = "Hello World")`)
+/// 3. The literal (or a parent expression of the literal) has a direct method call on it (for example: `"{value}".format(...)`)
+/// 4. The string has no `{...}` expression sections, or uses invalid f-string syntax.
+/// 5. The string references variables that are not in scope, or it doesn't capture variables at all.
+/// 6. Any format specifiers in the potential f-string are invalid.
 ///
 /// ## Example
 ///
@@ -74,24 +76,8 @@ pub(crate) fn missing_fstring_syntax(
     }
 }
 
-/// Returns `true` if `source` is valid f-string syntax with qualified, bound variables.
-/// `kwargs` should be the keyword arguments that were passed to function if the string literal is also
-/// being passed to the same function.
-/// If a identifier from `kwargs` is used in `source`'s formatting, this will return `false`,
-/// since it's possible the function could be formatting the literal in question.
-/// Here's a example case where we don't want to suggest turning a literal into an
-/// f-string:
-/// ```python
-/// def alternative_formatter(string, **kwargs):
-///     format(string, **kwargs)
-///
-/// print(alternative_formatter("{fmt}", fmt = "Hello World"))
-/// ```
-/// In general, if the literal is passed to a function which is also being
-/// passed at least one keyword argument with an identifier that also exists in the literal,
-/// that literal should return `false`.
-/// Additionally, if the literal is immediately part of a method call, or a parent expression is part of a method call,
-/// we ignore it.
+/// Returns `true` if `literal` is likely an f-string with a missing `f` prefix.
+/// See [`MissingFStringSyntax`] for the validation criteria.
 fn should_be_fstring(
     literal: &ast::StringLiteral,
     locator: &Locator,
