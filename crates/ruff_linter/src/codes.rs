@@ -389,6 +389,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // mccabe
         (McCabe, "1") => (RuleGroup::Stable, rules::mccabe::rules::ComplexStructure),
 
+        // flake8-cognitive-complexity
+        (Flake8CognitiveComplexity, "001") => (RuleGroup::Preview, rules::flake8_cognitive_complexity::rules::CognitiveComplexStructure),
+
         // flake8-tidy-imports
         (Flake8TidyImports, "251") => (RuleGroup::Stable, rules::flake8_tidy_imports::rules::BannedApi),
         (Flake8TidyImports, "252") => (RuleGroup::Stable, rules::flake8_tidy_imports::rules::RelativeImports),

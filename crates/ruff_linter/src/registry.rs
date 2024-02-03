@@ -43,6 +43,9 @@ pub enum Linter {
     /// [mccabe](https://pypi.org/project/mccabe/)
     #[prefix = "C90"]
     McCabe,
+    /// [flake8-cognitive-complexity](https://pypi.org/project/flake8-cognitive-complexity/)
+    #[prefix = "CCR"]
+    Flake8CognitiveComplexity,
     /// [isort](https://pypi.org/project/isort/)
     #[prefix = "I"]
     Isort,
