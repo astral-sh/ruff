@@ -18,7 +18,7 @@ use ruff_linter::settings::types::SerializationFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
-use crate::args::{Args, CheckCommand, Command, FormatCommand, HelpFormat};
+use crate::args::{Args, CheckCommand, Command, FormatCommand};
 use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
@@ -114,15 +114,6 @@ fn resolve_default_files(files: Vec<PathBuf>, is_stdin: bool) -> Vec<PathBuf> {
     }
 }
 
-/// Get the actual value of the `format` desired from either `output_format`
-/// or `format`, and warn the user if they're using the deprecated form.
-fn resolve_help_output_format(output_format: HelpFormat, format: Option<HelpFormat>) -> HelpFormat {
-    if format.is_some() {
-        warn_user!("The `--format` argument is deprecated. Use `--output-format` instead.");
-    }
-    format.unwrap_or(output_format)
-}
-
 pub fn run(
     Args {
         command,
@@ -166,10 +157,8 @@ pub fn run(
         Command::Rule {
             rule,
             all,
-            format,
-            mut output_format,
+            output_format,
         } => {
-            output_format = resolve_help_output_format(output_format, format);
             if all {
                 commands::rule::rules(output_format)?;
             }
@@ -182,11 +171,7 @@ pub fn run(
             commands::config::config(option.as_deref())?;
             Ok(ExitStatus::Success)
         }
-        Command::Linter {
-            format,
-            mut output_format,
-        } => {
-            output_format = resolve_help_output_format(output_format, format);
+        Command::Linter { output_format } => {
             commands::linter::linter(output_format)?;
             Ok(ExitStatus::Success)
         }
