@@ -447,20 +447,19 @@ pub struct FormatCommand {
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
 
-    /// Formats code in the specified range. When specified, Ruff will try to only format the code in the given range but
-    /// it might be necessary to extend the start backwards or the end forwards, e.g. to the start or end of the logical line.
-    ///
+    /// When specified, Ruff will try to only format the code in the given range.
+    /// It might be necessary to extend the start backwards or the end forwards, to fully enclose a logical line.
     /// The `<RANGE>` uses the format `<start_line>:<start_column>-<end_line><end_column>`.
-    /// The column numbers are the unicode codepoint from the beginning of the line.
     ///
-    /// * The line and column numbers are 1 based.
-    /// * The end position is exclusive.
-    /// * The column numbers are optional. You can write `--range=1-2` instead of `--range=1:1-2:1`
-    /// * The end position is optional. You can write `--range=2` to format the entire document starting from the second line.
-    /// * The start position is optional. You can write `--range=-3` to format the first three lines of the document.
+    /// - The line and column numbers are 1 based.
+    /// - The column specifies the nth-unicode codepoint on that line.
+    /// - The end offset is exclusive.
+    /// - The column numbers are optional. You can write `--range=1-2` instead of `--range=1:1-2:1`.
+    /// - The end position is optional. You can write `--range=2` to format the entire document starting from the second line.
+    /// - The start position is optional. You can write `--range=-3` to format the first three lines of the document.
     ///
     /// The option can only be used when formatting a single file. Range formatting of notebooks is unsupported.
-    #[arg(long)]
+    #[clap(long, help_heading = "Editor options", verbatim_doc_comment)]
     pub range: Option<FormatRange>,
 }
 

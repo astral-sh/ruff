@@ -1571,6 +1571,25 @@ def foo(arg1, arg2,):
 }
 
 #[test]
+fn range_formatting_unicode() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "test.py", "--range=2:21-3"])
+        .arg("-")
+        .pass_stdin(r#"
+def foo(arg1="👋🏽" ): print("Format this" )
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    def foo(arg1="👋🏽" ):
+        print("Format this")
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
 fn range_formatting_multiple_files() -> std::io::Result<()> {
     let tempdir = TempDir::new()?;
     let file1 = tempdir.path().join("file1.py");
