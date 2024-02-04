@@ -18,7 +18,7 @@ mod tests {
     #[test_case(3)]
     #[test_case(10)]
     fn max_cognitive_complexity_zero(max_cognitive_complexity: usize) -> Result<()> {
-        let snapshot = format!("max_cognitive_complexity {max_cognitive_complexity}");
+        let snapshot = format!("max_cognitive_complexity_{max_cognitive_complexity}");
         let diagnostics = test_path(
             Path::new("flake8_cognitive_complexity/CCR001.py"),
             &LinterSettings {

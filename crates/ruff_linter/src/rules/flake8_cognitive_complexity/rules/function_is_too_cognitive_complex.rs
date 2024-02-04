@@ -93,7 +93,7 @@ pub(crate) fn function_is_too_cognitive_complex(
     body: &[Stmt],
     max_cognitive_complexity: usize,
 ) -> Option<Diagnostic> {
-    let complexity = get_cognitive_complexity_number(body, 1);
+    let complexity = get_cognitive_complexity_number(body, 0);
     if complexity > max_cognitive_complexity {
         Some(Diagnostic::new(
             CognitiveComplexStructure {

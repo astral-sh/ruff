@@ -1,14 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_cognitive_complexity/mod.rs
-assertion_line: 29
 ---
-CCR001.py:2:5: CCR001 `sumOfPrimes` is too cognitive complex (9 > 3)
+CCR001.py:2:5: CCR001 `sumOfPrimes` is too cognitive complex (7 > 0)
   |
 1 | # Cognitive Complexity 7
 2 | def sumOfPrimes(max: int):
   |     ^^^^^^^^^^^ CCR001
 3 |     total = 0
-4 |     for i in range(max):  # +1
+4 |     for i in range(max):  # +1 (nested 0)
   |
 
 
