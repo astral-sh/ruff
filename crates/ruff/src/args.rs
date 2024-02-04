@@ -449,7 +449,7 @@ pub struct FormatCommand {
 
     /// When specified, Ruff will try to only format the code in the given range.
     /// It might be necessary to extend the start backwards or the end forwards, to fully enclose a logical line.
-    /// The `<RANGE>` uses the format `<start_line>:<start_column>-<end_line><end_column>`.
+    /// The `<RANGE>` uses the format `<start_line>:<start_column>-<end_line>:<end_column>`.
     ///
     /// - The line and column numbers are 1 based.
     /// - The column specifies the nth-unicode codepoint on that line.
