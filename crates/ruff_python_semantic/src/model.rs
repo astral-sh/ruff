@@ -172,8 +172,10 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
     pub fn match_typing_expr(&self, expr: &Expr, target: &str) -> bool {
-        self.resolve_call_path(expr)
-            .is_some_and(|call_path| self.match_typing_call_path(&call_path, target))
+        self.seen_typing()
+            && self
+                .resolve_call_path(expr)
+                .is_some_and(|call_path| self.match_typing_call_path(&call_path, target))
     }
 
     /// Return `true` if the call path is a reference to `typing.${target}`.
@@ -1088,22 +1090,24 @@ impl<'a> SemanticModel<'a> {
     /// the need to resolve symbols from these modules if they haven't been seen.
     pub fn add_module(&mut self, module: &str) {
         match module {
-            "trio" => self.seen.insert(Modules::TRIO),
+            "_typeshed" => self.seen.insert(Modules::TYPESHED),
+            "collections" => self.seen.insert(Modules::COLLECTIONS),
+            "dataclasses" => self.seen.insert(Modules::DATACLASSES),
+            "datetime" => self.seen.insert(Modules::DATETIME),
+            "django" => self.seen.insert(Modules::DJANGO),
+            "logging" => self.seen.insert(Modules::LOGGING),
+            "mock" => self.seen.insert(Modules::MOCK),
             "numpy" => self.seen.insert(Modules::NUMPY),
+            "os" => self.seen.insert(Modules::OS),
             "pandas" => self.seen.insert(Modules::PANDAS),
             "pytest" => self.seen.insert(Modules::PYTEST),
-            "django" => self.seen.insert(Modules::DJANGO),
+            "re" => self.seen.insert(Modules::RE),
             "six" => self.seen.insert(Modules::SIX),
-            "logging" => self.seen.insert(Modules::LOGGING),
+            "subprocess" => self.seen.insert(Modules::SUBPROCESS),
+            "tarfile" => self.seen.insert(Modules::TARFILE),
+            "trio" => self.seen.insert(Modules::TRIO),
             "typing" => self.seen.insert(Modules::TYPING),
             "typing_extensions" => self.seen.insert(Modules::TYPING_EXTENSIONS),
-            "tarfile" => self.seen.insert(Modules::TARFILE),
-            "re" => self.seen.insert(Modules::RE),
-            "collections" => self.seen.insert(Modules::COLLECTIONS),
-            "mock" => self.seen.insert(Modules::MOCK),
-            "os" => self.seen.insert(Modules::OS),
-            "datetime" => self.seen.insert(Modules::DATETIME),
-            "subprocess" => self.seen.insert(Modules::SUBPROCESS),
             _ => {}
         }
     }
@@ -1116,6 +1120,11 @@ impl<'a> SemanticModel<'a> {
     /// `true`.
     pub fn seen_module(&self, module: Modules) -> bool {
         self.seen.intersects(module)
+    }
+
+    pub fn seen_typing(&self) -> bool {
+        self.seen_module(Modules::TYPING | Modules::TYPESHED | Modules::TYPING_EXTENSIONS)
+            || !self.typing_modules.is_empty()
     }
 
     /// Set the [`Globals`] for the current [`Scope`].
@@ -1563,7 +1572,7 @@ impl ShadowedBinding {
 bitflags! {
     /// A select list of Python modules that the semantic model can explicitly track.
     #[derive(Debug)]
-    pub struct Modules: u16 {
+    pub struct Modules: u32 {
         const COLLECTIONS = 1 << 0;
         const DATETIME = 1 << 1;
         const DJANGO = 1 << 2;
@@ -1580,6 +1589,8 @@ bitflags! {
         const TRIO = 1 << 13;
         const TYPING = 1 << 14;
         const TYPING_EXTENSIONS = 1 << 15;
+        const TYPESHED = 1 << 16;
+        const DATACLASSES = 1 << 17;
     }
 }
 

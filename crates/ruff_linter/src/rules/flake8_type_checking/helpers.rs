@@ -6,7 +6,7 @@ use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::{self as ast, Decorator, Expr};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_semantic::{
-    analyze, Binding, BindingKind, NodeId, ResolvedReference, ScopeKind, SemanticModel,
+    analyze, Binding, BindingKind, Modules, NodeId, ResolvedReference, ScopeKind, SemanticModel,
 };
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
@@ -111,6 +111,10 @@ fn runtime_required_decorators(
 ///
 /// See: <https://docs.python.org/3/library/dataclasses.html#init-only-variables>
 pub(crate) fn is_dataclass_meta_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_module(Modules::DATACLASSES) {
+        return false;
+    }
+
     // Determine whether the assignment is in a `@dataclass` class definition.
     if let ScopeKind::Class(class_def) = semantic.current_scope().kind {
         if class_def.decorator_list.iter().any(|decorator| {
