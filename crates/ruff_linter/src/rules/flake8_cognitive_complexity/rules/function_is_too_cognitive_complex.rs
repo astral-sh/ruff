@@ -78,7 +78,7 @@ fn get_expt_cognitive_complexity(test: &Expr) -> usize {
     if test.is_bool_op_expr() {
         let bool_op = test.as_bool_op_expr().unwrap();
         expt_cognitive_complexity += 1;
-        for expr in bool_op.values.iter() {
+        for expr in &bool_op.values {
             expt_cognitive_complexity += get_expt_cognitive_complexity(expr);
         }
     }
