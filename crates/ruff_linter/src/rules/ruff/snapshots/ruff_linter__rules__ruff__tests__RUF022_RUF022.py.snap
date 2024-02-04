@@ -1009,7 +1009,7 @@ RUF022.py:243:11: RUF022 [*] `__all__` is not sorted
 251 | | )
     | |_^ RUF022
 252 |   
-253 |   ###################################
+253 |   __all__ = (  # comment about the opening paren
     |
     = help: Apply an isort-style sorting to `__all__`
 
@@ -1027,5 +1027,54 @@ RUF022.py:243:11: RUF022 [*] `__all__` is not sorted
 249 248 |     # strange comment 2
 250 249 |     ,
 251 250 | )
+
+RUF022.py:253:11: RUF022 [*] `__all__` is not sorted
+    |
+251 |   )
+252 |   
+253 |   __all__ = (  # comment about the opening paren
+    |  ___________^
+254 | |     # multiline strange comment 0a
+255 | |     # multiline strange comment 0b
+256 | |     "foo"  # inline comment about foo
+257 | |     # multiline strange comment 1a
+258 | |     # multiline strange comment 1b
+259 | |     ,  # comment about the comma??
+260 | |     # comment about bar part a
+261 | |     # comment about bar part b
+262 | |     "bar"  # inline comment about bar
+263 | |     # strange multiline comment comment 2a
+264 | |     # strange multiline comment 2b
+265 | |     ,
+266 | |     # strange multiline comment 3a
+267 | |     # strange multiline comment 3b
+268 | | )  # comment about the closing paren
+    | |_^ RUF022
+269 |   
+270 |   ###################################
+    |
+    = help: Apply an isort-style sorting to `__all__`
+
+ℹ Safe fix
+251 251 | )
+252 252 | 
+253 253 | __all__ = (  # comment about the opening paren
+254     |-    # multiline strange comment 0a
+255     |-    # multiline strange comment 0b
+256     |-    "foo"  # inline comment about foo
+257 254 |     # multiline strange comment 1a
+258 255 |     # multiline strange comment 1b
+259     |-    ,  # comment about the comma??
+    256 |+      # comment about the comma??
+260 257 |     # comment about bar part a
+261 258 |     # comment about bar part b
+262     |-    "bar"  # inline comment about bar
+    259 |+    "bar",  # inline comment about bar
+    260 |+    # multiline strange comment 0a
+    261 |+    # multiline strange comment 0b
+    262 |+    "foo"  # inline comment about foo
+263 263 |     # strange multiline comment comment 2a
+264 264 |     # strange multiline comment 2b
+265 265 |     ,
 
 

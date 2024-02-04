@@ -895,6 +895,24 @@ fn multiline_string_sequence_postlude<'a>(
     };
     let postlude = locator.slice(TextRange::new(postlude_start, dunder_all_range_end));
 
+    // If the postlude consists solely of a closing parenthesis
+    // (not preceded by any whitespace/newlines),
+    // plus possibly a single trailing comma prior to the parenthesis,
+    // fixup the postlude so that the parenthesis appears on its own line,
+    // and so that the final item has a trailing comma.
+    // This produces formatting more similar
+    // to that which the formatter would produce.
+    let parenthesis_re = regex::Regex::new(r"^,?([\])}])$").unwrap();
+    if let Some(captures) = parenthesis_re.captures(postlude) {
+        let closing_paren = &captures[1];
+        return Cow::Owned(format!(",{newline}{leading_indent}{closing_paren}"));
+    }
+
+    let newline_chars = ['\r', '\n'];
+    if !postlude.starts_with(newline_chars) {
+        return Cow::Borrowed(postlude);
+    }
+
     // The rest of this function uses heuristics to
     // avoid very long indents for the closing paren
     // that don't match the style for the rest of the
@@ -920,17 +938,6 @@ fn multiline_string_sequence_postlude<'a>(
     //     "y",
     //            ]
     // ```
-    let newline_chars = ['\r', '\n'];
-    if !postlude.starts_with(newline_chars) {
-        // Special-case a few common situations so we can get formatting for the closing
-        // parenthesis that is similar to what the formatter would produce
-        let parenthesis_re = regex::Regex::new(r"^,?([\])}])$").unwrap();
-        if let Some(captures) = parenthesis_re.captures(postlude) {
-            let closing_paren = &captures[1];
-            return Cow::Owned(format!(",{newline}{leading_indent}{closing_paren}"));
-        }
-        return Cow::Borrowed(postlude);
-    }
     if TextSize::of(leading_indentation(
         postlude.trim_start_matches(newline_chars),
     )) <= TextSize::of(item_indent)
@@ -938,7 +945,7 @@ fn multiline_string_sequence_postlude<'a>(
         return Cow::Borrowed(postlude);
     }
     let trimmed_postlude = postlude.trim_start();
-    if trimmed_postlude.starts_with([']', ')']) {
+    if trimmed_postlude.starts_with([']', ')', '}']) {
         return Cow::Owned(format!("{newline}{leading_indent}{trimmed_postlude}"));
     }
     Cow::Borrowed(postlude)
