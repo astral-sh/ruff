@@ -250,6 +250,18 @@
         }
       ]
     },
+    "flake8-cognitive-complexity": {
+      "description": "Options for the `flake8-cognitive-complexity` plugin.",
+      "deprecated": true,
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8CognitiveComplexityOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-comprehensions": {
       "description": "Options for the `flake8-comprehensions` plugin.",
       "deprecated": true,
@@ -916,6 +928,21 @@
           "items": {
             "type": "string"
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8CognitiveComplexityOptions": {
+      "type": "object",
+      "properties": {
+        "max-cognitive-complexity": {
+          "description": "The maximum cognitive complexity to allow before triggering `CCR001` errors.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
         }
       },
       "additionalProperties": false
@@ -1922,6 +1949,17 @@
             }
           ]
         },
+        "flake8-cognitive-complexity": {
+          "description": "Options for the `flake8-cognitive-complexity` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8CognitiveComplexityOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "flake8-comprehensions": {
           "description": "Options for the `flake8-comprehensions` plugin.",
           "anyOf": [
@@ -2700,6 +2738,10 @@
         "C9",
         "C90",
         "C901",
+        "CCR",
+        "CCR0",
+        "CCR00",
+        "CCR001",
         "COM",
         "COM8",
         "COM81",

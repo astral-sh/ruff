@@ -289,6 +289,7 @@ quality tools, including:
 - [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/)
 - [flake8-bugbear](https://pypi.org/project/flake8-bugbear/)
 - [flake8-builtins](https://pypi.org/project/flake8-builtins/)
+- [flake8-cognitive-complexity](https://pypi.org/project/flake8-cognitive-complexity/)
 - [flake8-commas](https://pypi.org/project/flake8-commas/)
 - [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
 - [flake8-copyright](https://pypi.org/project/flake8-copyright/)
