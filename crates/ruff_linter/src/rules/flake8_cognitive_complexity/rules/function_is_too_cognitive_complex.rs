@@ -8,15 +8,16 @@ use ruff_python_ast::{self as ast, identifier::Identifier, Expr, Stmt};
 /// ## Why is this bad?
 /// Cognitive complexity is a metric based of a whitepaper by G. Ann Campbell.
 ///
-///     Cognitive Complexity breaks from the practice of using mathematical models to
-///     assess software maintainability. It starts from the precedents set by Cyclomatic
-///     Complexity, but uses human judgment to assess how structures should be
-///     counted, and to decide what should be added to the model as a whole. As a
-///     result, it yields method complexity scores which strike programmers as fairer
-///     relative assessments of understandability than have been available with previous
-///     models. Further, because Cognitive Complexity charges no “cost of entry” for
-///     a method, it produces those fairer relative assessments not just at the method
-///     level, but also at the class and application levels.
+///  > Cognitive Complexity breaks from the practice of using mathematical models to
+///  > assess software maintainability. It starts from the precedents set by Cyclomatic
+///  > Complexity, but uses human judgment to assess how structures should be
+///  > counted, and to decide what should be added to the model as a whole. As a
+///  > result, it yields method complexity scores which strike programmers as fairer
+///  > relative assessments of understandability than have been available with previous
+///  > models. Further, because Cognitive Complexity charges no "cost of entry" for
+///  > a method, it produces those fairer relative assessments not just at the method
+///  > level, but also at the class and application levels.
+///
 /// ref [{Cognitive Complexity} a new way of measuring understandability](file:///home/anderss/Downloads/Cognitive_Complexity_Sonar_Guide_2023%20(1).pdf).
 ///
 /// Functions with a high cognitive complexity are hard to understand and maintain.
@@ -39,15 +40,15 @@ use ruff_python_ast::{self as ast, identifier::Identifier, Expr, Stmt};
 /// Use instead:
 /// ```python
 /// def foo(a, b, c):
-///      match a, b, c:
-///          case None, _, _:
-///              return 4
-///          case _, None, _:
-///              return 3
-///          case _, _, None:
-///              return 2
-///          case _:
-///              return 1
+///     match a, b, c:
+///         case None, _, _:
+///             return 4
+///         case _, None, _:
+///             return 3
+///         case _, _, None:
+///             return 2
+///         case _:
+///             return 1
 /// ```
 ///
 /// ## Options
@@ -76,7 +77,6 @@ fn get_expt_cognitive_complexity(test: &Expr) -> usize {
     let mut expt_cognitive_complexity: usize = 0;
     if test.is_bool_op_expr() {
         let bool_op = test.as_bool_op_expr().unwrap();
-        println!("{:?}", bool_op);
         expt_cognitive_complexity += 1;
         for expr in bool_op.values.iter() {
             expt_cognitive_complexity += get_expt_cognitive_complexity(expr);
