@@ -399,7 +399,7 @@ RUF022.py:54:11: RUF022 [*] `__all__` is not sorted
 82 82 |     "timegm",
 83 83 |     "weekday",
 84    |-    "weekheader"]
-   84 |+    "weekheader"
+   84 |+    "weekheader",
    85 |+]
 85 86 | 
 86 87 | ##########################################
@@ -565,7 +565,7 @@ RUF022.py:110:11: RUF022 [*] `__all__` is not sorted
     151 |+    "register_error",
     152 |+    "replace_errors",
     153 |+    "strict_errors",
-    154 |+    "xmlcharrefreplace_errors"
+    154 |+    "xmlcharrefreplace_errors",
     155 |+]
 124 156 | 
 125 157 | __all__: tuple[str, ...] = (  # a comment about the opening paren
