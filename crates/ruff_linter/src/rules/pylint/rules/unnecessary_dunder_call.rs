@@ -171,9 +171,11 @@ fn allowed_dunder_constants(dunder_method: &str, target_version: PythonVersion) 
             | "__await__"
             | "__class__"
             | "__class_getitem__"
+            | "__delete__"
             | "__dict__"
             | "__doc__"
             | "__exit__"
+            | "__get__"
             | "__getnewargs__"
             | "__getnewargs_ex__"
             | "__getstate__"
@@ -185,6 +187,7 @@ fn allowed_dunder_constants(dunder_method: &str, target_version: PythonVersion) 
             | "__post_init__"
             | "__reduce__"
             | "__reduce_ex__"
+            | "__set__"
             | "__set_name__"
             | "__setstate__"
             | "__sizeof__"
@@ -285,7 +288,6 @@ impl DunderReplacement {
             "__deepcopy__" => Some(Self::MessageOnly("Use `copy.deepcopy()` function")),
             "__del__" => Some(Self::MessageOnly("Use `del` statement")),
             "__delattr__" => Some(Self::MessageOnly("Use `del` statement")),
-            "__delete__" => Some(Self::MessageOnly("Use `del` statement")),
             "__delitem__" => Some(Self::MessageOnly("Use `del` statement")),
             "__divmod__" => Some(Self::MessageOnly("Use `divmod()` builtin")),
             "__format__" => Some(Self::MessageOnly(
@@ -329,8 +331,6 @@ fn allow_nested_expression(dunder_name: &str, semantic: &SemanticModel) -> bool 
             "__init__"
                 | "__del__"
                 | "__delattr__"
-                | "__set__"
-                | "__delete__"
                 | "__setitem__"
                 | "__delitem__"
                 | "__iadd__"

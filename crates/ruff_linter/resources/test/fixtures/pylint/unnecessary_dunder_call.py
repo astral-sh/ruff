@@ -30,6 +30,11 @@ class Thing:
     def do_thing(self, item):
         return object.__getattribute__(self, item)  # PLC2801
 
+    def use_descriptor(self, item):
+        item.__get__(self, type(self))  # OK
+        item.__set__(self, 1)  # OK
+        item.__delete__(self)
+
 
 blah = lambda: {"a": 1}.__delitem__("a")  # OK
 
