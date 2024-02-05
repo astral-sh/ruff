@@ -5,13 +5,13 @@ use itertools::Itertools;
 use libcst_native::{
     Arg, AssignEqual, AssignTargetExpression, Call, Comment, CompFor, Dict, DictComp, DictElement,
     Element, EmptyLine, Expression, GeneratorExp, LeftCurlyBrace, LeftParen, LeftSquareBracket,
-    List, ListComp, Name, ParenthesizableWhitespace, ParenthesizedNode, ParenthesizedWhitespace,
+    ListComp, Name, ParenthesizableWhitespace, ParenthesizedNode, ParenthesizedWhitespace,
     RightCurlyBrace, RightParen, RightSquareBracket, SetComp, SimpleString, SimpleWhitespace,
     TrailingWhitespace, Tuple,
 };
 
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::Expr;
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
@@ -25,7 +25,7 @@ use crate::{
     checkers::ast::Checker,
     cst::matchers::{
         match_arg, match_call, match_call_mut, match_expression, match_generator_exp, match_lambda,
-        match_list_comp, match_name, match_tuple,
+        match_list_comp, match_tuple,
     },
 };
 
@@ -213,126 +213,82 @@ pub(crate) fn fix_unnecessary_literal_dict(expr: &Expr, checker: &Checker) -> Re
     ))
 }
 
-/// (C408)
-pub(crate) fn fix_unnecessary_collection_call(expr: &Expr, checker: &Checker) -> Result<Edit> {
-    enum Collection {
-        Tuple,
-        List,
-        Dict,
-    }
-
+/// (C408) Convert `dict(a=1, b=2)` to `{"a": 1, "b": 2}`.
+pub(crate) fn fix_unnecessary_collection_call(
+    expr: &ast::ExprCall,
+    checker: &Checker,
+) -> Result<Edit> {
     let locator = checker.locator();
     let stylist = checker.stylist();
 
-    // Expr(Call("list" | "tuple" | "dict")))) -> Expr(List|Tuple|Dict)
+    // Expr(Call("dict")))) -> Expr(Dict)
     let module_text = locator.slice(expr);
     let mut tree = match_expression(module_text)?;
     let call = match_call(&tree)?;
-    let name = match_name(&call.func)?;
-    let collection = match name.value {
-        "tuple" => Collection::Tuple,
-        "list" => Collection::List,
-        "dict" => Collection::Dict,
-        _ => bail!("Expected 'tuple', 'list', or 'dict'"),
-    };
 
     // Arena allocator used to create formatted strings of sufficient lifetime,
     // below.
     let mut arena: Vec<String> = vec![];
 
-    match collection {
-        Collection::Tuple => {
-            tree = Expression::Tuple(Box::new(Tuple {
-                elements: vec![],
-                lpar: vec![LeftParen::default()],
-                rpar: vec![RightParen::default()],
-            }));
-        }
-        Collection::List => {
-            tree = Expression::List(Box::new(List {
-                elements: vec![],
-                lbracket: LeftSquareBracket::default(),
-                rbracket: RightSquareBracket::default(),
+    let quote = checker.f_string_quote_style().unwrap_or(stylist.quote());
+
+    // Quote each argument.
+    for arg in &call.args {
+        let quoted = format!(
+            "{}{}{}",
+            quote,
+            arg.keyword
+                .as_ref()
+                .expect("Expected dictionary argument to be kwarg")
+                .value,
+            quote,
+        );
+        arena.push(quoted);
+    }
+
+    let elements = call
+        .args
+        .iter()
+        .enumerate()
+        .map(|(i, arg)| DictElement::Simple {
+            key: Expression::SimpleString(Box::new(SimpleString {
+                value: &arena[i],
                 lpar: vec![],
                 rpar: vec![],
-            }));
-        }
-        Collection::Dict => {
-            if call.args.is_empty() {
-                tree = Expression::Dict(Box::new(Dict {
-                    elements: vec![],
-                    lbrace: LeftCurlyBrace::default(),
-                    rbrace: RightCurlyBrace::default(),
-                    lpar: vec![],
-                    rpar: vec![],
-                }));
-            } else {
-                let quote = checker.f_string_quote_style().unwrap_or(stylist.quote());
+            })),
+            value: arg.value.clone(),
+            comma: arg.comma.clone(),
+            whitespace_before_colon: ParenthesizableWhitespace::default(),
+            whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(
+                " ",
+            )),
+        })
+        .collect();
 
-                // Quote each argument.
-                for arg in &call.args {
-                    let quoted = format!(
-                        "{}{}{}",
-                        quote,
-                        arg.keyword
-                            .as_ref()
-                            .expect("Expected dictionary argument to be kwarg")
-                            .value,
-                        quote,
-                    );
-                    arena.push(quoted);
-                }
-
-                let elements = call
-                    .args
-                    .iter()
-                    .enumerate()
-                    .map(|(i, arg)| DictElement::Simple {
-                        key: Expression::SimpleString(Box::new(SimpleString {
-                            value: &arena[i],
-                            lpar: vec![],
-                            rpar: vec![],
-                        })),
-                        value: arg.value.clone(),
-                        comma: arg.comma.clone(),
-                        whitespace_before_colon: ParenthesizableWhitespace::default(),
-                        whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(
-                            SimpleWhitespace(" "),
-                        ),
-                    })
-                    .collect();
-
-                tree = Expression::Dict(Box::new(Dict {
-                    elements,
-                    lbrace: LeftCurlyBrace {
-                        whitespace_after: call.whitespace_before_args.clone(),
-                    },
-                    rbrace: RightCurlyBrace {
-                        whitespace_before: call
-                            .args
-                            .last()
-                            .expect("Arguments should be non-empty")
-                            .whitespace_after_arg
-                            .clone(),
-                    },
-                    lpar: vec![],
-                    rpar: vec![],
-                }));
-            }
-        }
-    };
+    tree = Expression::Dict(Box::new(Dict {
+        elements,
+        lbrace: LeftCurlyBrace {
+            whitespace_after: call.whitespace_before_args.clone(),
+        },
+        rbrace: RightCurlyBrace {
+            whitespace_before: call
+                .args
+                .last()
+                .expect("Arguments should be non-empty")
+                .whitespace_after_arg
+                .clone(),
+        },
+        lpar: vec![],
+        rpar: vec![],
+    }));
 
     Ok(Edit::range_replacement(
-        if matches!(collection, Collection::Dict) {
-            pad_expression(
-                tree.codegen_stylist(stylist),
-                expr.range(),
-                checker.locator(),
-                checker.semantic(),
-            )
-        } else {
-            tree.codegen_stylist(stylist)
-        },
+        pad_expression(
+            tree.codegen_stylist(stylist),
+            expr.range(),
+            checker.locator(),
+            checker.semantic(),
+        ),
         expr.range(),
     ))
 }
