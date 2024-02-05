@@ -6,6 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier;
 use ruff_python_ast::{self as ast, ExceptHandler, MatchCase, Stmt};
 use ruff_python_codegen::Stylist;
+use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -81,6 +82,7 @@ pub(crate) fn useless_else_on_loop(
             orelse,
             else_range,
             checker.locator(),
+            checker.indexer(),
             checker.stylist(),
         )
     });
@@ -134,6 +136,7 @@ fn remove_else(
     orelse: &[Stmt],
     else_range: TextRange,
     locator: &Locator,
+    indexer: &Indexer,
     stylist: &Stylist,
 ) -> Result<Fix> {
     let Some(start) = orelse.first() else {
@@ -164,6 +167,7 @@ fn remove_else(
             ),
             desired_indentation,
             locator,
+            indexer,
             stylist,
         )?;
 

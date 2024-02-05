@@ -2,6 +2,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -43,6 +44,10 @@ impl Violation for InvalidEnvvarDefault {
 
 /// PLW1508
 pub(crate) fn invalid_envvar_default(checker: &mut Checker, call: &ast::ExprCall) {
+    if !checker.semantic().seen_module(Modules::OS) {
+        return;
+    }
+
     if checker
         .semantic()
         .resolve_call_path(&call.func)

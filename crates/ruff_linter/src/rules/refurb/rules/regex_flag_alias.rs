@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Expr;
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -52,6 +53,10 @@ impl AlwaysFixableViolation for RegexFlagAlias {
 
 /// FURB167
 pub(crate) fn regex_flag_alias(checker: &mut Checker, expr: &Expr) {
+    if !checker.semantic().seen_module(Modules::RE) {
+        return;
+    }
+
     let Some(flag) =
         checker
             .semantic()

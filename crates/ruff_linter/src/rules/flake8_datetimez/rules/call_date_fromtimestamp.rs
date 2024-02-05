@@ -3,6 +3,7 @@ use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::Modules;
 
 use crate::checkers::ast::Checker;
 
@@ -57,6 +58,10 @@ impl Violation for CallDateFromtimestamp {
 }
 
 pub(crate) fn call_date_fromtimestamp(checker: &mut Checker, func: &Expr, location: TextRange) {
+    if !checker.semantic().seen_module(Modules::DATETIME) {
+        return;
+    }
+
     if checker
         .semantic()
         .resolve_call_path(func)

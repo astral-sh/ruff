@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -35,6 +36,10 @@ impl Violation for LoggingConfigInsecureListen {
 
 /// S612
 pub(crate) fn logging_config_insecure_listen(checker: &mut Checker, call: &ast::ExprCall) {
+    if !checker.semantic().seen_module(Modules::LOGGING) {
+        return;
+    }
+
     if checker
         .semantic()
         .resolve_call_path(&call.func)

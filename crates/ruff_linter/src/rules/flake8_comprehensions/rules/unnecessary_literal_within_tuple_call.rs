@@ -1,12 +1,9 @@
-use ruff_python_ast::{Expr, Keyword};
-
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, Expr};
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-
-use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
 
@@ -48,13 +45,11 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinTupleCall {
         let UnnecessaryLiteralWithinTupleCall { literal } = self;
         if literal == "list" {
             format!(
-                "Unnecessary `{literal}` literal passed to `tuple()` (rewrite as a `tuple` \
-                 literal)"
+                "Unnecessary `{literal}` literal passed to `tuple()` (rewrite as a `tuple` literal)"
             )
         } else {
             format!(
-                "Unnecessary `{literal}` literal passed to `tuple()` (remove the outer call to \
-                 `tuple()`)"
+                "Unnecessary `{literal}` literal passed to `tuple()` (remove the outer call to `tuple()`)"
             )
         }
     }
@@ -72,17 +67,13 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinTupleCall {
 }
 
 /// C409
-pub(crate) fn unnecessary_literal_within_tuple_call(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
-    if !keywords.is_empty() {
+pub(crate) fn unnecessary_literal_within_tuple_call(checker: &mut Checker, call: &ast::ExprCall) {
+    if !call.arguments.keywords.is_empty() {
         return;
     }
-    let Some(argument) = helpers::first_argument_with_matching_function("tuple", func, args) else {
+    let Some(argument) =
+        helpers::first_argument_with_matching_function("tuple", &call.func, &call.arguments.args)
+    else {
         return;
     };
     if !checker.semantic().is_builtin("tuple") {
@@ -93,15 +84,32 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
         Expr::List(_) => "list",
         _ => return,
     };
+
     let mut diagnostic = Diagnostic::new(
         UnnecessaryLiteralWithinTupleCall {
             literal: argument_kind.to_string(),
         },
-        expr.range(),
+        call.range(),
     );
-    diagnostic.try_set_fix(|| {
-        fixes::fix_unnecessary_literal_within_tuple_call(expr, checker.locator(), checker.stylist())
-            .map(Fix::unsafe_edit)
+
+    // Convert `tuple([1, 2])` to `tuple(1, 2)`
+    diagnostic.set_fix({
+        // Replace from the start of the call to the start of the inner list or tuple with `(`.
+        let call_start = Edit::replacement(
+            "(".to_string(),
+            call.start(),
+            argument.start() + TextSize::from(1),
+        );
+
+        // Replace from the end of the inner list or tuple to the end of the call with `)`.
+        let call_end = Edit::replacement(
+            ")".to_string(),
+            argument.end() - TextSize::from(1),
+            call.end(),
+        );
+
+        Fix::unsafe_edits(call_start, [call_end])
     });
+
     checker.diagnostics.push(diagnostic);
 }

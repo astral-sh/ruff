@@ -1090,9 +1090,9 @@ dependencies = [
 
 [[package]]
 name = "is-macro"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b75828adcb53122ef5ea649a39f50f82d94b754099bf6331b32e255e1891e8fb"
+checksum = "59a85abdc13717906baccb5a1e435556ce0df215f242892f721dff62bf25288f"
 dependencies = [
  "Inflector",
  "proc-macro2",
@@ -1132,9 +1132,9 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25db6b064527c5d482d0423354fcd07a89a2dfe07b67892e62411946db7f07b0"
+checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
 dependencies = [
  "either",
 ]
@@ -1324,9 +1324,9 @@ checksum = "2532096657941c2fea9c289d370a250971c689d4f143798ff67113ec042024a5"
 
 [[package]]
 name = "memchr"
-version = "2.6.4"
+version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f665ee40bc4a3c5590afb1e9677db74a508659dfd71e126420da8274909a0167"
+checksum = "523dc4f511e55ab87b694dc30d0f820d60906ef06413f93d4d7a1385599cc149"
 
 [[package]]
 name = "memoffset"
@@ -1780,12 +1780,12 @@ dependencies = [
 
 [[package]]
 name = "pyproject-toml"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46d4a5e69187f23a29f8aa0ea57491d104ba541bc55f76552c2a74962aa20e04"
+checksum = "ef61ae096a2f8c8b49eca360679dbc25f57c99145f6634b6bc18fedb1f9c6c30"
 dependencies = [
  "indexmap",
- "pep440_rs 0.3.12",
+ "pep440_rs 0.4.0",
  "pep508_rs",
  "serde",
  "toml",
@@ -2023,7 +2023,7 @@ dependencies = [
  "insta",
  "insta-cmd",
  "is-macro",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "log",
  "mimalloc",
  "notify",
@@ -2081,7 +2081,7 @@ dependencies = [
  "filetime",
  "glob",
  "globset",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "regex",
  "ruff_macros",
  "seahash",
@@ -2097,7 +2097,7 @@ dependencies = [
  "imara-diff",
  "indicatif",
  "indoc",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "libcst",
  "once_cell",
  "pretty_assertions",
@@ -2181,7 +2181,7 @@ dependencies = [
  "insta",
  "is-macro",
  "is-wsl",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "libcst",
  "log",
  "memchr",
@@ -2233,7 +2233,7 @@ dependencies = [
 name = "ruff_macros"
 version = "0.0.0"
 dependencies = [
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "proc-macro2",
  "quote",
  "ruff_python_trivia",
@@ -2246,7 +2246,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "insta",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "once_cell",
  "rand",
  "ruff_diagnostics",
@@ -2268,7 +2268,7 @@ dependencies = [
  "bitflags 2.4.1",
  "insta",
  "is-macro",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "once_cell",
  "ruff_python_parser",
  "ruff_python_trivia",
@@ -2300,7 +2300,7 @@ dependencies = [
  "clap",
  "countme",
  "insta",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "memchr",
  "once_cell",
  "regex",
@@ -2343,7 +2343,7 @@ dependencies = [
  "bitflags 2.4.1",
  "hexf-parse",
  "is-macro",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "lexical-parse-float",
  "rand",
  "unic-ucd-category",
@@ -2357,7 +2357,7 @@ dependencies = [
  "bitflags 2.4.1",
  "insta",
  "is-macro",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "lalrpop",
  "lalrpop-util",
  "memchr",
@@ -2408,7 +2408,7 @@ name = "ruff_python_trivia"
 version = "0.0.0"
 dependencies = [
  "insta",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "ruff_python_ast",
  "ruff_python_index",
  "ruff_python_parser",
@@ -2490,7 +2490,7 @@ dependencies = [
  "globset",
  "ignore",
  "is-macro",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "log",
  "once_cell",
  "path-absolutize",
@@ -3060,9 +3060,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "toml"
-version = "0.8.8"
+version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1a195ec8c9da26928f773888e0742ca3ca1040c6cd859c919c9f59c1954ab35"
+checksum = "c6a4b9e8023eb94392d3dca65d717c53abc5dad49c07cb65bb8fcd87115fa325"
 dependencies = [
  "serde",
  "serde_spanned",
@@ -3081,9 +3081,9 @@ dependencies = [
 
 [[package]]
 name = "toml_edit"
-version = "0.21.0"
+version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d34d383cd00a163b4a5b85053df514d45bc330f6de7737edfe0a93311d1eaa03"
+checksum = "6a8534fd7f78b5405e860340ad6575217ce99f38d4d5c8f2442cb5ecb50090e1"
 dependencies = [
  "indexmap",
  "serde",

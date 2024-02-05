@@ -5,6 +5,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::typing::is_dict;
+use ruff_python_semantic::Modules;
 
 use crate::checkers::ast::Checker;
 
@@ -121,6 +122,10 @@ fn is_lowercase_allowed(env_var: &str) -> bool {
 
 /// SIM112
 pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
+    if !checker.semantic().seen_module(Modules::OS) {
+        return;
+    }
+
     // Ex) `os.environ['foo']`
     if let Expr::Subscript(_) = expr {
         check_os_environ_subscript(checker, expr);

@@ -7,7 +7,7 @@ use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::str;
 
-use crate::settings::types::IdentifierPattern;
+use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
 /// Checks for functions names that do not follow the `snake_case` naming
@@ -60,17 +60,9 @@ pub(crate) fn invalid_function_name(
     stmt: &Stmt,
     name: &str,
     decorator_list: &[Decorator],
-    ignore_names: &[IdentifierPattern],
+    ignore_names: &IgnoreNames,
     semantic: &SemanticModel,
 ) -> Option<Diagnostic> {
-    // Ignore any explicitly-ignored function names.
-    if ignore_names
-        .iter()
-        .any(|ignore_name| ignore_name.matches(name))
-    {
-        return None;
-    }
-
     // Ignore any function names that are already lowercase.
     if str::is_lowercase(name) {
         return None;
@@ -82,6 +74,11 @@ pub(crate) fn invalid_function_name(
     if visibility::is_override(decorator_list, semantic)
         || visibility::is_overload(decorator_list, semantic)
     {
+        return None;
+    }
+
+    // Ignore any explicitly-allowed names.
+    if ignore_names.matches(name) {
         return None;
     }
 

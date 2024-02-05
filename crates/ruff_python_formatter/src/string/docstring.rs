@@ -6,6 +6,7 @@ use std::{borrow::Cow, collections::VecDeque};
 
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_python_parser::ParseError;
+
 use {once_cell::sync::Lazy, regex::Regex};
 use {
     ruff_formatter::{write, FormatOptions, IndentStyle, LineWidth, Printed},
@@ -114,7 +115,10 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     // is_borrowed is unstable :/
     let already_normalized = matches!(docstring, Cow::Borrowed(_));
 
-    let mut lines = docstring.lines().peekable();
+    // Use `split` instead of `lines` to preserve the closing quotes on their own line
+    // if they have no indentation (in which case the last line is `\n` which
+    // `lines` omit for the last element).
+    let mut lines = docstring.split('\n').peekable();
 
     // Start the string
     write!(f, [normalized.prefix, normalized.quotes])?;
@@ -259,7 +263,7 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     /// iterator given contains all lines except for the first.
     fn add_iter(
         &mut self,
-        mut lines: std::iter::Peekable<std::str::Lines<'src>>,
+        mut lines: std::iter::Peekable<std::str::Split<'src, char>>,
     ) -> FormatResult<()> {
         while let Some(line) = lines.next() {
             let line = InputDocstringLine {

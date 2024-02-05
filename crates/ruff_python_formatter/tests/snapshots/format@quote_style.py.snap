@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/quote_styl
 ---
 ## Input
 ```python
-'single'
+'single' # this string is treated as a docstring
 "double"
 r'r single'
 r"r double"
@@ -73,7 +73,7 @@ source_type                = Python
 ```
 
 ```python
-'single'
+'single'  # this string is treated as a docstring
 'double'
 r'r single'
 r'r double'
@@ -135,7 +135,8 @@ def docstring_single():
 --- Stable
 +++ Preview
 @@ -1,4 +1,5 @@
- 'single'
+-'single'  # this string is treated as a docstring
++"single"  # this string is treated as a docstring
 +
  'double'
  r'r single'
@@ -159,7 +160,7 @@ source_type                = Python
 ```
 
 ```python
-"single"
+"single"  # this string is treated as a docstring
 "double"
 r"r single"
 r"r double"
@@ -221,7 +222,7 @@ def docstring_single():
 --- Stable
 +++ Preview
 @@ -1,4 +1,5 @@
- "single"
+ "single"  # this string is treated as a docstring
 +
  "double"
  r"r single"
@@ -245,7 +246,7 @@ source_type                = Python
 ```
 
 ```python
-'single'
+'single'  # this string is treated as a docstring
 "double"
 r'r single'
 r"r double"
@@ -307,7 +308,8 @@ def docstring_single():
 --- Stable
 +++ Preview
 @@ -1,4 +1,5 @@
- 'single'
+-'single'  # this string is treated as a docstring
++"single"  # this string is treated as a docstring
 +
  "double"
  r'r single'

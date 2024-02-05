@@ -513,9 +513,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::SingleStringSlots) {
                 pylint::rules::single_string_slots(checker, class_def);
             }
-            if checker.enabled(Rule::BadDunderMethodName) {
-                pylint::rules::bad_dunder_method_name(checker, body);
-            }
             if checker.enabled(Rule::MetaClassABCMeta) {
                 refurb::rules::metaclass_abcmeta(checker, class_def);
             }

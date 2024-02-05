@@ -349,13 +349,6 @@ where
             }
         }
 
-        // Track each top-level import, to guide import insertions.
-        if matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_)) {
-            if self.semantic.at_top_level() {
-                self.importer.visit_import(stmt);
-            }
-        }
-
         // Store the flags prior to any further descent, so that we can restore them after visiting
         // the node.
         let flags_snapshot = self.semantic.flags;
@@ -371,14 +364,22 @@ where
                 self.handle_node_load(target);
             }
             Stmt::Import(ast::StmtImport { names, range: _ }) => {
+                if self.semantic.at_top_level() {
+                    self.importer.visit_import(stmt);
+                }
+
                 for alias in names {
-                    if alias.name.contains('.') && alias.asname.is_none() {
-                        // Given `import foo.bar`, `name` would be "foo", and `qualified_name` would be
-                        // "foo.bar".
-                        let name = alias.name.split('.').next().unwrap();
+                    // Given `import foo.bar`, `module` would be "foo", and `call_path` would be
+                    // `["foo", "bar"]`.
+                    let module = alias.name.split('.').next().unwrap();
+
+                    // Mark the top-level module as "seen" by the semantic model.
+                    self.semantic.add_module(module);
+
+                    if alias.asname.is_none() && alias.name.contains('.') {
                         let call_path: Box<[&str]> = alias.name.split('.').collect();
                         self.add_binding(
-                            name,
+                            module,
                             alias.identifier(),
                             BindingKind::SubmoduleImport(SubmoduleImport { call_path }),
                             BindingFlags::EXTERNAL,
@@ -413,8 +414,20 @@ where
                 level,
                 range: _,
             }) => {
+                if self.semantic.at_top_level() {
+                    self.importer.visit_import(stmt);
+                }
+
                 let module = module.as_deref();
                 let level = *level;
+
+                // Mark the top-level module as "seen" by the semantic model.
+                if level.map_or(true, |level| level == 0) {
+                    if let Some(module) = module.and_then(|module| module.split('.').next()) {
+                        self.semantic.add_module(module);
+                    }
+                }
+
                 for alias in names {
                     if let Some("__future__") = module {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
