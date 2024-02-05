@@ -1,3 +1,5 @@
+use std::iter;
+
 use anyhow::{bail, Result};
 use itertools::Itertools;
 use libcst_native::{
@@ -7,7 +9,6 @@ use libcst_native::{
     RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
     TrailingWhitespace, Tuple,
 };
-use std::iter;
 
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::Expr;
@@ -138,46 +139,6 @@ pub(crate) fn fix_unnecessary_generator_dict(expr: &Expr, checker: &Checker) -> 
         rpar: vec![],
         whitespace_before_colon: ParenthesizableWhitespace::default(),
         whitespace_after_colon: space(),
-    }));
-
-    Ok(Edit::range_replacement(
-        pad_expression(
-            tree.codegen_stylist(stylist),
-            expr.range(),
-            checker.locator(),
-            checker.semantic(),
-        ),
-        expr.range(),
-    ))
-}
-
-/// (C403) Convert `set([x for x in y])` to `{x for x in y}`.
-pub(crate) fn fix_unnecessary_list_comprehension_set(
-    expr: &Expr,
-    checker: &Checker,
-) -> Result<Edit> {
-    let locator = checker.locator();
-    let stylist = checker.stylist();
-    // Expr(Call(ListComp)))) ->
-    // Expr(SetComp)))
-    let module_text = locator.slice(expr);
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
-    let arg = match_arg(call)?;
-
-    let list_comp = match_list_comp(&arg.value)?;
-
-    tree = Expression::SetComp(Box::new(SetComp {
-        elt: list_comp.elt.clone(),
-        for_in: list_comp.for_in.clone(),
-        lbrace: LeftCurlyBrace {
-            whitespace_after: call.whitespace_before_args.clone(),
-        },
-        rbrace: RightCurlyBrace {
-            whitespace_before: arg.whitespace_after_arg.clone(),
-        },
-        lpar: list_comp.lpar.clone(),
-        rpar: list_comp.rpar.clone(),
     }));
 
     Ok(Edit::range_replacement(
@@ -544,7 +505,7 @@ pub(crate) fn fix_unnecessary_collection_call(expr: &Expr, checker: &Checker) ->
 /// However, this is a syntax error under the f-string grammar. As such,
 /// this method will pad the start and end of an expression as needed to
 /// avoid producing invalid syntax.
-fn pad_expression(
+pub(crate) fn pad_expression(
     content: String,
     range: TextRange,
     locator: &Locator,
@@ -572,6 +533,48 @@ fn pad_expression(
         format!("{content} ")
     } else {
         content
+    }
+}
+
+/// Like [`pad_expression`], but only pads the start of the expression.
+pub(crate) fn pad_start(
+    content: &str,
+    range: TextRange,
+    locator: &Locator,
+    semantic: &SemanticModel,
+) -> String {
+    if !semantic.in_f_string() {
+        return content.into();
+    }
+
+    // If the expression is immediately preceded by an opening brace, then
+    // we need to add a space before the expression.
+    let prefix = locator.up_to(range.start());
+    if matches!(prefix.chars().next_back(), Some('{')) {
+        format!(" {content}")
+    } else {
+        content.into()
+    }
+}
+
+/// Like [`pad_expression`], but only pads the end of the expression.
+pub(crate) fn pad_end(
+    content: &str,
+    range: TextRange,
+    locator: &Locator,
+    semantic: &SemanticModel,
+) -> String {
+    if !semantic.in_f_string() {
+        return content.into();
+    }
+
+    // If the expression is immediately preceded by an opening brace, then
+    // we need to add a space before the expression.
+    let suffix = locator.after(range.end());
+    if matches!(suffix.chars().next(), Some('}')) {
+        format!("{content} ")
+    } else {
+        content.into()
     }
 }
 

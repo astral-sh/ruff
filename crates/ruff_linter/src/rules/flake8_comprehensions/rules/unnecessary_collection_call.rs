@@ -76,7 +76,7 @@ pub(crate) fn unnecessary_collection_call(
         {
             // `dict()` or `dict(a=1)` (as opposed to `dict(**a)`)
         }
-        "list" | "tuple" => {
+        "list" | "tuple" if keywords.is_empty() => {
             // `list()` or `tuple()`
         }
         _ => return,

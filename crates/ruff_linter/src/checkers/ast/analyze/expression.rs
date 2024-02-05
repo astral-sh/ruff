@@ -653,9 +653,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 );
             }
             if checker.enabled(Rule::UnnecessaryListComprehensionSet) {
-                flake8_comprehensions::rules::unnecessary_list_comprehension_set(
-                    checker, expr, func, args, keywords,
-                );
+                flake8_comprehensions::rules::unnecessary_list_comprehension_set(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryListComprehensionDict) {
                 flake8_comprehensions::rules::unnecessary_list_comprehension_dict(
