@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.2.1
+
+This release includes support for range formatting (i.e., the ability to format specific lines
+within a source file).
+
+### Preview features
+
+- \[`refurn`\] Implement `missing-f-string-syntax` (`RUF027`) ([#9728](https://github.com/astral-sh/ruff/pull/9728))
+- Format module-level docstrings ([#9725](https://github.com/astral-sh/ruff/pull/9725))
+
+### Formatter
+
+- Add `--range` option to `ruff format` ([#9733](https://github.com/astral-sh/ruff/pull/9733))
+- Don't trim last empty line in docstrings ([#9813](https://github.com/astral-sh/ruff/pull/9813))
+
+### Bug fixes
+
+- Skip empty lines when determining base indentation ([#9795](https://github.com/astral-sh/ruff/pull/9795))
+- Drop `__get__` and `__set__` from `unnecessary-dunder-call` ([#9791](https://github.com/astral-sh/ruff/pull/9791))
+- Respect generic `Protocol` in ellipsis removal ([#9841](https://github.com/astral-sh/ruff/pull/9841))
+- Revert "Use publicly available Apple Silicon runners (#9726)" ([#9834](https://github.com/astral-sh/ruff/pull/9834))
+
+### Performance
+
+- Skip LibCST parsing for standard dedent adjustments ([#9769](https://github.com/astral-sh/ruff/pull/9769))
+- Remove CST-based fixer for `C408` ([#9822](https://github.com/astral-sh/ruff/pull/9822))
+- Add our own ignored-names abstractions ([#9802](https://github.com/astral-sh/ruff/pull/9802))
+- Remove CST-based fixers for `C400`, `C401`, `C410`, and `C418` ([#9819](https://github.com/astral-sh/ruff/pull/9819))
+- Use `AhoCorasick` to speed up quote match ([#9773](https://github.com/astral-sh/ruff/pull/9773))
+- Remove CST-based fixers for `C405` and `C409` ([#9821](https://github.com/astral-sh/ruff/pull/9821))
+- Add fast-path for comment detection ([#9808](https://github.com/astral-sh/ruff/pull/9808))
+- Invert order of checks in `zero-sleep-call` ([#9766](https://github.com/astral-sh/ruff/pull/9766))
+- Short-circuit typing matches based on imports ([#9800](https://github.com/astral-sh/ruff/pull/9800))
+- Run dunder method rule on methods directly ([#9815](https://github.com/astral-sh/ruff/pull/9815))
+- Track top-level module imports in the semantic model ([#9775](https://github.com/astral-sh/ruff/pull/9775))
+- Slight speed-up for lowercase and uppercase identifier checks ([#9798](https://github.com/astral-sh/ruff/pull/9798))
+- Remove LibCST-based fixer for `C403` ([#9818](https://github.com/astral-sh/ruff/pull/9818))
+
+### Documentation
+
+- Update `max-pos-args` example to `max-positional-args` ([#9797](https://github.com/astral-sh/ruff/pull/9797))
+- Fixed example code in `weak_cryptographic_key.rs` ([#9774](https://github.com/astral-sh/ruff/pull/9774))
+- Fix references to deprecated `ANN` rules in changelog ([#9771](https://github.com/astral-sh/ruff/pull/9771))
+- Fix default for `max-positional-args` ([#9838](https://github.com/astral-sh/ruff/pull/9838))
+
 ## 0.2.0
 
 ### Breaking changes
