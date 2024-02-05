@@ -685,7 +685,7 @@ Editor options:
                        It might be necessary to extend the start backwards or
                        the end forwards, to fully enclose a logical line.
                        The `<RANGE>` uses the format
-                       `<start_line>:<start_column>-<end_line><end_column>`.
+                       `<start_line>:<start_column>-<end_line>:<end_column>`.
 
 Log levels:
   -v, --verbose  Enable verbose logging
