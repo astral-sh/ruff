@@ -57,7 +57,7 @@ pub(crate) fn unnecessary_list_comprehension_set(checker: &mut Checker, call: &a
     }
     if argument.is_list_comp_expr() {
         let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionSet, call.range());
-        diagnostic.try_set_fix(|| {
+        diagnostic.set_fix({
             // Replace `set(` with `{`.
             let call_start = Edit::replacement(
                 pad_start("{", call.range(), checker.locator(), checker.semantic()),
@@ -79,10 +79,7 @@ pub(crate) fn unnecessary_list_comprehension_set(checker: &mut Checker, call: &a
             // Delete the close bracket (`]`).
             let argument_end = Edit::deletion(argument.end() - TextSize::from(1), argument.end());
 
-            Ok(Fix::unsafe_edits(
-                call_start,
-                [argument_start, argument_end, call_end],
-            ))
+            Fix::unsafe_edits(call_start, [argument_start, argument_end, call_end])
         });
         checker.diagnostics.push(diagnostic);
     }

@@ -29,73 +29,6 @@ use crate::{
     },
 };
 
-/// (C400) Convert `list(x for x in y)` to `[x for x in y]`.
-pub(crate) fn fix_unnecessary_generator_list(
-    expr: &Expr,
-    locator: &Locator,
-    stylist: &Stylist,
-) -> Result<Edit> {
-    // Expr(Call(GeneratorExp)))) -> Expr(ListComp)))
-    let module_text = locator.slice(expr);
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
-    let arg = match_arg(call)?;
-
-    let generator_exp = match_generator_exp(&arg.value)?;
-
-    tree = Expression::ListComp(Box::new(ListComp {
-        elt: generator_exp.elt.clone(),
-        for_in: generator_exp.for_in.clone(),
-        lbracket: LeftSquareBracket {
-            whitespace_after: call.whitespace_before_args.clone(),
-        },
-        rbracket: RightSquareBracket {
-            whitespace_before: arg.whitespace_after_arg.clone(),
-        },
-        lpar: generator_exp.lpar.clone(),
-        rpar: generator_exp.rpar.clone(),
-    }));
-
-    Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
-        expr.range(),
-    ))
-}
-
-/// (C401) Convert `set(x for x in y)` to `{x for x in y}`.
-pub(crate) fn fix_unnecessary_generator_set(expr: &Expr, checker: &Checker) -> Result<Edit> {
-    let locator = checker.locator();
-    let stylist = checker.stylist();
-
-    // Expr(Call(GeneratorExp)))) -> Expr(SetComp)))
-    let module_text = locator.slice(expr);
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
-    let arg = match_arg(call)?;
-
-    let generator_exp = match_generator_exp(&arg.value)?;
-
-    tree = Expression::SetComp(Box::new(SetComp {
-        elt: generator_exp.elt.clone(),
-        for_in: generator_exp.for_in.clone(),
-        lbrace: LeftCurlyBrace {
-            whitespace_after: call.whitespace_before_args.clone(),
-        },
-        rbrace: RightCurlyBrace {
-            whitespace_before: arg.whitespace_after_arg.clone(),
-        },
-        lpar: generator_exp.lpar.clone(),
-        rpar: generator_exp.rpar.clone(),
-    }));
-
-    let content = tree.codegen_stylist(stylist);
-
-    Ok(Edit::range_replacement(
-        pad_expression(content, expr.range(), checker.locator(), checker.semantic()),
-        expr.range(),
-    ))
-}
-
 /// (C402) Convert `dict((x, x) for x in range(3))` to `{x: x for x in
 /// range(3)}`.
 pub(crate) fn fix_unnecessary_generator_dict(expr: &Expr, checker: &Checker) -> Result<Edit> {
@@ -628,58 +561,6 @@ pub(crate) fn fix_unnecessary_literal_within_tuple_call(
     ))
 }
 
-/// (C410) Convert `list([1, 2])` to `[1, 2]`
-pub(crate) fn fix_unnecessary_literal_within_list_call(
-    expr: &Expr,
-    locator: &Locator,
-    stylist: &Stylist,
-) -> Result<Edit> {
-    let module_text = locator.slice(expr);
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
-    let arg = match_arg(call)?;
-    let (elements, whitespace_after, whitespace_before) = match &arg.value {
-        Expression::Tuple(inner) => (
-            &inner.elements,
-            &inner
-                .lpar
-                .first()
-                .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses"))?
-                .whitespace_after,
-            &inner
-                .rpar
-                .first()
-                .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses"))?
-                .whitespace_before,
-        ),
-        Expression::List(inner) => (
-            &inner.elements,
-            &inner.lbracket.whitespace_after,
-            &inner.rbracket.whitespace_before,
-        ),
-        _ => {
-            bail!("Expected Expression::Tuple | Expression::List");
-        }
-    };
-
-    tree = Expression::List(Box::new(List {
-        elements: elements.clone(),
-        lbracket: LeftSquareBracket {
-            whitespace_after: whitespace_after.clone(),
-        },
-        rbracket: RightSquareBracket {
-            whitespace_before: whitespace_before.clone(),
-        },
-        lpar: vec![],
-        rpar: vec![],
-    }));
-
-    Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
-        expr.range(),
-    ))
-}
-
 /// (C411) Convert `list([i * i for i in x])` to `[i * i for i in x]`.
 pub(crate) fn fix_unnecessary_list_call(
     expr: &Expr,
@@ -1092,25 +973,6 @@ pub(crate) fn fix_unnecessary_map(
     }
 
     Ok(Edit::range_replacement(content, expr.range()))
-}
-
-/// (C418) Convert `dict({"a": 1})` to `{"a": 1}`
-pub(crate) fn fix_unnecessary_literal_within_dict_call(
-    expr: &Expr,
-    locator: &Locator,
-    stylist: &Stylist,
-) -> Result<Edit> {
-    let module_text = locator.slice(expr);
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
-    let arg = match_arg(call)?;
-
-    tree = arg.value.clone();
-
-    Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
-        expr.range(),
-    ))
 }
 
 /// (C419) Convert `[i for i in a]` into `i for i in a`

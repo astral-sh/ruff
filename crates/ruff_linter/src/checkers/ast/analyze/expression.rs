@@ -638,14 +638,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_bandit::rules::tarfile_unsafe_members(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryGeneratorList) {
-                flake8_comprehensions::rules::unnecessary_generator_list(
-                    checker, expr, func, args, keywords,
-                );
+                flake8_comprehensions::rules::unnecessary_generator_list(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryGeneratorSet) {
-                flake8_comprehensions::rules::unnecessary_generator_set(
-                    checker, expr, func, args, keywords,
-                );
+                flake8_comprehensions::rules::unnecessary_generator_set(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryGeneratorDict) {
                 flake8_comprehensions::rules::unnecessary_generator_dict(
@@ -686,14 +682,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 );
             }
             if checker.enabled(Rule::UnnecessaryLiteralWithinListCall) {
-                flake8_comprehensions::rules::unnecessary_literal_within_list_call(
-                    checker, expr, func, args, keywords,
-                );
+                flake8_comprehensions::rules::unnecessary_literal_within_list_call(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryLiteralWithinDictCall) {
-                flake8_comprehensions::rules::unnecessary_literal_within_dict_call(
-                    checker, expr, func, args, keywords,
-                );
+                flake8_comprehensions::rules::unnecessary_literal_within_dict_call(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryListCall) {
                 flake8_comprehensions::rules::unnecessary_list_call(checker, expr, func, args);
