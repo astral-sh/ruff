@@ -1622,7 +1622,7 @@ FStringExpr: StringType = {
 FStringMiddlePattern: ast::FStringElement = {
     FStringReplacementField,
     <location:@L> <fstring_middle:fstring_middle> <end_location:@R> =>? {
-        let (source, is_raw) = fstring_middle;
+        let (source, is_raw, _) = fstring_middle;
         Ok(parse_fstring_literal_element(&source, is_raw, (location..end_location).into())?)
     }
 };
@@ -2067,7 +2067,8 @@ extern {
         },
         fstring_middle => token::Tok::FStringMiddle {
             value: <String>,
-            is_raw: <bool>
+            is_raw: <bool>,
+            triple_quoted: <bool>
         },
         name => token::Tok::Name { name: <String> },
         ipy_escape_command => token::Tok::IpyEscapeCommand {

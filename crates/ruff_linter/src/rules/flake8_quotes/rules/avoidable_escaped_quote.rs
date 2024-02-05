@@ -221,6 +221,7 @@ pub(crate) fn avoidable_escaped_quote(
             Tok::FStringMiddle {
                 value: string_contents,
                 is_raw,
+                triple_quoted: _,
             } if !is_raw => {
                 let Some(context) = fstrings.last_mut() else {
                     continue;
@@ -361,6 +362,7 @@ pub(crate) fn unnecessary_escaped_quote(
             Tok::FStringMiddle {
                 value: string_contents,
                 is_raw,
+                triple_quoted: _,
             } if !is_raw => {
                 let Some(context) = fstrings.last_mut() else {
                     continue;

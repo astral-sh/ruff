@@ -11,6 +11,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\\N{BULLET} normal \\Nope \\N",
             is_raw: false,
+            triple_quoted: false,
         },
         2..28,
     ),

@@ -675,6 +675,7 @@ impl<'source> Lexer<'source> {
         Ok(Some(Tok::FStringMiddle {
             value,
             is_raw: fstring.is_raw_string(),
+            triple_quoted: fstring.is_triple_quoted(),
         }))
     }
 

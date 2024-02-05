@@ -54,6 +54,8 @@ pub enum Tok {
         value: String,
         /// Whether the string is raw or not.
         is_raw: bool,
+        /// Whether the string is triple quoted.
+        triple_quoted: bool,
     },
     /// Token value for the end of an f-string. This includes the closing quote.
     FStringEnd,
