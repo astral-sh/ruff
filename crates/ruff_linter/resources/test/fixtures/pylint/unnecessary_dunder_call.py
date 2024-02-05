@@ -33,7 +33,7 @@ class Thing:
     def use_descriptor(self, item):
         item.__get__(self, type(self))  # OK
         item.__set__(self, 1)  # OK
-        item.__delete__(self)
+        item.__delete__(self)  # OK
 
 
 blah = lambda: {"a": 1}.__delitem__("a")  # OK
