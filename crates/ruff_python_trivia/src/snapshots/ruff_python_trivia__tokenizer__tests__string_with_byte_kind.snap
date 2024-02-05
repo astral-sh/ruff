@@ -4,7 +4,11 @@ expression: test_case.tokens()
 ---
 [
     SimpleToken {
-        kind: Name,
+        kind: Other,
         range: 0..2,
+    },
+    SimpleToken {
+        kind: Bogus,
+        range: 2..7,
     },
 ]
