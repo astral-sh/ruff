@@ -7,7 +7,7 @@ within a source file).
 
 ### Preview features
 
-- \[`refurn`\] Implement `missing-f-string-syntax` (`RUF027`) ([#9728](https://github.com/astral-sh/ruff/pull/9728))
+- \[`refurb`\] Implement `missing-f-string-syntax` (`RUF027`) ([#9728](https://github.com/astral-sh/ruff/pull/9728))
 - Format module-level docstrings ([#9725](https://github.com/astral-sh/ruff/pull/9725))
 
 ### Formatter
