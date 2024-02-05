@@ -207,3 +207,23 @@ class Repro:
     def stub(self) -> str:
         """Docstring"""
         ...
+
+
+class Repro(Protocol[int]):
+    def func(self) -> str:
+        """Docstring"""
+        ...
+
+    def impl(self) -> str:
+        """Docstring"""
+        return self.func()
+
+
+class Repro[int](Protocol):
+    def func(self) -> str:
+        """Docstring"""
+        ...
+
+    def impl(self) -> str:
+        """Docstring"""
+        return self.func()

@@ -1,6 +1,7 @@
 use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::whitespace::trailing_comment_start_offset;
 use ruff_python_ast::Stmt;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
@@ -132,7 +133,7 @@ fn in_protocol_or_abstract_method(semantic: &SemanticModel) -> bool {
         ScopeKind::Class(class_def) => class_def
             .bases()
             .iter()
-            .any(|base| semantic.match_typing_expr(base, "Protocol")),
+            .any(|base| semantic.match_typing_expr(map_subscript(base), "Protocol")),
         ScopeKind::Function(function_def) => {
             ruff_python_semantic::analyze::visibility::is_abstract(
                 &function_def.decorator_list,
