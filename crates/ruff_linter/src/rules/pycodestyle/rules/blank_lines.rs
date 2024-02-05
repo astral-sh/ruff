@@ -524,6 +524,13 @@ impl BlankLines {
             BlankLines::Many { count, .. } => count.get(),
         }
     }
+
+    fn range(&self) -> Option<TextRange> {
+        match self {
+            BlankLines::Zero => None,
+            BlankLines::Many { range, .. } => Some(*range),
+        }
+    }
 }
 
 impl PartialEq<u32> for BlankLines {
@@ -665,16 +672,15 @@ impl BlankLinesChecker {
                 && matches!(line.kind,  LogicalLineKind::Function)
                 && matches!(self.class_status, Status::Inside(_))
                 // The class/parent method's docstring can directly precede the def.
-                && !matches!(self.follows, Follows::Docstring)
+                // Allow following a decorator (if there is an error it will be triggered on the first decorator).
+                && !matches!(self.follows, Follows::Docstring | Follows::Decorator)
                 // Do not trigger when the def follows an if/while/etc...
                 && prev_indent_length.is_some_and(|prev_indent_length| prev_indent_length >= line.indent_length)
-                // Allow following a decorator (if there is an error it will be triggered on the first decorator).
-                && !matches!(self.follows, Follows::Decorator)
             {
                 // E301
                 let mut diagnostic = Diagnostic::new(
                     BlankLineBetweenMethods {
-                        actual_blank_lines: line.preceding_blank_lines.count(),
+                        actual_blank_lines: 0,
                     },
                     line.first_token_range,
                 );
@@ -704,26 +710,16 @@ impl BlankLinesChecker {
                     line.first_token_range,
                 );
 
-                match line.blank_lines {
-                    BlankLines::Many {
-                        count: _blank_lines,
-                        range: blank_lines_range,
-                    } => {
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            stylist
-                                .line_ending()
-                                .repeat((BLANK_LINES_TOP_LEVEL) as usize),
-                            blank_lines_range,
-                        )));
-                    }
-                    BlankLines::Zero => {
-                        diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                            stylist
-                                .line_ending()
-                                .repeat((BLANK_LINES_TOP_LEVEL) as usize),
-                            locator.line_start(self.last_non_comment_line_end),
-                        )));
-                    }
+                if let Some(blank_lines_range) = line.blank_lines.range() {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        stylist.line_ending().repeat(BLANK_LINES_TOP_LEVEL as usize),
+                        blank_lines_range,
+                    )));
+                } else {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                        stylist.line_ending().repeat(BLANK_LINES_TOP_LEVEL as usize),
+                        locator.line_start(self.last_non_comment_line_end),
+                    )));
                 }
 
                 diagnostics.push(diagnostic);
@@ -740,23 +736,17 @@ impl BlankLinesChecker {
                     line.first_token_range,
                 );
 
-                if let BlankLines::Many {
-                    count: _,
-                    range: blank_lines_range,
-                } = line.blank_lines
-                {
+                if let Some(blank_lines_range) = line.blank_lines.range() {
                     if line.indent_length > 0 {
                         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                             stylist
                                 .line_ending()
-                                .repeat((BLANK_LINES_METHOD_LEVEL) as usize),
+                                .repeat(BLANK_LINES_METHOD_LEVEL as usize),
                             blank_lines_range,
                         )));
                     } else {
                         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            stylist
-                                .line_ending()
-                                .repeat((BLANK_LINES_TOP_LEVEL) as usize),
+                            stylist.line_ending().repeat(BLANK_LINES_TOP_LEVEL as usize),
                             blank_lines_range,
                         )));
                     };
@@ -810,24 +800,16 @@ impl BlankLinesChecker {
                     line.first_token_range,
                 );
 
-                match line.blank_lines {
-                    BlankLines::Many {
-                        count: _blank_lines,
-                        range: blank_lines_range,
-                    } => {
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            stylist
-                                .line_ending()
-                                .repeat((BLANK_LINES_TOP_LEVEL) as usize),
-                            blank_lines_range,
-                        )));
-                    }
-                    BlankLines::Zero => diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                        stylist
-                            .line_ending()
-                            .repeat((BLANK_LINES_TOP_LEVEL) as usize),
+                if let Some(blank_lines_range) = line.blank_lines.range() {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        stylist.line_ending().repeat(BLANK_LINES_TOP_LEVEL as usize),
+                        blank_lines_range,
+                    )));
+                } else {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                        stylist.line_ending().repeat(BLANK_LINES_TOP_LEVEL as usize),
                         locator.line_start(line.first_token_range.start()),
-                    ))),
+                    )))
                 }
 
                 diagnostics.push(diagnostic);
