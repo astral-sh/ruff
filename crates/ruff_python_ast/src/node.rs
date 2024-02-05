@@ -89,6 +89,7 @@ pub enum AnyNode {
     ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler),
     FStringExpressionElement(ast::FStringExpressionElement),
     FStringLiteralElement(ast::FStringLiteralElement),
+    FStringFormatSpec(ast::FStringFormatSpec),
     PatternMatchValue(ast::PatternMatchValue),
     PatternMatchSingleton(ast::PatternMatchSingleton),
     PatternMatchSequence(ast::PatternMatchSequence),
@@ -169,6 +170,7 @@ impl AnyNode {
             | AnyNode::ExprCall(_)
             | AnyNode::FStringExpressionElement(_)
             | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringFormatSpec(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprStringLiteral(_)
             | AnyNode::ExprBytesLiteral(_)
@@ -281,6 +283,7 @@ impl AnyNode {
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::FStringExpressionElement(_)
             | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringFormatSpec(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
             | AnyNode::PatternMatchSequence(_)
@@ -361,6 +364,7 @@ impl AnyNode {
             | AnyNode::ExprCall(_)
             | AnyNode::FStringExpressionElement(_)
             | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringFormatSpec(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprStringLiteral(_)
             | AnyNode::ExprBytesLiteral(_)
@@ -465,6 +469,7 @@ impl AnyNode {
             | AnyNode::ExprCall(_)
             | AnyNode::FStringExpressionElement(_)
             | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringFormatSpec(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprStringLiteral(_)
             | AnyNode::ExprBytesLiteral(_)
@@ -554,6 +559,7 @@ impl AnyNode {
             | AnyNode::ExprCall(_)
             | AnyNode::FStringExpressionElement(_)
             | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringFormatSpec(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprStringLiteral(_)
             | AnyNode::ExprBytesLiteral(_)
@@ -668,6 +674,7 @@ impl AnyNode {
             Self::ExprCall(node) => AnyNodeRef::ExprCall(node),
             Self::FStringExpressionElement(node) => AnyNodeRef::FStringExpressionElement(node),
             Self::FStringLiteralElement(node) => AnyNodeRef::FStringLiteralElement(node),
+            Self::FStringFormatSpec(node) => AnyNodeRef::FStringFormatSpec(node),
             Self::ExprFString(node) => AnyNodeRef::ExprFString(node),
             Self::ExprStringLiteral(node) => AnyNodeRef::ExprStringLiteral(node),
             Self::ExprBytesLiteral(node) => AnyNodeRef::ExprBytesLiteral(node),
@@ -2626,6 +2633,43 @@ impl AstNode for ast::ExprCall {
         } = self;
         visitor.visit_expr(func);
         visitor.visit_arguments(arguments);
+    }
+}
+impl AstNode for ast::FStringFormatSpec {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::FStringFormatSpec(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::FStringFormatSpec(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        for element in &self.elements {
+            visitor.visit_f_string_element(element);
+        }
     }
 }
 impl AstNode for ast::FStringExpressionElement {
@@ -4854,6 +4898,12 @@ impl From<ast::FStringLiteralElement> for AnyNode {
     }
 }
 
+impl From<ast::FStringFormatSpec> for AnyNode {
+    fn from(node: ast::FStringFormatSpec) -> Self {
+        AnyNode::FStringFormatSpec(node)
+    }
+}
+
 impl From<ast::ExprFString> for AnyNode {
     fn from(node: ast::ExprFString) -> Self {
         AnyNode::ExprFString(node)
@@ -5150,6 +5200,7 @@ impl Ranged for AnyNode {
             AnyNode::ExprCall(node) => node.range(),
             AnyNode::FStringExpressionElement(node) => node.range(),
             AnyNode::FStringLiteralElement(node) => node.range(),
+            AnyNode::FStringFormatSpec(node) => node.range(),
             AnyNode::ExprFString(node) => node.range(),
             AnyNode::ExprStringLiteral(node) => node.range(),
             AnyNode::ExprBytesLiteral(node) => node.range(),
@@ -5246,6 +5297,7 @@ pub enum AnyNodeRef<'a> {
     ExprCall(&'a ast::ExprCall),
     FStringExpressionElement(&'a ast::FStringExpressionElement),
     FStringLiteralElement(&'a ast::FStringLiteralElement),
+    FStringFormatSpec(&'a ast::FStringFormatSpec),
     ExprFString(&'a ast::ExprFString),
     ExprStringLiteral(&'a ast::ExprStringLiteral),
     ExprBytesLiteral(&'a ast::ExprBytesLiteral),
@@ -5341,6 +5393,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::ExprCall(node) => NonNull::from(*node).cast(),
             AnyNodeRef::FStringExpressionElement(node) => NonNull::from(*node).cast(),
             AnyNodeRef::FStringLiteralElement(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::FStringFormatSpec(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprFString(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprStringLiteral(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprBytesLiteral(node) => NonNull::from(*node).cast(),
@@ -5442,6 +5495,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::ExprCall(_) => NodeKind::ExprCall,
             AnyNodeRef::FStringExpressionElement(_) => NodeKind::FStringExpressionElement,
             AnyNodeRef::FStringLiteralElement(_) => NodeKind::FStringLiteralElement,
+            AnyNodeRef::FStringFormatSpec(_) => NodeKind::FStringFormatSpec,
             AnyNodeRef::ExprFString(_) => NodeKind::ExprFString,
             AnyNodeRef::ExprStringLiteral(_) => NodeKind::ExprStringLiteral,
             AnyNodeRef::ExprBytesLiteral(_) => NodeKind::ExprBytesLiteral,
@@ -5538,6 +5592,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::FStringExpressionElement(_)
             | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringFormatSpec(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)
@@ -5650,6 +5705,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::FStringExpressionElement(_)
             | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringFormatSpec(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -5729,6 +5785,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::FStringExpressionElement(_)
             | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringFormatSpec(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)
@@ -5833,6 +5890,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::FStringExpressionElement(_)
             | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringFormatSpec(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)
@@ -5922,6 +5980,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::FStringExpressionElement(_)
             | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringFormatSpec(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)
@@ -5968,22 +6027,6 @@ impl<'a> AnyNodeRef<'a> {
         }
     }
 
-    pub const fn is_node_with_body(self) -> bool {
-        matches!(
-            self,
-            AnyNodeRef::StmtIf(_)
-                | AnyNodeRef::StmtFor(_)
-                | AnyNodeRef::StmtWhile(_)
-                | AnyNodeRef::StmtWith(_)
-                | AnyNodeRef::StmtMatch(_)
-                | AnyNodeRef::StmtFunctionDef(_)
-                | AnyNodeRef::StmtClassDef(_)
-                | AnyNodeRef::StmtTry(_)
-                | AnyNodeRef::ExceptHandlerExceptHandler(_)
-                | AnyNodeRef::ElifElseClause(_)
-        )
-    }
-
     /// In our AST, only some alternative branches are represented as a node. This has historical
     /// reasons, e.g. we added a node for elif/else in if statements which was not originally
     /// present in the parser.
@@ -5994,9 +6037,10 @@ impl<'a> AnyNodeRef<'a> {
         )
     }
 
-    pub fn visit_preorder<'b, V>(&'b self, visitor: &mut V)
+    pub fn visit_preorder<'b, V>(self, visitor: &mut V)
     where
         V: PreorderVisitor<'b> + ?Sized,
+        'a: 'b,
     {
         match self {
             AnyNodeRef::ModModule(node) => node.visit_preorder(visitor),
@@ -6045,6 +6089,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::ExprCall(node) => node.visit_preorder(visitor),
             AnyNodeRef::FStringExpressionElement(node) => node.visit_preorder(visitor),
             AnyNodeRef::FStringLiteralElement(node) => node.visit_preorder(visitor),
+            AnyNodeRef::FStringFormatSpec(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprFString(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprStringLiteral(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprBytesLiteral(node) => node.visit_preorder(visitor),
@@ -6432,6 +6477,12 @@ impl<'a> From<&'a ast::FStringExpressionElement> for AnyNodeRef<'a> {
 impl<'a> From<&'a ast::FStringLiteralElement> for AnyNodeRef<'a> {
     fn from(node: &'a ast::FStringLiteralElement) -> Self {
         AnyNodeRef::FStringLiteralElement(node)
+    }
+}
+
+impl<'a> From<&'a ast::FStringFormatSpec> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::FStringFormatSpec) -> Self {
+        AnyNodeRef::FStringFormatSpec(node)
     }
 }
 
@@ -6857,6 +6908,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::ExprCall(node) => node.range(),
             AnyNodeRef::FStringExpressionElement(node) => node.range(),
             AnyNodeRef::FStringLiteralElement(node) => node.range(),
+            AnyNodeRef::FStringFormatSpec(node) => node.range(),
             AnyNodeRef::ExprFString(node) => node.range(),
             AnyNodeRef::ExprStringLiteral(node) => node.range(),
             AnyNodeRef::ExprBytesLiteral(node) => node.range(),
@@ -6955,6 +7007,7 @@ pub enum NodeKind {
     ExprCall,
     FStringExpressionElement,
     FStringLiteralElement,
+    FStringFormatSpec,
     ExprFString,
     ExprStringLiteral,
     ExprBytesLiteral,

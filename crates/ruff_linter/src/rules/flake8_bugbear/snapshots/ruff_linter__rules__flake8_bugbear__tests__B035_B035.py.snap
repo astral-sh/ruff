@@ -1,0 +1,90 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B035.py:17:2: B035 Dictionary comprehension uses static key: `"key"`
+   |
+16 | # Errors
+17 | {"key": value.upper() for value in data}
+   |  ^^^^^ B035
+18 | {True: value.upper() for value in data}
+19 | {0: value.upper() for value in data}
+   |
+
+B035.py:18:2: B035 Dictionary comprehension uses static key: `True`
+   |
+16 | # Errors
+17 | {"key": value.upper() for value in data}
+18 | {True: value.upper() for value in data}
+   |  ^^^^ B035
+19 | {0: value.upper() for value in data}
+20 | {(1, "a"): value.upper() for value in data}  # Constant tuple
+   |
+
+B035.py:19:2: B035 Dictionary comprehension uses static key: `0`
+   |
+17 | {"key": value.upper() for value in data}
+18 | {True: value.upper() for value in data}
+19 | {0: value.upper() for value in data}
+   |  ^ B035
+20 | {(1, "a"): value.upper() for value in data}  # Constant tuple
+21 | {constant: value.upper() for value in data}
+   |
+
+B035.py:20:2: B035 Dictionary comprehension uses static key: `(1, "a")`
+   |
+18 | {True: value.upper() for value in data}
+19 | {0: value.upper() for value in data}
+20 | {(1, "a"): value.upper() for value in data}  # Constant tuple
+   |  ^^^^^^^^ B035
+21 | {constant: value.upper() for value in data}
+22 | {constant + constant: value.upper() for value in data}
+   |
+
+B035.py:21:2: B035 Dictionary comprehension uses static key: `constant`
+   |
+19 | {0: value.upper() for value in data}
+20 | {(1, "a"): value.upper() for value in data}  # Constant tuple
+21 | {constant: value.upper() for value in data}
+   |  ^^^^^^^^ B035
+22 | {constant + constant: value.upper() for value in data}
+23 | {constant.attribute: value.upper() for value in data}
+   |
+
+B035.py:22:2: B035 Dictionary comprehension uses static key: `constant + constant`
+   |
+20 | {(1, "a"): value.upper() for value in data}  # Constant tuple
+21 | {constant: value.upper() for value in data}
+22 | {constant + constant: value.upper() for value in data}
+   |  ^^^^^^^^^^^^^^^^^^^ B035
+23 | {constant.attribute: value.upper() for value in data}
+24 | {constant[0]: value.upper() for value in data}
+   |
+
+B035.py:23:2: B035 Dictionary comprehension uses static key: `constant.attribute`
+   |
+21 | {constant: value.upper() for value in data}
+22 | {constant + constant: value.upper() for value in data}
+23 | {constant.attribute: value.upper() for value in data}
+   |  ^^^^^^^^^^^^^^^^^^ B035
+24 | {constant[0]: value.upper() for value in data}
+25 | {tokens: token for token in tokens}
+   |
+
+B035.py:24:2: B035 Dictionary comprehension uses static key: `constant[0]`
+   |
+22 | {constant + constant: value.upper() for value in data}
+23 | {constant.attribute: value.upper() for value in data}
+24 | {constant[0]: value.upper() for value in data}
+   |  ^^^^^^^^^^^ B035
+25 | {tokens: token for token in tokens}
+   |
+
+B035.py:25:2: B035 Dictionary comprehension uses static key: `tokens`
+   |
+23 | {constant.attribute: value.upper() for value in data}
+24 | {constant[0]: value.upper() for value in data}
+25 | {tokens: token for token in tokens}
+   |  ^^^^^^ B035
+   |
+
+

@@ -32,8 +32,8 @@ use crate::renamer::Renamer;
 /// ```
 ///
 /// ## Options
-/// - `flake8-import-conventions.aliases`
-/// - `flake8-import-conventions.extend-aliases`
+/// - `lint.flake8-import-conventions.aliases`
+/// - `lint.flake8-import-conventions.extend-aliases`
 #[violation]
 pub struct UnconventionalImportAlias {
     name: String,

@@ -13,7 +13,7 @@ use ruff_text_size::Ranged;
 
 use crate::analyze::type_inference::{PythonType, ResolvedPythonType};
 use crate::model::SemanticModel;
-use crate::{Binding, BindingKind};
+use crate::{Binding, BindingKind, Modules};
 
 #[derive(Debug, Copy, Clone)]
 pub enum Callable {
@@ -101,18 +101,22 @@ impl std::fmt::Display for ModuleMember {
 /// Returns the PEP 585 standard library generic variant for a `typing` module reference, if such
 /// a variant exists.
 pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<ModuleMember> {
-    semantic.resolve_call_path(expr).and_then(|call_path| {
-        let [module, member] = call_path.as_slice() else {
-            return None;
-        };
-        as_pep_585_generic(module, member).map(|(module, member)| {
-            if module.is_empty() {
-                ModuleMember::BuiltIn(member)
-            } else {
-                ModuleMember::Member(module, member)
-            }
+    semantic
+        .seen_module(Modules::TYPING | Modules::TYPING_EXTENSIONS)
+        .then(|| semantic.resolve_call_path(expr))
+        .flatten()
+        .and_then(|call_path| {
+            let [module, member] = call_path.as_slice() else {
+                return None;
+            };
+            as_pep_585_generic(module, member).map(|(module, member)| {
+                if module.is_empty() {
+                    ModuleMember::BuiltIn(member)
+                } else {
+                    ModuleMember::Member(module, member)
+                }
+            })
         })
-    })
 }
 
 /// Return whether a given expression uses a PEP 585 standard library generic.
@@ -155,6 +159,11 @@ pub fn to_pep604_operator(
             Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(starred_annotation),
             _ => false,
         }
+    }
+
+    // If the typing modules were never imported, we'll never match below.
+    if !semantic.seen_typing() {
+        return None;
     }
 
     // If the slice is a forward reference (e.g., `Optional["Foo"]`), it can only be rewritten

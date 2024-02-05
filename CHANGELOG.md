@@ -1,5 +1,308 @@
 # Changelog
 
+## 0.2.1
+
+This release includes support for range formatting (i.e., the ability to format specific lines
+within a source file).
+
+### Preview features
+
+- \[`refurn`\] Implement `missing-f-string-syntax` (`RUF027`) ([#9728](https://github.com/astral-sh/ruff/pull/9728))
+- Format module-level docstrings ([#9725](https://github.com/astral-sh/ruff/pull/9725))
+
+### Formatter
+
+- Add `--range` option to `ruff format` ([#9733](https://github.com/astral-sh/ruff/pull/9733))
+- Don't trim last empty line in docstrings ([#9813](https://github.com/astral-sh/ruff/pull/9813))
+
+### Bug fixes
+
+- Skip empty lines when determining base indentation ([#9795](https://github.com/astral-sh/ruff/pull/9795))
+- Drop `__get__` and `__set__` from `unnecessary-dunder-call` ([#9791](https://github.com/astral-sh/ruff/pull/9791))
+- Respect generic `Protocol` in ellipsis removal ([#9841](https://github.com/astral-sh/ruff/pull/9841))
+- Revert "Use publicly available Apple Silicon runners (#9726)" ([#9834](https://github.com/astral-sh/ruff/pull/9834))
+
+### Performance
+
+- Skip LibCST parsing for standard dedent adjustments ([#9769](https://github.com/astral-sh/ruff/pull/9769))
+- Remove CST-based fixer for `C408` ([#9822](https://github.com/astral-sh/ruff/pull/9822))
+- Add our own ignored-names abstractions ([#9802](https://github.com/astral-sh/ruff/pull/9802))
+- Remove CST-based fixers for `C400`, `C401`, `C410`, and `C418` ([#9819](https://github.com/astral-sh/ruff/pull/9819))
+- Use `AhoCorasick` to speed up quote match ([#9773](https://github.com/astral-sh/ruff/pull/9773))
+- Remove CST-based fixers for `C405` and `C409` ([#9821](https://github.com/astral-sh/ruff/pull/9821))
+- Add fast-path for comment detection ([#9808](https://github.com/astral-sh/ruff/pull/9808))
+- Invert order of checks in `zero-sleep-call` ([#9766](https://github.com/astral-sh/ruff/pull/9766))
+- Short-circuit typing matches based on imports ([#9800](https://github.com/astral-sh/ruff/pull/9800))
+- Run dunder method rule on methods directly ([#9815](https://github.com/astral-sh/ruff/pull/9815))
+- Track top-level module imports in the semantic model ([#9775](https://github.com/astral-sh/ruff/pull/9775))
+- Slight speed-up for lowercase and uppercase identifier checks ([#9798](https://github.com/astral-sh/ruff/pull/9798))
+- Remove LibCST-based fixer for `C403` ([#9818](https://github.com/astral-sh/ruff/pull/9818))
+
+### Documentation
+
+- Update `max-pos-args` example to `max-positional-args` ([#9797](https://github.com/astral-sh/ruff/pull/9797))
+- Fixed example code in `weak_cryptographic_key.rs` ([#9774](https://github.com/astral-sh/ruff/pull/9774))
+- Fix references to deprecated `ANN` rules in changelog ([#9771](https://github.com/astral-sh/ruff/pull/9771))
+- Fix default for `max-positional-args` ([#9838](https://github.com/astral-sh/ruff/pull/9838))
+
+## 0.2.0
+
+### Breaking changes
+
+- The `NURSERY` selector cannot be used anymore
+- Legacy selection of nursery rules by exact codes is no longer allowed without preview enabled
+
+See also, the "Remapped rules" section which may result in disabled rules.
+
+### Deprecations
+
+The following rules are now deprecated:
+
+- [`missing-type-self`](https://docs.astral.sh/ruff/rules/missing-type-self/) (`ANN101`)
+- [`missing-type-cls`](https://docs.astral.sh/ruff/rules/missing-type-cls/) (`ANN102`)
+
+The following command line options are now deprecated:
+
+- `--show-source`; use `--output-format full` instead
+- `--no-show-source`; use `--output-format concise` instead
+- `--output-format text`; use `full` or `concise` instead
+
+The following settings have moved and the previous name is deprecated:
+
+- `ruff.allowed-confusables` → [`ruff.lint.allowed-confusables`](https://docs.astral.sh//ruff/settings/#lint_allowed-confusables)
+- `ruff.dummy-variable-rgx` → [`ruff.lint.dummy-variable-rgx`](https://docs.astral.sh//ruff/settings/#lint_dummy-variable-rgx)
+- `ruff.explicit-preview-rules` → [`ruff.lint.explicit-preview-rules`](https://docs.astral.sh//ruff/settings/#lint_explicit-preview-rules)
+- `ruff.extend-fixable` → [`ruff.lint.extend-fixable`](https://docs.astral.sh//ruff/settings/#lint_extend-fixable)
+- `ruff.extend-ignore` → [`ruff.lint.extend-ignore`](https://docs.astral.sh//ruff/settings/#lint_extend-ignore)
+- `ruff.extend-per-file-ignores` → [`ruff.lint.extend-per-file-ignores`](https://docs.astral.sh//ruff/settings/#lint_extend-per-file-ignores)
+- `ruff.extend-safe-fixes` → [`ruff.lint.extend-safe-fixes`](https://docs.astral.sh//ruff/settings/#lint_extend-safe-fixes)
+- `ruff.extend-select` → [`ruff.lint.extend-select`](https://docs.astral.sh//ruff/settings/#lint_extend-select)
+- `ruff.extend-unfixable` → [`ruff.lint.extend-unfixable`](https://docs.astral.sh//ruff/settings/#lint_extend-unfixable)
+- `ruff.extend-unsafe-fixes` → [`ruff.lint.extend-unsafe-fixes`](https://docs.astral.sh//ruff/settings/#lint_extend-unsafe-fixes)
+- `ruff.external` → [`ruff.lint.external`](https://docs.astral.sh//ruff/settings/#lint_external)
+- `ruff.fixable` → [`ruff.lint.fixable`](https://docs.astral.sh//ruff/settings/#lint_fixable)
+- `ruff.flake8-annotations` → [`ruff.lint.flake8-annotations`](https://docs.astral.sh//ruff/settings/#lint_flake8-annotations)
+- `ruff.flake8-bandit` → [`ruff.lint.flake8-bandit`](https://docs.astral.sh//ruff/settings/#lint_flake8-bandit)
+- `ruff.flake8-bugbear` → [`ruff.lint.flake8-bugbear`](https://docs.astral.sh//ruff/settings/#lint_flake8-bugbear)
+- `ruff.flake8-builtins` → [`ruff.lint.flake8-builtins`](https://docs.astral.sh//ruff/settings/#lint_flake8-builtins)
+- `ruff.flake8-comprehensions` → [`ruff.lint.flake8-comprehensions`](https://docs.astral.sh//ruff/settings/#lint_flake8-comprehensions)
+- `ruff.flake8-copyright` → [`ruff.lint.flake8-copyright`](https://docs.astral.sh//ruff/settings/#lint_flake8-copyright)
+- `ruff.flake8-errmsg` → [`ruff.lint.flake8-errmsg`](https://docs.astral.sh//ruff/settings/#lint_flake8-errmsg)
+- `ruff.flake8-gettext` → [`ruff.lint.flake8-gettext`](https://docs.astral.sh//ruff/settings/#lint_flake8-gettext)
+- `ruff.flake8-implicit-str-concat` → [`ruff.lint.flake8-implicit-str-concat`](https://docs.astral.sh//ruff/settings/#lint_flake8-implicit-str-concat)
+- `ruff.flake8-import-conventions` → [`ruff.lint.flake8-import-conventions`](https://docs.astral.sh//ruff/settings/#lint_flake8-import-conventions)
+- `ruff.flake8-pytest-style` → [`ruff.lint.flake8-pytest-style`](https://docs.astral.sh//ruff/settings/#lint_flake8-pytest-style)
+- `ruff.flake8-quotes` → [`ruff.lint.flake8-quotes`](https://docs.astral.sh//ruff/settings/#lint_flake8-quotes)
+- `ruff.flake8-self` → [`ruff.lint.flake8-self`](https://docs.astral.sh//ruff/settings/#lint_flake8-self)
+- `ruff.flake8-tidy-imports` → [`ruff.lint.flake8-tidy-imports`](https://docs.astral.sh//ruff/settings/#lint_flake8-tidy-imports)
+- `ruff.flake8-type-checking` → [`ruff.lint.flake8-type-checking`](https://docs.astral.sh//ruff/settings/#lint_flake8-type-checking)
+- `ruff.flake8-unused-arguments` → [`ruff.lint.flake8-unused-arguments`](https://docs.astral.sh//ruff/settings/#lint_flake8-unused-arguments)
+- `ruff.ignore` → [`ruff.lint.ignore`](https://docs.astral.sh//ruff/settings/#lint_ignore)
+- `ruff.ignore-init-module-imports` → [`ruff.lint.ignore-init-module-imports`](https://docs.astral.sh//ruff/settings/#lint_ignore-init-module-imports)
+- `ruff.isort` → [`ruff.lint.isort`](https://docs.astral.sh//ruff/settings/#lint_isort)
+- `ruff.logger-objects` → [`ruff.lint.logger-objects`](https://docs.astral.sh//ruff/settings/#lint_logger-objects)
+- `ruff.mccabe` → [`ruff.lint.mccabe`](https://docs.astral.sh//ruff/settings/#lint_mccabe)
+- `ruff.pep8-naming` → [`ruff.lint.pep8-naming`](https://docs.astral.sh//ruff/settings/#lint_pep8-naming)
+- `ruff.per-file-ignores` → [`ruff.lint.per-file-ignores`](https://docs.astral.sh//ruff/settings/#lint_per-file-ignores)
+- `ruff.pycodestyle` → [`ruff.lint.pycodestyle`](https://docs.astral.sh//ruff/settings/#lint_pycodestyle)
+- `ruff.pydocstyle` → [`ruff.lint.pydocstyle`](https://docs.astral.sh//ruff/settings/#lint_pydocstyle)
+- `ruff.pyflakes` → [`ruff.lint.pyflakes`](https://docs.astral.sh//ruff/settings/#lint_pyflakes)
+- `ruff.pylint` → [`ruff.lint.pylint`](https://docs.astral.sh//ruff/settings/#lint_pylint)
+- `ruff.pyupgrade` → [`ruff.lint.pyupgrade`](https://docs.astral.sh//ruff/settings/#lint_pyupgrade)
+- `ruff.select` → [`ruff.lint.select`](https://docs.astral.sh//ruff/settings/#lint_select)
+- `ruff.task-tags` → [`ruff.lint.task-tags`](https://docs.astral.sh//ruff/settings/#lint_task-tags)
+- `ruff.typing-modules` → [`ruff.lint.typing-modules`](https://docs.astral.sh//ruff/settings/#lint_typing-modules)
+- `ruff.unfixable` → [`ruff.lint.unfixable`](https://docs.astral.sh//ruff/settings/#lint_unfixable)
+
+### Remapped rules
+
+The following rules have been remapped to new codes:
+
+- [`raise-without-from-inside-except`](https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/): `TRY200` to `B904`
+- [`suspicious-eval-usage`](https://docs.astral.sh/ruff/rules/suspicious-eval-usage/): `PGH001` to `S307`
+- [`logging-warn`](https://docs.astral.sh/ruff/rules/logging-warn/): `PGH002` to `G010`
+- [`static-key-dict-comprehension`](https://docs.astral.sh/ruff/rules/static-key-dict-comprehension): `RUF011` to `B035`
+- [`runtime-string-union`](https://docs.astral.sh/ruff/rules/runtime-string-union): `TCH006` to `TCH010`
+
+### Stabilizations
+
+The following rules have been stabilized and are no longer in preview:
+
+- [`trio-timeout-without-await`](https://docs.astral.sh/ruff/rules/trio-timeout-without-await) (`TRIO100`)
+- [`trio-sync-call`](https://docs.astral.sh/ruff/rules/trio-sync-call) (`TRIO105`)
+- [`trio-async-function-with-timeout`](https://docs.astral.sh/ruff/rules/trio-async-function-with-timeout) (`TRIO109`)
+- [`trio-unneeded-sleep`](https://docs.astral.sh/ruff/rules/trio-unneeded-sleep) (`TRIO110`)
+- [`trio-zero-sleep-call`](https://docs.astral.sh/ruff/rules/trio-zero-sleep-call) (`TRIO115`)
+- [`unnecessary-escaped-quote`](https://docs.astral.sh/ruff/rules/unnecessary-escaped-quote) (`Q004`)
+- [`enumerate-for-loop`](https://docs.astral.sh/ruff/rules/enumerate-for-loop) (`SIM113`)
+- [`zip-dict-keys-and-values`](https://docs.astral.sh/ruff/rules/zip-dict-keys-and-values) (`SIM911`)
+- [`timeout-error-alias`](https://docs.astral.sh/ruff/rules/timeout-error-alias) (`UP041`)
+- [`flask-debug-true`](https://docs.astral.sh/ruff/rules/flask-debug-true) (`S201`)
+- [`tarfile-unsafe-members`](https://docs.astral.sh/ruff/rules/tarfile-unsafe-members) (`S202`)
+- [`ssl-insecure-version`](https://docs.astral.sh/ruff/rules/ssl-insecure-version) (`S502`)
+- [`ssl-with-bad-defaults`](https://docs.astral.sh/ruff/rules/ssl-with-bad-defaults) (`S503`)
+- [`ssl-with-no-version`](https://docs.astral.sh/ruff/rules/ssl-with-no-version) (`S504`)
+- [`weak-cryptographic-key`](https://docs.astral.sh/ruff/rules/weak-cryptographic-key) (`S505`)
+- [`ssh-no-host-key-verification`](https://docs.astral.sh/ruff/rules/ssh-no-host-key-verification) (`S507`)
+- [`django-raw-sql`](https://docs.astral.sh/ruff/rules/django-raw-sql) (`S611`)
+- [`mako-templates`](https://docs.astral.sh/ruff/rules/mako-templates) (`S702`)
+- [`generator-return-from-iter-method`](https://docs.astral.sh/ruff/rules/generator-return-from-iter-method) (`PYI058`)
+- [`runtime-string-union`](https://docs.astral.sh/ruff/rules/runtime-string-union) (`TCH006`)
+- [`numpy2-deprecation`](https://docs.astral.sh/ruff/rules/numpy2-deprecation) (`NPY201`)
+- [`quadratic-list-summation`](https://docs.astral.sh/ruff/rules/quadratic-list-summation) (`RUF017`)
+- [`assignment-in-assert`](https://docs.astral.sh/ruff/rules/assignment-in-assert) (`RUF018`)
+- [`unnecessary-key-check`](https://docs.astral.sh/ruff/rules/unnecessary-key-check) (`RUF019`)
+- [`never-union`](https://docs.astral.sh/ruff/rules/never-union) (`RUF020`)
+- [`direct-logger-instantiation`](https://docs.astral.sh/ruff/rules/direct-logger-instantiation) (`LOG001`)
+- [`invalid-get-logger-argument`](https://docs.astral.sh/ruff/rules/invalid-get-logger-argument) (`LOG002`)
+- [`exception-without-exc-info`](https://docs.astral.sh/ruff/rules/exception-without-exc-info) (`LOG007`)
+- [`undocumented-warn`](https://docs.astral.sh/ruff/rules/undocumented-warn) (`LOG009`)
+
+Fixes for the following rules have been stabilized and are now available without preview:
+
+- [`triple-single-quotes`](https://docs.astral.sh/ruff/rules/triple-single-quotes) (`D300`)
+- [`non-pep604-annotation`](https://docs.astral.sh/ruff/rules/non-pep604-annotation) (`UP007`)
+- [`dict-get-with-none-default`](https://docs.astral.sh/ruff/rules/dict-get-with-none-default) (`SIM910`)
+- [`in-dict-keys`](https://docs.astral.sh/ruff/rules/in-dict-keys) (`SIM118`)
+- [`collapsible-else-if`](https://docs.astral.sh/ruff/rules/collapsible-else-if) (`PLR5501`)
+- [`if-with-same-arms`](https://docs.astral.sh/ruff/rules/if-with-same-arms) (`SIM114`)
+- [`useless-else-on-loop`](https://docs.astral.sh/ruff/rules/useless-else-on-loop) (`PLW0120`)
+- [`unnecessary-literal-union`](https://docs.astral.sh/ruff/rules/unnecessary-literal-union) (`PYI030`)
+- [`unnecessary-spread`](https://docs.astral.sh/ruff/rules/unnecessary-spread) (`PIE800`)
+- [`error-instead-of-exception`](https://docs.astral.sh/ruff/rules/error-instead-of-exception) (`TRY400`)
+- [`redefined-while-unused`](https://docs.astral.sh/ruff/rules/redefined-while-unused) (`F811`)
+- [`duplicate-value`](https://docs.astral.sh/ruff/rules/duplicate-value) (`B033`)
+- [`multiple-imports-on-one-line`](https://docs.astral.sh/ruff/rules/multiple-imports-on-one-line) (`E401`)
+- [`non-pep585-annotation`](https://docs.astral.sh/ruff/rules/non-pep585-annotation) (`UP006`)
+
+Fixes for the following rules have been promoted from unsafe to safe:
+
+- [`unaliased-collections-abc-set-import`](https://docs.astral.sh/ruff/rules/unaliased-collections-abc-set-import) (`PYI025`)
+
+The following behaviors have been stabilized:
+
+- [`module-import-not-at-top-of-file`](https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file/) (`E402`) allows `sys.path` modifications between imports
+- [`reimplemented-container-builtin`](https://docs.astral.sh/ruff/rules/reimplemented-container-builtin/) (`PIE807`) includes lambdas that can be replaced with `dict`
+- [`unnecessary-placeholder`](https://docs.astral.sh/ruff/rules/unnecessary-placeholder/) (`PIE790`) applies to unnecessary ellipses (`...`)
+- [`if-else-block-instead-of-dict-get`](https://docs.astral.sh/ruff/rules/if-else-block-instead-of-dict-get/) (`SIM401`) applies to `if-else` expressions
+
+### Preview features
+
+- \[`refurb`\] Implement `metaclass_abcmeta` (`FURB180`) ([#9658](https://github.com/astral-sh/ruff/pull/9658))
+- Implement `blank_line_after_nested_stub_class` preview style ([#9155](https://github.com/astral-sh/ruff/pull/9155))
+- The preview rule [`and-or-ternary`](https://docs.astral.sh/ruff/rules/and-or-ternary) (`PLR1706`) was removed
+
+### Bug fixes
+
+- \[`flake8-async`\] Take `pathlib.Path` into account when analyzing async functions ([#9703](https://github.com/astral-sh/ruff/pull/9703))
+- \[`flake8-return`\] - fix indentation syntax error (`RET505`) ([#9705](https://github.com/astral-sh/ruff/pull/9705))
+- Detect multi-statement lines in else removal ([#9748](https://github.com/astral-sh/ruff/pull/9748))
+- `RUF022`, `RUF023`: never add two trailing commas to the end of a sequence ([#9698](https://github.com/astral-sh/ruff/pull/9698))
+- `RUF023`: Don't sort `__match_args__`, only `__slots__` ([#9724](https://github.com/astral-sh/ruff/pull/9724))
+- \[`flake8-simplify`\] - Fix syntax error in autofix (`SIM114`) ([#9704](https://github.com/astral-sh/ruff/pull/9704))
+- \[`pylint`\] Show verbatim constant in `magic-value-comparison` (`PLR2004`) ([#9694](https://github.com/astral-sh/ruff/pull/9694))
+- Removing trailing whitespace inside multiline strings is unsafe ([#9744](https://github.com/astral-sh/ruff/pull/9744))
+- Support `IfExp` with dual string arms in `invalid-envvar-default` ([#9734](https://github.com/astral-sh/ruff/pull/9734))
+- \[`pylint`\] Add `__mro_entries__` to known dunder methods (`PLW3201`) ([#9706](https://github.com/astral-sh/ruff/pull/9706))
+
+### Documentation
+
+- Removed rules are now retained in the documentation ([#9691](https://github.com/astral-sh/ruff/pull/9691))
+- Deprecated rules are now indicated in the documentation ([#9689](https://github.com/astral-sh/ruff/pull/9689))
+
+## 0.1.15
+
+### Preview features
+
+- Error when `NURSERY` selector is used with `--preview` ([#9682](https://github.com/astral-sh/ruff/pull/9682))
+- Preserve indentation around multiline strings in formatter ([#9637](https://github.com/astral-sh/ruff/pull/9637))
+- \[`flake8-return`\] Add fixes for all rules (`RET505`, `RET506`, `RET507`, `RET508`) ([#9595](https://github.com/astral-sh/ruff/pull/9595))
+- \[`flake8-simplify`\] Add fix for `if-with-same-arms` (`SIM114`) ([#9591](https://github.com/astral-sh/ruff/pull/9591))
+- \[`pycodestyle`\] Add fix for `multiple-imports-on-one-line` (`E401`) ([#9518](https://github.com/astral-sh/ruff/pull/9518))
+- \[`pylint`\] Add fix for `collapsible-else-if` (`PLR5501`) ([#9594](https://github.com/astral-sh/ruff/pull/9594))
+- \[`pylint`\] Add fix for `useless-else-on-loop` (`PLW0120`) ([#9590](https://github.com/astral-sh/ruff/pull/9590))
+- \[`pylint`\] Implement `assigning-non-slot` (`E0237`) ([#9623](https://github.com/astral-sh/ruff/pull/9623))
+- \[`pylint`\] Implement `potential-index-error` (`PLE0643`) ([#9545](https://github.com/astral-sh/ruff/pull/9545))
+- \[`pylint`\] Implement `too-many-nested-blocks` (`PLR1702`) ([#9172](https://github.com/astral-sh/ruff/pull/9172))
+- \[`ruff`\] Add rule to sort `__slots__` and `__match_args__` ([#9564](https://github.com/astral-sh/ruff/pull/9564))
+- \[`ruff`\] Detect unnecessary `dict` comprehensions for iterables (`RUF025`) ([#9613](https://github.com/astral-sh/ruff/pull/9613))
+- \[`ruff`\] Guard against use of `default_factory` as a keyword argument (`RUF026`) ([#9651](https://github.com/astral-sh/ruff/pull/9651))
+- \[`ruff`\] Implement `mutable-fromkeys-value` (`RUF024`) ([#9597](https://github.com/astral-sh/ruff/pull/9597))
+
+### CLI
+
+- Enable auto-wrapping of `--help` output ([#9633](https://github.com/astral-sh/ruff/pull/9633))
+
+### Bug fixes
+
+- Avoid rendering display-only rules as fixable ([#9649](https://github.com/astral-sh/ruff/pull/9649))
+- Detect automagic-like assignments in notebooks ([#9653](https://github.com/astral-sh/ruff/pull/9653))
+- Generate custom JSON schema for dynamic setting ([#9632](https://github.com/astral-sh/ruff/pull/9632))
+- \[`flake8-no-pep420`\] Include global `--config` when determining namespace packages ([#9603](https://github.com/astral-sh/ruff/pull/9603))
+- \[`flake8-pie`\] Omit bound tuples passed to `.startswith` or `.endswith` ([#9661](https://github.com/astral-sh/ruff/pull/9661))
+- \[`flake8-return`\] Avoid panic when fixing inlined else blocks ([#9657](https://github.com/astral-sh/ruff/pull/9657))
+- \[`flake8-return`\] Consider exception suppression in unnecessary assignment ([#9673](https://github.com/astral-sh/ruff/pull/9673))
+- \[`flake8-return`\] Take `NoReturn` annotation into account when analyzing implicit returns ([#9636](https://github.com/astral-sh/ruff/pull/9636))
+- \[`flake8-simplify`\] Support inverted returns in `needless-bool` (`SIM103`) ([#9619](https://github.com/astral-sh/ruff/pull/9619))
+- \[`flake8-type-checking`\] Add Pydantic's `BaseConfig` to default-copy list ([#9650](https://github.com/astral-sh/ruff/pull/9650))
+- \[`flake8-type-checking`\] Avoid marking `InitVar` as a typing-only annotation ([#9688](https://github.com/astral-sh/ruff/pull/9688))
+- \[`pycodestyle`\] Allow `dtype` comparisons in `type-comparison` ([#9676](https://github.com/astral-sh/ruff/pull/9676))
+- \[`pydocstyle`\] Re-implement `last-line-after-section` (`D413`) ([#9654](https://github.com/astral-sh/ruff/pull/9654))
+
+### Documentation
+
+- \[`flake8-pytest-style`\] Add fix safety documentation for `duplicate-parameterize-test-cases` ([#9678](https://github.com/astral-sh/ruff/pull/9678))
+- \[`pylint`\] Document `literal-membership` fix safety conditions ([#9677](https://github.com/astral-sh/ruff/pull/9677))
+- \[`isort`\] Fix reference to `isort` rule code ([#9598](https://github.com/astral-sh/ruff/pull/9598))
+
+## 0.1.14
+
+### Preview features
+
+- \[`flake8-bugbear`\] Add fix for `duplicate-value` (`B033`) ([#9510](https://github.com/astral-sh/ruff/pull/9510))
+- \[`flake8-simplify`\] Implement `enumerate-for-loop` (`SIM113`) ([#7777](https://github.com/astral-sh/ruff/pull/7777))
+- \[`pygrep_hooks`\] Add fix for `deprecated-log-warn` (`PGH002`) ([#9519](https://github.com/astral-sh/ruff/pull/9519))
+- \[`pylint`\] Implement `import-private-name` (`C2701`) ([#5920](https://github.com/astral-sh/ruff/pull/5920))
+- \[`refurb`\] Implement `regex-flag-alias` with fix (`FURB167`) ([#9516](https://github.com/astral-sh/ruff/pull/9516))
+- \[`ruff`\] Add rule and fix to sort contents of `__all__` (`RUF022`) ([#9474](https://github.com/astral-sh/ruff/pull/9474))
+- \[`tryceratops`\] Add fix for `error-instead-of-exception` (`TRY400`) ([#9520](https://github.com/astral-sh/ruff/pull/9520))
+
+### Rule changes
+
+- \[`flake8-pyi`\] Fix `PYI047` false negatives on PEP-695 type aliases ([#9566](https://github.com/astral-sh/ruff/pull/9566))
+- \[`flake8-pyi`\] Fix `PYI049` false negatives on call-based `TypedDict`s ([#9567](https://github.com/astral-sh/ruff/pull/9567))
+- \[`pylint`\] Exclude `self` and `cls` when counting method arguments (`PLR0917`) ([#9563](https://github.com/astral-sh/ruff/pull/9563))
+
+### CLI
+
+- `--show-settings` displays active settings in a far more readable format ([#9464](https://github.com/astral-sh/ruff/pull/9464))
+- Add `--extension` support to the formatter ([#9483](https://github.com/astral-sh/ruff/pull/9483))
+
+### Configuration
+
+- Ignore preview status for fixable and unfixable selectors ([#9538](https://github.com/astral-sh/ruff/pull/9538))
+- \[`pycodestyle`\] Use the configured tab size when expanding indents ([#9506](https://github.com/astral-sh/ruff/pull/9506))
+
+### Bug fixes
+
+- Recursively visit deferred AST nodes ([#9541](https://github.com/astral-sh/ruff/pull/9541))
+- Visit deferred lambdas before type definitions ([#9540](https://github.com/astral-sh/ruff/pull/9540))
+- \[`flake8-simplify`\] Avoid some more `enumerate-for-loop` false positives (`SIM113`) ([#9515](https://github.com/astral-sh/ruff/pull/9515))
+- \[`pandas-vet`\] Limit inplace diagnostics to methods that accept inplace ([#9495](https://github.com/astral-sh/ruff/pull/9495))
+- \[`pylint`\] Add the `__prepare__` method to the list of recognized dunder method ([#9529](https://github.com/astral-sh/ruff/pull/9529))
+- \[`pylint`\] Ignore unnecessary dunder calls within dunder definitions ([#9496](https://github.com/astral-sh/ruff/pull/9496))
+- \[`refurb`\] Avoid bailing when `reimplemented-operator` is called on function (`FURB118`) ([#9556](https://github.com/astral-sh/ruff/pull/9556))
+- \[`ruff`\] Avoid treating named expressions as static keys (`RUF011`) ([#9494](https://github.com/astral-sh/ruff/pull/9494))
+
+### Documentation
+
+- Add instructions on using `noqa` with isort rules ([#9555](https://github.com/astral-sh/ruff/pull/9555))
+- Documentation update for URL giving 'page not found' ([#9565](https://github.com/astral-sh/ruff/pull/9565))
+- Fix admonition in dark mode ([#9502](https://github.com/astral-sh/ruff/pull/9502))
+- Update contributing docs to use `cargo bench -p ruff_benchmark` ([#9535](https://github.com/astral-sh/ruff/pull/9535))
+- Update emacs integration section to include `emacs-ruff-format` ([#9403](https://github.com/astral-sh/ruff/pull/9403))
+- \[`flake8-blind-except`\] Document exceptions to `blind-except` rule ([#9580](https://github.com/astral-sh/ruff/pull/9580))
+
 ## 0.1.13
 
 ### Bug fixes

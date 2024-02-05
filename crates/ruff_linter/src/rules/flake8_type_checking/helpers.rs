@@ -2,11 +2,11 @@ use anyhow::Result;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::call_path::from_qualified_name;
-use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::{self as ast, Decorator, Expr};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_semantic::{
-    analyze, Binding, BindingKind, NodeId, ResolvedReference, SemanticModel,
+    analyze, Binding, BindingKind, Modules, NodeId, ResolvedReference, ScopeKind, SemanticModel,
 };
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
@@ -102,6 +102,39 @@ fn runtime_required_decorators(
                     .any(|base_class| from_qualified_name(base_class) == call_path)
             })
     })
+}
+
+/// Returns `true` if an annotation will be inspected at runtime by the `dataclasses` module.
+///
+/// Specifically, detects whether an annotation is to either `dataclasses.InitVar` or
+/// `typing.ClassVar` within a `@dataclass` class definition.
+///
+/// See: <https://docs.python.org/3/library/dataclasses.html#init-only-variables>
+pub(crate) fn is_dataclass_meta_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_module(Modules::DATACLASSES) {
+        return false;
+    }
+
+    // Determine whether the assignment is in a `@dataclass` class definition.
+    if let ScopeKind::Class(class_def) = semantic.current_scope().kind {
+        if class_def.decorator_list.iter().any(|decorator| {
+            semantic
+                .resolve_call_path(map_callable(&decorator.expression))
+                .is_some_and(|call_path| {
+                    matches!(call_path.as_slice(), ["dataclasses", "dataclass"])
+                })
+        }) {
+            // Determine whether the annotation is `typing.ClassVar` or `dataclasses.InitVar`.
+            return semantic
+                .resolve_call_path(map_subscript(annotation))
+                .is_some_and(|call_path| {
+                    matches!(call_path.as_slice(), ["dataclasses", "InitVar"])
+                        || semantic.match_typing_call_path(&call_path, "ClassVar")
+                });
+        }
+    }
+
+    false
 }
 
 /// Returns `true` if a function is registered as a `singledispatch` interface.

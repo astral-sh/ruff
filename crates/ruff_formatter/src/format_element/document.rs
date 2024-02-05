@@ -346,10 +346,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                 }
 
                 FormatElement::SourcePosition(position) => {
-                    write!(
-                        f,
-                        [text(&std::format!("source_position({position:?})"), None)]
-                    )?;
+                    write!(f, [text(&std::format!("source_position({position:?})"))])?;
                 }
 
                 FormatElement::LineSuffixBoundary => {
@@ -360,7 +357,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                     write!(f, [token("best_fitting(")])?;
 
                     if *mode != BestFittingMode::FirstLine {
-                        write!(f, [text(&std::format!("mode: {mode:?}, "), None)])?;
+                        write!(f, [text(&std::format!("mode: {mode:?}, "))])?;
                     }
 
                     write!(f, [token("[")])?;
@@ -392,17 +389,14 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             write!(
                                 f,
                                 [
-                                    text(&std::format!("<interned {index}>"), None),
+                                    text(&std::format!("<interned {index}>")),
                                     space(),
                                     &&**interned,
                                 ]
                             )?;
                         }
                         Some(reference) => {
-                            write!(
-                                f,
-                                [text(&std::format!("<ref interned *{reference}>"), None)]
-                            )?;
+                            write!(f, [text(&std::format!("<ref interned *{reference}>"))])?;
                         }
                     }
                 }
@@ -421,7 +415,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                                     f,
                                     [
                                         token("<END_TAG_WITHOUT_START<"),
-                                        text(&std::format!("{:?}", tag.kind()), None),
+                                        text(&std::format!("{:?}", tag.kind())),
                                         token(">>"),
                                     ]
                                 )?;
@@ -436,9 +430,9 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                                         token(")"),
                                         soft_line_break_or_space(),
                                         token("ERROR<START_END_TAG_MISMATCH<start: "),
-                                        text(&std::format!("{start_kind:?}"), None),
+                                        text(&std::format!("{start_kind:?}")),
                                         token(", end: "),
-                                        text(&std::format!("{:?}", tag.kind()), None),
+                                        text(&std::format!("{:?}", tag.kind())),
                                         token(">>")
                                     ]
                                 )?;
@@ -470,7 +464,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                                 f,
                                 [
                                     token("align("),
-                                    text(&count.to_string(), None),
+                                    text(&count.to_string()),
                                     token(","),
                                     space(),
                                 ]
@@ -482,7 +476,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                                 f,
                                 [
                                     token("line_suffix("),
-                                    text(&std::format!("{reserved_width:?}"), None),
+                                    text(&std::format!("{reserved_width:?}")),
                                     token(","),
                                     space(),
                                 ]
@@ -499,11 +493,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             if let Some(group_id) = group.id() {
                                 write!(
                                     f,
-                                    [
-                                        text(&std::format!("\"{group_id:?}\""), None),
-                                        token(","),
-                                        space(),
-                                    ]
+                                    [text(&std::format!("\"{group_id:?}\"")), token(","), space(),]
                                 )?;
                             }
 
@@ -524,11 +514,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             if let Some(group_id) = id {
                                 write!(
                                     f,
-                                    [
-                                        text(&std::format!("\"{group_id:?}\""), None),
-                                        token(","),
-                                        space(),
-                                    ]
+                                    [text(&std::format!("\"{group_id:?}\"")), token(","), space(),]
                                 )?;
                             }
                         }
@@ -561,7 +547,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                                 f,
                                 [
                                     token("indent_if_group_breaks("),
-                                    text(&std::format!("\"{id:?}\""), None),
+                                    text(&std::format!("\"{id:?}\"")),
                                     token(","),
                                     space(),
                                 ]
@@ -581,11 +567,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             if let Some(group_id) = condition.group_id {
                                 write!(
                                     f,
-                                    [
-                                        text(&std::format!("\"{group_id:?}\""), None),
-                                        token(","),
-                                        space(),
-                                    ]
+                                    [text(&std::format!("\"{group_id:?}\"")), token(","), space()]
                                 )?;
                             }
                         }
@@ -595,7 +577,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                                 f,
                                 [
                                     token("label("),
-                                    text(&std::format!("\"{label_id:?}\""), None),
+                                    text(&std::format!("\"{label_id:?}\"")),
                                     token(","),
                                     space(),
                                 ]
@@ -664,7 +646,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                     ContentArrayEnd,
                     token(")"),
                     soft_line_break_or_space(),
-                    text(&std::format!("<START_WITHOUT_END<{top:?}>>"), None),
+                    text(&std::format!("<START_WITHOUT_END<{top:?}>>")),
                 ]
             )?;
         }
@@ -807,7 +789,7 @@ impl Format<IrFormatContext<'_>> for Condition {
                 f,
                 [
                     token("if_group_fits_on_line("),
-                    text(&std::format!("\"{id:?}\""), None),
+                    text(&std::format!("\"{id:?}\"")),
                     token(")")
                 ]
             ),
@@ -816,7 +798,7 @@ impl Format<IrFormatContext<'_>> for Condition {
                 f,
                 [
                     token("if_group_breaks("),
-                    text(&std::format!("\"{id:?}\""), None),
+                    text(&std::format!("\"{id:?}\"")),
                     token(")")
                 ]
             ),

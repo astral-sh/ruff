@@ -98,7 +98,6 @@ pub(crate) use format::{
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::Mod;
 use ruff_python_trivia::{CommentRanges, PythonWhitespace};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -347,20 +346,28 @@ impl<'a> Comments<'a> {
 
     /// Extracts the comments from the AST.
     pub(crate) fn from_ast(
-        root: &'a Mod,
+        root: impl Into<AnyNodeRef<'a>>,
         source_code: SourceCode<'a>,
         comment_ranges: &'a CommentRanges,
     ) -> Self {
-        let map = if comment_ranges.is_empty() {
-            CommentsMap::new()
-        } else {
-            let mut builder =
-                CommentsMapBuilder::new(Locator::new(source_code.as_str()), comment_ranges);
-            CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
-            builder.finish()
-        };
+        fn collect_comments<'a>(
+            root: AnyNodeRef<'a>,
+            source_code: SourceCode<'a>,
+            comment_ranges: &'a CommentRanges,
+        ) -> Comments<'a> {
+            let map = if comment_ranges.is_empty() {
+                CommentsMap::new()
+            } else {
+                let mut builder =
+                    CommentsMapBuilder::new(Locator::new(source_code.as_str()), comment_ranges);
+                CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
+                builder.finish()
+            };
 
-        Self::new(map, comment_ranges)
+            Comments::new(map, comment_ranges)
+        }
+
+        collect_comments(root.into(), source_code, comment_ranges)
     }
 
     /// Returns `true` if the given `node` has any comments.

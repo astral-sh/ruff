@@ -5,6 +5,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::typing::is_dict;
+use ruff_python_semantic::Modules;
 
 use crate::checkers::ast::Checker;
 
@@ -69,10 +70,6 @@ impl Violation for UncapitalizedEnvironmentVariables {
 /// `None` is the default value for `dict.get()`, so it is redundant to pass it
 /// explicitly.
 ///
-/// In [preview], this rule applies to variables that are inferred to be
-/// dictionaries; in stable, it's limited to dictionary literals (e.g.,
-/// `{"foo": 1}.get("foo", None)`).
-///
 /// ## Example
 /// ```python
 /// ages = {"Tom": 23, "Maria": 23, "Dog": 11}
@@ -87,8 +84,6 @@ impl Violation for UncapitalizedEnvironmentVariables {
 ///
 /// ## References
 /// - [Python documentation: `dict.get`](https://docs.python.org/3/library/stdtypes.html#dict.get)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct DictGetWithNoneDefault {
     expected: SourceCodeSnippet,
@@ -127,6 +122,10 @@ fn is_lowercase_allowed(env_var: &str) -> bool {
 
 /// SIM112
 pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
+    if !checker.semantic().seen_module(Modules::OS) {
+        return;
+    }
+
     // Ex) `os.environ['foo']`
     if let Expr::Subscript(_) = expr {
         check_os_environ_subscript(checker, expr);
@@ -266,10 +265,6 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     match value.as_ref() {
         Expr::Dict(_) | Expr::DictComp(_) => {}
         Expr::Name(name) => {
-            if checker.settings.preview.is_disabled() {
-                return;
-            }
-
             let Some(binding) = checker
                 .semantic()
                 .only_binding(name)

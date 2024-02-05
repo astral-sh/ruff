@@ -54,7 +54,7 @@ enum UnusedImportContext {
 /// ```
 ///
 /// ## Options
-/// - `pyflakes.extend-generics`
+/// - `lint.pyflakes.extend-generics`
 ///
 /// ## References
 /// - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)

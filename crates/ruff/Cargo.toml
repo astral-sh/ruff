@@ -1,0 +1,74 @@
+[package]
+name = "ruff"
+version = "0.2.1"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = "../../README.md"
+default-run = "ruff"
+
+[dependencies]
+ruff_cache = { path = "../ruff_cache" }
+ruff_diagnostics = { path = "../ruff_diagnostics" }
+ruff_linter = { path = "../ruff_linter", features = ["clap"] }
+ruff_macros = { path = "../ruff_macros" }
+ruff_notebook = { path = "../ruff_notebook" }
+ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_python_formatter = { path = "../ruff_python_formatter" }
+ruff_source_file = { path = "../ruff_source_file" }
+ruff_text_size = { path = "../ruff_text_size" }
+ruff_workspace = { path = "../ruff_workspace" }
+
+anyhow = { workspace = true }
+argfile = { workspace = true }
+bincode = { workspace = true }
+bitflags = { workspace = true }
+cachedir = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true, features = ["derive", "env", "wrap_help"] }
+clap_complete_command = { workspace = true }
+clearscreen = { workspace = true }
+colored = { workspace = true }
+filetime = { workspace = true }
+ignore = { workspace = true }
+is-macro = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+notify = { workspace = true }
+path-absolutize = { workspace = true, features = ["once_cell_cache"] }
+rayon = { workspace = true }
+regex = { workspace = true }
+rustc-hash = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+shellexpand = { workspace = true }
+strum = { workspace = true, features = [] }
+thiserror = { workspace = true }
+tracing = { workspace = true, features = ["log"] }
+walkdir = { workspace = true }
+wild = { workspace = true }
+
+[dev-dependencies]
+# Enable test rules during development
+ruff_linter = { path = "../ruff_linter", features = ["clap", "test-rules"] }
+assert_cmd = { workspace = true }
+# Avoid writing colored snapshots when running tests from the terminal
+colored = { workspace = true, features = ["no-color"]}
+insta = { workspace = true, features = ["filters", "json"] }
+insta-cmd = { workspace = true }
+tempfile = { workspace = true }
+test-case = { workspace = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+mimalloc = { workspace = true }
+
+[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64")))'.dependencies]
+tikv-jemallocator = { workspace = true }
+
+[lints]
+workspace = true

@@ -4,7 +4,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::{self as ast, Expr, Operator};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -60,6 +60,10 @@ enum Reason {
 
 /// S103
 pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) {
+    if !checker.semantic().seen_module(Modules::OS) {
+        return;
+    }
+
     if checker
         .semantic()
         .resolve_call_path(&call.func)

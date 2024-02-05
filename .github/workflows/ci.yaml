@@ -35,7 +35,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: tj-actions/changed-files@v40
+      - uses: tj-actions/changed-files@v42
         id: changed
         with:
           files_yaml: |
@@ -76,6 +76,7 @@ jobs:
   cargo-fmt:
     name: "cargo fmt"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -87,6 +88,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -100,10 +102,11 @@ jobs:
         run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
 
   cargo-test-linux:
+    name: "cargo test (linux)"
     runs-on: ubuntu-latest
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
-    name: "cargo test (linux)"
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -114,7 +117,10 @@ jobs:
           tool: cargo-insta
       - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
-        run: cargo insta test --all --all-features --unreferenced reject
+        run: cargo insta test --all --exclude ruff_dev --all-features --unreferenced reject
+      - name: "Run dev tests"
+        # e.g. generating the schema — these should not run with all features enabled
+        run: cargo insta test -p ruff_dev --unreferenced reject
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
@@ -126,10 +132,11 @@ jobs:
           path: target/debug/ruff
 
   cargo-test-windows:
+    name: "cargo test (windows)"
     runs-on: windows-latest
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
-    name: "cargo test (windows)"
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -142,13 +149,14 @@ jobs:
       - name: "Run tests"
         shell: bash
         # We can't reject unreferenced snapshots on windows because flake8_executable can't run on windows
-        run: cargo insta test --all --all-features
+        run: cargo insta test --all --exclude ruff_dev --all-features
 
   cargo-test-wasm:
+    name: "cargo test (wasm)"
     runs-on: ubuntu-latest
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
-    name: "cargo test (wasm)"
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -166,10 +174,11 @@ jobs:
           wasm-pack test --node
 
   cargo-fuzz:
+    name: "cargo fuzz"
     runs-on: ubuntu-latest
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
-    name: "cargo fuzz"
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -188,6 +197,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -213,6 +223,7 @@ jobs:
     if: github.event_name == 'pull_request' && ${{
       needs.determine_changes.outputs.code == 'true'
       }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -322,6 +333,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: "Install nightly Rust toolchain"
@@ -336,6 +348,7 @@ jobs:
   python-package:
     name: "python package"
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -360,6 +373,7 @@ jobs:
   pre-commit:
     name: "pre-commit"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -371,7 +385,7 @@ jobs:
       - name: "Install pre-commit"
         run: pip install pre-commit
       - name: "Cache pre-commit"
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
@@ -388,6 +402,7 @@ jobs:
   docs:
     name: "mkdocs"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       MKDOCS_INSIDERS_SSH_KEY_EXISTS: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY != '' }}
     steps:
@@ -425,6 +440,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: determine_changes
     if: needs.determine_changes.outputs.formatter == 'true' || github.ref == 'refs/heads/main'
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -441,6 +457,7 @@ jobs:
   check-ruff-lsp:
     name: "test ruff-lsp"
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs:
       - cargo-test-linux
       - determine_changes
@@ -484,6 +501,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 20
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@v4

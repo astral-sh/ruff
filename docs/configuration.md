@@ -482,7 +482,8 @@ Options:
 Log levels:
   -v, --verbose  Enable verbose logging
   -q, --quiet    Print diagnostics, but nothing else
-  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting diagnostics)
+  -s, --silent   Disable all logging (but still exit with status code "1" upon
+                 detecting diagnostics)
 
 For help with a specific command, see: `ruff help <command>`.
 ```
@@ -503,33 +504,50 @@ Arguments:
 
 Options:
       --fix
-          Apply fixes to resolve lint violations. Use `--no-fix` to disable or `--unsafe-fixes` to include unsafe fixes
+          Apply fixes to resolve lint violations. Use `--no-fix` to disable or
+          `--unsafe-fixes` to include unsafe fixes
       --unsafe-fixes
-          Include fixes that may not retain the original intent of the code. Use `--no-unsafe-fixes` to disable
+          Include fixes that may not retain the original intent of the code.
+          Use `--no-unsafe-fixes` to disable
       --show-source
-          Show violations with source code. Use `--no-show-source` to disable
+          Show violations with source code. Use `--no-show-source` to disable.
+          (Deprecated: use `--output-format=full` or `--output-format=concise`
+          instead of `--show-source` and `--no-show-source`, respectively)
       --show-fixes
-          Show an enumeration of all fixed lint violations. Use `--no-show-fixes` to disable
+          Show an enumeration of all fixed lint violations. Use
+          `--no-show-fixes` to disable
       --diff
-          Avoid writing any fixed files back; instead, output a diff for each changed file to stdout. Implies `--fix-only`
+          Avoid writing any fixed files back; instead, output a diff for each
+          changed file to stdout. Implies `--fix-only`
   -w, --watch
           Run in watch mode by re-running whenever files change
       --fix-only
-          Apply fixes to resolve lint violations, but don't report on leftover violations. Implies `--fix`. Use `--no-fix-only` to disable or `--unsafe-fixes` to include unsafe fixes
+          Apply fixes to resolve lint violations, but don't report on leftover
+          violations. Implies `--fix`. Use `--no-fix-only` to disable or
+          `--unsafe-fixes` to include unsafe fixes
       --ignore-noqa
           Ignore any `# noqa` comments
       --output-format <OUTPUT_FORMAT>
-          Output serialization format for violations [env: RUFF_OUTPUT_FORMAT=] [possible values: text, json, json-lines, junit, grouped, github, gitlab, pylint, azure, sarif]
+          Output serialization format for violations. The default serialization
+          format is "concise". In preview mode, the default serialization
+          format is "full" [env: RUFF_OUTPUT_FORMAT=] [possible values: text,
+          concise, full, json, json-lines, junit, grouped, github, gitlab,
+          pylint, azure, sarif]
   -o, --output-file <OUTPUT_FILE>
           Specify file to write the linter output to (default: stdout)
       --target-version <TARGET_VERSION>
-          The minimum Python version that should be supported [possible values: py37, py38, py39, py310, py311, py312]
+          The minimum Python version that should be supported [possible values:
+          py37, py38, py39, py310, py311, py312]
       --preview
-          Enable preview mode; checks will include unstable rules and fixes. Use `--no-preview` to disable
+          Enable preview mode; checks will include unstable rules and fixes.
+          Use `--no-preview` to disable
       --config <CONFIG>
-          Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
+          Path to the `pyproject.toml` or `ruff.toml` file to use for
+          configuration
       --extension <EXTENSION>
-          List of mappings from file extension to language (one of ["python", "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython notebooks, use `--extension ipy:ipynb`
+          List of mappings from file extension to language (one of ["python",
+          "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython
+          notebooks, use `--extension ipy:ipynb`
       --statistics
           Show counts for every rule with at least one violation
       --add-noqa
@@ -543,27 +561,40 @@ Options:
 
 Rule selection:
       --select <RULE_CODE>
-          Comma-separated list of rule codes to enable (or ALL, to enable all rules)
+          Comma-separated list of rule codes to enable (or ALL, to enable all
+          rules)
       --ignore <RULE_CODE>
           Comma-separated list of rule codes to disable
       --extend-select <RULE_CODE>
-          Like --select, but adds additional rule codes on top of those already specified
+          Like --select, but adds additional rule codes on top of those already
+          specified
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
       --extend-per-file-ignores <EXTEND_PER_FILE_IGNORES>
-          Like `--per-file-ignores`, but adds additional ignores on top of those already specified
+          Like `--per-file-ignores`, but adds additional ignores on top of
+          those already specified
       --fixable <RULE_CODE>
-          List of rule codes to treat as eligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`)
+          List of rule codes to treat as eligible for fix. Only applicable when
+          fix itself is enabled (e.g., via `--fix`)
       --unfixable <RULE_CODE>
-          List of rule codes to treat as ineligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`)
+          List of rule codes to treat as ineligible for fix. Only applicable
+          when fix itself is enabled (e.g., via `--fix`)
       --extend-fixable <RULE_CODE>
-          Like --fixable, but adds additional rule codes on top of those already specified
+          Like --fixable, but adds additional rule codes on top of those
+          already specified
 
 File selection:
-      --exclude <FILE_PATTERN>         List of paths, used to omit files and/or directories from analysis
-      --extend-exclude <FILE_PATTERN>  Like --exclude, but adds additional files and directories on top of those already excluded
-      --respect-gitignore              Respect file exclusions via `.gitignore` and other standard ignore files. Use `--no-respect-gitignore` to disable
-      --force-exclude                  Enforce exclusions, even for paths passed to Ruff directly on the command-line. Use `--no-force-exclude` to disable
+      --exclude <FILE_PATTERN>
+          List of paths, used to omit files and/or directories from analysis
+      --extend-exclude <FILE_PATTERN>
+          Like --exclude, but adds additional files and directories on top of
+          those already excluded
+      --respect-gitignore
+          Respect file exclusions via `.gitignore` and other standard ignore
+          files. Use `--no-respect-gitignore` to disable
+      --force-exclude
+          Enforce exclusions, even for paths passed to Ruff directly on the
+          command-line. Use `--no-force-exclude` to disable
 
 Miscellaneous:
   -n, --no-cache
@@ -577,12 +608,14 @@ Miscellaneous:
   -e, --exit-zero
           Exit with status code "0", even upon detecting lint violations
       --exit-non-zero-on-fix
-          Exit with a non-zero status code if any files were modified via fix, even if no lint violations remain
+          Exit with a non-zero status code if any files were modified via fix,
+          even if no lint violations remain
 
 Log levels:
   -v, --verbose  Enable verbose logging
   -q, --quiet    Print diagnostics, but nothing else
-  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting diagnostics)
+  -s, --silent   Disable all logging (but still exit with status code "1" upon
+                 detecting diagnostics)
 ```
 
 <!-- End auto-generated check help. -->
@@ -601,38 +634,64 @@ Arguments:
 
 Options:
       --check
-          Avoid writing any formatted files back; instead, exit with a non-zero status code if any files would have been modified, and zero otherwise
+          Avoid writing any formatted files back; instead, exit with a non-zero
+          status code if any files would have been modified, and zero otherwise
       --diff
-          Avoid writing any formatted files back; instead, exit with a non-zero status code and the difference between the current file and how the formatted file would look like
+          Avoid writing any formatted files back; instead, exit with a non-zero
+          status code and the difference between the current file and how the
+          formatted file would look like
       --config <CONFIG>
-          Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
+          Path to the `pyproject.toml` or `ruff.toml` file to use for
+          configuration
       --extension <EXTENSION>
-          List of mappings from file extension to language (one of ["python", "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython notebooks, use `--extension ipy:ipynb`
+          List of mappings from file extension to language (one of ["python",
+          "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython
+          notebooks, use `--extension ipy:ipynb`
       --target-version <TARGET_VERSION>
-          The minimum Python version that should be supported [possible values: py37, py38, py39, py310, py311, py312]
+          The minimum Python version that should be supported [possible values:
+          py37, py38, py39, py310, py311, py312]
       --preview
-          Enable preview mode; enables unstable formatting. Use `--no-preview` to disable
+          Enable preview mode; enables unstable formatting. Use `--no-preview`
+          to disable
   -h, --help
-          Print help
+          Print help (see more with '--help')
 
 Miscellaneous:
-  -n, --no-cache                         Disable cache reads [env: RUFF_NO_CACHE=]
-      --cache-dir <CACHE_DIR>            Path to the cache directory [env: RUFF_CACHE_DIR=]
-      --isolated                         Ignore all configuration files
-      --stdin-filename <STDIN_FILENAME>  The name of the file when passing it through stdin
+  -n, --no-cache
+          Disable cache reads [env: RUFF_NO_CACHE=]
+      --cache-dir <CACHE_DIR>
+          Path to the cache directory [env: RUFF_CACHE_DIR=]
+      --isolated
+          Ignore all configuration files
+      --stdin-filename <STDIN_FILENAME>
+          The name of the file when passing it through stdin
 
 File selection:
-      --respect-gitignore       Respect file exclusions via `.gitignore` and other standard ignore files. Use `--no-respect-gitignore` to disable
-      --exclude <FILE_PATTERN>  List of paths, used to omit files and/or directories from analysis
-      --force-exclude           Enforce exclusions, even for paths passed to Ruff directly on the command-line. Use `--no-force-exclude` to disable
+      --respect-gitignore
+          Respect file exclusions via `.gitignore` and other standard ignore
+          files. Use `--no-respect-gitignore` to disable
+      --exclude <FILE_PATTERN>
+          List of paths, used to omit files and/or directories from analysis
+      --force-exclude
+          Enforce exclusions, even for paths passed to Ruff directly on the
+          command-line. Use `--no-force-exclude` to disable
 
 Format configuration:
       --line-length <LINE_LENGTH>  Set the line-length
 
+Editor options:
+      --range <RANGE>  When specified, Ruff will try to only format the code in
+                       the given range.
+                       It might be necessary to extend the start backwards or
+                       the end forwards, to fully enclose a logical line.
+                       The `<RANGE>` uses the format
+                       `<start_line>:<start_column>-<end_line>:<end_column>`.
+
 Log levels:
   -v, --verbose  Enable verbose logging
   -q, --quiet    Print diagnostics, but nothing else
-  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting diagnostics)
+  -s, --silent   Disable all logging (but still exit with status code "1" upon
+                 detecting diagnostics)
 ```
 
 <!-- End auto-generated format help. -->

@@ -1,0 +1,72 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+__main__.py:2:16: PLC2701 Private name import `_a`
+  |
+1 | # Errors.
+2 | from _a import b
+  |                ^ PLC2701
+3 | from c._d import e
+4 | from _f.g import h
+  |
+
+__main__.py:3:18: PLC2701 Private name import `_d` from external module `c`
+  |
+1 | # Errors.
+2 | from _a import b
+3 | from c._d import e
+  |                  ^ PLC2701
+4 | from _f.g import h
+5 | from i import _j
+  |
+
+__main__.py:4:18: PLC2701 Private name import `_f`
+  |
+2 | from _a import b
+3 | from c._d import e
+4 | from _f.g import h
+  |                  ^ PLC2701
+5 | from i import _j
+6 | from k import _l as m
+  |
+
+__main__.py:5:15: PLC2701 Private name import `_j` from external module `i`
+  |
+3 | from c._d import e
+4 | from _f.g import h
+5 | from i import _j
+  |               ^^ PLC2701
+6 | from k import _l as m
+7 | import _aaa
+  |
+
+__main__.py:6:21: PLC2701 Private name import `_l` from external module `k`
+  |
+4 | from _f.g import h
+5 | from i import _j
+6 | from k import _l as m
+  |                     ^ PLC2701
+7 | import _aaa
+8 | import bbb.ccc._ddd as eee  # Panicked in https://github.com/astral-sh/ruff/pull/5920
+  |
+
+__main__.py:7:8: PLC2701 Private name import `_aaa`
+  |
+5 | from i import _j
+6 | from k import _l as m
+7 | import _aaa
+  |        ^^^^ PLC2701
+8 | import bbb.ccc._ddd as eee  # Panicked in https://github.com/astral-sh/ruff/pull/5920
+  |
+
+__main__.py:8:24: PLC2701 Private name import `_ddd` from external module `bbb.ccc`
+   |
+ 6 | from k import _l as m
+ 7 | import _aaa
+ 8 | import bbb.ccc._ddd as eee  # Panicked in https://github.com/astral-sh/ruff/pull/5920
+   |                        ^^^ PLC2701
+ 9 | 
+10 | # Non-errors.
+   |
+
+

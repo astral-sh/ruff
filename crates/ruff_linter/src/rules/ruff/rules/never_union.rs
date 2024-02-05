@@ -30,7 +30,7 @@ use crate::checkers::ast::Checker;
 ///     ...
 /// ```
 ///
-/// ## Options
+/// ## References
 /// - [Python documentation: `typing.Never`](https://docs.python.org/3/library/typing.html#typing.Never)
 /// - [Python documentation: `typing.NoReturn`](https://docs.python.org/3/library/typing.html#typing.NoReturn)
 #[violation]

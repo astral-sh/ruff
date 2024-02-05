@@ -1,4 +1,4 @@
-'single'
+'single' # this string is treated as a docstring
 "double"
 r'r single'
 r"r double"

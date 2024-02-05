@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, identifier::Identifier};
-use ruff_python_semantic::analyze::visibility;
+use ruff_python_semantic::analyze::{function_type, visibility};
 
 use crate::checkers::ast::Checker;
 
@@ -9,7 +9,7 @@ use crate::checkers::ast::Checker;
 /// Checks for function definitions that include too many positional arguments.
 ///
 /// By default, this rule allows up to five arguments, as configured by the
-/// [`pylint.max-positional-args`] option.
+/// [`lint.pylint.max-positional-args`] option.
 ///
 /// ## Why is this bad?
 /// Functions with many arguments are harder to understand, maintain, and call.
@@ -40,7 +40,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Options
-/// - `pylint.max-positional-args`
+/// - `lint.pylint.max-positional-args`
 #[violation]
 pub struct TooManyPositional {
     c_pos: usize,
@@ -57,6 +57,9 @@ impl Violation for TooManyPositional {
 
 /// PLR0917
 pub(crate) fn too_many_positional(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+    let semantic = checker.semantic();
+
+    // Count the number of positional arguments.
     let num_positional_args = function_def
         .parameters
         .args
@@ -70,11 +73,30 @@ pub(crate) fn too_many_positional(checker: &mut Checker, function_def: &ast::Stm
         })
         .count();
 
+    // Check if the function is a method or class method.
+    let num_positional_args = if matches!(
+        function_type::classify(
+            &function_def.name,
+            &function_def.decorator_list,
+            semantic.current_scope(),
+            semantic,
+            &checker.settings.pep8_naming.classmethod_decorators,
+            &checker.settings.pep8_naming.staticmethod_decorators,
+        ),
+        function_type::FunctionType::Method | function_type::FunctionType::ClassMethod
+    ) {
+        // If so, we need to subtract one from the number of positional arguments, since the first
+        // argument is always `self` or `cls`.
+        num_positional_args.saturating_sub(1)
+    } else {
+        num_positional_args
+    };
+
     if num_positional_args > checker.settings.pylint.max_positional_args {
         // Allow excessive arguments in `@override` or `@overload` methods, since they're required
         // to adhere to the parent signature.
-        if visibility::is_override(&function_def.decorator_list, checker.semantic())
-            || visibility::is_overload(&function_def.decorator_list, checker.semantic())
+        if visibility::is_override(&function_def.decorator_list, semantic)
+            || visibility::is_overload(&function_def.decorator_list, semantic)
         {
             return;
         }

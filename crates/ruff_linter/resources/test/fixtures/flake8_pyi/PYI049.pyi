@@ -30,3 +30,8 @@ else:
 
 class _CustomClass2(_UsedTypedDict2):
    bar: list[int]
+
+_UnusedTypedDict3 = TypedDict("_UnusedTypedDict3", {"foo": int})
+_UsedTypedDict3 = TypedDict("_UsedTypedDict3", {"bar": bytes})
+
+def uses_UsedTypedDict3(arg: _UsedTypedDict3) -> None: ...

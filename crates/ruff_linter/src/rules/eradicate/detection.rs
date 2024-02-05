@@ -1,14 +1,16 @@
 /// See: [eradicate.py](https://github.com/myint/eradicate/blob/98f199940979c94447a461d50d27862b118b282d/eradicate.py)
 use aho_corasick::AhoCorasick;
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexSet};
 
 use ruff_python_parser::parse_suite;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::TextSize;
 
 static CODE_INDICATORS: Lazy<AhoCorasick> = Lazy::new(|| {
     AhoCorasick::new([
-        "(", ")", "[", "]", "{", "}", ":", "=", "%", "print", "return", "break", "continue",
-        "import",
+        "(", ")", "[", "]", "{", "}", ":", "=", "%", "return", "break", "continue", "import",
     ])
     .unwrap()
 });
@@ -41,6 +43,14 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
 
     // Fast path: if none of the indicators are present, the line is not code.
     if !CODE_INDICATORS.is_match(line) {
+        return false;
+    }
+
+    // Fast path: if the comment contains consecutive identifiers, we know it won't parse.
+    let tokenizer = SimpleTokenizer::starts_at(TextSize::default(), line).skip_trivia();
+    if tokenizer.tuple_windows().any(|(first, second)| {
+        first.kind == SimpleTokenKind::Name && second.kind == SimpleTokenKind::Name
+    }) {
         return false;
     }
 
@@ -123,9 +133,10 @@ mod tests {
 
     #[test]
     fn comment_contains_code_with_print() {
-        assert!(comment_contains_code("#print", &[]));
         assert!(comment_contains_code("#print(1)", &[]));
 
+        assert!(!comment_contains_code("#print", &[]));
+        assert!(!comment_contains_code("#print 1", &[]));
         assert!(!comment_contains_code("#to print", &[]));
     }
 

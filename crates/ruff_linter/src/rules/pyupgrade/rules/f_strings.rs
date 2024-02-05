@@ -298,7 +298,7 @@ fn try_convert_to_f_string(
                             converted.push(']');
                         }
                         FieldNamePart::StringIndex(index) => {
-                            let quote = match *trailing_quote {
+                            let quote = match trailing_quote {
                                 "'" | "'''" | "\"\"\"" => '"',
                                 "\"" => '\'',
                                 _ => unreachable!("invalid trailing quote"),

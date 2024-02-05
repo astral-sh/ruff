@@ -52,14 +52,13 @@ use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_semantic::analyze::{imports, typing, visibility};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, Globals, Import, Module,
-    ModuleKind, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, Snapshot,
-    StarImport, SubmoduleImport,
+    ModuleKind, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport,
+    SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{IPYTHON_BUILTINS, MAGIC_GLOBALS, PYTHON_BUILTINS};
 use ruff_source_file::{Locator, OneIndexed, SourceRow};
 
 use crate::checkers::ast::annotation::AnnotationContext;
-use crate::checkers::ast::deferred::Deferred;
 use crate::docstrings::extraction::ExtractionTarget;
 use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
@@ -105,8 +104,10 @@ pub(crate) struct Checker<'a> {
     importer: Importer<'a>,
     /// The [`SemanticModel`], built up over the course of the AST traversal.
     semantic: SemanticModel<'a>,
-    /// A set of deferred nodes to be processed after the current traversal (e.g., function bodies).
-    deferred: Deferred<'a>,
+    /// A set of deferred nodes to be visited after the current traversal (e.g., function bodies).
+    visit: deferred::Visit<'a>,
+    /// A set of deferred nodes to be analyzed after the AST traversal (e.g., `for` loops).
+    analyze: deferred::Analyze,
     /// The cumulative set of diagnostics computed across all lint rules.
     pub(crate) diagnostics: Vec<Diagnostic>,
     /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations..
@@ -145,7 +146,8 @@ impl<'a> Checker<'a> {
             indexer,
             importer,
             semantic: SemanticModel::new(&settings.typing_modules, path, module),
-            deferred: Deferred::default(),
+            visit: deferred::Visit::default(),
+            analyze: deferred::Analyze::default(),
             diagnostics: Vec::default(),
             flake8_bugbear_seen: Vec::default(),
             cell_offsets,
@@ -195,7 +197,7 @@ impl<'a> Checker<'a> {
         let trailing_quote = trailing_quote(self.locator.slice(string_range))?;
 
         // Invert the quote character, if it's a single quote.
-        match *trailing_quote {
+        match trailing_quote {
             "'" => Some(Quote::Double),
             "\"" => Some(Quote::Single),
             _ => None,
@@ -340,18 +342,10 @@ where
                     || helpers::is_assignment_to_a_dunder(stmt)
                     || helpers::in_nested_block(self.semantic.current_statements())
                     || imports::is_matplotlib_activation(stmt, self.semantic())
-                    || self.settings.preview.is_enabled()
-                        && imports::is_sys_path_modification(stmt, self.semantic()))
+                    || imports::is_sys_path_modification(stmt, self.semantic()))
                 {
                     self.semantic.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }
-            }
-        }
-
-        // Track each top-level import, to guide import insertions.
-        if matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_)) {
-            if self.semantic.at_top_level() {
-                self.importer.visit_import(stmt);
             }
         }
 
@@ -370,14 +364,22 @@ where
                 self.handle_node_load(target);
             }
             Stmt::Import(ast::StmtImport { names, range: _ }) => {
+                if self.semantic.at_top_level() {
+                    self.importer.visit_import(stmt);
+                }
+
                 for alias in names {
-                    if alias.name.contains('.') && alias.asname.is_none() {
-                        // Given `import foo.bar`, `name` would be "foo", and `qualified_name` would be
-                        // "foo.bar".
-                        let name = alias.name.split('.').next().unwrap();
+                    // Given `import foo.bar`, `module` would be "foo", and `call_path` would be
+                    // `["foo", "bar"]`.
+                    let module = alias.name.split('.').next().unwrap();
+
+                    // Mark the top-level module as "seen" by the semantic model.
+                    self.semantic.add_module(module);
+
+                    if alias.asname.is_none() && alias.name.contains('.') {
                         let call_path: Box<[&str]> = alias.name.split('.').collect();
                         self.add_binding(
-                            name,
+                            module,
                             alias.identifier(),
                             BindingKind::SubmoduleImport(SubmoduleImport { call_path }),
                             BindingFlags::EXTERNAL,
@@ -412,8 +414,20 @@ where
                 level,
                 range: _,
             }) => {
+                if self.semantic.at_top_level() {
+                    self.importer.visit_import(stmt);
+                }
+
                 let module = module.as_deref();
                 let level = *level;
+
+                // Mark the top-level module as "seen" by the semantic model.
+                if level.map_or(true, |level| level == 0) {
+                    if let Some(module) = module.and_then(|module| module.split('.').next()) {
+                        self.semantic.add_module(module);
+                    }
+                }
+
                 for alias in names {
                     if let Some("__future__") = module {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
@@ -596,7 +610,7 @@ where
                 self.semantic.push_scope(ScopeKind::Function(function_def));
                 self.semantic.flags -= SemanticModelFlags::EXCEPTION_HANDLER;
 
-                self.deferred.functions.push(self.semantic.snapshot());
+                self.visit.functions.push(self.semantic.snapshot());
 
                 // Extract any global bindings from the function body.
                 if let Some(globals) = Globals::from_body(body) {
@@ -652,7 +666,7 @@ where
                 if let Some(type_params) = type_params {
                     self.visit_type_params(type_params);
                 }
-                self.deferred
+                self.visit
                     .type_param_definitions
                     .push((value, self.semantic.snapshot()));
                 self.semantic.pop_scope();
@@ -718,6 +732,21 @@ where
                     }
                     AnnotationContext::RuntimeEvaluated => {
                         self.visit_runtime_evaluated_annotation(annotation);
+                    }
+                    AnnotationContext::TypingOnly
+                        if flake8_type_checking::helpers::is_dataclass_meta_annotation(
+                            annotation,
+                            self.semantic(),
+                        ) =>
+                    {
+                        if let Expr::Subscript(subscript) = &**annotation {
+                            // Ex) `InitVar[str]`
+                            self.visit_runtime_required_annotation(&subscript.value);
+                            self.visit_annotation(&subscript.slice);
+                        } else {
+                            // Ex) `InitVar`
+                            self.visit_runtime_required_annotation(annotation);
+                        }
                     }
                     AnnotationContext::TypingOnly => self.visit_annotation(annotation),
                 }
@@ -785,7 +814,7 @@ where
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => {
                 let scope_id = self.semantic.scope_id;
-                self.deferred.scopes.push(scope_id);
+                self.analyze.scopes.push(scope_id);
                 self.semantic.pop_scope(); // Function scope
                 self.semantic.pop_definition();
                 self.semantic.pop_scope(); // Type parameter scope
@@ -798,7 +827,7 @@ where
             }
             Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
                 let scope_id = self.semantic.scope_id;
-                self.deferred.scopes.push(scope_id);
+                self.analyze.scopes.push(scope_id);
                 self.semantic.pop_scope(); // Class scope
                 self.semantic.pop_definition();
                 self.semantic.pop_scope(); // Type parameter scope
@@ -835,13 +864,13 @@ where
             && self.semantic.future_annotations()
         {
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
-                self.deferred.string_type_definitions.push((
+                self.visit.string_type_definitions.push((
                     expr.range(),
                     value.to_str(),
                     self.semantic.snapshot(),
                 ));
             } else {
-                self.deferred
+                self.visit
                     .future_type_definitions
                     .push((expr, self.semantic.snapshot()));
             }
@@ -945,7 +974,8 @@ where
                 }
 
                 self.semantic.push_scope(ScopeKind::Lambda(lambda));
-                self.deferred.lambdas.push(self.semantic.snapshot());
+                self.visit.lambdas.push(self.semantic.snapshot());
+                self.analyze.lambdas.push(self.semantic.snapshot());
             }
             Expr::IfExp(ast::ExprIfExp {
                 test,
@@ -1252,7 +1282,7 @@ where
             }
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                 if self.semantic.in_type_definition() && !self.semantic.in_typing_literal() {
-                    self.deferred.string_type_definitions.push((
+                    self.visit.string_type_definitions.push((
                         expr.range(),
                         value.to_str(),
                         self.semantic.snapshot(),
@@ -1273,7 +1303,7 @@ where
             | Expr::ListComp(_)
             | Expr::DictComp(_)
             | Expr::SetComp(_) => {
-                self.deferred.scopes.push(self.semantic.scope_id);
+                self.analyze.scopes.push(self.semantic.scope_id);
                 self.semantic.pop_scope();
             }
             _ => {}
@@ -1447,7 +1477,7 @@ where
             bound: Some(bound), ..
         }) = type_param
         {
-            self.deferred
+            self.visit
                 .type_param_definitions
                 .push((bound, self.semantic.snapshot()));
         }
@@ -1809,8 +1839,8 @@ impl<'a> Checker<'a> {
 
     fn visit_deferred_future_type_definitions(&mut self) {
         let snapshot = self.semantic.snapshot();
-        while !self.deferred.future_type_definitions.is_empty() {
-            let type_definitions = std::mem::take(&mut self.deferred.future_type_definitions);
+        while !self.visit.future_type_definitions.is_empty() {
+            let type_definitions = std::mem::take(&mut self.visit.future_type_definitions);
             for (expr, snapshot) in type_definitions {
                 self.semantic.restore(snapshot);
 
@@ -1824,8 +1854,8 @@ impl<'a> Checker<'a> {
 
     fn visit_deferred_type_param_definitions(&mut self) {
         let snapshot = self.semantic.snapshot();
-        while !self.deferred.type_param_definitions.is_empty() {
-            let type_params = std::mem::take(&mut self.deferred.type_param_definitions);
+        while !self.visit.type_param_definitions.is_empty() {
+            let type_params = std::mem::take(&mut self.visit.type_param_definitions);
             for (type_param, snapshot) in type_params {
                 self.semantic.restore(snapshot);
 
@@ -1839,8 +1869,8 @@ impl<'a> Checker<'a> {
 
     fn visit_deferred_string_type_definitions(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
         let snapshot = self.semantic.snapshot();
-        while !self.deferred.string_type_definitions.is_empty() {
-            let type_definitions = std::mem::take(&mut self.deferred.string_type_definitions);
+        while !self.visit.string_type_definitions.is_empty() {
+            let type_definitions = std::mem::take(&mut self.visit.string_type_definitions);
             for (range, value, snapshot) in type_definitions {
                 if let Ok((expr, kind)) =
                     parse_type_annotation(value, range, self.locator.contents())
@@ -1887,8 +1917,8 @@ impl<'a> Checker<'a> {
 
     fn visit_deferred_functions(&mut self) {
         let snapshot = self.semantic.snapshot();
-        while !self.deferred.functions.is_empty() {
-            let deferred_functions = std::mem::take(&mut self.deferred.functions);
+        while !self.visit.functions.is_empty() {
+            let deferred_functions = std::mem::take(&mut self.visit.functions);
             for snapshot in deferred_functions {
                 self.semantic.restore(snapshot);
 
@@ -1906,11 +1936,12 @@ impl<'a> Checker<'a> {
         self.semantic.restore(snapshot);
     }
 
+    /// Visit all deferred lambdas. Returns a list of snapshots, such that the caller can restore
+    /// the semantic model to the state it was in before visiting the deferred lambdas.
     fn visit_deferred_lambdas(&mut self) {
         let snapshot = self.semantic.snapshot();
-        let mut deferred: Vec<Snapshot> = Vec::with_capacity(self.deferred.lambdas.len());
-        while !self.deferred.lambdas.is_empty() {
-            let lambdas = std::mem::take(&mut self.deferred.lambdas);
+        while !self.visit.lambdas.is_empty() {
+            let lambdas = std::mem::take(&mut self.visit.lambdas);
             for snapshot in lambdas {
                 self.semantic.restore(snapshot);
 
@@ -1927,13 +1958,21 @@ impl<'a> Checker<'a> {
                     self.visit_parameters(parameters);
                 }
                 self.visit_expr(body);
-
-                deferred.push(snapshot);
             }
         }
-        // Reset the deferred lambdas, so we can analyze them later on.
-        self.deferred.lambdas = deferred;
         self.semantic.restore(snapshot);
+    }
+
+    /// Recursively visit all deferred AST nodes, including lambdas, functions, and type
+    /// annotations.
+    fn visit_deferred(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
+        while !self.visit.is_empty() {
+            self.visit_deferred_functions();
+            self.visit_deferred_type_param_definitions();
+            self.visit_deferred_lambdas();
+            self.visit_deferred_future_type_definitions();
+            self.visit_deferred_string_type_definitions(allocator);
+        }
     }
 
     /// Run any lint rules that operate over the module exports (i.e., members of `__all__`).
@@ -2043,12 +2082,8 @@ pub(crate) fn check_ast(
     // Visit any deferred syntax nodes. Take care to visit in order, such that we avoid adding
     // new deferred nodes after visiting nodes of that kind. For example, visiting a deferred
     // function can add a deferred lambda, but the opposite is not true.
-    checker.visit_deferred_functions();
-    checker.visit_deferred_type_param_definitions();
-    checker.visit_deferred_future_type_definitions();
     let allocator = typed_arena::Arena::new();
-    checker.visit_deferred_string_type_definitions(&allocator);
-    checker.visit_deferred_lambdas();
+    checker.visit_deferred(&allocator);
     checker.visit_exports();
 
     // Check docstrings, bindings, and unresolved references.
@@ -2060,7 +2095,7 @@ pub(crate) fn check_ast(
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.semantic.scope_id = ScopeId::global();
-    checker.deferred.scopes.push(ScopeId::global());
+    checker.analyze.scopes.push(ScopeId::global());
     analyze::deferred_scopes(&mut checker);
 
     checker.diagnostics

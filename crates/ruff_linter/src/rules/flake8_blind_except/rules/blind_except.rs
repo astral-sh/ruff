@@ -34,6 +34,25 @@ use crate::checkers::ast::Checker;
 ///     ...
 /// ```
 ///
+/// Exceptions that are re-raised will _not_ be flagged, as they're expected to
+/// be caught elsewhere:
+/// ```python
+/// try:
+///     foo()
+/// except BaseException:
+///     raise
+/// ```
+///
+/// Exceptions that are logged via `logging.exception()` or `logging.error()`
+/// with `exc_info` enabled will _not_ be flagged, as this is a common pattern
+/// for propagating exception traces:
+/// ```python
+/// try:
+///     foo()
+/// except BaseException:
+///     logging.exception("Something went wrong")
+/// ```
+///
 /// ## References
 /// - [Python documentation: The `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
 /// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
