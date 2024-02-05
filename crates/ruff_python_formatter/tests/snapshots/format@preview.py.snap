@@ -161,11 +161,10 @@ def f():
 ```diff
 --- Stable
 +++ Preview
-@@ -1,13 +1,12 @@
+@@ -1,13 +1,13 @@
  """
--Black's `Preview.module_docstring_newlines`
--"""
-+Black's `Preview.module_docstring_newlines`"""
+ Black's `Preview.module_docstring_newlines`
+ """
 +
  first_stmt_after_module_level_docstring = 1
  
@@ -178,7 +177,7 @@ def f():
  
  
  def raw_docstring():
-@@ -27,23 +26,22 @@
+@@ -27,23 +27,22 @@
  
  
  class RemoveNewlineBeforeClassDocstring:
@@ -211,7 +210,7 @@ def f():
  
      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb] = (
          cccccccc.ccccccccccccc(d).cccccccc + e
-@@ -57,9 +55,9 @@
+@@ -57,9 +56,9 @@
          + eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
      )
  
@@ -247,7 +246,8 @@ source_type                = Python
 
 ```python
 """
-Black's `Preview.module_docstring_newlines`"""
+Black's `Preview.module_docstring_newlines`
+"""
 
 first_stmt_after_module_level_docstring = 1
 
