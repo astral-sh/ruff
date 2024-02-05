@@ -667,10 +667,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UnnecessaryCollectionCall) {
                 flake8_comprehensions::rules::unnecessary_collection_call(
                     checker,
-                    expr,
-                    func,
-                    args,
-                    keywords,
+                    call,
                     &checker.settings.flake8_comprehensions,
                 );
             }
