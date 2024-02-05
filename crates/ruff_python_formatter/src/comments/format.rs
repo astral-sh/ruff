@@ -3,11 +3,11 @@ use std::borrow::Cow;
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
 use ruff_python_ast::{AnyNodeRef, AstNode, NodeKind, PySourceType};
 use ruff_python_trivia::{
-    is_pragma_comment, lines_after, lines_after_ignoring_trivia, lines_before,
+    is_pragma_comment, lines_after, lines_after_ignoring_trivia, lines_before, CommentLinePosition,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
-use crate::comments::{CommentLinePosition, SourceComment};
+use crate::comments::SourceComment;
 use crate::context::NodeLevel;
 use crate::prelude::*;
 use crate::preview::is_blank_line_after_nested_stub_class_enabled;

@@ -1,10 +1,9 @@
 use ruff_formatter::write;
 use ruff_python_ast::StmtAnnAssign;
 
-use crate::comments::{SourceComment, SuppressionKind};
+use crate::comments::SourceComment;
 use crate::expression::parentheses::Parentheses;
 use crate::expression::{has_parentheses, is_splittable_expression};
-use crate::prelude::*;
 use crate::preview::{
     is_parenthesize_long_type_hints_enabled,
     is_prefer_splitting_right_hand_side_of_assignments_enabled,
@@ -13,6 +12,7 @@ use crate::statement::stmt_assign::{
     AnyAssignmentOperator, AnyBeforeOperator, FormatStatementsLastExpression,
 };
 use crate::statement::trailing_semicolon;
+use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
 pub struct FormatStmtAnnAssign;
@@ -106,6 +106,6 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
         trailing_comments: &[SourceComment],
         context: &PyFormatContext,
     ) -> bool {
-        SuppressionKind::has_skip_comment(trailing_comments, context.source())
+        has_skip_comment(trailing_comments, context.source())
     }
 }

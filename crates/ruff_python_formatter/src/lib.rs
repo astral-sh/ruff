@@ -8,7 +8,7 @@ use ruff_python_ast::AstNode;
 use ruff_python_ast::Mod;
 use ruff_python_index::tokens_and_ranges;
 use ruff_python_parser::{parse_tokens, AsMode, ParseError, ParseErrorType};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::{CommentRanges, SuppressionKind};
 use ruff_source_file::Locator;
 
 use crate::comments::{
@@ -114,6 +114,16 @@ where
     ) -> bool {
         false
     }
+}
+
+fn has_skip_comment(trailing_comments: &[SourceComment], source: &str) -> bool {
+    trailing_comments.iter().any(|comment| {
+        comment.line_position().is_end_of_line()
+            && matches!(
+                SuppressionKind::from_slice(comment.slice().text(SourceCode::new(source))),
+                Some(SuppressionKind::Skip | SuppressionKind::Off)
+            )
+    })
 }
 
 #[derive(Error, Debug)]

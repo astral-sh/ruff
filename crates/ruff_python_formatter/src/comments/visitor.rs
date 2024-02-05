@@ -8,13 +8,13 @@ use ruff_python_ast::{Mod, Stmt};
 // pre-order.
 #[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::preorder::*;
-use ruff_python_trivia::{is_python_whitespace, CommentRanges};
+use ruff_python_trivia::{is_python_whitespace, CommentLinePosition, CommentRanges};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::placement::place_comment;
-use crate::comments::{CommentLinePosition, CommentsMap, SourceComment};
+use crate::comments::{CommentsMap, SourceComment};
 
 /// Collect the preceding, following and enclosing node for each comment without applying
 /// [`place_comment`] for debugging.
