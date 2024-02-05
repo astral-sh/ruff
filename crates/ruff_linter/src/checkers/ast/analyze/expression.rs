@@ -657,9 +657,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 );
             }
             if checker.enabled(Rule::UnnecessaryLiteralSet) {
-                flake8_comprehensions::rules::unnecessary_literal_set(
-                    checker, expr, func, args, keywords,
-                );
+                flake8_comprehensions::rules::unnecessary_literal_set(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryLiteralDict) {
                 flake8_comprehensions::rules::unnecessary_literal_dict(
@@ -677,9 +675,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 );
             }
             if checker.enabled(Rule::UnnecessaryLiteralWithinTupleCall) {
-                flake8_comprehensions::rules::unnecessary_literal_within_tuple_call(
-                    checker, expr, func, args, keywords,
-                );
+                flake8_comprehensions::rules::unnecessary_literal_within_tuple_call(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryLiteralWithinListCall) {
                 flake8_comprehensions::rules::unnecessary_literal_within_list_call(checker, call);

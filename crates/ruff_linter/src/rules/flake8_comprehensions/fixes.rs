@@ -6,7 +6,7 @@ use libcst_native::{
     Arg, AssignEqual, AssignTargetExpression, Call, Comment, CompFor, Dict, DictComp, DictElement,
     Element, EmptyLine, Expression, GeneratorExp, LeftCurlyBrace, LeftParen, LeftSquareBracket,
     List, ListComp, Name, ParenthesizableWhitespace, ParenthesizedNode, ParenthesizedWhitespace,
-    RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
+    RightCurlyBrace, RightParen, RightSquareBracket, SetComp, SimpleString, SimpleWhitespace,
     TrailingWhitespace, Tuple,
 };
 
@@ -133,95 +133,6 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
         lpar: list_comp.lpar.clone(),
         rpar: list_comp.rpar.clone(),
     }));
-
-    Ok(Edit::range_replacement(
-        pad_expression(
-            tree.codegen_stylist(stylist),
-            expr.range(),
-            checker.locator(),
-            checker.semantic(),
-        ),
-        expr.range(),
-    ))
-}
-
-/// Drop a trailing comma from a list of tuple elements.
-fn drop_trailing_comma<'a>(
-    tuple: &Tuple<'a>,
-) -> Result<(
-    Vec<Element<'a>>,
-    ParenthesizableWhitespace<'a>,
-    ParenthesizableWhitespace<'a>,
-)> {
-    let whitespace_after = tuple
-        .lpar
-        .first()
-        .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses"))?
-        .whitespace_after
-        .clone();
-    let whitespace_before = tuple
-        .rpar
-        .first()
-        .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses"))?
-        .whitespace_before
-        .clone();
-
-    let mut elements = tuple.elements.clone();
-    if elements.len() == 1 {
-        if let Some(Element::Simple {
-            value,
-            comma: Some(..),
-            ..
-        }) = elements.last()
-        {
-            if whitespace_before == ParenthesizableWhitespace::default()
-                && whitespace_after == ParenthesizableWhitespace::default()
-            {
-                elements[0] = Element::Simple {
-                    value: value.clone(),
-                    comma: None,
-                };
-            }
-        }
-    }
-
-    Ok((elements, whitespace_after, whitespace_before))
-}
-
-/// (C405) Convert `set((1, 2))` to `{1, 2}`.
-pub(crate) fn fix_unnecessary_literal_set(expr: &Expr, checker: &Checker) -> Result<Edit> {
-    let locator = checker.locator();
-    let stylist = checker.stylist();
-
-    // Expr(Call(List|Tuple)))) -> Expr(Set)))
-    let module_text = locator.slice(expr);
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
-    let arg = match_arg(call)?;
-
-    let (elements, whitespace_after, whitespace_before) = match &arg.value {
-        Expression::Tuple(inner) => drop_trailing_comma(inner)?,
-        Expression::List(inner) => (
-            inner.elements.clone(),
-            inner.lbracket.whitespace_after.clone(),
-            inner.rbracket.whitespace_before.clone(),
-        ),
-        _ => {
-            bail!("Expected Expression::Tuple | Expression::List");
-        }
-    };
-
-    if elements.is_empty() {
-        call.args = vec![];
-    } else {
-        tree = Expression::Set(Box::new(Set {
-            elements,
-            lbrace: LeftCurlyBrace { whitespace_after },
-            rbrace: RightCurlyBrace { whitespace_before },
-            lpar: vec![],
-            rpar: vec![],
-        }));
-    }
 
     Ok(Edit::range_replacement(
         pad_expression(
@@ -509,56 +420,6 @@ pub(crate) fn pad_end(
     } else {
         content.into()
     }
-}
-
-/// (C409) Convert `tuple([1, 2])` to `tuple(1, 2)`
-pub(crate) fn fix_unnecessary_literal_within_tuple_call(
-    expr: &Expr,
-    locator: &Locator,
-    stylist: &Stylist,
-) -> Result<Edit> {
-    let module_text = locator.slice(expr);
-    let mut tree = match_expression(module_text)?;
-    let call = match_call_mut(&mut tree)?;
-    let arg = match_arg(call)?;
-    let (elements, whitespace_after, whitespace_before) = match &arg.value {
-        Expression::Tuple(inner) => (
-            &inner.elements,
-            &inner
-                .lpar
-                .first()
-                .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses"))?
-                .whitespace_after,
-            &inner
-                .rpar
-                .first()
-                .ok_or_else(|| anyhow::anyhow!("Expected at least one set of parentheses"))?
-                .whitespace_before,
-        ),
-        Expression::List(inner) => (
-            &inner.elements,
-            &inner.lbracket.whitespace_after,
-            &inner.rbracket.whitespace_before,
-        ),
-        _ => {
-            bail!("Expected Expression::Tuple | Expression::List");
-        }
-    };
-
-    tree = Expression::Tuple(Box::new(Tuple {
-        elements: elements.clone(),
-        lpar: vec![LeftParen {
-            whitespace_after: whitespace_after.clone(),
-        }],
-        rpar: vec![RightParen {
-            whitespace_before: whitespace_before.clone(),
-        }],
-    }));
-
-    Ok(Edit::range_replacement(
-        tree.codegen_stylist(stylist),
-        expr.range(),
-    ))
 }
 
 /// (C411) Convert `list([i * i for i in x])` to `[i * i for i in x]`.
