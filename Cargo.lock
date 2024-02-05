@@ -1132,9 +1132,9 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25db6b064527c5d482d0423354fcd07a89a2dfe07b67892e62411946db7f07b0"
+checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
 dependencies = [
  "either",
 ]
@@ -2023,7 +2023,7 @@ dependencies = [
  "insta",
  "insta-cmd",
  "is-macro",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "log",
  "mimalloc",
  "notify",
@@ -2081,7 +2081,7 @@ dependencies = [
  "filetime",
  "glob",
  "globset",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "regex",
  "ruff_macros",
  "seahash",
@@ -2097,7 +2097,7 @@ dependencies = [
  "imara-diff",
  "indicatif",
  "indoc",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "libcst",
  "once_cell",
  "pretty_assertions",
@@ -2181,7 +2181,7 @@ dependencies = [
  "insta",
  "is-macro",
  "is-wsl",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "libcst",
  "log",
  "memchr",
@@ -2233,7 +2233,7 @@ dependencies = [
 name = "ruff_macros"
 version = "0.0.0"
 dependencies = [
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "proc-macro2",
  "quote",
  "ruff_python_trivia",
@@ -2246,7 +2246,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "insta",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "once_cell",
  "rand",
  "ruff_diagnostics",
@@ -2268,7 +2268,7 @@ dependencies = [
  "bitflags 2.4.1",
  "insta",
  "is-macro",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "once_cell",
  "ruff_python_parser",
  "ruff_python_trivia",
@@ -2300,7 +2300,7 @@ dependencies = [
  "clap",
  "countme",
  "insta",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "memchr",
  "once_cell",
  "regex",
@@ -2343,7 +2343,7 @@ dependencies = [
  "bitflags 2.4.1",
  "hexf-parse",
  "is-macro",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "lexical-parse-float",
  "rand",
  "unic-ucd-category",
@@ -2357,7 +2357,7 @@ dependencies = [
  "bitflags 2.4.1",
  "insta",
  "is-macro",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "lalrpop",
  "lalrpop-util",
  "memchr",
@@ -2408,7 +2408,7 @@ name = "ruff_python_trivia"
 version = "0.0.0"
 dependencies = [
  "insta",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "ruff_python_ast",
  "ruff_python_index",
  "ruff_python_parser",
@@ -2490,7 +2490,7 @@ dependencies = [
  "globset",
  "ignore",
  "is-macro",
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "log",
  "once_cell",
  "path-absolutize",
