@@ -2787,6 +2787,11 @@ pub struct PylintOptions {
     #[option(default = r"50", value_type = "int", example = r"max-statements = 50")]
     pub max_statements: Option<usize>,
 
+    /// Maximum number of attributes allowed within a class definition
+    /// (see: `PLR0902`).
+    #[option(default = r"7", value_type = "int", example = r"max-attributes = 7")]
+    pub max_attributes: Option<usize>,
+
     /// Maximum number of public methods allowed for a class (see: `PLR0904`).
     #[option(
         default = r"20",
@@ -2823,6 +2828,7 @@ impl PylintOptions {
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),
             max_branches: self.max_branches.unwrap_or(defaults.max_branches),
             max_statements: self.max_statements.unwrap_or(defaults.max_statements),
+            max_attributes: self.max_attributes.unwrap_or(defaults.max_attributes),
             max_public_methods: self
                 .max_public_methods
                 .unwrap_or(defaults.max_public_methods),

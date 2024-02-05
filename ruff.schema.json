@@ -2460,6 +2460,15 @@
           "format": "uint",
           "minimum": 0.0
         },
+        "max-attributes": {
+          "description": "Maximum number of attributes allowed within a class definition (see: `PLR0902`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
         "max-bool-expr": {
           "description": "Maximum number of Boolean expressions allowed within a single `if` statement (see: `PLR0916`).",
           "type": [
@@ -3277,6 +3286,7 @@
         "PLR0402",
         "PLR09",
         "PLR090",
+        "PLR0902",
         "PLR0904",
         "PLR091",
         "PLR0911",

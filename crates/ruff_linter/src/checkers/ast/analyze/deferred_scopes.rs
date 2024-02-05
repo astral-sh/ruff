@@ -24,6 +24,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::RedefinedArgumentFromLocal,
         Rule::RedefinedWhileUnused,
         Rule::RuntimeImportInTypeCheckingBlock,
+        Rule::TooManyInstanceAttributes,
         Rule::TooManyLocals,
         Rule::TypingOnlyFirstPartyImport,
         Rule::TypingOnlyStandardLibraryImport,
@@ -314,6 +315,9 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     class_def,
                     &mut diagnostics,
                 );
+            }
+            if checker.enabled(Rule::TooManyInstanceAttributes) {
+                pylint::rules::too_many_instance_attributes(checker, class_def, &mut diagnostics);
             }
         }
 

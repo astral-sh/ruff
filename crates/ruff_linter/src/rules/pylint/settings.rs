@@ -58,6 +58,7 @@ pub struct Settings {
     pub max_bool_expr: usize,
     pub max_branches: usize,
     pub max_statements: usize,
+    pub max_attributes: usize,
     pub max_public_methods: usize,
     pub max_locals: usize,
     pub max_nested_blocks: usize,
@@ -74,6 +75,7 @@ impl Default for Settings {
             max_bool_expr: 5,
             max_branches: 12,
             max_statements: 50,
+            max_attributes: 7,
             max_public_methods: 20,
             max_locals: 15,
             max_nested_blocks: 5,
@@ -95,6 +97,7 @@ impl fmt::Display for Settings {
                 self.max_bool_expr,
                 self.max_branches,
                 self.max_statements,
+                self.max_attributes,
                 self.max_public_methods,
                 self.max_locals
             ]

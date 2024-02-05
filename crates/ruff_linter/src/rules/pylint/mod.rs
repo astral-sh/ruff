@@ -379,6 +379,22 @@ mod tests {
     }
 
     #[test]
+    fn too_many_attributes() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_attributes.py"),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    max_attributes: 7,
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules(vec![Rule::TooManyInstanceAttributes])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn unspecified_encoding_python39_or_lower() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/unspecified_encoding.py"),
