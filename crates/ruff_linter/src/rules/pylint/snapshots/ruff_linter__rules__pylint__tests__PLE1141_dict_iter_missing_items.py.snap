@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+dict_iter_missing_items.py:8:13: PLE1141 Call `items()` when unpacking a dictionary for iteration
+  |
+7 | # Errors
+8 | for k, v in d:
+  |             ^ PLE1141
+9 |     pass
+  |
+
+dict_iter_missing_items.py:12:13: PLE1141 Call `items()` when unpacking a dictionary for iteration
+   |
+11 | # False positive, since the keys are all tuples this is valid
+12 | for a, b in d_tuple: 
+   |             ^^^^^^^ PLE1141
+13 |     pass
+   |
+
+

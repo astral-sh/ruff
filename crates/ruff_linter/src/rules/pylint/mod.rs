@@ -171,6 +171,7 @@ mod tests {
     #[test_case(Rule::PotentialIndexError, Path::new("potential_index_error.py"))]
     #[test_case(Rule::SuperWithoutBrackets, Path::new("super_without_brackets.py"))]
     #[test_case(Rule::TooManyNestedBlocks, Path::new("too_many_nested_blocks.py"))]
+    #[test_case(Rule::DictIterMissingItems, Path::new("dict_iter_missing_items.py"))]
     #[test_case(
         Rule::UnnecessaryDictIndexLookup,
         Path::new("unnecessary_dict_index_lookup.py")
