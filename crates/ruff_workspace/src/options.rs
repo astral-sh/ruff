@@ -2756,7 +2756,7 @@ pub struct PylintOptions {
     ///
     /// If not specified, defaults to the value of `max-args`.
     #[option(
-        default = r"3",
+        default = r"5", // Needs to be in sync with default of `max-args`.
         value_type = "int",
         example = r"max-positional-args = 3"
     )]
