@@ -326,6 +326,8 @@ unnecessary_dunder_call.py:31:16: PLC2801 Unnecessary dunder call to `__getattri
 30 |     def do_thing(self, item):
 31 |         return object.__getattribute__(self, item)  # PLC2801
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC2801
+32 | 
+33 |     def use_descriptor(self, item):
    |
    = help: Access attribute directly or use getattr built-in function
 
