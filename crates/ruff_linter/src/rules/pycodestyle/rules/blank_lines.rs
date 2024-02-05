@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::num::NonZeroU32;
 use std::slice::Iter;
 
@@ -328,6 +329,8 @@ struct LogicalLineInfo {
 
     /// `true` if the line is a string only (including trivia tokens) line, which is a docstring if coming right after a class/function definition.
     is_docstring: bool,
+
+    /// The indentation length in columns. See [`expand_indent`] for the computation of the indent.
     indent_length: usize,
 
     /// The number of blank lines preceding the current line.
@@ -378,7 +381,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
         let mut is_docstring = false;
         // Number of consecutive blank lines directly preceding this logical line.
         let mut blank_lines = BlankLines::Zero;
-        let mut logical_line_start: Option<(LogicalLineKind, TextRange)> = None;
+        let mut first_logical_line_token: Option<(LogicalLineKind, TextRange)> = None;
         let mut last_token: TokenKind = TokenKind::EndOfFile;
         let mut parens = 0u32;
 
@@ -394,7 +397,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
             let token_kind = TokenKind::from_token(token);
 
             let (logical_line_kind, first_token_range) = if let Some(first_token_range) =
-                logical_line_start
+                first_logical_line_token
             {
                 first_token_range
             }
@@ -425,7 +428,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     _ => LogicalLineKind::Other,
                 };
 
-                logical_line_start = Some((logical_line_kind, *range));
+                first_logical_line_token = Some((logical_line_kind, *range));
 
                 (logical_line_kind, *range)
             };
@@ -453,9 +456,8 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     let indent_length =
                         expand_indent(self.locator.slice(indent_range), self.indent_width);
 
-                    if blank_lines.count() > self.max_preceding_blank_lines.count() {
-                        self.max_preceding_blank_lines = blank_lines;
-                    }
+                    self.max_preceding_blank_lines =
+                        self.max_preceding_blank_lines.max(blank_lines);
 
                     let logical_line = LogicalLineInfo {
                         kind: logical_line_kind,
@@ -524,14 +526,9 @@ impl BlankLines {
     }
 }
 
-use std::cmp::Ordering;
-
 impl PartialEq<u32> for BlankLines {
     fn eq(&self, other: &u32) -> bool {
-        match self {
-            BlankLines::Zero => *other == 0,
-            BlankLines::Many { count, range: _ } => count.get() == *other,
-        }
+        self.partial_cmp(other) == Some(Ordering::Equal)
     }
 }
 
@@ -540,6 +537,26 @@ impl PartialOrd<u32> for BlankLines {
         self.count().partial_cmp(other)
     }
 }
+
+impl PartialOrd for BlankLines {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for BlankLines {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.count().cmp(&other.count())
+    }
+}
+
+impl PartialEq for BlankLines {
+    fn eq(&self, other: &Self) -> bool {
+        self.count() == other.count()
+    }
+}
+
+impl Eq for BlankLines {}
 
 #[derive(Copy, Clone, Debug, Default)]
 enum Follows {
@@ -558,6 +575,34 @@ enum Status {
     CommentAfter(usize),
     #[default]
     Outside,
+}
+
+impl Status {
+    fn update(&mut self, line: &LogicalLineInfo) {
+        match *self {
+            Status::Inside(nesting_indent) => {
+                if line.indent_length <= nesting_indent {
+                    if line.is_comment_only {
+                        *self = Status::CommentAfter(nesting_indent);
+                    } else {
+                        *self = Status::Outside;
+                    }
+                }
+            }
+            Status::CommentAfter(indent) => {
+                if !line.is_comment_only {
+                    if line.indent_length > indent {
+                        *self = Status::Inside(indent);
+                    } else {
+                        *self = Status::Outside;
+                    }
+                }
+            }
+            Status::Outside => {
+                // Nothing to do
+            }
+        }
+    }
 }
 
 /// Contains variables used for the linting of blank lines.
@@ -610,50 +655,8 @@ impl BlankLinesChecker {
         stylist: &Stylist,
         diagnostics: &mut Vec<Diagnostic>,
     ) {
-        match self.class_status {
-            Status::Inside(nesting_indent) => {
-                if line.indent_length <= nesting_indent {
-                    if line.is_comment_only {
-                        self.class_status = Status::CommentAfter(nesting_indent);
-                    } else {
-                        self.class_status = Status::Outside;
-                    }
-                }
-            }
-            Status::CommentAfter(indent) => {
-                if !line.is_comment_only {
-                    if line.indent_length > indent {
-                        self.class_status = Status::Inside(indent);
-                    }
-                    self.class_status = Status::Outside;
-                }
-            }
-            Status::Outside => {
-                // Nothing to do
-            }
-        }
-
-        if let Status::Inside(nesting_indent) = self.fn_status {
-            if line.indent_length <= nesting_indent {
-                if line.is_comment_only {
-                    self.fn_status = Status::CommentAfter(nesting_indent);
-                } else {
-                    self.fn_status = Status::Outside;
-                }
-            }
-        }
-
-        // A comment can be de-indented while still being in a class/function, in that case
-        // we need to revert the variables.
-        if !line.is_comment_only {
-            if let Status::CommentAfter(indent) = self.fn_status {
-                if line.indent_length > indent {
-                    self.fn_status = Status::Inside(indent);
-                } else {
-                    self.fn_status = Status::Outside;
-                }
-            }
-        }
+        self.class_status.update(line);
+        self.fn_status.update(line);
 
         // Don't expect blank lines before the first non comment line.
         if self.is_not_first_logical_line {

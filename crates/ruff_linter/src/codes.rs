@@ -137,18 +137,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pycodestyle, "E274") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::TabBeforeKeyword),
         #[allow(deprecated)]
         (Pycodestyle, "E275") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MissingWhitespaceAfterKeyword),
-        #[allow(deprecated)]
-        (Pycodestyle, "E301") => (RuleGroup::Nursery, rules::pycodestyle::rules::BlankLineBetweenMethods),
-        #[allow(deprecated)]
-        (Pycodestyle, "E302") => (RuleGroup::Nursery, rules::pycodestyle::rules::BlankLinesTopLevel),
-        #[allow(deprecated)]
-        (Pycodestyle, "E303") => (RuleGroup::Nursery, rules::pycodestyle::rules::TooManyBlankLines),
-        #[allow(deprecated)]
-        (Pycodestyle, "E304") => (RuleGroup::Nursery, rules::pycodestyle::rules::BlankLineAfterDecorator),
-        #[allow(deprecated)]
-        (Pycodestyle, "E305") => (RuleGroup::Nursery, rules::pycodestyle::rules::BlankLinesAfterFunctionOrClass),
-        #[allow(deprecated)]
-        (Pycodestyle, "E306") => (RuleGroup::Nursery, rules::pycodestyle::rules::BlankLinesBeforeNestedDefinition),
+        (Pycodestyle, "E301") => (RuleGroup::Preview, rules::pycodestyle::rules::BlankLineBetweenMethods),
+        (Pycodestyle, "E302") => (RuleGroup::Preview, rules::pycodestyle::rules::BlankLinesTopLevel),
+        (Pycodestyle, "E303") => (RuleGroup::Preview, rules::pycodestyle::rules::TooManyBlankLines),
+        (Pycodestyle, "E304") => (RuleGroup::Preview, rules::pycodestyle::rules::BlankLineAfterDecorator),
+        (Pycodestyle, "E305") => (RuleGroup::Preview, rules::pycodestyle::rules::BlankLinesAfterFunctionOrClass),
+        (Pycodestyle, "E306") => (RuleGroup::Preview, rules::pycodestyle::rules::BlankLinesBeforeNestedDefinition),
         (Pycodestyle, "E401") => (RuleGroup::Stable, rules::pycodestyle::rules::MultipleImportsOnOneLine),
         (Pycodestyle, "E402") => (RuleGroup::Stable, rules::pycodestyle::rules::ModuleImportNotAtTopOfFile),
         (Pycodestyle, "E501") => (RuleGroup::Stable, rules::pycodestyle::rules::LineTooLong),
