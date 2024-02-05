@@ -654,7 +654,7 @@ Options:
           Enable preview mode; enables unstable formatting. Use `--no-preview`
           to disable
   -h, --help
-          Print help
+          Print help (see more with '--help')
 
 Miscellaneous:
   -n, --no-cache
@@ -678,6 +678,14 @@ File selection:
 
 Format configuration:
       --line-length <LINE_LENGTH>  Set the line-length
+
+Editor options:
+      --range <RANGE>  When specified, Ruff will try to only format the code in
+                       the given range.
+                       It might be necessary to extend the start backwards or
+                       the end forwards, to fully enclose a logical line.
+                       The `<RANGE>` uses the format
+                       `<start_line>:<start_column>-<end_line>:<end_column>`.
 
 Log levels:
   -v, --verbose  Enable verbose logging
