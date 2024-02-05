@@ -1045,15 +1045,15 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "009") => (RuleGroup::Stable, rules::flake8_logging::rules::UndocumentedWarn),
 
         // wemake_python_styleguide
-        (WemakePythonStyleguide, "201") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyImports),
-        (WemakePythonStyleguide, "202") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyModuleMembers),
-        (WemakePythonStyleguide, "203") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyImportedNames),
+        (WemakePythonStyleguide, "201") => (RuleGroup::Preview, rules::wemake_python_styleguide::TooManyImports),
+        (WemakePythonStyleguide, "202") => (RuleGroup::Preview, rules::wemake_python_styleguide::TooManyModuleMembers),
+        (WemakePythonStyleguide, "203") => (RuleGroup::Preview, rules::wemake_python_styleguide::TooManyImportedNames),
 
-        (WemakePythonStyleguide, "214") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyMethods),
-        (WemakePythonStyleguide, "215") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyBaseClasses),
-        // (WemakePythonStyleguide, "216") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyDecorators),
-        (WemakePythonStyleguide, "217") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyAwaits),
-        (WemakePythonStyleguide, "218") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyAsserts),
+        (WemakePythonStyleguide, "214") => (RuleGroup::Preview, rules::wemake_python_styleguide::TooManyMethods),
+        (WemakePythonStyleguide, "215") => (RuleGroup::Preview, rules::wemake_python_styleguide::TooManyBaseClasses),
+        // (WemakePythonStyleguide, "216") => (RuleGroup::Preview, rules::wemake_python_styleguide::TooManyDecorators),
+        (WemakePythonStyleguide, "217") => (RuleGroup::Preview, rules::wemake_python_styleguide::TooManyAwaits),
+        (WemakePythonStyleguide, "218") => (RuleGroup::Preview, rules::wemake_python_styleguide::TooManyAsserts),
         _ => return None,
     })
 }
