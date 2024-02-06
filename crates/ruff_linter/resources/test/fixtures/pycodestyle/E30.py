@@ -425,6 +425,17 @@ class Test:
 # end
 
 
+# no error
+class Test:
+    def a():
+        pass
+# wrongly indented comment
+
+    def b():
+        pass
+# end
+
+
 # E301
 class Class(object):
 
@@ -621,6 +632,19 @@ class Test:
     # another comment
 
     def test(self): pass
+# end
+
+
+# E303
+class Test:
+    def a(self):
+        pass
+
+# wrongly indented comment
+
+
+    def b(self):
+        pass
 # end
 
 
