@@ -69,7 +69,7 @@ impl AlwaysFixableViolation for BlankLineBetweenMethods {
     }
 
     fn fix_title(&self) -> String {
-        "Add missing blank line(s)".to_string()
+        "Add missing blank line".to_string()
     }
 }
 
