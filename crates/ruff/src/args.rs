@@ -163,7 +163,7 @@ pub struct CheckCommand {
     no_preview: bool,
     /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
     /// or a TOML `<KEY> = <VALUE>` pair (such as you might find in a `ruff.toml` config file)
-    /// overriding a specific config setting.
+    /// overriding a specific configuration option.
     /// Overrides of individual settings using this option always take precedence
     /// over all configuration files, including configuration files that were also
     /// specified using `--config`.
@@ -408,7 +408,7 @@ pub struct FormatCommand {
     pub diff: bool,
     /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
     /// or a TOML `<KEY> = <VALUE>` pair (such as you might find in a `ruff.toml` config file)
-    /// overriding a specific config setting.
+    /// overriding a specific configuration option.
     /// Overrides of individual settings using this option always take precedence
     /// over all configuration files, including configuration files that were also
     /// specified using `--config`.
@@ -554,10 +554,7 @@ impl From<&LogLevelArgs> for LogLevel {
     }
 }
 
-/// Struct to encapsulate all configuration-related arguments passed via the CLI.
-///
-/// Three kinds of configuration arguments can be provided via the CLI;
-/// each kind is represented by a separate field on this struct.
+/// Configuration-related arguments passed via the CLI.
 #[derive(Default)]
 pub struct ConfigArguments {
     /// Path to a pyproject.toml or ruff.toml config file (etc.).
@@ -811,7 +808,7 @@ impl TypedValueParser for ConfigArgumentParser {
         let mut tips = vec!["\
             The `--config` flag must either be a path to a `.toml` \
             configuration file or a TOML `<KEY> = <VALUE>` pair overriding \
-            a specific config setting"
+            a specific configuration option"
             .into()];
 
         // Here we do some heuristics to try to figure out whether

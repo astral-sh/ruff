@@ -94,18 +94,18 @@ fn format_warn_stdin_filename_with_files() {
 fn nonexistent_config_file() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["format", "--config", "foo.toml", "."]), @r###"
-        success: false
-        exit_code: 2
-        ----- stdout -----
+    success: false
+    exit_code: 2
+    ----- stdout -----
 
-        ----- stderr -----
-        error: invalid value 'foo.toml' for '--config <CONFIG_OPTION>'
+    ----- stderr -----
+    error: invalid value 'foo.toml' for '--config <CONFIG_OPTION>'
 
-          tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
-          tip: The path `foo.toml` does not exist on your filesystem
+      tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration option
+      tip: The path `foo.toml` does not exist on your filesystem
 
-        For more information, try '--help'.
-       "###);
+    For more information, try '--help'.
+    "###);
 }
 
 #[test]
@@ -119,7 +119,7 @@ fn config_override_rejected_if_invalid_toml() {
     ----- stderr -----
     error: invalid value 'foo = bar' for '--config <CONFIG_OPTION>'
 
-      tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
+      tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration option
       tip: The following error occurred when attempting to parse `foo = bar` as a `ruff.toml` config option:
 
     TOML parse error at line 1, column 7

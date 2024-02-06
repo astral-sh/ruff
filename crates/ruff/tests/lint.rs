@@ -515,18 +515,18 @@ fn nonexistent_config_file() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(["--config", "foo.toml", "."]), @r###"
-        success: false
-        exit_code: 2
-        ----- stdout -----
+    success: false
+    exit_code: 2
+    ----- stdout -----
 
-        ----- stderr -----
-        error: invalid value 'foo.toml' for '--config <CONFIG_OPTION>'
+    ----- stderr -----
+    error: invalid value 'foo.toml' for '--config <CONFIG_OPTION>'
 
-          tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
-          tip: The path `foo.toml` does not exist on your filesystem
+      tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration option
+      tip: The path `foo.toml` does not exist on your filesystem
 
-        For more information, try '--help'.
-       "###);
+    For more information, try '--help'.
+    "###);
 }
 
 #[test]
@@ -541,7 +541,7 @@ fn config_override_rejected_if_invalid_toml() {
     ----- stderr -----
     error: invalid value 'foo = bar' for '--config <CONFIG_OPTION>'
 
-      tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
+      tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration option
       tip: The following error occurred when attempting to parse `foo = bar` as a `ruff.toml` config option:
 
     TOML parse error at line 1, column 7
@@ -683,7 +683,7 @@ fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
     ----- stderr -----
     error: invalid value 'extend-select=['F481']' for '--config <CONFIG_OPTION>'
 
-      tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
+      tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration option
       tip: The following error occurred when attempting to parse `extend-select=['F481']` as a `ruff.toml` config option:
 
     TOML parse error at line 1, column 1
@@ -711,7 +711,7 @@ fn each_toml_option_requires_a_new_flag_1() {
     ----- stderr -----
     error: invalid value 'extend-select=['F841'], line-length=90' for '--config <CONFIG_OPTION>'
 
-      tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
+      tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration option
       tip: The following error occurred when attempting to parse `extend-select=['F841'], line-length=90` as a `ruff.toml` config option:
 
     TOML parse error at line 1, column 23
@@ -739,7 +739,7 @@ fn each_toml_option_requires_a_new_flag_2() {
     ----- stderr -----
     error: invalid value 'extend-select=['F841'] line-length=90' for '--config <CONFIG_OPTION>'
 
-      tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific config setting
+      tip: The `--config` flag must either be a path to a `.toml` configuration file or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration option
       tip: The following error occurred when attempting to parse `extend-select=['F841'] line-length=90` as a `ruff.toml` config option:
 
     TOML parse error at line 1, column 24
