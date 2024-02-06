@@ -726,9 +726,13 @@ impl BlankLinesChecker {
                 diagnostics.push(diagnostic);
             }
 
-            if line.blank_lines > BLANK_LINES_TOP_LEVEL
-                || (line.indent_length > 0 && line.blank_lines > BLANK_LINES_METHOD_LEVEL)
-            {
+            let expected_blank_lines = if line.indent_length > 0 {
+                BLANK_LINES_METHOD_LEVEL
+            } else {
+                BLANK_LINES_TOP_LEVEL
+            };
+
+            if line.blank_lines > expected_blank_lines {
                 // E303
                 let mut diagnostic = Diagnostic::new(
                     TooManyBlankLines {
@@ -738,19 +742,10 @@ impl BlankLinesChecker {
                 );
 
                 if let Some(blank_lines_range) = line.blank_lines.range() {
-                    if line.indent_length > 0 {
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            stylist
-                                .line_ending()
-                                .repeat(BLANK_LINES_METHOD_LEVEL as usize),
-                            blank_lines_range,
-                        )));
-                    } else {
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            stylist.line_ending().repeat(BLANK_LINES_TOP_LEVEL as usize),
-                            blank_lines_range,
-                        )));
-                    };
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        stylist.line_ending().repeat(expected_blank_lines as usize),
+                        blank_lines_range,
+                    )));
                 }
 
                 diagnostics.push(diagnostic);
@@ -768,7 +763,7 @@ impl BlankLinesChecker {
                 // Then remove all blank lines.
                 let trivia_range = TextRange::new(
                     self.last_non_comment_line_end,
-                    line.first_token_range.start(),
+                    locator.line_start(line.first_token_range.start()),
                 );
                 let trivia_text = locator.slice(trivia_range);
                 let mut trivia_without_blank_lines = trivia_text
@@ -818,7 +813,7 @@ impl BlankLinesChecker {
                     diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                         stylist.line_ending().repeat(BLANK_LINES_TOP_LEVEL as usize),
                         locator.line_start(line.first_token_range.start()),
-                    )))
+                    )));
                 }
 
                 diagnostics.push(diagnostic);
