@@ -94,6 +94,7 @@ fn should_be_fstring(
     };
 
     let mut kwargs = vec![];
+    let mut last_expr: Option<&ast::Expr> = None;
     for expr in semantic.current_expressions() {
         match expr {
             ast::Expr::Call(ast::ExprCall {
@@ -101,13 +102,24 @@ fn should_be_fstring(
                 func,
                 ..
             }) => {
-                if let ast::Expr::Attribute(ast::ExprAttribute { .. }) = func.as_ref() {
-                    return false;
+                if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() {
+                    match value.as_ref() {
+                        ast::Expr::StringLiteral(expr_literal)
+                            if expr_literal.value.as_slice().contains(literal) =>
+                        {
+                            return false;
+                        }
+                        value if last_expr == Some(value) => {
+                            return false;
+                        }
+                        _ => {}
+                    }
                 }
                 kwargs.extend(keywords.iter());
             }
             _ => continue,
         }
+        last_expr.replace(expr);
     }
 
     let kw_idents: FxHashSet<&str> = kwargs
