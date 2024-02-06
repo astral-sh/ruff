@@ -1,4 +1,6 @@
-use crate::PythonWhitespace;
+use ruff_text_size::TextRange;
+
+use crate::{is_python_whitespace, PythonWhitespace};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum SuppressionKind {
@@ -94,5 +96,20 @@ impl CommentLinePosition {
 
     pub const fn is_end_of_line(self) -> bool {
         matches!(self, Self::EndOfLine)
+    }
+
+    pub fn text_position(comment_range: TextRange, source_code: &str) -> Self {
+        let before = &source_code[TextRange::up_to(comment_range.start())];
+
+        for c in before.chars().rev() {
+            match c {
+                '\n' | '\r' => {
+                    break;
+                }
+                c if is_python_whitespace(c) => continue,
+                _ => return Self::EndOfLine,
+            }
+        }
+        Self::OwnLine
     }
 }

@@ -8,7 +8,7 @@ use ruff_python_ast::{Mod, Stmt};
 // pre-order.
 #[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::preorder::*;
-use ruff_python_trivia::{is_python_whitespace, CommentLinePosition, CommentRanges};
+use ruff_python_trivia::{CommentLinePosition, CommentRanges};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -90,7 +90,10 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 preceding: self.preceding_node,
                 following: Some(node),
                 parent: self.parents.iter().rev().nth(1).copied(),
-                line_position: text_position(*comment_range, self.source_code),
+                line_position: CommentLinePosition::text_position(
+                    *comment_range,
+                    self.source_code.as_str(),
+                ),
                 slice: self.source_code.slice(*comment_range),
             };
 
@@ -130,7 +133,10 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 parent: self.parents.last().copied(),
                 preceding: self.preceding_node,
                 following: None,
-                line_position: text_position(*comment_range, self.source_code),
+                line_position: CommentLinePosition::text_position(
+                    *comment_range,
+                    self.source_code.as_str(),
+                ),
                 slice: self.source_code.slice(*comment_range),
             };
 
@@ -161,22 +167,6 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast, '_> {
             }
         }
     }
-}
-
-fn text_position(comment_range: TextRange, source_code: SourceCode) -> CommentLinePosition {
-    let before = &source_code.as_str()[TextRange::up_to(comment_range.start())];
-
-    for c in before.chars().rev() {
-        match c {
-            '\n' | '\r' => {
-                break;
-            }
-            c if is_python_whitespace(c) => continue,
-            _ => return CommentLinePosition::EndOfLine,
-        }
-    }
-
-    CommentLinePosition::OwnLine
 }
 
 /// A comment decorated with additional information about its surrounding context in the source document.

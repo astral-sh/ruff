@@ -1,0 +1,61 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF028.py:7:1: RUF028 [*] Supression comment is useless - formatting was already enabled here
+  |
+5 |     elif False:
+6 |         pass
+7 | # fmt: on
+  | ^^^^^^^^^ RUF028
+8 | 
+9 | def fmt_off_between_lists():
+  |
+  = help: Remove this supression comment
+
+ℹ Unsafe fix
+4 4 |         pass
+5 5 |     elif False:
+6 6 |         pass
+7   |-# fmt: on
+8 7 | 
+9 8 | def fmt_off_between_lists():
+10 9 |     test_list = [
+
+RUF028.py:11:9: RUF028 [*] Supression comment is useless - suppression comments inside expressions are not supported
+   |
+ 9 | def fmt_off_between_lists():
+10 |     test_list = [
+11 |         #fmt: off
+   |         ^^^^^^^^^ RUF028
+12 |         1,
+13 |         2,
+   |
+   = help: Remove this supression comment
+
+ℹ Unsafe fix
+8  8  | 
+9  9  | def fmt_off_between_lists():
+10 10 |     test_list = [
+11    |-        #fmt: off
+12 11 |         1,
+13 12 |         2,
+14 13 |         3
+
+RUF028.py:20:5: RUF028 [*] Supression comment is useless - a skip comment has to be at the end of a line
+   |
+18 | @fmt_off_between_lists
+19 | def fmt_off_between_decorators():
+20 |     # fmt: skip
+   |     ^^^^^^^^^^^ RUF028
+21 |     pass
+   |
+   = help: Remove this supression comment
+
+ℹ Unsafe fix
+17 17 | @fmt_off_in_elif
+18 18 | @fmt_off_between_lists
+19 19 | def fmt_off_between_decorators():
+20    |-    # fmt: skip
+21 20 |     pass
+
+
