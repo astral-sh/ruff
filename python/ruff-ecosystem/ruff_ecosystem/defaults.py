@@ -97,7 +97,6 @@ DEFAULT_TARGETS = [
     ),
     Project(
         repo=Repository(owner="indico", name="indico", ref="master"),
-        check_options=CheckOptions(select="ALL"),
     ),
     # Jupyter Notebooks
     Project(
