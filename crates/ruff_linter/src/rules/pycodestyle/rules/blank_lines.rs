@@ -30,9 +30,7 @@ const BLANK_LINES_METHOD_LEVEL: u32 = 1;
 /// Checks for missing blank lines between methods of a class.
 ///
 /// ## Why is this bad?
-/// PEP 8 recommends the use of blank lines as follows:
-/// - Two blank lines are expected between functions and classes
-/// - One blank line is expected between methods of a class.
+/// PEP 8 recommends exactly one blank line between methods of a class.
 ///
 /// ## Example
 /// ```python
