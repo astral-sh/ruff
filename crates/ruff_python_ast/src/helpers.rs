@@ -1021,6 +1021,12 @@ impl Visitor<'_> for AwaitVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => (),
+            Stmt::With(ast::StmtWith { is_async: true, .. }) => {
+                self.seen_await = true;
+            }
+            Stmt::For(ast::StmtFor { is_async: true, .. }) => {
+                self.seen_await = true;
+            }
             _ => crate::visitor::walk_stmt(self, stmt),
         }
     }
