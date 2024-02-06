@@ -5,7 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_index::Indexer;
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
+use ruff_python_parser::TokenKind;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -101,28 +101,37 @@ pub(crate) fn implicit(
     for ((a_tok, a_range), (b_tok, b_range)) in tokens
         .iter()
         .flatten()
-        .filter(|(tok, _)| {
-            !tok.is_comment()
-                && (settings.flake8_implicit_str_concat.allow_multiline
-                    || !tok.is_non_logical_newline())
+        .filter_map(|(tok, range)| {
+            // Ignore comments.
+            if tok.is_comment() {
+                return None;
+            }
+
+            // Ignore non-localized newlines.
+            if !settings.flake8_implicit_str_concat.allow_multiline && tok.is_non_logical_newline()
+            {
+                return None;
+            }
+
+            Some((TokenKind::from(tok), *range))
         })
         .tuple_windows()
     {
         let (a_range, b_range) = match (a_tok, b_tok) {
-            (Tok::String { .. }, Tok::String { .. }) => (*a_range, *b_range),
-            (Tok::String { .. }, Tok::FStringStart) => {
+            (TokenKind::String, TokenKind::String) => (a_range, b_range),
+            (TokenKind::String, TokenKind::FStringStart) => {
                 match indexer.fstring_ranges().innermost(b_range.start()) {
-                    Some(b_range) => (*a_range, b_range),
+                    Some(b_range) => (a_range, b_range),
                     None => continue,
                 }
             }
-            (Tok::FStringEnd, Tok::String { .. }) => {
+            (TokenKind::FStringEnd, TokenKind::String { .. }) => {
                 match indexer.fstring_ranges().innermost(a_range.start()) {
-                    Some(a_range) => (a_range, *b_range),
+                    Some(a_range) => (a_range, b_range),
                     None => continue,
                 }
             }
-            (Tok::FStringEnd, Tok::FStringStart) => {
+            (TokenKind::FStringEnd, TokenKind::FStringStart) => {
                 match (
                     indexer.fstring_ranges().innermost(a_range.start()),
                     indexer.fstring_ranges().innermost(b_range.start()),
