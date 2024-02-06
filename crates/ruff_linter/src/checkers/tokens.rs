@@ -95,7 +95,7 @@ pub(crate) fn check_tokens(
     }
 
     if settings.rules.enabled(Rule::TabIndentation) {
-        pycodestyle::rules::tab_indentation(&mut diagnostics, tokens, locator, indexer);
+        pycodestyle::rules::tab_indentation(&mut diagnostics, locator, indexer);
     }
 
     if settings.rules.any_enabled(&[
