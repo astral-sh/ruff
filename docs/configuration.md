@@ -596,10 +596,10 @@ Options:
       --config <CONFIG_OPTION>
           Either a path to a TOML configuration file (`pyproject.toml` or
           `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
-          find in a `ruff.toml` config file) overriding a specific config
-          setting. Overrides of individual settings using this option always
-          take precedence over all configuration files, including configuration
-          files that were also specified using `--config`
+          find in a `ruff.toml` config file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
       --extension <EXTENSION>
           List of mappings from file extension to language (one of ["python",
           "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython
@@ -699,10 +699,10 @@ Options:
       --config <CONFIG_OPTION>
           Either a path to a TOML configuration file (`pyproject.toml` or
           `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
-          find in a `ruff.toml` config file) overriding a specific config
-          setting. Overrides of individual settings using this option always
-          take precedence over all configuration files, including configuration
-          files that were also specified using `--config`
+          find in a `ruff.toml` config file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
       --extension <EXTENSION>
           List of mappings from file extension to language (one of ["python",
           "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython
