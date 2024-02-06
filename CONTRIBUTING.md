@@ -231,7 +231,7 @@ Once you've completed the code for the rule itself, you can define tests with th
     For example, if you're adding a new rule named `E402`, you would run:
 
     ```shell
-    cargo run -p ruff -- check crates/ruff_linter/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402
+    cargo run -p ruff -- check crates/ruff_linter/resources/test/fixtures/pycodestyle/E402.py --no-cache --preview --select E402
     ```
 
     **Note:** Only a subset of rules are enabled by default. When testing a new rule, ensure that
