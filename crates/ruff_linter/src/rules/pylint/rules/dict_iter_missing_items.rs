@@ -1,6 +1,6 @@
 use ruff_python_ast::{Expr, ExprTuple};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_text_size::Ranged;
@@ -30,10 +30,14 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct DictIterMissingItems;
 
-impl Violation for DictIterMissingItems {
+impl AlwaysFixableViolation for DictIterMissingItems {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Call `items()` when unpacking a dictionary for iteration")
+    }
+
+    fn fix_title(&self) -> String {
+        format!("Add a call to `.items()`")
     }
 }
 
@@ -61,7 +65,10 @@ pub(crate) fn dict_iter_missing_items(checker: &mut Checker, target: &Expr, iter
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(DictIterMissingItems, iter.range()));
+    let mut diagnostic = Diagnostic::new(DictIterMissingItems, iter.range());
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        format!("{}.items()", name.id),
+        iter.range(),
+    )));
+    checker.diagnostics.push(diagnostic);
 }
