@@ -596,6 +596,7 @@ impl ConfigArguments {
                         .unwrap_or_else(|option| option.deref().clone());
                     new.overrides = new.overrides.combine(Configuration::from_options(
                         overridden_option,
+                        None,
                         &path_dedot::CWD,
                     )?);
                 }

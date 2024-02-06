@@ -108,8 +108,9 @@ impl Workspace {
     #[wasm_bindgen(constructor)]
     pub fn new(options: JsValue) -> Result<Workspace, Error> {
         let options: Options = serde_wasm_bindgen::from_value(options).map_err(into_error)?;
-        let configuration = Configuration::from_options(options, Path::new("."), Path::new("."))
-            .map_err(into_error)?;
+        let configuration =
+            Configuration::from_options(options, Some(Path::new(".")), Path::new("."))
+                .map_err(into_error)?;
         let settings = configuration
             .into_settings(Path::new("."))
             .map_err(into_error)?;

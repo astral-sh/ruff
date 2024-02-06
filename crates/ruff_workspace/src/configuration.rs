@@ -397,7 +397,13 @@ impl Configuration {
     }
 
     /// Convert the [`Options`] read from the given [`Path`] into a [`Configuration`].
-    pub fn from_options(options: Options, path: &Path, project_root: &Path) -> Result<Self> {
+    /// If `None` is supplied for `path`, it indicates that the `Options` instance
+    /// was created via "inline TOML" from the `--config` flag
+    pub fn from_options(
+        options: Options,
+        path: Option<&Path>,
+        project_root: &Path,
+    ) -> Result<Self> {
         warn_about_deprecated_top_level_lint_options(&options.lint_top_level.0, path);
 
         let lint = if let Some(mut lint) = options.lint {
@@ -1263,7 +1269,7 @@ pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> 
 
 fn warn_about_deprecated_top_level_lint_options(
     top_level_options: &LintCommonOptions,
-    path: &Path,
+    path: Option<&Path>,
 ) {
     let mut used_options = Vec::new();
 
@@ -1454,9 +1460,14 @@ fn warn_about_deprecated_top_level_lint_options(
         .map(|option| format!("- '{option}' -> 'lint.{option}'"))
         .join("\n  ");
 
+    let thing_to_update = path.map_or_else(
+        || String::from("your `--config` CLI arguments"),
+        |path| format!("`{}`", fs::relativize_path(path)),
+    );
+
     warn_user_once_by_message!(
-        "The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `{}`:\n  {options_mapping}",
-        fs::relativize_path(path),
+        "The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. \
+        Please update the following options in {thing_to_update}:\n  {options_mapping}",
     );
 }
 
