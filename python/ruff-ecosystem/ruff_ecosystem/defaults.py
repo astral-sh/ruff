@@ -77,17 +77,19 @@ DEFAULT_TARGETS = [
     Project(
         repo=Repository(owner="scikit-build", name="scikit-build-core", ref="main")
     ),
-    Project(
-        repo=Repository(
-            owner="sphinx-doc",
-            name="sphinx",
-            ref="master",
-        ),
-        format_options=FormatOptions(
-            # Does not contain valid UTF-8
-            exclude="tests/roots/test-pycode/cp_1251_coded.py"
-        ),
-    ),
+    # TODO(charlie): Ecosystem check fails in non-preview due to the direct
+    # selection of preview rules.
+    # Project(
+    #     repo=Repository(
+    #         owner="sphinx-doc",
+    #         name="sphinx",
+    #         ref="master",
+    #     ),
+    #     format_options=FormatOptions(
+    #         # Does not contain valid UTF-8
+    #         exclude="tests/roots/test-pycode/cp_1251_coded.py"
+    #     ),
+    # ),
     Project(repo=Repository(owner="spruceid", name="siwe-py", ref="main")),
     Project(repo=Repository(owner="tiangolo", name="fastapi", ref="master")),
     Project(repo=Repository(owner="yandex", name="ch-backup", ref="main")),
@@ -112,6 +114,12 @@ DEFAULT_TARGETS = [
     Project(
         repo=Repository(owner="openai", name="openai-cookbook", ref="main"),
         check_options=CheckOptions(select=JUPYTER_NOTEBOOK_SELECT),
-        config_overrides={"include": ["*.ipynb"]},
+        config_overrides={
+            "include": ["*.ipynb"],
+            # TODO(charlie): Re-enable after fixing typo.
+            "exclude": [
+                "examples/dalle/Image_generations_edits_and_variations_with_DALL-E.ipynb"
+            ],
+        },
     ),
 ]
