@@ -34,7 +34,7 @@ def tripled_quoted():
     multi_line = a = """b { # comment
     c}  d
     """
-    
+
 def single_quoted_multi_line():
     a = 4
     # RUF027
@@ -66,6 +66,7 @@ def negative_cases():
     c = """  {b} """
     d = "bad variable: {invalid}"
     e = "incorrect syntax: {}"
+    f = "uses a builtin: {max}"
     json = "{ positive: false }"
     json2 = "{ 'positive': false }"
     json3 = "{ 'positive': 'false' }"

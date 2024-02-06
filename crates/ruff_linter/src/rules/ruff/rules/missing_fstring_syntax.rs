@@ -124,7 +124,13 @@ fn should_be_fstring(
             .filter_map(|element| element.as_expression())
         {
             if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
-                if kw_idents.contains(id.as_str()) || semantic.lookup_symbol(id).is_none() {
+                if kw_idents.contains(id.as_str()) {
+                    return false;
+                }
+                if semantic
+                    .lookup_symbol(id)
+                    .map_or(true, |id| semantic.binding(id).kind.is_builtin())
+                {
                     return false;
                 }
                 has_name = true;
