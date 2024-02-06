@@ -812,6 +812,25 @@ fn complex_config_setting_overridden_via_cli() -> Result<()> {
 }
 
 #[test]
+fn deprecated_config_option_overridden_via_cli() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", "select=['N801']", "-"])
+        .pass_stdin("class lowercase: ..."),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:7: N801 Class name `lowercase` should use CapWords convention 
+    Found 1 error.
+
+    ----- stderr -----
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your `--config` CLI arguments:
+      - 'select' -> 'lint.select'
+    "###);
+}
+
+#[test]
 fn extension() -> Result<()> {
     let tempdir = TempDir::new()?;
 
