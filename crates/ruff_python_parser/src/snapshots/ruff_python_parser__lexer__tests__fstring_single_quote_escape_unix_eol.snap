@@ -11,6 +11,7 @@ expression: fstring_single_quote_escape_eol(UNIX_EOL)
         FStringMiddle {
             value: "text \\\n more text",
             is_raw: false,
+            triple_quoted: false,
         },
         2..19,
     ),

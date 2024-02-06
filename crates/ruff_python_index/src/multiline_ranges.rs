@@ -46,7 +46,8 @@ pub(crate) struct MultilineRangesBuilder {
 
 impl MultilineRangesBuilder {
     pub(crate) fn visit_token(&mut self, token: &Tok, range: TextRange) {
-        if let Tok::String { triple_quoted, .. } = token {
+        if let Tok::String { triple_quoted, .. } | Tok::FStringMiddle { triple_quoted, .. } = token
+        {
             if *triple_quoted {
                 self.ranges.push(range);
             }
