@@ -175,7 +175,7 @@ RUF027.py:34:22: RUF027 [*] Possible f-string without an `f` prefix
 35 | |     c}  d
 36 | |     """
    | |_______^ RUF027
-37 |       
+37 |   
 38 |   def single_quoted_multi_line():
    |
    = help: Add `f` prefix
@@ -188,7 +188,7 @@ RUF027.py:34:22: RUF027 [*] Possible f-string without an `f` prefix
    34 |+    multi_line = a = f"""b { # comment
 35 35 |     c}  d
 36 36 |     """
-37 37 |     
+37 37 | 
 
 RUF027.py:41:9: RUF027 [*] Possible f-string without an `f` prefix
    |
@@ -276,20 +276,20 @@ RUF027.py:52:9: RUF027 [*] Possible f-string without an `f` prefix
 54 54 | def alternative_formatter(src, **kwargs):
 55 55 |     src.format(**kwargs)
 
-RUF027.py:85:7: RUF027 [*] Possible f-string without an `f` prefix
+RUF027.py:86:7: RUF027 [*] Possible f-string without an `f` prefix
    |
-83 | "always ignore this: {a}"
-84 | 
-85 | print("but don't ignore this: {val}") # RUF027
+84 | "always ignore this: {a}"
+85 | 
+86 | print("but don't ignore this: {val}") # RUF027
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF027
    |
    = help: Add `f` prefix
 
 ℹ Unsafe fix
-82 82 | 
-83 83 | "always ignore this: {a}"
-84 84 | 
-85    |-print("but don't ignore this: {val}") # RUF027
-   85 |+print(f"but don't ignore this: {val}") # RUF027
+83 83 | 
+84 84 | "always ignore this: {a}"
+85 85 | 
+86    |-print("but don't ignore this: {val}") # RUF027
+   86 |+print(f"but don't ignore this: {val}") # RUF027
 
 
