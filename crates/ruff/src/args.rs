@@ -568,7 +568,7 @@ pub struct ConfigArguments {
     /// These overrides take precedence over all configuration files,
     /// even config files that were also specified using `--config`.
     overrides: Configuration,
-    /// Overrides provided via dedicated flags such as --line-length etc.
+    /// Overrides provided via dedicated flags such as `--line-length` etc.
     /// These overrides take precedence over all configuration files,
     /// and also over all overrides specified using any `--config "KEY=VALUE"` flags.
     per_flag_overrides: ExplicitConfigOverrides,
