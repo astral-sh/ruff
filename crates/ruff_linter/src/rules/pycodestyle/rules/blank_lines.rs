@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::cmp::Ordering;
 use std::num::NonZeroU32;
 use std::slice::Iter;
@@ -12,13 +13,13 @@ use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::lexer::LexicalError;
 use ruff_python_parser::Tok;
 use ruff_python_parser::TokenKind;
-use ruff_source_file::Locator;
+use ruff_source_file::{Locator, UniversalNewlines};
 use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
 
 use crate::checkers::logical_lines::expand_indent;
 use crate::line_width::IndentWidth;
-use regex::Regex;
+use ruff_python_trivia::PythonWhitespace;
 
 /// Number of blank lines around top level classes and functions.
 const BLANK_LINES_TOP_LEVEL: u32 = 2;
@@ -765,21 +766,29 @@ impl BlankLinesChecker {
 
                 // Get all the lines between the last decorator line (included) and the current line (included).
                 // Then remove all blank lines.
-                let trivia_range = locator.lines_range(TextRange::new(
-                    self.last_non_comment_line_end - stylist.line_ending().text_len(),
+                let trivia_range = TextRange::new(
+                    self.last_non_comment_line_end,
                     line.first_token_range.start(),
-                ));
-                let text = locator.full_lines(trivia_range);
-                let pattern = Regex::new(r"\n+").unwrap();
-                let result_string = pattern.replace_all(text, "\n");
+                );
+                let trivia_text = locator.slice(trivia_range);
+                let mut trivia_without_blank_lines = trivia_text
+                    .universal_newlines()
+                    .filter_map(|line| {
+                        (!line.trim_whitespace().is_empty()).then_some(line.as_str())
+                    })
+                    .join(&stylist.line_ending());
 
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    result_string.to_string(),
-                    TextRange::new(
-                        trivia_range.start(),
-                        trivia_range.end() + stylist.line_ending().text_len(),
-                    ),
-                )));
+                let fix = if trivia_without_blank_lines.is_empty() {
+                    Fix::safe_edit(Edit::range_deletion(trivia_range))
+                } else {
+                    trivia_without_blank_lines.push_str(&stylist.line_ending());
+                    Fix::safe_edit(Edit::range_replacement(
+                        trivia_without_blank_lines,
+                        trivia_range,
+                    ))
+                };
+
+                diagnostic.set_fix(fix);
 
                 diagnostics.push(diagnostic);
             }
