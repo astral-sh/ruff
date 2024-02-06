@@ -77,9 +77,7 @@ impl AlwaysFixableViolation for BlankLineBetweenMethods {
 /// Checks for missing blank lines between top level functions and classes.
 ///
 /// ## Why is this bad?
-/// PEP 8 recommends the use of blank lines as follows:
-/// - Two blank lines are expected between functions and classes
-/// - One blank line is expected between methods of a class.
+/// PEP 8 recommends exactly two blank lines between top level functions and classes.
 ///
 /// ## Example
 /// ```python
