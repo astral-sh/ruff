@@ -172,12 +172,10 @@ impl AlwaysFixableViolation for TooManyBlankLines {
 }
 
 /// ## What it does
-/// Checks for missing blank line after function decorator.
+/// Checks for extraneous blank line(s) after function decorator.
 ///
 /// ## Why is this bad?
-/// PEP 8 recommends the use of blank lines as follows:
-/// - Two blank lines are expected between functions and classes
-/// - One blank line is expected between methods of a class.
+/// There should be no blank lines between a decorator and the object it is decorating.
 ///
 /// ## Example
 /// ```python
