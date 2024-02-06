@@ -1,5 +1,10 @@
+from typing import Any
+
+
 d = {1: 1, 2: 2}
 d_tuple = {(1, 2): 3, (4, 5): 6}
+d_tuple_annotated: Any = {(1, 2): 3, (4, 5): 6}
+d_tuple_incorrect_tuple = {(1,): 3, (4, 5): 6}
 l = [1, 2]
 s1 = {1, 2}
 s2 = {1, 2, 3}
@@ -8,9 +13,9 @@ s2 = {1, 2, 3}
 for k, v in d:
     pass
 
-# False positive, since the keys are all tuples this is valid
-for a, b in d_tuple: 
+for k, v in d_tuple_incorrect_tuple:
     pass
+
 
 # Non errors
 for k, v in d.items():
@@ -20,4 +25,8 @@ for k in d.keys():
 for i, v in enumerate(l):
     pass
 for i, v in s1.intersection(s2):
+    pass
+for a, b in d_tuple: 
+    pass
+for a, b in d_tuple_annotated: 
     pass

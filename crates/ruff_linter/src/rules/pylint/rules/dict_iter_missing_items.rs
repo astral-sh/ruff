@@ -65,6 +65,24 @@ pub(crate) fn dict_iter_missing_items(checker: &mut Checker, target: &Expr, iter
         return;
     }
 
+    // If we can reliably determine that a dictionary has keys that are tuples of two we don't warn
+    if let Some(statement) = binding.statement(checker.semantic()) {
+        if let Some(assignment) = statement.as_assign_stmt() {
+            if let Some(dict_expr) = assignment.value.as_dict_expr() {
+                if dict_expr.keys.iter().all(|elt| {
+                    elt.as_ref().is_some_and(|x| {
+                        if let Some(tuple) = x.as_tuple_expr() {
+                            return tuple.elts.len() == 2;
+                        }
+                        false
+                    })
+                }) {
+                    return;
+                }
+            }
+        }
+    };
+
     let mut diagnostic = Diagnostic::new(DictIterMissingItems, iter.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         format!("{}.items()", name.id),
