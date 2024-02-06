@@ -19,7 +19,7 @@ use crate::checkers::ast::Checker;
 /// from cryptography.hazmat.primitives.asymmetric import dsa, ec
 ///
 /// dsa.generate_private_key(key_size=512)
-/// ec.generate_private_key(curve=ec.SECT163K1)
+/// ec.generate_private_key(curve=ec.SECT163K1())
 /// ```
 ///
 /// Use instead:
@@ -27,7 +27,7 @@ use crate::checkers::ast::Checker;
 /// from cryptography.hazmat.primitives.asymmetric import dsa, ec
 ///
 /// dsa.generate_private_key(key_size=4096)
-/// ec.generate_private_key(curve=ec.SECP384R1)
+/// ec.generate_private_key(curve=ec.SECP384R1())
 /// ```
 ///
 /// ## References

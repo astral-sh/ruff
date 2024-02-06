@@ -19,11 +19,11 @@ impl CommentRanges {
         Self { raw: ranges }
     }
 
-    /// Returns `true` if the given range includes a comment.
+    /// Returns `true` if the given range intersects with any comment range.
     pub fn intersects(&self, target: TextRange) -> bool {
         self.raw
             .binary_search_by(|range| {
-                if target.contains_range(*range) {
+                if target.intersect(*range).is_some() {
                     std::cmp::Ordering::Equal
                 } else if range.end() < target.start() {
                     std::cmp::Ordering::Less

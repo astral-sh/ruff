@@ -23,12 +23,13 @@ use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_python_formatter::{format_module_source, FormatModuleError, QuoteStyle};
+use ruff_python_formatter::{format_module_source, format_range, FormatModuleError, QuoteStyle};
+use ruff_source_file::LineIndex;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::resolver::{match_exclusion, python_files_in_path, ResolvedFile, Resolver};
 use ruff_workspace::FormatterSettings;
 
-use crate::args::{ConfigArguments, FormatArguments};
+use crate::args::{ConfigArguments, FormatArguments, FormatRange};
 use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches};
 use crate::panic::{catch_unwind, PanicError};
 use crate::resolve::resolve;
@@ -74,6 +75,13 @@ pub(crate) fn format(
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
         return Ok(ExitStatus::Success);
+    }
+
+    if cli.range.is_some() && paths.len() > 1 {
+        return Err(anyhow::anyhow!(
+            "The `--range` option is only supported when formatting a single file but the specified paths resolve to {} files.",
+            paths.len()
+        ));
     }
 
     warn_incompatible_formatter_settings(&resolver);
@@ -138,7 +146,14 @@ pub(crate) fn format(
 
                     Some(
                         match catch_unwind(|| {
-                            format_path(path, &settings.formatter, source_type, mode, cache)
+                            format_path(
+                                path,
+                                &settings.formatter,
+                                source_type,
+                                mode,
+                                cli.range,
+                                cache,
+                            )
                         }) {
                             Ok(inner) => inner.map(|result| FormatPathResult {
                                 path: resolved_file.path().to_path_buf(),
@@ -225,6 +240,7 @@ pub(crate) fn format_path(
     settings: &FormatterSettings,
     source_type: PySourceType,
     mode: FormatMode,
+    range: Option<FormatRange>,
     cache: Option<&Cache>,
 ) -> Result<FormatResult, FormatCommandError> {
     if let Some(cache) = cache {
@@ -249,8 +265,12 @@ pub(crate) fn format_path(
         }
     };
 
+    // Don't write back to the cache if formatting a range.
+    let cache = cache.filter(|_| range.is_none());
+
     // Format the source.
-    let format_result = match format_source(&unformatted, source_type, Some(path), settings)? {
+    let format_result = match format_source(&unformatted, source_type, Some(path), settings, range)?
+    {
         FormattedSource::Formatted(formatted) => match mode {
             FormatMode::Write => {
                 let mut writer = File::create(path).map_err(|err| {
@@ -318,12 +338,31 @@ pub(crate) fn format_source(
     source_type: PySourceType,
     path: Option<&Path>,
     settings: &FormatterSettings,
+    range: Option<FormatRange>,
 ) -> Result<FormattedSource, FormatCommandError> {
     match &source_kind {
         SourceKind::Python(unformatted) => {
             let options = settings.to_format_options(source_type, unformatted);
 
-            let formatted = format_module_source(unformatted, options).map_err(|err| {
+            let formatted = if let Some(range) = range {
+                let line_index = LineIndex::from_source_text(unformatted);
+                let byte_range = range.to_text_range(unformatted, &line_index);
+                format_range(unformatted, byte_range, options).map(|formatted_range| {
+                    let mut formatted = unformatted.to_string();
+                    formatted.replace_range(
+                        std::ops::Range::<usize>::from(formatted_range.source_range()),
+                        formatted_range.as_code(),
+                    );
+
+                    formatted
+                })
+            } else {
+                // Using `Printed::into_code` requires adding `ruff_formatter` as a direct dependency, and I suspect that Rust can optimize the closure away regardless.
+                #[allow(clippy::redundant_closure_for_method_calls)]
+                format_module_source(unformatted, options).map(|formatted| formatted.into_code())
+            };
+
+            let formatted = formatted.map_err(|err| {
                 if let FormatModuleError::ParseError(err) = err {
                     DisplayParseError::from_source_kind(
                         err,
@@ -336,7 +375,6 @@ pub(crate) fn format_source(
                 }
             })?;
 
-            let formatted = formatted.into_code();
             if formatted.len() == unformatted.len() && formatted == *unformatted {
                 Ok(FormattedSource::Unchanged)
             } else {
@@ -346,6 +384,12 @@ pub(crate) fn format_source(
         SourceKind::IpyNotebook(notebook) => {
             if !notebook.is_python_notebook() {
                 return Ok(FormattedSource::Unchanged);
+            }
+
+            if range.is_some() {
+                return Err(FormatCommandError::RangeFormatNotebook(
+                    path.map(Path::to_path_buf),
+                ));
             }
 
             let options = settings.to_format_options(source_type, notebook.source_code());
@@ -588,6 +632,7 @@ pub(crate) enum FormatCommandError {
     Format(Option<PathBuf>, FormatModuleError),
     Write(Option<PathBuf>, SourceError),
     Diff(Option<PathBuf>, io::Error),
+    RangeFormatNotebook(Option<PathBuf>),
 }
 
 impl FormatCommandError {
@@ -605,7 +650,8 @@ impl FormatCommandError {
             | Self::Read(path, _)
             | Self::Format(path, _)
             | Self::Write(path, _)
-            | Self::Diff(path, _) => path.as_deref(),
+            | Self::Diff(path, _)
+            | Self::RangeFormatNotebook(path) => path.as_deref(),
         }
     }
 }
@@ -627,9 +673,10 @@ impl Display for FormatCommandError {
                 } else {
                     write!(
                         f,
-                        "{} {}",
-                        "Encountered error:".bold(),
-                        err.io_error()
+                        "{header} {error}",
+                        header = "Encountered error:".bold(),
+                        error = err
+                            .io_error()
                             .map_or_else(|| err.to_string(), std::string::ToString::to_string)
                     )
                 }
@@ -647,7 +694,7 @@ impl Display for FormatCommandError {
                         ":".bold()
                     )
                 } else {
-                    write!(f, "{}{} {err}", "Failed to read".bold(), ":".bold())
+                    write!(f, "{header} {err}", header = "Failed to read:".bold())
                 }
             }
             Self::Write(path, err) => {
@@ -660,7 +707,7 @@ impl Display for FormatCommandError {
                         ":".bold()
                     )
                 } else {
-                    write!(f, "{}{} {err}", "Failed to write".bold(), ":".bold())
+                    write!(f, "{header} {err}", header = "Failed to write:".bold())
                 }
             }
             Self::Format(path, err) => {
@@ -673,7 +720,7 @@ impl Display for FormatCommandError {
                         ":".bold()
                     )
                 } else {
-                    write!(f, "{}{} {err}", "Failed to format".bold(), ":".bold())
+                    write!(f, "{header} {err}", header = "Failed to format:".bold())
                 }
             }
             Self::Diff(path, err) => {
@@ -688,9 +735,25 @@ impl Display for FormatCommandError {
                 } else {
                     write!(
                         f,
-                        "{}{} {err}",
-                        "Failed to generate diff".bold(),
-                        ":".bold()
+                        "{header} {err}",
+                        header = "Failed to generate diff:".bold(),
+                    )
+                }
+            }
+            Self::RangeFormatNotebook(path) => {
+                if let Some(path) = path {
+                    write!(
+                        f,
+                        "{header}{path}{colon} Range formatting isn't supported for notebooks.",
+                        header = "Failed to format ".bold(),
+                        path = fs::relativize_path(path).bold(),
+                        colon = ":".bold()
+                    )
+                } else {
+                    write!(
+                        f,
+                        "{header} Range formatting isn't supported for notebooks",
+                        header = "Failed to format:".bold()
                     )
                 }
             }

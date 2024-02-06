@@ -671,5 +671,8 @@ PIE790.py:209:9: PIE790 [*] Unnecessary `...` literal
 207 207 |     def stub(self) -> str:
 208 208 |         """Docstring"""
 209     |-        ...
+210 209 | 
+211 210 | 
+212 211 | class Repro(Protocol[int]):
 
 

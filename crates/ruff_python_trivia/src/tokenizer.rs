@@ -182,7 +182,7 @@ fn to_keyword_or_other(source: &str) -> SimpleTokenKind {
         "case" => SimpleTokenKind::Case,
         "with" => SimpleTokenKind::With,
         "yield" => SimpleTokenKind::Yield,
-        _ => SimpleTokenKind::Other, // Potentially an identifier, but only if it isn't a string prefix. We can ignore this for now https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
+        _ => SimpleTokenKind::Name, // Potentially an identifier, but only if it isn't a string prefix. The caller (SimpleTokenizer) is responsible for enforcing that constraint.
     }
 }
 
@@ -467,6 +467,9 @@ pub enum SimpleTokenKind {
     /// `yield`
     Yield,
 
+    /// An identifier or keyword.
+    Name,
+
     /// Any other non trivia token.
     Other,
 
@@ -566,10 +569,42 @@ impl<'a> SimpleTokenizer<'a> {
                 let range = TextRange::at(self.offset, token_len);
                 let kind = to_keyword_or_other(&self.source[range]);
 
-                if kind == SimpleTokenKind::Other {
+                // If the next character is a quote, we may be in a string prefix. For example:
+                // `f"foo`.
+                if kind == SimpleTokenKind::Name
+                    && matches!(self.cursor.first(), '"' | '\'')
+                    && matches!(
+                        &self.source[range],
+                        "B" | "BR"
+                            | "Br"
+                            | "F"
+                            | "FR"
+                            | "Fr"
+                            | "R"
+                            | "RB"
+                            | "RF"
+                            | "Rb"
+                            | "Rf"
+                            | "U"
+                            | "b"
+                            | "bR"
+                            | "br"
+                            | "f"
+                            | "fR"
+                            | "fr"
+                            | "r"
+                            | "rB"
+                            | "rF"
+                            | "rb"
+                            | "rf"
+                            | "u"
+                    )
+                {
                     self.bogus = true;
+                    SimpleTokenKind::Other
+                } else {
+                    kind
                 }
-                kind
             }
 
             // Space, tab, or form feed. We ignore the true semantics of form feed, and treat it as
@@ -1147,6 +1182,45 @@ mod tests {
     #[test]
     fn identifier_ending_in_non_start_char() {
         let source = "i5";
+
+        let test_case = tokenize(source);
+        assert_debug_snapshot!(test_case.tokens());
+        test_case.assert_reverse_tokenization();
+    }
+
+    #[test]
+    fn string_with_kind() {
+        let source = "f'foo'";
+
+        let test_case = tokenize(source);
+        assert_debug_snapshot!(test_case.tokens());
+
+        // note: not reversible: [other, bogus] vs [bogus, other]
+    }
+
+    #[test]
+    fn string_with_byte_kind() {
+        let source = "BR'foo'";
+
+        let test_case = tokenize(source);
+        assert_debug_snapshot!(test_case.tokens());
+
+        // note: not reversible: [other, bogus] vs [bogus, other]
+    }
+
+    #[test]
+    fn string_with_invalid_kind() {
+        let source = "abc'foo'";
+
+        let test_case = tokenize(source);
+        assert_debug_snapshot!(test_case.tokens());
+
+        // note: not reversible: [other, bogus] vs [bogus, other]
+    }
+
+    #[test]
+    fn identifier_starting_with_string_kind() {
+        let source = "foo bar";
 
         let test_case = tokenize(source);
         assert_debug_snapshot!(test_case.tokens());

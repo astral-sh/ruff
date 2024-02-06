@@ -198,3 +198,43 @@ else:
 def sb(self):
     if self._sb is not None: return self._sb
     else: self._sb = '\033[01;%dm'; self._sa = '\033[0;0m';
+
+
+def indent(x, y, w, z):
+    if x:  # [no-else-return]
+        a = 1
+        return y
+    else:
+
+        c = 3
+        return z
+
+
+def indent(x, y, w, z):
+    if x:  # [no-else-return]
+        a = 1
+        return y
+    else:
+        # comment
+        c = 3
+        return z
+
+
+def indent(x, y, w, z):
+    if x:  # [no-else-return]
+        a = 1
+        return y
+    else:
+          # comment
+        c = 3
+        return z
+
+
+def indent(x, y, w, z):
+    if x:  # [no-else-return]
+        a = 1
+        return y
+    else:
+  # comment
+        c = 3
+        return z

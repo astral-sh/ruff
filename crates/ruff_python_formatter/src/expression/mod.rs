@@ -304,30 +304,25 @@ fn format_with_parentheses_comments(
     // Custom FormatNodeRule::fmt variant that only formats the inner comments
     let format_node_rule_fmt = format_with(|f| {
         // No need to handle suppression comments, those are statement only
-        leading_comments(leading_inner).fmt(f)?;
-
-        let is_source_map_enabled = f.options().source_map_generation().is_enabled();
-
-        if is_source_map_enabled {
-            source_position(expression.start()).fmt(f)?;
-        }
-
-        fmt_fields.fmt(f)?;
-
-        if is_source_map_enabled {
-            source_position(expression.end()).fmt(f)?;
-        }
-
-        trailing_comments(trailing_inner).fmt(f)
+        write!(
+            f,
+            [
+                leading_comments(leading_inner),
+                fmt_fields,
+                trailing_comments(trailing_inner)
+            ]
+        )
     });
 
     // The actual parenthesized formatting
-    parenthesized("(", &format_node_rule_fmt, ")")
-        .with_dangling_comments(parentheses_comment)
-        .fmt(f)?;
-    trailing_comments(trailing_outer).fmt(f)?;
-
-    Ok(())
+    write!(
+        f,
+        [
+            parenthesized("(", &format_node_rule_fmt, ")")
+                .with_dangling_comments(parentheses_comment),
+            trailing_comments(trailing_outer)
+        ]
+    )
 }
 
 /// Wraps an expression in an optional parentheses except if its [`NeedsParentheses::needs_parentheses`] implementation

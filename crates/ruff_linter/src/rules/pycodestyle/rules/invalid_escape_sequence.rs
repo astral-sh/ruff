@@ -67,7 +67,7 @@ pub(crate) fn invalid_escape_sequence(
     token_range: TextRange,
 ) {
     let (token_source_code, string_start_location) = match token {
-        Tok::FStringMiddle { value, is_raw } => {
+        Tok::FStringMiddle { value, is_raw, .. } => {
             if *is_raw {
                 return;
             }

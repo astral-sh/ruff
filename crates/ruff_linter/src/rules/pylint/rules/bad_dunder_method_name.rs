@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::Stmt;
 use ruff_python_semantic::analyze::visibility;
 
 use crate::checkers::ast::Checker;
@@ -56,32 +56,32 @@ impl Violation for BadDunderMethodName {
 }
 
 /// PLW3201
-pub(crate) fn bad_dunder_method_name(checker: &mut Checker, class_body: &[Stmt]) {
-    for method in class_body
-        .iter()
-        .filter_map(ruff_python_ast::Stmt::as_function_def_stmt)
-        .filter(|method| {
-            if is_known_dunder_method(&method.name)
-                || checker
-                    .settings
-                    .pylint
-                    .allow_dunder_method_names
-                    .contains(method.name.as_str())
-                || matches!(method.name.as_str(), "_")
-            {
-                return false;
-            }
-            method.name.starts_with('_') && method.name.ends_with('_')
-        })
-    {
-        if visibility::is_override(&method.decorator_list, checker.semantic()) {
-            continue;
-        }
-        checker.diagnostics.push(Diagnostic::new(
-            BadDunderMethodName {
-                name: method.name.to_string(),
-            },
-            method.identifier(),
-        ));
+pub(crate) fn bad_dunder_method_name(checker: &mut Checker, method: &ast::StmtFunctionDef) {
+    // If the name isn't a dunder, skip it.
+    if !method.name.starts_with('_') || !method.name.ends_with('_') {
+        return;
     }
+
+    // If the name is explicitly allowed, skip it.
+    if is_known_dunder_method(&method.name)
+        || checker
+            .settings
+            .pylint
+            .allow_dunder_method_names
+            .contains(method.name.as_str())
+        || matches!(method.name.as_str(), "_")
+    {
+        return;
+    }
+
+    if visibility::is_override(&method.decorator_list, checker.semantic()) {
+        return;
+    }
+
+    checker.diagnostics.push(Diagnostic::new(
+        BadDunderMethodName {
+            name: method.name.to_string(),
+        },
+        method.identifier(),
+    ));
 }

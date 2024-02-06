@@ -4,7 +4,9 @@
 
 use std::{borrow::Cow, collections::VecDeque};
 
+use ruff_formatter::printer::SourceMapGeneration;
 use ruff_python_parser::ParseError;
+
 use {once_cell::sync::Lazy, regex::Regex};
 use {
     ruff_formatter::{write, FormatOptions, IndentStyle, LineWidth, Printed},
@@ -113,17 +115,13 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     // is_borrowed is unstable :/
     let already_normalized = matches!(docstring, Cow::Borrowed(_));
 
-    let mut lines = docstring.lines().peekable();
+    // Use `split` instead of `lines` to preserve the closing quotes on their own line
+    // if they have no indentation (in which case the last line is `\n` which
+    // `lines` omit for the last element).
+    let mut lines = docstring.split('\n').peekable();
 
     // Start the string
-    write!(
-        f,
-        [
-            normalized.prefix,
-            normalized.quotes,
-            source_position(normalized.start()),
-        ]
-    )?;
+    write!(f, [normalized.prefix, normalized.quotes])?;
     // We track where in the source docstring we are (in source code byte offsets)
     let mut offset = normalized.start();
 
@@ -152,7 +150,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
         if already_normalized {
             source_text_slice(trimmed_line_range).fmt(f)?;
         } else {
-            text(trim_both, Some(trimmed_line_range.start())).fmt(f)?;
+            text(trim_both).fmt(f)?;
         }
     }
     offset += first.text_len();
@@ -205,7 +203,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
         space().fmt(f)?;
     }
 
-    write!(f, [source_position(normalized.end()), normalized.quotes])
+    write!(f, [normalized.quotes])
 }
 
 fn contains_unescaped_newline(haystack: &str) -> bool {
@@ -265,7 +263,7 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     /// iterator given contains all lines except for the first.
     fn add_iter(
         &mut self,
-        mut lines: std::iter::Peekable<std::str::Lines<'src>>,
+        mut lines: std::iter::Peekable<std::str::Split<'src, char>>,
     ) -> FormatResult<()> {
         while let Some(line) = lines.next() {
             let line = InputDocstringLine {
@@ -404,7 +402,7 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             // prepend the in-docstring indentation to the string.
             let indent_len = indentation_length(trim_end) - self.stripped_indentation_length;
             let in_docstring_indent = " ".repeat(usize::from(indent_len)) + trim_end.trim_start();
-            text(&in_docstring_indent, Some(line.offset)).fmt(self.f)?;
+            text(&in_docstring_indent).fmt(self.f)?;
         } else {
             // Take the string with the trailing whitespace removed, then also
             // skip the leading whitespace.
@@ -414,11 +412,7 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
                 source_text_slice(trimmed_line_range).fmt(self.f)?;
             } else {
                 // All indents are ascii spaces, so the slicing is correct.
-                text(
-                    &trim_end[usize::from(self.stripped_indentation_length)..],
-                    Some(trimmed_line_range.start()),
-                )
-                .fmt(self.f)?;
+                text(&trim_end[usize::from(self.stripped_indentation_length)..]).fmt(self.f)?;
             }
         }
 
@@ -495,7 +489,8 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             // tabs will get erased anyway, we just clobber them here
             // instead of later, and as a result, get more consistent
             // results.
-            .with_indent_style(IndentStyle::Space);
+            .with_indent_style(IndentStyle::Space)
+            .with_source_map_generation(SourceMapGeneration::Disabled);
         let printed = match docstring_format_source(options, self.quote_char, &codeblob) {
             Ok(printed) => printed,
             Err(FormatModuleError::FormatError(err)) => return Err(err),

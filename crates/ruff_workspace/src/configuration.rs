@@ -31,7 +31,8 @@ use ruff_linter::settings::types::{
 };
 use ruff_linter::settings::{LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS};
 use ruff_linter::{
-    fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION,
+    fs, warn_user_once, warn_user_once_by_id, warn_user_once_by_message, RuleSelector,
+    RUFF_PKG_VERSION,
 };
 use ruff_python_formatter::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, QuoteStyle,
@@ -395,8 +396,9 @@ impl Configuration {
         })
     }
 
-    pub fn from_options(options: Options, project_root: &Path) -> Result<Self> {
-        warn_about_deprecated_top_level_lint_options(&options.lint_top_level.0);
+    /// Convert the [`Options`] read from the given [`Path`] into a [`Configuration`].
+    pub fn from_options(options: Options, path: &Path, project_root: &Path) -> Result<Self> {
+        warn_about_deprecated_top_level_lint_options(&options.lint_top_level.0, path);
 
         let lint = if let Some(mut lint) = options.lint {
             lint.common = lint.common.combine(options.lint_top_level.0);
@@ -429,7 +431,7 @@ impl Configuration {
                 .output_format
                 .map(|format| match format {
                     SerializationFormat::Text => {
-                        warn_user!(r#"Setting `output_format` to "text" is deprecated. Use "full" or "concise" instead. "text" will be treated as "{}"."#, SerializationFormat::default(options.preview.unwrap_or_default()));
+                        warn_user_once!(r#"Setting `output_format` to "text" is deprecated. Use "full" or "concise" instead. "text" will be treated as "{}"."#, SerializationFormat::default(options.preview.unwrap_or_default()));
                         SerializationFormat::default(options.preview.unwrap_or_default())
                     },
                     other => other
@@ -1010,7 +1012,7 @@ impl LintConfiguration {
         if preview.mode.is_disabled() {
             for selection in deprecated_selectors.iter().sorted() {
                 let (prefix, code) = selection.prefix_and_code();
-                warn_user!(
+                warn_user_once_by_message!(
                     "Rule `{prefix}{code}` is deprecated and will be removed in a future release.",
                 );
             }
@@ -1038,7 +1040,9 @@ impl LintConfiguration {
 
         for selection in ignored_preview_selectors.iter().sorted() {
             let (prefix, code) = selection.prefix_and_code();
-            warn_user!("Selection `{prefix}{code}` has no effect because preview is not enabled.",);
+            warn_user_once_by_message!(
+                "Selection `{prefix}{code}` has no effect because preview is not enabled.",
+            );
         }
 
         let mut rules = RuleTable::empty();
@@ -1257,7 +1261,10 @@ pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> 
     Ok(paths)
 }
 
-fn warn_about_deprecated_top_level_lint_options(top_level_options: &LintCommonOptions) {
+fn warn_about_deprecated_top_level_lint_options(
+    top_level_options: &LintCommonOptions,
+    path: &Path,
+) {
     let mut used_options = Vec::new();
 
     if top_level_options.allowed_confusables.is_some() {
@@ -1447,8 +1454,9 @@ fn warn_about_deprecated_top_level_lint_options(top_level_options: &LintCommonOp
         .map(|option| format!("- '{option}' -> 'lint.{option}'"))
         .join("\n  ");
 
-    warn_user!(
-        "The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:\n  {options_mapping}\n\n",
+    warn_user_once_by_message!(
+        "The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `{}`:\n  {options_mapping}",
+        fs::relativize_path(path),
     );
 }
 

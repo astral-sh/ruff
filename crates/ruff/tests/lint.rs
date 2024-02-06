@@ -2,6 +2,7 @@
 
 #![cfg(not(target_family = "wasm"))]
 
+use regex::escape;
 use std::fs;
 use std::process::Command;
 use std::str;
@@ -12,6 +13,10 @@ use tempfile::TempDir;
 
 const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["--no-cache", "--output-format", "concise"];
+
+fn tempdir_filter(tempdir: &TempDir) -> String {
+    format!(r"{}\\?/?", escape(tempdir.path().to_str().unwrap()))
+}
 
 #[test]
 fn top_level_options() -> Result<()> {
@@ -27,29 +32,32 @@ inline-quotes = "single"
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .arg("--config")
-        .arg(&ruff_toml)
-        .args(["--stdin-filename", "test.py"])
-        .arg("-")
-        .pass_stdin(r#"a = "abcba".strip("aba")"#), @r###"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    test.py:1:5: Q000 [*] Double quotes found but single quotes preferred
-    test.py:1:5: B005 Using `.strip()` with multi-character strings is misleading
-    test.py:1:19: Q000 [*] Double quotes found but single quotes preferred
-    Found 3 errors.
-    [*] 2 fixable with the `--fix` option.
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+            .args(["--stdin-filename", "test.py"])
+            .arg("-")
+            .pass_stdin(r#"a = "abcba".strip("aba")"#), @r###"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        test.py:1:5: Q000 [*] Double quotes found but single quotes preferred
+        test.py:1:5: B005 Using `.strip()` with multi-character strings is misleading
+        test.py:1:19: Q000 [*] Double quotes found but single quotes preferred
+        Found 3 errors.
+        [*] 2 fixable with the `--fix` option.
 
-    ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
-      - 'extend-select' -> 'lint.extend-select'
-      - 'flake8-quotes' -> 'lint.flake8-quotes'
+        ----- stderr -----
+        warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
+          - 'extend-select' -> 'lint.extend-select'
+          - 'flake8-quotes' -> 'lint.flake8-quotes'
+        "###);
+    });
 
-
-    "###);
     Ok(())
 }
 
@@ -68,6 +76,9 @@ inline-quotes = "single"
 "#,
     )?;
 
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
@@ -85,6 +96,8 @@ inline-quotes = "single"
 
     ----- stderr -----
     "###);
+    });
+
     Ok(())
 }
 
@@ -103,6 +116,9 @@ inline-quotes = "single"
 "#,
     )?;
 
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
@@ -119,11 +135,11 @@ inline-quotes = "single"
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
-
-
     "###);
+    });
+
     Ok(())
 }
 
@@ -146,6 +162,9 @@ inline-quotes = "single"
 "#,
     )?;
 
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
@@ -162,11 +181,11 @@ inline-quotes = "single"
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
       - 'flake8-quotes' -> 'lint.flake8-quotes'
-
-
     "###);
+    });
+
     Ok(())
 }
 
@@ -222,6 +241,9 @@ OTHER = "OTHER"
 
     fs::write(out_dir.join("a.py"), r#"a = "a""#)?;
 
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
         .arg("check")
@@ -241,11 +263,11 @@ OTHER = "OTHER"
     [*] 3 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
-
-
     "###);
+    });
+
     Ok(())
 }
 
@@ -266,6 +288,9 @@ inline-quotes = "single"
 "#,
     )?;
 
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
         .arg("check")
@@ -288,11 +313,11 @@ if __name__ == "__main__":
     [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
-
-
     "###);
+    });
+
     Ok(())
 }
 
@@ -311,6 +336,9 @@ max-line-length = 100
 "#,
     )?;
 
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
@@ -330,12 +358,12 @@ _ = "---------------------------------------------------------------------------
     Found 1 error.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `[TMP]/ruff.toml`:
       - 'select' -> 'lint.select'
       - 'pycodestyle' -> 'lint.pycodestyle'
-
-
     "###);
+    });
+
     Ok(())
 }
 
@@ -353,6 +381,9 @@ inline-quotes = "single"
 "#,
     )?;
 
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
         .arg("check")
@@ -377,11 +408,11 @@ if __name__ == "__main__":
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
-
-
     "###);
+    });
+
     Ok(())
 }
 
@@ -399,6 +430,9 @@ inline-quotes = "single"
 "#,
     )?;
 
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
         .arg("check")
@@ -423,11 +457,11 @@ if __name__ == "__main__":
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your configuration:
+    warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
       - 'extend-select' -> 'lint.extend-select'
-
-
     "###);
+    });
+
     Ok(())
 }
 
@@ -456,6 +490,9 @@ ignore = ["D203", "D212"]
 "#,
     )?;
 
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(sub_dir)
         .arg("check")
@@ -468,6 +505,8 @@ ignore = ["D203", "D212"]
     ----- stderr -----
     warning: No Python files found under the given path(s)
     "###);
+    });
+
     Ok(())
 }
 
@@ -825,6 +864,9 @@ include = ["*.ipy"]
 "#,
     )?;
 
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
         .arg("check")
@@ -841,5 +883,7 @@ include = ["*.ipy"]
 
     ----- stderr -----
     "###);
+    });
+
     Ok(())
 }

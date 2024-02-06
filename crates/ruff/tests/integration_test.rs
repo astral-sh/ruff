@@ -756,6 +756,35 @@ fn full_output_preview() {
 }
 
 #[test]
+fn full_output_preview_config() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"
+[tool.ruff]
+preview = true
+"#,
+    )?;
+    let mut cmd = RuffCheck::default().config(&pyproject_toml).build();
+    assert_cmd_snapshot!(cmd.pass_stdin("l = 1"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `l`
+      |
+    1 | l = 1
+      | ^ E741
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
 fn full_output_format() {
     let mut cmd = RuffCheck::default().output_format("full").build();
     assert_cmd_snapshot!(cmd

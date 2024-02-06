@@ -9,7 +9,7 @@ use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{match_exclusion, python_file_at_path, Resolver};
 use ruff_workspace::FormatterSettings;
 
-use crate::args::{ConfigArguments, FormatArguments};
+use crate::args::{ConfigArguments, FormatArguments, FormatRange};
 use crate::commands::format::{
     format_source, warn_incompatible_formatter_settings, FormatCommandError, FormatMode,
     FormatResult, FormattedSource,
@@ -71,7 +71,7 @@ pub(crate) fn format_stdin(
     };
 
     // Format the file.
-    match format_source_code(path, settings, source_type, mode) {
+    match format_source_code(path, cli.range, settings, source_type, mode) {
         Ok(result) => match mode {
             FormatMode::Write => Ok(ExitStatus::Success),
             FormatMode::Check | FormatMode::Diff => {
@@ -92,6 +92,7 @@ pub(crate) fn format_stdin(
 /// Format source code read from `stdin`.
 fn format_source_code(
     path: Option<&Path>,
+    range: Option<FormatRange>,
     settings: &FormatterSettings,
     source_type: PySourceType,
     mode: FormatMode,
@@ -109,7 +110,7 @@ fn format_source_code(
     };
 
     // Format the source.
-    let formatted = format_source(&source_kind, source_type, path, settings)?;
+    let formatted = format_source(&source_kind, source_type, path, settings, range)?;
 
     match &formatted {
         FormattedSource::Formatted(formatted) => match mode {

@@ -1,38 +1,6 @@
-use anyhow::Result;
-
-use ruff_python_codegen::Stylist;
 use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
-
-use crate::cst::matchers::{match_function_def, match_indented_block, match_statement};
-use crate::fix::codemods::CodegenStylist;
-
-/// Safely adjust the indentation of the indented block at [`TextRange`].
-pub(crate) fn adjust_indentation(
-    range: TextRange,
-    indentation: &str,
-    locator: &Locator,
-    stylist: &Stylist,
-) -> Result<String> {
-    let contents = locator.slice(range);
-
-    let module_text = format!("def f():{}{contents}", stylist.line_ending().as_str());
-
-    let mut tree = match_statement(&module_text)?;
-
-    let embedding = match_function_def(&mut tree)?;
-
-    let indented_block = match_indented_block(&mut embedding.body)?;
-    indented_block.indent = Some(indentation);
-
-    let module_text = indented_block.codegen_stylist(stylist);
-    let module_text = module_text
-        .strip_prefix(stylist.line_ending().as_str())
-        .unwrap()
-        .to_string();
-    Ok(module_text)
-}
 
 /// Remove any imports matching `members` from an import-from statement.
 pub(crate) fn remove_import_members(contents: &str, members: &[&str]) -> String {

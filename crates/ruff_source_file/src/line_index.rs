@@ -215,6 +215,34 @@ impl LineIndex {
         }
     }
 
+    /// Returns the [byte offset](TextSize) at `line` and `column`.
+    pub fn offset(&self, line: OneIndexed, column: OneIndexed, contents: &str) -> TextSize {
+        // If start-of-line position after last line
+        if line.to_zero_indexed() > self.line_starts().len() {
+            return contents.text_len();
+        }
+
+        let line_range = self.line_range(line, contents);
+
+        match self.kind() {
+            IndexKind::Ascii => {
+                line_range.start()
+                    + TextSize::try_from(column.get())
+                        .unwrap_or(line_range.len())
+                        .clamp(TextSize::new(0), line_range.len())
+            }
+            IndexKind::Utf8 => {
+                let rest = &contents[line_range];
+                let column_offset: TextSize = rest
+                    .chars()
+                    .take(column.get())
+                    .map(ruff_text_size::TextLen::text_len)
+                    .sum();
+                line_range.start() + column_offset
+            }
+        }
+    }
+
     /// Returns the [byte offsets](TextSize) for every line
     pub fn line_starts(&self) -> &[TextSize] {
         &self.inner.line_starts
