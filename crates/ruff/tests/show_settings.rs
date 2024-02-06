@@ -12,20 +12,18 @@ fn display_default_settings() {
         .unwrap()
         .parent()
         .unwrap();
-    println!("base_path: {:?}", base_path);
     let base_path = base_path.to_string_lossy();
+
+    // Escape the backslashes for the regex.
+    let base_path = regex::escape(&base_path);
 
     #[cfg(not(target_os = "windows"))]
     let test_filters = &[(base_path.as_ref(), "[BASEPATH]")];
 
     #[cfg(target_os = "windows")]
-    // Escape the backslashes for the regex.
-    let base_path = regex::escape(&base_path);
-
-    #[cfg(target_os = "windows")]
     let test_filters = &[
         (base_path.as_ref(), "[BASEPATH]"),
-        (r#"\\+(\w\w|\s|")"#, "/$1"),
+        (r#"\\+(\w\w|\s|\.|")"#, "/$1"),
     ];
 
     insta::with_settings!({ filters => test_filters.to_vec() }, {
