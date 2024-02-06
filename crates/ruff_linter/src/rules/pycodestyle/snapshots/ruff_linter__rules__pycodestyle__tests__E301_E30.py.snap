@@ -10,7 +10,7 @@ E30.py:444:5: E301 [*] Expected 1 blank line, found 0
 445 |         pass
 446 | # end
     |
-    = help: Add missing blank line(s)
+    = help: Add missing blank line
 
 ℹ Safe fix
 441 441 | 
@@ -30,7 +30,7 @@ E30.py:455:5: E301 [*] Expected 1 blank line, found 0
 456 |         pass
 457 | # end
     |
-    = help: Add missing blank line(s)
+    = help: Add missing blank line
 
 ℹ Safe fix
 451 451 | 

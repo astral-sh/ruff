@@ -205,7 +205,7 @@ pub struct BlankLineAfterDecorator;
 impl AlwaysFixableViolation for BlankLineAfterDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("blank lines found after function decorator")
+        format!("Blank lines found after function decorator")
     }
 
     fn fix_title(&self) -> String {
@@ -251,7 +251,7 @@ impl AlwaysFixableViolation for BlankLinesAfterFunctionOrClass {
         let BlankLinesAfterFunctionOrClass {
             actual_blank_lines: blank_lines,
         } = self;
-        format!("expected 2 blank lines after class or function definition, found ({blank_lines})")
+        format!("Expected 2 blank lines after class or function definition, found ({blank_lines})")
     }
 
     fn fix_title(&self) -> String {
