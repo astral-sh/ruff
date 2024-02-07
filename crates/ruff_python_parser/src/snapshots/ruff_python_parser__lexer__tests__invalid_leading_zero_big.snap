@@ -3,12 +3,10 @@ source: crates/ruff_python_parser/src/lexer.rs
 expression: tokens
 ---
 Err(
-    LexicalError(
-        LexicalErrorInner {
-            error: OtherError(
-                "Invalid Token",
-            ),
-            location: 0,
-        },
-    ),
+    LexicalError {
+        error: OtherError(
+            "Invalid Token",
+        ),
+        location: 0,
+    },
 )

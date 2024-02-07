@@ -186,7 +186,9 @@ impl<'a> StringParser<'a> {
                 if self.kind.is_any_bytes() && !first_char.is_ascii() {
                     return Err(LexicalError::new(
                         LexicalErrorType::OtherError(
-                            "bytes can only contain ASCII literal characters".to_owned(),
+                            "bytes can only contain ASCII literal characters"
+                                .to_string()
+                                .into_boxed_str(),
                         ),
                         self.get_pos(),
                     ));
@@ -257,7 +259,9 @@ impl<'a> StringParser<'a> {
                     if !ch.is_ascii() {
                         return Err(LexicalError::new(
                             LexicalErrorType::OtherError(
-                                "bytes can only contain ASCII literal characters".to_string(),
+                                "bytes can only contain ASCII literal characters"
+                                    .to_string()
+                                    .into_boxed_str(),
                             ),
                             self.get_pos(),
                         ));
@@ -291,7 +295,7 @@ impl<'a> StringParser<'a> {
             }
         }
         Ok(StringType::Str(ast::StringLiteral {
-            value,
+            value: value.into_boxed_str(),
             unicode: self.kind.is_unicode(),
             range: self.range,
         }))
@@ -355,7 +359,11 @@ pub(crate) fn concatenated_strings(
 
     if has_bytes && byte_literal_count < strings.len() {
         return Err(LexicalError::new(
-            LexicalErrorType::OtherError("cannot mix bytes and nonbytes literals".to_owned()),
+            LexicalErrorType::OtherError(
+                "cannot mix bytes and nonbytes literals"
+                    .to_string()
+                    .into_boxed_str(),
+            ),
             range.start(),
         ));
     }
@@ -421,7 +429,7 @@ impl From<FStringError> for LexicalError {
 }
 
 /// Represents the different types of errors that can occur during parsing of an f-string.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Copy, Debug, Clone, PartialEq)]
 pub enum FStringErrorType {
     /// Expected a right brace after an opened left brace.
     UnclosedLbrace,

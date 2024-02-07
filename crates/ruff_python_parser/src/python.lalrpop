@@ -289,7 +289,7 @@ ImportAsAlias<I>: ast::Alias = {
 DottedName: ast::Identifier = {
     <location:@L> <n:name> <end_location:@R> => ast::Identifier::new(n, (location..end_location).into()),
     <location:@L> <n:name> <n2: ("." Identifier)+> <end_location:@R> => {
-        let mut r = n;
+        let mut r = String::from(n);
         for x in n2 {
             r.push('.');
             r.push_str(x.1.as_str());
@@ -338,7 +338,7 @@ IpyEscapeCommandStatement: ast::Stmt = {
             ))
         } else {
             Err(LexicalError::new(
-                LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
+                LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string().into_boxed_str()),
                 location,
             ))?
         }
@@ -351,7 +351,7 @@ IpyEscapeCommandExpr: crate::parser::ParenthesizedExpr = {
             // This should never occur as the lexer won't allow it.
             if !matches!(c.0, IpyEscapeKind::Magic | IpyEscapeKind::Shell) {
                 return Err(LexicalError::new(
-                    LexicalErrorType::OtherError("IPython escape command expr is only allowed for % and !".to_string()),
+                    LexicalErrorType::OtherError("IPython escape command expr is only allowed for % and !".to_string().into_boxed_str()),
                     location,
                 ))?;
             }
@@ -362,7 +362,7 @@ IpyEscapeCommandExpr: crate::parser::ParenthesizedExpr = {
             }.into())
         } else {
             Err(LexicalError::new(
-                LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
+                LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string().into_boxed_str()),
                 location,
             ))?
         }
@@ -382,7 +382,7 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
                 ast::Expr::Subscript(ast::ExprSubscript { value, slice, range, .. }) => {
                     let ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value: ast::Number::Int(integer), .. }) = slice.as_ref() else {
                         return Err(LexicalError::new(
-                            LexicalErrorType::OtherError("only integer literals are allowed in Subscript expressions in help end escape command".to_string()),
+                            LexicalErrorType::OtherError("only integer literals are allowed in Subscript expressions in help end escape command".to_string().into_boxed_str()),
                             range.start(),
                         ));
                     };
@@ -398,7 +398,7 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
                 },
                 _ => {
                     return Err(LexicalError::new(
-                        LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end escape command".to_string()),
+                        LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end escape command".to_string().into_boxed_str()),
                         expr.start(),
                     ));
                 }
@@ -409,7 +409,7 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
         if mode != Mode::Ipython {
             return Err(ParseError::User {
                 error: LexicalError::new(
-                    LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
+                    LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string().into_boxed_str()),
                     location,
                 ),
             });
@@ -421,7 +421,7 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
             _ => {
                 return Err(ParseError::User {
                     error: LexicalError::new(
-                        LexicalErrorType::OtherError("maximum of 2 `?` tokens are allowed in help end escape command".to_string()),
+                        LexicalErrorType::OtherError("maximum of 2 `?` tokens are allowed in help end escape command".to_string().into_boxed_str()),
                         location,
                     ),
                 });
@@ -434,7 +434,7 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
         Ok(ast::Stmt::IpyEscapeCommand(
             ast::StmtIpyEscapeCommand {
                 kind,
-                value,
+                value: value.into_boxed_str(),
                 range: (location..end_location).into()
             }
         ))
@@ -562,7 +562,7 @@ AsPattern: ast::Pattern = {
     <location:@L> <pattern:OrPattern> "as" <name:Identifier> <end_location:@R> =>? {
         if name.as_str() == "_" {
             Err(LexicalError::new(
-                LexicalErrorType::OtherError("cannot use '_' as a target".to_string()),
+                LexicalErrorType::OtherError("cannot use '_' as a target".to_string().into_boxed_str()),
                 location,
             ))?
         } else {
@@ -1248,7 +1248,7 @@ ParameterListStarArgs<ParameterType, StarParameterType, DoubleStarParameterType>
     <location:@L> "*" <va:StarParameterType?> <kwonlyargs:("," <ParameterDef<ParameterType>>)*> <kwarg:("," <KwargParameter<DoubleStarParameterType>>)?> =>? {
         if va.is_none() && kwonlyargs.is_empty() && kwarg.is_none() {
             return Err(LexicalError::new(
-                LexicalErrorType::OtherError("named arguments must follow bare *".to_string()),
+                LexicalErrorType::OtherError("named arguments must follow bare *".to_string().into_boxed_str()),
                 location,
             ))?;
         }
@@ -1677,7 +1677,7 @@ FStringFormatSpec: ast::FStringFormatSpec = {
 
 FStringConversion: (TextSize, ast::ConversionFlag) = {
     <location:@L> "!" <name_location:@L> <s:name> =>? {
-        let conversion = match s.as_str() {
+        let conversion = match s.as_ref() {
             "s" => ast::ConversionFlag::Str,
             "r" => ast::ConversionFlag::Repr,
             "a" => ast::ConversionFlag::Ascii,
@@ -1723,7 +1723,7 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
         if left.is_none() && right.is_empty() && trailing_comma.is_none() {
             if mid.expr.is_starred_expr() {
                 return Err(LexicalError::new(
-                    LexicalErrorType::OtherError("cannot use starred expression here".to_string()),
+                    LexicalErrorType::OtherError("cannot use starred expression here".to_string().into_boxed_str()),
                     mid.start(),
                 ))?;
             }
@@ -1752,7 +1752,7 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
     }.into(),
     "(" <location:@L> "**" <e:Expression<"all">> ")" <end_location:@R> =>? {
         Err(LexicalError::new(
-            LexicalErrorType::OtherError("cannot use double starred expression here".to_string()),
+            LexicalErrorType::OtherError("cannot use double starred expression here".to_string().into_boxed_str()),
             location,
         ).into())
     },
@@ -2061,19 +2061,19 @@ extern {
         float => token::Tok::Float { value: <f64> },
         complex => token::Tok::Complex { real: <f64>, imag: <f64> },
         string => token::Tok::String {
-            value: <String>,
+            value: <Box<str>>,
             kind: <StringKind>,
             triple_quoted: <bool>
         },
         fstring_middle => token::Tok::FStringMiddle {
-            value: <String>,
+            value: <Box<str>>,
             is_raw: <bool>,
             triple_quoted: <bool>
         },
-        name => token::Tok::Name { name: <String> },
+        name => token::Tok::Name { name: <Box<str>> },
         ipy_escape_command => token::Tok::IpyEscapeCommand {
             kind: <IpyEscapeKind>,
-            value: <String>
+            value: <Box<str>>
         },
         "\n" => token::Tok::Newline,
         ";" => token::Tok::Semi,

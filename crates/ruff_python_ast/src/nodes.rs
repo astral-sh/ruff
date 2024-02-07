@@ -160,7 +160,7 @@ pub enum Stmt {
 pub struct StmtIpyEscapeCommand {
     pub range: TextRange,
     pub kind: IpyEscapeKind,
-    pub value: String,
+    pub value: Box<str>,
 }
 
 impl From<StmtIpyEscapeCommand> for Stmt {
@@ -671,7 +671,7 @@ impl Expr {
 pub struct ExprIpyEscapeCommand {
     pub range: TextRange,
     pub kind: IpyEscapeKind,
-    pub value: String,
+    pub value: Box<str>,
 }
 
 impl From<ExprIpyEscapeCommand> for Expr {
@@ -1384,7 +1384,7 @@ impl Default for StringLiteralValueInner {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StringLiteral {
     pub range: TextRange,
-    pub value: String,
+    pub value: Box<str>,
     pub unicode: bool,
 }
 
@@ -1398,7 +1398,7 @@ impl Deref for StringLiteral {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        self.value.as_str()
+        &self.value
     }
 }
 
@@ -1426,14 +1426,16 @@ struct ConcatenatedStringLiteral {
     /// Each string literal that makes up the concatenated string.
     strings: Vec<StringLiteral>,
     /// The concatenated string value.
-    value: OnceCell<String>,
+    value: OnceCell<Box<str>>,
 }
 
 impl ConcatenatedStringLiteral {
     /// Extracts a string slice containing the entire concatenated string.
     fn to_str(&self) -> &str {
-        self.value
-            .get_or_init(|| self.strings.iter().map(StringLiteral::as_str).collect())
+        self.value.get_or_init(|| {
+            let concatenated: String = self.strings.iter().map(StringLiteral::as_str).collect();
+            concatenated.into_boxed_str()
+        })
     }
 }
 

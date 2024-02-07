@@ -559,14 +559,14 @@ fn collect_string_sequence_lines(
 /// `self` and produces the classification for the line.
 #[derive(Debug, Default)]
 struct LineState {
-    first_item_in_line: Option<(String, TextRange)>,
-    following_items_in_line: Vec<(String, TextRange)>,
+    first_item_in_line: Option<(Box<str>, TextRange)>,
+    following_items_in_line: Vec<(Box<str>, TextRange)>,
     comment_range_start: Option<TextSize>,
     comment_in_line: Option<TextRange>,
 }
 
 impl LineState {
-    fn visit_string_token(&mut self, token_value: String, token_range: TextRange) {
+    fn visit_string_token(&mut self, token_value: Box<str>, token_range: TextRange) {
         if self.first_item_in_line.is_none() {
             self.first_item_in_line = Some((token_value, token_range));
         } else {
@@ -631,8 +631,8 @@ struct LineWithItems {
     // For elements in the list, we keep track of the value of the
     // value of the element as well as the source-code range of the element.
     // (We need to know the actual value so that we can sort the items.)
-    first_item: (String, TextRange),
-    following_items: Vec<(String, TextRange)>,
+    first_item: (Box<str>, TextRange),
+    following_items: Vec<(Box<str>, TextRange)>,
     // For comments, we only need to keep track of the source-code range.
     trailing_comment_range: Option<TextRange>,
 }
@@ -753,7 +753,7 @@ fn collect_string_sequence_items(
 /// source-code range of `"a"`.
 #[derive(Debug)]
 struct StringSequenceItem {
-    value: String,
+    value: Box<str>,
     preceding_comment_ranges: Vec<TextRange>,
     element_range: TextRange,
     // total_range incorporates the ranges of preceding comments
@@ -766,7 +766,7 @@ struct StringSequenceItem {
 
 impl StringSequenceItem {
     fn new(
-        value: String,
+        value: Box<str>,
         preceding_comment_ranges: Vec<TextRange>,
         element_range: TextRange,
         end_of_line_comments: Option<TextRange>,
@@ -787,7 +787,7 @@ impl StringSequenceItem {
         }
     }
 
-    fn with_no_comments(value: String, element_range: TextRange) -> Self {
+    fn with_no_comments(value: Box<str>, element_range: TextRange) -> Self {
         Self::new(value, vec![], element_range, None)
     }
 }
