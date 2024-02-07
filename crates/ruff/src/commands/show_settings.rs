@@ -31,9 +31,9 @@ pub(crate) fn show_settings(
 
     let settings = resolver.resolve(&path);
 
-    writeln!(writer, "Resolved settings for: {path:?}")?;
+    writeln!(writer, "Resolved settings for: \"{}\"", path.display())?;
     if let Some(settings_path) = pyproject_config.path.as_ref() {
-        writeln!(writer, "Settings path: {settings_path:?}")?;
+        writeln!(writer, "Settings path: \"{}\"", settings_path.display())?;
     }
     write!(writer, "{settings}")?;
 
