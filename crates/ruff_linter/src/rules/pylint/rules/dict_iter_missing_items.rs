@@ -3,6 +3,7 @@ use ruff_python_ast::{Expr, ExprTuple};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::typing::is_dict;
+use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -66,22 +67,9 @@ pub(crate) fn dict_iter_missing_items(checker: &mut Checker, target: &Expr, iter
     }
 
     // If we can reliably determine that a dictionary has keys that are tuples of two we don't warn
-    if let Some(statement) = binding.statement(checker.semantic()) {
-        if let Some(assignment) = statement.as_assign_stmt() {
-            if let Some(dict_expr) = assignment.value.as_dict_expr() {
-                if dict_expr.keys.iter().all(|elt| {
-                    elt.as_ref().is_some_and(|x| {
-                        if let Some(tuple) = x.as_tuple_expr() {
-                            return tuple.elts.len() == 2;
-                        }
-                        false
-                    })
-                }) {
-                    return;
-                }
-            }
-        }
-    };
+    if is_dict_key_tuple_with_two_elements(checker.semantic(), binding) {
+        return;
+    }
 
     let mut diagnostic = Diagnostic::new(DictIterMissingItems, iter.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
@@ -89,4 +77,28 @@ pub(crate) fn dict_iter_missing_items(checker: &mut Checker, target: &Expr, iter
         iter.range(),
     )));
     checker.diagnostics.push(diagnostic);
+}
+
+/// Returns true if the binding is a dictionary where each key is a tuple with two elements.
+fn is_dict_key_tuple_with_two_elements(semantic: &SemanticModel, binding: &Binding) -> bool {
+    let Some(statement) = binding.statement(semantic) else {
+        return false;
+    };
+
+    let Some(assign_stmt) = statement.as_assign_stmt() else {
+        return false;
+    };
+
+    let Some(dict_expr) = assign_stmt.value.as_dict_expr() else {
+        return false;
+    };
+
+    dict_expr.keys.iter().all(|elt| {
+        elt.as_ref().is_some_and(|x| {
+            if let Some(tuple) = x.as_tuple_expr() {
+                return tuple.elts.len() == 2;
+            }
+            false
+        })
+    })
 }
