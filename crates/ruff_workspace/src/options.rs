@@ -119,7 +119,7 @@ pub struct Options {
         "#
     )]
     #[deprecated(
-        note = "`show_source` is deprecated and is now part of `output_format` in the form of `full` or `concise` options. Please update your configuration."
+        note = "`show_source` is deprecated and is now part of `output-format` in the form of `full` or `concise` options. Please update your configuration."
     )]
     pub show_source: Option<bool>,
 
