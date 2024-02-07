@@ -32,3 +32,5 @@ def negative_cases():
     print(do_nothing("{a}").format(a="Test"))
     print(do_nothing("{a}").format2(a))
     print(("{a}" "{c}").format(a=1, c=2))
+    print("{a}".attribute.chaining.call(a=2))
+    print("{a} {c}".format(a))

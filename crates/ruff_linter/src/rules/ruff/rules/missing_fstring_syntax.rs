@@ -19,7 +19,7 @@ use rustc_hash::FxHashSet;
 /// Since there are many possible string literals which contain syntax similar to f-strings yet are not intended to be,
 /// this lint will disqualify any literal that satisfies any of the following conditions:
 /// 1. The string literal is a standalone expression. For example, a docstring.
-/// 2. The literal is part of a function call with keyword arguments that match at least one variable (for example: `format("Message: {value}", value = "Hello World")`)
+/// 2. The literal is part of a function call with argument names that match at least one variable (for example: `format("Message: {value}", value = "Hello World")`)
 /// 3. The literal (or a parent expression of the literal) has a direct method call on it (for example: `"{value}".format(...)`)
 /// 4. The string has no `{...}` expression sections, or uses invalid f-string syntax.
 /// 5. The string references variables that are not in scope, or it doesn't capture variables at all.
@@ -93,40 +93,50 @@ fn should_be_fstring(
         return false;
     };
 
-    let mut kwargs = vec![];
+    let mut arg_names = FxHashSet::default();
     let mut last_expr: Option<&ast::Expr> = None;
     for expr in semantic.current_expressions() {
         match expr {
             ast::Expr::Call(ast::ExprCall {
-                arguments: ast::Arguments { keywords, .. },
+                arguments: ast::Arguments { keywords, args, .. },
                 func,
                 ..
             }) => {
                 if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() {
                     match value.as_ref() {
+                        // if the first part of the attribute is the string literal,
+                        // we want to ignore this literal from the lint.
+                        // for example: `"{x}".some_method(...)`
                         ast::Expr::StringLiteral(expr_literal)
                             if expr_literal.value.as_slice().contains(literal) =>
                         {
                             return false;
                         }
+                        // if the first part of the attribute was the expression we
+                        // just went over in the last iteration, then we also want to pass
+                        // this over in the lint.
+                        // for example: `some_func("{x}").some_method(...)`
                         value if last_expr == Some(value) => {
                             return false;
                         }
                         _ => {}
                     }
                 }
-                kwargs.extend(keywords.iter());
+                for keyword in keywords {
+                    if let Some(ident) = keyword.arg.as_ref() {
+                        arg_names.insert(ident.as_str());
+                    }
+                }
+                for arg in args {
+                    if let ast::Expr::Name(ast::ExprName { id, .. }) = arg {
+                        arg_names.insert(id.as_str());
+                    }
+                }
             }
             _ => continue,
         }
         last_expr.replace(expr);
     }
-
-    let kw_idents: FxHashSet<&str> = kwargs
-        .iter()
-        .filter_map(|k| k.arg.as_ref())
-        .map(ast::Identifier::as_str)
-        .collect();
 
     for f_string in value.f_strings() {
         let mut has_name = false;
@@ -136,7 +146,7 @@ fn should_be_fstring(
             .filter_map(|element| element.as_expression())
         {
             if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
-                if kw_idents.contains(id.as_str()) {
+                if arg_names.contains(id.as_str()) {
                     return false;
                 }
                 if semantic
