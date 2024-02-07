@@ -5,7 +5,7 @@ use ruff_python_ast::docstrings::{leading_space, leading_words};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use strum_macros::EnumIter;
 
-use ruff_source_file::{Line, UniversalNewlineIterator, UniversalNewlines};
+use ruff_source_file::{Line, NewlineWithTrailingNewline, UniversalNewlines};
 
 use crate::docstrings::styles::SectionStyle;
 use crate::docstrings::{Docstring, DocstringBody};
@@ -356,13 +356,16 @@ impl<'a> SectionContext<'a> {
     pub(crate) fn previous_line(&self) -> Option<&'a str> {
         let previous =
             &self.docstring_body.as_str()[TextRange::up_to(self.range_relative().start())];
-        previous.universal_newlines().last().map(|l| l.as_str())
+        previous
+            .universal_newlines()
+            .last()
+            .map(|line| line.as_str())
     }
 
     /// Returns the lines belonging to this section after the summary line.
-    pub(crate) fn following_lines(&self) -> UniversalNewlineIterator<'a> {
+    pub(crate) fn following_lines(&self) -> NewlineWithTrailingNewline<'a> {
         let lines = self.following_lines_str();
-        UniversalNewlineIterator::with_offset(lines, self.offset() + self.data.summary_full_end)
+        NewlineWithTrailingNewline::with_offset(lines, self.offset() + self.data.summary_full_end)
     }
 
     fn following_lines_str(&self) -> &'a str {
