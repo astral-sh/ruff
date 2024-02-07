@@ -46,10 +46,12 @@ expression: tokens
         ),
     ),
     Err(
-        LexicalError {
-            error: IndentationError,
-            location: 20,
-        },
+        LexicalError(
+            LexicalErrorInner {
+                error: IndentationError,
+                location: 20,
+            },
+        ),
     ),
     Ok(
         (

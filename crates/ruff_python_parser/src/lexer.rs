@@ -107,10 +107,10 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = match self.inner.next()? {
             Ok((tok, range)) => Ok((tok, range + self.start_offset)),
-            Err(error) => Err(LexicalError {
-                location: error.location + self.start_offset,
-                ..error
-            }),
+            Err(error) => {
+                let location = error.location() + self.start_offset;
+                Err(LexicalError::new(error.into_error(), location))
+            }
         };
 
         Some(result)
@@ -284,10 +284,10 @@ impl<'source> Lexer<'source> {
         let value = match Int::from_str_radix(number.as_str(), radix.as_u32(), token) {
             Ok(int) => int,
             Err(err) => {
-                return Err(LexicalError {
-                    error: LexicalErrorType::OtherError(format!("{err:?}")),
-                    location: self.token_range().start(),
-                });
+                return Err(LexicalError::new(
+                    LexicalErrorType::OtherError(format!("{err:?}")),
+                    self.token_range().start(),
+                ));
             }
         };
         Ok(Tok::Int { value })
@@ -309,10 +309,10 @@ impl<'source> Lexer<'source> {
             number.push('.');
 
             if self.cursor.eat_char('_') {
-                return Err(LexicalError {
-                    error: LexicalErrorType::OtherError("Invalid Syntax".to_owned()),
-                    location: self.offset() - TextSize::new(1),
-                });
+                return Err(LexicalError::new(
+                    LexicalErrorType::OtherError("Invalid Syntax".to_owned()),
+                    self.offset() - TextSize::new(1),
+                ));
             }
 
             self.radix_run(&mut number, Radix::Decimal);
@@ -340,9 +340,11 @@ impl<'source> Lexer<'source> {
 
         if is_float {
             // Improvement: Use `Cow` instead of pushing to value text
-            let value = f64::from_str(number.as_str()).map_err(|_| LexicalError {
-                error: LexicalErrorType::OtherError("Invalid decimal literal".to_owned()),
-                location: self.token_start(),
+            let value = f64::from_str(number.as_str()).map_err(|_| {
+                LexicalError::new(
+                    LexicalErrorType::OtherError("Invalid decimal literal".to_owned()),
+                    self.token_start(),
+                )
             })?;
 
             // Parse trailing 'j':
@@ -364,18 +366,18 @@ impl<'source> Lexer<'source> {
                     Ok(value) => {
                         if start_is_zero && value.as_u8() != Some(0) {
                             // Leading zeros in decimal integer literals are not permitted.
-                            return Err(LexicalError {
-                                error: LexicalErrorType::OtherError("Invalid Token".to_owned()),
-                                location: self.token_range().start(),
-                            });
+                            return Err(LexicalError::new(
+                                LexicalErrorType::OtherError("Invalid Token".to_owned()),
+                                self.token_range().start(),
+                            ));
                         }
                         value
                     }
                     Err(err) => {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::OtherError(format!("{err:?}")),
-                            location: self.token_range().start(),
-                        })
+                        return Err(LexicalError::new(
+                            LexicalErrorType::OtherError(format!("{err:?}")),
+                            self.token_range().start(),
+                        ))
                     }
                 };
                 Ok(Tok::Int { value })
@@ -584,10 +586,10 @@ impl<'source> Lexer<'source> {
                     } else {
                         FStringErrorType::UnterminatedString
                     };
-                    return Err(LexicalError {
-                        error: LexicalErrorType::FStringError(error),
-                        location: self.offset(),
-                    });
+                    return Err(LexicalError::new(
+                        LexicalErrorType::FStringError(error),
+                        self.offset(),
+                    ));
                 }
                 '\n' | '\r' if !fstring.is_triple_quoted() => {
                     // If we encounter a newline while we're in a format spec, then
@@ -597,10 +599,10 @@ impl<'source> Lexer<'source> {
                     if in_format_spec {
                         break;
                     }
-                    return Err(LexicalError {
-                        error: LexicalErrorType::FStringError(FStringErrorType::UnterminatedString),
-                        location: self.offset(),
-                    });
+                    return Err(LexicalError::new(
+                        LexicalErrorType::FStringError(FStringErrorType::UnterminatedString),
+                        self.offset(),
+                    ));
                 }
                 '\\' => {
                     self.cursor.bump(); // '\'
@@ -705,20 +707,18 @@ impl<'source> Lexer<'source> {
                         // matches with f-strings quotes and if it is, then this must be a
                         // missing '}' token so raise the proper error.
                         if fstring.quote_char() == quote && !fstring.is_triple_quoted() {
-                            return Err(LexicalError {
-                                error: LexicalErrorType::FStringError(
-                                    FStringErrorType::UnclosedLbrace,
-                                ),
-                                location: self.offset() - TextSize::new(1),
-                            });
+                            return Err(LexicalError::new(
+                                LexicalErrorType::FStringError(FStringErrorType::UnclosedLbrace),
+                                self.offset() - TextSize::new(1),
+                            ));
                         }
                     }
-                    return Err(LexicalError {
-                        error: LexicalErrorType::OtherError(
+                    return Err(LexicalError::new(
+                        LexicalErrorType::OtherError(
                             "EOL while scanning string literal".to_owned(),
                         ),
-                        location: self.offset() - TextSize::new(1),
-                    });
+                        self.offset() - TextSize::new(1),
+                    ));
                 }
                 Some(c) if c == quote => {
                     if triple_quoted {
@@ -739,22 +739,20 @@ impl<'source> Lexer<'source> {
                         if fstring.quote_char() == quote
                             && fstring.is_triple_quoted() == triple_quoted
                         {
-                            return Err(LexicalError {
-                                error: LexicalErrorType::FStringError(
-                                    FStringErrorType::UnclosedLbrace,
-                                ),
-                                location: self.offset(),
-                            });
+                            return Err(LexicalError::new(
+                                LexicalErrorType::FStringError(FStringErrorType::UnclosedLbrace),
+                                self.offset(),
+                            ));
                         }
                     }
-                    return Err(LexicalError {
-                        error: if triple_quoted {
+                    return Err(LexicalError::new(
+                        if triple_quoted {
                             LexicalErrorType::Eof
                         } else {
                             LexicalErrorType::StringError
                         },
-                        location: self.offset(),
-                    });
+                        self.offset(),
+                    ));
                 }
             }
         };
@@ -829,10 +827,10 @@ impl<'source> Lexer<'source> {
 
                 Ok((identifier, self.token_range()))
             } else {
-                Err(LexicalError {
-                    error: LexicalErrorType::UnrecognizedToken { tok: c },
-                    location: self.token_start(),
-                })
+                Err(LexicalError::new(
+                    LexicalErrorType::UnrecognizedToken { tok: c },
+                    self.token_start(),
+                ))
             }
         } else {
             // Reached the end of the file. Emit a trailing newline token if not at the beginning of a logical line,
@@ -855,15 +853,12 @@ impl<'source> Lexer<'source> {
                     if self.cursor.eat_char('\r') {
                         self.cursor.eat_char('\n');
                     } else if self.cursor.is_eof() {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::Eof,
-                            location: self.token_start(),
-                        });
+                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_start()));
                     } else if !self.cursor.eat_char('\n') {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::LineContinuationError,
-                            location: self.token_start(),
-                        });
+                        return Err(LexicalError::new(
+                            LexicalErrorType::LineContinuationError,
+                            self.token_start(),
+                        ));
                     }
                 }
                 // Form feed
@@ -896,15 +891,12 @@ impl<'source> Lexer<'source> {
                     if self.cursor.eat_char('\r') {
                         self.cursor.eat_char('\n');
                     } else if self.cursor.is_eof() {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::Eof,
-                            location: self.token_start(),
-                        });
+                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_start()));
                     } else if !self.cursor.eat_char('\n') {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::LineContinuationError,
-                            location: self.token_start(),
-                        });
+                        return Err(LexicalError::new(
+                            LexicalErrorType::LineContinuationError,
+                            self.token_start(),
+                        ));
                     }
                     indentation = Indentation::root();
                 }
@@ -955,10 +947,10 @@ impl<'source> Lexer<'source> {
                 Some((Tok::Indent, self.token_range()))
             }
             Err(_) => {
-                return Err(LexicalError {
-                    error: LexicalErrorType::IndentationError,
-                    location: self.offset(),
-                });
+                return Err(LexicalError::new(
+                    LexicalErrorType::IndentationError,
+                    self.offset(),
+                ));
             }
         };
 
@@ -971,10 +963,7 @@ impl<'source> Lexer<'source> {
         if self.nesting > 0 {
             // Reset the nesting to avoid going into infinite loop.
             self.nesting = 0;
-            return Err(LexicalError {
-                error: LexicalErrorType::Eof,
-                location: self.offset(),
-            });
+            return Err(LexicalError::new(LexicalErrorType::Eof, self.offset()));
         }
 
         // Next, insert a trailing newline, if required.
@@ -1139,10 +1128,10 @@ impl<'source> Lexer<'source> {
             '}' => {
                 if let Some(fstring) = self.fstrings.current_mut() {
                     if fstring.nesting() == self.nesting {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::FStringError(FStringErrorType::SingleRbrace),
-                            location: self.token_start(),
-                        });
+                        return Err(LexicalError::new(
+                            LexicalErrorType::FStringError(FStringErrorType::SingleRbrace),
+                            self.token_start(),
+                        ));
                     }
                     fstring.try_end_format_spec(self.nesting);
                 }
@@ -1233,10 +1222,10 @@ impl<'source> Lexer<'source> {
             _ => {
                 self.state = State::Other;
 
-                return Err(LexicalError {
-                    error: LexicalErrorType::UnrecognizedToken { tok: c },
-                    location: self.token_start(),
-                });
+                return Err(LexicalError::new(
+                    LexicalErrorType::UnrecognizedToken { tok: c },
+                    self.token_start(),
+                ));
             }
         };
 
@@ -1295,43 +1284,46 @@ impl FusedIterator for Lexer<'_> {}
 ///
 /// [lexer]: crate::lexer
 #[derive(Debug, Clone, PartialEq)]
-pub struct LexicalError {
+pub struct LexicalError(Box<LexicalErrorInner>);
+
+impl LexicalError {
+    /// Creates a new `LexicalError` with the given error type and location.
+    pub fn new(error: LexicalErrorType, location: TextSize) -> Self {
+        Self(Box::new(LexicalErrorInner { error, location }))
+    }
+
+    pub fn error(&self) -> &LexicalErrorType {
+        &self.0.error
+    }
+
+    pub fn into_error(self) -> LexicalErrorType {
+        self.0.error
+    }
+
+    pub fn location(&self) -> TextSize {
+        self.0.location
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct LexicalErrorInner {
     /// The type of error that occurred.
     error: LexicalErrorType,
     /// The location of the error.
     location: TextSize,
 }
 
-impl LexicalError {
-    /// Creates a new `LexicalError` with the given error type and location.
-    pub fn new(error: LexicalErrorType, location: TextSize) -> Self {
-        Self { error, location }
-    }
-
-    pub fn error(&self) -> &LexicalErrorType {
-        &self.error
-    }
-
-    pub fn into_error(self) -> LexicalErrorType {
-        self.error
-    }
-
-    pub fn location(&self) -> TextSize {
-        self.location
-    }
-}
-
 impl std::ops::Deref for LexicalError {
     type Target = LexicalErrorType;
 
     fn deref(&self) -> &Self::Target {
-        &self.error
+        self.error()
     }
 }
 
 impl std::error::Error for LexicalError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.error)
+        Some(self.error())
     }
 }
 
@@ -1340,8 +1332,8 @@ impl std::fmt::Display for LexicalError {
         write!(
             f,
             "{} at byte offset {}",
-            &self.error,
-            u32::from(self.location)
+            self.error(),
+            u32::from(self.location())
         )
     }
 }
@@ -2005,8 +1997,8 @@ def f(arg=%timeit a = b):
         match lexed.as_slice() {
             [Err(error)] => {
                 assert_eq!(
-                    error.error,
-                    LexicalErrorType::UnrecognizedToken { tok: '🐦' }
+                    error.error(),
+                    &LexicalErrorType::UnrecognizedToken { tok: '🐦' }
                 );
             }
             result => panic!("Expected an error token but found {result:?}"),
@@ -2219,7 +2211,7 @@ f"{(lambda x:{x})}"
     }
 
     fn lex_fstring_error(source: &str) -> FStringErrorType {
-        match lex_error(source).error {
+        match lex_error(source).into_error() {
             LexicalErrorType::FStringError(error) => error,
             err => panic!("Expected FStringError: {err:?}"),
         }
@@ -2270,21 +2262,25 @@ f"{(lambda x:{x})}"
     #[test]
     fn test_fstring_error_location() {
         assert_debug_snapshot!(lex_error("f'{'"), @r###"
-        LexicalError {
-            error: FStringError(
-                UnclosedLbrace,
-            ),
-            location: 4,
-        }
+        LexicalError(
+            LexicalErrorInner {
+                error: FStringError(
+                    UnclosedLbrace,
+                ),
+                location: 4,
+            },
+        )
         "###);
 
         assert_debug_snapshot!(lex_error("f'{'α"), @r###"
-        LexicalError {
-            error: FStringError(
-                UnclosedLbrace,
-            ),
-            location: 6,
-        }
+        LexicalError(
+            LexicalErrorInner {
+                error: FStringError(
+                    UnclosedLbrace,
+                ),
+                location: 6,
+            },
+        )
         "###);
     }
 }
