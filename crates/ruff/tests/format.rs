@@ -101,9 +101,8 @@ fn nonexistent_config_file() {
     ----- stderr -----
     error: invalid value 'foo.toml' for '--config <CONFIG_OPTION>'
 
-      tip: The `--config` flag must either be a path to a `.toml` configuration
-           file or a TOML `<KEY> = <VALUE>` pair overriding a specific
-           configuration option
+      tip: A `--config` flag must either be a path to a `.toml` configuration file
+           or a `<KEY> = <VALUE>` pair overriding a specific configuration option
 
     It looks like you were trying to pass a path to a configuration file.
     The path `foo.toml` does not exist
@@ -123,9 +122,8 @@ fn config_override_rejected_if_invalid_toml() {
     ----- stderr -----
     error: invalid value 'foo = bar' for '--config <CONFIG_OPTION>'
 
-      tip: The `--config` flag must either be a path to a `.toml` configuration
-           file or a TOML `<KEY> = <VALUE>` pair overriding a specific
-           configuration option
+      tip: A `--config` flag must either be a path to a `.toml` configuration file
+           or a `<KEY> = <VALUE>` pair overriding a specific configuration option
 
     Failed to parse the supplied argument as a `ruff.toml` configuration option:
 

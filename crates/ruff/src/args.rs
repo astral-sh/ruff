@@ -815,9 +815,8 @@ impl TypedValueParser for ConfigArgumentParser {
 
         let mut tip = format!(
             "\
-The `--config` flag must either be a path to a `.toml` configuration
-{tip_indent}file or a TOML `<KEY> = <VALUE>` pair overriding a specific
-{tip_indent}configuration option"
+A `--config` flag must either be a path to a `.toml` configuration file
+{tip_indent}or a `<KEY> = <VALUE>` pair overriding a specific configuration option"
         );
 
         // Here we do some heuristics to try to figure out whether
