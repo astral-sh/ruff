@@ -9,15 +9,20 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for unpacking a dictionary in a for loop without calling `.items()`.
+/// Checks for dictionary unpacking in a for loop without calling `.items()`.
 ///
 /// ## Why is this bad?
-/// You are likely looking for an iteration over key, value pairs which can only be achieved
-/// when calling `.items()`.
+/// When iterating over a dictionary in a for loop, if a dictionary is unpacked
+/// without calling `.items()`, it could lead to a runtime error if the keys are not
+/// a tuple of two elements.
+///
+/// It is likely that you're looking for an iteration over (key, value) pairs which
+/// can only be achieved when calling `.items()`.
 ///
 /// ## Example
 /// ```python
 /// data = {"Paris": 2_165_423, "New York City": 8_804_190, "Tokyo": 13_988_129}
+///
 /// for city, population in data:
 ///     print(f"{city} has population {population}.")
 /// ```
@@ -25,6 +30,7 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 /// ```python
 /// data = {"Paris": 2_165_423, "New York City": 8_804_190, "Tokyo": 13_988_129}
+///
 /// for city, population in data.items():
 ///     print(f"{city} has population {population}.")
 /// ```
@@ -34,7 +40,7 @@ pub struct DictIterMissingItems;
 impl AlwaysFixableViolation for DictIterMissingItems {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Call `items()` when unpacking a dictionary for iteration")
+        format!("Unpacking a dictionary in iteration without calling `.items()`")
     }
 
     fn fix_title(&self) -> String {
