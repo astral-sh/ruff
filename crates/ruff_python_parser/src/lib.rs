@@ -121,6 +121,7 @@ use crate::lexer::LexResult;
 
 mod function;
 // Skip flattening lexer to distinguish from full ruff_python_parser
+mod ascii;
 mod context;
 mod invalid;
 pub mod lexer;

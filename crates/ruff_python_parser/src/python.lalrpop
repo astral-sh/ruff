@@ -1616,7 +1616,7 @@ StringLiteralOrFString: StringType = {
 StringLiteral: StringType = {
     <location:@L> <string:string> <end_location:@R> =>? {
         let (source, kind, triple_quoted) = string;
-        Ok(parse_string_literal(&source, kind, triple_quoted, (location..end_location).into())?)
+        Ok(parse_string_literal(source, kind, triple_quoted, (location..end_location).into())?)
     }
 };
 
@@ -1633,7 +1633,7 @@ FStringMiddlePattern: ast::FStringElement = {
     FStringReplacementField,
     <location:@L> <fstring_middle:fstring_middle> <end_location:@R> =>? {
         let (source, is_raw, _) = fstring_middle;
-        Ok(parse_fstring_literal_element(&source, is_raw, (location..end_location).into())?)
+        Ok(parse_fstring_literal_element(source, is_raw, (location..end_location).into())?)
     }
 };
 
