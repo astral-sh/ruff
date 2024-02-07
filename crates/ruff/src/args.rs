@@ -745,6 +745,41 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
     }
 }
 
+#[derive(Debug)]
+enum TomlParseFailureKind {
+    SyntaxError,
+    UnknownOption,
+}
+
+impl std::fmt::Display for TomlParseFailureKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let display = match self {
+            Self::SyntaxError => "The supplied argument is not valid TOML",
+            Self::UnknownOption => {
+                "Could not parse the supplied argument as a `ruff.toml` configuration option"
+            }
+        };
+        write!(f, "{display}")
+    }
+}
+
+#[derive(Debug)]
+struct TomlParseFailure {
+    kind: TomlParseFailureKind,
+    underlying_error: toml::de::Error,
+}
+
+impl std::fmt::Display for TomlParseFailure {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let TomlParseFailure {
+            kind,
+            underlying_error,
+        } = self;
+        let display = format!("{kind}:\n\n{underlying_error}");
+        write!(f, "{}", display.trim_end())
+    }
+}
+
 /// Enumeration to represent a single `--config` argument
 /// passed via the CLI.
 ///
@@ -792,9 +827,18 @@ impl TypedValueParser for ConfigArgumentParser {
             .to_str()
             .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
 
-        let toml_parse_error = match toml::from_str(value) {
-            Ok(option) => return Ok(SingleConfigArgument::SettingsOverride(Arc::new(option))),
-            Err(toml_error) => toml_error,
+        let toml_parse_error = match toml::Table::from_str(value) {
+            Ok(table) => match table.try_into() {
+                Ok(option) => return Ok(SingleConfigArgument::SettingsOverride(Arc::new(option))),
+                Err(underlying_error) => TomlParseFailure {
+                    kind: TomlParseFailureKind::UnknownOption,
+                    underlying_error,
+                },
+            },
+            Err(underlying_error) => TomlParseFailure {
+                kind: TomlParseFailureKind::SyntaxError,
+                underlying_error,
+            },
         };
 
         let mut new_error = clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
@@ -816,7 +860,8 @@ impl TypedValueParser for ConfigArgumentParser {
         let mut tip = format!(
             "\
 A `--config` flag must either be a path to a `.toml` configuration file
-{tip_indent}or a `<KEY> = <VALUE>` pair overriding a specific configuration option"
+{tip_indent}or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration
+{tip_indent}option"
         );
 
         // Here we do some heuristics to try to figure out whether
@@ -836,14 +881,7 @@ The path `{value}` does not exist"
                 ));
             }
         } else if value.contains('=') {
-            let context = format!(
-                "
-
-Failed to parse the supplied argument as a `ruff.toml` configuration option:
-
-{toml_parse_error}"
-            );
-            tip.push_str(context.trim_end());
+            tip.push_str(&format!("\n\n{toml_parse_error}"));
         }
 
         new_error.insert(
