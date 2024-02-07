@@ -162,7 +162,8 @@ pub struct CheckCommand {
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
     /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
-    /// or a TOML `<KEY> = <VALUE>` pair (such as you might find in a `ruff.toml` config file)
+    /// or a TOML `<KEY> = <VALUE>` pair
+    /// (such as you might find in a `ruff.toml` configuration file)
     /// overriding a specific configuration option.
     /// Overrides of individual settings using this option always take precedence
     /// over all configuration files, including configuration files that were also
@@ -308,9 +309,10 @@ pub struct CheckCommand {
     /// Ignore all configuration files.
     //
     // Note: We can't mark this as conflicting with `--config` here
-    // as `--config` can be used for specifying config overrides as well as config files.
-    // Specifying a config file conflicts with `--isolated`;
-    // specifying a config override does not.
+    // as `--config` can be used for specifying configuration overrides
+    // as well as configuration files.
+    // Specifying a configuration file conflicts with `--isolated`;
+    // specifying a configuration override does not.
     // If a user specifies `ruff check --isolated --config=ruff.toml`,
     // we emit an error later on, after the initial parsing by clap.
     #[arg(long, help_heading = "Miscellaneous")]
@@ -407,7 +409,8 @@ pub struct FormatCommand {
     #[arg(long)]
     pub diff: bool,
     /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
-    /// or a TOML `<KEY> = <VALUE>` pair (such as you might find in a `ruff.toml` config file)
+    /// or a TOML `<KEY> = <VALUE>` pair
+    /// (such as you might find in a `ruff.toml` configuration file)
     /// overriding a specific configuration option.
     /// Overrides of individual settings using this option always take precedence
     /// over all configuration files, including configuration files that were also
@@ -462,9 +465,10 @@ pub struct FormatCommand {
     /// Ignore all configuration files.
     //
     // Note: We can't mark this as conflicting with `--config` here
-    // as `--config` can be used for specifying config overrides as well as config files.
-    // Specifying a config file conflicts with `--isolated`;
-    // specifying a config override does not.
+    // as `--config` can be used for specifying configuration overrides
+    // as well as configuration files.
+    // Specifying a configuration file conflicts with `--isolated`;
+    // specifying a configuration override does not.
     // If a user specifies `ruff check --isolated --config=ruff.toml`,
     // we emit an error later on, after the initial parsing by clap.
     #[arg(long, help_heading = "Miscellaneous")]
@@ -557,13 +561,13 @@ impl From<&LogLevelArgs> for LogLevel {
 /// Configuration-related arguments passed via the CLI.
 #[derive(Default)]
 pub struct ConfigArguments {
-    /// Path to a pyproject.toml or ruff.toml config file (etc.).
-    /// Either 0 or 1 config file paths may be provided on the command line.
+    /// Path to a pyproject.toml or ruff.toml configuration file (etc.).
+    /// Either 0 or 1 configuration file paths may be provided on the command line.
     config_file: Option<PathBuf>,
     /// Overrides provided via the `--config "KEY=VALUE"` option.
     /// An arbitrary number of these overrides may be provided on the command line.
     /// These overrides take precedence over all configuration files,
-    /// even config files that were also specified using `--config`.
+    /// even configuration files that were also specified using `--config`.
     overrides: Configuration,
     /// Overrides provided via dedicated flags such as `--line-length` etc.
     /// These overrides take precedence over all configuration files,
@@ -805,14 +809,19 @@ impl TypedValueParser for ConfigArgumentParser {
             clap::error::ContextValue::String(value.to_string()),
         );
 
-        let mut tips = vec!["\
-            The `--config` flag must either be a path to a `.toml` \
-            configuration file or a TOML `<KEY> = <VALUE>` pair overriding \
-            a specific configuration option"
-            .into()];
+        // small hack so that multiline tips
+        // have the same indent on the left-hand side:
+        let tip_indent = " ".repeat("  tip: ".len());
+
+        let mut tip = format!(
+            "\
+The `--config` flag must either be a path to a `.toml` configuration
+{tip_indent}file or a TOML `<KEY> = <VALUE>` pair overriding a specific
+{tip_indent}configuration option"
+        );
 
         // Here we do some heuristics to try to figure out whether
-        // the user was trying to pass in a path to a config file
+        // the user was trying to pass in a path to a configuration file
         // or some inline TOML.
         // We want to display the most helpful error to the user as possible.
         if std::path::Path::new(value)
@@ -820,22 +829,27 @@ impl TypedValueParser for ConfigArgumentParser {
             .map_or(false, |ext| ext.eq_ignore_ascii_case("toml"))
         {
             if !value.contains('=') {
-                tips.push(format!("The path `{value}` does not exist on your filesystem").into());
+                tip.push_str(&format!(
+                    "
+
+It looks like you were trying to pass a path to a configuration file.
+The path `{value}` does not exist"
+                ));
             }
         } else if value.contains('=') {
             let context = format!(
-                "\
-The following error occurred when attempting to parse `{value}` as a `ruff.toml` config option:
+                "
+
+Failed to parse the supplied argument as a `ruff.toml` configuration option:
 
 {toml_parse_error}"
             );
-            let context = context.trim_end().to_string();
-            tips.push(context.into());
+            tip.push_str(context.trim_end());
         }
 
         new_error.insert(
             clap::error::ContextKind::Suggested,
-            clap::error::ContextValue::StyledStrs(tips),
+            clap::error::ContextValue::StyledStrs(vec![tip.into()]),
         );
 
         Err(new_error)

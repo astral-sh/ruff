@@ -596,7 +596,7 @@ Options:
       --config <CONFIG_OPTION>
           Either a path to a TOML configuration file (`pyproject.toml` or
           `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
-          find in a `ruff.toml` config file) overriding a specific
+          find in a `ruff.toml` configuration file) overriding a specific
           configuration option. Overrides of individual settings using this
           option always take precedence over all configuration files, including
           configuration files that were also specified using `--config`
@@ -699,7 +699,7 @@ Options:
       --config <CONFIG_OPTION>
           Either a path to a TOML configuration file (`pyproject.toml` or
           `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
-          find in a `ruff.toml` config file) overriding a specific
+          find in a `ruff.toml` configuration file) overriding a specific
           configuration option. Overrides of individual settings using this
           option always take precedence over all configuration files, including
           configuration files that were also specified using `--config`
