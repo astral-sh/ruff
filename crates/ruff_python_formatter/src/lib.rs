@@ -134,8 +134,8 @@ pub fn format_module_source(
     let source_type = options.source_type();
     let (tokens, comment_ranges) =
         tokens_and_ranges(source, source_type).map_err(|err| ParseError {
-            offset: err.location,
-            error: ParseErrorType::Lexical(err.error),
+            offset: err.location(),
+            error: ParseErrorType::Lexical(err.into_error()),
         })?;
     let module = parse_tokens(tokens, source, source_type.as_mode())?;
     let formatted = format_module_ast(&module, &comment_ranges, source, options)?;

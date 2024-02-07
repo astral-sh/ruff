@@ -73,8 +73,8 @@ pub fn format_range(
 
     let (tokens, comment_ranges) =
         tokens_and_ranges(source, options.source_type()).map_err(|err| ParseError {
-            offset: err.location,
-            error: ParseErrorType::Lexical(err.error),
+            offset: err.location(),
+            error: ParseErrorType::Lexical(err.into_error()),
         })?;
 
     assert_valid_char_boundaries(range, source);

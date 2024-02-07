@@ -8,6 +8,7 @@ use crate::Mode;
 
 use ruff_python_ast::{Int, IpyEscapeKind};
 use ruff_text_size::TextSize;
+use static_assertions::assert_eq_size;
 use std::fmt;
 
 /// The set of tokens the Python source code can be tokenized in.
@@ -912,3 +913,5 @@ impl From<&Tok> for TokenKind {
         Self::from_token(value)
     }
 }
+
+assert_eq_size!(Tok, [u8; 32]);

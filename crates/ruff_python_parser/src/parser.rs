@@ -285,8 +285,8 @@ fn parse_error_from_lalrpop(err: LalrpopError<TextSize, Tok, LexicalError>) -> P
             offset: token.0,
         },
         LalrpopError::User { error } => ParseError {
-            error: ParseErrorType::Lexical(error.error),
-            offset: error.location,
+            offset: error.location(),
+            error: ParseErrorType::Lexical(error.into_error()),
         },
         LalrpopError::UnrecognizedToken { token, expected } => {
             // Hacky, but it's how CPython does it. See PyParser_AddToken,
@@ -359,8 +359,8 @@ impl ParseErrorType {
 impl From<LexicalError> for ParseError {
     fn from(error: LexicalError) -> Self {
         ParseError {
-            error: ParseErrorType::Lexical(error.error),
-            offset: error.location,
+            offset: error.location(),
+            error: ParseErrorType::Lexical(error.into_error()),
         }
     }
 }

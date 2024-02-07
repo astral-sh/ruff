@@ -1357,15 +1357,27 @@ impl FusedIterator for Lexer<'_> {}
 #[derive(Debug, Clone, PartialEq)]
 pub struct LexicalError {
     /// The type of error that occurred.
-    pub error: LexicalErrorType,
+    error: LexicalErrorType,
     /// The location of the error.
-    pub location: TextSize,
+    location: TextSize,
 }
 
 impl LexicalError {
     /// Creates a new `LexicalError` with the given error type and location.
     pub fn new(error: LexicalErrorType, location: TextSize) -> Self {
         Self { error, location }
+    }
+
+    pub fn error(&self) -> &LexicalErrorType {
+        &self.error
+    }
+
+    pub fn into_error(self) -> LexicalErrorType {
+        self.error
+    }
+
+    pub fn location(&self) -> TextSize {
+        self.location
     }
 }
 

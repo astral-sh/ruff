@@ -337,10 +337,10 @@ IpyEscapeCommandStatement: ast::Stmt = {
                 }
             ))
         } else {
-            Err(LexicalError {
-                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
+            Err(LexicalError::new(
+                LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
                 location,
-            })?
+            ))?
         }
     }
 }
@@ -350,10 +350,10 @@ IpyEscapeCommandExpr: crate::parser::ParenthesizedExpr = {
         if mode == Mode::Ipython {
             // This should never occur as the lexer won't allow it.
             if !matches!(c.0, IpyEscapeKind::Magic | IpyEscapeKind::Shell) {
-                return Err(LexicalError {
-                    error: LexicalErrorType::OtherError("IPython escape command expr is only allowed for % and !".to_string()),
+                return Err(LexicalError::new(
+                    LexicalErrorType::OtherError("IPython escape command expr is only allowed for % and !".to_string()),
                     location,
-                })?;
+                ))?;
             }
             Ok(ast::ExprIpyEscapeCommand {
                 kind: c.0,
@@ -361,10 +361,10 @@ IpyEscapeCommandExpr: crate::parser::ParenthesizedExpr = {
                 range: (location..end_location).into()
             }.into())
         } else {
-            Err(LexicalError {
-                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
+            Err(LexicalError::new(
+                LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
                 location,
-            })?
+            ))?
         }
     }
 }
@@ -381,10 +381,10 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
                 },
                 ast::Expr::Subscript(ast::ExprSubscript { value, slice, range, .. }) => {
                     let ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value: ast::Number::Int(integer), .. }) = slice.as_ref() else {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::OtherError("only integer literals are allowed in Subscript expressions in help end escape command".to_string()),
-                            location: range.start(),
-                        });
+                        return Err(LexicalError::new(
+                            LexicalErrorType::OtherError("only integer literals are allowed in Subscript expressions in help end escape command".to_string()),
+                            range.start(),
+                        ));
                     };
                     unparse_expr(value, buffer)?;
                     buffer.push('[');
@@ -397,10 +397,10 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
                     buffer.push_str(attr.as_str());
                 },
                 _ => {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end escape command".to_string()),
-                        location: expr.start(),
-                    });
+                    return Err(LexicalError::new(
+                        LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end escape command".to_string()),
+                        expr.start(),
+                    ));
                 }
             }
             Ok(())
@@ -408,10 +408,10 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
 
         if mode != Mode::Ipython {
             return Err(ParseError::User {
-                error: LexicalError {
-                    error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
+                error: LexicalError::new(
+                    LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
                     location,
-                },
+                ),
             });
         }
 
@@ -420,10 +420,10 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
             2 => IpyEscapeKind::Help2,
             _ => {
                 return Err(ParseError::User {
-                    error: LexicalError {
-                        error: LexicalErrorType::OtherError("maximum of 2 `?` tokens are allowed in help end escape command".to_string()),
+                    error: LexicalError::new(
+                        LexicalErrorType::OtherError("maximum of 2 `?` tokens are allowed in help end escape command".to_string()),
                         location,
-                    },
+                    ),
                 });
             }
         };
@@ -561,10 +561,10 @@ Pattern: ast::Pattern = {
 AsPattern: ast::Pattern = {
     <location:@L> <pattern:OrPattern> "as" <name:Identifier> <end_location:@R> =>? {
         if name.as_str() == "_" {
-            Err(LexicalError {
-                error: LexicalErrorType::OtherError("cannot use '_' as a target".to_string()),
+            Err(LexicalError::new(
+                LexicalErrorType::OtherError("cannot use '_' as a target".to_string()),
                 location,
-            })?
+            ))?
         } else {
             Ok(ast::Pattern::MatchAs(
                 ast::PatternMatchAs {
@@ -1247,10 +1247,10 @@ DoubleStarTypedParameter: ast::Parameter = {
 ParameterListStarArgs<ParameterType, StarParameterType, DoubleStarParameterType>: (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>) = {
     <location:@L> "*" <va:StarParameterType?> <kwonlyargs:("," <ParameterDef<ParameterType>>)*> <kwarg:("," <KwargParameter<DoubleStarParameterType>>)?> =>? {
         if va.is_none() && kwonlyargs.is_empty() && kwarg.is_none() {
-            return Err(LexicalError {
-                error: LexicalErrorType::OtherError("named arguments must follow bare *".to_string()),
+            return Err(LexicalError::new(
+                LexicalErrorType::OtherError("named arguments must follow bare *".to_string()),
                 location,
-            })?;
+            ))?;
         }
 
         let kwarg = kwarg.flatten();
@@ -1364,10 +1364,10 @@ NamedExpression: crate::parser::ParenthesizedExpr = {
 LambdaDef: crate::parser::ParenthesizedExpr = {
     <location:@L> "lambda" <location_args:@L> <parameters:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> <end_location_args:@R> ":" <fstring_middle:fstring_middle?> <body:Test<"all">> <end_location:@R> =>? {
         if fstring_middle.is_some() {
-            return Err(LexicalError {
-                error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
+            return Err(LexicalError::new(
+                LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
                 location,
-            })?;
+            ))?;
         }
         parameters.as_ref().map(validate_arguments).transpose()?;
 
@@ -1630,10 +1630,10 @@ FStringMiddlePattern: ast::FStringElement = {
 FStringReplacementField: ast::FStringElement = {
     <location:@L> "{" <value:TestListOrYieldExpr> <debug:"="?> <conversion:FStringConversion?> <format_spec:FStringFormatSpecSuffix?> "}" <end_location:@R> =>? {
         if value.expr.is_lambda_expr() && !value.is_parenthesized() {
-            return Err(LexicalError {
-                error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
-                location: value.start(),
-            })?;
+            return Err(LexicalError::new(
+                LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
+                value.start(),
+            ))?;
         }
         let debug_text = debug.map(|_| {
             let start_offset = location + "{".text_len();
@@ -1681,10 +1681,10 @@ FStringConversion: (TextSize, ast::ConversionFlag) = {
             "s" => ast::ConversionFlag::Str,
             "r" => ast::ConversionFlag::Repr,
             "a" => ast::ConversionFlag::Ascii,
-            _ => Err(LexicalError {
-                error: LexicalErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
-                location: name_location,
-            })?
+            _ => Err(LexicalError::new(
+                LexicalErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
+                name_location,
+            ))?
         };
         Ok((location, conversion))
     }
@@ -1722,10 +1722,10 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> "(" <left:(<OneOrMore<Test<"all">>> ",")?> <mid:NamedOrStarExpr> <right:("," <TestOrStarNamedExpr>)*> <trailing_comma:","?> ")" <end_location:@R> =>? {
         if left.is_none() && right.is_empty() && trailing_comma.is_none() {
             if mid.expr.is_starred_expr() {
-                return Err(LexicalError{
-                    error: LexicalErrorType::OtherError("cannot use starred expression here".to_string()),
-                    location: mid.start(),
-                })?;
+                return Err(LexicalError::new(
+                    LexicalErrorType::OtherError("cannot use starred expression here".to_string()),
+                    mid.start(),
+                ))?;
             }
             Ok(crate::parser::ParenthesizedExpr {
                 expr: mid.into(),
@@ -1751,10 +1751,10 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
         range: (location..end_location).into(),
     }.into(),
     "(" <location:@L> "**" <e:Expression<"all">> ")" <end_location:@R> =>? {
-        Err(LexicalError{
-            error : LexicalErrorType::OtherError("cannot use double starred expression here".to_string()),
+        Err(LexicalError::new(
+            LexicalErrorType::OtherError("cannot use double starred expression here".to_string()),
             location,
-        }.into())
+        ).into())
     },
     <location:@L> "{" <e:DictLiteralValues?> "}" <end_location:@R> => {
         let (keys, values) = e
