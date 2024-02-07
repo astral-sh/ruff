@@ -39,10 +39,10 @@ pub(crate) fn validate_arguments(arguments: &ast::Parameters) -> Result<(), Lexi
         let range = arg.range;
         let arg_name = arg.name.as_str();
         if !all_arg_names.insert(arg_name) {
-            return Err(LexicalError {
-                error: LexicalErrorType::DuplicateArgumentError(arg_name.to_string()),
-                location: range.start(),
-            });
+            return Err(LexicalError::new(
+                LexicalErrorType::DuplicateArgumentError(arg_name.to_string()),
+                range.start(),
+            ));
         }
     }
 
@@ -64,10 +64,10 @@ pub(crate) fn validate_pos_params(
         .skip_while(|arg| arg.default.is_some()) // and then args with default
         .next(); // there must not be any more args without default
     if let Some(invalid) = first_invalid {
-        return Err(LexicalError {
-            error: LexicalErrorType::DefaultArgumentError,
-            location: invalid.parameter.start(),
-        });
+        return Err(LexicalError::new(
+            LexicalErrorType::DefaultArgumentError,
+            invalid.parameter.start(),
+        ));
     }
     Ok(())
 }
@@ -94,12 +94,10 @@ pub(crate) fn parse_arguments(
             // Check for duplicate keyword arguments in the call.
             if let Some(keyword_name) = &name {
                 if !keyword_names.insert(keyword_name.to_string()) {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::DuplicateKeywordArgumentError(
-                            keyword_name.to_string(),
-                        ),
-                        location: start,
-                    });
+                    return Err(LexicalError::new(
+                        LexicalErrorType::DuplicateKeywordArgumentError(keyword_name.to_string()),
+                        start,
+                    ));
                 }
             } else {
                 double_starred = true;
@@ -113,17 +111,17 @@ pub(crate) fn parse_arguments(
         } else {
             // Positional arguments mustn't follow keyword arguments.
             if !keywords.is_empty() && !is_starred(&value) {
-                return Err(LexicalError {
-                    error: LexicalErrorType::PositionalArgumentError,
-                    location: value.start(),
-                });
+                return Err(LexicalError::new(
+                    LexicalErrorType::PositionalArgumentError,
+                    value.start(),
+                ));
                 // Allow starred arguments after keyword arguments but
                 // not after double-starred arguments.
             } else if double_starred {
-                return Err(LexicalError {
-                    error: LexicalErrorType::UnpackedArgumentError,
-                    location: value.start(),
-                });
+                return Err(LexicalError::new(
+                    LexicalErrorType::UnpackedArgumentError,
+                    value.start(),
+                ));
             }
 
             args.push(value);
