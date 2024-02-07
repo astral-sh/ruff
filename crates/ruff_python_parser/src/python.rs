@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 02c60b5c591440061dda68775005d87a203b5448c205120bda1566a62fc2147c
+// sha3: d38cc0f2252a58db42d3bd63a102b537865992b3cf51d402cdb4828f48989c9d
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -36369,7 +36369,7 @@ fn __action217<
 {
     {
         let (source, kind, triple_quoted) = string;
-        Ok(parse_string_literal(&source, kind, triple_quoted, (location..end_location).into())?)
+        Ok(parse_string_literal(source, kind, triple_quoted, (location..end_location).into())?)
     }
 }
 
@@ -36419,7 +36419,7 @@ fn __action220<
 {
     {
         let (source, is_raw, _) = fstring_middle;
-        Ok(parse_fstring_literal_element(&source, is_raw, (location..end_location).into())?)
+        Ok(parse_fstring_literal_element(source, is_raw, (location..end_location).into())?)
     }
 }
 
