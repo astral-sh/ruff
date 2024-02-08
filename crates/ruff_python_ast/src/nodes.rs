@@ -3880,18 +3880,20 @@ impl Ranged for crate::nodes::ParameterWithDefault {
     }
 }
 
-#[cfg(target_pointer_width = "64")]
-mod size_assertions {
-    use static_assertions::assert_eq_size;
-
+#[cfg(test)]
+mod tests {
     #[allow(clippy::wildcard_imports)]
     use super::*;
 
-    assert_eq_size!(Stmt, [u8; 144]);
-    assert_eq_size!(StmtFunctionDef, [u8; 144]);
-    assert_eq_size!(StmtClassDef, [u8; 104]);
-    assert_eq_size!(StmtTry, [u8; 112]);
-    assert_eq_size!(Expr, [u8; 80]);
-    assert_eq_size!(Pattern, [u8; 96]);
-    assert_eq_size!(Mod, [u8; 32]);
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn size() {
+        assert!(std::mem::size_of::<Stmt>() <= 144);
+        assert!(std::mem::size_of::<StmtFunctionDef>() <= 144);
+        assert!(std::mem::size_of::<StmtClassDef>() <= 104);
+        assert!(std::mem::size_of::<StmtTry>() <= 112);
+        assert!(std::mem::size_of::<Expr>() <= 72);
+        assert!(std::mem::size_of::<Pattern>() <= 88);
+        assert!(std::mem::size_of::<Mod>() <= 32);
+    }
 }

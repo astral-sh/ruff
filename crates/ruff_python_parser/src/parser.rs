@@ -560,20 +560,17 @@ impl From<ExprSlice> for ParenthesizedExpr {
     }
 }
 
-#[cfg(target_pointer_width = "64")]
-mod size_assertions {
-    use static_assertions::assert_eq_size;
-
-    use crate::parser::ParenthesizedExpr;
-
-    assert_eq_size!(ParenthesizedExpr, [u8; 88]);
-}
-
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
 
     use super::*;
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn size_assertions() {
+        assert!(std::mem::size_of::<ParenthesizedExpr>() <= 80);
+    }
 
     #[test]
     fn test_parse_empty() {
