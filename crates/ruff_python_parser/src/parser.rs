@@ -569,7 +569,8 @@ mod tests {
     #[cfg(target_pointer_width = "64")]
     #[test]
     fn size_assertions() {
-        assert!(std::mem::size_of::<ParenthesizedExpr>() <= 80);
+        // 80 with Rustc >= 1.76, 88 with Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<ParenthesizedExpr>(), 80 | 88));
     }
 
     #[test]

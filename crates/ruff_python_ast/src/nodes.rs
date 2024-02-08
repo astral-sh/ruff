@@ -3892,8 +3892,10 @@ mod tests {
         assert!(std::mem::size_of::<StmtFunctionDef>() <= 144);
         assert!(std::mem::size_of::<StmtClassDef>() <= 104);
         assert!(std::mem::size_of::<StmtTry>() <= 112);
-        assert!(std::mem::size_of::<Expr>() <= 72);
-        assert!(std::mem::size_of::<Pattern>() <= 88);
+        // 80 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<Expr>(), 72 | 80));
+        // 96 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<Pattern>(), 88 | 96));
         assert!(std::mem::size_of::<Mod>() <= 32);
     }
 }
