@@ -27,6 +27,40 @@ sections.py:30:5: D406 [*] Section name should end with a newline ("Returns")
 34 34 |     A value of some sort.
 35 35 | 
 
+sections.py:216:5: D406 [*] Section name should end with a newline ("Raises")
+    |
+214 |   @expect("D407: Missing dashed underline after section ('Raises')")
+215 |   def multiple_sections():  # noqa: D416
+216 |       """Toggle the gizmo.
+    |  _____^
+217 | | 
+218 | |     Short summary
+219 | |     -------------
+220 | | 
+221 | |     This is the function's description, which will also specify what it
+222 | |     returns.
+223 | | 
+224 | |     Returns
+225 | |     ------
+226 | |     Many many wonderful things.
+227 | |     Raises:
+228 | |     My attention.
+229 | | 
+230 | |     """
+    | |_______^ D406
+    |
+    = help: Add newline after "Raises"
+
+ℹ Safe fix
+224 224 |     Returns
+225 225 |     ------
+226 226 |     Many many wonderful things.
+227     |-    Raises:
+    227 |+    Raises
+228 228 |     My attention.
+229 229 | 
+230 230 |     """
+
 sections.py:512:9: D406 [*] Section name should end with a newline ("Parameters")
     |
 510 |       @staticmethod

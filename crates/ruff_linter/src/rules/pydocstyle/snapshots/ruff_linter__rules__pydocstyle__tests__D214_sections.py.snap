@@ -27,4 +27,27 @@ sections.py:144:5: D214 [*] Section is over-indented ("Returns")
 148 148 |     A value of some sort.
 149 149 | 
 
+sections.py:589:5: D214 [*] Section is over-indented ("Returns")
+    |
+588 |   def titlecase_sub_section_header():
+589 |       """Below, `Returns:` should be considered a section header.
+    |  _____^
+590 | | 
+591 | |     Args:
+592 | |         Here's a note.
+593 | | 
+594 | |         Returns:
+595 | |     """
+    | |_______^ D214
+    |
+    = help: Remove over-indentation from "Returns"
+
+ℹ Safe fix
+591 591 |     Args:
+592 592 |         Here's a note.
+593 593 | 
+594     |-        Returns:
+    594 |+    Returns:
+595 595 |     """
+
 

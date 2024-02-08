@@ -167,7 +167,7 @@ sections.py:579:5: D413 [*] Missing blank line after last section ("Args")
 586 587 | 
 587 588 | 
 
-sections.py:589:5: D413 [*] Missing blank line after last section ("Args")
+sections.py:589:5: D413 [*] Missing blank line after last section ("Returns")
     |
 588 |   def titlecase_sub_section_header():
 589 |       """Below, `Returns:` should be considered a section header.
@@ -180,7 +180,7 @@ sections.py:589:5: D413 [*] Missing blank line after last section ("Args")
 595 | |     """
     | |_______^ D413
     |
-    = help: Add blank line after "Args"
+    = help: Add blank line after "Returns"
 
 ℹ Safe fix
 592 592 |         Here's a note.
