@@ -1,12 +1,16 @@
 //! Parsing of string literals, bytes literals, and implicit string concatenation.
 
 use bstr::ByteSlice;
+use memchr::memmem;
+use once_cell::sync::Lazy;
 
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::lexer::{LexicalError, LexicalErrorType};
 use crate::token::{StringKind, Tok};
+
+const BACKSLASH_FINDER: Lazy<memmem::Finder> = Lazy::new(|| memmem::Finder::new(b"\\"));
 
 pub(crate) enum StringType {
     Str(ast::StringLiteral),
@@ -310,7 +314,7 @@ impl StringParser {
             }));
         }
 
-        let Some(mut escape) = memchr::memchr(b'\\', self.source.as_bytes()) else {
+        let Some(mut escape) = BACKSLASH_FINDER.find(self.source.as_bytes()) else {
             // If the string doesn't contain any escape sequences, return the owned string.
             return Ok(StringType::Bytes(ast::BytesLiteral {
                 value: self.source.into_boxed_bytes(),
@@ -336,7 +340,7 @@ impl StringParser {
                 }
             }
 
-            let Some(next_escape) = memchr::memchr(b'\\', self.source[self.cursor..].as_bytes())
+            let Some(next_escape) = BACKSLASH_FINDER.find(self.source[self.cursor..].as_bytes())
             else {
                 // Add the rest of the string to the value.
                 let rest = &self.source[self.cursor..];
@@ -364,7 +368,7 @@ impl StringParser {
             }));
         }
 
-        let Some(mut escape) = memchr::memchr(b'\\', self.source.as_bytes()) else {
+        let Some(mut escape) = BACKSLASH_FINDER.find(self.source.as_bytes()) else {
             // If the string doesn't contain any escape sequences, return the owned string.
             return Ok(StringType::Str(ast::StringLiteral {
                 value: self.source,
@@ -392,7 +396,7 @@ impl StringParser {
                 }
             }
 
-            let Some(next_escape) = memchr::memchr(b'\\', self.source[self.cursor..].as_bytes())
+            let Some(next_escape) = BACKSLASH_FINDER.find(self.source[self.cursor..].as_bytes())
             else {
                 // Add the rest of the string to the value.
                 let rest = &self.source[self.cursor..];
