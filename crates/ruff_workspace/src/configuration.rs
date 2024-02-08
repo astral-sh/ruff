@@ -431,12 +431,6 @@ impl Configuration {
 
         #[allow(deprecated)]
         let output_format = {
-            if options.show_source.is_some() {
-                warn_user_once!(
-                    r#"The `show-source` option has been deprecated in favor of `output-format`'s "full" and "concise" variants. Please update your configuration to use `output-format = <full|concise>` instead."#
-                );
-            }
-
             options
                 .output_format
                 .map(|format| match format {
@@ -446,13 +440,6 @@ impl Configuration {
                     },
                     other => other
                 })
-                .or(options.show_source.map(|show_source| {
-                    if show_source {
-                        SerializationFormat::Full
-                    } else {
-                        SerializationFormat::Concise
-                    }
-                }))
         };
 
         Ok(Self {

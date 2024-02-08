@@ -160,13 +160,6 @@ pub struct CheckCommand {
     unsafe_fixes: bool,
     #[arg(long, overrides_with("unsafe_fixes"), hide = true)]
     no_unsafe_fixes: bool,
-    /// Show violations with source code.
-    /// Use `--no-show-source` to disable.
-    /// (Deprecated: use `--output-format=full` or `--output-format=concise` instead of `--show-source` and `--no-show-source`, respectively)
-    #[arg(long, overrides_with("no_show_source"))]
-    show_source: bool,
-    #[clap(long, overrides_with("show_source"), hide = true)]
-    no_show_source: bool,
     /// Show an enumeration of all fixed lint violations.
     /// Use `--no-show-fixes` to disable.
     #[arg(long, overrides_with("no_show_fixes"))]
@@ -365,7 +358,6 @@ pub struct CheckCommand {
         long,
         // Unsupported default-command arguments.
         conflicts_with = "diff",
-        conflicts_with = "show_source",
         conflicts_with = "watch",
     )]
     pub statistics: bool,
@@ -703,7 +695,6 @@ impl CheckCommand {
             force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
             output_format: resolve_output_format(
                 self.output_format,
-                resolve_bool_arg(self.show_source, self.no_show_source),
                 resolve_bool_arg(self.preview, self.no_preview).unwrap_or_default(),
             ),
             show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
@@ -935,32 +926,11 @@ The path `{value}` does not point to a configuration file"
 
 fn resolve_output_format(
     output_format: Option<SerializationFormat>,
-    show_sources: Option<bool>,
     preview: bool,
 ) -> Option<SerializationFormat> {
-    Some(match (output_format, show_sources) {
-        (Some(o), None) => o,
-        (Some(SerializationFormat::Grouped), Some(true)) => {
-            warn_user!("`--show-source` with `--output-format=grouped` is deprecated, and will not show source files. Use `--output-format=full` to show source information.");
-            SerializationFormat::Grouped
-        }
-        (Some(fmt), Some(true)) => {
-            warn_user!("The `--show-source` argument is deprecated and has been ignored in favor of `--output-format={fmt}`.");
-            fmt
-        }
-        (Some(fmt), Some(false)) => {
-            warn_user!("The `--no-show-source` argument is deprecated and has been ignored in favor of `--output-format={fmt}`.");
-            fmt
-        }
-        (None, Some(true)) => {
-            warn_user!("The `--show-source` argument is deprecated. Use `--output-format=full` instead.");
-            SerializationFormat::Full
-        }
-        (None, Some(false)) => {
-            warn_user!("The `--no-show-source` argument is deprecated. Use `--output-format=concise` instead.");
-            SerializationFormat::Concise
-        }
-        (None, None) => return None
+    Some(match output_format {
+        Some(o) => o,
+        None => return None
     }).map(|format| match format {
         SerializationFormat::Text => {
             warn_user!("`--output-format=text` is deprecated. Use `--output-format=full` or `--output-format=concise` instead. `text` will be treated as `{}`.", SerializationFormat::default(preview));
