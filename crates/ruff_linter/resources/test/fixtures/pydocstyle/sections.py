@@ -428,19 +428,19 @@ line continuation.
 
         """
 
-    def test_method_should_be_correctly_capitalized(self, parameters: list[str], attributes: dict[str, str]): # noqa: D213
+    def test_method_should_be_correctly_capitalized(self, parameters: list[str], other_parameters: dict[str, str]): # noqa: D213
         """Test parameters and attributes sections are capitalized correctly.
 
         Parameters
         ----------
         parameters:
             A list of string parameters
-        attributes:
+        other_parameters:
             A dictionary of string attributes
 
-        Attributes
+        Other Parameters
         ----------
-        attributes:
+        other_parameters:
             A dictionary of string attributes
         parameters:
             A list of string parameters
