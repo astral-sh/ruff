@@ -3,7 +3,7 @@
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html>
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -848,7 +848,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
             // Eval
             ["" | "builtins", "eval"] => Some(SuspiciousEvalUsage.into()),
             // MarkSafe
-            ["django", "utils", "safestring", "mark_safe"] => Some(SuspiciousMarkSafeUsage.into()),
+            ["django", "utils", "safestring" | "html", "mark_safe"] => Some(SuspiciousMarkSafeUsage.into()),
             // URLOpen (`urlopen`, `urlretrieve`, `Request`)
             ["urllib", "request", "urlopen" | "urlretrieve" | "Request"] |
             ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve" | "Request"] => {
@@ -897,6 +897,30 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
     };
 
     let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, call.range());
+    if checker.enabled(diagnostic.kind.rule()) {
+        checker.diagnostics.push(diagnostic);
+    }
+}
+
+/// S308
+pub(crate) fn suspicious_function_decorator(checker: &mut Checker, decorator: &Decorator) {
+    let Some(diagnostic_kind) = checker
+        .semantic()
+        .resolve_call_path(&decorator.expression)
+        .and_then(|call_path| {
+            match call_path.as_slice() {
+                // MarkSafe
+                ["django", "utils", "safestring" | "html", "mark_safe"] => {
+                    Some(SuspiciousMarkSafeUsage.into())
+                }
+                _ => None,
+            }
+        })
+    else {
+        return;
+    };
+
+    let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, decorator.range());
     if checker.enabled(diagnostic.kind.rule()) {
         checker.diagnostics.push(diagnostic);
     }
