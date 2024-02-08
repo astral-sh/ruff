@@ -1,9 +1,10 @@
 //! Parsing of string literals, bytes literals, and implicit string concatenation.
 
+use bstr::ByteSlice;
+
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::ascii::first_non_ascii_byte;
 use crate::lexer::{LexicalError, LexicalErrorType};
 use crate::token::{StringKind, Tok};
 
@@ -218,9 +219,9 @@ impl StringParser {
 
         let mut value = String::with_capacity(self.source.len());
         loop {
-            // Add the characters before the escape sequence to the string.
-            let before_with_slash = self.skip_bytes(index + 1);
-            let before = &before_with_slash[..before_with_slash.len() - 1];
+            // Add the characters before the escape sequence (or curly brace) to the string.
+            let before_with_slash_or_brace = self.skip_bytes(index + 1);
+            let before = &before_with_slash_or_brace[..before_with_slash_or_brace.len() - 1];
             value.push_str(before);
 
             // Add the escaped character to the string.
@@ -284,14 +285,13 @@ impl StringParser {
         }
 
         Ok(ast::FStringElement::Literal(ast::FStringLiteralElement {
-            value,
+            value: value.into_boxed_str(),
             range: self.range,
         }))
     }
 
     fn parse_bytes(mut self) -> Result<StringType, LexicalError> {
-        let index = first_non_ascii_byte(self.source.as_bytes());
-        if index < self.source.len() {
+        if let Some(index) = self.source.as_bytes().find_non_ascii_byte() {
             return Err(LexicalError::new(
                 LexicalErrorType::OtherError(
                     "bytes can only contain ASCII literal characters"
@@ -305,7 +305,7 @@ impl StringParser {
         if self.kind.is_raw() {
             // For raw strings, no escaping is necessary.
             return Ok(StringType::Bytes(ast::BytesLiteral {
-                value: self.source.into_bytes(),
+                value: self.source.into_boxed_bytes(),
                 range: self.range,
             }));
         }
@@ -313,7 +313,7 @@ impl StringParser {
         let Some(mut escape) = memchr::memchr(b'\\', self.source.as_bytes()) else {
             // If the string doesn't contain any escape sequences, return the owned string.
             return Ok(StringType::Bytes(ast::BytesLiteral {
-                value: self.source.into_bytes(),
+                value: self.source.into_boxed_bytes(),
                 range: self.range,
             }));
         };
@@ -349,7 +349,7 @@ impl StringParser {
         }
 
         Ok(StringType::Bytes(ast::BytesLiteral {
-            value,
+            value: value.into_boxed_slice(),
             range: self.range,
         }))
     }
