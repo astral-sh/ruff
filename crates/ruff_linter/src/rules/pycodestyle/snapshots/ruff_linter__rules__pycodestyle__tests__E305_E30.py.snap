@@ -1,0 +1,102 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E30.py:687:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
+    |
+686 |     # another comment
+687 | fn()
+    | ^^ E305
+688 | # end
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+684 684 |     # comment
+685 685 | 
+686 686 |     # another comment
+    687 |+
+    688 |+
+687 689 | fn()
+688 690 | # end
+689 691 | 
+
+E30.py:698:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
+    |
+697 |     # another comment
+698 | a = 1
+    | ^ E305
+699 | # end
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+695 695 |     # comment
+696 696 | 
+697 697 |     # another comment
+    698 |+
+    699 |+
+698 700 | a = 1
+699 701 | # end
+700 702 | 
+
+E30.py:710:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
+    |
+708 |     # another comment
+709 | 
+710 | try:
+    | ^^^ E305
+711 |     fn()
+712 | except Exception:
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+707 707 | 
+708 708 |     # another comment
+709 709 | 
+    710 |+
+710 711 | try:
+711 712 |     fn()
+712 713 | except Exception:
+
+E30.py:722:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
+    |
+721 | # Two spaces before comments, too.
+722 | if a():
+    | ^^ E305
+723 |     a()
+724 | # end
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+719 719 |     print()
+720 720 | 
+721 721 | # Two spaces before comments, too.
+    722 |+
+    723 |+
+722 724 | if a():
+723 725 |     a()
+724 726 | # end
+
+E30.py:735:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
+    |
+733 |     blah, blah
+734 | 
+735 | if __name__ == '__main__':
+    | ^^ E305
+736 |     main()
+737 | # end
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+732 732 | def main():
+733 733 |     blah, blah
+734 734 | 
+    735 |+
+735 736 | if __name__ == '__main__':
+736 737 |     main()
+737 738 | # end
+
+
