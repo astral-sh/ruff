@@ -989,12 +989,7 @@ where
             }
             Expr::Call(ast::ExprCall {
                 func,
-                arguments:
-                    Arguments {
-                        args,
-                        keywords,
-                        range: _,
-                    },
+                arguments,
                 range: _,
             }) => {
                 self.visit_expr(func);
@@ -1037,7 +1032,7 @@ where
                 });
                 match callable {
                     Some(typing::Callable::Bool) => {
-                        let mut args = args.iter();
+                        let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_boolean_test(arg);
                         }
@@ -1046,7 +1041,7 @@ where
                         }
                     }
                     Some(typing::Callable::Cast) => {
-                        let mut args = args.iter();
+                        let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_type_definition(arg);
                         }
@@ -1055,7 +1050,7 @@ where
                         }
                     }
                     Some(typing::Callable::NewType) => {
-                        let mut args = args.iter();
+                        let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
                         }
@@ -1064,21 +1059,21 @@ where
                         }
                     }
                     Some(typing::Callable::TypeVar) => {
-                        let mut args = args.iter();
+                        let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
                         }
                         for arg in args {
                             self.visit_type_definition(arg);
                         }
-                        for keyword in keywords {
+                        for keyword in arguments.keywords.iter() {
                             let Keyword {
                                 arg,
                                 value,
                                 range: _,
                             } = keyword;
                             if let Some(id) = arg {
-                                if id == "bound" {
+                                if id.as_str() == "bound" {
                                     self.visit_type_definition(value);
                                 } else {
                                     self.visit_non_type_definition(value);
@@ -1088,7 +1083,7 @@ where
                     }
                     Some(typing::Callable::NamedTuple) => {
                         // Ex) NamedTuple("a", [("a", int)])
-                        let mut args = args.iter();
+                        let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
                         }
@@ -1117,7 +1112,7 @@ where
                             }
                         }
 
-                        for keyword in keywords {
+                        for keyword in arguments.keywords.iter() {
                             let Keyword { arg, value, .. } = keyword;
                             match (arg.as_ref(), value) {
                                 // Ex) NamedTuple("a", **{"a": int})
@@ -1144,7 +1139,7 @@ where
                     }
                     Some(typing::Callable::TypedDict) => {
                         // Ex) TypedDict("a", {"a": int})
-                        let mut args = args.iter();
+                        let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
                         }
@@ -1167,13 +1162,13 @@ where
                         }
 
                         // Ex) TypedDict("a", a=int)
-                        for keyword in keywords {
+                        for keyword in arguments.keywords.iter() {
                             let Keyword { value, .. } = keyword;
                             self.visit_type_definition(value);
                         }
                     }
                     Some(typing::Callable::MypyExtension) => {
-                        let mut args = args.iter();
+                        let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
                             self.visit_type_definition(arg);
@@ -1181,13 +1176,13 @@ where
                             for arg in args {
                                 self.visit_non_type_definition(arg);
                             }
-                            for keyword in keywords {
+                            for keyword in arguments.keywords.iter() {
                                 let Keyword { value, .. } = keyword;
                                 self.visit_non_type_definition(value);
                             }
                         } else {
                             // Ex) DefaultNamedArg(type="bool", name="some_prop_name")
-                            for keyword in keywords {
+                            for keyword in arguments.keywords.iter() {
                                 let Keyword {
                                     value,
                                     arg,
@@ -1205,10 +1200,10 @@ where
                         // If we're in a type definition, we need to treat the arguments to any
                         // other callables as non-type definitions (i.e., we don't want to treat
                         // any strings as deferred type definitions).
-                        for arg in args {
+                        for arg in arguments.args {
                             self.visit_non_type_definition(arg);
                         }
-                        for keyword in keywords {
+                        for keyword in arguments.keywords.iter() {
                             let Keyword { value, .. } = keyword;
                             self.visit_non_type_definition(value);
                         }

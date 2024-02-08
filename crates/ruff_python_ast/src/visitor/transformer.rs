@@ -448,10 +448,10 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             range: _,
         }) => {
             visitor.visit_expr(left);
-            for cmp_op in ops {
+            for cmp_op in &mut **ops {
                 visitor.visit_cmp_op(cmp_op);
             }
-            for expr in comparators {
+            for expr in &mut **comparators {
                 visitor.visit_expr(expr);
             }
         }

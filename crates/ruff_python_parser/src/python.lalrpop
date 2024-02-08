@@ -1406,8 +1406,13 @@ NotTest<Goal>: crate::parser::ParenthesizedExpr = {
 
 Comparison<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> <left:Expression<"all">> <comparisons:(CompOp Expression<"all">)+> <end_location:@R> => {
-        let (ops, comparators) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
-        ast::ExprCompare { left: Box::new(left.into()), ops, comparators, range: (location..end_location).into() }.into()
+        let (ops, comparators): (Vec<ast::CmpOp>, Vec<ast::Expr>) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
+        ast::ExprCompare {
+            left: Box::new(left.into()),
+            ops: ops.into_boxed_slice(),
+            comparators: comparators.into_boxed_slice(),
+            range: (location..end_location).into(),
+        }.into()
     },
     Expression<Goal>,
 };
@@ -1539,7 +1544,7 @@ AtomExpr2<Goal>: crate::parser::ParenthesizedExpr = {
     Atom<Goal>,
     <location:@L> <func:AtomExpr2<"all">> <arguments:Arguments> <end_location:@R> => ast::ExprCall {
         func: Box::new(func.into()),
-        arguments,
+        arguments: Box::new(arguments),
         range: (location..end_location).into(),
     }.into(),
     <location:@L> <value:AtomExpr2<"all">> "[" <slice:SubscriptList> "]" <end_location:@R> => ast::ExprSubscript {

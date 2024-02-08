@@ -894,8 +894,8 @@ impl From<ExprYieldFrom> for Expr {
 pub struct ExprCompare {
     pub range: TextRange,
     pub left: Box<Expr>,
-    pub ops: Vec<CmpOp>,
-    pub comparators: Vec<Expr>,
+    pub ops: Box<[CmpOp]>,
+    pub comparators: Box<[Expr]>,
 }
 
 impl From<ExprCompare> for Expr {
@@ -2987,8 +2987,8 @@ pub struct ParameterWithDefault {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arguments {
     pub range: TextRange,
-    pub args: Vec<Expr>,
-    pub keywords: Vec<Keyword>,
+    pub args: Box<[Expr]>,
+    pub keywords: Box<[Keyword]>,
 }
 
 /// An entry in the argument list of a function call.
@@ -3881,6 +3881,14 @@ impl Ranged for crate::nodes::ParameterWithDefault {
         self.range
     }
 }
+
+static_assertions::assert_eq_size!(Expr, [u8; 64]);
+static_assertions::assert_eq_size!(ExprLambda, [u8; 24]);
+static_assertions::assert_eq_size!(ExprListComp, [u8; 40]);
+static_assertions::assert_eq_size!(ExprDictComp, [u8; 48]);
+static_assertions::assert_eq_size!(ExprFString, [u8; 48]);
+static_assertions::assert_eq_size!(ExprCall, [u8; 56]); // 72 on `main`
+static_assertions::assert_eq_size!(ExprCompare, [u8; 48]); // 64 on `main`
 
 #[cfg(test)]
 mod tests {

@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: fd05d84d3b654796ff740a7f905ec0ae8915f43f952428717735481947ab55e1
+// sha3: d5774a4a5c1930f0ba67655ce80e6e25eb2c3c95a6e65439e04bfd28d659b7c5
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -40651,8 +40651,13 @@ fn __action515<
 ) -> crate::parser::ParenthesizedExpr
 {
     {
-        let (ops, comparators) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
-        ast::ExprCompare { left: Box::new(left.into()), ops, comparators, range: (location..end_location).into() }.into()
+        let (ops, comparators): (Vec<ast::CmpOp>, Vec<ast::Expr>) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
+        ast::ExprCompare {
+            left: Box::new(left.into()),
+            ops: ops.into_boxed_slice(),
+            comparators: comparators.into_boxed_slice(),
+            range: (location..end_location).into(),
+        }.into()
     }
 }
 
@@ -40816,8 +40821,13 @@ fn __action526<
 ) -> crate::parser::ParenthesizedExpr
 {
     {
-        let (ops, comparators) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
-        ast::ExprCompare { left: Box::new(left.into()), ops, comparators, range: (location..end_location).into() }.into()
+        let (ops, comparators): (Vec<ast::CmpOp>, Vec<ast::Expr>) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
+        ast::ExprCompare {
+            left: Box::new(left.into()),
+            ops: ops.into_boxed_slice(),
+            comparators: comparators.into_boxed_slice(),
+            range: (location..end_location).into(),
+        }.into()
     }
 }
 
@@ -41051,7 +41061,7 @@ fn __action541<
 {
     ast::ExprCall {
         func: Box::new(func.into()),
-        arguments,
+        arguments: Box::new(arguments),
         range: (location..end_location).into(),
     }.into()
 }
@@ -41842,7 +41852,7 @@ fn __action588<
 {
     ast::ExprCall {
         func: Box::new(func.into()),
-        arguments,
+        arguments: Box::new(arguments),
         range: (location..end_location).into(),
     }.into()
 }
