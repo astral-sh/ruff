@@ -3,14 +3,16 @@ use std::{collections::BTreeMap, fmt::Display};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{AnyNodeRef, Suite};
-use ruff_python_trivia::SuppressionKind;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_trivia::{indentation_at_offset, SuppressionKind};
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextLen};
 
 use crate::checkers::{ast::Checker, noqa::delete_comment};
 
 use super::suppression_comment_visitor::{
-    CaptureSuppressionComment, SuppressionCommentData, SuppressionCommentVisitor,
+    own_line_comment_indentation, CaptureSuppressionComment, SuppressionCommentData,
+    SuppressionCommentVisitor,
 };
 
 /// ## What it does
@@ -48,24 +50,23 @@ pub struct UselessFormatterNOQA {
 impl AlwaysFixableViolation for UselessFormatterNOQA {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Supression comment is useless - {}", self.reason)
+        format!("Suppression comment is useless - {}", self.reason)
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove this supression comment")
+        format!("Remove this suppression comment")
     }
 }
 
 /// RUF028
-pub(crate) fn useless_formatter_noqa(checker: &mut Checker, suite: &Suite) {
+pub(crate) fn useless_formatter_noqa(checker: &mut Checker, suite: &ast::Suite) {
     let indexer = checker.indexer();
     let locator = checker.locator();
     let comment_ranges = indexer.comment_ranges();
-    let contents = locator.to_source_code().text();
 
-    let mut comments = UselessSuppressionComments::new();
+    let mut comments = UselessSuppressionComments::new(locator);
 
-    let visitor = SuppressionCommentVisitor::new(contents, comment_ranges, &mut comments);
+    let visitor = SuppressionCommentVisitor::new(comment_ranges, &mut comments, checker.locator());
 
     visitor.visit(suite);
 
@@ -78,18 +79,22 @@ pub(crate) fn useless_formatter_noqa(checker: &mut Checker, suite: &Suite) {
     }
 }
 
-struct UselessSuppressionComments<'src> {
+struct UselessSuppressionComments<'src, 'loc> {
     captured: BTreeMap<SuppressionCommentData<'src>, Option<UselessReason>>,
+    locator: &'loc Locator<'src>,
 }
 
-impl<'src> UselessSuppressionComments<'src> {
-    fn new() -> Self {
+impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
+    fn new(locator: &'loc Locator<'src>) -> Self {
         Self {
             captured: BTreeMap::default(),
+            locator,
         }
     }
+    /// This function determines whether or not `comment` is a useful suppression comment.
+    /// If it isn't, it will give a reason why the comment is useless. See [`UselessReason`] for more.
     fn check_suppression_comment(&self, comment: &SuppressionCommentData) -> Option<UselessReason> {
-        // Check if the comment is inside of an expression.
+        // check if the comment is inside of an expression.
         if comment
             .enclosing
             .map(AnyNodeRef::is_expression)
@@ -97,29 +102,72 @@ impl<'src> UselessSuppressionComments<'src> {
         {
             return Some(UselessReason::InsideExpression);
         }
+
+        // check if a skip comment is at the end of a line
         if comment.kind == SuppressionKind::Skip && !comment.line_position.is_end_of_line() {
             return Some(UselessReason::SkipHasToBeTrailing);
         }
-        // If the comment turns off formatting, we need to make sure
-        // that something follows it which is worth formatting.
-        if comment.kind == SuppressionKind::Off && comment.following.is_none() {
-            return Some(UselessReason::NoCodeSuppressed);
+
+        if comment.kind == SuppressionKind::Off && comment.line_position.is_own_line() {
+            // check for a previous `fmt: off`
+            if comment.previous_state == Some(SuppressionKind::Off) {
+                return Some(UselessReason::FmtOffUsedEarlier);
+            }
+            let Some(following) = comment.following else {
+                return Some(UselessReason::NoCodeSuppressed);
+            };
+            if let Some(enclosing) = comment.enclosing {
+                // check if this comment is dangling (in other words, in a block with nothing following it)
+
+                // check if this comment is before an alternative body (for example: an `else` or `elif`)
+                if let Some(preceding) = comment.preceding {
+                    if is_first_statement_in_alternate_body(following, enclosing) {
+                        // check indentation
+                        let comment_indentation =
+                            own_line_comment_indentation(preceding, comment.range, self.locator);
+
+                        let preceding_indentation =
+                            indentation_at_offset(preceding.start(), self.locator)
+                                .unwrap_or_default()
+                                .text_len();
+                        if comment_indentation <= preceding_indentation {
+                            return Some(UselessReason::FmtOffOverElseBlock);
+                        }
+                    }
+                }
+            }
         }
-        // If the comment turns on formatting, we need to check if another
-        // comment turned formatting off within the same scope.
+
         if comment.kind == SuppressionKind::On {
-            let enclosing_range = comment
-                .enclosing
-                .map_or(TextRange::new(0u32.into(), u32::MAX.into()), |e| e.range());
-            let has_corresponding_fmt_off = self
-                .captured
-                .iter()
-                .rev()
-                .filter(|(c, _)| c.enclosing == comment.enclosing)
-                .take_while(|(c, _)| c.range.start() >= enclosing_range.start())
-                .any(|(c, _)| c.kind == SuppressionKind::Off);
-            if !has_corresponding_fmt_off {
-                return Some(UselessReason::NoFmtOff);
+            // Ensure the comment is not a trailing comment
+            if !comment.line_position.is_own_line() {
+                return Some(UselessReason::FmtOnCannotBeTrailing);
+            }
+
+            // If the comment turns on formatting, we need to check if another
+            // comment turned formatting off within the same scope.
+            match comment.previous_state {
+                None | Some(SuppressionKind::On) => return Some(UselessReason::NoFmtOff),
+                _ => {}
+            }
+        }
+
+        if comment.kind == SuppressionKind::Off || comment.kind == SuppressionKind::On {
+            if let Some(enclosing) = comment.enclosing {
+                match enclosing {
+                    AnyNodeRef::StmtClassDef(class_def) => {
+                        if comment.line_position.is_own_line()
+                            && comment.start() < class_def.name.start()
+                        {
+                            if let Some(decorator) = class_def.decorator_list.last() {
+                                if decorator.end() < comment.start() {
+                                    return Some(UselessReason::BetweenDecorators);
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
             }
         }
         None
@@ -132,20 +180,64 @@ impl<'src> UselessSuppressionComments<'src> {
     }
 }
 
-impl<'src> CaptureSuppressionComment<'src> for UselessSuppressionComments<'src> {
+impl<'src, 'loc> CaptureSuppressionComment<'src> for UselessSuppressionComments<'src, 'loc> {
     fn capture(&mut self, comment: SuppressionCommentData<'src>) {
         let possible_reason = self.check_suppression_comment(&comment);
         self.captured.insert(comment, possible_reason);
     }
 }
 
+/// Returns `true` if `statement` is the first statement in an alternate `body` (e.g. the else of an if statement)
+fn is_first_statement_in_alternate_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bool {
+    match has_body {
+        AnyNodeRef::StmtFor(ast::StmtFor { orelse, .. })
+        | AnyNodeRef::StmtWhile(ast::StmtWhile { orelse, .. }) => {
+            are_same_optional(statement, orelse.first())
+        }
+
+        AnyNodeRef::StmtTry(ast::StmtTry {
+            handlers,
+            orelse,
+            finalbody,
+            ..
+        }) => {
+            are_same_optional(statement, handlers.first())
+                || are_same_optional(statement, orelse.first())
+                || are_same_optional(statement, finalbody.first())
+        }
+
+        AnyNodeRef::StmtIf(ast::StmtIf {
+            elif_else_clauses, ..
+        }) => are_same_optional(statement, elif_else_clauses.first()),
+        _ => false,
+    }
+}
+
+/// Returns `true` if the parameters are parenthesized (as in a function definition), or `false` if
+/// not (as in a lambda).
+fn are_parameters_parenthesized(parameters: &ast::Parameters, contents: &str) -> bool {
+    // A lambda never has parentheses around its parameters, but a function definition always does.
+    contents[parameters.range()].starts_with('(')
+}
+
+/// Returns `true` if `right` is `Some` and `left` and `right` are referentially equal.
+fn are_same_optional<'a, T>(left: AnyNodeRef, right: Option<T>) -> bool
+where
+    T: Into<AnyNodeRef<'a>>,
+{
+    right.is_some_and(|right| left.ptr_eq(right.into()))
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum UselessReason {
     InsideExpression,
+    FmtOffUsedEarlier,
     NoFmtOff,
     NoCodeSuppressed,
-    OnOffNotAllowed,
+    BetweenDecorators,
+    FmtOnCannotBeTrailing,
     SkipHasToBeTrailing,
+    FmtOffOverElseBlock,
 }
 
 impl Display for UselessReason {
@@ -155,10 +247,21 @@ impl Display for UselessReason {
                 f,
                 "suppression comments inside expressions are not supported"
             ),
-            Self::NoFmtOff => write!(f, "formatting was already enabled here"),
+            Self::FmtOffUsedEarlier => write!(f, "formatting is already disabled here"),
+            Self::NoFmtOff => write!(f, "formatting is already enabled here"),
             Self::NoCodeSuppressed => write!(f, "no eligible code is suppressed by this comment"),
-            Self::OnOffNotAllowed => write!(f, "on/off suppression comments are not allowed here"),
-            Self::SkipHasToBeTrailing => write!(f, "a skip comment has to be at the end of a line"),
+            Self::BetweenDecorators => {
+                write!(f, "suppression comment cannot be between decorators")
+            }
+            Self::SkipHasToBeTrailing => {
+                write!(f, "'fmt: skip' has to be at the end of a line")
+            }
+            Self::FmtOnCannotBeTrailing => {
+                write!(f, "'fmt: on' cannot be at the end of a line")
+            }
+            Self::FmtOffOverElseBlock => {
+                write!(f, "'fmt: off' cannot be in front of an else/elif")
+            }
         }
     }
 }

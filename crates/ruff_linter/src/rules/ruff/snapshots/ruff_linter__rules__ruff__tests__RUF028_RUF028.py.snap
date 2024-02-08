@@ -1,61 +1,238 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF028.py:7:1: RUF028 [*] Supression comment is useless - formatting was already enabled here
+RUF028.py:1:1: RUF028 [*] Suppression comment is useless - formatting is already enabled here
   |
-5 |     elif False:
-6 |         pass
-7 | # fmt: on
+1 | # fmt: on
   | ^^^^^^^^^ RUF028
-8 | 
-9 | def fmt_off_between_lists():
+2 | def fmt_off_used_earlier():
+3 |     if True:
   |
-  = help: Remove this supression comment
+  = help: Remove this suppression comment
 
 ℹ Unsafe fix
-4 4 |         pass
-5 5 |     elif False:
-6 6 |         pass
-7   |-# fmt: on
-8 7 | 
-9 8 | def fmt_off_between_lists():
-10 9 |     test_list = [
+1   |-# fmt: on
+2 1 | def fmt_off_used_earlier():
+3 2 |     if True:
+4 3 |         a = 5
 
-RUF028.py:11:9: RUF028 [*] Supression comment is useless - suppression comments inside expressions are not supported
+RUF028.py:15:9: RUF028 [*] Suppression comment is useless - formatting is already disabled here
    |
- 9 | def fmt_off_between_lists():
-10 |     test_list = [
-11 |         #fmt: off
-   |         ^^^^^^^^^ RUF028
-12 |         1,
-13 |         2,
+13 |     # fmt: off
+14 |     if True:
+15 |         # fmt: off
+   |         ^^^^^^^^^^ RUF028
+16 |         pass
+17 |     # fmt: off 
    |
-   = help: Remove this supression comment
+   = help: Remove this suppression comment
 
 ℹ Unsafe fix
-8  8  | 
-9  9  | def fmt_off_between_lists():
-10 10 |     test_list = [
-11    |-        #fmt: off
-12 11 |         1,
-13 12 |         2,
-14 13 |         3
+12 12 |         pass
+13 13 |     # fmt: off
+14 14 |     if True:
+15    |-        # fmt: off
+16 15 |         pass
+17 16 |     # fmt: off 
+18 17 | 
 
-RUF028.py:20:5: RUF028 [*] Supression comment is useless - a skip comment has to be at the end of a line
+RUF028.py:19:1: RUF028 [*] Suppression comment is useless - formatting is already disabled here
    |
-18 | @fmt_off_between_lists
-19 | def fmt_off_between_decorators():
-20 |     # fmt: skip
+17 |     # fmt: off 
+18 | 
+19 | # fmt: off
+   | ^^^^^^^^^^ RUF028
+20 | 
+21 | # fmt: on
+   |
+   = help: Remove this suppression comment
+
+ℹ Unsafe fix
+16 16 |         pass
+17 17 |     # fmt: off 
+18 18 | 
+19    |-# fmt: off
+20 19 | 
+21 20 | # fmt: on
+22 21 | 
+
+RUF028.py:26:9: RUF028 [*] Suppression comment is useless - suppression comments inside expressions are not supported
+   |
+24 | def fmt_off_between_lists():
+25 |     test_list = [
+26 |         # fmt: off
+   |         ^^^^^^^^^^ RUF028
+27 |         1,
+28 |         2,
+   |
+   = help: Remove this suppression comment
+
+ℹ Unsafe fix
+23 23 | 
+24 24 | def fmt_off_between_lists():
+25 25 |     test_list = [
+26    |-        # fmt: off
+27 26 |         1,
+28 27 |         2,
+29 28 |         3,
+
+RUF028.py:37:5: RUF028 [*] Suppression comment is useless - 'fmt: skip' has to be at the end of a line
+   |
+35 | @fmt_off_between_lists
+36 | def fmt_off_between_decorators():
+37 |     # fmt: skip
    |     ^^^^^^^^^^^ RUF028
-21 |     pass
+38 |     pass
    |
-   = help: Remove this supression comment
+   = help: Remove this suppression comment
 
 ℹ Unsafe fix
-17 17 | @fmt_off_in_elif
-18 18 | @fmt_off_between_lists
-19 19 | def fmt_off_between_decorators():
-20    |-    # fmt: skip
-21 20 |     pass
+34 34 | # fmt: off
+35 35 | @fmt_off_between_lists
+36 36 | def fmt_off_between_decorators():
+37    |-    # fmt: skip
+38 37 |     pass
+39 38 | 
+40 39 | def fmt_on_trailing():
+
+RUF028.py:42:13: RUF028 [*] Suppression comment is useless - 'fmt: on' cannot be at the end of a line
+   |
+40 | def fmt_on_trailing():
+41 |     # fmt: off
+42 |     val = 5 # fmt: on
+   |             ^^^^^^^^^ RUF028
+43 |     pass
+   |
+   = help: Remove this suppression comment
+
+ℹ Unsafe fix
+39 39 | 
+40 40 | def fmt_on_trailing():
+41 41 |     # fmt: off
+42    |-    val = 5 # fmt: on
+   42 |+    val = 5
+43 43 |     pass
+44 44 | 
+45 45 | def fmt_off_in_else():
+
+RUF028.py:49:5: RUF028 [*] Suppression comment is useless - 'fmt: off' cannot be in front of an else/elif
+   |
+47 |     for val in x:
+48 |         print(x)
+49 |     # fmt: off
+   |     ^^^^^^^^^^ RUF028
+50 |     else:
+51 |         print("done")
+   |
+   = help: Remove this suppression comment
+
+ℹ Unsafe fix
+46 46 |     x = [1, 2, 3]
+47 47 |     for val in x:
+48 48 |         print(x)
+49    |-    # fmt: off
+50 49 |     else:
+51 50 |         print("done")
+52 51 |     while False:
+
+RUF028.py:54:5: RUF028 [*] Suppression comment is useless - formatting is already enabled here
+   |
+52 |     while False:
+53 |         print("while")
+54 |     # fmt: on
+   |     ^^^^^^^^^ RUF028
+55 |     # fmt: off
+56 |     else:
+   |
+   = help: Remove this suppression comment
+
+ℹ Unsafe fix
+51 51 |         print("done")
+52 52 |     while False:
+53 53 |         print("while")
+54    |-    # fmt: on
+55 54 |     # fmt: off
+56 55 |     else:
+57 56 |         print("done")
+
+RUF028.py:55:5: RUF028 [*] Suppression comment is useless - 'fmt: off' cannot be in front of an else/elif
+   |
+53 |         print("while")
+54 |     # fmt: on
+55 |     # fmt: off
+   |     ^^^^^^^^^^ RUF028
+56 |     else:
+57 |         print("done")
+   |
+   = help: Remove this suppression comment
+
+ℹ Unsafe fix
+52 52 |     while False:
+53 53 |         print("while")
+54 54 |     # fmt: on
+55    |-    # fmt: off
+56 55 |     else:
+57 56 |         print("done")
+58 57 |     if len(x) > 3:
+
+RUF028.py:60:5: RUF028 [*] Suppression comment is useless - formatting is already enabled here
+   |
+58 |     if len(x) > 3:
+59 |         print("huh?")
+60 |     # fmt: on
+   |     ^^^^^^^^^ RUF028
+61 |     # fmt: off
+62 |     else:
+   |
+   = help: Remove this suppression comment
+
+ℹ Unsafe fix
+57 57 |         print("done")
+58 58 |     if len(x) > 3:
+59 59 |         print("huh?")
+60    |-    # fmt: on
+61 60 |     # fmt: off
+62 61 |     else:
+63 62 |         print("expected")
+
+RUF028.py:61:5: RUF028 [*] Suppression comment is useless - 'fmt: off' cannot be in front of an else/elif
+   |
+59 |         print("huh?")
+60 |     # fmt: on
+61 |     # fmt: off
+   |     ^^^^^^^^^^ RUF028
+62 |     else:
+63 |         print("expected")
+   |
+   = help: Remove this suppression comment
+
+ℹ Unsafe fix
+58 58 |     if len(x) > 3:
+59 59 |         print("huh?")
+60 60 |     # fmt: on
+61    |-    # fmt: off
+62 61 |     else:
+63 62 |         print("expected")
+64 63 | 
+
+RUF028.py:75:9: RUF028 [*] Suppression comment is useless - formatting is already disabled here
+   |
+73 |         else:
+74 |             pass
+75 |         # fmt: off
+   |         ^^^^^^^^^^ RUF028
+76 |     else:
+77 |         pass
+   |
+   = help: Remove this suppression comment
+
+ℹ Unsafe fix
+72 72 |             pass
+73 73 |         else:
+74 74 |             pass
+75    |-        # fmt: off
+76 75 |     else:
+77 76 |         pass
+78 77 |     # fmt: off
 
 

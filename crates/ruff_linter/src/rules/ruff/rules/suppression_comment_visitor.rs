@@ -4,8 +4,12 @@ use ruff_python_ast::{
     visitor::preorder::{self, PreorderVisitor, TraversalSignal},
     AnyNodeRef, Suite,
 };
-use ruff_python_trivia::{CommentLinePosition, CommentRanges, SuppressionKind};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_python_trivia::{
+    indentation_at_offset, CommentLinePosition, CommentRanges, SimpleTokenKind, SimpleTokenizer,
+    SuppressionKind,
+};
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 #[derive(Clone, Copy, Debug)]
 struct SuppressionComment {
@@ -19,33 +23,35 @@ type CommentIter<'src> = Peekable<FilterMap<std::slice::Iter<'src, TextRange>, M
 /// Visitor that captures AST data for suppression comments. This uses a similar approach
 /// to `CommentsVisitor` in the formatter crate.
 pub(super) struct SuppressionCommentVisitor<'src, 'builder> {
-    source: &'src str,
     comments: CommentIter<'src>,
 
     parents: Vec<AnyNodeRef<'src>>,
     preceding_node: Option<AnyNodeRef<'src>>,
+    comments_in_scope: Vec<(Option<AnyNodeRef<'src>>, SuppressionKind)>,
 
     builder: &'builder mut (dyn CaptureSuppressionComment<'src> + 'src),
+    locator: &'src Locator<'src>,
 }
 
 impl<'src, 'builder> SuppressionCommentVisitor<'src, 'builder> {
     pub(super) fn new(
-        source: &'src str,
         comment_ranges: &'src CommentRanges,
         builder: &'builder mut (dyn CaptureSuppressionComment<'src> + 'src),
+        locator: &'src Locator<'src>,
     ) -> Self {
         let map_fn: MapCommentFn<'_> = Box::new(|range: &'src TextRange| {
             Some(SuppressionComment {
                 range: *range,
-                kind: SuppressionKind::from_slice(&source[*range])?,
+                kind: SuppressionKind::from_slice(locator.slice(range))?,
             })
         });
         Self {
-            source,
             comments: comment_ranges.iter().filter_map(map_fn).peekable(),
             parents: Vec::default(),
             preceding_node: Option::default(),
+            comments_in_scope: Vec::with_capacity(comment_ranges.len()),
             builder,
+            locator,
         }
     }
 
@@ -75,17 +81,25 @@ impl<'ast> PreorderVisitor<'ast> for SuppressionCommentVisitor<'ast, '_> {
                 break;
             }
 
+            let line_position = CommentLinePosition::text_position(range, self.locator.contents());
+
+            let previous_state = self.comments_in_scope.last().map(|(_, s)| s).copied();
+
             let data = SuppressionCommentData {
                 enclosing: enclosing_node,
                 preceding: self.preceding_node,
                 following: Some(node),
-                parent: self.parents.iter().rev().nth(0).copied(),
-                line_position: CommentLinePosition::text_position(range, self.source),
+                parent: self.parents.iter().rev().nth(1).copied(),
+                previous_state,
+                line_position,
                 kind,
                 range,
             };
 
             self.builder.capture(data);
+            if line_position.is_own_line() {
+                self.comments_in_scope.push((enclosing_node, kind));
+            }
             self.comments.next();
         }
 
@@ -101,28 +115,59 @@ impl<'ast> PreorderVisitor<'ast> for SuppressionCommentVisitor<'ast, '_> {
     }
 
     fn leave_node(&mut self, node: AnyNodeRef<'ast>) {
-        self.parents.pop();
+        let parent_node = self.parents.pop();
 
         let node_end = node.end();
 
-        // Process all comments that start after the `preceding` node and end before this node's end.
-        while let Some(SuppressionComment { range, kind }) = self.comments.peek().copied() {
-            // If the comment starts after this node, break.
-            if range.start() >= node_end {
+        for index in (0..self.comments_in_scope.len()).rev() {
+            if self.comments_in_scope[index].0 == parent_node {
+                self.comments_in_scope.pop();
+            } else {
                 break;
             }
+        }
+
+        // Process all comments that start after the `preceding` node and end before this node's end.
+        while let Some(SuppressionComment { range, kind }) = self.comments.peek().copied() {
+            let line_position = CommentLinePosition::text_position(range, self.locator.contents());
+            // TODO(jane):  We want to catch any own-line comments that have the same indentation
+            if range.start() >= node_end {
+                break;
+                /*
+                if !line_position.is_own_line() {
+                    break;
+                }
+                let Some(preceding) = self.preceding_node else { break; };
+                // check indent
+                let comment_ident =
+                    own_line_comment_indentation(preceding, range, self.locator);
+                let preceding_indentation =
+                    indentation_at_offset(preceding.start(), self.locator)
+                        .unwrap_or_default()
+                        .text_len();
+                if comment_ident < preceding_indentation {
+                    break;
+                }
+                */
+            }
+
+            let previous_state = self.comments_in_scope.last().map(|(_, s)| s).copied();
 
             let data = SuppressionCommentData {
                 enclosing: Some(node),
                 preceding: self.preceding_node,
                 following: None,
                 parent: self.parents.last().copied(),
-                line_position: CommentLinePosition::text_position(range, self.source),
+                previous_state,
+                line_position,
                 kind,
                 range,
             };
 
             self.builder.capture(data);
+            if line_position.is_own_line() {
+                self.comments_in_scope.push((Some(node), kind));
+            }
             self.comments.next();
         }
 
@@ -159,6 +204,7 @@ pub(super) struct SuppressionCommentData<'src> {
     pub(super) preceding: Option<AnyNodeRef<'src>>,
     pub(super) following: Option<AnyNodeRef<'src>>,
     pub(super) parent: Option<AnyNodeRef<'src>>,
+    pub(super) previous_state: Option<SuppressionKind>,
     pub(super) line_position: CommentLinePosition,
     pub(super) kind: SuppressionKind,
     pub(super) range: TextRange,
@@ -192,4 +238,78 @@ impl<'src> Ranged for SuppressionCommentData<'src> {
 
 pub(super) trait CaptureSuppressionComment<'src> {
     fn capture(&mut self, comment: SuppressionCommentData<'src>);
+}
+
+/// Determine the indentation level of an own-line comment, defined as the minimum indentation of
+/// all comments between the preceding node and the comment, including the comment itself. In
+/// other words, we don't allow successive comments to ident _further_ than any preceding comments.
+///
+/// For example, given:
+/// ```python
+/// if True:
+///     pass
+///     # comment
+/// ```
+///
+/// The indentation would be 4, as the comment is indented by 4 spaces.
+///
+/// Given:
+/// ```python
+/// if True:
+///     pass
+/// # comment
+/// else:
+///     pass
+/// ```
+///
+/// The indentation would be 0, as the comment is not indented at all.
+///
+/// Given:
+/// ```python
+/// if True:
+///     pass
+///     # comment
+///         # comment
+/// ```
+///
+/// Both comments would be marked as indented at 4 spaces, as the indentation of the first comment
+/// is used for the second comment.
+///
+/// This logic avoids pathological cases like:
+/// ```python
+/// try:
+///     if True:
+///         if True:
+///             pass
+///
+///         # a
+///             # b
+///         # c
+/// except Exception:
+///     pass
+/// ```
+///
+/// If we don't use the minimum indentation of any preceding comments, we would mark `# b` as
+/// indented to the same depth as `pass`, which could in turn lead to us treating it as a trailing
+/// comment of `pass`, despite there being a comment between them that "resets" the indentation.
+pub(super) fn own_line_comment_indentation(
+    preceding: AnyNodeRef,
+    comment_range: TextRange,
+    locator: &Locator,
+) -> TextSize {
+    let tokenizer = SimpleTokenizer::new(
+        locator.contents(),
+        TextRange::new(locator.full_line_end(preceding.end()), comment_range.end()),
+    );
+
+    tokenizer
+        .filter_map(|token| {
+            if token.kind() == SimpleTokenKind::Comment {
+                indentation_at_offset(token.start(), locator).map(TextLen::text_len)
+            } else {
+                None
+            }
+        })
+        .min()
+        .unwrap_or_default()
 }
