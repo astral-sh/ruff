@@ -18,6 +18,7 @@ use rustc_hash::FxHashSet;
 ///
 /// Since there are many possible string literals which contain syntax similar to f-strings yet are not intended to be,
 /// this lint will disqualify any literal that satisfies any of the following conditions:
+///
 /// 1. The string literal is a standalone expression. For example, a docstring.
 /// 2. The literal is part of a function call with keyword arguments that match at least one variable (for example: `format("Message: {value}", value = "Hello World")`)
 /// 3. The literal (or a parent expression of the literal) has a direct method call on it (for example: `"{value}".format(...)`)
