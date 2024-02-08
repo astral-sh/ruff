@@ -690,48 +690,65 @@ impl<'source> Lexer<'source> {
 
         let value_start = self.offset();
 
-        let value_end = loop {
-            match self.cursor.bump() {
-                Some('\\') => {
-                    if self.cursor.eat_char('\r') {
-                        self.cursor.eat_char('\n');
-                    } else {
-                        self.cursor.bump();
-                    }
-                }
-                Some('\r' | '\n') if !triple_quoted => {
+        let quote_byte = u8::try_from(quote).expect("char that fits in u8");
+        let value_end = if triple_quoted {
+            // For triple-quoted strings, scan until we find the closing quote (ignoring escaped
+            // quotes) or the end of the file.
+            loop {
+                let Some(index) = memchr::memchr(quote_byte, self.cursor.rest().as_bytes()) else {
+                    self.cursor.skip_to_end();
+
                     if let Some(fstring) = self.fstrings.current() {
                         // When we are in an f-string, check whether the initial quote
                         // matches with f-strings quotes and if it is, then this must be a
                         // missing '}' token so raise the proper error.
-                        if fstring.quote_char() == quote && !fstring.is_triple_quoted() {
+                        if fstring.quote_char() == quote
+                            && fstring.is_triple_quoted() == triple_quoted
+                        {
                             return Err(LexicalError {
                                 error: LexicalErrorType::FStringError(
                                     FStringErrorType::UnclosedLbrace,
                                 ),
-                                location: self.offset() - TextSize::new(1),
+                                location: self.cursor.text_len(),
                             });
                         }
                     }
                     return Err(LexicalError {
-                        error: LexicalErrorType::OtherError(
-                            "EOL while scanning string literal".to_owned(),
-                        ),
-                        location: self.offset() - TextSize::new(1),
+                        error: LexicalErrorType::Eof,
+                        location: self.cursor.text_len(),
                     });
-                }
-                Some(c) if c == quote => {
-                    if triple_quoted {
-                        if self.cursor.eat_char2(quote, quote) {
-                            break self.offset() - TextSize::new(3);
-                        }
-                    } else {
-                        break self.offset() - TextSize::new(1);
-                    }
+                };
+
+                // Rare case: if there are an odd number of backslashes before the quote, then
+                // the quote is escaped and we should continue scanning.
+                let num_backslashes = self.cursor.rest().as_bytes()[..index]
+                    .iter()
+                    .rev()
+                    .take_while(|&&c| c == b'\\')
+                    .count();
+
+                // Advance the cursor past the quote and continue scanning.
+                self.cursor.skip_bytes(index + 1);
+
+                // If the character is escaped, continue scanning.
+                if num_backslashes % 2 == 1 {
+                    continue;
                 }
 
-                Some(_) => {}
-                None => {
+                // Otherwise, if it's followed by two more quotes, then we're done.
+                if self.cursor.eat_char2(quote, quote) {
+                    break self.offset() - TextSize::new(3);
+                }
+            }
+        } else {
+            // For non-triple-quoted strings, scan until we find the closing quote, but end early
+            // if we encounter a newline or the end of the file.
+            loop {
+                let Some(index) =
+                    memchr::memchr3(quote_byte, b'\r', b'\n', self.cursor.rest().as_bytes())
+                else {
+                    self.cursor.skip_to_end();
+
                     if let Some(fstring) = self.fstrings.current() {
                         // When we are in an f-string, check whether the initial quote
                         // matches with f-strings quotes and if it is, then this must be a
@@ -748,23 +765,66 @@ impl<'source> Lexer<'source> {
                         }
                     }
                     return Err(LexicalError {
-                        error: if triple_quoted {
-                            LexicalErrorType::Eof
-                        } else {
-                            LexicalErrorType::StringError
-                        },
+                        error: LexicalErrorType::StringError,
                         location: self.offset(),
                     });
+                };
+
+                // Rare case: if there are an odd number of backslashes before the quote, then
+                // the quote is escaped and we should continue scanning.
+                let num_backslashes = self.cursor.rest().as_bytes()[..index]
+                    .iter()
+                    .rev()
+                    .take_while(|&&c| c == b'\\')
+                    .count();
+
+                // Skip up to the current character.
+                self.cursor.skip_bytes(index);
+                let ch = self.cursor.bump();
+
+                // If the character is escaped, continue scanning.
+                if num_backslashes % 2 == 1 {
+                    if ch == Some('\r') {
+                        self.cursor.eat_char('\n');
+                    }
+                    continue;
+                }
+
+                match ch {
+                    Some('\r' | '\n') => {
+                        if let Some(fstring) = self.fstrings.current() {
+                            // When we are in an f-string, check whether the initial quote
+                            // matches with f-strings quotes and if it is, then this must be a
+                            // missing '}' token so raise the proper error.
+                            if fstring.quote_char() == quote && !fstring.is_triple_quoted() {
+                                return Err(LexicalError {
+                                    error: LexicalErrorType::FStringError(
+                                        FStringErrorType::UnclosedLbrace,
+                                    ),
+                                    location: self.offset() - TextSize::new(1),
+                                });
+                            }
+                        }
+                        return Err(LexicalError {
+                            error: LexicalErrorType::OtherError(
+                                "EOL while scanning string literal".to_owned(),
+                            ),
+                            location: self.offset() - TextSize::new(1),
+                        });
+                    }
+                    Some(ch) if ch == quote => {
+                        break self.offset() - TextSize::new(1);
+                    }
+                    _ => unreachable!("memchr2 returned an index that is not a quote or a newline"),
                 }
             }
         };
 
-        let tok = Tok::String {
+        Ok(Tok::String {
             value: self.source[TextRange::new(value_start, value_end)].to_string(),
             kind,
             triple_quoted,
-        };
-        Ok(tok)
+        })
     }
 
     // This is the main entry point. Call this function to retrieve the next token.
