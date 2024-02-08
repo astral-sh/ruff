@@ -108,21 +108,6 @@ pub struct Options {
     #[option(default = "false", value_type = "bool", example = "fix-only = true")]
     pub fix_only: Option<bool>,
 
-    /// Whether to show source code snippets when reporting lint violations
-    /// (overridden by the `--show-source` command-line flag).
-    #[option(
-        default = "false",
-        value_type = "bool",
-        example = r#"
-            # By default, always show source code snippets.
-            show-source = true
-        "#
-    )]
-    #[deprecated(
-        note = "`show-source` is deprecated and is now part of `output-format` in the form of `full` or `concise` options. Please update your configuration."
-    )]
-    pub show_source: Option<bool>,
-
     /// Whether to show an enumeration of all fixed lint violations
     /// (overridden by the `--show-fixes` command-line flag).
     #[option(
