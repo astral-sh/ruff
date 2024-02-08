@@ -67,7 +67,7 @@ where
                     if let Expr::Name(ast::ExprName { id, .. }) = map_subscript(func) {
                         let id = id.as_str();
                         if matches!(id, "tuple" | "list") && is_builtin(id) {
-                            let [arg] = arguments.args.as_slice() else {
+                            let [arg] = arguments.args.as_ref() else {
                                 return (None, DunderAllFlags::empty());
                             };
                             match arg {

@@ -194,7 +194,7 @@ pub(crate) fn key_in_dict_comprehension(checker: &mut Checker, comprehension: &C
 
 /// SIM118 in a comparison.
 pub(crate) fn key_in_dict_compare(checker: &mut Checker, compare: &ast::ExprCompare) {
-    let [op] = compare.ops.as_slice() else {
+    let [op] = &*compare.ops else {
         return;
     };
 
@@ -202,7 +202,7 @@ pub(crate) fn key_in_dict_compare(checker: &mut Checker, compare: &ast::ExprComp
         return;
     }
 
-    let [right] = compare.comparators.as_slice() else {
+    let [right] = &*compare.comparators else {
         return;
     };
 

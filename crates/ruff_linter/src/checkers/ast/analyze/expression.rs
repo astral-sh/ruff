@@ -343,16 +343,15 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
         Expr::Call(
             call @ ast::ExprCall {
                 func,
-                arguments,
+                arguments:
+                    Arguments {
+                        args,
+                        keywords,
+                        range: _,
+                    },
                 range: _,
             },
         ) => {
-            let Arguments {
-                args,
-                keywords,
-                range: _,
-            } = &**arguments;
-
             if checker.any_enabled(&[
                 // pylint
                 Rule::BadStringFormatCharacter,

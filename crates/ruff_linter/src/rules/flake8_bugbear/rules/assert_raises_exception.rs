@@ -91,7 +91,7 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, items: &[WithItem])
             return;
         }
 
-        let [arg] = arguments.args.as_slice() else {
+        let [arg] = &*arguments.args else {
             return;
         };
 

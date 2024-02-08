@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: d5774a4a5c1930f0ba67655ce80e6e25eb2c3c95a6e65439e04bfd28d659b7c5
+// sha3: 15290f23b8dd4969eab2d79f2960a88c23db9e95985d6d022a75894a8e53f8dc
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -36771,8 +36771,8 @@ fn __action241<
     {
         let ArgumentList { args, keywords } = parse_arguments(e)?;
         Ok(ast::Arguments {
-            args,
-            keywords,
+            args: args.into_boxed_slice(),
+            keywords: keywords.into_boxed_slice(),
             range: (location..end_location).into()
         })
     }
@@ -41061,7 +41061,7 @@ fn __action541<
 {
     ast::ExprCall {
         func: Box::new(func.into()),
-        arguments: Box::new(arguments),
+        arguments,
         range: (location..end_location).into(),
     }.into()
 }
@@ -41852,7 +41852,7 @@ fn __action588<
 {
     ast::ExprCall {
         func: Box::new(func.into()),
-        arguments: Box::new(arguments),
+        arguments,
         range: (location..end_location).into(),
     }.into()
 }

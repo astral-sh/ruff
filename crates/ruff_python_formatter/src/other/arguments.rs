@@ -38,7 +38,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         let all_arguments = format_with(|f: &mut PyFormatter| {
             let source = f.context().source();
             let mut joiner = f.join_comma_separated(range.end());
-            match args.as_slice() {
+            match args.as_ref() {
                 [arg] if keywords.is_empty() => {
                     match arg {
                         Expr::GeneratorExp(generator_exp) => joiner.entry(
@@ -180,7 +180,7 @@ fn is_single_argument_parenthesized(argument: &Expr, call_end: TextSize, source:
 /// of those collections.
 fn is_arguments_huggable(arguments: &Arguments, context: &PyFormatContext) -> bool {
     // Find the lone argument or `**kwargs` keyword.
-    let arg = match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+    let arg = match (arguments.args.as_ref(), arguments.keywords.as_ref()) {
         ([arg], []) => arg,
         ([], [keyword]) if keyword.arg.is_none() && !context.comments().has(keyword) => {
             &keyword.value

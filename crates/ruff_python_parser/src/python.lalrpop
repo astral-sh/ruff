@@ -1544,7 +1544,7 @@ AtomExpr2<Goal>: crate::parser::ParenthesizedExpr = {
     Atom<Goal>,
     <location:@L> <func:AtomExpr2<"all">> <arguments:Arguments> <end_location:@R> => ast::ExprCall {
         func: Box::new(func.into()),
-        arguments: Box::new(arguments),
+        arguments,
         range: (location..end_location).into(),
     }.into(),
     <location:@L> <value:AtomExpr2<"all">> "[" <slice:SubscriptList> "]" <end_location:@R> => ast::ExprSubscript {
@@ -1885,8 +1885,8 @@ Arguments: ast::Arguments = {
     <location:@L> "(" <e: Comma<FunctionArgument>> ")" <end_location:@R> =>? {
         let ArgumentList { args, keywords } = parse_arguments(e)?;
         Ok(ast::Arguments {
-            args,
-            keywords,
+            args: args.into_boxed_slice(),
+            keywords: keywords.into_boxed_slice(),
             range: (location..end_location).into()
         })
     }

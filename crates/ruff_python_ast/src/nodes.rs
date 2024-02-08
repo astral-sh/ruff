@@ -3883,12 +3883,38 @@ impl Ranged for crate::nodes::ParameterWithDefault {
 }
 
 static_assertions::assert_eq_size!(Expr, [u8; 64]);
-static_assertions::assert_eq_size!(ExprLambda, [u8; 24]);
-static_assertions::assert_eq_size!(ExprListComp, [u8; 40]);
-static_assertions::assert_eq_size!(ExprDictComp, [u8; 48]);
-static_assertions::assert_eq_size!(ExprFString, [u8; 48]);
+static_assertions::assert_eq_size!(ExprAttribute, [u8; 56]);
+static_assertions::assert_eq_size!(ExprAwait, [u8; 16]);
+static_assertions::assert_eq_size!(ExprBinOp, [u8; 32]);
+static_assertions::assert_eq_size!(ExprBoolOp, [u8; 40]);
+static_assertions::assert_eq_size!(ExprBooleanLiteral, [u8; 12]);
+static_assertions::assert_eq_size!(ExprBytesLiteral, [u8; 40]);
 static_assertions::assert_eq_size!(ExprCall, [u8; 56]); // 72 on `main`
 static_assertions::assert_eq_size!(ExprCompare, [u8; 48]); // 64 on `main`
+static_assertions::assert_eq_size!(ExprDict, [u8; 56]);
+static_assertions::assert_eq_size!(ExprDictComp, [u8; 48]);
+static_assertions::assert_eq_size!(ExprEllipsisLiteral, [u8; 8]);
+static_assertions::assert_eq_size!(ExprFString, [u8; 48]);
+static_assertions::assert_eq_size!(ExprGeneratorExp, [u8; 40]);
+static_assertions::assert_eq_size!(ExprIfExp, [u8; 32]);
+static_assertions::assert_eq_size!(ExprIpyEscapeCommand, [u8; 40]);
+static_assertions::assert_eq_size!(ExprLambda, [u8; 24]);
+static_assertions::assert_eq_size!(ExprList, [u8; 40]);
+static_assertions::assert_eq_size!(ExprListComp, [u8; 40]);
+static_assertions::assert_eq_size!(ExprName, [u8; 40]);
+static_assertions::assert_eq_size!(ExprNamedExpr, [u8; 24]);
+static_assertions::assert_eq_size!(ExprNoneLiteral, [u8; 8]);
+static_assertions::assert_eq_size!(ExprNumberLiteral, [u8; 32]);
+static_assertions::assert_eq_size!(ExprSet, [u8; 32]);
+static_assertions::assert_eq_size!(ExprSetComp, [u8; 40]);
+static_assertions::assert_eq_size!(ExprSlice, [u8; 32]);
+static_assertions::assert_eq_size!(ExprStarred, [u8; 24]);
+static_assertions::assert_eq_size!(ExprStringLiteral, [u8; 56]);
+static_assertions::assert_eq_size!(ExprSubscript, [u8; 32]);
+static_assertions::assert_eq_size!(ExprTuple, [u8; 40]);
+static_assertions::assert_eq_size!(ExprUnaryOp, [u8; 24]);
+static_assertions::assert_eq_size!(ExprYield, [u8; 16]);
+static_assertions::assert_eq_size!(ExprYieldFrom, [u8; 16]);
 
 #[cfg(test)]
 mod tests {

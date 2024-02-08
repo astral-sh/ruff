@@ -31,8 +31,8 @@ use std::path::Path;
 use itertools::Itertools;
 use log::debug;
 use ruff_python_ast::{
-    self as ast, Arguments, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
-    Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt, Suite, UnaryOp,
+    self as ast, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext, Keyword,
+    MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt, Suite, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -1200,7 +1200,7 @@ where
                         // If we're in a type definition, we need to treat the arguments to any
                         // other callables as non-type definitions (i.e., we don't want to treat
                         // any strings as deferred type definitions).
-                        for arg in arguments.args {
+                        for arg in arguments.args.iter() {
                             self.visit_non_type_definition(arg);
                         }
                         for keyword in arguments.keywords.iter() {
