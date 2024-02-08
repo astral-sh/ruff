@@ -428,25 +428,6 @@ line continuation.
 
         """
 
-    def test_method_should_be_correctly_capitalized(self, parameters: list[str], other_parameters: dict[str, str]): # noqa: D213
-        """Test parameters and attributes sections are capitalized correctly.
-
-        Parameters
-        ----------
-        parameters:
-            A list of string parameters
-        other_parameters:
-            A dictionary of string attributes
-
-        Other Parameters
-        ----------
-        other_parameters:
-            A dictionary of string attributes
-        parameters:
-            A list of string parameters
-
-        """
-
     @expect("D417: Missing argument descriptions in the docstring "
             "(argument(s) test, y, z are missing descriptions in "
             "'test_missing_args' docstring)", arg_count=5)
@@ -505,18 +486,6 @@ line continuation.
         danger
             Zoneeeeee!
 
-        """
-
-    @staticmethod
-    def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213
-        """Test that lower case sub-section header is valid even if it has the same name as section kind.
-
-        Parameters:
-        ----------
-        parameters:
-            A list of string parameters
-        value:
-            Some value
         """
 
 
@@ -592,4 +561,36 @@ def titlecase_sub_section_header():
         Here's a note.
 
         Returns:
+    """
+
+
+def test_method_should_be_correctly_capitalized(parameters: list[str], other_parameters: dict[str, str]): # noqa: D213
+    """Test parameters and attributes sections are capitalized correctly.
+
+    Parameters
+    ----------
+    parameters:
+        A list of string parameters
+    other_parameters:
+        A dictionary of string attributes
+
+    Other Parameters
+    ----------
+    other_parameters:
+        A dictionary of string attributes
+    parameters:
+        A list of string parameters
+
+    """
+
+
+def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213
+    """Test that lower case subsection header is valid even if it has the same name as section kind.
+
+    Parameters:
+    ----------
+    parameters:
+        A list of string parameters
+    value:
+        Some value
     """

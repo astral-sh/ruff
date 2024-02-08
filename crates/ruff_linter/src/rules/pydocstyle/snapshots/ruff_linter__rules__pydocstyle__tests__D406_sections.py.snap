@@ -61,32 +61,31 @@ sections.py:216:5: D406 [*] Section name should end with a newline ("Raises")
 229 229 | 
 230 230 |     """
 
-sections.py:512:9: D406 [*] Section name should end with a newline ("Parameters")
+sections.py:588:5: D406 [*] Section name should end with a newline ("Parameters")
     |
-510 |       @staticmethod
-511 |       def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213
-512 |           """Test that lower case sub-section header is valid even if it has the same name as section kind.
-    |  _________^
-513 | | 
-514 | |         Parameters:
-515 | |         ----------
-516 | |         parameters:
-517 | |             A list of string parameters
-518 | |         value:
-519 | |             Some value
-520 | |         """
-    | |___________^ D406
+587 |   def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213
+588 |       """Test that lower case subsection header is valid even if it has the same name as section kind.
+    |  _____^
+589 | | 
+590 | |     Parameters:
+591 | |     ----------
+592 | |     parameters:
+593 | |         A list of string parameters
+594 | |     value:
+595 | |         Some value
+596 | |     """
+    | |_______^ D406
     |
     = help: Add newline after "Parameters"
 
 ℹ Safe fix
-511 511 |     def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213
-512 512 |         """Test that lower case sub-section header is valid even if it has the same name as section kind.
-513 513 | 
-514     |-        Parameters:
-    514 |+        Parameters
-515 515 |         ----------
-516 516 |         parameters:
-517 517 |             A list of string parameters
+587 587 | def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213
+588 588 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
+589 589 | 
+590     |-    Parameters:
+    590 |+    Parameters
+591 591 |     ----------
+592 592 |     parameters:
+593 593 |         A list of string parameters
 
 

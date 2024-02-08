@@ -61,41 +61,39 @@ sections.py:216:5: D409 [*] Section underline should match the length of its nam
 227 227 |     Raises:
 228 228 |     My attention.
 
-sections.py:432:9: D409 [*] Section underline should match the length of its name ("Other Parameters")
+sections.py:568:5: D409 [*] Section underline should match the length of its name ("Other Parameters")
     |
-431 |       def test_method_should_be_correctly_capitalized(self, parameters: list[str], other_parameters: dict[str, str]): # noqa: D213
-432 |           """Test parameters and attributes sections are capitalized correctly.
-    |  _________^
-433 | | 
-434 | |         Parameters
-435 | |         ----------
-436 | |         parameters:
-437 | |             A list of string parameters
-438 | |         other_parameters:
-439 | |             A dictionary of string attributes
-440 | | 
-441 | |         Other Parameters
-442 | |         ----------
-443 | |         other_parameters:
-444 | |             A dictionary of string attributes
-445 | |         parameters:
-446 | |             A list of string parameters
-447 | | 
-448 | |         """
-    | |___________^ D409
-449 |   
-450 |       @expect("D417: Missing argument descriptions in the docstring "
+567 |   def test_method_should_be_correctly_capitalized(parameters: list[str], other_parameters: dict[str, str]): # noqa: D213
+568 |       """Test parameters and attributes sections are capitalized correctly.
+    |  _____^
+569 | | 
+570 | |     Parameters
+571 | |     ----------
+572 | |     parameters:
+573 | |         A list of string parameters
+574 | |     other_parameters:
+575 | |         A dictionary of string attributes
+576 | | 
+577 | |     Other Parameters
+578 | |     ----------
+579 | |     other_parameters:
+580 | |         A dictionary of string attributes
+581 | |     parameters:
+582 | |         A list of string parameters
+583 | | 
+584 | |     """
+    | |_______^ D409
     |
     = help: Adjust underline length to match "Other Parameters"
 
 ℹ Safe fix
-439 439 |             A dictionary of string attributes
-440 440 | 
-441 441 |         Other Parameters
-442     |-        ----------
-    442 |+        ----------------
-443 443 |         other_parameters:
-444 444 |             A dictionary of string attributes
-445 445 |         parameters:
+575 575 |         A dictionary of string attributes
+576 576 | 
+577 577 |     Other Parameters
+578     |-    ----------
+    578 |+    ----------------
+579 579 |     other_parameters:
+580 580 |         A dictionary of string attributes
+581 581 |     parameters:
 
 

@@ -97,17 +97,17 @@ sections.py:261:5: D414 Section has no content ("Returns")
     | |_______^ D414
     |
 
-sections.py:589:5: D414 Section has no content ("Returns")
+sections.py:558:5: D414 Section has no content ("Returns")
     |
-588 |   def titlecase_sub_section_header():
-589 |       """Below, `Returns:` should be considered a section header.
+557 |   def titlecase_sub_section_header():
+558 |       """Below, `Returns:` should be considered a section header.
     |  _____^
-590 | | 
-591 | |     Args:
-592 | |         Here's a note.
-593 | | 
-594 | |         Returns:
-595 | |     """
+559 | | 
+560 | |     Args:
+561 | |         Here's a note.
+562 | | 
+563 | |         Returns:
+564 | |     """
     | |_______^ D414
     |
 

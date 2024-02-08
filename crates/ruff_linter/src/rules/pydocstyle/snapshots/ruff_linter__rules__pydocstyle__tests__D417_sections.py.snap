@@ -64,40 +64,40 @@ sections.py:398:5: D417 Missing argument description in the docstring for `test_
 399 |     """Toggle the gizmo.
     |
 
-sections.py:453:9: D417 Missing argument descriptions in the docstring for `test_missing_args`: `test`, `y`, `z`
+sections.py:434:9: D417 Missing argument descriptions in the docstring for `test_missing_args`: `test`, `y`, `z`
     |
-451 |             "(argument(s) test, y, z are missing descriptions in "
-452 |             "'test_missing_args' docstring)", arg_count=5)
-453 |     def test_missing_args(self, test, x, y, z=3, t=1, _private=0):  # noqa: D213, D407
+432 |             "(argument(s) test, y, z are missing descriptions in "
+433 |             "'test_missing_args' docstring)", arg_count=5)
+434 |     def test_missing_args(self, test, x, y, z=3, t=1, _private=0):  # noqa: D213, D407
     |         ^^^^^^^^^^^^^^^^^ D417
-454 |         """Test a valid args section.
+435 |         """Test a valid args section.
     |
 
-sections.py:468:9: D417 Missing argument descriptions in the docstring for `test_missing_args_class_method`: `test`, `y`, `z`
+sections.py:449:9: D417 Missing argument descriptions in the docstring for `test_missing_args_class_method`: `test`, `y`, `z`
     |
-466 |             "(argument(s) test, y, z are missing descriptions in "
-467 |             "'test_missing_args_class_method' docstring)", arg_count=4)
-468 |     def test_missing_args_class_method(cls, test, x, y, z=3):  # noqa: D213, D407
+447 |             "(argument(s) test, y, z are missing descriptions in "
+448 |             "'test_missing_args_class_method' docstring)", arg_count=4)
+449 |     def test_missing_args_class_method(cls, test, x, y, z=3):  # noqa: D213, D407
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D417
+450 |         """Test a valid args section.
+    |
+
+sections.py:468:9: D417 Missing argument descriptions in the docstring for `test_missing_args_static_method`: `a`, `z`
+    |
+466 |             "(argument(s) a, z are missing descriptions in "
+467 |             "'test_missing_args_static_method' docstring)", arg_count=3)
+468 |     def test_missing_args_static_method(a, x, y, z=3, t=1):  # noqa: D213, D407
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D417
 469 |         """Test a valid args section.
     |
 
-sections.py:487:9: D417 Missing argument descriptions in the docstring for `test_missing_args_static_method`: `a`, `z`
+sections.py:498:9: D417 Missing argument description in the docstring for `test_incorrect_indent`: `y`
     |
-485 |             "(argument(s) a, z are missing descriptions in "
-486 |             "'test_missing_args_static_method' docstring)", arg_count=3)
-487 |     def test_missing_args_static_method(a, x, y, z=3, t=1):  # noqa: D213, D407
-    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D417
-488 |         """Test a valid args section.
-    |
-
-sections.py:529:9: D417 Missing argument description in the docstring for `test_incorrect_indent`: `y`
-    |
-527 |             "(argument(s) y are missing descriptions in "
-528 |             "'test_incorrect_indent' docstring)", arg_count=3)
-529 |     def test_incorrect_indent(self, x=1, y=2):  # noqa: D207, D213, D407
+496 |             "(argument(s) y are missing descriptions in "
+497 |             "'test_incorrect_indent' docstring)", arg_count=3)
+498 |     def test_incorrect_indent(self, x=1, y=2):  # noqa: D207, D213, D407
     |         ^^^^^^^^^^^^^^^^^^^^^ D417
-530 |         """Reproducing issue #437.
+499 |         """Reproducing issue #437.
     |
 
 
