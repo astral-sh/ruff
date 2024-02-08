@@ -55,17 +55,12 @@ const BLANK_LINES_METHOD_LEVEL: u32 = 1;
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E301.html)
 #[violation]
-pub struct BlankLineBetweenMethods {
-    actual_blank_lines: u32,
-}
+pub struct BlankLineBetweenMethods;
 
 impl AlwaysFixableViolation for BlankLineBetweenMethods {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLineBetweenMethods {
-            actual_blank_lines: nb_blank_lines,
-        } = self;
-        format!("Expected {BLANK_LINES_METHOD_LEVEL:?} blank line, found {nb_blank_lines}")
+        format!("Expected {BLANK_LINES_METHOD_LEVEL:?} blank line, found 0")
     }
 
     fn fix_title(&self) -> String {
@@ -172,7 +167,7 @@ impl AlwaysFixableViolation for TooManyBlankLines {
 }
 
 /// ## What it does
-/// Checks for extraneous blank line(s) after function decorator.
+/// Checks for extraneous blank line(s) after function decorators.
 ///
 /// ## Why is this bad?
 /// There should be no blank lines between a decorator and the object it is decorating.
@@ -200,12 +195,17 @@ impl AlwaysFixableViolation for TooManyBlankLines {
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E304.html)
 #[violation]
-pub struct BlankLineAfterDecorator;
+pub struct BlankLineAfterDecorator {
+    actual_blank_lines: u32,
+}
 
 impl AlwaysFixableViolation for BlankLineAfterDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Blank lines found after function decorator")
+        format!(
+            "Blank lines found after function decorator ({lines})",
+            lines = self.actual_blank_lines
+        )
     }
 
     fn fix_title(&self) -> String {
@@ -214,10 +214,10 @@ impl AlwaysFixableViolation for BlankLineAfterDecorator {
 }
 
 /// ## What it does
-/// Checks for missing blank lines after end of function or class.
+/// Checks for missing blank lines after the end of function or class.
 ///
 /// ## Why is this bad?
-/// PEP 8 recommends the using blank lines as following:
+/// PEP 8 recommends using blank lines as following:
 /// - Two blank lines are expected between functions and classes
 /// - One blank line is expected between methods of a class.
 ///
@@ -260,10 +260,10 @@ impl AlwaysFixableViolation for BlankLinesAfterFunctionOrClass {
 }
 
 /// ## What it does
-/// Checks for for 1 blank line between nested functions/classes definitions.
+/// Checks for 1 blank line between nested function or class definitions.
 ///
 /// ## Why is this bad?
-/// PEP 8 recommends the using blank lines as following:
+/// PEP 8 recommends using blank lines as following:
 /// - Two blank lines are expected between functions and classes
 /// - One blank line is expected between methods of a class.
 ///
@@ -290,17 +290,12 @@ impl AlwaysFixableViolation for BlankLinesAfterFunctionOrClass {
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E306.html)
 #[violation]
-pub struct BlankLinesBeforeNestedDefinition {
-    actual_blank_lines: u32,
-}
+pub struct BlankLinesBeforeNestedDefinition;
 
 impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLinesBeforeNestedDefinition {
-            actual_blank_lines: blank_lines,
-        } = self;
-        format!("Expected 1 blank line before a nested definition, found {blank_lines}")
+        format!("Expected 1 blank line before a nested definition, found 0")
     }
 
     fn fix_title(&self) -> String {
@@ -673,12 +668,8 @@ impl BlankLinesChecker {
                 && prev_indent_length.is_some_and(|prev_indent_length| prev_indent_length >= line.indent_length)
             {
                 // E301
-                let mut diagnostic = Diagnostic::new(
-                    BlankLineBetweenMethods {
-                        actual_blank_lines: 0,
-                    },
-                    line.first_token_range,
-                );
+                let mut diagnostic =
+                    Diagnostic::new(BlankLineBetweenMethods, line.first_token_range);
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                     stylist.line_ending().to_string(),
                     locator.line_start(self.last_non_comment_line_end),
@@ -750,8 +741,12 @@ impl BlankLinesChecker {
                 && line.preceding_blank_lines > 0
             {
                 // E304
-                let mut diagnostic =
-                    Diagnostic::new(BlankLineAfterDecorator, line.first_token_range);
+                let mut diagnostic = Diagnostic::new(
+                    BlankLineAfterDecorator {
+                        actual_blank_lines: line.preceding_blank_lines.count(),
+                    },
+                    line.first_token_range,
+                );
 
                 // Get all the lines between the last decorator line (included) and the current line (included).
                 // Then remove all blank lines.
@@ -827,12 +822,8 @@ impl BlankLinesChecker {
                 && !(matches!(self.follows, Follows::Def) && line.last_token != TokenKind::Colon)
             {
                 // E306
-                let mut diagnostic = Diagnostic::new(
-                    BlankLinesBeforeNestedDefinition {
-                        actual_blank_lines: 0,
-                    },
-                    line.first_token_range,
-                );
+                let mut diagnostic =
+                    Diagnostic::new(BlankLinesBeforeNestedDefinition, line.first_token_range);
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                     stylist.line_ending().to_string(),
