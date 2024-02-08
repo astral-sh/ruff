@@ -132,7 +132,7 @@ fn match_check(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
         ..
     } = if_stmt.test.as_compare_expr()?;
 
-    if &**ops != [CmpOp::In] {
+    if **ops != [CmpOp::In] {
         return None;
     }
 

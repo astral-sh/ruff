@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 15290f23b8dd4969eab2d79f2960a88c23db9e95985d6d022a75894a8e53f8dc
+// sha3: 02c60b5c591440061dda68775005d87a203b5448c205120bda1566a62fc2147c
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -40651,7 +40651,12 @@ fn __action515<
 ) -> crate::parser::ParenthesizedExpr
 {
     {
-        let (ops, comparators): (Vec<ast::CmpOp>, Vec<ast::Expr>) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
+        let mut ops = Vec::with_capacity(comparisons.len());
+        let mut comparators = Vec::with_capacity(comparisons.len());
+        for (op, comparator) in comparisons {
+            ops.push(op);
+            comparators.push(comparator.into());
+        }
         ast::ExprCompare {
             left: Box::new(left.into()),
             ops: ops.into_boxed_slice(),
@@ -40821,7 +40826,12 @@ fn __action526<
 ) -> crate::parser::ParenthesizedExpr
 {
     {
-        let (ops, comparators): (Vec<ast::CmpOp>, Vec<ast::Expr>) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
+        let mut ops = Vec::with_capacity(comparisons.len());
+        let mut comparators = Vec::with_capacity(comparisons.len());
+        for (op, comparator) in comparisons {
+            ops.push(op);
+            comparators.push(comparator.into());
+        }
         ast::ExprCompare {
             left: Box::new(left.into()),
             ops: ops.into_boxed_slice(),

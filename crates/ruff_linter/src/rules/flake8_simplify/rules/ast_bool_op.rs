@@ -480,7 +480,7 @@ fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
     else {
         return None;
     };
-    if ops.as_ref() != &[CmpOp::Eq] {
+    if **ops != [CmpOp::Eq] {
         return None;
     }
     let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {

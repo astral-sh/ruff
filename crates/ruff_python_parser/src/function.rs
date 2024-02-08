@@ -81,16 +81,16 @@ type FunctionArgument = (
 pub(crate) fn parse_arguments(
     function_arguments: Vec<FunctionArgument>,
 ) -> Result<ArgumentList, LexicalError> {
-    let mut args = vec![];
-    let mut keywords = vec![];
-
+    // First, run through the comments to determine the number of positional and keyword arguments.
     let mut keyword_names = FxHashSet::with_capacity_and_hasher(
         function_arguments.len(),
         BuildHasherDefault::default(),
     );
     let mut double_starred = false;
-    for (name, value) in function_arguments {
-        if let Some((start, end, name)) = name {
+    let mut num_args = 0;
+    let mut num_keywords = 0;
+    for (name, value) in &function_arguments {
+        if let Some((start, _end, name)) = name {
             // Check for duplicate keyword arguments in the call.
             if let Some(keyword_name) = &name {
                 if !keyword_names.insert(keyword_name.to_string()) {
@@ -98,21 +98,17 @@ pub(crate) fn parse_arguments(
                         LexicalErrorType::DuplicateKeywordArgumentError(
                             keyword_name.to_string().into_boxed_str(),
                         ),
-                        start,
+                        *start,
                     ));
                 }
             } else {
                 double_starred = true;
             }
 
-            keywords.push(ast::Keyword {
-                arg: name,
-                value,
-                range: TextRange::new(start, end),
-            });
+            num_keywords += 1;
         } else {
             // Positional arguments mustn't follow keyword arguments.
-            if !keywords.is_empty() && !is_starred(&value) {
+            if num_keywords > 0 && !is_starred(value) {
                 return Err(LexicalError::new(
                     LexicalErrorType::PositionalArgumentError,
                     value.start(),
@@ -126,9 +122,26 @@ pub(crate) fn parse_arguments(
                 ));
             }
 
+            num_args += 1;
+        }
+    }
+
+    // Second, push the arguments into vectors of exact capacity. This avoids a vector resize later
+    // on when these vectors are boxed into slices.
+    let mut args = Vec::with_capacity(num_args);
+    let mut keywords = Vec::with_capacity(num_keywords);
+    for (name, value) in function_arguments {
+        if let Some((start, end, name)) = name {
+            keywords.push(ast::Keyword {
+                arg: name,
+                value,
+                range: TextRange::new(start, end),
+            });
+        } else {
             args.push(value);
         }
     }
+
     Ok(ArgumentList { args, keywords })
 }
 

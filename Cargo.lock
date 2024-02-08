@@ -2277,7 +2277,6 @@ dependencies = [
  "rustc-hash",
  "serde",
  "smallvec",
- "static_assertions",
 ]
 
 [[package]]
