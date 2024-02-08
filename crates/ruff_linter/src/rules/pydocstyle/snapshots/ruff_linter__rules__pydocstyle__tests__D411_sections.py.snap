@@ -57,37 +57,4 @@ sections.py:131:5: D411 [*] Missing blank line before section ("Returns")
 135 136 |     -------
 136 137 |     A value of some sort.
 
-sections.py:216:5: D411 [*] Missing blank line before section ("Raises")
-    |
-214 |   @expect("D407: Missing dashed underline after section ('Raises')")
-215 |   def multiple_sections():  # noqa: D416
-216 |       """Toggle the gizmo.
-    |  _____^
-217 | | 
-218 | |     Short summary
-219 | |     -------------
-220 | | 
-221 | |     This is the function's description, which will also specify what it
-222 | |     returns.
-223 | | 
-224 | |     Returns
-225 | |     ------
-226 | |     Many many wonderful things.
-227 | |     Raises:
-228 | |     My attention.
-229 | | 
-230 | |     """
-    | |_______^ D411
-    |
-    = help: Add blank line before "Raises"
-
-ℹ Safe fix
-224 224 |     Returns
-225 225 |     ------
-226 226 |     Many many wonderful things.
-    227 |+
-227 228 |     Raises:
-228 229 |     My attention.
-229 230 | 
-
 

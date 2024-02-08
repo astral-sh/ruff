@@ -459,14 +459,29 @@ fn is_docstring_section(
     //         args: The arguments to the function.
     //     """
     // ```
+    // or if the style uses Numpy convention and argument name is the same as the section name and argument type is not specified:
+    // ```python
+    // def func(parameters: tuple[int]):
+    //     """Toggle the gizmo.
+    //
+    //     Parameters:
+    //     -----
+    //     parameters:
+    //         The arguments to the function.
+    //     """
+    // ```
     // However, if the header is an _exact_ match (like `Returns:`, as opposed to `returns:`), then
     // continue to treat it as a section header.
     if let Some(previous_section) = previous_section {
+        let verbatim = &line[TextRange::at(indent_size, section_name_size)];
         if previous_section.indent_size < indent_size {
-            let verbatim = &line[TextRange::at(indent_size, section_name_size)];
             if section_kind.as_str() != verbatim {
                 return false;
             }
+        }
+        // sub-section header should be lower case
+        if verbatim.chars().next().map(char::is_lowercase).is_some() {
+            return false;
         }
     }
 

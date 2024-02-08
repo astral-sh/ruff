@@ -72,94 +72,121 @@ sections.py:170:5: D413 [*] Missing blank line after last section ("Returns")
 175 176 | 
 176 177 | 
 
-sections.py:519:5: D413 [*] Missing blank line after last section ("Parameters")
+sections.py:512:9: D413 [*] Missing blank line after last section ("Parameters")
     |
-518 |   def replace_equals_with_dash():
-519 |       """Equal length equals should be replaced with dashes.
-    |  _____^
-520 | | 
-521 | |     Parameters
-522 | |     ==========
-523 | |     """
-    | |_______^ D413
-    |
-    = help: Add blank line after "Parameters"
-
-ℹ Safe fix
-520 520 | 
-521 521 |     Parameters
-522 522 |     ==========
-    523 |+    
-523 524 |     """
-524 525 | 
-525 526 | 
-
-sections.py:527:5: D413 [*] Missing blank line after last section ("Parameters")
-    |
-526 |   def replace_equals_with_dash2():
-527 |       """Here, the length of equals is not the same.
-    |  _____^
-528 | | 
-529 | |     Parameters
-530 | |     ===========
-531 | |     """
-    | |_______^ D413
+510 |       @staticmethod
+511 |       def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213
+512 |           """Test that lower case sub-section header is valid even if it has the same name as section kind.
+    |  _________^
+513 | | 
+514 | |         Parameters:
+515 | |         ----------
+516 | |         parameters:
+517 | |             A list of string parameters
+518 | |         value:
+519 | |             Some value
+520 | |         """
+    | |___________^ D413
     |
     = help: Add blank line after "Parameters"
 
 ℹ Safe fix
-528 528 | 
-529 529 |     Parameters
-530 530 |     ===========
-    531 |+    
-531 532 |     """
-532 533 | 
-533 534 | 
+517 517 |             A list of string parameters
+518 518 |         value:
+519 519 |             Some value
+    520 |+        
+520 521 |         """
+521 522 | 
+522 523 | 
 
-sections.py:548:5: D413 [*] Missing blank line after last section ("Args")
+sections.py:550:5: D413 [*] Missing blank line after last section ("Parameters")
     |
-547 |   def lowercase_sub_section_header():
-548 |       """Below, `returns:` should _not_ be considered a section header.
+549 |   def replace_equals_with_dash():
+550 |       """Equal length equals should be replaced with dashes.
     |  _____^
-549 | | 
-550 | |     Args:
-551 | |         Here's a note.
-552 | | 
-553 | |         returns:
+551 | | 
+552 | |     Parameters
+553 | |     ==========
 554 | |     """
     | |_______^ D413
     |
-    = help: Add blank line after "Args"
+    = help: Add blank line after "Parameters"
 
 ℹ Safe fix
-551 551 |         Here's a note.
-552 552 | 
-553 553 |         returns:
+551 551 | 
+552 552 |     Parameters
+553 553 |     ==========
     554 |+    
 554 555 |     """
 555 556 | 
 556 557 | 
 
-sections.py:558:5: D413 [*] Missing blank line after last section ("Returns")
+sections.py:558:5: D413 [*] Missing blank line after last section ("Parameters")
     |
-557 |   def titlecase_sub_section_header():
-558 |       """Below, `Returns:` should be considered a section header.
+557 |   def replace_equals_with_dash2():
+558 |       """Here, the length of equals is not the same.
     |  _____^
 559 | | 
-560 | |     Args:
-561 | |         Here's a note.
-562 | | 
-563 | |         Returns:
-564 | |     """
+560 | |     Parameters
+561 | |     ===========
+562 | |     """
     | |_______^ D413
     |
-    = help: Add blank line after "Returns"
+    = help: Add blank line after "Parameters"
 
 ℹ Safe fix
-561 561 |         Here's a note.
-562 562 | 
-563 563 |         Returns:
-    564 |+    
-564 565 |     """
+559 559 | 
+560 560 |     Parameters
+561 561 |     ===========
+    562 |+    
+562 563 |     """
+563 564 | 
+564 565 | 
+
+sections.py:579:5: D413 [*] Missing blank line after last section ("Args")
+    |
+578 |   def lowercase_sub_section_header():
+579 |       """Below, `returns:` should _not_ be considered a section header.
+    |  _____^
+580 | | 
+581 | |     Args:
+582 | |         Here's a note.
+583 | | 
+584 | |         returns:
+585 | |     """
+    | |_______^ D413
+    |
+    = help: Add blank line after "Args"
+
+ℹ Safe fix
+582 582 |         Here's a note.
+583 583 | 
+584 584 |         returns:
+    585 |+    
+585 586 |     """
+586 587 | 
+587 588 | 
+
+sections.py:589:5: D413 [*] Missing blank line after last section ("Args")
+    |
+588 |   def titlecase_sub_section_header():
+589 |       """Below, `Returns:` should be considered a section header.
+    |  _____^
+590 | | 
+591 | |     Args:
+592 | |         Here's a note.
+593 | | 
+594 | |         Returns:
+595 | |     """
+    | |_______^ D413
+    |
+    = help: Add blank line after "Args"
+
+ℹ Safe fix
+592 592 |         Here's a note.
+593 593 | 
+594 594 |         Returns:
+    595 |+    
+595 596 |     """
 
 

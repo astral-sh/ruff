@@ -78,37 +78,4 @@ sections.py:170:5: D414 Section has no content ("Returns")
     | |_______^ D414
     |
 
-sections.py:261:5: D414 Section has no content ("Returns")
-    |
-259 |   @expect("D414: Section has no content ('Returns')")
-260 |   def valid_google_style_section():  # noqa: D406, D407
-261 |       """Toggle the gizmo.
-    |  _____^
-262 | | 
-263 | |     Args:
-264 | |         note: A random string.
-265 | | 
-266 | |     Returns:
-267 | | 
-268 | |     Raises:
-269 | |         RandomError: A random error that occurs randomly.
-270 | | 
-271 | |     """
-    | |_______^ D414
-    |
-
-sections.py:558:5: D414 Section has no content ("Returns")
-    |
-557 |   def titlecase_sub_section_header():
-558 |       """Below, `Returns:` should be considered a section header.
-    |  _____^
-559 | | 
-560 | |     Args:
-561 | |         Here's a note.
-562 | | 
-563 | |         Returns:
-564 | |     """
-    | |_______^ D414
-    |
-
 
