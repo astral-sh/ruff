@@ -321,10 +321,11 @@ mod schema {
                             true
                         }
                     })
-                    .filter(|rule| {
+                    .filter(|_rule| {
                         // Filter out all test-only rules
                         #[cfg(feature = "test-rules")]
-                        if rule.starts_with("RUF9") {
+                        #[allow(clippy::used_underscore_binding)]
+                        if _rule.starts_with("RUF9") {
                             return false;
                         }
 
