@@ -321,6 +321,15 @@ mod schema {
                             true
                         }
                     })
+                    .filter(|rule| {
+                        // Filter out all test-only rules
+                        #[cfg(feature = "test-rules")]
+                        if rule.starts_with("RUF9") {
+                            return false;
+                        }
+
+                        true
+                    })
                     .sorted()
                     .map(Value::String)
                     .collect(),
