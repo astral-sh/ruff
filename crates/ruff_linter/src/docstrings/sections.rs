@@ -130,6 +130,34 @@ impl SectionKind {
             Self::Yields => "Yields",
         }
     }
+
+    /// Returns `true` if a section can contain subsections, as in:
+    /// ```python
+    /// Yields
+    /// ------
+    /// int
+    ///     Description of the anonymous integer return value.
+    /// ```
+    ///
+    /// For NumPy, see: <https://numpydoc.readthedocs.io/en/latest/format.html>
+    ///
+    /// For Google, see: <https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings>
+    pub(crate) fn has_subsections(self) -> bool {
+        matches!(
+            self,
+            Self::Args
+                | Self::Arguments
+                | Self::OtherArgs
+                | Self::OtherParameters
+                | Self::OtherParams
+                | Self::Parameters
+                | Self::Raises
+                | Self::Returns
+                | Self::SeeAlso
+                | Self::Warns
+                | Self::Yields
+        )
+    }
 }
 
 pub(crate) struct SectionContexts<'a> {
@@ -472,11 +500,41 @@ fn is_docstring_section(
     // ```
     // However, if the header is an _exact_ match (like `Returns:`, as opposed to `returns:`), then
     // continue to treat it as a section header.
-    if let Some(previous_section) = previous_section {
-        let verbatim = &line[TextRange::at(indent_size, section_name_size)];
-        if previous_section.kind == section_kind || previous_section.indent_size < indent_size {
-            if section_kind.as_str() != verbatim {
-                return false;
+    if section_kind.has_subsections() {
+        if let Some(previous_section) = previous_section {
+            let verbatim = &line[TextRange::at(indent_size, section_name_size)];
+
+            // If the section is more deeply indented, assume it's a subsection, as in:
+            // ```python
+            // def func(args: tuple[int]):
+            //     """Toggle the gizmo.
+            //
+            //     Args:
+            //         args: The arguments to the function.
+            //     """
+            // ```
+            if previous_section.indent_size < indent_size {
+                if section_kind.as_str() != verbatim {
+                    return false;
+                }
+            }
+
+            // If the section isn't underlined, and isn't title-cased, assume it's a subsection,
+            // as in:
+            // ```python
+            // def func(parameters: tuple[int]):
+            //     """Toggle the gizmo.
+            //
+            //     Parameters:
+            //     -----
+            //     parameters:
+            //         The arguments to the function.
+            //     """
+            // ```
+            if !next_line_is_underline && verbatim.chars().next().is_some_and(char::is_lowercase) {
+                if section_kind.as_str() != verbatim {
+                    return false;
+                }
             }
         }
     }

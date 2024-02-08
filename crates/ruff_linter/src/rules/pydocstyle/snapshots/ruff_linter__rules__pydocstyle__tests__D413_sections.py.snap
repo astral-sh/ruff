@@ -187,5 +187,7 @@ sections.py:588:5: D413 [*] Missing blank line after last section ("Parameters")
 595 595 |         Some value
     596 |+    
 596 597 |     """
+597 598 | 
+598 599 | 
 
 
