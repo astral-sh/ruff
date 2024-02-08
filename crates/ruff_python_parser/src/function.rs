@@ -39,10 +39,10 @@ pub(crate) fn validate_arguments(arguments: &ast::Parameters) -> Result<(), Lexi
         let range = arg.range;
         let arg_name = arg.name.as_str();
         if !all_arg_names.insert(arg_name) {
-            return Err(LexicalError {
-                error: LexicalErrorType::DuplicateArgumentError(arg_name.to_string()),
-                location: range.start(),
-            });
+            return Err(LexicalError::new(
+                LexicalErrorType::DuplicateArgumentError(arg_name.to_string().into_boxed_str()),
+                range.start(),
+            ));
         }
     }
 
@@ -64,10 +64,10 @@ pub(crate) fn validate_pos_params(
         .skip_while(|arg| arg.default.is_some()) // and then args with default
         .next(); // there must not be any more args without default
     if let Some(invalid) = first_invalid {
-        return Err(LexicalError {
-            error: LexicalErrorType::DefaultArgumentError,
-            location: invalid.parameter.start(),
-        });
+        return Err(LexicalError::new(
+            LexicalErrorType::DefaultArgumentError,
+            invalid.parameter.start(),
+        ));
     }
     Ok(())
 }
@@ -94,12 +94,12 @@ pub(crate) fn parse_arguments(
             // Check for duplicate keyword arguments in the call.
             if let Some(keyword_name) = &name {
                 if !keyword_names.insert(keyword_name.to_string()) {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::DuplicateKeywordArgumentError(
-                            keyword_name.to_string(),
+                    return Err(LexicalError::new(
+                        LexicalErrorType::DuplicateKeywordArgumentError(
+                            keyword_name.to_string().into_boxed_str(),
                         ),
-                        location: start,
-                    });
+                        start,
+                    ));
                 }
             } else {
                 double_starred = true;
@@ -113,17 +113,17 @@ pub(crate) fn parse_arguments(
         } else {
             // Positional arguments mustn't follow keyword arguments.
             if !keywords.is_empty() && !is_starred(&value) {
-                return Err(LexicalError {
-                    error: LexicalErrorType::PositionalArgumentError,
-                    location: value.start(),
-                });
+                return Err(LexicalError::new(
+                    LexicalErrorType::PositionalArgumentError,
+                    value.start(),
+                ));
                 // Allow starred arguments after keyword arguments but
                 // not after double-starred arguments.
             } else if double_starred {
-                return Err(LexicalError {
-                    error: LexicalErrorType::UnpackedArgumentError,
-                    location: value.start(),
-                });
+                return Err(LexicalError::new(
+                    LexicalErrorType::UnpackedArgumentError,
+                    value.start(),
+                ));
             }
 
             args.push(value);
@@ -202,22 +202,22 @@ mod tests {
 
     function_and_lambda_error! {
         // Check definitions
-        test_duplicates_f1: "def f(a, a): pass", LexicalErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_f2: "def f(a, *, a): pass", LexicalErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_f3: "def f(a, a=20): pass", LexicalErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_f4: "def f(a, *a): pass", LexicalErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_f5: "def f(a, *, **a): pass", LexicalErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_l1: "lambda a, a: 1", LexicalErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_l2: "lambda a, *, a: 1", LexicalErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_l3: "lambda a, a=20: 1", LexicalErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_l4: "lambda a, *a: 1", LexicalErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_l5: "lambda a, *, **a: 1", LexicalErrorType::DuplicateArgumentError("a".to_string()),
+        test_duplicates_f1: "def f(a, a): pass", LexicalErrorType::DuplicateArgumentError("a".to_string().into_boxed_str()),
+        test_duplicates_f2: "def f(a, *, a): pass", LexicalErrorType::DuplicateArgumentError("a".to_string().into_boxed_str()),
+        test_duplicates_f3: "def f(a, a=20): pass", LexicalErrorType::DuplicateArgumentError("a".to_string().into_boxed_str()),
+        test_duplicates_f4: "def f(a, *a): pass", LexicalErrorType::DuplicateArgumentError("a".to_string().into_boxed_str()),
+        test_duplicates_f5: "def f(a, *, **a): pass", LexicalErrorType::DuplicateArgumentError("a".to_string().into_boxed_str()),
+        test_duplicates_l1: "lambda a, a: 1", LexicalErrorType::DuplicateArgumentError("a".to_string().into_boxed_str()),
+        test_duplicates_l2: "lambda a, *, a: 1", LexicalErrorType::DuplicateArgumentError("a".to_string().into_boxed_str()),
+        test_duplicates_l3: "lambda a, a=20: 1", LexicalErrorType::DuplicateArgumentError("a".to_string().into_boxed_str()),
+        test_duplicates_l4: "lambda a, *a: 1", LexicalErrorType::DuplicateArgumentError("a".to_string().into_boxed_str()),
+        test_duplicates_l5: "lambda a, *, **a: 1", LexicalErrorType::DuplicateArgumentError("a".to_string().into_boxed_str()),
         test_default_arg_error_f: "def f(a, b=20, c): pass", LexicalErrorType::DefaultArgumentError,
         test_default_arg_error_l: "lambda a, b=20, c: 1", LexicalErrorType::DefaultArgumentError,
 
         // Check some calls.
         test_positional_arg_error_f: "f(b=20, c)", LexicalErrorType::PositionalArgumentError,
         test_unpacked_arg_error_f: "f(**b, *c)", LexicalErrorType::UnpackedArgumentError,
-        test_duplicate_kw_f1: "f(a=20, a=30)", LexicalErrorType::DuplicateKeywordArgumentError("a".to_string()),
+        test_duplicate_kw_f1: "f(a=20, a=30)", LexicalErrorType::DuplicateKeywordArgumentError("a".to_string().into_boxed_str()),
     }
 }

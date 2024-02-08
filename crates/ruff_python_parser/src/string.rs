@@ -151,10 +151,10 @@ impl<'a> StringParser<'a> {
 
     fn parse_escaped_char(&mut self, string: &mut String) -> Result<(), LexicalError> {
         let Some(first_char) = self.next_char() else {
-            return Err(LexicalError {
-                error: LexicalErrorType::StringError,
-                location: self.get_pos(),
-            });
+            return Err(LexicalError::new(
+                LexicalErrorType::StringError,
+                self.get_pos(),
+            ));
         };
 
         let new_char = match first_char {
@@ -184,12 +184,14 @@ impl<'a> StringParser<'a> {
             }
             _ => {
                 if self.kind.is_any_bytes() && !first_char.is_ascii() {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::OtherError(
-                            "bytes can only contain ASCII literal characters".to_owned(),
+                    return Err(LexicalError::new(
+                        LexicalErrorType::OtherError(
+                            "bytes can only contain ASCII literal characters"
+                                .to_string()
+                                .into_boxed_str(),
                         ),
-                        location: self.get_pos(),
-                    });
+                        self.get_pos(),
+                    ));
                 }
 
                 string.push('\\');
@@ -257,7 +259,9 @@ impl<'a> StringParser<'a> {
                     if !ch.is_ascii() {
                         return Err(LexicalError::new(
                             LexicalErrorType::OtherError(
-                                "bytes can only contain ASCII literal characters".to_string(),
+                                "bytes can only contain ASCII literal characters"
+                                    .to_string()
+                                    .into_boxed_str(),
                             ),
                             self.get_pos(),
                         ));
@@ -291,7 +295,7 @@ impl<'a> StringParser<'a> {
             }
         }
         Ok(StringType::Str(ast::StringLiteral {
-            value,
+            value: value.into_boxed_str(),
             unicode: self.kind.is_unicode(),
             range: self.range,
         }))
@@ -354,12 +358,14 @@ pub(crate) fn concatenated_strings(
     let has_bytes = byte_literal_count > 0;
 
     if has_bytes && byte_literal_count < strings.len() {
-        return Err(LexicalError {
-            error: LexicalErrorType::OtherError(
-                "cannot mix bytes and nonbytes literals".to_owned(),
+        return Err(LexicalError::new(
+            LexicalErrorType::OtherError(
+                "cannot mix bytes and nonbytes literals"
+                    .to_string()
+                    .into_boxed_str(),
             ),
-            location: range.start(),
-        });
+            range.start(),
+        ));
     }
 
     if has_bytes {
@@ -418,15 +424,12 @@ struct FStringError {
 
 impl From<FStringError> for LexicalError {
     fn from(err: FStringError) -> Self {
-        LexicalError {
-            error: LexicalErrorType::FStringError(err.error),
-            location: err.location,
-        }
+        LexicalError::new(LexicalErrorType::FStringError(err.error), err.location)
     }
 }
 
 /// Represents the different types of errors that can occur during parsing of an f-string.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Copy, Debug, Clone, PartialEq)]
 pub enum FStringErrorType {
     /// Expected a right brace after an opened left brace.
     UnclosedLbrace,
@@ -466,10 +469,7 @@ impl std::fmt::Display for FStringErrorType {
 impl From<FStringError> for crate::parser::LalrpopError<TextSize, Tok, LexicalError> {
     fn from(err: FStringError) -> Self {
         lalrpop_util::ParseError::User {
-            error: LexicalError {
-                error: LexicalErrorType::FStringError(err.error),
-                location: err.location,
-            },
+            error: LexicalError::new(LexicalErrorType::FStringError(err.error), err.location),
         }
     }
 }

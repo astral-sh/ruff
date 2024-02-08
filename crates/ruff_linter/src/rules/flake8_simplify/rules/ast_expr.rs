@@ -217,7 +217,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         slice.range(),
     );
     let node = ast::StringLiteral {
-        value: capital_env_var,
+        value: capital_env_var.into_boxed_str(),
         unicode: env_var.is_unicode(),
         ..ast::StringLiteral::default()
     };
