@@ -21,6 +21,8 @@ use crate::{prelude::*, DocstringCodeLineWidth, FormatModuleError};
 
 use super::{NormalizedString, QuoteChar};
 
+const TAB_INDENT_WIDTH: usize = 8;
+
 /// Format a docstring by trimming whitespace and adjusting the indentation.
 ///
 /// Summary of changes we make:
@@ -82,9 +84,7 @@ use super::{NormalizedString, QuoteChar};
 /// ```
 ///
 /// Tabs are counted by padding them to the next multiple of 8 according to
-/// [`str.expandtabs`](https://docs.python.org/3/library/stdtypes.html#str.expandtabs). When
-/// we see indentation that contains a tab or any other none ascii-space whitespace we rewrite the
-/// string.
+/// [`str.expandtabs`](https://docs.python.org/3/library/stdtypes.html#str.expandtabs).
 ///
 /// Additionally, if any line in the docstring has less indentation than the docstring
 /// (effectively a negative indentation wrt. to the current level), we pad all lines to the
@@ -106,6 +106,10 @@ use super::{NormalizedString, QuoteChar};
 ///         line c
 ///    """
 /// ```
+/// The indentation is rewritten to all-spaces when using [`IndentStyle::Space`].
+/// The formatter preserves tab-indentations when using [`IndentStyle::Tab`], but doesn't convert
+/// `indent-width * spaces` to tabs because doing so could break ASCII art and other docstrings
+/// that use spaces for alignment.
 pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> FormatResult<()> {
     let docstring = &normalized.text;
 
@@ -178,19 +182,19 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     // align it with the docstring statement. Conversely, if all lines are over-indented, we strip
     // the extra indentation. We call this stripped indentation since it's relative to the block
     // indent printer-made indentation.
-    let stripped_indentation_length = lines
+    let stripped_indentation = lines
         .clone()
         // We don't want to count whitespace-only lines as miss-indented
         .filter(|line| !line.trim().is_empty())
-        .map(|line| Indent::from_str(line).len())
-        .min()
+        .map(Indent::from_str)
+        .min_by_key(|indent| indent.len())
         .unwrap_or_default();
 
     DocstringLinePrinter {
         f,
         action_queue: VecDeque::new(),
         offset,
-        stripped_indentation_length,
+        stripped_indentation,
         already_normalized,
         quote_char: normalized.quotes.quote_char,
         code_example: CodeExample::default(),
@@ -242,9 +246,9 @@ struct DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     /// printed.
     offset: TextSize,
 
-    /// Indentation alignment (in columns) based on the least indented line in the
+    /// Indentation alignment based on the least indented line in the
     /// docstring.
-    stripped_indentation_length: usize,
+    stripped_indentation: Indent,
 
     /// Whether the docstring is overall already considered normalized. When it
     /// is, the formatter can take a fast path.
@@ -389,12 +393,62 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             };
         }
 
-        let tab_or_non_ascii_space = trim_end
-            .chars()
-            .take_while(|c| c.is_whitespace())
-            .any(|c| c != ' ');
+        let indent_offset = match self.f.options().indent_style() {
+            // Normalize all indent to spaces.
+            IndentStyle::Space => {
+                let tab_or_non_ascii_space = trim_end
+                    .chars()
+                    .take_while(|c| c.is_whitespace())
+                    .any(|c| c != ' ');
 
-        if tab_or_non_ascii_space {
+                if tab_or_non_ascii_space {
+                    None
+                } else {
+                    // It's guaranteed that the `indent` is all spaces because `tab_or_non_ascii_space` is
+                    // `false` (indent contains neither tabs nor non-space whitespace).
+                    let stripped_indentation_len = self
+                        .stripped_indentation
+                        .text_len()
+                        .expect("Indentation to be all whitespace");
+
+                    // Take the string with the trailing whitespace removed, then also
+                    // skip the leading whitespace.
+                    Some(stripped_indentation_len)
+                }
+            }
+            // Preserve tabs that are used for indentation, but only if it isn't a mix of tabs and spaces
+            // and the `stripped_indentation` is a prefix of the line's indent.
+            IndentStyle::Tab => {
+                let line_indent = Indent::from_str(trim_end);
+
+                let non_ascii_whitespace = trim_end
+                    .chars()
+                    .take_while(|c| c.is_whitespace())
+                    .any(|c| !matches!(c, ' ' | '\t'));
+
+                if !non_ascii_whitespace
+                    && line_indent.trim_start(self.stripped_indentation).is_some()
+                {
+                    // Trim the indent but otherwise preserve it as is.
+                    let stripped_indent_len = self.stripped_indentation.text_len().unwrap();
+                    Some(stripped_indent_len)
+                } else {
+                    None
+                }
+            }
+        };
+
+        if let Some(indent_offset) = indent_offset {
+            // Take the string with the trailing whitespace removed, then also
+            // skip the leading whitespace.
+            if self.already_normalized {
+                let trimmed_line_range =
+                    TextRange::at(line.offset, trim_end.text_len()).add_start(indent_offset);
+                source_text_slice(trimmed_line_range).fmt(self.f)?;
+            } else {
+                text(&trim_end[indent_offset.to_usize()..]).fmt(self.f)?;
+            }
+        } else {
             // We strip the indentation that is shared with the docstring
             // statement, unless a line was indented less than the docstring
             // statement, in which case we strip only this much indentation to
@@ -402,24 +456,10 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             // overindented, in which case we strip the additional whitespace
             // (see example in [`format_docstring`] doc comment). We then
             // prepend the in-docstring indentation to the string.
-            let indent_len = Indent::from_str(trim_end).len() - self.stripped_indentation_length;
+            let indent_len = Indent::from_str(trim_end).len() - self.stripped_indentation.len();
             let in_docstring_indent = " ".repeat(indent_len) + trim_end.trim_start();
             text(&in_docstring_indent).fmt(self.f)?;
-        } else {
-            // It's guaranteed that the `indent` is all spaces because `tab_or_non_ascii_space` is
-            // `false` (indent contains neither tabs nor non-space whitespace).
-
-            // Take the string with the trailing whitespace removed, then also
-            // skip the leading whitespace.
-            let trimmed_line_range = TextRange::at(line.offset, trim_end.text_len())
-                .add_start(TextSize::try_from(self.stripped_indentation_length).unwrap());
-            if self.already_normalized {
-                source_text_slice(trimmed_line_range).fmt(self.f)?;
-            } else {
-                // All indents are ascii spaces, so the slicing is correct.
-                text(&trim_end[self.stripped_indentation_length..]).fmt(self.f)?;
-            }
-        }
+        };
 
         // We handled the case that the closing quotes are on their own line
         // above (the last line is empty except for whitespace). If they are on
@@ -1035,7 +1075,7 @@ impl<'src> CodeExampleRst<'src> {
             line.code = if line.original.line.trim().is_empty() {
                 ""
             } else {
-                min_indent.trim(line.original.line)
+                min_indent.trim_start_str(line.original.line)
             };
         }
         &self.lines
@@ -1373,7 +1413,7 @@ impl<'src> CodeExampleMarkdown<'src> {
         // Unlike reStructuredText blocks, for Markdown fenced code blocks, the
         // indentation that we want to strip from each line is known when the
         // block is opened. So we can strip it as we collect lines.
-        let code = self.opening_fence_indent.trim(original.line);
+        let code = self.opening_fence_indent.trim_start_str(original.line);
         self.lines.push(CodeExampleLine { original, code });
     }
 
@@ -1549,8 +1589,12 @@ enum Indent {
     /// Tabs only indentation.
     Tabs { count: usize },
 
-    /// Smart tab indentation that uses tabs for indents, and spaces for alignment.
-    Align { tabs: usize, spaces: usize },
+    /// Indentation that uses tabs followed by spaces.
+    /// Also known as smart tabs where tabs are used for indents, and spaces for alignment.
+    TabSpaces { tabs: usize, spaces: usize },
+
+    /// Indentation that uses spaces followed by tabs.
+    SpacesTabs { spaces: usize, tabs: usize },
 
     /// Mixed indentation of tabs and spaces.
     Mixed(usize),
@@ -1568,35 +1612,40 @@ impl Indent {
             return Indent::Spaces(spaces);
         }
 
-        // Test if there are any spaces following the tabs
-        let spaces = iter.peeking_take_while(|c| *c == ' ').count();
+        let align_spaces = iter.peeking_take_while(|c| *c == ' ').count();
 
         if spaces == 0 {
-            return Indent::Tabs { count: tabs };
-        }
-
-        // At this point it's either a smart tab (tabs followed by spaces) or a wild mix of tabs and spaces.
-        if iter.peek().copied() == Some('\t') {
-            // Sequence of tabs, spaces, tabs...
-            let indent_width = 8;
-            let mut indentation = tabs * indent_width + spaces;
-
-            for char in iter {
-                if char == '\t' {
-                    // Pad to the next multiple of tab_width
-                    indentation += indent_width - (indentation.rem_euclid(indent_width));
-                } else if char.is_whitespace() {
-                    indentation += char.len_utf8();
-                } else {
-                    break;
-                }
+            if align_spaces == 0 {
+                return Indent::Tabs { count: tabs };
             }
 
-            // Mixed tabs and spaces
-            Indent::Mixed(indentation)
-        } else {
-            Indent::Align { tabs, spaces }
+            // At this point it's either a smart tab (tabs followed by spaces) or a wild mix of tabs and spaces.
+            if iter.peek().copied() != Some('\t') {
+                return Indent::TabSpaces {
+                    tabs,
+                    spaces: align_spaces,
+                };
+            }
+        } else if align_spaces == 0 {
+            return Indent::SpacesTabs { spaces, tabs };
         }
+
+        // Sequence of spaces.. tabs, spaces, tabs...
+        let mut indentation = spaces + tabs * TAB_INDENT_WIDTH + align_spaces;
+
+        for char in iter {
+            if char == '\t' {
+                // Pad to the next multiple of tab_width
+                indentation += TAB_INDENT_WIDTH - (indentation.rem_euclid(TAB_INDENT_WIDTH));
+            } else if char.is_whitespace() {
+                indentation += char.len_utf8();
+            } else {
+                break;
+            }
+        }
+
+        // Mixed tabs and spaces
+        Indent::Mixed(indentation)
     }
 
     /// Returns the indentation's visual width in columns/spaces.
@@ -1606,12 +1655,105 @@ impl Indent {
     /// [`str.expandtabs`](https://docs.python.org/3/library/stdtypes.html#str.expandtabs),
     /// which black [calls with the default tab width of 8](https://github.com/psf/black/blob/c36e468794f9256d5e922c399240d49782ba04f1/src/black/strings.py#L61).
     const fn len(self) -> usize {
-        let indent_width = 8usize;
         match self {
             Indent::Spaces(count) => count,
-            Indent::Tabs { count } => count * indent_width,
-            Indent::Align { tabs, spaces } => tabs * indent_width + spaces,
+            Indent::Tabs { count } => count * TAB_INDENT_WIDTH,
+            Indent::TabSpaces { tabs, spaces } => tabs * TAB_INDENT_WIDTH + spaces,
+            Indent::SpacesTabs { spaces, tabs } => {
+                let mut indent = spaces;
+                indent += TAB_INDENT_WIDTH - indent.rem_euclid(TAB_INDENT_WIDTH);
+                indent + (tabs - 1) * TAB_INDENT_WIDTH
+            }
             Indent::Mixed(width) => width,
+        }
+    }
+
+    fn text_len(self) -> Option<TextSize> {
+        let len = match self {
+            Indent::Spaces(count) => count,
+            Indent::Tabs { count } => count,
+            Indent::TabSpaces { tabs, spaces } => tabs + spaces,
+            Indent::SpacesTabs { spaces, tabs } => spaces + tabs,
+            Indent::Mixed(_) => return None,
+        };
+        Some(TextSize::try_from(len).unwrap())
+    }
+
+    /// Trims the indent of `rhs` by `self`.
+    ///
+    /// Returns `None` if `self` is not a prefix of `rhs` or either `self` or `rhs` use mixed indentation.
+    fn trim_start(self, rhs: Indent) -> Option<Indent> {
+        match (self, rhs) {
+            (left, Indent::Spaces(0)) => Some(left),
+            (Indent::Spaces(left), Indent::Spaces(right)) => {
+                left.checked_sub(right).map(Indent::Spaces)
+            }
+            (Indent::Tabs { count: left }, Indent::Tabs { count: right }) => left
+                .checked_sub(right)
+                .map(|tabs| Indent::Tabs { count: tabs }),
+            (Indent::TabSpaces { tabs, spaces }, Indent::Tabs { count: right_tabs }) => {
+                tabs.checked_sub(right_tabs).map(|tabs| {
+                    if tabs == 0 {
+                        Indent::Spaces(spaces)
+                    } else {
+                        Indent::TabSpaces { tabs, spaces }
+                    }
+                })
+            }
+            (
+                Indent::TabSpaces {
+                    tabs: left_tabs,
+                    spaces: left_spaces,
+                },
+                Indent::TabSpaces {
+                    tabs: right_tabs,
+                    spaces: right_spaces,
+                },
+            ) => left_tabs.checked_sub(right_tabs).and_then(|tabs| {
+                let spaces = left_spaces.checked_sub(right_spaces)?;
+
+                Some(if tabs == 0 {
+                    Indent::Spaces(spaces)
+                } else {
+                    Indent::TabSpaces { tabs, spaces }
+                })
+            }),
+            (
+                Indent::SpacesTabs {
+                    spaces: left_spaces,
+                    tabs,
+                },
+                Indent::Spaces(right_spaces),
+            ) => left_spaces.checked_sub(right_spaces).map(|spaces| {
+                if spaces == 0 {
+                    Indent::Tabs { count: tabs }
+                } else {
+                    Indent::SpacesTabs { tabs, spaces }
+                }
+            }),
+            (
+                Indent::SpacesTabs {
+                    spaces: left_spaces,
+                    tabs: left_tabs,
+                },
+                Indent::SpacesTabs {
+                    spaces: right_spaces,
+                    tabs: right_tabs,
+                },
+            ) => left_spaces.checked_sub(right_spaces).and_then(|spaces| {
+                let tabs = left_tabs.checked_sub(right_tabs)?;
+
+                Some(if spaces == 0 {
+                    if tabs == 0 {
+                        Indent::Spaces(0)
+                    } else {
+                        Indent::Tabs { count: tabs }
+                    }
+                } else {
+                    Indent::SpacesTabs { spaces, tabs }
+                })
+            }),
+            _ => None,
         }
     }
 
@@ -1622,9 +1764,7 @@ impl Indent {
     /// `indentation_length`. This is useful when one needs to trim some minimum
     /// level of indentation from a code snippet collected from a docstring before
     /// attempting to reformat it.
-    fn trim(self, line: &str) -> &str {
-        let indent_width = 8usize;
-
+    fn trim_start_str(self, line: &str) -> &str {
         let mut seen_indent_len = 0;
         let mut trimmed = line;
         let indent_len = self.len();
@@ -1635,7 +1775,8 @@ impl Indent {
             }
             if char == '\t' {
                 // Pad to the next multiple of tab_width
-                seen_indent_len += indent_width - (seen_indent_len.rem_euclid(indent_width));
+                seen_indent_len +=
+                    TAB_INDENT_WIDTH - (seen_indent_len.rem_euclid(TAB_INDENT_WIDTH));
                 trimmed = &trimmed[1..];
             } else if char.is_whitespace() {
                 seen_indent_len += char.len_utf8();
