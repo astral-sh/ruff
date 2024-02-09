@@ -12,6 +12,11 @@ license = { workspace = true }
 build = "build.rs"
 
 [lib]
+bench = false
+
+[[bench]]
+name = "string"
+harness = false
 
 [dependencies]
 ruff_python_ast = { path = "../ruff_python_ast" }
@@ -29,6 +34,14 @@ static_assertions = { workspace = true }
 unicode-ident = { workspace = true }
 unicode_names2 = { workspace = true }
 once_cell = "1.19.0"
+criterion = { workspace = true, default-features = false }
+codspeed-criterion-compat = { workspace = true, default-features = false, optional = true}
+
+[target.'cfg(target_os = "windows")'.dev-dependencies]
+mimalloc = { workspace = true }
+
+[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64")))'.dev-dependencies]
+tikv-jemallocator = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
