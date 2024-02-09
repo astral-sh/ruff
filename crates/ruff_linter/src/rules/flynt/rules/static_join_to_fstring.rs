@@ -116,7 +116,7 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
     if !keywords.is_empty() {
         return;
     }
-    let [arg] = args.as_slice() else {
+    let [arg] = &**args else {
         return;
     };
 

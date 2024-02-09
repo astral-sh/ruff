@@ -64,7 +64,7 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr, body: &[
         return;
     };
 
-    let [arg] = args.as_slice() else {
+    let [arg] = &**args else {
         return;
     };
 

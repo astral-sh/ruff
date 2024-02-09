@@ -45,7 +45,7 @@ impl AlwaysFixableViolation for LiteralMembership {
 
 /// PLR6201
 pub(crate) fn literal_membership(checker: &mut Checker, compare: &ast::ExprCompare) {
-    let [op] = compare.ops.as_slice() else {
+    let [op] = &*compare.ops else {
         return;
     };
 
@@ -53,7 +53,7 @@ pub(crate) fn literal_membership(checker: &mut Checker, compare: &ast::ExprCompa
         return;
     }
 
-    let [right] = compare.comparators.as_slice() else {
+    let [right] = &*compare.comparators else {
         return;
     };
 

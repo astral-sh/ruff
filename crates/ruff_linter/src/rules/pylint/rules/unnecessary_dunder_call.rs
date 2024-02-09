@@ -111,7 +111,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
     let mut title: Option<String> = None;
 
     if let Some(dunder) = DunderReplacement::from_method(attr) {
-        match (call.arguments.args.as_slice(), dunder) {
+        match (&*call.arguments.args, dunder) {
             ([], DunderReplacement::Builtin(replacement, message)) => {
                 if !checker.semantic().is_builtin(replacement) {
                     return;

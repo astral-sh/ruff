@@ -1406,8 +1406,18 @@ NotTest<Goal>: crate::parser::ParenthesizedExpr = {
 
 Comparison<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> <left:Expression<"all">> <comparisons:(CompOp Expression<"all">)+> <end_location:@R> => {
-        let (ops, comparators) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
-        ast::ExprCompare { left: Box::new(left.into()), ops, comparators, range: (location..end_location).into() }.into()
+        let mut ops = Vec::with_capacity(comparisons.len());
+        let mut comparators = Vec::with_capacity(comparisons.len());
+        for (op, comparator) in comparisons {
+            ops.push(op);
+            comparators.push(comparator.into());
+        }
+        ast::ExprCompare {
+            left: Box::new(left.into()),
+            ops: ops.into_boxed_slice(),
+            comparators: comparators.into_boxed_slice(),
+            range: (location..end_location).into(),
+        }.into()
     },
     Expression<Goal>,
 };
@@ -1880,8 +1890,8 @@ Arguments: ast::Arguments = {
     <location:@L> "(" <e: Comma<FunctionArgument>> ")" <end_location:@R> =>? {
         let ArgumentList { args, keywords } = parse_arguments(e)?;
         Ok(ast::Arguments {
-            args,
-            keywords,
+            args: args.into_boxed_slice(),
+            keywords: keywords.into_boxed_slice(),
             range: (location..end_location).into()
         })
     }

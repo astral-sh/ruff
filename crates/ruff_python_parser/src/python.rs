@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: fd05d84d3b654796ff740a7f905ec0ae8915f43f952428717735481947ab55e1
+// sha3: 02c60b5c591440061dda68775005d87a203b5448c205120bda1566a62fc2147c
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -36771,8 +36771,8 @@ fn __action241<
     {
         let ArgumentList { args, keywords } = parse_arguments(e)?;
         Ok(ast::Arguments {
-            args,
-            keywords,
+            args: args.into_boxed_slice(),
+            keywords: keywords.into_boxed_slice(),
             range: (location..end_location).into()
         })
     }
@@ -40651,8 +40651,18 @@ fn __action515<
 ) -> crate::parser::ParenthesizedExpr
 {
     {
-        let (ops, comparators) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
-        ast::ExprCompare { left: Box::new(left.into()), ops, comparators, range: (location..end_location).into() }.into()
+        let mut ops = Vec::with_capacity(comparisons.len());
+        let mut comparators = Vec::with_capacity(comparisons.len());
+        for (op, comparator) in comparisons {
+            ops.push(op);
+            comparators.push(comparator.into());
+        }
+        ast::ExprCompare {
+            left: Box::new(left.into()),
+            ops: ops.into_boxed_slice(),
+            comparators: comparators.into_boxed_slice(),
+            range: (location..end_location).into(),
+        }.into()
     }
 }
 
@@ -40816,8 +40826,18 @@ fn __action526<
 ) -> crate::parser::ParenthesizedExpr
 {
     {
-        let (ops, comparators) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
-        ast::ExprCompare { left: Box::new(left.into()), ops, comparators, range: (location..end_location).into() }.into()
+        let mut ops = Vec::with_capacity(comparisons.len());
+        let mut comparators = Vec::with_capacity(comparisons.len());
+        for (op, comparator) in comparisons {
+            ops.push(op);
+            comparators.push(comparator.into());
+        }
+        ast::ExprCompare {
+            left: Box::new(left.into()),
+            ops: ops.into_boxed_slice(),
+            comparators: comparators.into_boxed_slice(),
+            range: (location..end_location).into(),
+        }.into()
     }
 }
 
