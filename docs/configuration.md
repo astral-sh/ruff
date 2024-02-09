@@ -457,6 +457,9 @@ file discovery, logging level, and more:
 ruff check path/to/code/ --select F401 --select F403 --quiet
 ```
 
+All other configuration options can be set via the command line
+using the `--config` flag, detailed below.
+
 ### The `--config` CLI flag
 
 The `--config` flag has two uses. It is most often used to point to the
