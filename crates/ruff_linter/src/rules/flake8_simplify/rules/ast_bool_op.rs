@@ -323,7 +323,7 @@ fn isinstance_target<'a>(call: &'a Expr, semantic: &'a SemanticModel) -> Option<
     let Expr::Name(ast::ExprName { id: func_name, .. }) = func.as_ref() else {
         return None;
     };
-    if func_name != "isinstance" {
+    if &**func_name != "isinstance" {
         return None;
     }
     if !semantic.is_builtin("isinstance") {

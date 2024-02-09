@@ -72,7 +72,7 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr, body: &[
         return;
     };
 
-    if !(id == "list" && checker.semantic().is_builtin("list")) {
+    if &**id != "list" || !checker.semantic().is_builtin("list") {
         return;
     }
 
@@ -142,7 +142,7 @@ fn match_append(stmt: &Stmt, id: &str) -> bool {
     let Some(ast::ExprName { id: target_id, .. }) = value.as_name_expr() else {
         return false;
     };
-    target_id == id
+    &**target_id == id
 }
 
 /// Generate a [`Fix`] to remove a `list` cast from an expression.

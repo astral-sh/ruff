@@ -64,7 +64,7 @@ pub(crate) fn ssl_with_bad_defaults(checker: &mut Checker, function_def: &StmtFu
             if let Some(default) = &param.default {
                 match default.as_ref() {
                     Expr::Name(ast::ExprName { id, range, .. }) => {
-                        if is_insecure_protocol(id.as_str()) {
+                        if is_insecure_protocol(id) {
                             checker.diagnostics.push(Diagnostic::new(
                                 SslWithBadDefaults {
                                     protocol: id.to_string(),

@@ -47,7 +47,7 @@ pub(crate) fn unnecessary_subscript_reversal(checker: &mut Checker, call: &ast::
     let Some(func) = call.func.as_name_expr() else {
         return;
     };
-    if !matches!(func.id.as_str(), "reversed" | "set" | "sorted") {
+    if !matches!(&*func.id, "reversed" | "set" | "sorted") {
         return;
     }
     if !checker.semantic().is_builtin(&func.id) {

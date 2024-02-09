@@ -190,7 +190,7 @@ fn fields_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Option<Ve
 
 fn fields_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Option<Vec<Stmt>> {
     let ast::ExprName { id, .. } = func.as_name_expr()?;
-    if id != "dict" {
+    if &**id != "dict" {
         return None;
     }
 

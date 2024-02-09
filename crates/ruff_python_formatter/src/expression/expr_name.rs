@@ -14,7 +14,7 @@ impl FormatNodeRule<ExprName> for FormatExprName {
         let ExprName { id, range, ctx: _ } = item;
 
         debug_assert_eq!(
-            id.as_str(),
+            &**id,
             f.context()
                 .source_code()
                 .slice(*range)

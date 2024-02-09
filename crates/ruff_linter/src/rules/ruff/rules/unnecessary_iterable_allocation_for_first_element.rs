@@ -142,7 +142,7 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
         }) => {
             let ast::ExprName { id, .. } = func.as_name_expr()?;
 
-            if !matches!(id.as_str(), "tuple" | "list") {
+            if !matches!(&**id, "tuple" | "list") {
                 return None;
             }
 
@@ -150,7 +150,7 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
                 return None;
             };
 
-            if !semantic.is_builtin(id.as_str()) {
+            if !semantic.is_builtin(id) {
                 return None;
             }
 
@@ -264,6 +264,6 @@ fn match_simple_comprehension(elt: &Expr, generators: &[Comprehension]) -> Optio
 /// Returns `true` if the function is a builtin iterator.
 fn is_func_builtin_iterator(func: &Expr, semantic: &SemanticModel) -> bool {
     func.as_name_expr().map_or(false, |func_name| {
-        is_iterator(func_name.id.as_str()) && semantic.is_builtin(func_name.id.as_str())
+        is_iterator(&func_name.id) && semantic.is_builtin(&func_name.id)
     })
 }

@@ -66,7 +66,7 @@ pub(crate) fn unnecessary_call_around_sorted(
     let Some(outer) = func.as_name_expr() else {
         return;
     };
-    if !matches!(outer.id.as_str(), "list" | "reversed") {
+    if !matches!(&*outer.id, "list" | "reversed") {
         return;
     }
     let Some(arg) = args.first() else {
@@ -78,7 +78,7 @@ pub(crate) fn unnecessary_call_around_sorted(
     let Some(inner) = func.as_name_expr() else {
         return;
     };
-    if inner.id != "sorted" {
+    if &*inner.id != "sorted" {
         return;
     }
     if !checker.semantic().is_builtin(&inner.id) || !checker.semantic().is_builtin(&outer.id) {
@@ -93,7 +93,7 @@ pub(crate) fn unnecessary_call_around_sorted(
     diagnostic.try_set_fix(|| {
         Ok(Fix::applicable_edit(
             fixes::fix_unnecessary_call_around_sorted(expr, checker.locator(), checker.stylist())?,
-            if outer.id == "reversed" {
+            if &*outer.id == "reversed" {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe

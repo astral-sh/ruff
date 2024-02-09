@@ -98,7 +98,7 @@ fn is_open(func: &Expr, semantic: &SemanticModel) -> Option<Kind> {
         }
         // Ex) `open(...)`
         Expr::Name(ast::ExprName { id, .. }) => {
-            (id.as_str() == "open" && semantic.is_builtin("open")).then_some(Kind::Builtin)
+            (&**id == "open" && semantic.is_builtin("open")).then_some(Kind::Builtin)
         }
         _ => None,
     }

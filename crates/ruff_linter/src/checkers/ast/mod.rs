@@ -904,7 +904,7 @@ where
                 range: _,
             }) => {
                 if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
-                    if id == "locals" && ctx.is_load() {
+                    if &**id == "locals" && ctx.is_load() {
                         let scope = self.semantic.current_scope_mut();
                         scope.set_uses_locals();
                     }
@@ -1073,7 +1073,7 @@ where
                                 range: _,
                             } = keyword;
                             if let Some(id) = arg {
-                                if id.as_str() == "bound" {
+                                if &**id == "bound" {
                                     self.visit_type_definition(value);
                                 } else {
                                     self.visit_non_type_definition(value);
@@ -1755,21 +1755,21 @@ impl<'a> Checker<'a> {
             && match parent {
                 Stmt::Assign(ast::StmtAssign { targets, .. }) => {
                     if let Some(Expr::Name(ast::ExprName { id, .. })) = targets.first() {
-                        id == "__all__"
+                        &**id == "__all__"
                     } else {
                         false
                     }
                 }
                 Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
                     if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                        id == "__all__"
+                        &**id == "__all__"
                     } else {
                         false
                     }
                 }
                 Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
                     if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                        id == "__all__"
+                        &**id == "__all__"
                     } else {
                         false
                     }

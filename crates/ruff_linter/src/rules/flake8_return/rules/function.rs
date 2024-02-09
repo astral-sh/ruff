@@ -564,7 +564,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
             continue;
         }
 
-        if stack.non_locals.contains(assigned_id.as_str()) {
+        if stack.non_locals.contains(&**assigned_id) {
             continue;
         }
 

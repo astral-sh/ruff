@@ -59,7 +59,7 @@ where
             // Ex) `list()`
             if arguments.is_empty() {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                    if !is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
+                    if !is_iterable_initializer(id, |id| is_builtin(id)) {
                         return true;
                     }
                     return false;
@@ -705,8 +705,9 @@ where
     any_over_body(body, &|expr| {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
             if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                if matches!(id.as_str(), "locals" | "globals" | "vars" | "exec" | "eval") {
-                    if is_builtin(id.as_str()) {
+                let id = &**id;
+                if matches!(id, "locals" | "globals" | "vars" | "exec" | "eval") {
+                    if is_builtin(id) {
                         return true;
                     }
                 }
@@ -1230,7 +1231,7 @@ impl Truthiness {
                 func, arguments, ..
             }) => {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                    if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
+                    if is_iterable_initializer(id, |id| is_builtin(id)) {
                         if arguments.is_empty() {
                             // Ex) `list()`
                             Self::Falsey
@@ -1439,7 +1440,7 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
 pub fn typing_optional(elt: Expr, binding: String) -> Expr {
     Expr::Subscript(ast::ExprSubscript {
         value: Box::new(Expr::Name(ast::ExprName {
-            id: binding,
+            id: binding.into_boxed_str(),
             range: TextRange::default(),
             ctx: ExprContext::Load,
         })),
@@ -1471,7 +1472,7 @@ pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
 
     Expr::Subscript(ast::ExprSubscript {
         value: Box::new(Expr::Name(ast::ExprName {
-            id: binding.clone(),
+            id: binding.clone().into_boxed_str(),
             range: TextRange::default(),
             ctx: ExprContext::Load,
         })),
@@ -1537,7 +1538,7 @@ mod tests {
     fn any_over_stmt_type_alias() {
         let seen = RefCell::new(Vec::new());
         let name = Expr::Name(ExprName {
-            id: "x".to_string(),
+            id: "x".to_string().into_boxed_str(),
             range: TextRange::default(),
             ctx: ExprContext::Load,
         });

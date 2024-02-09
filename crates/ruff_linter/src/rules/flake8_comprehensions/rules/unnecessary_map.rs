@@ -77,7 +77,7 @@ pub(crate) fn unnecessary_map(
         return;
     };
 
-    let object_type = match func.id.as_str() {
+    let object_type = match &*func.id {
         "map" => ObjectType::Generator,
         "list" => ObjectType::List,
         "set" => ObjectType::Set,
@@ -95,7 +95,7 @@ pub(crate) fn unnecessary_map(
             if parent
                 .and_then(Expr::as_call_expr)
                 .and_then(|call| call.func.as_name_expr())
-                .is_some_and(|name| matches!(name.id.as_str(), "list" | "set" | "dict"))
+                .is_some_and(|name| matches!(&*name.id, "list" | "set" | "dict"))
             {
                 return;
             }

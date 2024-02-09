@@ -70,7 +70,7 @@ pub(crate) fn exclude_with_model_form(checker: &mut Checker, class_def: &ast::St
                 let Expr::Name(ast::ExprName { id, .. }) = target else {
                     continue;
                 };
-                if id == "exclude" {
+                if &**id == "exclude" {
                     checker
                         .diagnostics
                         .push(Diagnostic::new(DjangoExcludeWithModelForm, target.range()));

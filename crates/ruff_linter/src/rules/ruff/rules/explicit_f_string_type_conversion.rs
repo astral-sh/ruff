@@ -104,7 +104,7 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &mut Checker, f_string:
             continue;
         };
 
-        if !matches!(id.as_str(), "str" | "repr" | "ascii") {
+        if !matches!(&**id, "str" | "repr" | "ascii") {
             continue;
         };
 

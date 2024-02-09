@@ -131,7 +131,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
             }) => {
                 match func.as_ref() {
                     Expr::Name(ast::ExprName { id, .. }) => {
-                        if matches!(id.as_str(), "filter" | "reduce" | "map") {
+                        if matches!(&**id, "filter" | "reduce" | "map") {
                             for arg in arguments.args.iter() {
                                 if arg.is_lambda_expr() {
                                     self.safe_functions.push(arg);
@@ -142,7 +142,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                     Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
                         if attr == "reduce" {
                             if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
-                                if id == "functools" {
+                                if &**id == "functools" {
                                     for arg in arguments.args.iter() {
                                         if arg.is_lambda_expr() {
                                             self.safe_functions.push(arg);
@@ -209,7 +209,7 @@ impl<'a> Visitor<'a> for NamesFromAssignmentsVisitor<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
-                self.names.push(id.as_str());
+                self.names.push(id);
             }
             Expr::Starred(ast::ExprStarred { value, .. }) => {
                 self.visit_expr(value);
@@ -303,7 +303,7 @@ pub(crate) fn function_uses_loop_variable(checker: &mut Checker, node: &Node) {
         // If a variable was used in a function or lambda body, and assigned in the
         // loop, flag it.
         for name in suspicious_variables {
-            if reassigned_in_loop.contains(&name.id.as_str()) {
+            if reassigned_in_loop.contains(&&*name.id) {
                 if !checker.flake8_bugbear_seen.contains(&name.range()) {
                     checker.flake8_bugbear_seen.push(name.range());
                     checker.diagnostics.push(Diagnostic::new(

@@ -94,7 +94,7 @@ pub(crate) fn type_none_comparison(checker: &mut Checker, compare: &ast::ExprCom
 
     // Get the name of the other object (or `None` if both were `None`).
     let other_arg_name = match other_arg {
-        Expr::Name(ast::ExprName { id, .. }) => id.as_str(),
+        Expr::Name(ast::ExprName { id, .. }) => &**id,
         Expr::NoneLiteral { .. } => "None",
         _ => return,
     };
@@ -137,7 +137,7 @@ fn type_call_arg<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a 
 
     // The function itself must be the builtin `type`.
     let ast::ExprName { id, .. } = func.as_name_expr()?;
-    if id.as_str() != "type" || !semantic.is_builtin(id) {
+    if &**id != "type" || !semantic.is_builtin(id) {
         return None;
     }
 

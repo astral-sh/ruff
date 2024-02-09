@@ -164,7 +164,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
 fn match_annotation_to_literal_bool(annotation: &Expr) -> bool {
     match annotation {
         // Ex) `True`
-        Expr::Name(name) => &name.id == "bool",
+        Expr::Name(name) => &*name.id == "bool",
         // Ex) `"True"`
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "bool",
         _ => false,
@@ -176,7 +176,7 @@ fn match_annotation_to_literal_bool(annotation: &Expr) -> bool {
 fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel) -> bool {
     match annotation {
         // Ex) `bool`
-        Expr::Name(name) => &name.id == "bool",
+        Expr::Name(name) => &*name.id == "bool",
         // Ex) `"bool"`
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "bool",
         // Ex) `bool | int`

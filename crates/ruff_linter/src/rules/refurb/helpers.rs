@@ -6,7 +6,7 @@ use ruff_text_size::TextRange;
 pub(super) fn generate_method_call(name: &str, method: &str, generator: Generator) -> String {
     // Construct `name`.
     let var = ast::ExprName {
-        id: name.to_string(),
+        id: name.to_string().into_boxed_str(),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };
@@ -43,7 +43,7 @@ pub(super) fn generate_none_identity_comparison(
 ) -> String {
     // Construct `name`.
     let var = ast::ExprName {
-        id: name.to_string(),
+        id: name.to_string().into_boxed_str(),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };

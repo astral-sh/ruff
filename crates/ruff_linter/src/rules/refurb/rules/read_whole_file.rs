@@ -141,7 +141,8 @@ fn find_file_open<'a>(
         ..
     } = item.context_expr.as_call_expr()?;
 
-    if func.as_name_expr()?.id != "open" {
+    let func = func.as_name_expr()?;
+    if &*func.id != "open" {
         return None;
     }
 
@@ -168,7 +169,7 @@ fn find_file_open<'a>(
 
     // Now we need to find what is this variable bound to...
     let scope = semantic.current_scope();
-    let bindings: Vec<BindingId> = scope.get_all(var.id.as_str()).collect();
+    let bindings: Vec<BindingId> = scope.get_all(&var.id).collect();
 
     let binding = bindings
         .iter()
@@ -315,7 +316,7 @@ fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> SourceCodeSnipp
         ReadMode::Bytes => "read_bytes",
     };
     let name = ast::ExprName {
-        id: method_name.to_string(),
+        id: method_name.to_string().into_boxed_str(),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };

@@ -286,7 +286,7 @@ impl<'a> SemanticModel<'a> {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
         if self.in_forward_reference() {
-            if let Some(binding_id) = self.scopes.global().get(name.id.as_str()) {
+            if let Some(binding_id) = self.scopes.global().get(&name.id) {
                 if !self.bindings[binding_id].is_unbound() {
                     // Mark the binding as used.
                     let reference_id = self.resolved_references.push(
@@ -299,7 +299,7 @@ impl<'a> SemanticModel<'a> {
 
                     // Mark any submodule aliases as used.
                     if let Some(binding_id) =
-                        self.resolve_submodule(name.id.as_str(), ScopeId::global(), binding_id)
+                        self.resolve_submodule(&name.id, ScopeId::global(), binding_id)
                     {
                         let reference_id = self.resolved_references.push(
                             ScopeId::global(),
@@ -329,7 +329,7 @@ impl<'a> SemanticModel<'a> {
                 //     def __init__(self):
                 //         print(__class__)
                 // ```
-                if seen_function && matches!(name.id.as_str(), "__class__") {
+                if seen_function && matches!(&*name.id, "__class__") {
                     return ReadResult::ImplicitGlobal;
                 }
                 // Do not allow usages of class symbols unless it is the immediate parent
@@ -356,7 +356,7 @@ impl<'a> SemanticModel<'a> {
             // function and class definitions and their parent class scope.
             class_variables_visible = scope.kind.is_type() && index == 0;
 
-            if let Some(binding_id) = scope.get(name.id.as_str()) {
+            if let Some(binding_id) = scope.get(&name.id) {
                 // Mark the binding as used.
                 let reference_id = self.resolved_references.push(
                     self.scope_id,
@@ -367,9 +367,7 @@ impl<'a> SemanticModel<'a> {
                 self.bindings[binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
-                if let Some(binding_id) =
-                    self.resolve_submodule(name.id.as_str(), scope_id, binding_id)
-                {
+                if let Some(binding_id) = self.resolve_submodule(&name.id, scope_id, binding_id) {
                     let reference_id = self.resolved_references.push(
                         self.scope_id,
                         self.node_id,
@@ -449,7 +447,7 @@ impl<'a> SemanticModel<'a> {
 
                         // Mark any submodule aliases as used.
                         if let Some(binding_id) =
-                            self.resolve_submodule(name.id.as_str(), scope_id, binding_id)
+                            self.resolve_submodule(&name.id, scope_id, binding_id)
                         {
                             let reference_id = self.resolved_references.push(
                                 self.scope_id,
@@ -488,7 +486,7 @@ impl<'a> SemanticModel<'a> {
             //     print(__qualname__)
             // ```
             if index == 0 && scope.kind.is_class() {
-                if matches!(name.id.as_str(), "__module__" | "__qualname__") {
+                if matches!(&*name.id, "__module__" | "__qualname__") {
                     return ReadResult::ImplicitGlobal;
                 }
             }
@@ -708,7 +706,7 @@ impl<'a> SemanticModel<'a> {
             BindingKind::Builtin => {
                 if value.is_name_expr() {
                     // Ex) `dict`
-                    Some(smallvec!["", head.id.as_str()])
+                    Some(smallvec!["", &*head.id])
                 } else {
                     // Ex) `dict.__dict__`
                     let value_path = collect_call_path(value)?;

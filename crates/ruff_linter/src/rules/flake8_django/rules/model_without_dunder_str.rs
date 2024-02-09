@@ -106,7 +106,7 @@ fn is_model_abstract(class_def: &ast::StmtClassDef) -> bool {
                 let Expr::Name(ast::ExprName { id, .. }) = target else {
                     continue;
                 };
-                if id != "abstract" {
+                if &**id != "abstract" {
                     continue;
                 }
                 if !is_const_true(value) {

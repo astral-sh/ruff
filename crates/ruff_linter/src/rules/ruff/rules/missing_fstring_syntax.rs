@@ -130,7 +130,7 @@ fn should_be_fstring(
                 }
                 for arg in args.iter() {
                     if let ast::Expr::Name(ast::ExprName { id, .. }) = arg {
-                        arg_names.insert(id.as_str());
+                        arg_names.insert(&**id);
                     }
                 }
             }
@@ -147,7 +147,7 @@ fn should_be_fstring(
             .filter_map(|element| element.as_expression())
         {
             if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
-                if arg_names.contains(id.as_str()) {
+                if arg_names.contains(&**id) {
                     return false;
                 }
                 if semantic

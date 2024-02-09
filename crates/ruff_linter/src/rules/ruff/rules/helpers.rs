@@ -10,7 +10,7 @@ use ruff_python_semantic::{analyze, BindingKind, Modules, SemanticModel};
 pub(super) fn is_special_attribute(value: &Expr) -> bool {
     if let Expr::Name(ast::ExprName { id, .. }) = value {
         matches!(
-            id.as_str(),
+            &**id,
             "__slots__" | "__dict__" | "__weakref__" | "__annotations__"
         )
     } else {

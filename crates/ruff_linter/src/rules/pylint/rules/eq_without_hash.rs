@@ -80,7 +80,7 @@ fn has_eq_without_hash(body: &[Stmt]) -> bool {
                 //
                 //     __hash__ = None
                 // ```
-                if id == "__hash__" && value.is_none_literal_expr() {
+                if &**id == "__hash__" && value.is_none_literal_expr() {
                     has_hash = true;
                 }
             }

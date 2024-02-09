@@ -121,7 +121,7 @@ fn is_open(checker: &mut Checker, func: &Expr) -> bool {
         }
         // open(...)
         Expr::Name(ast::ExprName { id, .. }) => {
-            id.as_str() == "open" && checker.semantic().is_builtin("open")
+            &**id == "open" && checker.semantic().is_builtin("open")
         }
         _ => false,
     }

@@ -142,7 +142,7 @@ fn class_method(
 
     // Don't error if the first argument is annotated with typing.Type[T].
     // These are edge cases, and it's hard to give good error messages for them.
-    if value.id != "type" {
+    if &*value.id != "type" {
         return false;
     };
 

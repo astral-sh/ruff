@@ -242,7 +242,7 @@ where
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
                 if let Some(current_assert) = self.current_assert {
-                    if id.as_str() == self.exception_name {
+                    if &**id == self.exception_name {
                         self.errors.push(Diagnostic::new(
                             PytestAssertInExcept {
                                 name: id.to_string(),
@@ -419,7 +419,7 @@ fn to_pytest_raises_args<'a>(
                     if kwarg
                         .arg
                         .as_ref()
-                        .is_some_and(|id| id.as_str() == "expected_exception") =>
+                        .is_some_and(|id| &**id == "expected_exception") =>
                 {
                     Cow::Borrowed(checker.locator().slice(kwarg.value.range()))
                 }
@@ -452,11 +452,11 @@ fn to_pytest_raises_args<'a>(
                     if kwarg1
                         .arg
                         .as_ref()
-                        .is_some_and(|id| id.as_str() == "expected_exception")
+                        .is_some_and(|id| &**id == "expected_exception")
                         && kwarg2
                             .arg
                             .as_ref()
-                            .is_some_and(|id| id.as_str() == "expected_regex") =>
+                            .is_some_and(|id| &**id == "expected_regex") =>
                 {
                     Cow::Owned(format!(
                         "{}, match={}",
@@ -469,11 +469,11 @@ fn to_pytest_raises_args<'a>(
                     if kwarg1
                         .arg
                         .as_ref()
-                        .is_some_and(|id| id.as_str() == "expected_regex")
+                        .is_some_and(|id| &**id == "expected_regex")
                         && kwarg2
                             .arg
                             .as_ref()
-                            .is_some_and(|id| id.as_str() == "expected_exception") =>
+                            .is_some_and(|id| &**id == "expected_exception") =>
                 {
                     Cow::Owned(format!(
                         "{}, match={}",

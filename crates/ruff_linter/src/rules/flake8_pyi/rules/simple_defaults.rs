@@ -450,7 +450,7 @@ fn is_type_var_like_call(expr: &Expr, semantic: &SemanticModel) -> bool {
 /// `__all__`).
 fn is_special_assignment(target: &Expr, semantic: &SemanticModel) -> bool {
     if let Expr::Name(ast::ExprName { id, .. }) = target {
-        match id.as_str() {
+        match &**id {
             "__all__" => semantic.current_scope().kind.is_module(),
             "__match_args__" | "__slots__" => semantic.current_scope().kind.is_class(),
             _ => false,

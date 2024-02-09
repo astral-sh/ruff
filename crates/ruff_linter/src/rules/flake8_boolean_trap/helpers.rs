@@ -54,7 +54,7 @@ pub(super) fn is_allowed_func_def(name: &str) -> bool {
 pub(super) fn allow_boolean_trap(call: &ast::ExprCall) -> bool {
     let func_name = match call.func.as_ref() {
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr.as_str(),
-        Expr::Name(ast::ExprName { id, .. }) => id.as_str(),
+        Expr::Name(ast::ExprName { id, .. }) => &**id,
         _ => return false,
     };
 

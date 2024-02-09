@@ -52,7 +52,7 @@ impl Violation for HardcodedPasswordString {
 fn password_target(target: &Expr) -> Option<&str> {
     let target_name = match target {
         // variable = "s3cr3t"
-        Expr::Name(ast::ExprName { id, .. }) => id.as_str(),
+        Expr::Name(ast::ExprName { id, .. }) => &**id,
         // d["password"] = "s3cr3t"
         Expr::Subscript(ast::ExprSubscript { slice, .. }) => match slice.as_ref() {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.to_str(),

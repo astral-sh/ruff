@@ -47,7 +47,7 @@ pub(crate) fn unsupported_method_call_on_all(checker: &mut Checker, func: &Expr)
     let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
         return;
     };
-    if id.as_str() != "__all__" {
+    if &**id != "__all__" {
         return;
     }
     if !is_unsupported_method(attr.as_str()) {

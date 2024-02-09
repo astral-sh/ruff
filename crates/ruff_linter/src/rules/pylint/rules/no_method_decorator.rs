@@ -100,7 +100,7 @@ fn get_undecorated_methods(
     class_def: &ast::StmtClassDef,
     method_type: &MethodType,
 ) {
-    let mut explicit_decorator_calls: HashMap<String, TextRange> = HashMap::default();
+    let mut explicit_decorator_calls: HashMap<Box<str>, TextRange> = HashMap::default();
 
     let (method_name, diagnostic_type): (&str, DiagnosticKind) = match method_type {
         MethodType::Classmethod => ("classmethod", NoClassmethodDecorator.into()),
@@ -115,7 +115,7 @@ fn get_undecorated_methods(
             }) = value.as_ref()
             {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                    if id == method_name && checker.semantic().is_builtin(method_name) {
+                    if &**id == method_name && checker.semantic().is_builtin(method_name) {
                         if arguments.args.len() != 1 {
                             continue;
                         }
@@ -130,7 +130,7 @@ fn get_undecorated_methods(
                         };
 
                         if let Expr::Name(ast::ExprName { id, .. }) = &arguments.args[0] {
-                            if target_name == *id {
+                            if target_name == **id {
                                 explicit_decorator_calls.insert(id.clone(), stmt.range());
                             }
                         };
@@ -158,7 +158,7 @@ fn get_undecorated_methods(
             // if we find the decorator we're looking for, skip
             if decorator_list.iter().any(|decorator| {
                 if let Expr::Name(ast::ExprName { id, .. }) = &decorator.expression {
-                    if id == method_name && checker.semantic().is_builtin(method_name) {
+                    if &**id == method_name && checker.semantic().is_builtin(method_name) {
                         return true;
                     }
                 }

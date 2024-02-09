@@ -77,10 +77,7 @@ pub(crate) fn unnecessary_double_cast_or_process(
     let Some(outer) = func.as_name_expr() else {
         return;
     };
-    if !matches!(
-        outer.id.as_str(),
-        "list" | "tuple" | "set" | "reversed" | "sorted"
-    ) {
+    if !matches!(&*outer.id, "list" | "tuple" | "set" | "reversed" | "sorted") {
         return;
     }
     let Some(arg) = args.first() else {
@@ -105,7 +102,7 @@ pub(crate) fn unnecessary_double_cast_or_process(
 
     // Avoid collapsing nested `sorted` calls with non-identical keyword arguments
     // (i.e., `key`, `reverse`).
-    if inner.id == "sorted" && outer.id == "sorted" {
+    if &*inner.id == "sorted" && &*outer.id == "sorted" {
         if inner_kw.len() != outer_kw.len() {
             return;
         }
@@ -122,7 +119,7 @@ pub(crate) fn unnecessary_double_cast_or_process(
     // Ex) `list(tuple(...))`
     // Ex) `set(set(...))`
     if matches!(
-        (outer.id.as_str(), inner.id.as_str()),
+        (&*outer.id, &*inner.id),
         ("set" | "sorted", "list" | "tuple" | "reversed" | "sorted")
             | ("set", "set")
             | ("list" | "tuple", "list" | "tuple")

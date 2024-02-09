@@ -519,7 +519,7 @@ trait BuiltinTypeChecker {
         let Expr::Name(ast::ExprName { id, .. }) = type_expr else {
             return false;
         };
-        id == Self::BUILTIN_TYPE_NAME && semantic.is_builtin(Self::BUILTIN_TYPE_NAME)
+        &**id == Self::BUILTIN_TYPE_NAME && semantic.is_builtin(Self::BUILTIN_TYPE_NAME)
     }
 }
 
@@ -711,7 +711,7 @@ pub fn find_binding_value<'a>(
 /// Given a target and value, find the value that's assigned to the given symbol.
 fn match_value<'a>(symbol: &str, target: &Expr, value: &'a Expr) -> Option<&'a Expr> {
     match target {
-        Expr::Name(ast::ExprName { id, .. }) if id.as_str() == symbol => Some(value),
+        Expr::Name(ast::ExprName { id, .. }) if &**id == symbol => Some(value),
         Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
             match value {
                 Expr::Tuple(ast::ExprTuple {
@@ -733,7 +733,7 @@ fn match_value<'a>(symbol: &str, target: &Expr, value: &'a Expr) -> Option<&'a E
 /// Returns `true` if the [`Expr`] defines the symbol.
 fn defines(symbol: &str, expr: &Expr) -> bool {
     match expr {
-        Expr::Name(ast::ExprName { id, .. }) => id == symbol,
+        Expr::Name(ast::ExprName { id, .. }) => &**id == symbol,
         Expr::Tuple(ast::ExprTuple { elts, .. })
         | Expr::List(ast::ExprList { elts, .. })
         | Expr::Set(ast::ExprSet { elts, .. }) => elts.iter().any(|elt| defines(symbol, elt)),
@@ -772,7 +772,7 @@ fn get_value_by_id<'a>(target_id: &str, targets: &[Expr], values: &'a [Expr]) ->
                 };
             }
             Expr::Name(ast::ExprName { id, .. }) => {
-                if *id == target_id {
+                if &**id == target_id {
                     return Some(value);
                 }
             }

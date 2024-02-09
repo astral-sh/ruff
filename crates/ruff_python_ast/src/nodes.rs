@@ -1766,7 +1766,7 @@ impl From<ExprStarred> for Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprName {
     pub range: TextRange,
-    pub id: String,
+    pub id: Box<str>,
     pub ctx: ExprContext,
 }
 
@@ -3283,13 +3283,13 @@ impl IpyEscapeKind {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Identifier {
-    id: String,
+    id: Box<str>,
     range: TextRange,
 }
 
 impl Identifier {
     #[inline]
-    pub fn new(id: impl Into<String>, range: TextRange) -> Self {
+    pub fn new(id: impl Into<Box<str>>, range: TextRange) -> Self {
         Self {
             id: id.into(),
             range,
@@ -3300,21 +3300,21 @@ impl Identifier {
 impl Identifier {
     #[inline]
     pub fn as_str(&self) -> &str {
-        self.id.as_str()
+        &self.id
     }
 }
 
 impl PartialEq<str> for Identifier {
     #[inline]
     fn eq(&self, other: &str) -> bool {
-        self.id == other
+        &*self.id == other
     }
 }
 
 impl PartialEq<String> for Identifier {
     #[inline]
     fn eq(&self, other: &String) -> bool {
-        &self.id == other
+        &*self.id == other
     }
 }
 
@@ -3322,34 +3322,27 @@ impl std::ops::Deref for Identifier {
     type Target = str;
     #[inline]
     fn deref(&self) -> &Self::Target {
-        self.id.as_str()
+        &self.id
     }
 }
 
 impl AsRef<str> for Identifier {
     #[inline]
     fn as_ref(&self) -> &str {
-        self.id.as_str()
+        &self.id
     }
 }
 
-impl AsRef<String> for Identifier {
+impl From<Identifier> for Box<str> {
     #[inline]
-    fn as_ref(&self) -> &String {
-        &self.id
+    fn from(id: Identifier) -> Self {
+        id.id
     }
 }
 
 impl std::fmt::Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.id, f)
-    }
-}
-
-impl From<Identifier> for String {
-    #[inline]
-    fn from(identifier: Identifier) -> String {
-        identifier.id
     }
 }
 
@@ -3895,11 +3888,11 @@ mod tests {
         assert!(std::mem::size_of::<StmtClassDef>() <= 104);
         assert!(std::mem::size_of::<StmtTry>() <= 112);
         assert!(std::mem::size_of::<Mod>() <= 32);
-        // 96 for Rustc < 1.76
-        assert!(matches!(std::mem::size_of::<Pattern>(), 88 | 96));
+        // 88 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<Pattern>(), 80 | 88));
 
         assert_eq!(std::mem::size_of::<Expr>(), 64);
-        assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
+        assert_eq!(std::mem::size_of::<ExprAttribute>(), 48);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 16);
         assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
         assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
@@ -3917,7 +3910,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprLambda>(), 24);
         assert_eq!(std::mem::size_of::<ExprList>(), 40);
         assert_eq!(std::mem::size_of::<ExprListComp>(), 40);
-        assert_eq!(std::mem::size_of::<ExprName>(), 40);
+        assert_eq!(std::mem::size_of::<ExprName>(), 32);
         assert_eq!(std::mem::size_of::<ExprNamedExpr>(), 24);
         assert_eq!(std::mem::size_of::<ExprNoneLiteral>(), 8);
         assert_eq!(std::mem::size_of::<ExprNumberLiteral>(), 32);

@@ -71,9 +71,9 @@ impl MinMax {
         let Expr::Name(ast::ExprName { id, .. }) = func else {
             return None;
         };
-        if id.as_str() == "min" && semantic.is_builtin("min") {
+        if &**id == "min" && semantic.is_builtin("min") {
             Some(MinMax::Min)
-        } else if id.as_str() == "max" && semantic.is_builtin("max") {
+        } else if &**id == "max" && semantic.is_builtin("max") {
             Some(MinMax::Max)
         } else {
             None

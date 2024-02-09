@@ -135,7 +135,7 @@ pub(crate) fn unnecessary_lambda(checker: &mut Checker, lambda: &ExprLambda) {
                         return;
                     };
 
-                    if id.as_str() != kwarg.name.as_str() {
+                    if **id != *kwarg.name {
                         return;
                     }
                 }
@@ -157,7 +157,7 @@ pub(crate) fn unnecessary_lambda(checker: &mut Checker, lambda: &ExprLambda) {
                         return;
                     };
 
-                    if id.as_str() != vararg.name.as_str() {
+                    if **id != *vararg.name {
                         return;
                     }
                 }
@@ -176,7 +176,7 @@ pub(crate) fn unnecessary_lambda(checker: &mut Checker, lambda: &ExprLambda) {
                 let Expr::Name(ast::ExprName { id, .. }) = arg else {
                     return;
                 };
-                if id.as_str() != param.name.as_str() {
+                if **id != *param.name {
                     return;
                 }
             }

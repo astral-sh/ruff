@@ -377,7 +377,7 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
         fn unparse_expr(expr: &ast::Expr, buffer: &mut String) -> Result<(), LexicalError> {
             match expr {
                 ast::Expr::Name(ast::ExprName { id, .. }) => {
-                    buffer.push_str(id.as_str());
+                    buffer.push_str(id);
                 },
                 ast::Expr::Subscript(ast::ExprSubscript { value, slice, range, .. }) => {
                     let ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value: ast::Number::Int(integer), .. }) = slice.as_ref() else {

@@ -122,7 +122,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
                                 .into_iter()
                                 .map(|type_member| {
                                     Expr::Name(ast::ExprName {
-                                        id: type_member,
+                                        id: type_member.into_boxed_str(),
                                         ctx: ExprContext::Load,
                                         range: TextRange::default(),
                                     })

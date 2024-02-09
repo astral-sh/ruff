@@ -75,7 +75,7 @@ pub(crate) fn unnecessary_comprehension_any_all(
     let Expr::Name(ast::ExprName { id, .. }) = func else {
         return;
     };
-    if !matches!(id.as_str(), "all" | "any") {
+    if !matches!(&**id, "all" | "any") {
         return;
     }
     let [arg] = args else {

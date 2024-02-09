@@ -150,7 +150,7 @@ fn enumerate_items<'a>(
 
     // If either of the variable names are intentionally ignored by naming them `_`, then don't
     // emit.
-    if index_name.id == "_" || value_name.id == "_" {
+    if &*index_name.id == "_" || &*value_name.id == "_" {
         return None;
     }
 

@@ -108,7 +108,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
                     continue;
                 };
 
-                if id == "__slots__" {
+                if &**id == "__slots__" {
                     slots.extend(slots_attributes(value));
                 }
             }
@@ -123,7 +123,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
                     continue;
                 };
 
-                if id == "__slots__" {
+                if &**id == "__slots__" {
                     slots.extend(slots_attributes(value));
                 }
             }
@@ -134,7 +134,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
                     continue;
                 };
 
-                if id == "__slots__" {
+                if &**id == "__slots__" {
                     slots.extend(slots_attributes(value));
                 }
             }
@@ -164,7 +164,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
                         let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() else {
                             continue;
                         };
-                        if id == "self" && !slots.contains(attribute.attr.as_str()) {
+                        if &**id == "self" && !slots.contains(attribute.attr.as_str()) {
                             assignments.push(AttributeAssignment {
                                 name: &attribute.attr,
                                 range: attribute.range(),
@@ -180,7 +180,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
                         let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() else {
                             continue;
                         };
-                        if id == "self" && !slots.contains(attribute.attr.as_str()) {
+                        if &**id == "self" && !slots.contains(attribute.attr.as_str()) {
                             assignments.push(AttributeAssignment {
                                 name: &attribute.attr,
                                 range: attribute.range(),
@@ -196,7 +196,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
                         let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() else {
                             continue;
                         };
-                        if id == "self" && !slots.contains(attribute.attr.as_str()) {
+                        if &**id == "self" && !slots.contains(attribute.attr.as_str()) {
                             assignments.push(AttributeAssignment {
                                 name: &attribute.attr,
                                 range: attribute.range(),

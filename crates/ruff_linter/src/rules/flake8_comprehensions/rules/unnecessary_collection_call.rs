@@ -68,7 +68,7 @@ pub(crate) fn unnecessary_collection_call(
     let Some(func) = call.func.as_name_expr() else {
         return;
     };
-    let collection = match func.id.as_str() {
+    let collection = match &*func.id {
         "dict"
             if call.arguments.keywords.is_empty()
                 || (!settings.allow_dict_calls_with_keyword_arguments
@@ -87,7 +87,7 @@ pub(crate) fn unnecessary_collection_call(
         }
         _ => return,
     };
-    if !checker.semantic().is_builtin(func.id.as_str()) {
+    if !checker.semantic().is_builtin(&func.id) {
         return;
     }
 

@@ -120,7 +120,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
         }
 
         duplicates
-            .entry((attr.as_str(), arg_name.as_str()))
+            .entry((&**attr, &**arg_name))
             .or_insert_with(Vec::new)
             .push(index);
     }
@@ -229,7 +229,7 @@ fn is_bound_to_tuple(arg: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    let Some(binding_id) = semantic.lookup_symbol(id.as_str()) else {
+    let Some(binding_id) = semantic.lookup_symbol(id) else {
         return false;
     };
 

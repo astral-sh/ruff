@@ -49,13 +49,13 @@ where
             }
             Expr::Name(ast::ExprName { id, .. }) => {
                 // Ex) `__all__ = __all__ + multiprocessing.__all__`
-                if id == "__all__" {
+                if &**id == "__all__" {
                     return (None, DunderAllFlags::empty());
                 }
             }
             Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
                 // Ex) `__all__ = __all__ + multiprocessing.__all__`
-                if attr == "__all__" {
+                if &**attr == "__all__" {
                     return (None, DunderAllFlags::empty());
                 }
             }
@@ -65,7 +65,7 @@ where
                 // Allow `tuple()`, `list()`, and their generic forms, like `list[int]()`.
                 if arguments.keywords.is_empty() && arguments.args.len() <= 1 {
                     if let Expr::Name(ast::ExprName { id, .. }) = map_subscript(func) {
-                        let id = id.as_str();
+                        let id = &**id;
                         if matches!(id, "tuple" | "list") && is_builtin(id) {
                             let [arg] = arguments.args.as_ref() else {
                                 return (None, DunderAllFlags::empty());

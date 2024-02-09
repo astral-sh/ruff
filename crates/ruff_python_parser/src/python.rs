@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: d38cc0f2252a58db42d3bd63a102b537865992b3cf51d402cdb4828f48989c9d
+// sha3: cae04435d0832985b15c6bddb901e8115d4161a49ee0d850c425c1a4a87ef29b
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -33711,7 +33711,7 @@ fn __action76<
         fn unparse_expr(expr: &ast::Expr, buffer: &mut String) -> Result<(), LexicalError> {
             match expr {
                 ast::Expr::Name(ast::ExprName { id, .. }) => {
-                    buffer.push_str(id.as_str());
+                    buffer.push_str(id);
                 },
                 ast::Expr::Subscript(ast::ExprSubscript { value, slice, range, .. }) => {
                     let ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value: ast::Number::Int(integer), .. }) = slice.as_ref() else {

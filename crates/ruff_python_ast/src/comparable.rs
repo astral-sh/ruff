@@ -1096,9 +1096,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
 
 impl<'a> From<&'a ast::ExprName> for ComparableExpr<'a> {
     fn from(expr: &'a ast::ExprName) -> Self {
-        Self::Name(ExprName {
-            id: expr.id.as_str(),
-        })
+        Self::Name(ExprName { id: &expr.id })
     }
 }
 

@@ -145,7 +145,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
             let new_expr = Expr::Subscript(ast::ExprSubscript {
                 range: TextRange::default(),
                 value: Box::new(Expr::Name(ast::ExprName {
-                    id: binding,
+                    id: binding.into_boxed_str(),
                     ctx: ast::ExprContext::Store,
                     range: TextRange::default(),
                 })),

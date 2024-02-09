@@ -158,7 +158,7 @@ pub(crate) fn native_literals(
         return;
     }
 
-    let Ok(literal_type) = LiteralType::from_str(id.as_str()) else {
+    let Ok(literal_type) = LiteralType::from_str(id) else {
         return;
     };
 

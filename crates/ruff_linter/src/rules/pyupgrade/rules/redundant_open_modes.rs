@@ -113,7 +113,7 @@ fn is_open_builtin(func: &Expr, semantic: &SemanticModel) -> bool {
     let Some(ast::ExprName { id, .. }) = func.as_name_expr() else {
         return false;
     };
-    id.as_str() == OPEN_FUNC_NAME && semantic.is_builtin(id)
+    &**id == OPEN_FUNC_NAME && semantic.is_builtin(id)
 }
 
 #[derive(Debug, Copy, Clone)]

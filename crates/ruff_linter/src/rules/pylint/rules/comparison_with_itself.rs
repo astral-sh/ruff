@@ -107,7 +107,7 @@ pub(crate) fn comparison_with_itself(
 
                 // The call must be to pure function, like `id`.
                 if matches!(
-                    left_func.id.as_str(),
+                    &*left_func.id,
                     "id" | "len" | "type" | "int" | "bool" | "str" | "repr" | "bytes"
                 ) && checker.semantic().is_builtin(&left_func.id)
                 {

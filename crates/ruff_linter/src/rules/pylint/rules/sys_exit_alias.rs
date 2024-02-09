@@ -62,11 +62,11 @@ pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
         return;
     };
 
-    if !matches!(id.as_str(), "exit" | "quit") {
+    if !matches!(&**id, "exit" | "quit") {
         return;
     }
 
-    if !checker.semantic().is_builtin(id.as_str()) {
+    if !checker.semantic().is_builtin(id) {
         return;
     }
 

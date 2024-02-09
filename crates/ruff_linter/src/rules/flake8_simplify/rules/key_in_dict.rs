@@ -3,7 +3,7 @@ use ruff_diagnostics::{Applicability, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{self as ast, Arguments, CmpOp, Comprehension, Expr};
+use ruff_python_ast::{self as ast, CmpOp, Comprehension, Expr};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
@@ -67,20 +67,21 @@ fn key_in_dict(
 ) {
     let Expr::Call(ast::ExprCall {
         func,
-        arguments: Arguments { args, keywords, .. },
+        arguments,
         range: _,
     }) = &right
     else {
         return;
     };
-    if !(args.is_empty() && keywords.is_empty()) {
+
+    if !arguments.is_empty() {
         return;
     }
 
     let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
         return;
     };
-    if attr != "keys" {
+    if &**attr != "keys" {
         return;
     }
 
@@ -89,10 +90,7 @@ fn key_in_dict(
     // def __contains__(self, key: object) -> bool:
     //     return key in self.keys()
     // ```
-    if value
-        .as_name_expr()
-        .is_some_and(|name| matches!(name.id.as_str(), "self"))
-    {
+    if value.as_name_expr().is_some_and(|name| &*name.id == "self") {
         return;
     }
 

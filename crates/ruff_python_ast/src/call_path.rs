@@ -12,9 +12,7 @@ pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
     let attr1 = match expr {
         Expr::Attribute(attr1) => attr1,
         // Ex) `foo`
-        Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(CallPath::from_slice(&[id.as_str()]))
-        }
+        Expr::Name(nodes::ExprName { id, .. }) => return Some(CallPath::from_slice(&[id])),
         _ => return None,
     };
 
@@ -22,7 +20,7 @@ pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
         Expr::Attribute(attr2) => attr2,
         // Ex) `foo.bar`
         Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(CallPath::from_slice(&[id.as_str(), attr1.attr.as_str()]))
+            return Some(CallPath::from_slice(&[id, &*attr1.attr]))
         }
         _ => return None,
     };
@@ -31,11 +29,7 @@ pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
         Expr::Attribute(attr3) => attr3,
         // Ex) `foo.bar.baz`
         Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(CallPath::from_slice(&[
-                id.as_str(),
-                attr2.attr.as_str(),
-                attr1.attr.as_str(),
-            ]));
+            return Some(CallPath::from_slice(&[id, &*attr2.attr, &*attr1.attr]));
         }
         _ => return None,
     };
@@ -45,10 +39,10 @@ pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
         // Ex) `foo.bar.baz.bop`
         Expr::Name(nodes::ExprName { id, .. }) => {
             return Some(CallPath::from_slice(&[
-                id.as_str(),
-                attr3.attr.as_str(),
-                attr2.attr.as_str(),
-                attr1.attr.as_str(),
+                id,
+                &*attr3.attr,
+                &*attr2.attr,
+                &*attr1.attr,
             ]));
         }
         _ => return None,
@@ -59,11 +53,11 @@ pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
         // Ex) `foo.bar.baz.bop.bap`
         Expr::Name(nodes::ExprName { id, .. }) => {
             return Some(CallPath::from_slice(&[
-                id.as_str(),
-                attr4.attr.as_str(),
-                attr3.attr.as_str(),
-                attr2.attr.as_str(),
-                attr1.attr.as_str(),
+                id,
+                &*attr4.attr,
+                &*attr3.attr,
+                &*attr2.attr,
+                &*attr1.attr,
             ]));
         }
         _ => return None,
@@ -74,12 +68,12 @@ pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
         // Ex) `foo.bar.baz.bop.bap.bab`
         Expr::Name(nodes::ExprName { id, .. }) => {
             return Some(CallPath::from_slice(&[
-                id.as_str(),
-                attr5.attr.as_str(),
-                attr4.attr.as_str(),
-                attr3.attr.as_str(),
-                attr2.attr.as_str(),
-                attr1.attr.as_str(),
+                id,
+                &*attr5.attr,
+                &*attr4.attr,
+                &*attr3.attr,
+                &*attr2.attr,
+                &*attr1.attr,
             ]));
         }
         _ => return None,
@@ -90,13 +84,13 @@ pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
         // Ex) `foo.bar.baz.bop.bap.bab.bob`
         Expr::Name(nodes::ExprName { id, .. }) => {
             return Some(CallPath::from_slice(&[
-                id.as_str(),
-                attr6.attr.as_str(),
-                attr5.attr.as_str(),
-                attr4.attr.as_str(),
-                attr3.attr.as_str(),
-                attr2.attr.as_str(),
-                attr1.attr.as_str(),
+                id,
+                &*attr6.attr,
+                &*attr5.attr,
+                &*attr4.attr,
+                &*attr3.attr,
+                &*attr2.attr,
+                &*attr1.attr,
             ]));
         }
         _ => return None,
@@ -107,14 +101,14 @@ pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
         // Ex) `foo.bar.baz.bop.bap.bab.bob.bib`
         Expr::Name(nodes::ExprName { id, .. }) => {
             return Some(CallPath::from_slice(&[
-                id.as_str(),
-                attr7.attr.as_str(),
-                attr6.attr.as_str(),
-                attr5.attr.as_str(),
-                attr4.attr.as_str(),
-                attr3.attr.as_str(),
-                attr2.attr.as_str(),
-                attr1.attr.as_str(),
+                id,
+                &*attr7.attr,
+                &*attr6.attr,
+                &*attr5.attr,
+                &*attr4.attr,
+                &*attr3.attr,
+                &*attr2.attr,
+                &*attr1.attr,
             ]));
         }
         _ => return None,
@@ -122,14 +116,14 @@ pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
 
     collect_call_path(&attr8.value).map(|mut segments| {
         segments.extend([
-            attr8.attr.as_str(),
-            attr7.attr.as_str(),
-            attr6.attr.as_str(),
-            attr5.attr.as_str(),
-            attr4.attr.as_str(),
-            attr3.attr.as_str(),
-            attr2.attr.as_str(),
-            attr1.attr.as_str(),
+            &*attr8.attr,
+            &*attr7.attr,
+            &*attr6.attr,
+            &*attr5.attr,
+            &*attr4.attr,
+            &*attr3.attr,
+            &*attr2.attr,
+            &*attr1.attr,
         ]);
         segments
     })

@@ -100,7 +100,7 @@ pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt_for: &ast::StmtFor) 
         checker
             .semantic()
             .current_scope()
-            .get_all(name.id.as_str())
+            .get_all(&name.id)
             .any(|binding_id| {
                 let binding = checker.semantic().binding(binding_id);
                 binding.references.iter().any(|reference_id| {

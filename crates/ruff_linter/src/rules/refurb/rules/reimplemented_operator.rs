@@ -327,7 +327,7 @@ fn is_same_expression(arg: &ast::ParameterWithDefault, expr: &Expr) -> bool {
     if arg.default.is_some() {
         false
     } else if let Expr::Name(name) = expr {
-        name.id == arg.parameter.name.as_str()
+        &*name.id == arg.parameter.name.as_str()
     } else {
         false
     }

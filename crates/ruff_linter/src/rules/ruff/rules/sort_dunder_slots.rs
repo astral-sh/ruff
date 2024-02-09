@@ -88,7 +88,7 @@ fn sort_dunder_slots(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr
         return;
     };
 
-    if id != "__slots__" {
+    if &**id != "__slots__" {
         return;
     }
 

@@ -47,7 +47,7 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
     let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() else {
         return;
     };
-    if id != "range" {
+    if &**id != "range" {
         return;
     };
     if !checker.semantic().is_builtin("range") {

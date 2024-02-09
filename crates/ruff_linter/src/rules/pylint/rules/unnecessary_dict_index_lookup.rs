@@ -128,7 +128,7 @@ fn dict_items<'a>(
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
         return None;
     };
-    if attr != "items" {
+    if &**attr != "items" {
         return None;
     }
 
@@ -154,7 +154,7 @@ fn dict_items<'a>(
 
     // If either of the variable names are intentionally ignored by naming them `_`, then don't
     // emit.
-    if index_name.id == "_" || value_name.id == "_" {
+    if &*index_name.id == "_" || &*value_name.id == "_" {
         return None;
     }
 

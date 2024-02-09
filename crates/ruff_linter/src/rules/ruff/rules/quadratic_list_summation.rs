@@ -124,7 +124,7 @@ fn func_is_builtin(func: &Expr, name: &str, semantic: &SemanticModel) -> bool {
     let Expr::Name(ast::ExprName { id, .. }) = func else {
         return false;
     };
-    id == name && semantic.is_builtin(id)
+    &**id == name && semantic.is_builtin(id)
 }
 
 /// Returns `true` if the `start` argument to a `sum()` call is an empty list.

@@ -72,7 +72,7 @@ pub(crate) fn all_with_model_form(checker: &mut Checker, class_def: &ast::StmtCl
                 let Expr::Name(ast::ExprName { id, .. }) = target else {
                     continue;
                 };
-                if id != "fields" {
+                if &**id != "fields" {
                     continue;
                 }
                 match value.as_ref() {

@@ -106,7 +106,7 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
     // Type variables must be unique; filter while preserving order.
     let vars = vars
         .into_iter()
-        .unique_by(|TypeVar { name, .. }| name.id.as_str())
+        .unique_by(|TypeVar { name, .. }| &name.id)
         .collect::<Vec<_>>();
 
     let type_params = if vars.is_empty() {
@@ -137,7 +137,12 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
         })
     };
 
-    let mut diagnostic = Diagnostic::new(NonPEP695TypeAlias { name: name.clone() }, stmt.range());
+    let mut diagnostic = Diagnostic::new(
+        NonPEP695TypeAlias {
+            name: name.to_string(),
+        },
+        stmt.range(),
+    );
 
     let edit = Edit::range_replacement(
         checker.generator().stmt(&Stmt::from(StmtTypeAlias {
@@ -186,7 +191,7 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
             Expr::Name(name) if name.ctx.is_load() => {
                 let Some(Stmt::Assign(StmtAssign { value, .. })) = self
                     .semantic
-                    .lookup_symbol(name.id.as_str())
+                    .lookup_symbol(&name.id)
                     .and_then(|binding_id| {
                         self.semantic
                             .binding(binding_id)

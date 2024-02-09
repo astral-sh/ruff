@@ -51,7 +51,7 @@ pub(crate) fn isinstance_type_none(checker: &mut Checker, call: &ast::ExprCall) 
     let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() else {
         return;
     };
-    if id.as_str() != "isinstance" {
+    if &**id != "isinstance" {
         return;
     }
     if !checker.semantic().is_builtin(id) {
@@ -94,7 +94,7 @@ fn is_none(expr: &Expr) -> bool {
                 func, arguments, ..
             }) if arguments.len() == 1 => {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                    if id.as_str() == "type" {
+                    if &**id == "type" {
                         return matches!(arguments.args.first(), Some(Expr::NoneLiteral(_)));
                     }
                 }

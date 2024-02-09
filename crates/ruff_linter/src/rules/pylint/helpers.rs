@@ -122,17 +122,17 @@ impl SequenceIndexVisitor<'_> {
         // diagnostics.
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
-                id == self.sequence_name || id == self.index_name || id == self.value_name
+                &**id == self.sequence_name || &**id == self.index_name || &**id == self.value_name
             }
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
                     return false;
                 };
-                if id == self.sequence_name {
+                if &**id == self.sequence_name {
                     let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() else {
                         return false;
                     };
-                    if id == self.index_name {
+                    if &**id == self.index_name {
                         return true;
                     }
                 }
@@ -184,11 +184,11 @@ impl<'a> Visitor<'_> for SequenceIndexVisitor<'a> {
                 let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
                     return;
                 };
-                if id == self.sequence_name {
+                if &**id == self.sequence_name {
                     let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() else {
                         return;
                     };
-                    if id == self.index_name {
+                    if &**id == self.index_name {
                         self.accesses.push(*range);
                     }
                 }

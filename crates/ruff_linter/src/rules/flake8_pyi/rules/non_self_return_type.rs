@@ -264,7 +264,7 @@ fn is_name(expr: &Expr, name: &str) -> bool {
     let Expr::Name(ast::ExprName { id, .. }) = expr else {
         return false;
     };
-    id.as_str() == name
+    &**id == name
 }
 
 /// Return `true` if the given expression resolves to `typing.Self`.

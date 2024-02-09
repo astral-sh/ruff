@@ -76,7 +76,7 @@ pub(crate) fn mutable_fromkeys_value(checker: &mut Checker, call: &ast::ExprCall
     let Some(name_expr) = value.as_name_expr() else {
         return;
     };
-    if name_expr.id != "dict" {
+    if &*name_expr.id != "dict" {
         return;
     }
     if !checker.semantic().is_builtin("dict") {
@@ -104,7 +104,7 @@ pub(crate) fn mutable_fromkeys_value(checker: &mut Checker, call: &ast::ExprCall
 fn generate_dict_comprehension(keys: &Expr, value: &Expr, generator: Generator) -> String {
     // Construct `key`.
     let key = ast::ExprName {
-        id: "key".to_string(),
+        id: "key".to_string().into_boxed_str(),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };

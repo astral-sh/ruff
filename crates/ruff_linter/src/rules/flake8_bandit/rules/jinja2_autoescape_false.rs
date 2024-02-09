@@ -69,7 +69,7 @@ pub(crate) fn jinja2_autoescape_false(checker: &mut Checker, call: &ast::ExprCal
                 Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. }) => (),
                 Expr::Call(ast::ExprCall { func, .. }) => {
                     if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                        if id != "select_autoescape" {
+                        if &**id != "select_autoescape" {
                             checker.diagnostics.push(Diagnostic::new(
                                 Jinja2AutoescapeFalse { value: true },
                                 keyword.range(),
