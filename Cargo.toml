@@ -65,7 +65,7 @@ pathdiff = { version = "0.2.1" }
 pep440_rs = { version = "0.4.0", features = ["serde"] }
 pretty_assertions = "1.3.0"
 proc-macro2 = { version = "1.0.78" }
-pyproject-toml = { version = "0.8.2" }
+pyproject-toml = { version = "0.9.0" }
 quick-junit = { version = "0.3.5" }
 quote = { version = "1.0.23" }
 rand = { version = "0.8.5" }
