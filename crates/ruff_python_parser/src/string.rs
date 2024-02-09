@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::lexer::{LexicalError, LexicalErrorType};
 use crate::token::{StringKind, Tok};
 
-pub enum StringType {
+pub(crate) enum StringType {
     Str(ast::StringLiteral),
     Bytes(ast::BytesLiteral),
     FString(ast::FString),
@@ -419,7 +419,7 @@ impl StringParser {
     }
 }
 
-pub fn parse_string_literal(
+pub(crate) fn parse_string_literal(
     source: Box<str>,
     kind: StringKind,
     triple_quoted: bool,
@@ -435,7 +435,7 @@ pub fn parse_string_literal(
     StringParser::new(source, kind, start_location, range).parse()
 }
 
-pub fn parse_fstring_literal_element(
+pub(crate) fn parse_fstring_literal_element(
     source: Box<str>,
     is_raw: bool,
     range: TextRange,
@@ -524,7 +524,7 @@ pub(crate) fn concatenated_strings(
 // TODO: consolidate these with ParseError
 /// An error that occurred during parsing of an f-string.
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct FStringError {
+struct FStringError {
     /// The type of error that occurred.
     pub(crate) error: FStringErrorType,
     /// The location of the error.

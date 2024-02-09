@@ -124,10 +124,9 @@ mod function;
 mod invalid;
 // Skip flattening lexer to distinguish from full ruff_python_parser
 pub mod lexer;
-pub mod old_string;
 mod parser;
 mod soft_keywords;
-pub mod string;
+mod string;
 mod token;
 mod token_source;
 pub mod typing;
