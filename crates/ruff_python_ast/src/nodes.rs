@@ -949,7 +949,7 @@ impl Ranged for FStringExpressionElement {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FStringLiteralElement {
     pub range: TextRange,
-    pub value: String,
+    pub value: Box<str>,
 }
 
 impl Ranged for FStringLiteralElement {
@@ -962,7 +962,7 @@ impl Deref for FStringLiteralElement {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        self.value.as_str()
+        &self.value
     }
 }
 
@@ -1607,7 +1607,7 @@ impl Default for BytesLiteralValueInner {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct BytesLiteral {
     pub range: TextRange,
-    pub value: Vec<u8>,
+    pub value: Box<[u8]>,
 }
 
 impl Ranged for BytesLiteral {
@@ -1620,7 +1620,7 @@ impl Deref for BytesLiteral {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        self.value.as_slice()
+        &self.value
     }
 }
 

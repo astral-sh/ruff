@@ -644,7 +644,7 @@ pub struct ComparableBytesLiteral<'a> {
 impl<'a> From<&'a ast::BytesLiteral> for ComparableBytesLiteral<'a> {
     fn from(bytes_literal: &'a ast::BytesLiteral) -> Self {
         Self {
-            value: bytes_literal.value.as_slice(),
+            value: &bytes_literal.value,
         }
     }
 }
