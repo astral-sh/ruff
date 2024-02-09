@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Node;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprContext, Stmt};
+use ruff_python_ast::{self as ast, Comprehension, Expr, ExprContext, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -126,18 +126,13 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
         match expr {
             Expr::Call(ast::ExprCall {
                 func,
-                arguments:
-                    Arguments {
-                        args,
-                        keywords,
-                        range: _,
-                    },
+                arguments,
                 range: _,
             }) => {
                 match func.as_ref() {
                     Expr::Name(ast::ExprName { id, .. }) => {
                         if matches!(id.as_str(), "filter" | "reduce" | "map") {
-                            for arg in args {
+                            for arg in arguments.args.iter() {
                                 if arg.is_lambda_expr() {
                                     self.safe_functions.push(arg);
                                 }
@@ -148,7 +143,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                         if attr == "reduce" {
                             if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
                                 if id == "functools" {
-                                    for arg in args {
+                                    for arg in arguments.args.iter() {
                                         if arg.is_lambda_expr() {
                                             self.safe_functions.push(arg);
                                         }
@@ -160,7 +155,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                     _ => {}
                 }
 
-                for keyword in keywords {
+                for keyword in arguments.keywords.iter() {
                     if keyword.arg.as_ref().is_some_and(|arg| arg == "key")
                         && keyword.value.is_lambda_expr()
                     {

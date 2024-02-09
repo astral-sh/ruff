@@ -90,7 +90,7 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
             continue;
         };
 
-        let ([op], [comparison]) = (ops.as_slice(), comparators.as_slice()) else {
+        let ([op], [comparison]) = (&**ops, &**comparators) else {
             continue;
         };
 

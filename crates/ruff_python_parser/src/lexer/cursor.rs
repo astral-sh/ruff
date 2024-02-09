@@ -145,4 +145,9 @@ impl<'a> Cursor<'a> {
 
         self.chars = self.chars.as_str()[count..].chars();
     }
+
+    /// Skips to the end of the input stream.
+    pub(super) fn skip_to_end(&mut self) {
+        self.chars = "".chars();
+    }
 }

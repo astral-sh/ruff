@@ -140,7 +140,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                     range: _,
                 }) = &loop_.test
                 {
-                    if let ([op], [comparator]) = (ops.as_slice(), comparators.as_slice()) {
+                    if let ([op], [comparator]) = (&**ops, &**comparators) {
                         let op = match op {
                             CmpOp::Eq => CmpOp::NotEq,
                             CmpOp::NotEq => CmpOp::Eq,
@@ -155,8 +155,8 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                         };
                         let node = ast::ExprCompare {
                             left: left.clone(),
-                            ops: vec![op],
-                            comparators: vec![comparator.clone()],
+                            ops: Box::from([op]),
+                            comparators: Box::from([comparator.clone()]),
                             range: TextRange::default(),
                         };
                         node.into()
@@ -391,8 +391,8 @@ fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
     let node2 = ast::ExprCall {
         func: Box::new(node1.into()),
         arguments: Arguments {
-            args: vec![node.into()],
-            keywords: vec![],
+            args: Box::from([node.into()]),
+            keywords: Box::from([]),
             range: TextRange::default(),
         },
         range: TextRange::default(),

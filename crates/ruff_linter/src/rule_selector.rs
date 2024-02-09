@@ -321,6 +321,16 @@ mod schema {
                             true
                         }
                     })
+                    .filter(|_rule| {
+                        // Filter out all test-only rules
+                        #[cfg(feature = "test-rules")]
+                        #[allow(clippy::used_underscore_binding)]
+                        if _rule.starts_with("RUF9") {
+                            return false;
+                        }
+
+                        true
+                    })
                     .sorted()
                     .map(Value::String)
                     .collect(),

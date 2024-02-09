@@ -1483,6 +1483,12 @@ mod tests {
         Rule::UnnecessaryEnumerate,
         Rule::MathConstant,
         Rule::PreviewTestRule,
+        Rule::BlankLineBetweenMethods,
+        Rule::BlankLinesTopLevel,
+        Rule::TooManyBlankLines,
+        Rule::BlankLineAfterDecorator,
+        Rule::BlankLinesAfterFunctionOrClass,
+        Rule::BlankLinesBeforeNestedDefinition,
     ];
 
     #[allow(clippy::needless_pass_by_value)]

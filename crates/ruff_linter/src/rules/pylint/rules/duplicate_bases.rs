@@ -59,7 +59,7 @@ pub(crate) fn duplicate_bases(checker: &mut Checker, name: &str, arguments: Opti
 
     let mut seen: FxHashSet<&str> =
         FxHashSet::with_capacity_and_hasher(bases.len(), BuildHasherDefault::default());
-    for base in bases {
+    for base in bases.iter() {
         if let Expr::Name(ast::ExprName { id, .. }) = base {
             if !seen.insert(id) {
                 checker.diagnostics.push(Diagnostic::new(

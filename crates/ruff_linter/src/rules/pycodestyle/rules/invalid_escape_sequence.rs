@@ -74,7 +74,7 @@ pub(crate) fn invalid_escape_sequence(
             let Some(range) = indexer.fstring_ranges().innermost(token_range.start()) else {
                 return;
             };
-            (value.as_str(), range.start())
+            (&**value, range.start())
         }
         Tok::String { kind, .. } => {
             if kind.is_raw() {

@@ -107,7 +107,7 @@ pub(crate) fn sort_dunder_all_extend_call(
         ..
     }: &ast::ExprCall,
 ) {
-    let ([value_passed], []) = (args.as_slice(), keywords.as_slice()) else {
+    let ([value_passed], []) = (&**args, &**keywords) else {
         return;
     };
     let ast::Expr::Attribute(ast::ExprAttribute {

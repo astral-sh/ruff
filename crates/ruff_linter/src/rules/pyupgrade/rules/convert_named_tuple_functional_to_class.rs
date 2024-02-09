@@ -216,8 +216,8 @@ fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> 
     ast::StmtClassDef {
         name: Identifier::new(typename.to_string(), TextRange::default()),
         arguments: Some(Box::new(Arguments {
-            args: vec![base_class.clone()],
-            keywords: vec![],
+            args: Box::from([base_class.clone()]),
+            keywords: Box::from([]),
             range: TextRange::default(),
         })),
         body,

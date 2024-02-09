@@ -110,7 +110,7 @@ fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
                 .generator()
                 .expr(&Expr::StringLiteral(ast::ExprStringLiteral {
                     value: ast::StringLiteralValue::single(ast::StringLiteral {
-                        value: "locale".to_string(),
+                        value: "locale".to_string().into_boxed_str(),
                         unicode: false,
                         range: TextRange::default(),
                     }),

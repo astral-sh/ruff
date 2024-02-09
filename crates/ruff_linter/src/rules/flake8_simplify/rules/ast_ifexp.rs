@@ -185,8 +185,8 @@ pub(crate) fn if_expr_with_true_false(
                         .into(),
                     ),
                     arguments: Arguments {
-                        args: vec![test.clone()],
-                        keywords: vec![],
+                        args: Box::from([test.clone()]),
+                        keywords: Box::from([]),
                         range: TextRange::default(),
                     },
                     range: TextRange::default(),

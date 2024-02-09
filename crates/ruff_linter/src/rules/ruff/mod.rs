@@ -46,7 +46,8 @@ mod tests {
     #[test_case(Rule::MutableFromkeysValue, Path::new("RUF024.py"))]
     #[test_case(Rule::UnnecessaryDictComprehensionForIterable, Path::new("RUF025.py"))]
     #[test_case(Rule::DefaultFactoryKwarg, Path::new("RUF026.py"))]
-    #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027.py"))]
+    #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_0.py"))]
+    #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_1.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

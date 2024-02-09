@@ -437,8 +437,8 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 let node2 = ast::ExprCall {
                     func: Box::new(node1.into()),
                     arguments: Arguments {
-                        args: vec![target.clone(), node.into()],
-                        keywords: vec![],
+                        args: Box::from([target.clone(), node.into()]),
+                        keywords: Box::from([]),
                         range: TextRange::default(),
                     },
                     range: TextRange::default(),
@@ -480,13 +480,13 @@ fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
     else {
         return None;
     };
-    if ops != &[CmpOp::Eq] {
+    if **ops != [CmpOp::Eq] {
         return None;
     }
     let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
         return None;
     };
-    let [comparator] = comparators.as_slice() else {
+    let [comparator] = &**comparators else {
         return None;
     };
     if !comparator.is_name_expr() {
@@ -551,8 +551,8 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         };
         let node2 = ast::ExprCompare {
             left: Box::new(node1.into()),
-            ops: vec![CmpOp::In],
-            comparators: vec![node.into()],
+            ops: Box::from([CmpOp::In]),
+            comparators: Box::from([node.into()]),
             range: TextRange::default(),
         };
         let in_expr = node2.into();

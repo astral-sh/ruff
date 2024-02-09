@@ -69,7 +69,7 @@ pub(crate) fn bad_version_info_comparison(checker: &mut Checker, test: &Expr) {
         return;
     };
 
-    let ([op], [_right]) = (ops.as_slice(), comparators.as_slice()) else {
+    let ([op], [_right]) = (&**ops, &**comparators) else {
         return;
     };
 

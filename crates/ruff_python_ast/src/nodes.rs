@@ -160,7 +160,7 @@ pub enum Stmt {
 pub struct StmtIpyEscapeCommand {
     pub range: TextRange,
     pub kind: IpyEscapeKind,
-    pub value: String,
+    pub value: Box<str>,
 }
 
 impl From<StmtIpyEscapeCommand> for Stmt {
@@ -671,7 +671,7 @@ impl Expr {
 pub struct ExprIpyEscapeCommand {
     pub range: TextRange,
     pub kind: IpyEscapeKind,
-    pub value: String,
+    pub value: Box<str>,
 }
 
 impl From<ExprIpyEscapeCommand> for Expr {
@@ -894,8 +894,8 @@ impl From<ExprYieldFrom> for Expr {
 pub struct ExprCompare {
     pub range: TextRange,
     pub left: Box<Expr>,
-    pub ops: Vec<CmpOp>,
-    pub comparators: Vec<Expr>,
+    pub ops: Box<[CmpOp]>,
+    pub comparators: Box<[Expr]>,
 }
 
 impl From<ExprCompare> for Expr {
@@ -1384,7 +1384,7 @@ impl Default for StringLiteralValueInner {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StringLiteral {
     pub range: TextRange,
-    pub value: String,
+    pub value: Box<str>,
     pub unicode: bool,
 }
 
@@ -1398,7 +1398,7 @@ impl Deref for StringLiteral {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        self.value.as_str()
+        &self.value
     }
 }
 
@@ -1426,14 +1426,16 @@ struct ConcatenatedStringLiteral {
     /// Each string literal that makes up the concatenated string.
     strings: Vec<StringLiteral>,
     /// The concatenated string value.
-    value: OnceCell<String>,
+    value: OnceCell<Box<str>>,
 }
 
 impl ConcatenatedStringLiteral {
     /// Extracts a string slice containing the entire concatenated string.
     fn to_str(&self) -> &str {
-        self.value
-            .get_or_init(|| self.strings.iter().map(StringLiteral::as_str).collect())
+        self.value.get_or_init(|| {
+            let concatenated: String = self.strings.iter().map(StringLiteral::as_str).collect();
+            concatenated.into_boxed_str()
+        })
     }
 }
 
@@ -2985,8 +2987,8 @@ pub struct ParameterWithDefault {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arguments {
     pub range: TextRange,
-    pub args: Vec<Expr>,
-    pub keywords: Vec<Keyword>,
+    pub args: Box<[Expr]>,
+    pub keywords: Box<[Keyword]>,
 }
 
 /// An entry in the argument list of a function call.
@@ -3880,18 +3882,54 @@ impl Ranged for crate::nodes::ParameterWithDefault {
     }
 }
 
-#[cfg(target_pointer_width = "64")]
-mod size_assertions {
-    use static_assertions::assert_eq_size;
-
+#[cfg(test)]
+mod tests {
     #[allow(clippy::wildcard_imports)]
     use super::*;
 
-    assert_eq_size!(Stmt, [u8; 144]);
-    assert_eq_size!(StmtFunctionDef, [u8; 144]);
-    assert_eq_size!(StmtClassDef, [u8; 104]);
-    assert_eq_size!(StmtTry, [u8; 112]);
-    assert_eq_size!(Expr, [u8; 80]);
-    assert_eq_size!(Pattern, [u8; 96]);
-    assert_eq_size!(Mod, [u8; 32]);
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn size() {
+        assert!(std::mem::size_of::<Stmt>() <= 144);
+        assert!(std::mem::size_of::<StmtFunctionDef>() <= 144);
+        assert!(std::mem::size_of::<StmtClassDef>() <= 104);
+        assert!(std::mem::size_of::<StmtTry>() <= 112);
+        assert!(std::mem::size_of::<Mod>() <= 32);
+        // 96 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<Pattern>(), 88 | 96));
+
+        assert_eq!(std::mem::size_of::<Expr>(), 64);
+        assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
+        assert_eq!(std::mem::size_of::<ExprAwait>(), 16);
+        assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
+        assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 12);
+        assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 40);
+        assert_eq!(std::mem::size_of::<ExprCall>(), 56);
+        assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
+        assert_eq!(std::mem::size_of::<ExprDict>(), 56);
+        assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
+        assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
+        assert_eq!(std::mem::size_of::<ExprFString>(), 48);
+        assert_eq!(std::mem::size_of::<ExprGeneratorExp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprIfExp>(), 32);
+        assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
+        assert_eq!(std::mem::size_of::<ExprLambda>(), 24);
+        assert_eq!(std::mem::size_of::<ExprList>(), 40);
+        assert_eq!(std::mem::size_of::<ExprListComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprName>(), 40);
+        assert_eq!(std::mem::size_of::<ExprNamedExpr>(), 24);
+        assert_eq!(std::mem::size_of::<ExprNoneLiteral>(), 8);
+        assert_eq!(std::mem::size_of::<ExprNumberLiteral>(), 32);
+        assert_eq!(std::mem::size_of::<ExprSet>(), 32);
+        assert_eq!(std::mem::size_of::<ExprSetComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprSlice>(), 32);
+        assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
+        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 48);
+        assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
+        assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
+        assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
+        assert_eq!(std::mem::size_of::<ExprYield>(), 16);
+        assert_eq!(std::mem::size_of::<ExprYieldFrom>(), 16);
+    }
 }
