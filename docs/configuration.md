@@ -460,7 +460,7 @@ ruff check path/to/code/ --select F401 --select F403 --quiet
 ### The `--config` CLI flag
 
 The `--config` flag has two uses. It is most often used to point to the
-configuration file that you would like ruff to use, for example:
+configuration file that you would like Ruff to use, for example:
 
 ```shell
 ruff check path/to/directory --config path/to/ruff.toml
@@ -483,27 +483,27 @@ ruff check path/to/file --config path/to/ruff.toml --config "lint.dummy-variable
 
 Configuration options passed to `--config` are parsed in the same way
 as configuration options in a `ruff.toml` file.
-As such, options specific to the ruff linter need to be prefixed with `lint.`
+As such, options specific to the Ruff linter need to be prefixed with `lint.`
 (`--config "lint.dummy-variable-rgx = '__.*'"` rather than simply
-`--config "dummy-variable-rgx = '__.*'"`), and options specific to the ruff formatter
+`--config "dummy-variable-rgx = '__.*'"`), and options specific to the Ruff formatter
 need to be prefixed with `format.`.
 
 If a specific configuration option is simultaneously overridden by
 a dedicated flag and by the `--config` flag, the dedicated flag
-always takes priority. In this example, the maximum permitted line
-length will be set to 90, not 100:
+takes priority. In this example, the maximum permitted line length
+will be set to 90, not 100:
 
 ```shell
 ruff format path/to/file --line-length=90 --config "line-length=100"
 ```
 
 Specifying `--config "line-length=90"` will override the `line-length`
-setting from *all* configuration files detected by ruff,
+setting from *all* configuration files detected by Ruff,
 including configuration files discovered in subdirectories.
 In this respect, specifying `--config "line-length=90"` has
 the same effect as specifying `--line-length=90`,
 which will similarly override the `line-length` setting from
-all configuration files detected by ruff, regardless of where
+all configuration files detected by Ruff, regardless of where
 a specific configuration file is located.
 
 ### Full command-line interface
