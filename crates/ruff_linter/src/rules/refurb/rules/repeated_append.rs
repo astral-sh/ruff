@@ -280,7 +280,7 @@ fn match_append<'a>(semantic: &'a SemanticModel, stmt: &'a Stmt) -> Option<Appen
     };
 
     // `append` should have just one argument, an element to be added.
-    let [argument] = arguments.args.as_slice() else {
+    let [argument] = &*arguments.args else {
         return None;
     };
 
@@ -361,8 +361,8 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
-            args: vec![tuple.into()],
-            keywords: vec![],
+            args: Box::from([tuple.into()]),
+            keywords: Box::from([]),
             range: TextRange::default(),
         },
         range: TextRange::default(),

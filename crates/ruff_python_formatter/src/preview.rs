@@ -48,6 +48,13 @@ pub(crate) const fn is_wrap_multiple_context_managers_in_parens_enabled(
     context.is_preview()
 }
 
+/// Returns `true` if the [`blank_line_after_nested_stub_class`](https://github.com/astral-sh/ruff/issues/8891) preview style is enabled.
+pub(crate) const fn is_blank_line_after_nested_stub_class_enabled(
+    context: &PyFormatContext,
+) -> bool {
+    context.is_preview()
+}
+
 /// Returns `true` if the [`module_docstring_newlines`](https://github.com/astral-sh/ruff/issues/7995) preview style is enabled.
 pub(crate) const fn is_module_docstring_newlines_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
@@ -65,5 +72,12 @@ pub(crate) const fn is_hex_codes_in_unicode_sequences_enabled(context: &PyFormat
 
 /// Returns `true` if the [`multiline_string_handling`](https://github.com/astral-sh/ruff/issues/8896) preview style is enabled.
 pub(crate) const fn is_multiline_string_handling_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}
+
+/// Returns `true` if the [`multiline_string_handling`](https://github.com/astral-sh/ruff/pull/9725) preview style is enabled.
+/// Black does not [`format docstrings`](https://github.com/psf/black/issues/3493) so we keep this
+/// preview for compatibility with Black.
+pub(crate) const fn is_format_module_docstring_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }

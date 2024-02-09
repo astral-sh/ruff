@@ -106,7 +106,7 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                 range: _,
             }) = arg
             {
-                if let [arg] = args.as_slice() {
+                if let [arg] = &**args {
                     if arg.as_starred_expr().is_none() {
                         let new_arg = Expr::Starred(ast::ExprStarred {
                             value: Box::new(arg.clone()),
@@ -164,8 +164,8 @@ pub(crate) fn nested_min_max(
             let flattened_expr = Expr::Call(ast::ExprCall {
                 func: Box::new(func.clone()),
                 arguments: Arguments {
-                    args: collect_nested_args(min_max, args, checker.semantic()),
-                    keywords: keywords.to_owned(),
+                    args: collect_nested_args(min_max, args, checker.semantic()).into_boxed_slice(),
+                    keywords: Box::from(keywords),
                     range: TextRange::default(),
                 },
                 range: TextRange::default(),

@@ -76,7 +76,7 @@ pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::Expr
     // For a `super` invocation to be unnecessary, the first argument needs to match
     // the enclosing class, and the second argument needs to match the first
     // argument to the enclosing function.
-    let [first_arg, second_arg] = call.arguments.args.as_slice() else {
+    let [first_arg, second_arg] = &*call.arguments.args else {
         return;
     };
 

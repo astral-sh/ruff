@@ -6,6 +6,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
+use crate::options_base::{OptionsMetadata, Visit};
 use ruff_formatter::IndentStyle;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
@@ -14,6 +15,7 @@ use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
 use ruff_linter::rules::isort::settings::RelativeImportsOrder;
 use ruff_linter::rules::isort::{ImportSection, ImportType};
+use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
 use ruff_linter::rules::pydocstyle::settings::Convention;
 use ruff_linter::rules::pylint::settings::ConstantType;
 use ruff_linter::rules::{
@@ -31,7 +33,7 @@ use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 
 use crate::settings::LineEnding;
 
-#[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
@@ -71,14 +73,14 @@ pub struct Options {
     )]
     pub extend: Option<String>,
 
-    /// The style in which violation messages should be formatted: `"text"`
-    /// (default), `"grouped"` (group messages by file), `"json"`
+    /// The style in which violation messages should be formatted: `"full"`
+    /// (shows source),`"concise"` (default), `"grouped"` (group messages by file), `"json"`
     /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
     /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
     /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
     #[option(
-        default = r#""text""#,
-        value_type = r#""text" | "json" | "junit" | "github" | "gitlab" | "pylint" | "azure""#,
+        default = r#""concise""#,
+        value_type = r#""full" | "concise" | "grouped" | "json" | "junit" | "github" | "gitlab" | "pylint" | "azure""#,
         example = r#"
             # Group violations by containing file.
             output-format = "grouped"
@@ -115,6 +117,9 @@ pub struct Options {
             # By default, always show source code snippets.
             show-source = true
         "#
+    )]
+    #[deprecated(
+        note = "`show-source` is deprecated and is now part of `output-format` in the form of `full` or `concise` options. Please update your configuration."
     )]
     pub show_source: Option<bool>,
 
@@ -420,23 +425,23 @@ pub struct Options {
     )]
     pub tab_size: Option<IndentWidth>,
 
+    #[option_group]
     pub lint: Option<LintOptions>,
 
     /// The lint sections specified at the top level.
     #[serde(flatten)]
-    pub lint_top_level: LintCommonOptions,
+    pub lint_top_level: DeprecatedTopLevelLintOptions,
 
     /// Options to configure code formatting.
     #[option_group]
     pub format: Option<FormatOptions>,
 }
 
-/// Experimental section to configure Ruff's linting. This new section will eventually
-/// replace the top-level linting options.
+/// Configures how ruff checks your code.
 ///
-/// Options specified in the `lint` section take precedence over the top-level settings.
+/// Options specified in the `lint` section take precedence over the deprecated top-level settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct LintOptions {
     #[serde(flatten)]
@@ -477,15 +482,67 @@ pub struct LintOptions {
     pub preview: Option<bool>,
 }
 
+/// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
+#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct DeprecatedTopLevelLintOptions(pub LintCommonOptions);
+
+impl OptionsMetadata for DeprecatedTopLevelLintOptions {
+    fn record(_visit: &mut dyn Visit) {
+        // Intentionally empty. Omit all fields from the documentation and instead promote the options under the `lint.` section.
+        // This doesn't create an empty 'common' option  because the field in the `Options` struct is marked with `#[serde(flatten)]`.
+        // Meaning, the code here flattens no-properties into the parent, which is what we want.
+    }
+}
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
+    fn schema_name() -> std::string::String {
+        "DeprecatedTopLevelLintOptions".to_owned()
+    }
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed(std::concat!(
+            std::module_path!(),
+            "::",
+            "DeprecatedTopLevelLintOptions"
+        ))
+    }
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        use schemars::schema::Schema;
+
+        let common_schema = LintCommonOptions::json_schema(gen);
+        let mut schema_obj = common_schema.into_object();
+
+        if let Some(object) = schema_obj.object.as_mut() {
+            for property in object.properties.values_mut() {
+                if let Schema::Object(property_object) = property {
+                    if let Some(metadata) = &mut property_object.metadata {
+                        metadata.deprecated = true;
+                    } else {
+                        property_object.metadata = Some(Box::new(schemars::schema::Metadata {
+                            deprecated: true,
+                            ..schemars::schema::Metadata::default()
+                        }));
+                    }
+                }
+            }
+        }
+
+        Schema::Object(schema_obj)
+    }
+}
+
 // Note: This struct should be inlined into [`LintOptions`] once support for the top-level lint settings
 // is removed.
-
+// Don't add any new options to this struct. Add them to [`LintOptions`] directly to avoid exposing them in the
+// global settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(
-    Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
+    Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct LintCommonOptions {
+    // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
     /// A list of allowed "confusable" Unicode characters to ignore when
     /// enforcing `RUF001`, `RUF002`, and `RUF003`.
     #[option(
@@ -734,6 +791,7 @@ pub struct LintCommonOptions {
     )]
     pub unfixable: Option<Vec<RuleSelector>>,
 
+    // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
     /// Options for the `flake8-annotations` plugin.
     #[option_group]
     pub flake8_annotations: Option<Flake8AnnotationsOptions>,
@@ -830,6 +888,8 @@ pub struct LintCommonOptions {
     #[option_group]
     pub pyupgrade: Option<PyUpgradeOptions>,
 
+    // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
+
     // Tables are required to go last.
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, when considering any matching files.
@@ -857,11 +917,12 @@ pub struct LintCommonOptions {
         "#
     )]
     pub extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
 }
 
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(
-    Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
+    Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Flake8AnnotationsOptions {
@@ -929,7 +990,7 @@ impl Flake8AnnotationsOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -977,7 +1038,7 @@ impl Flake8BanditOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1007,7 +1068,7 @@ impl Flake8BugbearOptions {
     }
 }
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1029,7 +1090,7 @@ impl Flake8BuiltinsOptions {
     }
 }
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1054,7 +1115,7 @@ impl Flake8ComprehensionsOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1108,7 +1169,7 @@ impl Flake8CopyrightOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1127,7 +1188,7 @@ impl Flake8ErrMsgOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1164,7 +1225,7 @@ impl Flake8GetTextOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1197,7 +1258,7 @@ impl Flake8ImplicitStrConcatOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1279,7 +1340,7 @@ impl Flake8ImportConventionsOptions {
     }
 }
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1415,7 +1476,7 @@ impl Flake8PytestStyleOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1487,7 +1548,7 @@ impl Flake8QuotesOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1527,7 +1588,7 @@ impl Flake8SelfOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1584,7 +1645,7 @@ impl Flake8TidyImportsOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1713,7 +1774,7 @@ impl Flake8TypeCheckingOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1736,7 +1797,7 @@ impl Flake8UnusedArgumentsOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2339,7 +2400,7 @@ impl IsortOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2367,7 +2428,7 @@ impl McCabeOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2451,16 +2512,7 @@ impl Pep8NamingOptions {
         self,
     ) -> Result<pep8_naming::settings::Settings, pep8_naming::settings::SettingsError> {
         Ok(pep8_naming::settings::Settings {
-            ignore_names: self
-                .ignore_names
-                .unwrap_or_else(pep8_naming::settings::default_ignore_names)
-                .into_iter()
-                .chain(self.extend_ignore_names.unwrap_or_default())
-                .map(|name| {
-                    IdentifierPattern::new(&name)
-                        .map_err(pep8_naming::settings::SettingsError::InvalidIgnoreName)
-                })
-                .collect::<Result<Vec<_>, pep8_naming::settings::SettingsError>>()?,
+            ignore_names: IgnoreNames::from_options(self.ignore_names, self.extend_ignore_names)?,
             classmethod_decorators: self.classmethod_decorators.unwrap_or_default(),
             staticmethod_decorators: self.staticmethod_decorators.unwrap_or_default(),
         })
@@ -2468,7 +2520,7 @@ impl Pep8NamingOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2540,7 +2592,7 @@ impl PycodestyleOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2630,7 +2682,7 @@ impl PydocstyleOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2658,7 +2710,7 @@ impl PyflakesOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2703,7 +2755,11 @@ pub struct PylintOptions {
     /// (see: `PLR0917`).
     ///
     /// If not specified, defaults to the value of `max-args`.
-    #[option(default = r"3", value_type = "int", example = r"max-pos-args = 3")]
+    #[option(
+        default = r"5", // Needs to be in sync with default of `max-args`.
+        value_type = "int",
+        example = r"max-positional-args = 3"
+    )]
     pub max_positional_args: Option<usize>,
 
     /// Maximum number of local variables allowed for a function or method body (see:
@@ -2762,7 +2818,7 @@ impl PylintOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2816,11 +2872,9 @@ impl PyUpgradeOptions {
     }
 }
 
-/// Experimental: Configures how `ruff format` formats your code.
-///
-/// Please provide feedback in [this discussion](https://github.com/astral-sh/ruff/discussions/7310).
+/// Configures the way ruff formats your code.
 #[derive(
-    Debug, PartialEq, Eq, Default, Deserialize, Serialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Deserialize, Serialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]

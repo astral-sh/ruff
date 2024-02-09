@@ -148,10 +148,10 @@ fn create_class_def_stmt(
     ast::StmtClassDef {
         name: Identifier::new(class_name.to_string(), TextRange::default()),
         arguments: Some(Box::new(Arguments {
-            args: vec![base_class.clone()],
+            args: Box::from([base_class.clone()]),
             keywords: match total_keyword {
-                Some(keyword) => vec![keyword.clone()],
-                None => vec![],
+                Some(keyword) => Box::from([keyword.clone()]),
+                None => Box::from([]),
             },
             range: TextRange::default(),
         })),
@@ -226,7 +226,7 @@ fn fields_from_keywords(keywords: &[Keyword]) -> Option<Vec<Stmt>> {
 
 /// Match the fields and `total` keyword from a `TypedDict` call.
 fn match_fields_and_total(arguments: &Arguments) -> Option<(Vec<Stmt>, Option<&Keyword>)> {
-    match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+    match (&*arguments.args, &*arguments.keywords) {
         // Ex) `TypedDict("MyType", {"a": int, "b": str})`
         ([_typename, fields], [..]) => {
             let total = arguments.find_keyword("total");

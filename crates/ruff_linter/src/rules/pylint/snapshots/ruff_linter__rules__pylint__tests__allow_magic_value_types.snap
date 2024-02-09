@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-magic_value_comparison.py:59:22: PLR2004 Magic value used in comparison, consider replacing "Hunter2" with a constant variable
+magic_value_comparison.py:59:22: PLR2004 Magic value used in comparison, consider replacing `"Hunter2"` with a constant variable
    |
 57 |     pass
 58 | 
@@ -10,7 +10,7 @@ magic_value_comparison.py:59:22: PLR2004 Magic value used in comparison, conside
 60 |     pass
    |
 
-magic_value_comparison.py:65:21: PLR2004 Magic value used in comparison, consider replacing 3.141592653589793 with a constant variable
+magic_value_comparison.py:65:21: PLR2004 Magic value used in comparison, consider replacing `3.141592653589793238` with a constant variable
    |
 63 | pi_estimation = 3.14
 64 | 
@@ -19,13 +19,13 @@ magic_value_comparison.py:65:21: PLR2004 Magic value used in comparison, conside
 66 |     pass
    |
 
-magic_value_comparison.py:74:18: PLR2004 Magic value used in comparison, consider replacing b"something" with a constant variable
+magic_value_comparison.py:77:18: PLR2004 Magic value used in comparison, consider replacing `b"something"` with a constant variable
    |
-72 | user_input = b"Hello, There!"
-73 | 
-74 | if user_input == b"something":  # correct
+75 | user_input = b"Hello, There!"
+76 | 
+77 | if user_input == b"something":  # correct
    |                  ^^^^^^^^^^^^ PLR2004
-75 |     pass
+78 |     pass
    |
 
 

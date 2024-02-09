@@ -132,11 +132,11 @@ fn match_check(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
         ..
     } = if_stmt.test.as_compare_expr()?;
 
-    if ops.as_slice() != [CmpOp::In] {
+    if **ops != [CmpOp::In] {
         return None;
     }
 
-    let [Expr::Name(right @ ast::ExprName { .. })] = comparators.as_slice() else {
+    let [Expr::Name(right @ ast::ExprName { .. })] = &**comparators else {
         return None;
     };
 
@@ -165,7 +165,7 @@ fn match_remove(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
         return None;
     };
 
-    let [arg] = args.as_slice() else {
+    let [arg] = &**args else {
         return None;
     };
 
@@ -191,8 +191,8 @@ fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) ->
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
-            args: vec![element.clone()],
-            keywords: vec![],
+            args: Box::from([element.clone()]),
+            keywords: Box::from([]),
             range: TextRange::default(),
         },
         range: TextRange::default(),

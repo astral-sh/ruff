@@ -70,7 +70,7 @@ pub(crate) fn redundant_log_base(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let [arg, base] = &call.arguments.args.as_slice() else {
+    let [arg, base] = &*call.arguments.args else {
         return;
     };
 

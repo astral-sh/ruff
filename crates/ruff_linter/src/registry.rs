@@ -264,6 +264,11 @@ impl Rule {
             | Rule::BadQuotesMultilineString
             | Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
+            | Rule::BlankLineAfterDecorator
+            | Rule::BlankLineBetweenMethods
+            | Rule::BlankLinesAfterFunctionOrClass
+            | Rule::BlankLinesBeforeNestedDefinition
+            | Rule::BlankLinesTopLevel
             | Rule::CommentedOutCode
             | Rule::EmptyComment
             | Rule::ExtraneousParentheses
@@ -296,6 +301,7 @@ impl Rule {
             | Rule::ShebangNotFirstLine
             | Rule::SingleLineImplicitStringConcatenation
             | Rule::TabIndentation
+            | Rule::TooManyBlankLines
             | Rule::TrailingCommaOnBareTuple
             | Rule::TypeCommentInStub
             | Rule::UselessSemicolon

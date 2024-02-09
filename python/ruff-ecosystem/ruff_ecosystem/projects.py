@@ -206,6 +206,12 @@ class CheckOptions(CommandOptions):
             "check",
             "--no-cache",
             "--exit-zero",
+            # Ignore internal test rules
+            "--ignore",
+            "RUF9",
+            # Use the concise format for comparing violations
+            "--output-format",
+            "concise",
             f"--{'' if self.preview else 'no-'}preview",
         ]
         if self.select:

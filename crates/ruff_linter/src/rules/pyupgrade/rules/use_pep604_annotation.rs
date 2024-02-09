@@ -23,7 +23,7 @@ use crate::settings::types::PythonVersion;
 /// `__future__` annotations are not evaluated at runtime. If your code relies
 /// on runtime type annotations (either directly or via a library like
 /// Pydantic), you can disable this behavior for Python versions prior to 3.10
-/// by setting [`pyupgrade.keep-runtime-typing`] to `true`.
+/// by setting [`lint.pyupgrade.keep-runtime-typing`] to `true`.
 ///
 /// ## Example
 /// ```python
@@ -46,7 +46,7 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## Options
 /// - `target-version`
-/// - `pyupgrade.keep-runtime-typing`
+/// - `lint.pyupgrade.keep-runtime-typing`
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[violation]
@@ -78,12 +78,8 @@ pub(crate) fn use_pep604_annotation(
         && !checker.semantic().in_complex_string_type_definition()
         && is_allowed_value(slice);
 
-    let applicability = if checker.settings.preview.is_enabled() {
-        if checker.settings.target_version >= PythonVersion::Py310 {
-            Applicability::Safe
-        } else {
-            Applicability::Unsafe
-        }
+    let applicability = if checker.settings.target_version >= PythonVersion::Py310 {
+        Applicability::Safe
     } else {
         Applicability::Unsafe
     };

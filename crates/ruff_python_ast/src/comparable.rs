@@ -637,7 +637,7 @@ pub struct ComparableStringLiteral<'a> {
 impl<'a> From<&'a ast::StringLiteral> for ComparableStringLiteral<'a> {
     fn from(string_literal: &'a ast::StringLiteral) -> Self {
         Self {
-            value: string_literal.value.as_str(),
+            value: &string_literal.value,
         }
     }
 }
@@ -650,7 +650,7 @@ pub struct ComparableBytesLiteral<'a> {
 impl<'a> From<&'a ast::BytesLiteral> for ComparableBytesLiteral<'a> {
     fn from(bytes_literal: &'a ast::BytesLiteral) -> Self {
         Self {
-            value: bytes_literal.value.as_slice(),
+            value: &bytes_literal.value,
         }
     }
 }
@@ -1097,10 +1097,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 kind,
                 value,
                 range: _,
-            }) => Self::IpyEscapeCommand(ExprIpyEscapeCommand {
-                kind: *kind,
-                value: value.as_str(),
-            }),
+            }) => Self::IpyEscapeCommand(ExprIpyEscapeCommand { kind: *kind, value }),
             #[allow(deprecated)]
             ast::Expr::Invalid(_) => Self::Invalid,
         }
@@ -1547,10 +1544,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 kind,
                 value,
                 range: _,
-            }) => Self::IpyEscapeCommand(StmtIpyEscapeCommand {
-                kind: *kind,
-                value: value.as_str(),
-            }),
+            }) => Self::IpyEscapeCommand(StmtIpyEscapeCommand { kind: *kind, value }),
             ast::Stmt::Expr(ast::StmtExpr { value, range: _ }) => Self::Expr(StmtExpr {
                 value: value.into(),
             }),

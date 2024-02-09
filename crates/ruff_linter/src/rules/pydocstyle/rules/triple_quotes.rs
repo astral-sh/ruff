@@ -80,14 +80,12 @@ pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
 
-                if checker.settings.preview.is_enabled() {
-                    let body = docstring.body().as_str();
-                    if !body.ends_with('\'') {
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            format!("{prefixes}'''{body}'''"),
-                            docstring.range(),
-                        )));
-                    }
+                let body = docstring.body().as_str();
+                if !body.ends_with('\'') {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        format!("{prefixes}'''{body}'''"),
+                        docstring.range(),
+                    )));
                 }
 
                 checker.diagnostics.push(diagnostic);
@@ -98,14 +96,12 @@ pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
 
-                if checker.settings.preview.is_enabled() {
-                    let body = docstring.body().as_str();
-                    if !body.ends_with('"') {
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            format!("{prefixes}\"\"\"{body}\"\"\""),
-                            docstring.range(),
-                        )));
-                    }
+                let body = docstring.body().as_str();
+                if !body.ends_with('"') {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        format!("{prefixes}\"\"\"{body}\"\"\""),
+                        docstring.range(),
+                    )));
                 }
 
                 checker.diagnostics.push(diagnostic);

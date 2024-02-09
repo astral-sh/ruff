@@ -492,6 +492,8 @@ impl FromIterator<ExtensionPair> for ExtensionMapping {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum SerializationFormat {
     Text,
+    Concise,
+    Full,
     Json,
     JsonLines,
     Junit,
@@ -507,6 +509,8 @@ impl Display for SerializationFormat {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Text => write!(f, "text"),
+            Self::Concise => write!(f, "concise"),
+            Self::Full => write!(f, "full"),
             Self::Json => write!(f, "json"),
             Self::JsonLines => write!(f, "json_lines"),
             Self::Junit => write!(f, "junit"),
@@ -520,13 +524,17 @@ impl Display for SerializationFormat {
     }
 }
 
-impl Default for SerializationFormat {
-    fn default() -> Self {
-        Self::Text
+impl SerializationFormat {
+    pub fn default(preview: bool) -> Self {
+        if preview {
+            Self::Full
+        } else {
+            Self::Concise
+        }
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(try_from = "String")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Version(String);

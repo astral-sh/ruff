@@ -76,8 +76,8 @@ fn parse_error_from_lalrpop(err: LalrpopError<TextSize, Tok, LexicalError>) -> P
             location: TextRange::new(token.0, token.2),
         },
         LalrpopError::User { error } => ParseError {
-            error: ParseErrorType::Lexical(error.error),
-            location: error.location,
+            location: error.location(),
+            error: ParseErrorType::Lexical(error.into_error()),
         },
         LalrpopError::UnrecognizedToken { token, expected } => {
             // Hacky, but it's how CPython does it. See PyParser_AddToken,
@@ -307,5 +307,5 @@ mod size_assertions {
 
     use super::ParenthesizedExpr;
 
-    assert_eq_size!(ParenthesizedExpr, [u8; 88]);
+    assert_eq_size!(ParenthesizedExpr, [u8; 72]);
 }

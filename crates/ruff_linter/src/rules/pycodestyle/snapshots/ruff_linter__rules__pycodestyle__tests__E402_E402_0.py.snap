@@ -1,36 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E402_0.py:25:1: E402 Module level import not at top of file
-   |
-23 | sys.path.insert(0, "some/path")
-24 | 
-25 | import f
-   | ^^^^^^^^ E402
-26 | 
-27 | import matplotlib
-   |
-
-E402_0.py:27:1: E402 Module level import not at top of file
-   |
-25 | import f
-26 | 
-27 | import matplotlib
-   | ^^^^^^^^^^^^^^^^^ E402
-28 | 
-29 | matplotlib.use("Agg")
-   |
-
-E402_0.py:31:1: E402 Module level import not at top of file
-   |
-29 | matplotlib.use("Agg")
-30 | 
-31 | import g
-   | ^^^^^^^^ E402
-32 | 
-33 | __some__magic = 1
-   |
-
 E402_0.py:35:1: E402 Module level import not at top of file
    |
 33 | __some__magic = 1

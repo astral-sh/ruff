@@ -31,23 +31,12 @@ fn ruff_cmd() -> Command {
 }
 
 /// Builder for `ruff check` commands.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct RuffCheck<'a> {
-    output_format: &'a str,
+    output_format: Option<&'a str>,
     config: Option<&'a Path>,
     filename: Option<&'a str>,
     args: Vec<&'a str>,
-}
-
-impl<'a> Default for RuffCheck<'a> {
-    fn default() -> RuffCheck<'a> {
-        RuffCheck {
-            output_format: "text",
-            config: None,
-            filename: None,
-            args: vec![],
-        }
-    }
 }
 
 impl<'a> RuffCheck<'a> {
@@ -61,7 +50,7 @@ impl<'a> RuffCheck<'a> {
     /// Set the `--output-format` option.
     #[must_use]
     fn output_format(mut self, format: &'a str) -> Self {
-        self.output_format = format;
+        self.output_format = Some(format);
         self
     }
 
@@ -82,7 +71,11 @@ impl<'a> RuffCheck<'a> {
     /// Generate a [`Command`] for the `ruff check` command.
     fn build(self) -> Command {
         let mut cmd = ruff_cmd();
-        cmd.args(["--output-format", self.output_format, "--no-cache"]);
+        if let Some(output_format) = self.output_format {
+            cmd.args(["--output-format", output_format]);
+        }
+        cmd.arg("--no-cache");
+
         if let Some(path) = self.config {
             cmd.arg("--config");
             cmd.arg(path);
@@ -743,8 +736,57 @@ fn stdin_parse_error() {
 }
 
 #[test]
-fn show_source() {
-    let mut cmd = RuffCheck::default().args(["--show-source"]).build();
+fn full_output_preview() {
+    let mut cmd = RuffCheck::default().args(["--preview"]).build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("l = 1"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `l`
+      |
+    1 | l = 1
+      | ^ E741
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn full_output_preview_config() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"
+[tool.ruff]
+preview = true
+"#,
+    )?;
+    let mut cmd = RuffCheck::default().config(&pyproject_toml).build();
+    assert_cmd_snapshot!(cmd.pass_stdin("l = 1"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `l`
+      |
+    1 | l = 1
+      | ^ E741
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn full_output_format() {
+    let mut cmd = RuffCheck::default().output_format("full").build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("l = 1"), @r###"
     success: false
@@ -799,15 +841,23 @@ fn show_statistics() {
 
 #[test]
 fn nursery_prefix() {
-    // `--select E` should detect E741, but not E225, which is in the nursery.
-    let mut cmd = RuffCheck::default().args(["--select", "E"]).build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("I=42\n"), @r###"
+    // Should only detect RUF90X, but not the unstable test rules
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "RUF9", "--output-format=concise"])
+        .build();
+    assert_cmd_snapshot!(cmd, @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `I`
-    Found 1 error.
+    -:1:1: RUF900 Hey this is a stable test rule.
+    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
+    -:1:1: RUF920 Hey this is a deprecated test rule.
+    -:1:1: RUF921 Hey this is another deprecated test rule.
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    Found 7 errors.
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     "###);
@@ -815,16 +865,24 @@ fn nursery_prefix() {
 
 #[test]
 fn nursery_all() {
-    // `--select ALL` should detect E741, but not E225, which is in the nursery.
-    let mut cmd = RuffCheck::default().args(["--select", "ALL"]).build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("I=42\n"), @r###"
+    // Should detect RUF90X, but not the unstable test rules
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "ALL", "--output-format=concise"])
+        .build();
+    assert_cmd_snapshot!(cmd, @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `I`
     -:1:1: D100 Missing docstring in public module
-    Found 2 errors.
+    -:1:1: RUF900 Hey this is a stable test rule.
+    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
+    -:1:1: RUF920 Hey this is a deprecated test rule.
+    -:1:1: RUF921 Hey this is another deprecated test rule.
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    Found 8 errors.
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
@@ -834,77 +892,77 @@ fn nursery_all() {
 
 #[test]
 fn nursery_direct() {
-    // `--select E225` should detect E225.
-    let mut cmd = RuffCheck::default().args(["--select", "E225"]).build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("I=42\n"), @r###"
+    // Should fail when a nursery rule is selected without the preview flag
+    // Before Ruff v0.2.0 this would warn
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "RUF912", "--output-format=concise"])
+        .build();
+    assert_cmd_snapshot!(cmd, @r###"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
-    -:1:2: E225 [*] Missing whitespace around operator
-    Found 1 error.
-    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: Selection of nursery rule `E225` without the `--preview` flag is deprecated.
+    ruff failed
+      Cause: Selection of unstable rule `RUF912` without the `--preview` flag is not allowed.
     "###);
 }
 
 #[test]
 fn nursery_group_selector() {
-    // Only nursery rules should be detected e.g. E225 and a warning should be displayed
-    let mut cmd = RuffCheck::default().args(["--select", "NURSERY"]).build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("I=42\n"), @r###"
+    // The NURSERY selector is removed but parses in the CLI for a nicer error message
+    // Before Ruff v0.2.0 this would warn
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "NURSERY", "--output-format=concise"])
+        .build();
+    assert_cmd_snapshot!(cmd, @r###"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
-    -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:2: E225 [*] Missing whitespace around operator
-    Found 2 errors.
-    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The `NURSERY` selector has been deprecated. Use the `--preview` flag instead.
+    ruff failed
+      Cause: The `NURSERY` selector was removed. Use the `--preview` flag instead.
     "###);
 }
 
 #[test]
 fn nursery_group_selector_preview_enabled() {
-    // Only nursery rules should be detected e.g. E225 and a warning should be displayed
+    // When preview mode is enabled, we shouldn't suggest using the `--preview` flag.
+    // Before Ruff v0.2.0 this would warn
     let mut cmd = RuffCheck::default()
         .args(["--select", "NURSERY", "--preview"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("I=42\n"), @r###"
+    assert_cmd_snapshot!(cmd, @r###"
     success: false
-    exit_code: 1
+    exit_code: 2
     ----- stdout -----
-    -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:2: E225 [*] Missing whitespace around operator
-    Found 2 errors.
-    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: The `NURSERY` selector has been deprecated.
+    ruff failed
+      Cause: The `NURSERY` selector was removed. Unstable rules should be selected individually or by their respective groups.
     "###);
 }
 
 #[test]
 fn preview_enabled_prefix() {
-    // E741 and E225 (preview) should both be detected
+    // All the RUF9XX test rules should be triggered
     let mut cmd = RuffCheck::default()
-        .args(["--select", "E", "--preview"])
+        .args(["--select", "RUF9", "--output-format=concise", "--preview"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("I=42\n"), @r###"
+    assert_cmd_snapshot!(cmd, @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `I`
-    -:1:2: E225 [*] Missing whitespace around operator
-    Found 2 errors.
-    [*] 1 fixable with the `--fix` option.
+    -:1:1: RUF900 Hey this is a stable test rule.
+    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
+    -:1:1: RUF911 Hey this is a preview test rule.
+    -:1:1: RUF912 Hey this is a nursery test rule.
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    Found 7 errors.
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     "###);
@@ -913,19 +971,23 @@ fn preview_enabled_prefix() {
 #[test]
 fn preview_enabled_all() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "ALL", "--preview"])
+        .args(["--select", "ALL", "--output-format=concise", "--preview"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("I=42\n"), @r###"
+    assert_cmd_snapshot!(cmd, @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `I`
     -:1:1: D100 Missing docstring in public module
     -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:2: E225 [*] Missing whitespace around operator
-    Found 4 errors.
-    [*] 1 fixable with the `--fix` option.
+    -:1:1: RUF900 Hey this is a stable test rule.
+    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
+    -:1:1: RUF911 Hey this is a preview test rule.
+    -:1:1: RUF912 Hey this is a nursery test rule.
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    Found 9 errors.
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
@@ -935,18 +997,16 @@ fn preview_enabled_all() {
 
 #[test]
 fn preview_enabled_direct() {
-    // E225 should be detected without warning
+    // Should be enabled without warning
     let mut cmd = RuffCheck::default()
-        .args(["--select", "E225", "--preview"])
+        .args(["--select", "RUF911", "--output-format=concise", "--preview"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("I=42\n"), @r###"
+    assert_cmd_snapshot!(cmd, @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:2: E225 [*] Missing whitespace around operator
+    -:1:1: RUF911 Hey this is a preview test rule.
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     "###);
@@ -954,45 +1014,46 @@ fn preview_enabled_direct() {
 
 #[test]
 fn preview_disabled_direct() {
-    // FURB145 is preview not nursery so selecting should be empty
-    let mut cmd = RuffCheck::default().args(["--select", "FURB145"]).build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("a = l[:]\n"), @r###"
+    // RUFF911 is preview so we should warn without selecting
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "RUF911", "--output-format=concise"])
+        .build();
+    assert_cmd_snapshot!(cmd, @r###"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
-    warning: Selection `FURB145` has no effect because the `--preview` flag was not included.
+    warning: Selection `RUF911` has no effect because preview is not enabled.
     "###);
 }
 
 #[test]
 fn preview_disabled_prefix_empty() {
-    // Warns that the selection is empty since all of the CPY rules are in preview
-    let mut cmd = RuffCheck::default().args(["--select", "CPY"]).build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("I=42\n"), @r###"
+    // Warns that the selection is empty since all of the RUF91 rules are in preview
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "RUF91", "--output-format=concise"])
+        .build();
+    assert_cmd_snapshot!(cmd, @r###"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
-    warning: Selection `CPY` has no effect because the `--preview` flag was not included.
+    warning: Selection `RUF91` has no effect because preview is not enabled.
     "###);
 }
 
 #[test]
 fn preview_disabled_does_not_warn_for_empty_ignore_selections() {
     // Does not warn that the selection is empty since the user is not trying to enable the rule
-    let mut cmd = RuffCheck::default().args(["--ignore", "CPY"]).build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("I=42\n"), @r###"
-    success: false
-    exit_code: 1
+    let mut cmd = RuffCheck::default()
+        .args(["--ignore", "RUF9", "--output-format=concise"])
+        .build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: true
+    exit_code: 0
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `I`
-    Found 1 error.
 
     ----- stderr -----
     "###);
@@ -1001,14 +1062,13 @@ fn preview_disabled_does_not_warn_for_empty_ignore_selections() {
 #[test]
 fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
     // Does not warn that the selection is empty since the user is not trying to enable the rule
-    let mut cmd = RuffCheck::default().args(["--fixable", "CPY"]).build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("I=42\n"), @r###"
-    success: false
-    exit_code: 1
+    let mut cmd = RuffCheck::default()
+        .args(["--fixable", "RUF9", "--output-format=concise"])
+        .build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: true
+    exit_code: 0
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `I`
-    Found 1 error.
 
     ----- stderr -----
     "###);
@@ -1018,7 +1078,12 @@ fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
 fn preview_group_selector() {
     // `--select PREVIEW` should error (selector was removed)
     let mut cmd = RuffCheck::default()
-        .args(["--select", "PREVIEW", "--preview"])
+        .args([
+            "--select",
+            "PREVIEW",
+            "--preview",
+            "--output-format=concise",
+        ])
         .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
@@ -1035,20 +1100,235 @@ fn preview_group_selector() {
 
 #[test]
 fn preview_enabled_group_ignore() {
-    // `--select E --ignore PREVIEW` should detect E741 and E225, which is in preview but "E" is more specific.
+    // Should detect stable and unstable rules, RUF9 is more specific than RUF so ignore has no effect
     let mut cmd = RuffCheck::default()
-        .args(["--select", "E", "--ignore", "PREVIEW", "--preview"])
+        .args([
+            "--select",
+            "RUF9",
+            "--ignore",
+            "RUF",
+            "--preview",
+            "--output-format=concise",
+        ])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("I=42\n"), @r###"
+    assert_cmd_snapshot!(cmd, @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: RUF900 Hey this is a stable test rule.
+    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
+    -:1:1: RUF911 Hey this is a preview test rule.
+    -:1:1: RUF912 Hey this is a nursery test rule.
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    Found 7 errors.
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn removed_direct() {
+    // Selection of a removed rule should fail
+    let mut cmd = RuffCheck::default().args(["--select", "RUF931"]).build();
+    assert_cmd_snapshot!(cmd, @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    error: invalid value 'PREVIEW' for '--ignore <RULE_CODE>'
+    ruff failed
+      Cause: Rule `RUF931` was removed and cannot be selected.
+    "###);
+}
 
-    For more information, try '--help'.
+#[test]
+fn removed_direct_multiple() {
+    // Selection of multiple removed rule should fail with a message
+    // including all the rules
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "RUF930", "--select", "RUF931"])
+        .build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: The following rules have been removed and cannot be selected:
+        - RUF930
+        - RUF931
+
+    "###);
+}
+
+#[test]
+fn removed_indirect() {
+    // Selection _including_ a removed rule without matching should not fail
+    // nor should the rule be used
+    let mut cmd = RuffCheck::default().args(["--select", "RUF93"]).build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn redirect_direct() {
+    // Selection of a redirected rule directly should use the new rule and warn
+    let mut cmd = RuffCheck::default().args(["--select", "RUF940"]).build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    Found 1 error.
+
+    ----- stderr -----
+    warning: `RUF940` has been remapped to `RUF950`.
+    "###);
+}
+
+#[test]
+fn redirect_indirect() {
+    // Selection _including_ a redirected rule without matching should not fail
+    // nor should the rule be used
+    let mut cmd = RuffCheck::default().args(["--select", "RUF94"]).build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn redirect_prefix() {
+    // Selection using a redirected prefix should switch to all rules in the
+    // new prefix
+    let mut cmd = RuffCheck::default().args(["--select", "RUF96"]).build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    Found 1 error.
+
+    ----- stderr -----
+    warning: `RUF96` has been remapped to `RUF95`.
+    "###);
+}
+
+#[test]
+fn deprecated_direct() {
+    // Selection of a deprecated rule without preview enabled should still work
+    // but a warning should be displayed
+    let mut cmd = RuffCheck::default().args(["--select", "RUF920"]).build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: RUF920 Hey this is a deprecated test rule.
+    Found 1 error.
+
+    ----- stderr -----
+    warning: Rule `RUF920` is deprecated and will be removed in a future release.
+    "###);
+}
+
+#[test]
+fn deprecated_multiple_direct() {
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "RUF920", "--select", "RUF921"])
+        .build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: RUF920 Hey this is a deprecated test rule.
+    -:1:1: RUF921 Hey this is another deprecated test rule.
+    Found 2 errors.
+
+    ----- stderr -----
+    warning: Rule `RUF920` is deprecated and will be removed in a future release.
+    warning: Rule `RUF921` is deprecated and will be removed in a future release.
+    "###);
+}
+
+#[test]
+fn deprecated_indirect() {
+    // `RUF92` includes deprecated rules but should not warn
+    // since it is not a "direct" selection
+    let mut cmd = RuffCheck::default().args(["--select", "RUF92"]).build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: RUF920 Hey this is a deprecated test rule.
+    -:1:1: RUF921 Hey this is another deprecated test rule.
+    Found 2 errors.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn deprecated_direct_preview_enabled() {
+    // Direct selection of a deprecated rule in preview should fail
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "RUF920", "--preview"])
+        .build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Selection of deprecated rule `RUF920` is not allowed when preview is enabled.
+    "###);
+}
+
+#[test]
+fn deprecated_indirect_preview_enabled() {
+    // `RUF920` is deprecated and should be off by default in preview.
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "RUF92", "--preview"])
+        .build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn deprecated_multiple_direct_preview_enabled() {
+    // Direct selection of the deprecated rules in preview should fail with
+    // a message listing all of the rule codes
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "RUF920", "--select", "RUF921", "--preview"])
+        .build();
+    assert_cmd_snapshot!(cmd, @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Selection of deprecated rules is not allowed when preview is enabled. Remove selection of:
+    	- RUF920
+    	- RUF921
+
     "###);
 }
 
@@ -1153,16 +1433,15 @@ fn check_input_from_argfile() -> Result<()> {
 #[test]
 fn check_hints_hidden_unsafe_fixes() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "F601,UP034"])
+        .args(["--select", "RUF901,RUF902"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+    assert_cmd_snapshot!(cmd,
         @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:14: F601 Dictionary key literal `'a'` repeated
-    -:2:7: UP034 [*] Avoid extraneous parentheses
+    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
     Found 2 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1172,14 +1451,14 @@ fn check_hints_hidden_unsafe_fixes() {
 
 #[test]
 fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
-    let mut cmd = RuffCheck::default().args(["--select", "F601"]).build();
+    let mut cmd = RuffCheck::default().args(["--select", "RUF902"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\n"),
         @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:14: F601 Dictionary key literal `'a'` repeated
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1190,16 +1469,15 @@ fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
 #[test]
 fn check_no_hint_for_hidden_unsafe_fixes_when_disabled() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "F601,UP034", "--no-unsafe-fixes"])
+        .args(["--select", "RUF901,RUF902", "--no-unsafe-fixes"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+    assert_cmd_snapshot!(cmd,
         @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:14: F601 Dictionary key literal `'a'` repeated
-    -:2:7: UP034 [*] Avoid extraneous parentheses
+    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
     Found 2 errors.
     [*] 1 fixable with the --fix option.
 
@@ -1210,7 +1488,7 @@ fn check_no_hint_for_hidden_unsafe_fixes_when_disabled() {
 #[test]
 fn check_no_hint_for_hidden_unsafe_fixes_with_no_safe_fixes_when_disabled() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "F601", "--no-unsafe-fixes"])
+        .args(["--select", "RUF902", "--no-unsafe-fixes"])
         .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\n"),
@@ -1218,7 +1496,7 @@ fn check_no_hint_for_hidden_unsafe_fixes_with_no_safe_fixes_when_disabled() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:14: F601 Dictionary key literal `'a'` repeated
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
     Found 1 error.
 
     ----- stderr -----
@@ -1228,16 +1506,15 @@ fn check_no_hint_for_hidden_unsafe_fixes_with_no_safe_fixes_when_disabled() {
 #[test]
 fn check_shows_unsafe_fixes_with_opt_in() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "F601,UP034", "--unsafe-fixes"])
+        .args(["--select", "RUF901,RUF902", "--unsafe-fixes"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+    assert_cmd_snapshot!(cmd,
         @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:14: F601 [*] Dictionary key literal `'a'` repeated
-    -:2:7: UP034 [*] Avoid extraneous parentheses
+    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: RUF902 [*] Hey this is a stable test rule with an unsafe fix.
     Found 2 errors.
     [*] 2 fixable with the --fix option.
 
@@ -1248,19 +1525,17 @@ fn check_shows_unsafe_fixes_with_opt_in() {
 #[test]
 fn fix_applies_safe_fixes_by_default() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "F601,UP034", "--fix"])
+        .args(["--select", "RUF901,RUF902", "--fix"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+    assert_cmd_snapshot!(cmd,
         @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    x = {'a': 1, 'a': 1}
-    print('foo')
+    # fix from stable-test-rule-safe-fix
 
     ----- stderr -----
-    -:1:14: F601 Dictionary key literal `'a'` repeated
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
     Found 2 errors (1 fixed, 1 remaining).
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
     "###);
@@ -1269,16 +1544,15 @@ fn fix_applies_safe_fixes_by_default() {
 #[test]
 fn fix_applies_unsafe_fixes_with_opt_in() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "F601,UP034", "--fix", "--unsafe-fixes"])
+        .args(["--select", "RUF901,RUF902", "--fix", "--unsafe-fixes"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+    assert_cmd_snapshot!(cmd,
         @r###"
     success: true
     exit_code: 0
     ----- stdout -----
-    x = {'a': 1}
-    print('foo')
+    # fix from stable-test-rule-unsafe-fix
+    # fix from stable-test-rule-safe-fix
 
     ----- stderr -----
     Found 2 errors (2 fixed, 0 remaining).
@@ -1288,7 +1562,7 @@ fn fix_applies_unsafe_fixes_with_opt_in() {
 #[test]
 fn fix_does_not_apply_display_only_fixes() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "B006", "--fix"])
+        .args(["--select", "RUF903", "--fix"])
         .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("def add_to_list(item, some_list=[]): ..."),
@@ -1298,7 +1572,7 @@ fn fix_does_not_apply_display_only_fixes() {
     ----- stdout -----
     def add_to_list(item, some_list=[]): ...
     ----- stderr -----
-    -:1:33: B006 Do not use mutable data structures for argument defaults
+    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     Found 1 error.
     "###);
 }
@@ -1306,7 +1580,7 @@ fn fix_does_not_apply_display_only_fixes() {
 #[test]
 fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "B006", "--fix", "--unsafe-fixes"])
+        .args(["--select", "RUF903", "--fix", "--unsafe-fixes"])
         .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("def add_to_list(item, some_list=[]): ..."),
@@ -1316,7 +1590,7 @@ fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
     ----- stdout -----
     def add_to_list(item, some_list=[]): ...
     ----- stderr -----
-    -:1:33: B006 Do not use mutable data structures for argument defaults
+    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     Found 1 error.
     "###);
 }
@@ -1324,19 +1598,16 @@ fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
 #[test]
 fn fix_only_unsafe_fixes_available() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "F601", "--fix"])
+        .args(["--select", "RUF902", "--fix"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+    assert_cmd_snapshot!(cmd,
         @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    x = {'a': 1, 'a': 1}
-    print(('foo'))
 
     ----- stderr -----
-    -:1:14: F601 Dictionary key literal `'a'` repeated
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
     "###);
@@ -1345,16 +1616,14 @@ fn fix_only_unsafe_fixes_available() {
 #[test]
 fn fix_only_flag_applies_safe_fixes_by_default() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "F601,UP034", "--fix-only"])
+        .args(["--select", "RUF901,RUF902", "--fix-only"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+    assert_cmd_snapshot!(cmd,
         @r###"
     success: true
     exit_code: 0
     ----- stdout -----
-    x = {'a': 1, 'a': 1}
-    print('foo')
+    # fix from stable-test-rule-safe-fix
 
     ----- stderr -----
     Fixed 1 error (1 additional fix available with `--unsafe-fixes`).
@@ -1364,16 +1633,15 @@ fn fix_only_flag_applies_safe_fixes_by_default() {
 #[test]
 fn fix_only_flag_applies_unsafe_fixes_with_opt_in() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "F601,UP034", "--fix-only", "--unsafe-fixes"])
+        .args(["--select", "RUF901,RUF902", "--fix-only", "--unsafe-fixes"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+    assert_cmd_snapshot!(cmd,
         @r###"
     success: true
     exit_code: 0
     ----- stdout -----
-    x = {'a': 1}
-    print('foo')
+    # fix from stable-test-rule-unsafe-fix
+    # fix from stable-test-rule-safe-fix
 
     ----- stderr -----
     Fixed 2 errors.
@@ -1383,18 +1651,15 @@ fn fix_only_flag_applies_unsafe_fixes_with_opt_in() {
 #[test]
 fn diff_shows_safe_fixes_by_default() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "F601,UP034", "--diff"])
+        .args(["--select", "RUF901,RUF902", "--diff"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+    assert_cmd_snapshot!(cmd,
         @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    @@ -1,2 +1,2 @@
-     x = {'a': 1, 'a': 1}
-    -print(('foo'))
-    +print('foo')
+    @@ -0,0 +1 @@
+    +# fix from stable-test-rule-safe-fix
 
 
     ----- stderr -----
@@ -1406,19 +1671,16 @@ fn diff_shows_safe_fixes_by_default() {
 #[test]
 fn diff_shows_unsafe_fixes_with_opt_in() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "F601,UP034", "--diff", "--unsafe-fixes"])
+        .args(["--select", "RUF901,RUF902", "--diff", "--unsafe-fixes"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+    assert_cmd_snapshot!(cmd,
         @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    @@ -1,2 +1,2 @@
-    -x = {'a': 1, 'a': 1}
-    -print(('foo'))
-    +x = {'a': 1}
-    +print('foo')
+    @@ -0,0 +1,2 @@
+    +# fix from stable-test-rule-unsafe-fix
+    +# fix from stable-test-rule-safe-fix
 
 
     ----- stderr -----
@@ -1430,7 +1692,7 @@ fn diff_shows_unsafe_fixes_with_opt_in() {
 #[test]
 fn diff_does_not_show_display_only_fixes_with_unsafe_fixes_enabled() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "B006", "--diff", "--unsafe-fixes"])
+        .args(["--select", "RUF903", "--diff", "--unsafe-fixes"])
         .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("def add_to_list(item, some_list=[]): ..."),
@@ -1446,10 +1708,9 @@ fn diff_does_not_show_display_only_fixes_with_unsafe_fixes_enabled() {
 #[test]
 fn diff_only_unsafe_fixes_available() {
     let mut cmd = RuffCheck::default()
-        .args(["--select", "F601", "--diff"])
+        .args(["--select", "RUF902", "--diff"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+    assert_cmd_snapshot!(cmd,
         @r###"
     success: true
     exit_code: 0
@@ -1469,22 +1730,21 @@ fn check_extend_unsafe_fixes() -> Result<()> {
         &ruff_toml,
         r#"
 [lint]
-extend-unsafe-fixes = ["UP034"]
+extend-unsafe-fixes = ["RUF901"]
 "#,
     )?;
 
     let mut cmd = RuffCheck::default()
         .config(&ruff_toml)
-        .args(["--select", "F601,UP034"])
+        .args(["--select", "RUF901,RUF902"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+    assert_cmd_snapshot!(cmd,
             @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:14: F601 Dictionary key literal `'a'` repeated
-    -:2:7: UP034 Avoid extraneous parentheses
+    -:1:1: RUF901 Hey this is a stable test rule with a safe fix.
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
     Found 2 errors.
     No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
 
@@ -1502,22 +1762,21 @@ fn check_extend_safe_fixes() -> Result<()> {
         &ruff_toml,
         r#"
 [lint]
-extend-safe-fixes = ["F601"]
+extend-safe-fixes = ["RUF902"]
 "#,
     )?;
 
     let mut cmd = RuffCheck::default()
         .config(&ruff_toml)
-        .args(["--select", "F601,UP034"])
+        .args(["--select", "RUF901,RUF902"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+    assert_cmd_snapshot!(cmd,
             @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:14: F601 [*] Dictionary key literal `'a'` repeated
-    -:2:7: UP034 [*] Avoid extraneous parentheses
+    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: RUF902 [*] Hey this is a stable test rule with an unsafe fix.
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
 
@@ -1536,25 +1795,24 @@ fn check_extend_unsafe_fixes_conflict_with_extend_safe_fixes() -> Result<()> {
         &ruff_toml,
         r#"
 [lint]
-extend-unsafe-fixes = ["UP034"]
-extend-safe-fixes = ["UP034"]
+extend-unsafe-fixes = ["RUF902"]
+extend-safe-fixes = ["RUF902"]
 "#,
     )?;
 
     let mut cmd = RuffCheck::default()
         .config(&ruff_toml)
-        .args(["--select", "F601,UP034"])
+        .args(["--select", "RUF901,RUF902"])
         .build();
-    assert_cmd_snapshot!(cmd
-        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+    assert_cmd_snapshot!(cmd,
             @r###"
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:14: F601 Dictionary key literal `'a'` repeated
-    -:2:7: UP034 Avoid extraneous parentheses
+    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
     Found 2 errors.
-    No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     "###);
@@ -1572,14 +1830,14 @@ fn check_extend_unsafe_fixes_conflict_with_extend_safe_fixes_by_specificity() ->
         r#"
 target-version = "py310"
 [lint]
-extend-unsafe-fixes = ["UP", "UP034"]
-extend-safe-fixes = ["UP03"]
+extend-unsafe-fixes = ["RUF", "RUF901"]
+extend-safe-fixes = ["RUF9"]
 "#,
     )?;
 
     let mut cmd = RuffCheck::default()
         .config(&ruff_toml)
-        .args(["--select", "F601,UP018,UP034,UP038"])
+        .args(["--select", "RUF9"])
         .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\nprint(str('foo'))\nisinstance(x, (int, str))\n"),
@@ -1587,12 +1845,15 @@ extend-safe-fixes = ["UP03"]
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:14: F601 Dictionary key literal `'a'` repeated
-    -:2:7: UP034 Avoid extraneous parentheses
-    -:3:7: UP018 Unnecessary `str` call (rewrite as a literal)
-    -:4:1: UP038 [*] Use `X | Y` in `isinstance` call instead of `(X, Y)`
-    Found 4 errors.
-    [*] 1 fixable with the `--fix` option (3 hidden fixes can be enabled with the `--unsafe-fixes` option).
+    -:1:1: RUF900 Hey this is a stable test rule.
+    -:1:1: RUF901 Hey this is a stable test rule with a safe fix.
+    -:1:1: RUF902 [*] Hey this is a stable test rule with an unsafe fix.
+    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
+    -:1:1: RUF920 Hey this is a deprecated test rule.
+    -:1:1: RUF921 Hey this is another deprecated test rule.
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    Found 7 errors.
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
     "###);

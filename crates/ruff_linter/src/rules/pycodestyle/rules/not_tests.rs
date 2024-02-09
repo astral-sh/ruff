@@ -90,7 +90,7 @@ pub(crate) fn not_tests(checker: &mut Checker, unary_op: &ast::ExprUnaryOp) {
         return;
     };
 
-    match ops.as_slice() {
+    match &**ops {
         [CmpOp::In] => {
             if checker.enabled(Rule::NotInTest) {
                 let mut diagnostic = Diagnostic::new(NotInTest, unary_op.operand.range());

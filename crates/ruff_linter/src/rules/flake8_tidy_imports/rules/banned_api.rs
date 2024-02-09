@@ -24,7 +24,7 @@ use crate::rules::flake8_tidy_imports::matchers::NameMatchPolicy;
 /// automatic way.
 ///
 /// ## Options
-/// - `flake8-tidy-imports.banned-api`
+/// - `lint.flake8-tidy-imports.banned-api`
 #[violation]
 pub struct BannedApi {
     name: String,
@@ -58,6 +58,10 @@ pub(crate) fn banned_api<T: Ranged>(checker: &mut Checker, policy: &NameMatchPol
 /// TID251
 pub(crate) fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
     let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
+    if banned_api.is_empty() {
+        return;
+    }
+
     if let Some((banned_path, ban)) =
         checker
             .semantic()

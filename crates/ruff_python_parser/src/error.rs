@@ -38,8 +38,8 @@ impl fmt::Display for ParseError {
 impl From<LexicalError> for ParseError {
     fn from(error: LexicalError) -> Self {
         ParseError {
-            error: ParseErrorType::Lexical(error.error),
-            location: error.location,
+            location: error.location(),
+            error: ParseErrorType::Lexical(error.into_error()),
         }
     }
 }

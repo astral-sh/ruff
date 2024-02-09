@@ -17,9 +17,8 @@ Settings path: "[BASEPATH]/pyproject.toml"
 cache_dir = "[BASEPATH]/.ruff_cache"
 fix = false
 fix_only = false
-output_format = text
+output_format = concise
 show_fixes = false
-show_source = false
 unsafe_fixes = hint
 
 # File Resolver Settings
@@ -206,7 +205,9 @@ linter.external = []
 linter.ignore_init_module_imports = false
 linter.logger_objects = []
 linter.namespace_packages = []
-linter.src = ["[BASEPATH]"]
+linter.src = [
+	"[BASEPATH]",
+]
 linter.tab_size = 4
 linter.line_length = 88
 linter.task_tags = [

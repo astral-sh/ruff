@@ -244,7 +244,10 @@ impl<'src> Parser<'src> {
             let (Tok::Name { name }, _) = self.next_token() else {
                 unreachable!();
             };
-            ast::Identifier { id: name, range }
+            ast::Identifier {
+                id: name.to_string(),
+                range,
+            }
         } else {
             if self.current_kind().is_keyword() {
                 let (tok, range) = self.next_token();
@@ -508,8 +511,8 @@ impl<'src> Parser<'src> {
 
         let arguments = ast::Arguments {
             range: self.node_range(start),
-            args,
-            keywords,
+            args: args.into_boxed_slice(),
+            keywords: keywords.into_boxed_slice(),
         };
 
         if let Err(error) = helpers::validate_arguments(&arguments) {
@@ -737,8 +740,8 @@ impl<'src> Parser<'src> {
 
         ast::ExprCompare {
             left: Box::new(lhs),
-            ops,
-            comparators,
+            ops: ops.into_boxed_slice(),
+            comparators: comparators.into_boxed_slice(),
             range: self.node_range(start),
         }
     }
@@ -758,7 +761,8 @@ impl<'src> Parser<'src> {
         } = tok
         {
             progress.assert_progressing(self);
-            match parse_string_literal(&value, kind, triple_quoted, tok_range) {
+            // TODO: remove clone
+            match parse_string_literal(value.clone(), kind, triple_quoted, tok_range) {
                 Ok(string) => {
                     strings.push(string);
                 }
@@ -768,7 +772,8 @@ impl<'src> Parser<'src> {
                         range: tok_range,
                         unicode: kind.is_unicode(),
                     }));
-                    self.add_error(ParseErrorType::Lexical(error.error), error.location);
+                    let location = error.location();
+                    self.add_error(ParseErrorType::Lexical(error.into_error()), location);
                 }
             }
 
@@ -802,7 +807,7 @@ impl<'src> Parser<'src> {
                 }
                 #[allow(deprecated)]
                 StringType::Invalid(invalid) => Expr::Invalid(ast::ExprInvalid {
-                    value: invalid.value,
+                    value: invalid.value.to_string(),
                     range,
                 }),
                 StringType::FString(_) => unreachable!(),
@@ -810,11 +815,12 @@ impl<'src> Parser<'src> {
         }
 
         concatenated_strings(strings, range).unwrap_or_else(|error| {
-            self.add_error(ParseErrorType::Lexical(error.error), error.location);
+            let location = error.location();
+            self.add_error(ParseErrorType::Lexical(error.into_error()), location);
             #[allow(deprecated)]
             Expr::Invalid(ast::ExprInvalid {
-                value: self.src_text(error.location).into(),
-                range: error.location,
+                value: self.src_text(location).into(),
+                range: location,
             })
         })
     }
@@ -845,7 +851,8 @@ impl<'src> Parser<'src> {
 
                 let range = self.node_range(start);
 
-                match parse_string_literal(&value, kind, triple_quoted, range) {
+                // TODO: remove clone
+                match parse_string_literal(value.clone(), kind, triple_quoted, range) {
                     Ok(string) => {
                         strings.push(string);
                     }
@@ -855,7 +862,8 @@ impl<'src> Parser<'src> {
                             range,
                             unicode: kind.is_unicode(),
                         }));
-                        self.add_error(ParseErrorType::Lexical(error.error), error.location);
+                        let location = error.location();
+                        self.add_error(ParseErrorType::Lexical(error.into_error()), location);
                     }
                 }
             } else {
@@ -883,12 +891,13 @@ impl<'src> Parser<'src> {
         let range = self.node_range(start);
 
         concatenated_strings(strings, range).unwrap_or_else(|error| {
-            self.add_error(ParseErrorType::Lexical(error.error), error.location);
+            let location = error.location();
+            self.add_error(ParseErrorType::Lexical(error.into_error()), location);
 
             #[allow(deprecated)]
             Expr::Invalid(ast::ExprInvalid {
-                value: self.src_text(error.location).into(),
-                range: error.location,
+                value: self.src_text(location).into(),
+                range: location,
             })
         })
     }
@@ -922,19 +931,21 @@ impl<'src> Parser<'src> {
                     FStringElement::Expression(self.parse_fstring_expression_element())
                 }
                 TokenKind::FStringMiddle => {
-                    let (Tok::FStringMiddle { value, is_raw }, range) = self.next_token() else {
+                    let (Tok::FStringMiddle { value, is_raw, .. }, range) = self.next_token()
+                    else {
                         unreachable!()
                     };
-                    let fstring_literal = parse_fstring_literal_element(&value, is_raw, range)
+                    let fstring_literal = parse_fstring_literal_element(value, is_raw, range)
                         .unwrap_or_else(|lex_error| {
+                            let location = lex_error.location();
                             self.add_error(
-                                ParseErrorType::Lexical(lex_error.error),
-                                lex_error.location,
+                                ParseErrorType::Lexical(lex_error.into_error()),
+                                location,
                             );
                             #[allow(deprecated)]
                             ast::FStringElement::Invalid(ast::FStringInvalidElement {
-                                value: self.src_text(lex_error.location).into(),
-                                range: lex_error.location,
+                                value: self.src_text(location).into(),
+                                range: location,
                             })
                         });
                     fstring_literal

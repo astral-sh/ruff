@@ -202,7 +202,10 @@ impl<'src> Parser<'src> {
                     // FIXME(micha): Is this range correct
                     let range = self.node_range(start);
                     Stmt::IpyEscapeCommand(ast::StmtIpyEscapeCommand {
-                        value: self.src_text(parsed_expr.range()).to_string(),
+                        value: self
+                            .src_text(parsed_expr.range())
+                            .to_string()
+                            .into_boxed_str(),
                         kind,
                         range,
                     })
@@ -473,7 +476,7 @@ impl<'src> Parser<'src> {
         let (tok, tok_range) = self.next_token();
         let name = if let Tok::Name { name } = tok {
             Expr::Name(ast::ExprName {
-                id: name,
+                id: name.to_string(),
                 ctx: ExprContext::Store,
                 range: tok_range,
             })

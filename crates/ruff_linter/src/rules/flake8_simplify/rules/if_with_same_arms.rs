@@ -94,17 +94,15 @@ pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt_if: &ast::StmtIf) {
             TextRange::new(current_branch.start(), following_branch.end()),
         );
 
-        if checker.settings.preview.is_enabled() {
-            diagnostic.try_set_fix(|| {
-                merge_branches(
-                    stmt_if,
-                    &current_branch,
-                    following_branch,
-                    checker.locator(),
-                    checker.indexer(),
-                )
-            });
-        }
+        diagnostic.try_set_fix(|| {
+            merge_branches(
+                stmt_if,
+                &current_branch,
+                following_branch,
+                checker.locator(),
+                checker.indexer(),
+            )
+        });
 
         checker.diagnostics.push(diagnostic);
     }
@@ -126,19 +124,9 @@ fn merge_branches(
         return Err(anyhow::anyhow!("Expected colon after test"));
     };
 
-    let mut following_branch_tokenizer =
-        SimpleTokenizer::starts_at(following_branch.test.end(), locator.contents());
-
-    // Identify the colon (`:`) at the end of the following branch's test.
-    let Some(following_branch_colon) =
-        following_branch_tokenizer.find(|token| token.kind == SimpleTokenKind::Colon)
-    else {
-        return Err(anyhow::anyhow!("Expected colon after test"));
-    };
-
     let main_edit = Edit::deletion(
-        locator.full_line_end(current_branch_colon.end()),
-        locator.full_line_end(following_branch_colon.end()),
+        locator.full_line_end(current_branch.end()),
+        locator.full_line_end(following_branch.end()),
     );
 
     // If the test isn't parenthesized, consider parenthesizing it.

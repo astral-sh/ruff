@@ -191,6 +191,11 @@ fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel)
         }
         // Ex) `typing.Union[bool, int]`
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            // If the typing modules were never imported, we'll never match below.
+            if !semantic.seen_typing() {
+                return false;
+            }
+
             let call_path = semantic.resolve_call_path(value);
             if call_path
                 .as_ref()

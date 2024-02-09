@@ -29,6 +29,15 @@ pub trait OptionsMetadata {
     }
 }
 
+impl<T> OptionsMetadata for Option<T>
+where
+    T: OptionsMetadata,
+{
+    fn record(visit: &mut dyn Visit) {
+        T::record(visit);
+    }
+}
+
 /// Metadata of an option that can either be a [`OptionField`] or [`OptionSet`].
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum OptionEntry {

@@ -2,6 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, ExprCall, Int, Number};
 use ruff_python_semantic::analyze::typing::find_assigned_value;
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -47,11 +48,7 @@ impl AlwaysFixableViolation for TrioZeroSleepCall {
 
 /// TRIO115
 pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
-    if !checker
-        .semantic()
-        .resolve_call_path(call.func.as_ref())
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["trio", "sleep"]))
-    {
+    if !checker.semantic().seen_module(Modules::TRIO) {
         return;
     }
 
@@ -62,6 +59,14 @@ pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
     let Some(arg) = call.arguments.find_argument("seconds", 0) else {
         return;
     };
+
+    if !checker
+        .semantic()
+        .resolve_call_path(call.func.as_ref())
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["trio", "sleep"]))
+    {
+        return;
+    }
 
     match arg {
         Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {

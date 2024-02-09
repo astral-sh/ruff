@@ -378,7 +378,7 @@ impl<'src> Parser<'src> {
             }),
             Tok::Name { name } if self.at(TokenKind::Dot) => {
                 let id = Expr::Name(ast::ExprName {
-                    id: name,
+                    id: name.to_string(),
                     ctx: ExprContext::Load,
                     range: tok_range,
                 });
@@ -393,11 +393,11 @@ impl<'src> Parser<'src> {
             Tok::Name { name } => Pattern::MatchAs(ast::PatternMatchAs {
                 range: tok_range,
                 pattern: None,
-                name: if name == "_" {
+                name: if name.contains("_") {
                     None
                 } else {
                     Some(ast::Identifier {
-                        id: name,
+                        id: name.to_string(),
                         range: tok_range,
                     })
                 },

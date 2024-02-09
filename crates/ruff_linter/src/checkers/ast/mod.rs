@@ -31,8 +31,8 @@ use std::path::Path;
 use itertools::Itertools;
 use log::debug;
 use ruff_python_ast::{
-    self as ast, Arguments, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
-    Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt, Suite, UnaryOp,
+    self as ast, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext, Keyword,
+    MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt, Suite, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -197,7 +197,7 @@ impl<'a> Checker<'a> {
         let trailing_quote = trailing_quote(self.locator.slice(string_range))?;
 
         // Invert the quote character, if it's a single quote.
-        match *trailing_quote {
+        match trailing_quote {
             "'" => Some(Quote::Double),
             "\"" => Some(Quote::Single),
             _ => None,
@@ -342,18 +342,10 @@ where
                     || helpers::is_assignment_to_a_dunder(stmt)
                     || helpers::in_nested_block(self.semantic.current_statements())
                     || imports::is_matplotlib_activation(stmt, self.semantic())
-                    || self.settings.preview.is_enabled()
-                        && imports::is_sys_path_modification(stmt, self.semantic()))
+                    || imports::is_sys_path_modification(stmt, self.semantic()))
                 {
                     self.semantic.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }
-            }
-        }
-
-        // Track each top-level import, to guide import insertions.
-        if matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_)) {
-            if self.semantic.at_top_level() {
-                self.importer.visit_import(stmt);
             }
         }
 
@@ -372,14 +364,22 @@ where
                 self.handle_node_load(target);
             }
             Stmt::Import(ast::StmtImport { names, range: _ }) => {
+                if self.semantic.at_top_level() {
+                    self.importer.visit_import(stmt);
+                }
+
                 for alias in names {
-                    if alias.name.contains('.') && alias.asname.is_none() {
-                        // Given `import foo.bar`, `name` would be "foo", and `qualified_name` would be
-                        // "foo.bar".
-                        let name = alias.name.split('.').next().unwrap();
+                    // Given `import foo.bar`, `module` would be "foo", and `call_path` would be
+                    // `["foo", "bar"]`.
+                    let module = alias.name.split('.').next().unwrap();
+
+                    // Mark the top-level module as "seen" by the semantic model.
+                    self.semantic.add_module(module);
+
+                    if alias.asname.is_none() && alias.name.contains('.') {
                         let call_path: Box<[&str]> = alias.name.split('.').collect();
                         self.add_binding(
-                            name,
+                            module,
                             alias.identifier(),
                             BindingKind::SubmoduleImport(SubmoduleImport { call_path }),
                             BindingFlags::EXTERNAL,
@@ -414,8 +414,20 @@ where
                 level,
                 range: _,
             }) => {
+                if self.semantic.at_top_level() {
+                    self.importer.visit_import(stmt);
+                }
+
                 let module = module.as_deref();
                 let level = *level;
+
+                // Mark the top-level module as "seen" by the semantic model.
+                if level.map_or(true, |level| level == 0) {
+                    if let Some(module) = module.and_then(|module| module.split('.').next()) {
+                        self.semantic.add_module(module);
+                    }
+                }
+
                 for alias in names {
                     if let Some("__future__") = module {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
@@ -721,6 +733,21 @@ where
                     AnnotationContext::RuntimeEvaluated => {
                         self.visit_runtime_evaluated_annotation(annotation);
                     }
+                    AnnotationContext::TypingOnly
+                        if flake8_type_checking::helpers::is_dataclass_meta_annotation(
+                            annotation,
+                            self.semantic(),
+                        ) =>
+                    {
+                        if let Expr::Subscript(subscript) = &**annotation {
+                            // Ex) `InitVar[str]`
+                            self.visit_runtime_required_annotation(&subscript.value);
+                            self.visit_annotation(&subscript.slice);
+                        } else {
+                            // Ex) `InitVar`
+                            self.visit_runtime_required_annotation(annotation);
+                        }
+                    }
                     AnnotationContext::TypingOnly => self.visit_annotation(annotation),
                 }
 
@@ -962,12 +989,7 @@ where
             }
             Expr::Call(ast::ExprCall {
                 func,
-                arguments:
-                    Arguments {
-                        args,
-                        keywords,
-                        range: _,
-                    },
+                arguments,
                 range: _,
             }) => {
                 self.visit_expr(func);
@@ -1010,7 +1032,7 @@ where
                 });
                 match callable {
                     Some(typing::Callable::Bool) => {
-                        let mut args = args.iter();
+                        let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_boolean_test(arg);
                         }
@@ -1019,7 +1041,7 @@ where
                         }
                     }
                     Some(typing::Callable::Cast) => {
-                        let mut args = args.iter();
+                        let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_type_definition(arg);
                         }
@@ -1028,7 +1050,7 @@ where
                         }
                     }
                     Some(typing::Callable::NewType) => {
-                        let mut args = args.iter();
+                        let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
                         }
@@ -1037,21 +1059,21 @@ where
                         }
                     }
                     Some(typing::Callable::TypeVar) => {
-                        let mut args = args.iter();
+                        let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
                         }
                         for arg in args {
                             self.visit_type_definition(arg);
                         }
-                        for keyword in keywords {
+                        for keyword in arguments.keywords.iter() {
                             let Keyword {
                                 arg,
                                 value,
                                 range: _,
                             } = keyword;
                             if let Some(id) = arg {
-                                if id == "bound" {
+                                if id.as_str() == "bound" {
                                     self.visit_type_definition(value);
                                 } else {
                                     self.visit_non_type_definition(value);
@@ -1061,7 +1083,7 @@ where
                     }
                     Some(typing::Callable::NamedTuple) => {
                         // Ex) NamedTuple("a", [("a", int)])
-                        let mut args = args.iter();
+                        let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
                         }
@@ -1090,7 +1112,7 @@ where
                             }
                         }
 
-                        for keyword in keywords {
+                        for keyword in arguments.keywords.iter() {
                             let Keyword { arg, value, .. } = keyword;
                             match (arg.as_ref(), value) {
                                 // Ex) NamedTuple("a", **{"a": int})
@@ -1117,7 +1139,7 @@ where
                     }
                     Some(typing::Callable::TypedDict) => {
                         // Ex) TypedDict("a", {"a": int})
-                        let mut args = args.iter();
+                        let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
                         }
@@ -1140,13 +1162,13 @@ where
                         }
 
                         // Ex) TypedDict("a", a=int)
-                        for keyword in keywords {
+                        for keyword in arguments.keywords.iter() {
                             let Keyword { value, .. } = keyword;
                             self.visit_type_definition(value);
                         }
                     }
                     Some(typing::Callable::MypyExtension) => {
-                        let mut args = args.iter();
+                        let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
                             self.visit_type_definition(arg);
@@ -1154,13 +1176,13 @@ where
                             for arg in args {
                                 self.visit_non_type_definition(arg);
                             }
-                            for keyword in keywords {
+                            for keyword in arguments.keywords.iter() {
                                 let Keyword { value, .. } = keyword;
                                 self.visit_non_type_definition(value);
                             }
                         } else {
                             // Ex) DefaultNamedArg(type="bool", name="some_prop_name")
-                            for keyword in keywords {
+                            for keyword in arguments.keywords.iter() {
                                 let Keyword {
                                     value,
                                     arg,
@@ -1178,10 +1200,10 @@ where
                         // If we're in a type definition, we need to treat the arguments to any
                         // other callables as non-type definitions (i.e., we don't want to treat
                         // any strings as deferred type definitions).
-                        for arg in args {
+                        for arg in arguments.args.iter() {
                             self.visit_non_type_definition(arg);
                         }
-                        for keyword in keywords {
+                        for keyword in arguments.keywords.iter() {
                             let Keyword { value, .. } = keyword;
                             self.visit_non_type_definition(value);
                         }

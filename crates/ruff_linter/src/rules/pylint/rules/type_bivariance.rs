@@ -74,6 +74,11 @@ impl Violation for TypeBivariance {
 
 /// PLC0131
 pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr) {
+    // If the typing modules were never imported, we'll never match below.
+    if !checker.semantic().seen_typing() {
+        return;
+    }
+
     let Expr::Call(ast::ExprCall {
         func, arguments, ..
     }) = value

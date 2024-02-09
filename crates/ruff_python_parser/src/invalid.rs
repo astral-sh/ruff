@@ -41,7 +41,7 @@ pub(crate) fn assignment_target(target: &Expr) -> Result<(), LexicalError> {
 
     let err = |location: TextRange| -> LexicalError {
         let error = LexicalErrorType::AssignmentError;
-        LexicalError { error, location }
+        LexicalError::new(error, location)
     };
     match *target {
         BoolOp(ref e) => Err(err(e.range)),

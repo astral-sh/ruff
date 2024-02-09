@@ -71,7 +71,7 @@ impl<'a> FormatSummaryValues<'a> {
         let mut extracted_args: Vec<&Expr> = Vec::new();
         let mut extracted_kwargs: FxHashMap<&str, &Expr> = FxHashMap::default();
 
-        for arg in &call.arguments.args {
+        for arg in call.arguments.args.iter() {
             if matches!(arg, Expr::Starred(..))
                 || contains_quotes(locator.slice(arg))
                 || locator.contains_line_break(arg.range())
@@ -80,7 +80,7 @@ impl<'a> FormatSummaryValues<'a> {
             }
             extracted_args.push(arg);
         }
-        for keyword in &call.arguments.keywords {
+        for keyword in call.arguments.keywords.iter() {
             let Keyword {
                 arg,
                 value,
@@ -298,7 +298,7 @@ fn try_convert_to_f_string(
                             converted.push(']');
                         }
                         FieldNamePart::StringIndex(index) => {
-                            let quote = match *trailing_quote {
+                            let quote = match trailing_quote {
                                 "'" | "'''" | "\"\"\"" => '"',
                                 "\"" => '\'',
                                 _ => unreachable!("invalid trailing quote"),

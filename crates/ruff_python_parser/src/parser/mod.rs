@@ -211,7 +211,7 @@ impl<'src> Parser<'src> {
             match parse_error
                 .location
                 .start()
-                .cmp(&lex_error.location.start())
+                .cmp(&lex_error.location().start())
             {
                 Ordering::Less => merged.push(parse_errors.next().unwrap()),
                 Ordering::Equal => {

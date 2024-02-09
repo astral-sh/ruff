@@ -113,7 +113,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
                 .resolve_call_path(func)
                 .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "dict"]))
             {
-                for keyword in keywords {
+                for keyword in keywords.iter() {
                     if let Some(attr) = &keyword.arg {
                         if is_reserved_attr(attr) {
                             checker.diagnostics.push(Diagnostic::new(

@@ -96,7 +96,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
         };
 
         // Enforced via `is_allowed_value`.
-        let [right] = comparators.as_slice() else {
+        let [right] = &**comparators else {
             return;
         };
 
@@ -136,15 +136,15 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
                 checker.generator().expr(&Expr::Compare(ast::ExprCompare {
                     left: Box::new(value.as_expr().clone()),
                     ops: match bool_op.op {
-                        BoolOp::Or => vec![CmpOp::In],
-                        BoolOp::And => vec![CmpOp::NotIn],
+                        BoolOp::Or => Box::from([CmpOp::In]),
+                        BoolOp::And => Box::from([CmpOp::NotIn]),
                     },
-                    comparators: vec![Expr::Tuple(ast::ExprTuple {
+                    comparators: Box::from([Expr::Tuple(ast::ExprTuple {
                         elts: comparators.iter().copied().cloned().collect(),
                         range: TextRange::default(),
                         ctx: ExprContext::Load,
                         parenthesized: true,
-                    })],
+                    })]),
                     range: bool_op.range(),
                 })),
                 bool_op.range(),
@@ -170,7 +170,7 @@ fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
     };
 
     // Ignore, e.g., `foo == bar == baz`.
-    let [op] = ops.as_slice() else {
+    let [op] = &**ops else {
         return false;
     };
 
@@ -182,7 +182,7 @@ fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
     }
 
     // Ignore self-comparisons, e.g., `foo == foo`.
-    let [right] = comparators.as_slice() else {
+    let [right] = &**comparators else {
         return false;
     };
     if ComparableExpr::from(left) == ComparableExpr::from(right) {

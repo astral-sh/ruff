@@ -1050,6 +1050,7 @@ mod tests {
                 &self.settings.formatter,
                 PySourceType::Python,
                 FormatMode::Write,
+                None,
                 Some(cache),
             )
         }

@@ -21,6 +21,12 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// 1 in {1, 2, 3}
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as the use of a `set` literal will
+/// error at runtime if the sequence contains unhashable elements (like lists
+/// or dictionaries).
+///
 /// ## References
 /// - [What’s New In Python 3.2](https://docs.python.org/3/whatsnew/3.2.html#optimizations)
 #[violation]
@@ -39,7 +45,7 @@ impl AlwaysFixableViolation for LiteralMembership {
 
 /// PLR6201
 pub(crate) fn literal_membership(checker: &mut Checker, compare: &ast::ExprCompare) {
-    let [op] = compare.ops.as_slice() else {
+    let [op] = &*compare.ops else {
         return;
     };
 
@@ -47,7 +53,7 @@ pub(crate) fn literal_membership(checker: &mut Checker, compare: &ast::ExprCompa
         return;
     }
 
-    let [right] = compare.comparators.as_slice() else {
+    let [right] = &*compare.comparators else {
         return;
     };
 

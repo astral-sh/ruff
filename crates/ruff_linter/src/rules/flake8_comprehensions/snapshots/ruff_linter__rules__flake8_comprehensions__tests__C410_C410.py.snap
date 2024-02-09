@@ -33,6 +33,7 @@ C410.py:2:6: C410 [*] Unnecessary `tuple` literal passed to `list()` (rewrite as
   2 |+l2 = [1, 2]
 3 3 | l3 = list([])
 4 4 | l4 = list(())
+5 5 | 
 
 C410.py:3:6: C410 [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
   |
@@ -50,6 +51,8 @@ C410.py:3:6: C410 [*] Unnecessary `list` literal passed to `list()` (remove the 
 3   |-l3 = list([])
   3 |+l3 = []
 4 4 | l4 = list(())
+5 5 | 
+6 6 | 
 
 C410.py:4:6: C410 [*] Unnecessary `tuple` literal passed to `list()` (rewrite as a `list` literal)
   |
@@ -66,5 +69,52 @@ C410.py:4:6: C410 [*] Unnecessary `tuple` literal passed to `list()` (rewrite as
 3 3 | l3 = list([])
 4   |-l4 = list(())
   4 |+l4 = []
+5 5 | 
+6 6 | 
+7 7 | list(  # comment
+
+C410.py:7:1: C410 [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
+   |
+ 7 | / list(  # comment
+ 8 | |     [1, 2]
+ 9 | | )
+   | |_^ C410
+10 |   
+11 |   list([  # comment
+   |
+   = help: Remove outer `list` call
+
+ℹ Unsafe fix
+4  4  | l4 = list(())
+5  5  | 
+6  6  | 
+7     |-list(  # comment
+8     |-    [1, 2]
+9     |-)
+   7  |+[1, 2]
+10 8  | 
+11 9  | list([  # comment
+12 10 |     1, 2
+
+C410.py:11:1: C410 [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
+   |
+ 9 |   )
+10 |   
+11 | / list([  # comment
+12 | |     1, 2
+13 | | ])
+   | |__^ C410
+   |
+   = help: Remove outer `list` call
+
+ℹ Unsafe fix
+8  8  |     [1, 2]
+9  9  | )
+10 10 | 
+11    |-list([  # comment
+   11 |+[  # comment
+12 12 |     1, 2
+13    |-])
+   13 |+]
 
 

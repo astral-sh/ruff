@@ -146,7 +146,7 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
                 return None;
             }
 
-            let [arg] = args.as_slice() else {
+            let [arg] = &**args else {
                 return None;
             };
 

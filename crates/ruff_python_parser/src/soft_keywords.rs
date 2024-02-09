@@ -202,7 +202,9 @@ fn soft_to_name(tok: &Tok) -> Tok {
         Tok::Type => "type",
         _ => unreachable!("other tokens never reach here"),
     };
-    Tok::Name { name: name.into() }
+    Tok::Name {
+        name: name.to_string().into_boxed_str(),
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

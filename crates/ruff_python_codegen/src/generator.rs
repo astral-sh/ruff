@@ -1009,7 +1009,7 @@ impl<'a> Generator<'a> {
                 group_if!(precedence::CMP, {
                     let new_lvl = precedence::CMP + 1;
                     self.unparse_expr(left, new_lvl);
-                    for (op, cmp) in ops.iter().zip(comparators) {
+                    for (op, cmp) in ops.iter().zip(&**comparators) {
                         let op = match op {
                             CmpOp::Eq => " == ",
                             CmpOp::NotEq => " != ",
@@ -1041,7 +1041,7 @@ impl<'a> Generator<'a> {
                         range: _,
                     })],
                     [],
-                ) = (arguments.args.as_slice(), arguments.keywords.as_slice())
+                ) = (arguments.args.as_ref(), arguments.keywords.as_ref())
                 {
                     // Ensure that a single generator doesn't get double-parenthesized.
                     self.unparse_expr(elt, precedence::COMMA);

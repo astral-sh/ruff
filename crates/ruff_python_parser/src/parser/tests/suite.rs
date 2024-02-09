@@ -4,6 +4,12 @@ mod tests {
 
     use crate::{lexer, parse, parse_expression, parse_suite, parse_tokens, Mode};
 
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn size_assertions() {
+        assert_eq!(std::mem::size_of::<ParenthesizedExpr>(), 72);
+    }
+
     #[test]
     fn test_parse_empty() {
         let parse_ast = parse_suite("").unwrap();

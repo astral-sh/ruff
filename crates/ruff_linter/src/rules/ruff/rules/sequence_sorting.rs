@@ -2,7 +2,7 @@
 ///
 /// Examples where these are useful:
 /// - Sorting `__all__` in the global scope,
-/// - Sorting `__slots__` or `__match_args__` in a class scope
+/// - Sorting `__slots__` in a class scope
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
@@ -10,7 +10,7 @@ use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{lexer, Mode, Tok, TokenKind};
 use ruff_python_stdlib::str::is_cased_uppercase;
-use ruff_python_trivia::leading_indentation;
+use ruff_python_trivia::{first_non_trivia_token, leading_indentation, SimpleTokenKind};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -434,6 +434,18 @@ impl MultilineStringSequenceValue {
             locator,
         );
 
+        // We only add a trailing comma to the last item in the sequence
+        // as part of `join_multiline_string_sequence_items()`
+        // if both the following are true:
+        //
+        // (1) The last item in the original sequence had a trailing comma; AND,
+        // (2) The first "semantically significant" token in the postlude is not a comma
+        //     (if the first semantically significant token *is* a comma, and we add another comma,
+        //     we'll end up with two commas after the final item, which would be invalid syntax)
+        let needs_trailing_comma = self.ends_with_trailing_comma
+            && first_non_trivia_token(TextSize::new(0), &postlude)
+                .map_or(true, |tok| tok.kind() != SimpleTokenKind::Comma);
+
         self.items
             .sort_by(|a, b| sorting_style.compare(&a.value, &b.value));
         let joined_items = join_multiline_string_sequence_items(
@@ -441,7 +453,7 @@ impl MultilineStringSequenceValue {
             locator,
             &item_indent,
             newline,
-            self.ends_with_trailing_comma,
+            needs_trailing_comma,
         );
 
         format!("{prelude}{joined_items}{postlude}")
@@ -547,14 +559,14 @@ fn collect_string_sequence_lines(
 /// `self` and produces the classification for the line.
 #[derive(Debug, Default)]
 struct LineState {
-    first_item_in_line: Option<(String, TextRange)>,
-    following_items_in_line: Vec<(String, TextRange)>,
+    first_item_in_line: Option<(Box<str>, TextRange)>,
+    following_items_in_line: Vec<(Box<str>, TextRange)>,
     comment_range_start: Option<TextSize>,
     comment_in_line: Option<TextRange>,
 }
 
 impl LineState {
-    fn visit_string_token(&mut self, token_value: String, token_range: TextRange) {
+    fn visit_string_token(&mut self, token_value: Box<str>, token_range: TextRange) {
         if self.first_item_in_line.is_none() {
             self.first_item_in_line = Some((token_value, token_range));
         } else {
@@ -619,8 +631,8 @@ struct LineWithItems {
     // For elements in the list, we keep track of the value of the
     // value of the element as well as the source-code range of the element.
     // (We need to know the actual value so that we can sort the items.)
-    first_item: (String, TextRange),
-    following_items: Vec<(String, TextRange)>,
+    first_item: (Box<str>, TextRange),
+    following_items: Vec<(Box<str>, TextRange)>,
     // For comments, we only need to keep track of the source-code range.
     trailing_comment_range: Option<TextRange>,
 }
@@ -741,7 +753,7 @@ fn collect_string_sequence_items(
 /// source-code range of `"a"`.
 #[derive(Debug)]
 struct StringSequenceItem {
-    value: String,
+    value: Box<str>,
     preceding_comment_ranges: Vec<TextRange>,
     element_range: TextRange,
     // total_range incorporates the ranges of preceding comments
@@ -754,7 +766,7 @@ struct StringSequenceItem {
 
 impl StringSequenceItem {
     fn new(
-        value: String,
+        value: Box<str>,
         preceding_comment_ranges: Vec<TextRange>,
         element_range: TextRange,
         end_of_line_comments: Option<TextRange>,
@@ -775,7 +787,7 @@ impl StringSequenceItem {
         }
     }
 
-    fn with_no_comments(value: String, element_range: TextRange) -> Self {
+    fn with_no_comments(value: Box<str>, element_range: TextRange) -> Self {
         Self::new(value, vec![], element_range, None)
     }
 }
@@ -883,6 +895,27 @@ fn multiline_string_sequence_postlude<'a>(
     };
     let postlude = locator.slice(TextRange::new(postlude_start, dunder_all_range_end));
 
+    // If the postlude consists solely of a closing parenthesis
+    // (not preceded by any whitespace/newlines),
+    // plus possibly a single trailing comma prior to the parenthesis,
+    // fixup the postlude so that the parenthesis appears on its own line,
+    // and so that the final item has a trailing comma.
+    // This produces formatting more similar
+    // to that which the formatter would produce.
+    if postlude.len() <= 2 {
+        let mut reversed_postlude_chars = postlude.chars().rev();
+        if let Some(closing_paren @ (')' | '}' | ']')) = reversed_postlude_chars.next() {
+            if reversed_postlude_chars.next().map_or(true, |c| c == ',') {
+                return Cow::Owned(format!(",{newline}{leading_indent}{closing_paren}"));
+            }
+        }
+    }
+
+    let newline_chars = ['\r', '\n'];
+    if !postlude.starts_with(newline_chars) {
+        return Cow::Borrowed(postlude);
+    }
+
     // The rest of this function uses heuristics to
     // avoid very long indents for the closing paren
     // that don't match the style for the rest of the
@@ -908,10 +941,6 @@ fn multiline_string_sequence_postlude<'a>(
     //     "y",
     //            ]
     // ```
-    let newline_chars = ['\r', '\n'];
-    if !postlude.starts_with(newline_chars) {
-        return Cow::Borrowed(postlude);
-    }
     if TextSize::of(leading_indentation(
         postlude.trim_start_matches(newline_chars),
     )) <= TextSize::of(item_indent)
@@ -919,7 +948,7 @@ fn multiline_string_sequence_postlude<'a>(
         return Cow::Borrowed(postlude);
     }
     let trimmed_postlude = postlude.trim_start();
-    if trimmed_postlude.starts_with([']', ')']) {
+    if trimmed_postlude.starts_with([']', ')', '}']) {
         return Cow::Owned(format!("{newline}{leading_indent}{trimmed_postlude}"));
     }
     Cow::Borrowed(postlude)

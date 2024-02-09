@@ -25,7 +25,7 @@ impl TokenSource {
 
         let range = match first {
             Ok((_, range)) => *range,
-            Err(LexicalError { location, .. }) => *location,
+            Err(error) => error.location(),
         };
 
         Some(range.start())
@@ -37,7 +37,7 @@ impl TokenSource {
 
         let range = match last {
             Ok((_, range)) => *range,
-            Err(LexicalError { location, .. }) => *location,
+            Err(error) => error.location(),
         };
 
         Some(range.end())
@@ -56,7 +56,7 @@ impl TokenSource {
             if n == 0 {
                 break Some(match next {
                     Ok((token, range)) => (TokenKind::from_token(token), *range),
-                    Err(LexicalError { location, .. }) => (TokenKind::Unknown, *location),
+                    Err(error) => (TokenKind::Unknown, error.location()),
                 });
             }
 
@@ -100,7 +100,7 @@ impl Iterator for TokenSource {
                 }
 
                 Err(error) => {
-                    let location = error.location;
+                    let location = error.location();
                     self.errors.push(error);
                     break Some((Tok::Unknown, location));
                 }

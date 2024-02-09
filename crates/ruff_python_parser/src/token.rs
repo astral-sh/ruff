@@ -17,7 +17,7 @@ pub enum Tok {
     /// Token value for a name, commonly known as an identifier.
     Name {
         /// The name value.
-        name: String,
+        name: Box<str>,
     },
     /// Token value for an integer.
     Int {
@@ -39,7 +39,7 @@ pub enum Tok {
     /// Token value for a string.
     String {
         /// The string value.
-        value: String,
+        value: Box<str>,
         /// The kind of string.
         kind: StringKind,
         /// Whether the string is triple quoted.
@@ -52,9 +52,11 @@ pub enum Tok {
     /// part of the expression part and isn't an opening or closing brace.
     FStringMiddle {
         /// The string value.
-        value: String,
+        value: Box<str>,
         /// Whether the string is raw or not.
         is_raw: bool,
+        /// Whether the string is triple quoted.
+        triple_quoted: bool,
     },
     /// Token value for the end of an f-string. This includes the closing quote.
     FStringEnd,
@@ -62,12 +64,12 @@ pub enum Tok {
     /// only when the mode is [`Mode::Ipython`].
     IpyEscapeCommand {
         /// The magic command value.
-        value: String,
+        value: Box<str>,
         /// The kind of magic command.
         kind: IpyEscapeKind,
     },
     /// Token value for a comment. These are filtered out of the token stream prior to parsing.
-    Comment(String),
+    Comment(Box<str>),
     /// Token value for a newline.
     Newline,
     /// Token value for a newline that is not a logical line break. These are filtered out of
@@ -997,4 +999,15 @@ impl TryFrom<TokenKind> for UnaryOp {
             _ => return Err(()),
         })
     }
+}
+
+#[cfg(target_pointer_width = "64")]
+mod sizes {
+    use crate::lexer::{LexicalError, LexicalErrorType};
+    use crate::Tok;
+    use static_assertions::assert_eq_size;
+
+    assert_eq_size!(Tok, [u8; 24]);
+    assert_eq_size!(LexicalErrorType, [u8; 24]);
+    assert_eq_size!(Result<Tok, LexicalError>, [u8; 32]);
 }

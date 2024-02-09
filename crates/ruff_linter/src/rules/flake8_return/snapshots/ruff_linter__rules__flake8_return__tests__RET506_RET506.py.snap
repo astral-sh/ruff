@@ -10,6 +10,7 @@ RET506.py:8:5: RET506 Unnecessary `elif` after `raise` statement
  9 |         b = 2
 10 |         raise Exception(w)
    |
+   = help: Remove unnecessary `elif`
 
 RET506.py:23:5: RET506 Unnecessary `elif` after `raise` statement
    |
@@ -20,6 +21,7 @@ RET506.py:23:5: RET506 Unnecessary `elif` after `raise` statement
 24 |         raise Exception(y)
 25 |     else:
    |
+   = help: Remove unnecessary `elif`
 
 RET506.py:34:5: RET506 Unnecessary `else` after `raise` statement
    |
@@ -30,6 +32,7 @@ RET506.py:34:5: RET506 Unnecessary `else` after `raise` statement
 35 |         b = 2
 36 |         raise Exception(z)
    |
+   = help: Remove unnecessary `else`
 
 RET506.py:45:9: RET506 Unnecessary `else` after `raise` statement
    |
@@ -40,6 +43,7 @@ RET506.py:45:9: RET506 Unnecessary `else` after `raise` statement
 46 |             c = 3
 47 |             raise Exception(x)
    |
+   = help: Remove unnecessary `else`
 
 RET506.py:60:5: RET506 Unnecessary `else` after `raise` statement
    |
@@ -50,6 +54,7 @@ RET506.py:60:5: RET506 Unnecessary `else` after `raise` statement
 61 |         c = 3
 62 |     raise Exception(y)
    |
+   = help: Remove unnecessary `else`
 
 RET506.py:70:9: RET506 Unnecessary `else` after `raise` statement
    |
@@ -60,6 +65,7 @@ RET506.py:70:9: RET506 Unnecessary `else` after `raise` statement
 71 |             b = 2
 72 |     else:
    |
+   = help: Remove unnecessary `else`
 
 RET506.py:80:5: RET506 Unnecessary `else` after `raise` statement
    |
@@ -70,5 +76,6 @@ RET506.py:80:5: RET506 Unnecessary `else` after `raise` statement
 81 |         try:
 82 |             raise Exception(False)
    |
+   = help: Remove unnecessary `else`
 
 
