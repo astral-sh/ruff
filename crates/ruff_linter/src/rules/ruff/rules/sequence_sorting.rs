@@ -902,10 +902,13 @@ fn multiline_string_sequence_postlude<'a>(
     // and so that the final item has a trailing comma.
     // This produces formatting more similar
     // to that which the formatter would produce.
-    let parenthesis_re = regex::Regex::new(r"^,?([\])}])$").unwrap();
-    if let Some(captures) = parenthesis_re.captures(postlude) {
-        let closing_paren = &captures[1];
-        return Cow::Owned(format!(",{newline}{leading_indent}{closing_paren}"));
+    if postlude.len() <= 2 {
+        let mut reversed_postlude_chars = postlude.chars().rev();
+        if let Some(closing_paren @ (')' | '}' | ']')) = reversed_postlude_chars.next() {
+            if reversed_postlude_chars.next().map_or(true, |c| c == ',') {
+                return Cow::Owned(format!(",{newline}{leading_indent}{closing_paren}"));
+            }
+        }
     }
 
     let newline_chars = ['\r', '\n'];
