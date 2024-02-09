@@ -306,6 +306,7 @@ impl StringPart {
         normalize_hex: bool,
     ) -> NormalizedString<'a> {
         // Per PEP 8, always prefer double quotes for triple-quoted strings.
+        // Except when using quote-style-preserve.
         let preferred_style = if self.quotes.triple {
             // ... unless we're formatting a code snippet inside a docstring,
             // then we specifically want to invert our quote style to avoid
@@ -354,6 +355,8 @@ impl StringPart {
             // if it doesn't have perfect alignment with PEP8.
             if let Some(quote) = parent_docstring_quote_char {
                 QuoteStyle::from(quote.invert())
+            } else if configured_style.is_preserve() {
+                QuoteStyle::Preserve
             } else {
                 QuoteStyle::Double
             }

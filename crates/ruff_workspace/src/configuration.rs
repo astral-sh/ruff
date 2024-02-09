@@ -166,12 +166,6 @@ impl Configuration {
             PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
         };
 
-        if quote_style == QuoteStyle::Preserve && !format_preview.is_enabled() {
-            return Err(anyhow!(
-                "'quote-style = preserve' is a preview only feature. Run with '--preview' to enable it."
-            ));
-        }
-
         let formatter = FormatterSettings {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
             extension: self.extension.clone().unwrap_or_default(),
