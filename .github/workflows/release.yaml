@@ -59,7 +59,7 @@ jobs:
       - name: "Archive binary"
         run: |
           ARCHIVE_FILE=ruff-${{ inputs.tag }}-x86_64-apple-darwin.tar.gz
-          tar czvf $ARCHIVE_FILE -C target/x86_64-apple-darwin/release ruff
+          tar czvf $ARCHIVE_FILE -C target/x86_64-apple-darwin/debug ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v3
