@@ -449,14 +449,69 @@ Alternatively, pass the notebook file(s) to `ruff` on the command-line directly.
 
 ## Command-line interface
 
-Some configuration options can be provided via the command-line, such as those related to rule
-enablement and disablement, file discovery, logging level, and more:
+Some configuration options can be provided or overridden via dedicated flags on the command line.
+This includes those related to rule enablement and disablement,
+file discovery, logging level, and more:
 
 ```shell
 ruff check path/to/code/ --select F401 --select F403 --quiet
 ```
 
-See `ruff help` for more on Ruff's top-level commands:
+All other configuration options can be set via the command line
+using the `--config` flag, detailed below.
+
+### The `--config` CLI flag
+
+The `--config` flag has two uses. It is most often used to point to the
+configuration file that you would like Ruff to use, for example:
+
+```shell
+ruff check path/to/directory --config path/to/ruff.toml
+```
+
+However, the `--config` flag can also be used to provide arbitrary
+overrides of configuration settings using TOML `<KEY> = <VALUE>` pairs.
+This is mostly useful in situations where you wish to override a configuration setting
+that does not have a dedicated command-line flag.
+
+In the below example, the `--config` flag is the only way of overriding the
+`dummy-variable-rgx` configuration setting from the command line,
+since this setting has no dedicated CLI flag. The `per-file-ignores` setting
+could also have been overridden via the `--per-file-ignores` dedicated flag,
+but using `--config` to override the setting is also fine:
+
+```shell
+ruff check path/to/file --config path/to/ruff.toml --config "lint.dummy-variable-rgx = '__.*'" --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
+```
+
+Configuration options passed to `--config` are parsed in the same way
+as configuration options in a `ruff.toml` file.
+As such, options specific to the Ruff linter need to be prefixed with `lint.`
+(`--config "lint.dummy-variable-rgx = '__.*'"` rather than simply
+`--config "dummy-variable-rgx = '__.*'"`), and options specific to the Ruff formatter
+need to be prefixed with `format.`.
+
+If a specific configuration option is simultaneously overridden by
+a dedicated flag and by the `--config` flag, the dedicated flag
+takes priority. In this example, the maximum permitted line length
+will be set to 90, not 100:
+
+```shell
+ruff format path/to/file --line-length=90 --config "line-length=100"
+```
+
+Specifying `--config "line-length=90"` will override the `line-length`
+setting from *all* configuration files detected by Ruff,
+including configuration files discovered in subdirectories.
+In this respect, specifying `--config "line-length=90"` has
+the same effect as specifying `--line-length=90`,
+which will similarly override the `line-length` setting from
+all configuration files detected by Ruff, regardless of where
+a specific configuration file is located.
+
+### Full command-line interface
+
+See `ruff help` for the full list of Ruff's top-level commands:
 
 <!-- Begin auto-generated command help. -->
 
@@ -541,9 +596,13 @@ Options:
       --preview
           Enable preview mode; checks will include unstable rules and fixes.
           Use `--no-preview` to disable
-      --config <CONFIG>
-          Path to the `pyproject.toml` or `ruff.toml` file to use for
-          configuration
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
       --extension <EXTENSION>
           List of mappings from file extension to language (one of ["python",
           "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython
@@ -640,9 +699,13 @@ Options:
           Avoid writing any formatted files back; instead, exit with a non-zero
           status code and the difference between the current file and how the
           formatted file would look like
-      --config <CONFIG>
-          Path to the `pyproject.toml` or `ruff.toml` file to use for
-          configuration
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
       --extension <EXTENSION>
           List of mappings from file extension to language (one of ["python",
           "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython

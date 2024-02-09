@@ -29,7 +29,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::resolver::{match_exclusion, python_files_in_path, ResolvedFile, Resolver};
 use ruff_workspace::FormatterSettings;
 
-use crate::args::{CliOverrides, FormatArguments, FormatRange};
+use crate::args::{ConfigArguments, FormatArguments, FormatRange};
 use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches};
 use crate::panic::{catch_unwind, PanicError};
 use crate::resolve::resolve;
@@ -60,18 +60,17 @@ impl FormatMode {
 /// Format a set of files, and return the exit status.
 pub(crate) fn format(
     cli: FormatArguments,
-    overrides: &CliOverrides,
+    config_arguments: &ConfigArguments,
     log_level: LogLevel,
 ) -> Result<ExitStatus> {
     let pyproject_config = resolve(
         cli.isolated,
-        cli.config.as_deref(),
-        overrides,
+        config_arguments,
         cli.stdin_filename.as_deref(),
     )?;
     let mode = FormatMode::from_cli(&cli);
     let files = resolve_default_files(cli.files, false);
-    let (paths, resolver) = python_files_in_path(&files, &pyproject_config, overrides)?;
+    let (paths, resolver) = python_files_in_path(&files, &pyproject_config, config_arguments)?;
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
