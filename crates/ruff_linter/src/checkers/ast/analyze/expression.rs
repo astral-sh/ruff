@@ -1307,6 +1307,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::NonOctalPermissions) {
                 ruff::rules::non_octal_permissions(checker, call);
             }
+            if checker.is_rule_enabled(Rule::MissingAwaitForCoroutine) {
+                ruff::rules::missing_await_for_coroutine(checker, call);
+            }
             if checker.is_rule_enabled(Rule::AssertRaisesException) {
                 flake8_bugbear::rules::assert_raises_exception_call(checker, call);
             }
