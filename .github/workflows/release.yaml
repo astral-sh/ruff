@@ -48,7 +48,7 @@ jobs:
           # Set env var: MACOSX_DEPLOYMENT_TARGET: 10.14
           docker-options: --env MACOSX_DEPLOYMENT_TARGET=10.14
           target: x86_64
-          args: --dev --locked --out dist
+          args: --locked --out dist
         env:
           MACOSX_DEPLOYMENT_TARGET: 10.14
       - name: "Upload wheels"
