@@ -436,6 +436,15 @@ class Test:
 # end
 
 
+# no error
+def test():
+    pass
+  
+  # Wrongly indented comment
+    pass
+# end
+
+
 # E301
 class Class(object):
 
@@ -531,6 +540,20 @@ def f():
 @decorator
 def g():
     pass
+# end
+
+
+# E302
+class Test:
+	
+	pass
+	
+	def method1():
+		return 1
+		
+		
+	def method2():
+		return 22
 # end
 
 
@@ -645,6 +668,15 @@ class Test:
 
     def b(self):
         pass
+# end
+
+
+# E303
+def fn():
+    pass
+
+ 
+    pass
 # end
 
 

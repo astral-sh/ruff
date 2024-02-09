@@ -501,7 +501,6 @@ impl BlankLines {
                 }
             }
             BlankLines::Many { count, range } => {
-                assert_eq!(range.end(), line_range.start());
                 *count = count.saturating_add(1);
                 *range = TextRange::new(range.start(), line_range.end());
             }
