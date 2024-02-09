@@ -72,6 +72,7 @@ jobs:
   macos:
     needs: macos-x86_64
     strategy:
+      fail-fast: false
       matrix:
         os: ["macos-11", "macos-12", "macos-13"]
     runs-on: ${{ matrix.os}}
