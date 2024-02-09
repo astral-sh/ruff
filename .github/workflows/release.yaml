@@ -48,7 +48,7 @@ jobs:
           # Set env var: MACOSX_DEPLOYMENT_TARGET: 10.14
           docker-options: --env MACOSX_DEPLOYMENT_TARGET=10.14
           target: x86_64
-          args: --locked --out dist
+          args: --locked --out dist --profile profiling
         env:
           MACOSX_DEPLOYMENT_TARGET: 10.14
       - name: "Upload wheels"
@@ -59,7 +59,7 @@ jobs:
       - name: "Archive binary"
         run: |
           ARCHIVE_FILE=ruff-${{ inputs.tag }}-x86_64-apple-darwin.tar.gz
-          tar czvf $ARCHIVE_FILE -C target/x86_64-apple-darwin/debug ruff
+          tar czvf $ARCHIVE_FILE -C target/x86_64-apple-darwin/profiling ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v3
