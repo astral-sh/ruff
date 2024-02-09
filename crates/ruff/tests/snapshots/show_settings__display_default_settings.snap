@@ -205,7 +205,9 @@ linter.external = []
 linter.ignore_init_module_imports = false
 linter.logger_objects = []
 linter.namespace_packages = []
-linter.src = ["[BASEPATH]"]
+linter.src = [
+	"[BASEPATH]",
+]
 linter.tab_size = 4
 linter.line_length = 88
 linter.task_tags = [

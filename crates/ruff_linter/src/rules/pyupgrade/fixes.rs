@@ -21,7 +21,7 @@ pub(crate) fn remove_import_members(contents: &str, members: &[&str]) -> String 
                 let last_range = names.last_mut().unwrap();
                 *last_range = TextRange::new(last_range.start(), range.end());
             } else {
-                if members.contains(&name.as_str()) {
+                if members.contains(&&**name) {
                     removal_indices.push(names.len());
                 }
                 names.push(range);

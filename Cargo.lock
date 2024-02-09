@@ -217,12 +217,12 @@ checksum = "327762f6e5a765692301e5bb513e0d9fef63be86bbc14528052b1cd3e6f03e07"
 
 [[package]]
 name = "bstr"
-version = "1.6.2"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c2f7349907b712260e64b0afe2f84692af14a454be26187d9df565c7f69266a"
+checksum = "c48f0051a4b4c5e0b6d365cd04af53aeaa209e3cc15ec2cdb69e73cc87fbd0dc"
 dependencies = [
  "memchr",
- "regex-automata 0.3.9",
+ "regex-automata 0.4.3",
  "serde",
 ]
 
@@ -1571,18 +1571,6 @@ checksum = "9fa00462b37ead6d11a82c9d568b26682d78e0477dc02d1966c013af80969739"
 
 [[package]]
 name = "pep440_rs"
-version = "0.3.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "887f66cc62717ea72caac4f1eb4e6f392224da3ffff3f40ec13ab427802746d6"
-dependencies = [
- "lazy_static",
- "regex",
- "serde",
- "unicode-width",
-]
-
-[[package]]
-name = "pep440_rs"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0c29f9c43de378b4e4e0cd7dbcce0e5cfb80443de8c05620368b2948bc936a1"
@@ -1595,12 +1583,12 @@ dependencies = [
 
 [[package]]
 name = "pep508_rs"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0713d7bb861ca2b7d4c50a38e1f31a4b63a2e2df35ef1e5855cc29e108453e2"
+checksum = "910c513bea0f4f833122321c0f20e8c704e01de98692f6989c2ec21f43d88b1e"
 dependencies = [
  "once_cell",
- "pep440_rs 0.3.12",
+ "pep440_rs",
  "regex",
  "serde",
  "thiserror",
@@ -1780,12 +1768,12 @@ dependencies = [
 
 [[package]]
 name = "pyproject-toml"
-version = "0.8.2"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef61ae096a2f8c8b49eca360679dbc25f57c99145f6634b6bc18fedb1f9c6c30"
+checksum = "95c3dd745f99aa3c554b7bb00859f7d18c2f1d6afd749ccc86d60b61e702abd9"
 dependencies = [
  "indexmap",
- "pep440_rs 0.4.0",
+ "pep440_rs",
  "pep508_rs",
  "serde",
  "toml",
@@ -1932,12 +1920,6 @@ checksum = "6c230d73fb8d8c1b9c0b3135c5142a8acee3a0558fb8db5cf1cb65f8d7862132"
 dependencies = [
  "regex-syntax 0.6.29",
 ]
-
-[[package]]
-name = "regex-automata"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59b23e92ee4318893fa3fe3e6fb365258efbfe6ac6ab30f090cdcbb7aa37efa9"
 
 [[package]]
 name = "regex-automata"
@@ -2190,7 +2172,7 @@ dependencies = [
  "once_cell",
  "path-absolutize",
  "pathdiff",
- "pep440_rs 0.4.0",
+ "pep440_rs",
  "pretty_assertions",
  "pyproject-toml",
  "quick-junit",
@@ -2278,7 +2260,6 @@ dependencies = [
  "rustc-hash",
  "serde",
  "smallvec",
- "static_assertions",
 ]
 
 [[package]]
@@ -2356,6 +2337,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bitflags 2.4.1",
+ "bstr",
  "insta",
  "is-macro",
  "itertools 0.12.1",
@@ -2495,7 +2477,7 @@ dependencies = [
  "log",
  "once_cell",
  "path-absolutize",
- "pep440_rs 0.4.0",
+ "pep440_rs",
  "regex",
  "ruff_cache",
  "ruff_formatter",

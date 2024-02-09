@@ -88,7 +88,7 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &mut Checker, f_string:
         }
 
         // Can't be a conversion otherwise.
-        let [arg] = args.as_slice() else {
+        let [arg] = &**args else {
             continue;
         };
 

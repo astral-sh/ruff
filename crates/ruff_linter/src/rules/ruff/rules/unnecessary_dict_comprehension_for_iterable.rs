@@ -160,11 +160,11 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
     let iterable = generator.iter.clone();
     let args = Arguments {
         args: if value.is_none_literal_expr() {
-            vec![iterable]
+            Box::from([iterable])
         } else {
-            vec![iterable, value.clone()]
+            Box::from([iterable, value.clone()])
         },
-        keywords: vec![],
+        keywords: Box::from([]),
         range: TextRange::default(),
     };
     Expr::Call(ExprCall {

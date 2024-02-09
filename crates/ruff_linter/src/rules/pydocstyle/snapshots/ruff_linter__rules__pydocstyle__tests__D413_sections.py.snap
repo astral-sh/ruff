@@ -161,5 +161,33 @@ sections.py:558:5: D413 [*] Missing blank line after last section ("Returns")
 563 563 |         Returns:
     564 |+    
 564 565 |     """
+565 566 | 
+566 567 | 
+
+sections.py:588:5: D413 [*] Missing blank line after last section ("Parameters")
+    |
+587 |   def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213
+588 |       """Test that lower case subsection header is valid even if it has the same name as section kind.
+    |  _____^
+589 | | 
+590 | |     Parameters:
+591 | |     ----------
+592 | |     parameters:
+593 | |         A list of string parameters
+594 | |     value:
+595 | |         Some value
+596 | |     """
+    | |_______^ D413
+    |
+    = help: Add blank line after "Parameters"
+
+ℹ Safe fix
+593 593 |         A list of string parameters
+594 594 |     value:
+595 595 |         Some value
+    596 |+    
+596 597 |     """
+597 598 | 
+598 599 | 
 
 

@@ -97,7 +97,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
             continue;
         }
 
-        let [arg] = args.as_slice() else {
+        let [arg] = &**args else {
             continue;
         };
 
@@ -188,8 +188,8 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
             let node3 = Expr::Call(ast::ExprCall {
                 func: Box::new(node2),
                 arguments: Arguments {
-                    args: vec![node],
-                    keywords: vec![],
+                    args: Box::from([node]),
+                    keywords: Box::from([]),
                     range: TextRange::default(),
                 },
                 range: TextRange::default(),

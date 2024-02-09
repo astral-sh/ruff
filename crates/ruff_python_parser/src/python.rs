@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: aa0540221d25f4eadfc9e043fb4fc631d537b672b8a96785dfec2407e0524b79
+// sha3: d38cc0f2252a58db42d3bd63a102b537865992b3cf51d402cdb4828f48989c9d
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -50,11 +50,11 @@ mod __parse__Top {
         Variant0(token::Tok),
         Variant1((f64, f64)),
         Variant2(f64),
-        Variant3((String, bool, bool)),
+        Variant3((Box<str>, bool, bool)),
         Variant4(Int),
-        Variant5((IpyEscapeKind, String)),
-        Variant6(String),
-        Variant7((String, StringKind, bool)),
+        Variant5((IpyEscapeKind, Box<str>)),
+        Variant6(Box<str>),
+        Variant7((Box<str>, StringKind, bool)),
         Variant8(core::option::Option<token::Tok>),
         Variant9(Option<Box<ast::Parameter>>),
         Variant10(core::option::Option<Option<Box<ast::Parameter>>>),
@@ -151,7 +151,7 @@ mod __parse__Top {
         Variant101(ast::TypeParams),
         Variant102(core::option::Option<ast::TypeParams>),
         Variant103(ast::UnaryOp),
-        Variant104(core::option::Option<(String, bool, bool)>),
+        Variant104(core::option::Option<(Box<str>, bool, bool)>),
     }
     const __ACTION: &[i16] = &[
         // State 0
@@ -18323,10 +18323,30 @@ mod __parse__Top {
     fn __symbol_type_mismatch() -> ! {
         panic!("symbol type mismatch")
     }
+    fn __pop_Variant7<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, (Box<str>, StringKind, bool), TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant7(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant3<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, (Box<str>, bool, bool), TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant3(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
     fn __pop_Variant5<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, (IpyEscapeKind, String), TextSize)
+    ) -> (TextSize, (IpyEscapeKind, Box<str>), TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant5(__v), __r)) => (__l, __v, __r),
@@ -18370,26 +18390,6 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant79(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
-    fn __pop_Variant7<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, (String, StringKind, bool), TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant7(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
-    fn __pop_Variant3<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, (String, bool, bool), TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant3(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18493,6 +18493,16 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
+    fn __pop_Variant6<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, Box<str>, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant6(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
     fn __pop_Variant4<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
@@ -18520,16 +18530,6 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant95(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
-    fn __pop_Variant6<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, String, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant6(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -19113,6 +19113,16 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
+    fn __pop_Variant104<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, core::option::Option<(Box<str>, bool, bool)>, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant104(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
     fn __pop_Variant74<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
@@ -19130,16 +19140,6 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant14(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
-    fn __pop_Variant104<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, core::option::Option<(String, bool, bool)>, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant104(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -33541,7 +33541,7 @@ fn __action69<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, n, _): (TextSize, String, TextSize),
+    (_, n, _): (TextSize, Box<str>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
 {
@@ -33555,13 +33555,13 @@ fn __action70<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, n, _): (TextSize, String, TextSize),
+    (_, n, _): (TextSize, Box<str>, TextSize),
     (_, n2, _): (TextSize, alloc::vec::Vec<(token::Tok, ast::Identifier)>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
 {
     {
-        let mut r = n;
+        let mut r = String::from(n);
         for x in n2 {
             r.push('.');
             r.push_str(x.1.as_str());
@@ -33639,7 +33639,7 @@ fn __action74<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, c, _): (TextSize, (IpyEscapeKind, String), TextSize),
+    (_, c, _): (TextSize, (IpyEscapeKind, Box<str>), TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -33653,10 +33653,10 @@ fn __action74<
                 }
             ))
         } else {
-            Err(LexicalError {
-                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
+            Err(LexicalError::new(
+                LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string().into_boxed_str()),
                 location,
-            })?
+            ))?
         }
     }
 }
@@ -33668,7 +33668,7 @@ fn __action75<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, c, _): (TextSize, (IpyEscapeKind, String), TextSize),
+    (_, c, _): (TextSize, (IpyEscapeKind, Box<str>), TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -33676,10 +33676,10 @@ fn __action75<
         if mode == Mode::Ipython {
             // This should never occur as the lexer won't allow it.
             if !matches!(c.0, IpyEscapeKind::Magic | IpyEscapeKind::Shell) {
-                return Err(LexicalError {
-                    error: LexicalErrorType::OtherError("IPython escape command expr is only allowed for % and !".to_string()),
+                return Err(LexicalError::new(
+                    LexicalErrorType::OtherError("IPython escape command expr is only allowed for % and !".to_string().into_boxed_str()),
                     location,
-                })?;
+                ))?;
             }
             Ok(ast::ExprIpyEscapeCommand {
                 kind: c.0,
@@ -33687,10 +33687,10 @@ fn __action75<
                 range: (location..end_location).into()
             }.into())
         } else {
-            Err(LexicalError {
-                error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
+            Err(LexicalError::new(
+                LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string().into_boxed_str()),
                 location,
-            })?
+            ))?
         }
     }
 }
@@ -33715,10 +33715,10 @@ fn __action76<
                 },
                 ast::Expr::Subscript(ast::ExprSubscript { value, slice, range, .. }) => {
                     let ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value: ast::Number::Int(integer), .. }) = slice.as_ref() else {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::OtherError("only integer literals are allowed in Subscript expressions in help end escape command".to_string()),
-                            location: range.start(),
-                        });
+                        return Err(LexicalError::new(
+                            LexicalErrorType::OtherError("only integer literals are allowed in Subscript expressions in help end escape command".to_string().into_boxed_str()),
+                            range.start(),
+                        ));
                     };
                     unparse_expr(value, buffer)?;
                     buffer.push('[');
@@ -33731,10 +33731,10 @@ fn __action76<
                     buffer.push_str(attr.as_str());
                 },
                 _ => {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end escape command".to_string()),
-                        location: expr.start(),
-                    });
+                    return Err(LexicalError::new(
+                        LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end escape command".to_string().into_boxed_str()),
+                        expr.start(),
+                    ));
                 }
             }
             Ok(())
@@ -33742,10 +33742,10 @@ fn __action76<
 
         if mode != Mode::Ipython {
             return Err(ParseError::User {
-                error: LexicalError {
-                    error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
+                error: LexicalError::new(
+                    LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string().into_boxed_str()),
                     location,
-                },
+                ),
             });
         }
 
@@ -33754,10 +33754,10 @@ fn __action76<
             2 => IpyEscapeKind::Help2,
             _ => {
                 return Err(ParseError::User {
-                    error: LexicalError {
-                        error: LexicalErrorType::OtherError("maximum of 2 `?` tokens are allowed in help end escape command".to_string()),
+                    error: LexicalError::new(
+                        LexicalErrorType::OtherError("maximum of 2 `?` tokens are allowed in help end escape command".to_string().into_boxed_str()),
                         location,
-                    },
+                    ),
                 });
             }
         };
@@ -33768,7 +33768,7 @@ fn __action76<
         Ok(ast::Stmt::IpyEscapeCommand(
             ast::StmtIpyEscapeCommand {
                 kind,
-                value,
+                value: value.into_boxed_str(),
                 range: (location..end_location).into()
             }
         ))
@@ -34126,10 +34126,10 @@ fn __action95<
 {
     {
         if name.as_str() == "_" {
-            Err(LexicalError {
-                error: LexicalErrorType::OtherError("cannot use '_' as a target".to_string()),
+            Err(LexicalError::new(
+                LexicalErrorType::OtherError("cannot use '_' as a target".to_string().into_boxed_str()),
                 location,
-            })?
+            ))?
         } else {
             Ok(ast::Pattern::MatchAs(
                 ast::PatternMatchAs {
@@ -35910,17 +35910,17 @@ fn __action184<
     (_, parameters, _): (TextSize, core::option::Option<ast::Parameters>, TextSize),
     (_, end_location_args, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, fstring_middle, _): (TextSize, core::option::Option<(String, bool, bool)>, TextSize),
+    (_, fstring_middle, _): (TextSize, core::option::Option<(Box<str>, bool, bool)>, TextSize),
     (_, body, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         if fstring_middle.is_some() {
-            return Err(LexicalError {
-                error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
+            return Err(LexicalError::new(
+                LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
                 location,
-            })?;
+            ))?;
         }
         parameters.as_ref().map(validate_arguments).transpose()?;
 
@@ -36363,13 +36363,13 @@ fn __action217<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, string, _): (TextSize, (String, StringKind, bool), TextSize),
+    (_, string, _): (TextSize, (Box<str>, StringKind, bool), TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<StringType,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         let (source, kind, triple_quoted) = string;
-        Ok(parse_string_literal(&source, kind, triple_quoted, (location..end_location).into())?)
+        Ok(parse_string_literal(source, kind, triple_quoted, (location..end_location).into())?)
     }
 }
 
@@ -36413,13 +36413,13 @@ fn __action220<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, fstring_middle, _): (TextSize, (String, bool, bool), TextSize),
+    (_, fstring_middle, _): (TextSize, (Box<str>, bool, bool), TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         let (source, is_raw, _) = fstring_middle;
-        Ok(parse_fstring_literal_element(&source, is_raw, (location..end_location).into())?)
+        Ok(parse_fstring_literal_element(source, is_raw, (location..end_location).into())?)
     }
 }
 
@@ -36441,10 +36441,10 @@ fn __action221<
 {
     {
         if value.expr.is_lambda_expr() && !value.is_parenthesized() {
-            return Err(LexicalError {
-                error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
-                location: value.start(),
-            })?;
+            return Err(LexicalError::new(
+                LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
+                value.start(),
+            ))?;
         }
         let debug_text = debug.map(|_| {
             let start_offset = location + "{".text_len();
@@ -36514,18 +36514,18 @@ fn __action224<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, name_location, _): (TextSize, TextSize, TextSize),
-    (_, s, _): (TextSize, String, TextSize),
+    (_, s, _): (TextSize, Box<str>, TextSize),
 ) -> Result<(TextSize, ast::ConversionFlag),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
-        let conversion = match s.as_str() {
+        let conversion = match s.as_ref() {
             "s" => ast::ConversionFlag::Str,
             "r" => ast::ConversionFlag::Repr,
             "a" => ast::ConversionFlag::Ascii,
-            _ => Err(LexicalError {
-                error: LexicalErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
-                location: name_location,
-            })?
+            _ => Err(LexicalError::new(
+                LexicalErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
+                name_location,
+            ))?
         };
         Ok((location, conversion))
     }
@@ -36771,8 +36771,8 @@ fn __action241<
     {
         let ArgumentList { args, keywords } = parse_arguments(e)?;
         Ok(ast::Arguments {
-            args,
-            keywords,
+            args: args.into_boxed_slice(),
+            keywords: keywords.into_boxed_slice(),
             range: (location..end_location).into()
         })
     }
@@ -36899,7 +36899,7 @@ fn __action249<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, s, _): (TextSize, String, TextSize),
+    (_, s, _): (TextSize, Box<str>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
 {
@@ -37357,8 +37357,8 @@ fn __action281<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, (String, bool, bool), TextSize),
-) -> core::option::Option<(String, bool, bool)>
+    (_, __0, _): (TextSize, (Box<str>, bool, bool), TextSize),
+) -> core::option::Option<(Box<str>, bool, bool)>
 {
     Some(__0)
 }
@@ -37371,7 +37371,7 @@ fn __action282<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<(String, bool, bool)>
+) -> core::option::Option<(Box<str>, bool, bool)>
 {
     None
 }
@@ -39668,10 +39668,10 @@ fn __action445<
 {
     {
         if va.is_none() && kwonlyargs.is_empty() && kwarg.is_none() {
-            return Err(LexicalError {
-                error: LexicalErrorType::OtherError("named arguments must follow bare *".to_string()),
+            return Err(LexicalError::new(
+                LexicalErrorType::OtherError("named arguments must follow bare *".to_string().into_boxed_str()),
                 location,
-            })?;
+            ))?;
         }
 
         let kwarg = kwarg.flatten();
@@ -39793,10 +39793,10 @@ fn __action453<
 {
     {
         if va.is_none() && kwonlyargs.is_empty() && kwarg.is_none() {
-            return Err(LexicalError {
-                error: LexicalErrorType::OtherError("named arguments must follow bare *".to_string()),
+            return Err(LexicalError::new(
+                LexicalErrorType::OtherError("named arguments must follow bare *".to_string().into_boxed_str()),
                 location,
-            })?;
+            ))?;
         }
 
         let kwarg = kwarg.flatten();
@@ -40651,8 +40651,18 @@ fn __action515<
 ) -> crate::parser::ParenthesizedExpr
 {
     {
-        let (ops, comparators) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
-        ast::ExprCompare { left: Box::new(left.into()), ops, comparators, range: (location..end_location).into() }.into()
+        let mut ops = Vec::with_capacity(comparisons.len());
+        let mut comparators = Vec::with_capacity(comparisons.len());
+        for (op, comparator) in comparisons {
+            ops.push(op);
+            comparators.push(comparator.into());
+        }
+        ast::ExprCompare {
+            left: Box::new(left.into()),
+            ops: ops.into_boxed_slice(),
+            comparators: comparators.into_boxed_slice(),
+            range: (location..end_location).into(),
+        }.into()
     }
 }
 
@@ -40816,8 +40826,18 @@ fn __action526<
 ) -> crate::parser::ParenthesizedExpr
 {
     {
-        let (ops, comparators) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
-        ast::ExprCompare { left: Box::new(left.into()), ops, comparators, range: (location..end_location).into() }.into()
+        let mut ops = Vec::with_capacity(comparisons.len());
+        let mut comparators = Vec::with_capacity(comparisons.len());
+        for (op, comparator) in comparisons {
+            ops.push(op);
+            comparators.push(comparator.into());
+        }
+        ast::ExprCompare {
+            left: Box::new(left.into()),
+            ops: ops.into_boxed_slice(),
+            comparators: comparators.into_boxed_slice(),
+            range: (location..end_location).into(),
+        }.into()
     }
 }
 
@@ -41296,10 +41316,10 @@ fn __action554<
     {
         if left.is_none() && right.is_empty() && trailing_comma.is_none() {
             if mid.expr.is_starred_expr() {
-                return Err(LexicalError{
-                    error: LexicalErrorType::OtherError("cannot use starred expression here".to_string()),
-                    location: mid.start(),
-                })?;
+                return Err(LexicalError::new(
+                    LexicalErrorType::OtherError("cannot use starred expression here".to_string().into_boxed_str()),
+                    mid.start(),
+                ))?;
             }
             Ok(crate::parser::ParenthesizedExpr {
                 expr: mid.into(),
@@ -41386,10 +41406,10 @@ fn __action558<
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
-        Err(LexicalError{
-            error : LexicalErrorType::OtherError("cannot use double starred expression here".to_string()),
+        Err(LexicalError::new(
+            LexicalErrorType::OtherError("cannot use double starred expression here".to_string().into_boxed_str()),
             location,
-        }.into())
+        ).into())
     }
 }
 
@@ -41994,10 +42014,10 @@ fn __action596<
     {
         if left.is_none() && right.is_empty() && trailing_comma.is_none() {
             if mid.expr.is_starred_expr() {
-                return Err(LexicalError{
-                    error: LexicalErrorType::OtherError("cannot use starred expression here".to_string()),
-                    location: mid.start(),
-                })?;
+                return Err(LexicalError::new(
+                    LexicalErrorType::OtherError("cannot use starred expression here".to_string().into_boxed_str()),
+                    mid.start(),
+                ))?;
             }
             Ok(crate::parser::ParenthesizedExpr {
                 expr: mid.into(),
@@ -42084,10 +42104,10 @@ fn __action600<
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
-        Err(LexicalError{
-            error : LexicalErrorType::OtherError("cannot use double starred expression here".to_string()),
+        Err(LexicalError::new(
+            LexicalErrorType::OtherError("cannot use double starred expression here".to_string().into_boxed_str()),
             location,
-        }.into())
+        ).into())
     }
 }
 
@@ -48027,7 +48047,7 @@ fn __action789<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, Box<str>, TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
 {
@@ -48055,7 +48075,7 @@ fn __action790<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, Box<str>, TextSize),
     __1: (TextSize, alloc::vec::Vec<(token::Tok, ast::Identifier)>, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
@@ -48408,7 +48428,7 @@ fn __action801<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, String, TextSize),
+    __1: (TextSize, Box<str>, TextSize),
 ) -> Result<(TextSize, ast::ConversionFlag),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
@@ -48505,7 +48525,7 @@ fn __action804<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, (String, bool, bool), TextSize),
+    __0: (TextSize, (Box<str>, bool, bool), TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -49209,7 +49229,7 @@ fn __action826<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, Box<str>, TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
 {
@@ -49519,7 +49539,7 @@ fn __action836<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, (IpyEscapeKind, String), TextSize),
+    __0: (TextSize, (IpyEscapeKind, Box<str>), TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -49547,7 +49567,7 @@ fn __action837<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, (IpyEscapeKind, String), TextSize),
+    __0: (TextSize, (IpyEscapeKind, Box<str>), TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -49609,7 +49629,7 @@ fn __action839<
     __1: (TextSize, core::option::Option<ast::Parameters>, TextSize),
     __2: (TextSize, TextSize, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, core::option::Option<(String, bool, bool)>, TextSize),
+    __4: (TextSize, core::option::Option<(Box<str>, bool, bool)>, TextSize),
     __5: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __6: (TextSize, TextSize, TextSize),
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -52719,7 +52739,7 @@ fn __action937<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, (String, StringKind, bool), TextSize),
+    __0: (TextSize, (Box<str>, StringKind, bool), TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> Result<StringType,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -64211,7 +64231,7 @@ fn __action1304<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, Box<str>, TextSize),
 ) -> ast::Identifier
 {
     let __start0 = __0.2;
@@ -64237,7 +64257,7 @@ fn __action1305<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, Box<str>, TextSize),
     __1: (TextSize, alloc::vec::Vec<(token::Tok, ast::Identifier)>, TextSize),
 ) -> ast::Identifier
 {
@@ -64527,7 +64547,7 @@ fn __action1315<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, (String, bool, bool), TextSize),
+    __0: (TextSize, (Box<str>, bool, bool), TextSize),
 ) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
@@ -65035,7 +65055,7 @@ fn __action1333<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, Box<str>, TextSize),
 ) -> ast::Identifier
 {
     let __start0 = __0.2;
@@ -65347,7 +65367,7 @@ fn __action1344<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, (IpyEscapeKind, String), TextSize),
+    __0: (TextSize, (IpyEscapeKind, Box<str>), TextSize),
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
@@ -65373,7 +65393,7 @@ fn __action1345<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, (IpyEscapeKind, String), TextSize),
+    __0: (TextSize, (IpyEscapeKind, Box<str>), TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
@@ -65430,7 +65450,7 @@ fn __action1347<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<ast::Parameters>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, core::option::Option<(String, bool, bool)>, TextSize),
+    __3: (TextSize, core::option::Option<(Box<str>, bool, bool)>, TextSize),
     __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -69997,7 +70017,7 @@ fn __action1494<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, (String, StringKind, bool), TextSize),
+    __0: (TextSize, (Box<str>, StringKind, bool), TextSize),
 ) -> Result<StringType,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
@@ -77662,7 +77682,7 @@ fn __action1727<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Parameters, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, core::option::Option<(String, bool, bool)>, TextSize),
+    __3: (TextSize, core::option::Option<(Box<str>, bool, bool)>, TextSize),
     __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -77693,7 +77713,7 @@ fn __action1728<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<(String, bool, bool)>, TextSize),
+    __2: (TextSize, core::option::Option<(Box<str>, bool, bool)>, TextSize),
     __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -79598,7 +79618,7 @@ fn __action1785<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Parameters, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, (String, bool, bool), TextSize),
+    __3: (TextSize, (Box<str>, bool, bool), TextSize),
     __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -79661,7 +79681,7 @@ fn __action1787<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, (String, bool, bool), TextSize),
+    __2: (TextSize, (Box<str>, bool, bool), TextSize),
     __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {

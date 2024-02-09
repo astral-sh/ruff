@@ -21,10 +21,9 @@ D413.py:1:1: D413 [*] Missing blank line after last section ("Returns")
 7  7  | Returns:
 8  8  |     the value
    9  |+
-   10 |+
-9  11 | """
-10 12 | 
-11 13 | 
+9  10 | """
+10 11 | 
+11 12 | 
 
 D413.py:13:5: D413 [*] Missing blank line after last section ("Returns")
    |

@@ -52,12 +52,12 @@ where
         // Accept empty initializers.
         if let Expr::Call(ast::ExprCall {
             func,
-            arguments: Arguments { args, keywords, .. },
+            arguments,
             range: _,
         }) = expr
         {
             // Ex) `list()`
-            if args.is_empty() && keywords.is_empty() {
+            if arguments.is_empty() {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if !is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
                         return true;
@@ -221,14 +221,14 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         }) => any_over_expr(left, func) || comparators.iter().any(|expr| any_over_expr(expr, func)),
         Expr::Call(ast::ExprCall {
             func: call_func,
-            arguments: Arguments { args, keywords, .. },
+            arguments,
             range: _,
         }) => {
             any_over_expr(call_func, func)
                 // Note that this is the evaluation order but not necessarily the declaration order
                 // (e.g. for `f(*args, a=2, *args2, **kwargs)` it's not)
-                || args.iter().any(|expr| any_over_expr(expr, func))
-                || keywords
+                || arguments.args.iter().any(|expr| any_over_expr(expr, func))
+                || arguments.keywords
                     .iter()
                     .any(|keyword| any_over_expr(&keyword.value, func))
         }
@@ -1021,6 +1021,12 @@ impl Visitor<'_> for AwaitVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => (),
+            Stmt::With(ast::StmtWith { is_async: true, .. }) => {
+                self.seen_await = true;
+            }
+            Stmt::For(ast::StmtFor { is_async: true, .. }) => {
+                self.seen_await = true;
+            }
             _ => crate::visitor::walk_stmt(self, stmt),
         }
     }
@@ -1221,18 +1227,16 @@ impl Truthiness {
                 }
             }
             Expr::Call(ast::ExprCall {
-                func,
-                arguments: Arguments { args, keywords, .. },
-                ..
+                func, arguments, ..
             }) => {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
-                        if args.is_empty() && keywords.is_empty() {
+                        if arguments.is_empty() {
                             // Ex) `list()`
                             Self::Falsey
-                        } else if args.len() == 1 && keywords.is_empty() {
+                        } else if arguments.args.len() == 1 && arguments.keywords.is_empty() {
                             // Ex) `list([1, 2, 3])`
-                            Self::from_expr(&args[0], is_builtin)
+                            Self::from_expr(&arguments.args[0], is_builtin)
                         } else {
                             Self::Unknown
                         }

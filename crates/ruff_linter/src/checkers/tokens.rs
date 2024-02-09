@@ -4,6 +4,7 @@ use std::path::Path;
 
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
+use ruff_python_codegen::Stylist;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 
@@ -14,6 +15,7 @@ use ruff_source_file::Locator;
 use crate::directives::TodoComment;
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{AsRule, Rule};
+use crate::rules::pycodestyle::rules::BlankLinesChecker;
 use crate::rules::ruff::rules::Context;
 use crate::rules::{
     eradicate, flake8_commas, flake8_executable, flake8_fixme, flake8_implicit_str_concat,
@@ -21,16 +23,36 @@ use crate::rules::{
 };
 use crate::settings::LinterSettings;
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_tokens(
     tokens: &[LexResult],
     path: &Path,
     locator: &Locator,
     indexer: &Indexer,
+    stylist: &Stylist,
     settings: &LinterSettings,
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
+
+    if settings.rules.any_enabled(&[
+        Rule::BlankLineBetweenMethods,
+        Rule::BlankLinesTopLevel,
+        Rule::TooManyBlankLines,
+        Rule::BlankLineAfterDecorator,
+        Rule::BlankLinesAfterFunctionOrClass,
+        Rule::BlankLinesBeforeNestedDefinition,
+    ]) {
+        let mut blank_lines_checker = BlankLinesChecker::default();
+        blank_lines_checker.check_lines(
+            tokens,
+            locator,
+            stylist,
+            settings.tab_size,
+            &mut diagnostics,
+        );
+    }
 
     if settings.rules.enabled(Rule::BlanketNOQA) {
         pygrep_hooks::rules::blanket_noqa(&mut diagnostics, indexer, locator);
@@ -95,7 +117,7 @@ pub(crate) fn check_tokens(
     }
 
     if settings.rules.enabled(Rule::TabIndentation) {
-        pycodestyle::rules::tab_indentation(&mut diagnostics, tokens, locator, indexer);
+        pycodestyle::rules::tab_indentation(&mut diagnostics, locator, indexer);
     }
 
     if settings.rules.any_enabled(&[

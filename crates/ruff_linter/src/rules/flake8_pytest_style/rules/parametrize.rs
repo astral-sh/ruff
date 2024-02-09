@@ -257,15 +257,18 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
     }
 
     let node = Expr::from(ast::StringLiteral {
-        value: elts.iter().fold(String::new(), |mut acc, elt| {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
-                if !acc.is_empty() {
-                    acc.push(',');
+        value: elts
+            .iter()
+            .fold(String::new(), |mut acc, elt| {
+                if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
+                    if !acc.is_empty() {
+                        acc.push(',');
+                    }
+                    acc.push_str(value.to_str());
                 }
-                acc.push_str(value.to_str());
-            }
-            acc
-        }),
+                acc
+            })
+            .into_boxed_str(),
         ..ast::StringLiteral::default()
     });
     Some(generator.expr(&node))
@@ -327,7 +330,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 .iter()
                                 .map(|name| {
                                     Expr::from(ast::StringLiteral {
-                                        value: (*name).to_string(),
+                                        value: (*name).to_string().into_boxed_str(),
                                         ..ast::StringLiteral::default()
                                     })
                                 })
@@ -360,7 +363,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 .iter()
                                 .map(|name| {
                                     Expr::from(ast::StringLiteral {
-                                        value: (*name).to_string(),
+                                        value: (*name).to_string().into_boxed_str(),
                                         ..ast::StringLiteral::default()
                                     })
                                 })
@@ -635,17 +638,17 @@ pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Decorator]) {
             }) = &decorator.expression
             {
                 if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
-                    if let [names, ..] = args.as_slice() {
+                    if let [names, ..] = &**args {
                         check_names(checker, decorator, names);
                     }
                 }
                 if checker.enabled(Rule::PytestParametrizeValuesWrongType) {
-                    if let [names, values, ..] = args.as_slice() {
+                    if let [names, values, ..] = &**args {
                         check_values(checker, names, values);
                     }
                 }
                 if checker.enabled(Rule::PytestDuplicateParametrizeTestCases) {
-                    if let [_, values, ..] = args.as_slice() {
+                    if let [_, values, ..] = &**args {
                         check_duplicates(checker, values);
                     }
                 }

@@ -461,10 +461,10 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             range: _,
         }) => {
             visitor.visit_expr(left);
-            for cmp_op in ops {
+            for cmp_op in &**ops {
                 visitor.visit_cmp_op(cmp_op);
             }
-            for expr in comparators {
+            for expr in &**comparators {
                 visitor.visit_expr(expr);
             }
         }
@@ -594,10 +594,10 @@ pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &
     // Note that the there might be keywords before the last arg, e.g. in
     // f(*args, a=2, *args2, **kwargs)`, but we follow Python in evaluating first `args` and then
     // `keywords`. See also [Arguments::arguments_source_order`].
-    for arg in &arguments.args {
+    for arg in arguments.args.iter() {
         visitor.visit_expr(arg);
     }
-    for keyword in &arguments.keywords {
+    for keyword in arguments.keywords.iter() {
         visitor.visit_keyword(keyword);
     }
 }

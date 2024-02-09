@@ -232,10 +232,10 @@ fn cmp_op(expr: &ast::ExprCompare, params: &ast::Parameters) -> Option<&'static 
     let [arg1, arg2] = params.args.as_slice() else {
         return None;
     };
-    let [op] = expr.ops.as_slice() else {
+    let [op] = &*expr.ops else {
         return None;
     };
-    let [right] = expr.comparators.as_slice() else {
+    let [right] = &*expr.comparators else {
         return None;
     };
 
