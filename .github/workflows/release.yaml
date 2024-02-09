@@ -91,4 +91,4 @@ jobs:
       - name: "Install wheels"
         run: python -m pip install dist/*.whl
       - name: "Run tests"
-        run: ruff --version
+        run: lldb -o "run" -k "bt" -o "quit" ruff -- --version
