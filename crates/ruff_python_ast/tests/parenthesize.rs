@@ -43,7 +43,7 @@ fn test_parenthesized_argument() {
     let expr = parse_expression(source_code).unwrap();
 
     let call = expr.as_call_expr().unwrap();
-    let arguments = &call.arguments;
+    let arguments = &*call.arguments;
     let argument = arguments.args.first().unwrap();
 
     let parenthesized = parenthesized_range(
@@ -61,7 +61,7 @@ fn test_non_parenthesized_argument() {
     let expr = parse_expression(source_code).unwrap();
 
     let call = expr.as_call_expr().unwrap();
-    let arguments = &call.arguments;
+    let arguments = &*call.arguments;
     let argument = arguments.args.first().unwrap();
 
     let parenthesized = parenthesized_range(
@@ -130,7 +130,7 @@ fn test_twice_parenthesized_argument() {
     let expr = parse_expression(source_code).unwrap();
 
     let call = expr.as_call_expr().unwrap();
-    let arguments = &call.arguments;
+    let arguments = &*call.arguments;
     let argument = arguments.args.first().unwrap();
 
     let parenthesized = parenthesized_range(

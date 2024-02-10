@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
@@ -69,26 +69,19 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &mut Checker, f_string:
         }
 
         let Expr::Call(ast::ExprCall {
-            func,
-            arguments:
-                Arguments {
-                    args,
-                    keywords,
-                    range: _,
-                },
-            ..
+            func, arguments, ..
         }) = expression.as_ref()
         else {
             continue;
         };
 
         // Can't be a conversion otherwise.
-        if !keywords.is_empty() {
+        if !arguments.keywords.is_empty() {
             continue;
         }
 
         // Can't be a conversion otherwise.
-        let [arg] = &**args else {
+        let [arg] = &*arguments.args else {
             continue;
         };
 

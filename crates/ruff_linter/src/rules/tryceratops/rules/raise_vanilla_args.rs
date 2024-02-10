@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -56,15 +56,13 @@ impl Violation for RaiseVanillaArgs {
 /// TRY003
 pub(crate) fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, .. },
-        ..
+        func, arguments, ..
     }) = expr
     else {
         return;
     };
 
-    let Some(arg) = args.first() else {
+    let Some(arg) = arguments.args.first() else {
         return;
     };
 

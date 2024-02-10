@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, Keyword};
+use ruff_python_ast::{self as ast, Decorator, Expr, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
@@ -59,12 +59,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
     for decorator in decorator_list {
         let Expr::Call(ast::ExprCall {
             func,
-            arguments:
-                Arguments {
-                    args,
-                    keywords,
-                    range: _,
-                },
+            arguments,
             range: _,
         }) = &decorator.expression
         else {
@@ -72,8 +67,8 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
         };
 
         // Look for, e.g., `import functools; @functools.lru_cache(maxsize=None)`.
-        if args.is_empty()
-            && keywords.len() == 1
+        if arguments.args.is_empty()
+            && arguments.keywords.len() == 1
             && checker
                 .semantic()
                 .resolve_call_path(func)
@@ -83,7 +78,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                 arg,
                 value,
                 range: _,
-            } = &keywords[0];
+            } = &arguments.keywords[0];
             if arg.as_ref().is_some_and(|arg| arg == "maxsize") && value.is_none_literal_expr() {
                 let mut diagnostic = Diagnostic::new(
                     LRUCacheWithMaxsizeNone,

@@ -359,11 +359,11 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
     // Make the actual call `var.extend((elt1, elt2, ..., eltN))`
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
-        arguments: ast::Arguments {
+        arguments: Box::new(ast::Arguments {
             args: Box::from([tuple.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-        },
+        }),
         range: TextRange::default(),
     };
     // And finally, turn it into a statement.

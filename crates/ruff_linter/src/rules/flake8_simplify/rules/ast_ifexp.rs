@@ -184,11 +184,11 @@ pub(crate) fn if_expr_with_true_false(
                         }
                         .into(),
                     ),
-                    arguments: Arguments {
+                    arguments: Box::new(Arguments {
                         args: Box::from([test.clone()]),
                         keywords: Box::from([]),
                         range: TextRange::default(),
-                    },
+                    }),
                     range: TextRange::default(),
                 }
                 .into(),

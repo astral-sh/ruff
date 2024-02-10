@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, Int};
+use ruff_python_ast::{self as ast, Comprehension, Expr, Int};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::builtins::is_iterator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -136,9 +136,7 @@ struct IterationTarget {
 fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<IterationTarget> {
     let result = match expr {
         Expr::Call(ast::ExprCall {
-            func,
-            arguments: Arguments { args, .. },
-            ..
+            func, arguments, ..
         }) => {
             let ast::ExprName { id, .. } = func.as_name_expr()?;
 
@@ -146,7 +144,7 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
                 return None;
             }
 
-            let [arg] = &**args else {
+            let [arg] = &*arguments.args else {
                 return None;
             };
 

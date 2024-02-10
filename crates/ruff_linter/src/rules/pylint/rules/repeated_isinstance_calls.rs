@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr};
+use ruff_python_ast::{self as ast, BoolOp, Expr};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::fix::edits::pad;
@@ -85,9 +85,7 @@ pub(crate) fn repeated_isinstance_calls(
         FxHashMap::default();
     for value in values {
         let Expr::Call(ast::ExprCall {
-            func,
-            arguments: Arguments { args, .. },
-            ..
+            func, arguments, ..
         }) = value
         else {
             continue;
@@ -95,7 +93,7 @@ pub(crate) fn repeated_isinstance_calls(
         if !matches!(func.as_ref(), Expr::Name(ast::ExprName { id, .. }) if &**id =="isinstance") {
             continue;
         }
-        let [obj, types] = &args[..] else {
+        let [obj, types] = &*arguments.args else {
             continue;
         };
         if !checker.semantic().is_builtin("isinstance") {

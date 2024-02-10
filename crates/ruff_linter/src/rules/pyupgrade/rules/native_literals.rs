@@ -141,12 +141,7 @@ pub(crate) fn native_literals(
 ) {
     let ast::ExprCall {
         func,
-        arguments:
-            ast::Arguments {
-                args,
-                keywords,
-                range: _,
-            },
+        arguments,
         range: _,
     } = call;
 
@@ -154,7 +149,7 @@ pub(crate) fn native_literals(
         return;
     };
 
-    if !keywords.is_empty() || args.len() > 1 {
+    if !arguments.keywords.is_empty() || arguments.args.len() > 1 {
         return;
     }
 
@@ -179,7 +174,7 @@ pub(crate) fn native_literals(
         }
     }
 
-    match args.first() {
+    match arguments.args.first() {
         None => {
             let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
 

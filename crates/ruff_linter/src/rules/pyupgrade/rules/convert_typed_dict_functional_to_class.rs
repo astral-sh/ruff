@@ -238,9 +238,9 @@ fn match_fields_and_total(arguments: &Arguments) -> Option<(Vec<Stmt>, Option<&K
                 }) => Some((fields_from_dict_literal(keys, values)?, total)),
                 Expr::Call(ast::ExprCall {
                     func,
-                    arguments: Arguments { keywords, .. },
+                    arguments,
                     range: _,
-                }) => Some((fields_from_dict_call(func, keywords)?, total)),
+                }) => Some((fields_from_dict_call(func, &arguments.keywords)?, total)),
                 _ => None,
             }
         }

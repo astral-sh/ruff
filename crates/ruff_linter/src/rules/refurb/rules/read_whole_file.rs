@@ -136,9 +136,7 @@ fn find_file_open<'a>(
 ) -> Option<FileOpen<'a>> {
     // We want to match `open(...) as var`.
     let ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
+        func, arguments, ..
     } = item.context_expr.as_call_expr()?;
 
     let func = func.as_name_expr()?;
@@ -151,17 +149,20 @@ fn find_file_open<'a>(
     // Ignore calls with `*args` and `**kwargs`. In the exact case of `open(*filename, mode="r")`,
     // it could be a match; but in all other cases, the call _could_ contain unsupported keyword
     // arguments, like `buffering`.
-    if args.iter().any(Expr::is_starred_expr)
-        || keywords.iter().any(|keyword| keyword.arg.is_none())
+    if arguments.args.iter().any(Expr::is_starred_expr)
+        || arguments
+            .keywords
+            .iter()
+            .any(|keyword| keyword.arg.is_none())
     {
         return None;
     }
 
     // Match positional arguments, get filename and read mode.
-    let (filename, pos_mode) = match_open_args(args)?;
+    let (filename, pos_mode) = match_open_args(&arguments.args)?;
 
     // Match keyword arguments, get keyword arguments to forward and possibly read mode.
-    let (keywords, kw_mode) = match_open_keywords(keywords)?;
+    let (keywords, kw_mode) = match_open_keywords(&arguments.keywords)?;
 
     // `pos_mode` could've been assigned default value corresponding to "r", while
     // keyword mode should override that.
@@ -322,11 +323,11 @@ fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> SourceCodeSnipp
     };
     let call = ast::ExprCall {
         func: Box::new(name.into()),
-        arguments: ast::Arguments {
+        arguments: Box::new(ast::Arguments {
             args: Box::from([]),
             keywords: open.keywords.iter().copied().cloned().collect(),
             range: TextRange::default(),
-        },
+        }),
         range: TextRange::default(),
     };
     SourceCodeSnippet::from_str(&generator.expr(&call.into()))

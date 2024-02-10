@@ -20,11 +20,11 @@ pub(super) fn generate_method_call(name: &str, method: &str, generator: Generato
     // Make it into a call `name.method()`
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
-        arguments: ast::Arguments {
+        arguments: Box::new(ast::Arguments {
             args: Box::from([]),
             keywords: Box::from([]),
             range: TextRange::default(),
-        },
+        }),
         range: TextRange::default(),
     };
     // And finally, turn it into a statement.

@@ -909,7 +909,7 @@ impl From<ExprCompare> for Expr {
 pub struct ExprCall {
     pub range: TextRange,
     pub func: Box<Expr>,
-    pub arguments: Arguments,
+    pub arguments: Box<Arguments>,
 }
 
 impl From<ExprCall> for Expr {
@@ -3891,14 +3891,14 @@ mod tests {
         // 88 for Rustc < 1.76
         assert!(matches!(std::mem::size_of::<Pattern>(), 80 | 88));
 
-        assert_eq!(std::mem::size_of::<Expr>(), 64);
+        assert_eq!(std::mem::size_of::<Expr>(), 56);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 48);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 16);
         assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
         assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
         assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 12);
         assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 40);
-        assert_eq!(std::mem::size_of::<ExprCall>(), 56);
+        assert_eq!(std::mem::size_of::<ExprCall>(), 24);
         assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
         assert_eq!(std::mem::size_of::<ExprDict>(), 40);
         assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);

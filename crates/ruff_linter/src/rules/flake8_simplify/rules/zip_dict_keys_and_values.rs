@@ -1,6 +1,6 @@
 use ast::{ExprAttribute, ExprName, Identifier};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall};
+use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, fix::snippet::SourceCodeSnippet};
@@ -61,11 +61,9 @@ impl AlwaysFixableViolation for ZipDictKeysAndValues {
 /// SIM911
 pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ExprCall) {
     let ExprCall {
-        func,
-        arguments: Arguments { args, keywords, .. },
-        ..
+        func, arguments, ..
     } = expr;
-    match &keywords[..] {
+    match &*arguments.keywords {
         [] => {}
         [ast::Keyword {
             arg: Some(name), ..
@@ -75,7 +73,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ExprCall) {
     if matches!(func.as_ref(), Expr::Name(ExprName { id, .. }) if &**id != "zip") {
         return;
     }
-    let [arg1, arg2] = &args[..] else {
+    let [arg1, arg2] = &*arguments.args else {
         return;
     };
     let Some((var1, attr1)) = get_var_attr(arg1) else {

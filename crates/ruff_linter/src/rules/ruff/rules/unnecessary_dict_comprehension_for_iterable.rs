@@ -158,7 +158,7 @@ fn is_constant_like(expr: &Expr) -> bool {
 /// - Given `{n: 1 for n in [1,2,3]}`, generate `dict.fromkeys([1,2,3], 1)`.
 fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -> Expr {
     let iterable = generator.iter.clone();
-    let args = Arguments {
+    let arguments = Arguments {
         args: if value.is_none_literal_expr() {
             Box::from([iterable])
         } else {
@@ -173,7 +173,7 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
             ctx: ExprContext::Load,
             range: TextRange::default(),
         })),
-        arguments: args,
+        arguments: Box::new(arguments),
         range: TextRange::default(),
     })
 }

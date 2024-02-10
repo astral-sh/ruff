@@ -5,7 +5,7 @@ use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Parameters, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprContext, Parameters, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -125,23 +125,22 @@ pub(crate) fn unnecessary_map(
         ObjectType::List | ObjectType::Set => {
             // Only flag, e.g., `list(map(lambda x: x + 1, iterable))`.
             let [Expr::Call(ast::ExprCall {
-                func,
-                arguments: Arguments { args, keywords, .. },
-                ..
+                func, arguments, ..
             })] = args
             else {
                 return;
             };
 
-            if args.len() != 2 {
+            if arguments.args.len() != 2 {
                 return;
             }
 
-            if !keywords.is_empty() {
+            if !arguments.keywords.is_empty() {
                 return;
             }
 
-            let Some(argument) = helpers::first_argument_with_matching_function("map", func, args)
+            let Some(argument) =
+                helpers::first_argument_with_matching_function("map", func, &arguments.args)
             else {
                 return;
             };
@@ -170,23 +169,22 @@ pub(crate) fn unnecessary_map(
         ObjectType::Dict => {
             // Only flag, e.g., `dict(map(lambda v: (v, v ** 2), values))`.
             let [Expr::Call(ast::ExprCall {
-                func,
-                arguments: Arguments { args, keywords, .. },
-                ..
+                func, arguments, ..
             })] = args
             else {
                 return;
             };
 
-            if args.len() != 2 {
+            if arguments.args.len() != 2 {
                 return;
             }
 
-            if !keywords.is_empty() {
+            if !arguments.keywords.is_empty() {
                 return;
             }
 
-            let Some(argument) = helpers::first_argument_with_matching_function("map", func, args)
+            let Some(argument) =
+                helpers::first_argument_with_matching_function("map", func, &arguments.args)
             else {
                 return;
             };

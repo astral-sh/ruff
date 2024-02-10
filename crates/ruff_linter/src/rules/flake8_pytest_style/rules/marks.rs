@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Decorator, Expr};
+use ruff_python_ast::{self as ast, Decorator, Expr};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -137,18 +137,10 @@ fn check_mark_parentheses(checker: &mut Checker, decorator: &Decorator, marker: 
     match &decorator.expression {
         Expr::Call(ast::ExprCall {
             func,
-            arguments:
-                Arguments {
-                    args,
-                    keywords,
-                    range: _,
-                },
+            arguments,
             range: _,
         }) => {
-            if !checker.settings.flake8_pytest_style.mark_parentheses
-                && args.is_empty()
-                && keywords.is_empty()
-            {
+            if !checker.settings.flake8_pytest_style.mark_parentheses && arguments.is_empty() {
                 let fix = Fix::safe_edit(Edit::deletion(func.end(), decorator.end()));
                 pytest_mark_parentheses(checker, decorator, marker, fix, "", "()");
             }
@@ -171,11 +163,8 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Decorator, marke
         // @pytest.mark.usefixtures
         Expr::Attribute(..) => {}
         // @pytest.mark.usefixtures(...)
-        Expr::Call(ast::ExprCall {
-            arguments: Arguments { args, keywords, .. },
-            ..
-        }) => {
-            if !args.is_empty() || !keywords.is_empty() {
+        Expr::Call(ast::ExprCall { arguments, .. }) => {
+            if !arguments.is_empty() {
                 return;
             }
         }

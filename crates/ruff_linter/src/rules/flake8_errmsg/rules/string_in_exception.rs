@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
@@ -175,12 +175,8 @@ impl Violation for DotFormatInException {
 
 /// EM101, EM102, EM103
 pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
-    if let Expr::Call(ast::ExprCall {
-        arguments: Arguments { args, .. },
-        ..
-    }) = exc
-    {
-        if let Some(first) = args.first() {
+    if let Expr::Call(ast::ExprCall { arguments, .. }) = exc {
+        if let Some(first) = arguments.args.first() {
             match first {
                 // Check for string literals.
                 Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. }) => {

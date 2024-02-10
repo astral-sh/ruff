@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableKeyword;
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
+use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -84,11 +84,7 @@ pub(crate) fn unnecessary_double_cast_or_process(
         return;
     };
     let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments {
-            keywords: inner_kw, ..
-        },
-        ..
+        func, arguments, ..
     }) = arg
     else {
         return;
@@ -103,10 +99,10 @@ pub(crate) fn unnecessary_double_cast_or_process(
     // Avoid collapsing nested `sorted` calls with non-identical keyword arguments
     // (i.e., `key`, `reverse`).
     if &*inner.id == "sorted" && &*outer.id == "sorted" {
-        if inner_kw.len() != outer_kw.len() {
+        if arguments.keywords.len() != outer_kw.len() {
             return;
         }
-        if !inner_kw.iter().all(|inner| {
+        if !arguments.keywords.iter().all(|inner| {
             outer_kw
                 .iter()
                 .any(|outer| ComparableKeyword::from(inner) == ComparableKeyword::from(outer))

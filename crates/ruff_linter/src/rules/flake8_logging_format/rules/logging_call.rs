@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Operator};
+use ruff_python_ast::{self as ast, Expr, Keyword, Operator};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
@@ -104,16 +104,14 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
             }
         }
         Expr::Call(ast::ExprCall {
-            func,
-            arguments: Arguments { keywords, .. },
-            ..
+            func, arguments, ..
         }) => {
             if checker
                 .semantic()
                 .resolve_call_path(func)
                 .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "dict"]))
             {
-                for keyword in keywords.iter() {
+                for keyword in arguments.keywords.iter() {
                     if let Some(attr) = &keyword.arg {
                         if is_reserved_attr(attr) {
                             checker.diagnostics.push(Diagnostic::new(

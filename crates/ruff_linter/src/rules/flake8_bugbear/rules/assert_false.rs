@@ -57,7 +57,7 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
             })),
-            arguments: Arguments {
+            arguments: Box::new(Arguments {
                 args: if let Some(msg) = msg {
                     Box::from([msg.clone()])
                 } else {
@@ -65,7 +65,7 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
                 },
                 keywords: Box::from([]),
                 range: TextRange::default(),
-            },
+            }),
             range: TextRange::default(),
         }))),
         cause: None,

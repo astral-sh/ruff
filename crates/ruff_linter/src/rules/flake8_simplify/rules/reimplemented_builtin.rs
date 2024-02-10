@@ -390,11 +390,11 @@ fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
     };
     let node2 = ast::ExprCall {
         func: Box::new(node1.into()),
-        arguments: Arguments {
+        arguments: Box::new(Arguments {
             args: Box::from([node.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-        },
+        }),
         range: TextRange::default(),
     };
     let node3 = ast::StmtReturn {

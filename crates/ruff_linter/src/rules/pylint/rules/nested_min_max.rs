@@ -97,16 +97,11 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
         for arg in args {
             if let Expr::Call(ast::ExprCall {
                 func,
-                arguments:
-                    Arguments {
-                        args,
-                        keywords,
-                        range: _,
-                    },
+                arguments,
                 range: _,
             }) = arg
             {
-                if let [arg] = &**args {
+                if let [arg] = &*arguments.args {
                     if arg.as_starred_expr().is_none() {
                         let new_arg = Expr::Starred(ast::ExprStarred {
                             value: Box::new(arg.clone()),
@@ -117,8 +112,8 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                         continue;
                     }
                 }
-                if MinMax::try_from_call(func, keywords, semantic) == Some(min_max) {
-                    inner(min_max, args, semantic, new_args);
+                if MinMax::try_from_call(func, &arguments.keywords, semantic) == Some(min_max) {
+                    inner(min_max, &arguments.args, semantic, new_args);
                     continue;
                 }
             }
@@ -143,31 +138,29 @@ pub(crate) fn nested_min_max(
         return;
     };
 
-    if matches!(&args, [Expr::Call(ast::ExprCall { arguments: Arguments {args, .. }, .. })] if args.len() == 1)
-    {
+    if matches!(&args, [Expr::Call(ast::ExprCall { arguments, .. })] if arguments.args.len() == 1) {
         return;
     }
 
     if args.iter().any(|arg| {
         let Expr::Call(ast::ExprCall {
-            func,
-            arguments: Arguments { keywords, .. },
-            ..
+            func, arguments, ..
         }) = arg
         else {
             return false;
         };
-        MinMax::try_from_call(func.as_ref(), keywords.as_ref(), checker.semantic()) == Some(min_max)
+        let keywords = arguments.keywords.as_ref();
+        MinMax::try_from_call(func.as_ref(), keywords, checker.semantic()) == Some(min_max)
     }) {
         let mut diagnostic = Diagnostic::new(NestedMinMax { func: min_max }, expr.range());
         if !checker.indexer().has_comments(expr, checker.locator()) {
             let flattened_expr = Expr::Call(ast::ExprCall {
                 func: Box::new(func.clone()),
-                arguments: Arguments {
+                arguments: Box::new(Arguments {
                     args: collect_nested_args(min_max, args, checker.semantic()).into_boxed_slice(),
                     keywords: Box::from(keywords),
                     range: TextRange::default(),
-                },
+                }),
                 range: TextRange::default(),
             });
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(

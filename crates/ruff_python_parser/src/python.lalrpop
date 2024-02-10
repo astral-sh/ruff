@@ -1549,7 +1549,7 @@ AtomExpr2<Goal>: crate::parser::ParenthesizedExpr = {
     Atom<Goal>,
     <location:@L> <func:AtomExpr2<"all">> <arguments:Arguments> <end_location:@R> => ast::ExprCall {
         func: Box::new(func.into()),
-        arguments,
+        arguments: Box::new(arguments),
         range: (location..end_location).into(),
     }.into(),
     <location:@L> <value:AtomExpr2<"all">> "[" <slice:SubscriptList> "]" <end_location:@R> => ast::ExprSubscript {

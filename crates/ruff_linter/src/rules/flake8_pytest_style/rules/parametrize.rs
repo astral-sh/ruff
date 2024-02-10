@@ -7,7 +7,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::AstNode;
-use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprContext};
+use ruff_python_ast::{self as ast, Decorator, Expr, ExprContext};
 use ruff_python_codegen::Generator;
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
@@ -632,23 +632,19 @@ fn handle_value_rows(
 pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Decorator]) {
     for decorator in decorators {
         if is_pytest_parametrize(decorator, checker.semantic()) {
-            if let Expr::Call(ast::ExprCall {
-                arguments: Arguments { args, .. },
-                ..
-            }) = &decorator.expression
-            {
+            if let Expr::Call(ast::ExprCall { arguments, .. }) = &decorator.expression {
                 if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
-                    if let [names, ..] = &**args {
+                    if let [names, ..] = &*arguments.args {
                         check_names(checker, decorator, names);
                     }
                 }
                 if checker.enabled(Rule::PytestParametrizeValuesWrongType) {
-                    if let [names, values, ..] = &**args {
+                    if let [names, values, ..] = &*arguments.args {
                         check_values(checker, names, values);
                     }
                 }
                 if checker.enabled(Rule::PytestDuplicateParametrizeTestCases) {
-                    if let [_, values, ..] = &**args {
+                    if let [_, values, ..] = &*arguments.args {
                         check_duplicates(checker, values);
                     }
                 }

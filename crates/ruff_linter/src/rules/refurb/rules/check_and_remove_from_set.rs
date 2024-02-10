@@ -151,7 +151,7 @@ fn match_remove(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
 
     let ast::ExprCall {
         func: attr,
-        arguments: ast::Arguments { args, keywords, .. },
+        arguments,
         ..
     } = expr.as_call_expr()?;
 
@@ -165,11 +165,11 @@ fn match_remove(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
         return None;
     };
 
-    let [arg] = &**args else {
+    let [arg] = &*arguments.args else {
         return None;
     };
 
-    if func_name != "remove" || !keywords.is_empty() {
+    if func_name != "remove" || !arguments.keywords.is_empty() {
         return None;
     }
 
@@ -190,11 +190,11 @@ fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) ->
     // Make the actual call `set.discard(element)`
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
-        arguments: ast::Arguments {
+        arguments: Box::new(ast::Arguments {
             args: Box::from([element.clone()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-        },
+        }),
         range: TextRange::default(),
     };
     // And finally, turn it into a statement.

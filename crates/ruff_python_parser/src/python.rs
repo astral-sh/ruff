@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 8f9c419cf07ccd6289047223fa22bb70c6afd0133b58ea606f601340160cab8b
+// sha3: 06d23132da088f5a6184a546b53be668a940ce6dfd046b5ac08b6e70b7c9eb99
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -41071,7 +41071,7 @@ fn __action541<
 {
     ast::ExprCall {
         func: Box::new(func.into()),
-        arguments,
+        arguments: Box::new(arguments),
         range: (location..end_location).into(),
     }.into()
 }
@@ -41868,7 +41868,7 @@ fn __action588<
 {
     ast::ExprCall {
         func: Box::new(func.into()),
-        arguments,
+        arguments: Box::new(arguments),
         range: (location..end_location).into(),
     }.into()
 }

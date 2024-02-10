@@ -303,11 +303,11 @@ fn construct_starmap_call(starmap_binding: String, iter: &Expr, func: &Expr) -> 
     };
     ast::ExprCall {
         func: Box::new(starmap.into()),
-        arguments: ast::Arguments {
+        arguments: Box::new(ast::Arguments {
             args: Box::from([func.clone(), iter.clone()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-        },
+        }),
         range: TextRange::default(),
     }
 }
@@ -321,11 +321,11 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: &str) -> ast::ExprCall {
     };
     ast::ExprCall {
         func: Box::new(name.into()),
-        arguments: ast::Arguments {
+        arguments: Box::new(ast::Arguments {
             args: Box::from([call.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-        },
+        }),
         range: TextRange::default(),
     }
 }
@@ -353,14 +353,12 @@ fn match_comprehension_target(comprehension: &ast::Comprehension) -> Option<Comp
 /// Match that the given expression is `func(x, y, z, ...)`.
 fn match_call(element: &Expr) -> Option<(&[Expr], &Expr)> {
     let ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
+        func, arguments, ..
     } = element.as_call_expr()?;
 
-    if !keywords.is_empty() {
+    if !arguments.keywords.is_empty() {
         return None;
     }
 
-    Some((args, func))
+    Some((&arguments.args, func))
 }

@@ -135,7 +135,7 @@ fn match_named_tuple_assign<'a>(
     };
     let Expr::Call(ast::ExprCall {
         func,
-        arguments: Arguments { args, keywords, .. },
+        arguments,
         range: _,
     }) = value
     else {
@@ -144,7 +144,7 @@ fn match_named_tuple_assign<'a>(
     if !semantic.match_typing_expr(func, "NamedTuple") {
         return None;
     }
-    Some((typename, args, keywords, func))
+    Some((typename, &arguments.args, &arguments.keywords, func))
 }
 
 /// Generate a [`Stmt::AnnAssign`] representing the provided field definition.

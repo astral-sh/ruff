@@ -3,7 +3,7 @@ use std::fmt;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_ast::{Arguments, Expr};
+use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -70,14 +70,12 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::Stm
         return;
     };
     let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, .. },
-        ..
+        func, arguments, ..
     }) = stmt_for.iter.as_ref()
     else {
         return;
     };
-    if !args.is_empty() {
+    if !arguments.is_empty() {
         return;
     }
     let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {

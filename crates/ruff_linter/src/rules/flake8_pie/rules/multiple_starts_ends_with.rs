@@ -81,23 +81,18 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
     for (index, call) in values.iter().enumerate() {
         let Expr::Call(ast::ExprCall {
             func,
-            arguments:
-                Arguments {
-                    args,
-                    keywords,
-                    range: _,
-                },
+            arguments,
             range: _,
         }) = &call
         else {
             continue;
         };
 
-        if !keywords.is_empty() {
+        if !arguments.keywords.is_empty() {
             continue;
         }
 
-        let [arg] = &**args else {
+        let [arg] = &*arguments.args else {
             continue;
         };
 
@@ -140,12 +135,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                 .map(|expr| {
                     let Expr::Call(ast::ExprCall {
                         func: _,
-                        arguments:
-                            Arguments {
-                                args,
-                                keywords: _,
-                                range: _,
-                            },
+                        arguments,
                         range: _,
                     }) = expr
                     else {
@@ -154,7 +144,9 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                             format!("Indices should only contain `{attr_name}` calls")
                         )
                     };
-                    args.first()
+                    arguments
+                        .args
+                        .first()
                         .unwrap_or_else(|| panic!("`{attr_name}` should have one argument"))
                 })
                 .collect();
@@ -187,11 +179,11 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
             });
             let node3 = Expr::Call(ast::ExprCall {
                 func: Box::new(node2),
-                arguments: Arguments {
+                arguments: Box::new(Arguments {
                     args: Box::from([node]),
                     keywords: Box::from([]),
                     range: TextRange::default(),
-                },
+                }),
                 range: TextRange::default(),
             });
             let call = node3;

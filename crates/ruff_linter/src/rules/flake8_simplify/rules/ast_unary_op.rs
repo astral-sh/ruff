@@ -278,11 +278,11 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: UnaryOp, o
         };
         let node1 = ast::ExprCall {
             func: Box::new(node.into()),
-            arguments: Arguments {
+            arguments: Box::new(Arguments {
                 args: Box::from([*operand.clone()]),
                 keywords: Box::from([]),
                 range: TextRange::default(),
-            },
+            }),
             range: TextRange::default(),
         };
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(

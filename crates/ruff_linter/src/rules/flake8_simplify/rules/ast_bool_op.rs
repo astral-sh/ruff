@@ -303,21 +303,16 @@ fn isinstance_target<'a>(call: &'a Expr, semantic: &'a SemanticModel) -> Option<
     // Verify that this is an `isinstance` call.
     let Expr::Call(ast::ExprCall {
         func,
-        arguments:
-            Arguments {
-                args,
-                keywords,
-                range: _,
-            },
+        arguments,
         range: _,
     }) = &call
     else {
         return None;
     };
-    if args.len() != 2 {
+    if !arguments.keywords.is_empty() {
         return None;
     }
-    if !keywords.is_empty() {
+    if arguments.args.len() != 2 {
         return None;
     }
     let Expr::Name(ast::ExprName { id: func_name, .. }) = func.as_ref() else {
@@ -331,7 +326,7 @@ fn isinstance_target<'a>(call: &'a Expr, semantic: &'a SemanticModel) -> Option<
     }
 
     // Collect the target (e.g., `obj` in `isinstance(obj, int)`).
-    Some(&args[0])
+    Some(&arguments.args[0])
 }
 
 /// SIM101
@@ -374,12 +369,10 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         if indices.len() > 1 {
             // Grab the target used in each duplicate `isinstance` call (e.g., `obj` in
             // `isinstance(obj, int)`).
-            let target = if let Expr::Call(ast::ExprCall {
-                arguments: Arguments { args, .. },
-                ..
-            }) = &values[indices[0]]
-            {
-                args.first()
+            let target = if let Expr::Call(ast::ExprCall { arguments, .. }) = &values[indices[0]] {
+                arguments
+                    .args
+                    .first()
                     .expect("`isinstance` should have two arguments")
             } else {
                 unreachable!("Indices should only contain `isinstance` calls")
@@ -401,14 +394,13 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     .iter()
                     .map(|index| &values[*index])
                     .map(|expr| {
-                        let Expr::Call(ast::ExprCall {
-                            arguments: Arguments { args, .. },
-                            ..
-                        }) = expr
-                        else {
+                        let Expr::Call(ast::ExprCall { arguments, .. }) = expr else {
                             unreachable!("Indices should only contain `isinstance` calls")
                         };
-                        args.get(1).expect("`isinstance` should have two arguments")
+                        arguments
+                            .args
+                            .get(1)
+                            .expect("`isinstance` should have two arguments")
                     })
                     .collect();
 
@@ -436,11 +428,11 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 };
                 let node2 = ast::ExprCall {
                     func: Box::new(node1.into()),
-                    arguments: Arguments {
+                    arguments: Box::new(Arguments {
                         args: Box::from([target.clone(), node.into()]),
                         keywords: Box::from([]),
                         range: TextRange::default(),
-                    },
+                    }),
                     range: TextRange::default(),
                 };
                 let call = node2.into();

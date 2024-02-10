@@ -3,7 +3,7 @@ use itertools::Itertools;
 use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -103,20 +103,16 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
 
 /// FLY002
 pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) {
-    let Expr::Call(ast::ExprCall {
-        arguments: Arguments { args, keywords, .. },
-        ..
-    }) = expr
-    else {
+    let Expr::Call(ast::ExprCall { arguments, .. }) = expr else {
         return;
     };
 
     // If there are kwargs or more than one argument, this is some non-standard
     // string join call.
-    if !keywords.is_empty() {
+    if !arguments.keywords.is_empty() {
         return;
     }
-    let [arg] = &**args else {
+    let [arg] = &*arguments.args else {
         return;
     };
 

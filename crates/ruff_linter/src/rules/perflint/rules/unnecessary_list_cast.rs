@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::find_assigned_value;
 use ruff_text_size::TextRange;
 
@@ -52,19 +52,14 @@ impl AlwaysFixableViolation for UnnecessaryListCast {
 pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr, body: &[Stmt]) {
     let Expr::Call(ast::ExprCall {
         func,
-        arguments:
-            Arguments {
-                args,
-                keywords: _,
-                range: _,
-            },
+        arguments,
         range: list_range,
     }) = iter
     else {
         return;
     };
 
-    let [arg] = &**args else {
+    let [arg] = &*arguments.args else {
         return;
     };
 

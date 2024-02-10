@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::is_list;
 
 use crate::checkers::ast::Checker;
@@ -60,23 +60,18 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stm
 
     let Expr::Call(ast::ExprCall {
         func,
-        arguments:
-            Arguments {
-                args,
-                keywords,
-                range: _,
-            },
+        arguments,
         range,
     }) = value.as_ref()
     else {
         return;
     };
 
-    if !keywords.is_empty() {
+    if !arguments.keywords.is_empty() {
         return;
     }
 
-    let [arg] = &**args else {
+    let [arg] = &*arguments.args else {
         return;
     };
 

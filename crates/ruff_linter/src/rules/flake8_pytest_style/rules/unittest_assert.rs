@@ -389,11 +389,11 @@ impl UnittestAssert {
                 };
                 let node1 = ast::ExprCall {
                     func: Box::new(node.into()),
-                    arguments: Arguments {
+                    arguments: Box::new(Arguments {
                         args: Box::from([(**obj).clone(), (**cls).clone()]),
                         keywords: Box::from([]),
                         range: TextRange::default(),
-                    },
+                    }),
                     range: TextRange::default(),
                 };
                 let isinstance = node1.into();
@@ -433,11 +433,11 @@ impl UnittestAssert {
                 };
                 let node2 = ast::ExprCall {
                     func: Box::new(node1.into()),
-                    arguments: Arguments {
+                    arguments: Box::new(Arguments {
                         args: Box::from([(**regex).clone(), (**text).clone()]),
                         keywords: Box::from([]),
                         range: TextRange::default(),
-                    },
+                    }),
                     range: TextRange::default(),
                 };
                 let re_search = node2.into();

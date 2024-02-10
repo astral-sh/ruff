@@ -102,12 +102,10 @@ pub(crate) fn sort_dunder_all_aug_assign(checker: &mut Checker, node: &ast::Stmt
 pub(crate) fn sort_dunder_all_extend_call(
     checker: &mut Checker,
     ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
+        func, arguments, ..
     }: &ast::ExprCall,
 ) {
-    let ([value_passed], []) = (&**args, &**keywords) else {
+    let ([value_passed], []) = (&*arguments.args, &*arguments.keywords) else {
         return;
     };
     let ast::Expr::Attribute(ast::ExprAttribute {

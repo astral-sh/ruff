@@ -99,9 +99,7 @@ fn should_be_fstring(
     for expr in semantic.current_expressions() {
         match expr {
             ast::Expr::Call(ast::ExprCall {
-                arguments: ast::Arguments { keywords, args, .. },
-                func,
-                ..
+                arguments, func, ..
             }) => {
                 if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() {
                     match value.as_ref() {
@@ -123,12 +121,12 @@ fn should_be_fstring(
                         _ => {}
                     }
                 }
-                for keyword in keywords.iter() {
+                for keyword in arguments.keywords.iter() {
                     if let Some(ident) = keyword.arg.as_ref() {
                         arg_names.insert(ident.as_str());
                     }
                 }
-                for arg in args.iter() {
+                for arg in arguments.args.iter() {
                     if let ast::Expr::Name(ast::ExprName { id, .. }) = arg {
                         arg_names.insert(&**id);
                     }

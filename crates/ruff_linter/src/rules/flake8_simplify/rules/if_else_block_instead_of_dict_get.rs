@@ -175,11 +175,11 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: 
     };
     let node3 = ast::ExprCall {
         func: Box::new(node2.into()),
-        arguments: Arguments {
+        arguments: Box::new(Arguments {
             args: Box::from([node1, node]),
             keywords: Box::from([]),
             range: TextRange::default(),
-        },
+        }),
         range: TextRange::default(),
     };
     let node4 = expected_var.clone();
@@ -275,11 +275,11 @@ pub(crate) fn if_exp_instead_of_dict_get(
     };
     let fixed_node = ast::ExprCall {
         func: Box::new(dict_get_node.into()),
-        arguments: Arguments {
+        arguments: Box::new(Arguments {
             args: Box::from([dict_key_node, default_value_node]),
             keywords: Box::from([]),
             range: TextRange::default(),
-        },
+        }),
         range: TextRange::default(),
     };
 

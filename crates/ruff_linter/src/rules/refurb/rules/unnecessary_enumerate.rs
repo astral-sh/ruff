@@ -250,11 +250,11 @@ fn generate_range_len_call(name: &str, generator: Generator) -> String {
             }
             .into(),
         ),
-        arguments: Arguments {
+        arguments: Box::new(Arguments {
             args: Box::from([var.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-        },
+        }),
         range: TextRange::default(),
     };
     // Construct `range(len(name))`.
@@ -267,11 +267,11 @@ fn generate_range_len_call(name: &str, generator: Generator) -> String {
             }
             .into(),
         ),
-        arguments: Arguments {
+        arguments: Box::new(Arguments {
             args: Box::from([len.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
-        },
+        }),
         range: TextRange::default(),
     };
     // And finally, turn it into a statement.
