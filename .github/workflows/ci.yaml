@@ -111,13 +111,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: rustup show
-      - name: "Install cargo insta"
+      - name: "Install mold"
+        uses: rui314/setup-mold@v1
+      - name: "Install cargo nextest"
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-insta
+          tool: cargo-nextest
       - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
-        run: cargo insta test --all --all-features --unreferenced reject
+        shell: bash
+        run: cargo nextest run --workspace --status-level skip --failure-output immediate-final --no-fail-fast -j 12
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
@@ -138,15 +141,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: rustup show
-      - name: "Install cargo insta"
+      - name: "Install cargo nextest"
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-insta
+          tool: cargo-nextest
       - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
         shell: bash
-        # We can't reject unreferenced snapshots on windows because flake8_executable can't run on windows
-        run: cargo insta test --all --exclude ruff_dev --all-features
+        run: cargo nextest run --workspace --status-level skip --failure-output immediate-final --no-fail-fast -j 12
 
   cargo-test-wasm:
     name: "cargo test (wasm)"
