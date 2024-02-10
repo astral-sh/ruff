@@ -120,7 +120,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
         shell: bash
-        run: cargo nextest run --all --status-level skip --failure-output immediate-final --no-fail-fast -j 8
+        run: cargo nextest run --workspace --status-level skip --failure-output immediate-final --no-fail-fast -j 12
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
@@ -148,7 +148,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
         shell: bash
-        run: cargo nextest run --all --status-level skip --failure-output immediate-final --no-fail-fast -j 8
+        run: cargo nextest run --workspace --status-level skip --failure-output immediate-final --no-fail-fast -j 12
 
   cargo-test-wasm:
     name: "cargo test (wasm)"
