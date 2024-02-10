@@ -416,8 +416,6 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
                     Some(stripped_indentation_len)
                 }
             }
-            // Preserve tabs that are used for indentation, but only if it isn't a mix of tabs and spaces
-            // and the `stripped_indentation` is a prefix of the line's indent.
             IndentStyle::Tab => {
                 let line_indent = Indent::from_str(trim_end);
 
@@ -426,15 +424,16 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
                     .take_while(|c| c.is_whitespace())
                     .any(|c| !matches!(c, ' ' | '\t'));
 
-                if !non_ascii_whitespace
-                    && line_indent.trim_start(self.stripped_indentation).is_some()
-                {
-                    // Trim the indent but otherwise preserve it as is.
-                    let stripped_indent_len = self.stripped_indentation.text_len().unwrap();
-                    Some(stripped_indent_len)
-                } else {
-                    None
-                }
+                let trimmed = line_indent.trim_start(self.stripped_indentation);
+
+                // Preserve tabs that are used for indentation, but only if the indent isn't
+                // * a mix of tabs and spaces
+                // * the `stripped_indentation` is a prefix of the line's indent
+                // * the trimmed indent isn't spaces followed by tabs because that would result in a
+                //   mixed tab, spaces, tab indentation, resulting in instabilities.
+                let preserve_indent = !non_ascii_whitespace
+                    && trimmed.is_some_and(|trimmed| !trimmed.is_spaces_tabs());
+                preserve_indent.then(|| self.stripped_indentation.text_len().unwrap())
             }
         };
 
@@ -940,8 +939,7 @@ struct CodeExampleRst<'src> {
     /// The lines that have been seen so far that make up the block.
     lines: Vec<CodeExampleLine<'src>>,
 
-    /// The indent of the line "opening" this block measured via
-    /// `indentation_length` (in columns).
+    /// The indent of the line "opening" this block in columns.
     ///
     /// It can either be the indent of a line ending with `::` (for a literal
     /// block) or the indent of a line starting with `.. ` (a directive).
@@ -951,7 +949,7 @@ struct CodeExampleRst<'src> {
     /// that is "more than" it.
     opening_indent: Indent,
 
-    /// The minimum indent of the block measured via `indentation_length`.
+    /// The minimum indent of the block in columns.
     ///
     /// This is `None` until the first such line is seen. If no such line is
     /// found, then we consider it an invalid block and bail out of trying to
@@ -1260,8 +1258,7 @@ struct CodeExampleMarkdown<'src> {
     /// The lines that have been seen so far that make up the block.
     lines: Vec<CodeExampleLine<'src>>,
 
-    /// The indent of the line "opening" fence of this block measured via
-    /// `indentation_length` (in columns).
+    /// The indent of the line "opening" fence of this block in columns.
     ///
     /// This indentation is trimmed from the indentation of every line in the
     /// body of the code block,
@@ -1528,7 +1525,6 @@ enum CodeExampleAddAction<'src> {
     /// results in that code example becoming invalid. In this case,
     /// we don't want to treat it as a code example, but instead write
     /// back the lines to the docstring unchanged.
-    #[allow(dead_code)] // FIXME: remove when reStructuredText support is added
     Reset {
         /// The lines of code that we collected but should be printed back to
         /// the docstring as-is and not formatted.
@@ -1587,7 +1583,7 @@ enum Indent {
     Spaces(usize),
 
     /// Tabs only indentation.
-    Tabs { count: usize },
+    Tabs(usize),
 
     /// Indentation that uses tabs followed by spaces.
     /// Also known as smart tabs where tabs are used for indents, and spaces for alignment.
@@ -1616,7 +1612,7 @@ impl Indent {
 
         if spaces == 0 {
             if align_spaces == 0 {
-                return Indent::Tabs { count: tabs };
+                return Indent::Tabs(tabs);
             }
 
             // At this point it's either a smart tab (tabs followed by spaces) or a wild mix of tabs and spaces.
@@ -1657,7 +1653,7 @@ impl Indent {
     const fn len(self) -> usize {
         match self {
             Indent::Spaces(count) => count,
-            Indent::Tabs { count } => count * TAB_INDENT_WIDTH,
+            Indent::Tabs(count) => count * TAB_INDENT_WIDTH,
             Indent::TabSpaces { tabs, spaces } => tabs * TAB_INDENT_WIDTH + spaces,
             Indent::SpacesTabs { spaces, tabs } => {
                 let mut indent = spaces;
@@ -1671,7 +1667,7 @@ impl Indent {
     fn text_len(self) -> Option<TextSize> {
         let len = match self {
             Indent::Spaces(count) => count,
-            Indent::Tabs { count } => count,
+            Indent::Tabs(count) => count,
             Indent::TabSpaces { tabs, spaces } => tabs + spaces,
             Indent::SpacesTabs { spaces, tabs } => spaces + tabs,
             Indent::Mixed(_) => return None,
@@ -1683,85 +1679,73 @@ impl Indent {
     ///
     /// Returns `None` if `self` is not a prefix of `rhs` or either `self` or `rhs` use mixed indentation.
     fn trim_start(self, rhs: Indent) -> Option<Indent> {
-        match (self, rhs) {
-            (left, Indent::Spaces(0)) => Some(left),
-            (Indent::Spaces(left), Indent::Spaces(right)) => {
-                left.checked_sub(right).map(Indent::Spaces)
-            }
-            (Indent::Tabs { count: left }, Indent::Tabs { count: right }) => left
-                .checked_sub(right)
-                .map(|tabs| Indent::Tabs { count: tabs }),
-            (Indent::TabSpaces { tabs, spaces }, Indent::Tabs { count: right_tabs }) => {
-                tabs.checked_sub(right_tabs).map(|tabs| {
-                    if tabs == 0 {
-                        Indent::Spaces(spaces)
-                    } else {
-                        Indent::TabSpaces { tabs, spaces }
+        let (left_tabs, left_spaces) = match self {
+            Indent::Spaces(spaces) => (0usize, spaces),
+            Indent::Tabs(tabs) => (tabs, 0usize),
+            Indent::TabSpaces { tabs, spaces } => (tabs, spaces),
+            // Handle spaces here because it is the only indent where the spaces come before the tabs.
+            Indent::SpacesTabs {
+                spaces: left_spaces,
+                tabs: left_tabs,
+            } => {
+                return match rhs {
+                    Indent::Spaces(right_spaces) => {
+                        left_spaces.checked_sub(right_spaces).map(|spaces| {
+                            if spaces == 0 {
+                                Indent::Tabs(left_tabs)
+                            } else {
+                                Indent::SpacesTabs {
+                                    tabs: left_tabs,
+                                    spaces,
+                                }
+                            }
+                        })
                     }
-                })
-            }
-            (
-                Indent::TabSpaces {
-                    tabs: left_tabs,
-                    spaces: left_spaces,
-                },
-                Indent::TabSpaces {
-                    tabs: right_tabs,
-                    spaces: right_spaces,
-                },
-            ) => left_tabs.checked_sub(right_tabs).and_then(|tabs| {
-                let spaces = left_spaces.checked_sub(right_spaces)?;
+                    Indent::SpacesTabs {
+                        spaces: right_spaces,
+                        tabs: right_tabs,
+                    } => left_spaces.checked_sub(right_spaces).and_then(|spaces| {
+                        let tabs = left_tabs.checked_sub(right_tabs)?;
 
-                Some(if tabs == 0 {
-                    Indent::Spaces(spaces)
-                } else {
-                    Indent::TabSpaces { tabs, spaces }
-                })
-            }),
-            (
-                Indent::SpacesTabs {
-                    spaces: left_spaces,
-                    tabs,
-                },
-                Indent::Spaces(right_spaces),
-            ) => left_spaces.checked_sub(right_spaces).map(|spaces| {
-                if spaces == 0 {
-                    Indent::Tabs { count: tabs }
-                } else {
-                    Indent::SpacesTabs { tabs, spaces }
+                        Some(if spaces == 0 {
+                            if tabs == 0 {
+                                Indent::Spaces(0)
+                            } else {
+                                Indent::Tabs(tabs)
+                            }
+                        } else {
+                            Indent::SpacesTabs { spaces, tabs }
+                        })
+                    }),
+
+                    _ => None,
                 }
-            }),
-            (
-                Indent::SpacesTabs {
-                    spaces: left_spaces,
-                    tabs: left_tabs,
-                },
-                Indent::SpacesTabs {
-                    spaces: right_spaces,
-                    tabs: right_tabs,
-                },
-            ) => left_spaces.checked_sub(right_spaces).and_then(|spaces| {
-                let tabs = left_tabs.checked_sub(right_tabs)?;
+            }
+            Indent::Mixed(_) => return None,
+        };
 
-                Some(if spaces == 0 {
-                    if tabs == 0 {
-                        Indent::Spaces(0)
-                    } else {
-                        Indent::Tabs { count: tabs }
-                    }
-                } else {
-                    Indent::SpacesTabs { spaces, tabs }
-                })
-            }),
-            _ => None,
-        }
+        let (right_tabs, right_spaces) = match rhs {
+            Indent::Spaces(spaces) => (0usize, spaces),
+            Indent::Tabs(tabs) => (tabs, 0usize),
+            Indent::TabSpaces { tabs, spaces } => (tabs, spaces),
+            Indent::SpacesTabs { .. } | Indent::Mixed(_) => return None,
+        };
+
+        let tabs = left_tabs.checked_sub(right_tabs)?;
+        let spaces = left_spaces.checked_sub(right_spaces)?;
+
+        Some(if tabs == 0 {
+            Indent::Spaces(spaces)
+        } else if spaces == 0 {
+            Indent::Tabs(tabs)
+        } else {
+            Indent::TabSpaces { tabs, spaces }
+        })
     }
 
     /// Trims at most `indent_len` indentation from the beginning of `line`.
     ///
-    /// This treats indentation in precisely the same way as `indentation_length`.
-    /// As such, it is expected that `indent_len` is computed from
-    /// `indentation_length`. This is useful when one needs to trim some minimum
+    /// This is useful when one needs to trim some minimum
     /// level of indentation from a code snippet collected from a docstring before
     /// attempting to reformat it.
     fn trim_start_str(self, line: &str) -> &str {
@@ -1786,6 +1770,10 @@ impl Indent {
             }
         }
         trimmed
+    }
+
+    const fn is_spaces_tabs(self) -> bool {
+        matches!(self, Indent::SpacesTabs { .. })
     }
 }
 

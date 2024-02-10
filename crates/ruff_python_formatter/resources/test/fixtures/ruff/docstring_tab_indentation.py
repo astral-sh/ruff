@@ -31,6 +31,11 @@ def under_indented_tabs(arg1: str) -> None:
 arg2: Not properly indented
 	"""
 
+def spaces_tabs_over_indent(arg1: str) -> None:
+    """
+    Arguments:
+      	arg1: super duper arg with a tab and a space in front
+    """
 
 # The docstring itself is indented with spaces but the argument is indented by a tab.
 # Keep the tab indentation of the argument, convert th docstring indent to tabs.
