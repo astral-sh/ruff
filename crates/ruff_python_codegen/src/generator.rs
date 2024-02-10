@@ -908,7 +908,7 @@ impl<'a> Generator<'a> {
             }) => {
                 self.p("{");
                 let mut first = true;
-                for (k, v) in keys.iter().zip(values) {
+                for (k, v) in keys.iter().zip(values.iter()) {
                     self.p_delim(&mut first, ", ");
                     if let Some(k) = k {
                         self.unparse_expr(k, precedence::COMMA);

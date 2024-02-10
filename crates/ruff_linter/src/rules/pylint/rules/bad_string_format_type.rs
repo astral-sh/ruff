@@ -193,7 +193,7 @@ fn is_valid_dict(
                 .map(|mapping_key| (mapping_key.as_str(), format))
         })
         .collect();
-    for (key, value) in keys.iter().zip(values) {
+    for (key, value) in keys.iter().zip(values.iter()) {
         let Some(key) = key else {
             return true;
         };

@@ -178,7 +178,7 @@ impl<'a> StringLiteralDisplay<'a> {
                 range,
             }) => {
                 let mut narrowed_keys = Vec::with_capacity(values.len());
-                for key in keys {
+                for key in keys.iter() {
                     if let Some(key) = key {
                         // This is somewhat unfortunate,
                         // *but* using a dict for __slots__ is very rare

@@ -770,8 +770,8 @@ impl From<ExprIfExp> for Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprDict {
     pub range: TextRange,
-    pub keys: Vec<Option<Expr>>,
-    pub values: Vec<Expr>,
+    pub keys: Box<[Option<Expr>]>,
+    pub values: Box<[Expr]>,
 }
 
 impl From<ExprDict> for Expr {
@@ -3900,7 +3900,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 40);
         assert_eq!(std::mem::size_of::<ExprCall>(), 56);
         assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
-        assert_eq!(std::mem::size_of::<ExprDict>(), 56);
+        assert_eq!(std::mem::size_of::<ExprDict>(), 40);
         assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
         assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
         assert_eq!(std::mem::size_of::<ExprFString>(), 48);

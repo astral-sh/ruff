@@ -396,7 +396,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             for expr in keys.iter().flatten() {
                 visitor.visit_expr(expr);
             }
-            for expr in values {
+            for expr in values.iter() {
                 visitor.visit_expr(expr);
             }
         }

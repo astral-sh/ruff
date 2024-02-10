@@ -383,7 +383,7 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             for expr in keys.iter_mut().flatten() {
                 visitor.visit_expr(expr);
             }
-            for expr in values {
+            for expr in values.iter_mut() {
                 visitor.visit_expr(expr);
             }
         }

@@ -1117,7 +1117,7 @@ where
                             match (arg.as_ref(), value) {
                                 // Ex) NamedTuple("a", **{"a": int})
                                 (None, Expr::Dict(ast::ExprDict { keys, values, .. })) => {
-                                    for (key, value) in keys.iter().zip(values) {
+                                    for (key, value) in keys.iter().zip(values.iter()) {
                                         if let Some(key) = key.as_ref() {
                                             self.visit_non_type_definition(key);
                                             self.visit_type_definition(value);
@@ -1153,7 +1153,7 @@ where
                                 for key in keys.iter().flatten() {
                                     self.visit_non_type_definition(key);
                                 }
-                                for value in values {
+                                for value in values.iter() {
                                     self.visit_type_definition(value);
                                 }
                             } else {

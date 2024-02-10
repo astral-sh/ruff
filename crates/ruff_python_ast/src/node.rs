@@ -2212,7 +2212,7 @@ impl AstNode for ast::ExprDict {
             range: _,
         } = self;
 
-        for (key, value) in keys.iter().zip(values) {
+        for (key, value) in keys.iter().zip(values.iter()) {
             if let Some(key) = key {
                 visitor.visit_expr(key);
             }

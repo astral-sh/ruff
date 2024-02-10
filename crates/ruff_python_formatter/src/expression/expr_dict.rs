@@ -46,7 +46,7 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
             let mut joiner = f.join_comma_separated(item.end());
 
             let mut key_value_comments = key_value_comments;
-            for (key, value) in keys.iter().zip(values) {
+            for (key, value) in keys.iter().zip(values.iter()) {
                 let mut key_value_pair = KeyValuePair::new(key, value);
 
                 let partition = key_value_comments

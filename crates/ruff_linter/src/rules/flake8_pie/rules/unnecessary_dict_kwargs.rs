@@ -70,7 +70,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
         };
 
         // Ex) `foo(**{**bar})`
-        if matches!(keys.as_slice(), [None]) {
+        if matches!(&**keys, [None]) {
             let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, keyword.range());
 
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
@@ -151,7 +151,7 @@ fn duplicates(call: &ast::ExprCall) -> FxHashSet<&str> {
                 duplicates.insert(name.as_str());
             }
         } else if let Expr::Dict(ast::ExprDict { keys, .. }) = &keyword.value {
-            for key in keys {
+            for key in keys.iter() {
                 if let Some(name) = key.as_ref().and_then(as_kwarg) {
                     if !seen.insert(name) {
                         duplicates.insert(name);

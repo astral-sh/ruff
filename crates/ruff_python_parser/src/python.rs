@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: cae04435d0832985b15c6bddb901e8115d4161a49ee0d850c425c1a4a87ef29b
+// sha3: 8f9c419cf07ccd6289047223fa22bb70c6afd0133b58ea606f601340160cab8b
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -41427,11 +41427,17 @@ fn __action559<
 ) -> crate::parser::ParenthesizedExpr
 {
     {
-        let (keys, values) = e
-            .unwrap_or_default()
-            .into_iter()
-            .map(|(k, v)| (k.map(|x| ast::Expr::from(*x)), ast::Expr::from(v)))
-            .unzip();
+        let (keys, values) = if let Some(e) = e {
+            let mut keys = Vec::with_capacity(e.len());
+            let mut values = Vec::with_capacity(e.len());
+            for (k, v) in e {
+                keys.push(k.map(|x| ast::Expr::from(*x)));
+                values.push(ast::Expr::from(v));
+            }
+            (keys.into_boxed_slice(), values.into_boxed_slice())
+        } else {
+            (Box::from([]), Box::from([]))
+        };
         ast::ExprDict { keys, values, range: (location..end_location).into() }.into()
     }
 }
@@ -42125,11 +42131,17 @@ fn __action601<
 ) -> crate::parser::ParenthesizedExpr
 {
     {
-        let (keys, values) = e
-            .unwrap_or_default()
-            .into_iter()
-            .map(|(k, v)| (k.map(|x| ast::Expr::from(*x)), ast::Expr::from(v)))
-            .unzip();
+        let (keys, values) = if let Some(e) = e {
+            let mut keys = Vec::with_capacity(e.len());
+            let mut values = Vec::with_capacity(e.len());
+            for (k, v) in e {
+                keys.push(k.map(|x| ast::Expr::from(*x)));
+                values.push(ast::Expr::from(v));
+            }
+            (keys.into_boxed_slice(), values.into_boxed_slice())
+        } else {
+            (Box::from([]), Box::from([]))
+        };
         ast::ExprDict { keys, values, range: (location..end_location).into() }.into()
     }
 }

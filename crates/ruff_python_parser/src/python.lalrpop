@@ -1767,11 +1767,17 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
         ).into())
     },
     <location:@L> "{" <e:DictLiteralValues?> "}" <end_location:@R> => {
-        let (keys, values) = e
-            .unwrap_or_default()
-            .into_iter()
-            .map(|(k, v)| (k.map(|x| ast::Expr::from(*x)), ast::Expr::from(v)))
-            .unzip();
+        let (keys, values) = if let Some(e) = e {
+            let mut keys = Vec::with_capacity(e.len());
+            let mut values = Vec::with_capacity(e.len());
+            for (k, v) in e {
+                keys.push(k.map(|x| ast::Expr::from(*x)));
+                values.push(ast::Expr::from(v));
+            }
+            (keys.into_boxed_slice(), values.into_boxed_slice())
+        } else {
+            (Box::from([]), Box::from([]))
+        };
         ast::ExprDict { keys, values, range: (location..end_location).into() }.into()
     },
     <location:@L> "{" <e1:DictEntry> <generators:CompFor> "}" <end_location:@R> => {

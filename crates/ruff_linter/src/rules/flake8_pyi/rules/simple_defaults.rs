@@ -307,7 +307,7 @@ fn is_valid_default_value_with_annotation(
         }) => {
             return allow_container
                 && keys.len() <= 10
-                && keys.iter().zip(values).all(|(k, v)| {
+                && keys.iter().zip(values.iter()).all(|(k, v)| {
                     k.as_ref().is_some_and(|k| {
                         is_valid_default_value_with_annotation(k, false, locator, semantic)
                     }) && is_valid_default_value_with_annotation(v, false, locator, semantic)
