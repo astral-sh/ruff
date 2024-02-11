@@ -1473,6 +1473,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.settings.rules.enabled(Rule::TypeBivariance) {
                 pylint::rules::type_bivariance(checker, value);
             }
+            if checker.enabled(Rule::BinaryOpAndNormalAssignment) {
+                pylint::rules::binary_op_and_normal_assignment(checker, assign);
+            }
             if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_assign(checker, assign);
             }

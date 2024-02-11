@@ -175,6 +175,10 @@ mod tests {
         Rule::UnnecessaryDictIndexLookup,
         Path::new("unnecessary_dict_index_lookup.py")
     )]
+    #[test_case(
+        Rule::BinaryOpAndNormalAssignment,
+        Path::new("binary_op_and_normal_assignment.py")
+    )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
