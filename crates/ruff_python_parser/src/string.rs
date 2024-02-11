@@ -76,7 +76,7 @@ impl StringParser {
 
     #[inline]
     fn range(&self, start_location: TextSize) -> TextRange {
-        TextRange::new(start_location, self.offset)
+        TextRange::new(dbg!(start_location), dbg!(self.offset))
     }
 
     /// Returns the next byte in the string, if there is one.
@@ -114,14 +114,14 @@ impl StringParser {
                     None => {
                         return Err(LexicalError::new(
                             LexicalErrorType::UnicodeError,
-                            self.range(self.get_pos()),
+                            TextRange::empty(self.get_pos()),
                         ))
                     }
                 },
                 None => {
                     return Err(LexicalError::new(
                         LexicalErrorType::UnicodeError,
-                        self.range(self.get_pos()),
+                        TextRange::empty(self.get_pos()),
                     ))
                 }
             }
@@ -130,7 +130,7 @@ impl StringParser {
             0xD800..=0xDFFF => Ok(std::char::REPLACEMENT_CHARACTER),
             _ => std::char::from_u32(p).ok_or(LexicalError::new(
                 LexicalErrorType::UnicodeError,
-                self.range(self.get_pos()),
+                TextRange::empty(self.get_pos()),
             )),
         }
     }
