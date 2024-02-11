@@ -20,6 +20,7 @@ use std::collections::HashMap;
 /// def foo():
 ///     return (1, 2)
 ///
+///
 /// x, y = foo()
 ///
 /// print(x)
@@ -28,7 +29,8 @@ use std::collections::HashMap;
 /// Use instead:
 /// ```python
 /// def foo():
-///    return (1, 2)
+///     return (1, 2)
+///
 ///
 /// x, _y = foo()
 ///
