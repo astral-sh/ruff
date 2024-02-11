@@ -26,6 +26,10 @@ Welcome! We're happy to have you here. Thank you in advance for your contributio
 - [`cargo dev`](#cargo-dev)
 - [Subsystems](#subsystems)
     - [Compilation Pipeline](#compilation-pipeline)
+    - [Import Categorization](#import-categorization)
+        - [Project root](#project-root)
+        - [Package root](#package-root)
+        - [Import categorization](#import-categorization-1)
 
 ## The Basics
 
@@ -80,7 +84,7 @@ We recommend [nextest](https://nexte.st/) to run Ruff's test suite (via `cargo n
 though it's not strictly necessary:
 
 ```shell
-cargo install nextest
+cargo install cargo-nextest --locked
 ```
 
 Throughout this guide, any usages of `cargo test` can be replaced with `cargo nextest run`,
