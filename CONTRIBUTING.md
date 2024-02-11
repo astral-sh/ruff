@@ -85,7 +85,7 @@ We recommend [nextest](https://nexte.st/) to run Ruff's test suite (via `cargo n
 though it's not strictly necessary:
 
 ```shell
-cargo install cargo-nextest
+cargo install cargo-nextest --locked
 ```
 
 Throughout this guide, any usages of `cargo test` can be replaced with `cargo nextest run`,
