@@ -353,13 +353,11 @@ Alternatively, it can be used via the [Apheleia](https://github.com/radian-softw
 Ruff is also available via the [`textmate2-ruff-linter`](https://github.com/vigo/textmate2-ruff-linter)
 bundle for TextMate.
 
-## mdformat
+## mdformat (Unofficial)
 
-[mdformat](https://mdformat.readthedocs.io/en/stable/users/plugins.html#code-formatter-plugins) can
-format code fence in markdown.
-[mdformat-ruff](https://github.com/Freed-Wu/mdformat-ruff) is a [mdformat
-plugin](https://mdformat.readthedocs.io/en/stable/users/plugins.html#code-formatter-plugins)
-to use ruff to format python code in markdown.
+[mdformat](https://mdformat.readthedocs.io/en/stable/users/plugins.html#code-formatter-plugins) is
+capable of formatting code blocks within Markdown. The [`mdformat-ruff`](https://github.com/Freed-Wu/mdformat-ruff)
+plugin enables mdformat to format Python code blocks with Ruff.
 
 ## GitHub Actions
 
