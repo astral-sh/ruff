@@ -40,6 +40,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::UnusedPrivateTypedDict,
         Rule::UnusedStaticMethodArgument,
         Rule::UnusedVariable,
+        Rule::UnusedTupleElement,
     ]) {
         return;
     }
@@ -313,6 +314,10 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Lambda(_)) {
             if checker.enabled(Rule::UnusedVariable) {
                 pyflakes::rules::unused_variable(checker, scope, &mut diagnostics);
+            }
+
+            if checker.enabled(Rule::UnusedTupleElement) {
+                ruff::rules::unused_tuple_element(checker, scope, &mut diagnostics);
             }
 
             if checker.enabled(Rule::UnusedAnnotation) {

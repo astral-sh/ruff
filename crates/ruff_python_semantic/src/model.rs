@@ -1053,6 +1053,19 @@ impl<'a> SemanticModel<'a> {
             .expect("No statement found")
     }
 
+    /// Return the [`NodeId`] for the [`Stmt`] corresponding to the given [`NodeId`].
+    pub fn statement_id(&self, node_id: NodeId) -> NodeId {
+        self.nodes
+            .ancestor_ids(node_id)
+            .find(|id| {
+                if self.nodes[*id].as_statement().is_some() {
+                    return true;
+                }
+                false
+            })
+            .expect("No statement found")
+    }
+
     /// Given a [`Stmt`], return its parent, if any.
     #[inline]
     pub fn parent_statement(&self, node_id: NodeId) -> Option<&'a Stmt> {

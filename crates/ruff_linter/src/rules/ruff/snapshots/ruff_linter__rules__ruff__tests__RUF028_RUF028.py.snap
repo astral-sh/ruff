@@ -1,0 +1,100 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF028.py:6:8: RUF028 [*] Local variable `b` is assigned to but never used. Consider renaming to `_b`.
+  |
+4 | # Flagged
+5 | def f():
+6 |     a, b = foo()
+  |        ^ RUF028
+7 |     print(a)
+  |
+  = help: Replace assignment of unused variable from `b` to `_b`.
+
+ℹ Unsafe fix
+3 3 | 
+4 4 | # Flagged
+5 5 | def f():
+6   |-    a, b = foo()
+  6 |+    a, _b = foo()
+7 7 |     print(a)
+8 8 | 
+9 9 | def f():
+
+RUF028.py:10:9: RUF028 [*] Local variable `b` is assigned to but never used. Consider renaming to `_b`.
+   |
+ 9 | def f():
+10 |     (a, b) = foo() # Testing with parentheses
+   |         ^ RUF028
+11 |     print(a)
+   |
+   = help: Replace assignment of unused variable from `b` to `_b`.
+
+ℹ Unsafe fix
+7  7  |     print(a)
+8  8  | 
+9  9  | def f():
+10    |-    (a, b) = foo() # Testing with parentheses
+   10 |+    (a, _b) = foo() # Testing with parentheses
+11 11 |     print(a)
+12 12 | 
+13 13 | def f():
+
+RUF028.py:14:8: RUF028 [*] Local variable `b` is assigned to but never used. Consider renaming to `_b`.
+   |
+13 | def f():
+14 |     a, b = c, d = foo()
+   |        ^ RUF028
+15 |     print(a)
+   |
+   = help: Replace assignment of unused variable from `b` to `_b`.
+
+ℹ Unsafe fix
+11 11 |     print(a)
+12 12 | 
+13 13 | def f():
+14    |-    a, b = c, d = foo()
+   14 |+    a, _b = c, d = foo()
+15 15 |     print(a)
+16 16 | 
+17 17 | 
+
+RUF028.py:14:12: RUF028 [*] Local variable `c` is assigned to but never used. Consider renaming to `_c`.
+   |
+13 | def f():
+14 |     a, b = c, d = foo()
+   |            ^ RUF028
+15 |     print(a)
+   |
+   = help: Replace assignment of unused variable from `c` to `_c`.
+
+ℹ Unsafe fix
+11 11 |     print(a)
+12 12 | 
+13 13 | def f():
+14    |-    a, b = c, d = foo()
+   14 |+    a, b = _c, d = foo()
+15 15 |     print(a)
+16 16 | 
+17 17 | 
+
+RUF028.py:14:15: RUF028 [*] Local variable `d` is assigned to but never used. Consider renaming to `_d`.
+   |
+13 | def f():
+14 |     a, b = c, d = foo()
+   |               ^ RUF028
+15 |     print(a)
+   |
+   = help: Replace assignment of unused variable from `d` to `_d`.
+
+ℹ Unsafe fix
+11 11 |     print(a)
+12 12 | 
+13 13 | def f():
+14    |-    a, b = c, d = foo()
+   14 |+    a, b = c, _d = foo()
+15 15 |     print(a)
+16 16 | 
+17 17 | 
+
+
