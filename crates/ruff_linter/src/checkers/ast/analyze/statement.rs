@@ -366,6 +366,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::SslWithBadDefaults) {
                 flake8_bandit::rules::ssl_with_bad_defaults(checker, function_def);
             }
+            if checker.enabled(Rule::SpuriousAsync) {
+                ruff::rules::spurious_async(checker, *is_async, name, body, stmt.range());
+            }
         }
         Stmt::Return(_) => {
             if checker.enabled(Rule::ReturnOutsideFunction) {
