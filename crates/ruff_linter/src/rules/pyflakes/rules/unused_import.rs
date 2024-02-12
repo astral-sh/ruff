@@ -28,6 +28,15 @@ enum UnusedImportContext {
 /// If an import statement is used to check for the availability or existence
 /// of a module, consider using `importlib.util.find_spec` instead.
 ///
+/// If an import statement is used to re-export a symbol as part of a module's
+/// public interface, consider using a "redundant" import alias, which
+/// instructs Ruff (and other tools) to respect the re-export, and avoid
+/// marking it as unused, as in:
+///
+/// ```python
+/// from module import member as member
+/// ```
+///
 /// ## Example
 /// ```python
 /// import numpy as np  # unused import
@@ -51,13 +60,6 @@ enum UnusedImportContext {
 ///     print("numpy is installed")
 /// else:
 ///     print("numpy is not installed")
-/// ```
-///
-/// Note that Ruff respects symbols used in a module's interface. So an unused
-/// import can be preserved with a 'redundant import alias':
-///
-/// ```python
-/// from other_module import reexported_fn as reexported_fn
 /// ```
 ///
 /// ## Options
