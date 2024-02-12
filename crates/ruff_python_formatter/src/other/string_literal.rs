@@ -50,11 +50,13 @@ impl Format<PyFormatContext<'_>> for FormatStringLiteral<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let locator = f.context().locator();
 
-        let quote_style = if self.layout.is_docstring() {
-            // Per PEP 8 and PEP 257, always prefer double quotes for docstrings
+        let quote_style = f.options().quote_style();
+        let quote_style = if self.layout.is_docstring() && !quote_style.is_preserve() {
+            // Per PEP 8 and PEP 257, always prefer double quotes for docstrings,
+            // except when using quote-style=preserve
             QuoteStyle::Double
         } else {
-            f.options().quote_style()
+            quote_style
         };
 
         let normalized = StringPart::from_source(self.value.range(), &locator).normalize(
