@@ -305,19 +305,16 @@ where
             self.semantic.flags -= SemanticModelFlags::IMPORT_BOUNDARY;
         }
 
-        // Track whether we've seen docstrings, non-imports, etc.
+        // Track whether we've seen module docstrings, non-imports, etc.
         match stmt {
             Stmt::Expr(ast::StmtExpr { value, .. })
-                if !self
-                    .semantic
-                    .flags
-                    .intersects(SemanticModelFlags::MODULE_DOCSTRING)
+                if !self.semantic.seen_module_docstring_boundary()
                     && value.is_string_literal_expr() =>
             {
-                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING;
+                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
             }
             Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
-                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING;
+                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
 
                 // Allow __future__ imports until we see a non-__future__ import.
                 if let Some("__future__") = module.as_deref() {
@@ -332,11 +329,11 @@ where
                 }
             }
             Stmt::Import(_) => {
-                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING;
+                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
                 self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
             }
             _ => {
-                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING;
+                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
                 self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
                 if !(self.semantic.seen_import_boundary()
                     || helpers::is_assignment_to_a_dunder(stmt)
