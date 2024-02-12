@@ -12,17 +12,8 @@ use crate::checkers::ast::Checker;
 /// function to be declared `async`.
 ///
 /// ## Why is this bad?
-/// TODO
-///
-/// ## Example
-/// TODO
-/// ```
-/// ```
-///
-/// Use instead:
-/// TODO
-/// ```
-/// ```
+/// Declaring a function `async` when it's not is usually a mistake, and may artificially limit the
+/// contexts where that function may be called.
 #[violation]
 pub struct SpuriousAsync {
     name: String,
