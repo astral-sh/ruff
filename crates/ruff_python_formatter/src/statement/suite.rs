@@ -103,7 +103,9 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             }
 
             SuiteKind::Function => {
-                if let Some(docstring) = DocstringStmt::try_from_statement(first, self.kind) {
+                if let Some(docstring) =
+                    DocstringStmt::try_from_statement(first, self.kind, source_type)
+                {
                     SuiteChildStatement::Docstring(docstring)
                 } else {
                     SuiteChildStatement::Other(first)
@@ -111,7 +113,9 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             }
 
             SuiteKind::Class => {
-                if let Some(docstring) = DocstringStmt::try_from_statement(first, self.kind) {
+                if let Some(docstring) =
+                    DocstringStmt::try_from_statement(first, self.kind, source_type)
+                {
                     if !comments.has_leading(first)
                         && lines_before(first.start(), source) > 1
                         && !source_type.is_stub()
@@ -143,7 +147,9 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             }
             SuiteKind::TopLevel => {
                 if is_format_module_docstring_enabled(f.context()) {
-                    if let Some(docstring) = DocstringStmt::try_from_statement(first, self.kind) {
+                    if let Some(docstring) =
+                        DocstringStmt::try_from_statement(first, self.kind, source_type)
+                    {
                         SuiteChildStatement::Docstring(docstring)
                     } else {
                         SuiteChildStatement::Other(first)
@@ -184,7 +190,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 true
             } else if is_module_docstring_newlines_enabled(f.context())
                 && self.kind == SuiteKind::TopLevel
-                && DocstringStmt::try_from_statement(first.statement(), self.kind).is_some()
+                && DocstringStmt::try_from_statement(first.statement(), self.kind, source_type)
+                    .is_some()
             {
                 // Only in preview mode, insert a newline after a module level docstring, but treat
                 // it as a docstring otherwise. See: https://github.com/psf/black/pull/3932.
@@ -734,7 +741,16 @@ pub(crate) struct DocstringStmt<'a> {
 
 impl<'a> DocstringStmt<'a> {
     /// Checks if the statement is a simple string that can be formatted as a docstring
-    fn try_from_statement(stmt: &'a Stmt, suite_kind: SuiteKind) -> Option<DocstringStmt<'a>> {
+    fn try_from_statement(
+        stmt: &'a Stmt,
+        suite_kind: SuiteKind,
+        source_type: PySourceType,
+    ) -> Option<DocstringStmt<'a>> {
+        // Notebooks don't have a concept of notebooks, never recognise them as docstrings.
+        if source_type.is_ipynb() && suite_kind == SuiteKind::TopLevel {
+            return None;
+        }
+
         let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
             return None;
         };
@@ -752,7 +768,11 @@ impl<'a> DocstringStmt<'a> {
         }
     }
 
-    pub(crate) fn is_docstring_statement(stmt: &StmtExpr) -> bool {
+    pub(crate) fn is_docstring_statement(stmt: &StmtExpr, source_type: PySourceType) -> bool {
+        if source_type.is_ipynb() {
+            return false;
+        }
+
         if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = stmt.value.as_ref() {
             !value.is_implicit_concatenated()
         } else {
