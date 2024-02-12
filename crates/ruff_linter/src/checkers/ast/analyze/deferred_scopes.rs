@@ -281,7 +281,9 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
             }
         }
 
-        if matches!(scope.kind, ScopeKind::Module | ScopeKind::Function(_)) {
+        if checker.source_type.is_stub()
+            || matches!(scope.kind, ScopeKind::Module | ScopeKind::Function(_))
+        {
             if checker.enabled(Rule::UnusedPrivateTypeVar) {
                 flake8_pyi::rules::unused_private_type_var(checker, scope, &mut diagnostics);
             }
