@@ -1499,6 +1499,12 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::FUTURES_BOUNDARY)
     }
 
+    /// Return `true` if the model has traversed past the module docstring boundary.
+    pub const fn seen_module_docstring_boundary(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY)
+    }
+
     /// Return `true` if `__future__`-style type annotations are enabled.
     pub const fn future_annotations(&self) -> bool {
         self.flags
@@ -1807,7 +1813,7 @@ bitflags! {
         ///
         /// x: int = 1
         /// ```
-        const MODULE_DOCSTRING = 1 << 16;
+        const MODULE_DOCSTRING_BOUNDARY = 1 << 16;
 
         /// The model is in a type parameter definition.
         ///
