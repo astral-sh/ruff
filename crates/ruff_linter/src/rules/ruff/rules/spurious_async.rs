@@ -38,18 +38,22 @@ impl Violation for SpuriousAsync {
 }
 
 #[derive(Default)]
-struct YieldingExprVisitor<'a> {
-    yieldingExprs: Vec<&'a TextRange>,
+struct YieldingExprVisitor {
+    found_yield: bool,
 }
 
-impl<'a> Visitor<'a> for YieldingExprVisitor<'a> {
+impl<'a> Visitor<'a> for YieldingExprVisitor {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
-            Expr::Await(ast::ExprAwait{ range, value }) => {
-                self.yieldingExprs.push(range);
-                visitor::walk_expr(self, value)
-            },
+            Expr::Await(_) => { self.found_yield = true; },
             _ => visitor::walk_expr(self, expr),
+        }
+    }
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        match stmt {
+            Stmt::With(ast::StmtWith{ is_async:true, .. }) => { self.found_yield = true; },
+            Stmt::For(ast::StmtFor{ is_async:true, .. }) => { self.found_yield = true; },
+            _ => visitor::walk_stmt(self, stmt),
         }
     }
 }
@@ -61,11 +65,12 @@ pub(crate) fn spurious_async(checker: &mut Checker, is_async: bool, name: &str, 
     }
 
     let yields = {
-        let mut visitor = YieldingExprVisitor::default();
+        let mut visitor = YieldingExprVisitor{ found_yield: false };
         visitor.visit_body(body);
-        visitor.yieldingExprs
+        visitor.found_yield
     };
-    if yields.is_empty() {
+
+    if !yields {
         checker
             .diagnostics
             .push(Diagnostic::new(SpuriousAsync{name:name.to_string()}, range));
