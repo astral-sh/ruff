@@ -832,7 +832,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  
  some_commented_string = (  # This comment stays at the top.
      "This string is long but not so long that it needs hahahah toooooo be so greatttt"
-@@ -279,36 +280,25 @@
+@@ -279,37 +280,26 @@
  )
  
  lpar_and_rpar_have_comments = func_call(  # LPAR Comment
@@ -852,31 +852,32 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 -    f" {'' if ID is None else ID} | perl -nE 'print if /^{field}:/'"
 -)
 +cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {'' if ID is None else ID} | perl -nE 'print if /^{field}:/'"
++
++cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {'{{}}' if ID is None else ID} | perl -nE 'print if /^{field}:/'"
  
 -cmd_fstring = (
 -    "sudo -E deluge-console info --detailed --sort-reverse=time_added"
 -    f" {'{{}}' if ID is None else ID} | perl -nE 'print if /^{field}:/'"
 -)
-+cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {'{{}}' if ID is None else ID} | perl -nE 'print if /^{field}:/'"
++cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {{'' if ID is None else ID}} | perl -nE 'print if /^{field}:/'"
  
 -cmd_fstring = (
 -    "sudo -E deluge-console info --detailed --sort-reverse=time_added {'' if ID is"
 -    f" None else ID}} | perl -nE 'print if /^{field}:/'"
 -)
-+cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {{'' if ID is None else ID}} | perl -nE 'print if /^{field}:/'"
- 
 +fstring = f"This string really doesn't need to be an {{{{fstring}}}}, but this one most certainly, absolutely {does}."
-+
+ 
  fstring = (
 -    "This string really doesn't need to be an {{fstring}}, but this one most"
 -    f" certainly, absolutely {does}."
 +    f"We have to remember to escape {braces}." " Like {these}." f" But not {this}."
  )
--
--fstring = f"We have to remember to escape {braces}. Like {{these}}. But not {this}."
  
+-fstring = f"We have to remember to escape {braces}. Like {{these}}. But not {this}."
+-
  
  class A:
+     class B:
 @@ -364,10 +354,7 @@
          def foo():
              if not hasattr(module, name):
@@ -979,7 +980,13 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  )
  
  # The parens should NOT be removed in this case.
-@@ -518,88 +494,78 @@
+@@ -513,93 +489,83 @@
+ 
+ 
+ temp_msg = (
+-    f"{f'{humanize_number(pos)}.': <{pound_len+2}} "
++    f"{f'{humanize_number(pos)}.': <{pound_len + 2}} "
+     f"{balance: <{bal_len + 5}} "
      f"<<{author.display_name}>>\n"
  )
  
@@ -1103,7 +1110,13 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
      "6. Click on Create Credential at the top."
      '7. At the top click the link for "API key".'
      "8. No application restrictions are needed. Click Create at the bottom."
-@@ -613,55 +579,40 @@
+@@ -608,60 +574,45 @@
+ 
+ # It shouldn't matter if the string prefixes are capitalized.
+ temp_msg = (
+-    f"{F'{humanize_number(pos)}.': <{pound_len+2}} "
++    f"{f'{humanize_number(pos)}.': <{pound_len + 2}} "
+     f"{balance: <{bal_len + 5}} "
      f"<<{author.display_name}>>\n"
  )
  
@@ -1688,7 +1701,7 @@ class X:
 
 
 temp_msg = (
-    f"{f'{humanize_number(pos)}.': <{pound_len+2}} "
+    f"{f'{humanize_number(pos)}.': <{pound_len + 2}} "
     f"{balance: <{bal_len + 5}} "
     f"<<{author.display_name}>>\n"
 )
@@ -1773,7 +1786,7 @@ message = (
 
 # It shouldn't matter if the string prefixes are capitalized.
 temp_msg = (
-    f"{F'{humanize_number(pos)}.': <{pound_len+2}} "
+    f"{f'{humanize_number(pos)}.': <{pound_len + 2}} "
     f"{balance: <{bal_len + 5}} "
     f"<<{author.display_name}>>\n"
 )

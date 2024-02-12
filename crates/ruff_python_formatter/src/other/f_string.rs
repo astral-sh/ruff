@@ -1,8 +1,12 @@
+use ruff_formatter::write;
 use ruff_python_ast::FString;
 use ruff_text_size::Ranged;
 
 use crate::prelude::*;
-use crate::string::{Quoting, StringNormalizer, StringPart};
+use crate::preview::is_pep_701_enabled;
+use crate::string::{Quoting, StringNormalizer, StringPart, StringPrefix, StringQuotes};
+
+use super::f_string_element::FormatFStringElement;
 
 /// Formats an f-string which is part of a larger f-string expression.
 ///
@@ -24,26 +28,80 @@ impl<'a> FormatFString<'a> {
 impl Format<PyFormatContext<'_>> for FormatFString<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let locator = f.context().locator();
+        let comments = f.context().comments().clone();
 
-        let result = StringNormalizer::from_context(f.context())
+        let normalizer = StringNormalizer::from_context(f.context())
             .with_quoting(self.quoting)
-            .with_preferred_quote_style(f.options().quote_style())
-            .normalize(
-                &StringPart::from_source(self.value.range(), &locator),
-                &locator,
-            )
-            .fmt(f);
+            .with_preferred_quote_style(f.options().quote_style());
 
-        // TODO(dhruvmanila): With PEP 701, comments can be inside f-strings.
-        // This is to mark all of those comments as formatted but we need to
-        // figure out how to handle them. Note that this needs to be done only
-        // after the f-string is formatted, so only for all the non-formatted
-        // comments.
-        let comments = f.context().comments();
-        self.value.elements.iter().for_each(|value| {
-            comments.mark_verbatim_node_comments_formatted(value.into());
-        });
+        if !is_pep_701_enabled(f.context()) {
+            let result = normalizer
+                .normalize(
+                    &StringPart::from_source(self.value.range(), &locator),
+                    &locator,
+                )
+                .fmt(f);
+            self.value.elements.iter().for_each(|value| {
+                comments.mark_verbatim_node_comments_formatted(value.into());
+            });
+            return result;
+        }
 
-        result
+        let string = StringPart::from_source(self.value.range(), &locator);
+
+        // TODO(dhruvmanila): This could probably be simplified for Python 3.12 specifically
+        // as same quotes can be re-used inside an f-string.
+        let quotes = normalizer.choose_quotes(&string, &locator);
+
+        let is_multiline =
+            memchr::memchr2(b'\n', b'\r', locator.slice(self.value).as_bytes()).is_some();
+        let context = FStringContext::new(string.prefix(), quotes, is_multiline);
+
+        // Starting prefix and quote
+        write!(f, [string.prefix(), quotes])?;
+
+        format_with(|f| {
+            f.join()
+                .entries(
+                    self.value
+                        .elements
+                        .iter()
+                        .map(|element| FormatFStringElement::new(element, context)),
+                )
+                .finish()
+        })
+        .fmt(f)?;
+
+        // Ending quote
+        quotes.fmt(f)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct FStringContext {
+    prefix: StringPrefix,
+    quotes: StringQuotes,
+    is_multiline: bool,
+}
+
+impl FStringContext {
+    const fn new(prefix: StringPrefix, quotes: StringQuotes, is_multiline: bool) -> Self {
+        Self {
+            prefix,
+            quotes,
+            is_multiline,
+        }
+    }
+
+    pub(crate) const fn quotes(self) -> StringQuotes {
+        self.quotes
+    }
+
+    pub(crate) const fn prefix(self) -> StringPrefix {
+        self.prefix
+    }
+
+    pub(crate) const fn should_remove_soft_line_breaks(self) -> bool {
+        !self.is_multiline
     }
 }

@@ -1,9 +1,9 @@
 use ruff_python_ast::StringLiteral;
 use ruff_text_size::Ranged;
 
+use crate::options::QuoteStyle;
 use crate::prelude::*;
 use crate::string::{docstring, Quoting, StringNormalizer, StringPart};
-use crate::QuoteStyle;
 
 pub(crate) struct FormatStringLiteral<'a> {
     value: &'a StringLiteral,

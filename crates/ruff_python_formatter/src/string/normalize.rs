@@ -12,6 +12,8 @@ pub(crate) struct StringNormalizer {
     quoting: Quoting,
     preferred_quote_style: QuoteStyle,
     parent_docstring_quote_char: Option<QuoteChar>,
+    expression_location: ExpressionLocation,
+    target_version: PythonVersion,
     normalize_hex: bool,
 }
 
@@ -21,6 +23,8 @@ impl StringNormalizer {
             quoting: Quoting::default(),
             preferred_quote_style: QuoteStyle::default(),
             parent_docstring_quote_char: context.docstring(),
+            expression_location: context.expression_location(),
+            target_version: context.options().target_version(),
             normalize_hex: is_hex_codes_in_unicode_sequences_enabled(context),
         }
     }
@@ -96,7 +100,20 @@ impl StringNormalizer {
             self.preferred_quote_style
         };
 
-        match self.quoting {
+        let quoting =
+            if let ExpressionLocation::InsideFString(f_string_quotes) = self.expression_location {
+                if (f_string_quotes.is_triple() && !string.quotes().is_triple())
+                    || self.target_version.supports_pep_701()
+                {
+                    self.quoting
+                } else {
+                    Quoting::Preserve
+                }
+            } else {
+                self.quoting
+            };
+
+        match quoting {
             Quoting::Preserve => string.quotes(),
             Quoting::CanChange => {
                 if let Some(preferred_quote) = QuoteChar::from_style(preferred_style) {

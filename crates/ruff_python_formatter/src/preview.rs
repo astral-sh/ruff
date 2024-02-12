@@ -81,3 +81,8 @@ pub(crate) const fn is_multiline_string_handling_enabled(context: &PyFormatConte
 pub(crate) const fn is_format_module_docstring_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }
+
+/// Returns `true` if the [`PEP 701`](https://github.com/astral-sh/ruff/issues/7594) preview style is enabled.
+pub(crate) fn is_pep_701_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}

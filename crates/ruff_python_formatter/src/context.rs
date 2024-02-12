@@ -1,10 +1,21 @@
 use crate::comments::Comments;
-use crate::string::QuoteChar;
+use crate::string::{QuoteChar, StringQuotes};
 use crate::PyFormatOptions;
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
 use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
+
+/// Location of the expression which is currently being formatted.
+#[derive(Copy, Clone, Debug, Default)]
+pub(crate) enum ExpressionLocation {
+    /// The expression is inside an f-string, in the replacement field i.e., `f"foo {x}"`.
+    ///
+    /// The containing `StringQuotes` is surrounding f-string quote information.
+    InsideFString(StringQuotes),
+    #[default]
+    Other,
+}
 
 #[derive(Clone)]
 pub struct PyFormatContext<'a> {
@@ -22,6 +33,7 @@ pub struct PyFormatContext<'a> {
     /// quote style that is inverted from the one here in order to ensure that
     /// the formatted Python code will be valid.
     docstring: Option<QuoteChar>,
+    expression_location: ExpressionLocation,
 }
 
 impl<'a> PyFormatContext<'a> {
@@ -33,6 +45,7 @@ impl<'a> PyFormatContext<'a> {
             node_level: NodeLevel::TopLevel(TopLevelStatementPosition::Other),
             indent_level: IndentLevel::new(0),
             docstring: None,
+            expression_location: ExpressionLocation::Other,
         }
     }
 
@@ -84,6 +97,14 @@ impl<'a> PyFormatContext<'a> {
             docstring: Some(quote),
             ..self
         }
+    }
+
+    pub(crate) fn expression_location(&self) -> ExpressionLocation {
+        self.expression_location
+    }
+
+    pub(crate) fn set_expression_location(&mut self, expression_location: ExpressionLocation) {
+        self.expression_location = expression_location;
     }
 
     /// Returns `true` if preview mode is enabled.
@@ -330,5 +351,67 @@ where
             .state_mut()
             .context_mut()
             .set_indent_level(self.saved_level);
+    }
+}
+
+pub(crate) struct WithExprLocation<'a, B, D>
+where
+    D: DerefMut<Target = B>,
+    B: Buffer<Context = PyFormatContext<'a>>,
+{
+    buffer: D,
+    saved_location: ExpressionLocation,
+}
+
+impl<'a, B, D> WithExprLocation<'a, B, D>
+where
+    D: DerefMut<Target = B>,
+    B: Buffer<Context = PyFormatContext<'a>>,
+{
+    pub(crate) fn new(expr_location: ExpressionLocation, mut buffer: D) -> Self {
+        let context = buffer.state_mut().context_mut();
+        let saved_location = context.expression_location();
+
+        context.set_expression_location(expr_location);
+
+        Self {
+            buffer,
+            saved_location,
+        }
+    }
+}
+
+impl<'a, B, D> Deref for WithExprLocation<'a, B, D>
+where
+    D: DerefMut<Target = B>,
+    B: Buffer<Context = PyFormatContext<'a>>,
+{
+    type Target = B;
+
+    fn deref(&self) -> &Self::Target {
+        &self.buffer
+    }
+}
+
+impl<'a, B, D> DerefMut for WithExprLocation<'a, B, D>
+where
+    D: DerefMut<Target = B>,
+    B: Buffer<Context = PyFormatContext<'a>>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buffer
+    }
+}
+
+impl<'a, B, D> Drop for WithExprLocation<'a, B, D>
+where
+    D: DerefMut<Target = B>,
+    B: Buffer<Context = PyFormatContext<'a>>,
+{
+    fn drop(&mut self) {
+        self.buffer
+            .state_mut()
+            .context_mut()
+            .set_expression_location(self.saved_location);
     }
 }
