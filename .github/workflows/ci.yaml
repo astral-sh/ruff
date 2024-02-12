@@ -156,7 +156,7 @@ jobs:
       - name: "Run tests"
         shell: bash
         run: |
-          cargo nextest run --all-features --profile ci
+          cargo nextest run --all-features --profile ci -j 12
           cargo test --all-features --doc
 
   cargo-test-wasm:
