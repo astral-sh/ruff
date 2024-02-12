@@ -1656,8 +1656,8 @@ FStringReplacementField: ast::FStringElement = {
                 )
             };
             ast::DebugText {
-                leading: source_code[TextRange::new(start_offset, value.start())].to_string(),
-                trailing: source_code[TextRange::new(value.end(), end_offset)].to_string(),
+                leading: source_code[TextRange::new(start_offset, value.expr.start())].to_string(),
+                trailing: source_code[TextRange::new(value.expr.end(), end_offset)].to_string(),
             }
         });
         Ok(
