@@ -746,7 +746,7 @@ impl<'a> DocstringStmt<'a> {
         suite_kind: SuiteKind,
         source_type: PySourceType,
     ) -> Option<DocstringStmt<'a>> {
-        // Notebooks don't have a concept of notebooks, never recognise them as docstrings.
+        // Notebooks don't have a concept of modules, therefore, don't recognise the first string as the module docstring.
         if source_type.is_ipynb() && suite_kind == SuiteKind::TopLevel {
             return None;
         }
