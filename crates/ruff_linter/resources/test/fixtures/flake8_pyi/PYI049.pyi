@@ -35,3 +35,12 @@ _UnusedTypedDict3 = TypedDict("_UnusedTypedDict3", {"foo": int})
 _UsedTypedDict3 = TypedDict("_UsedTypedDict3", {"bar": bytes})
 
 def uses_UsedTypedDict3(arg: _UsedTypedDict3) -> None: ...
+
+
+# OK
+class _CustomClass3:
+    class _UnusedTypeDict4(TypedDict):
+        pass
+
+    def f(self) -> None:
+        print(_CustomClass3._UnusedTypeDict4())
