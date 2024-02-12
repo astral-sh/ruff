@@ -87,6 +87,7 @@ fn is_magic_value(literal_expr: LiteralExpressionRef, allowed_types: &[ConstantT
         }
         LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
             ast::Number::Int(value) => !matches!(*value, Int::ZERO | Int::ONE),
+            ast::Number::Float(value) => !(*value == 0.0 || *value == 1.0),
             _ => true,
         },
         LiteralExpressionRef::BytesLiteral(_) => true,
