@@ -53,12 +53,20 @@ enum UnusedImportContext {
 ///     print("numpy is not installed")
 /// ```
 ///
+/// Note that Ruff respects symbols used in a module's interface. So an unused
+/// import can be preserved with a 'redundant import alias':
+///
+/// ```python
+/// from other_module import reexported_fn as reexported_fn
+/// ```
+///
 /// ## Options
-/// - `lint.pyflakes.extend-generics`
+/// - `lint.ignore-init-module-imports`
 ///
 /// ## References
 /// - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 /// - [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
+/// - [Typing documentation: interface conventions](https://typing.readthedocs.io/en/latest/source/libraries.html#library-interface-public-and-private-symbols)
 #[violation]
 pub struct UnusedImport {
     name: String,
