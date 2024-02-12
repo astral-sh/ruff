@@ -92,7 +92,9 @@ pub fn derive_message_formats(_attr: TokenStream, item: TokenStream) -> TokenStr
 ///
 /// Good:
 ///
-/// ```rust
+/// ```ignroe
+/// use ruff_macros::newtype_index;
+///
 /// #[newtype_index]
 /// #[derive(Ord, PartialOrd)]
 /// struct MyIndex;

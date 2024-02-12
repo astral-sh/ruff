@@ -117,10 +117,17 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest
+      - name: "Install cargo insta"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-insta
       - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
         shell: bash
-        run: cargo nextest run --workspace --status-level skip --failure-output immediate-final --no-fail-fast -j 12
+        env:
+          NEXTEST_PROFILE: "ci"
+        run: cargo insta test --all-features --unreferenced reject --test-runner nextest
+
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
@@ -148,7 +155,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
         shell: bash
-        run: cargo nextest run --workspace --status-level skip --failure-output immediate-final --no-fail-fast -j 12
+        run: |
+          cargo nextest run --all-features --profile ci
+          cargo test --all-features --doc
 
   cargo-test-wasm:
     name: "cargo test (wasm)"
