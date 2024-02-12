@@ -11,6 +11,9 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[lib]
+doctest = false
+
 [dependencies]
 bitflags = { workspace = true }
 hexf-parse = { workspace = true }
