@@ -443,25 +443,6 @@ jobs:
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
         run: mkdocs build --strict -f mkdocs.public.yml
 
-  check-formatter-instability-and-black-similarity:
-    name: "formatter instabilities and black similarity"
-    runs-on: ubuntu-latest
-    needs: determine_changes
-    if: needs.determine_changes.outputs.formatter == 'true' || github.ref == 'refs/heads/main'
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - name: "Install Rust toolchain"
-        run: rustup show
-      - name: "Cache rust"
-        uses: Swatinem/rust-cache@v2
-      - name: "Formatter progress"
-        run: scripts/formatter_ecosystem_checks.sh
-      - name: "Github step summary"
-        run: cat target/progress_projects_stats.txt > $GITHUB_STEP_SUMMARY
-      - name: "Remove checkouts from cache"
-        run: rm -r target/progress_projects
-
   check-ruff-lsp:
     name: "test ruff-lsp"
     runs-on: ubuntu-latest
