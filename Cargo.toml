@@ -44,7 +44,7 @@ hexf-parse = { version ="0.2.1"}
 ignore = { version = "0.4.22" }
 imara-diff ={ version = "0.1.5"}
 imperative = { version = "1.0.4" }
-indicatif ={ version = "0.17.7"}
+indicatif ={ version = "0.17.8"}
 indoc ={ version = "2.0.4"}
 insta = { version = "1.34.0", feature = ["filters", "glob"] }
 insta-cmd = { version = "0.4.0" }
