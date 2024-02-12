@@ -2,8 +2,7 @@ use ruff_python_ast::StringLiteral;
 use ruff_text_size::Ranged;
 
 use crate::prelude::*;
-use crate::preview::is_hex_codes_in_unicode_sequences_enabled;
-use crate::string::{docstring, Quoting, StringPart};
+use crate::string::{docstring, Quoting, StringNormalizer, StringPart};
 use crate::QuoteStyle;
 
 pub(crate) struct FormatStringLiteral<'a> {
@@ -59,13 +58,13 @@ impl Format<PyFormatContext<'_>> for FormatStringLiteral<'_> {
             quote_style
         };
 
-        let normalized = StringPart::from_source(self.value.range(), &locator).normalize(
-            self.layout.quoting(),
-            &locator,
-            quote_style,
-            f.context().docstring(),
-            is_hex_codes_in_unicode_sequences_enabled(f.context()),
-        );
+        let normalized = StringNormalizer::from_context(f.context())
+            .with_quoting(self.layout.quoting())
+            .with_preferred_quote_style(quote_style)
+            .normalize(
+                &StringPart::from_source(self.value.range(), &locator),
+                &locator,
+            );
 
         if self.layout.is_docstring() {
             docstring::format(&normalized, f)

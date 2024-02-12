@@ -18,6 +18,7 @@ use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space
 use crate::other::f_string::FormatFString;
 use crate::other::string_literal::{FormatStringLiteral, StringLiteralKind};
 use crate::prelude::*;
+use crate::preview::is_hex_codes_in_unicode_sequences_enabled;
 use crate::QuoteStyle;
 
 pub(crate) mod docstring;
@@ -291,23 +292,54 @@ impl StringPart {
         }
     }
 
-    /// Computes the strings preferred quotes and normalizes its content.
-    ///
-    /// The parent docstring quote style should be set when formatting a code
-    /// snippet within the docstring. The quote style should correspond to the
-    /// style of quotes used by said docstring. Normalization will ensure the
-    /// quoting styles don't conflict.
-    pub(crate) fn normalize<'a>(
-        self,
-        quoting: Quoting,
-        locator: &'a Locator,
-        configured_style: QuoteStyle,
-        parent_docstring_quote_char: Option<QuoteChar>,
-        normalize_hex: bool,
-    ) -> NormalizedString<'a> {
+    /// Returns the prefix of the string part.
+    pub(crate) const fn prefix(&self) -> StringPrefix {
+        self.prefix
+    }
+
+    /// Returns the surrounding quotes of the string part.
+    pub(crate) const fn quotes(&self) -> StringQuotes {
+        self.quotes
+    }
+
+    /// Returns the range of the string's content in the source (minus prefix and quotes).
+    pub(crate) const fn content_range(&self) -> TextRange {
+        self.content_range
+    }
+}
+
+pub(crate) struct StringNormalizer {
+    quoting: Quoting,
+    preferred_quote_style: QuoteStyle,
+    parent_docstring_quote_char: Option<QuoteChar>,
+    normalize_hex: bool,
+}
+
+impl StringNormalizer {
+    pub(crate) fn from_context(context: &PyFormatContext<'_>) -> Self {
+        Self {
+            quoting: Quoting::default(),
+            preferred_quote_style: QuoteStyle::default(),
+            parent_docstring_quote_char: context.docstring(),
+            normalize_hex: is_hex_codes_in_unicode_sequences_enabled(context),
+        }
+    }
+
+    pub(crate) fn with_preferred_quote_style(mut self, quote_style: QuoteStyle) -> Self {
+        self.preferred_quote_style = quote_style;
+        self
+    }
+
+    pub(crate) fn with_quoting(mut self, quoting: Quoting) -> Self {
+        self.quoting = quoting;
+        self
+    }
+
+    /// Computes the strings preferred quotes.
+    pub(crate) fn choose_quotes(&self, string: &StringPart, locator: &Locator) -> StringQuotes {
         // Per PEP 8, always prefer double quotes for triple-quoted strings.
         // Except when using quote-style-preserve.
-        let preferred_style = if self.quotes.triple {
+        let preferred_style = if string.quotes().triple {
             // ... unless we're formatting a code snippet inside a docstring,
             // then we specifically want to invert our quote style to avoid
             // writing out invalid Python.
@@ -353,39 +385,49 @@ impl StringPart {
             // Overall this is a bit of a corner case and just inverting the
             // style from what the parent ultimately decided upon works, even
             // if it doesn't have perfect alignment with PEP8.
-            if let Some(quote) = parent_docstring_quote_char {
+            if let Some(quote) = self.parent_docstring_quote_char {
                 QuoteStyle::from(quote.invert())
-            } else if configured_style.is_preserve() {
+            } else if self.preferred_quote_style.is_preserve() {
                 QuoteStyle::Preserve
             } else {
                 QuoteStyle::Double
             }
         } else {
-            configured_style
+            self.preferred_quote_style
         };
 
-        let raw_content = &locator.slice(self.content_range);
-
-        let quotes = match quoting {
-            Quoting::Preserve => self.quotes,
+        match self.quoting {
+            Quoting::Preserve => string.quotes(),
             Quoting::CanChange => {
                 if let Some(preferred_quote) = QuoteChar::from_style(preferred_style) {
-                    if self.prefix.is_raw_string() {
-                        choose_quotes_raw(raw_content, self.quotes, preferred_quote)
+                    let raw_content = locator.slice(string.content_range());
+                    if string.prefix().is_raw_string() {
+                        choose_quotes_for_raw_string(raw_content, string.quotes(), preferred_quote)
                     } else {
-                        choose_quotes(raw_content, self.quotes, preferred_quote)
+                        choose_quotes_impl(raw_content, string.quotes(), preferred_quote)
                     }
                 } else {
-                    self.quotes
+                    string.quotes()
                 }
             }
-        };
+        }
+    }
 
-        let normalized = normalize_string(raw_content, quotes, self.prefix, normalize_hex);
+    /// Computes the strings preferred quotes and normalizes its content.
+    pub(crate) fn normalize<'a>(
+        &self,
+        string: &StringPart,
+        locator: &'a Locator,
+    ) -> NormalizedString<'a> {
+        let raw_content = locator.slice(string.content_range());
+
+        let quotes = self.choose_quotes(string, locator);
+
+        let normalized = normalize_string(raw_content, quotes, string.prefix(), self.normalize_hex);
 
         NormalizedString {
-            prefix: self.prefix,
-            content_range: self.content_range,
+            prefix: string.prefix(),
+            content_range: string.content_range(),
             text: normalized,
             quotes,
         }
@@ -512,7 +554,7 @@ impl Format<PyFormatContext<'_>> for StringPrefix {
 /// The preferred quote style is chosen unless the string contains unescaped quotes of the
 /// preferred style. For example, `r"foo"` is chosen over `r'foo'` if the preferred quote
 /// style is double quotes.
-fn choose_quotes_raw(
+fn choose_quotes_for_raw_string(
     input: &str,
     quotes: StringQuotes,
     preferred_quote: QuoteChar,
@@ -571,7 +613,11 @@ fn choose_quotes_raw(
 /// For triple quoted strings, the preferred quote style is always used, unless the string contains
 /// a triplet of the quote character (e.g., if double quotes are preferred, double quotes will be
 /// used unless the string contains `"""`).
-fn choose_quotes(input: &str, quotes: StringQuotes, preferred_quote: QuoteChar) -> StringQuotes {
+fn choose_quotes_impl(
+    input: &str,
+    quotes: StringQuotes,
+    preferred_quote: QuoteChar,
+) -> StringQuotes {
     let quote = if quotes.triple {
         // True if the string contains a triple quote sequence of the configured quote style.
         let mut uses_triple_quotes = false;
@@ -780,7 +826,7 @@ impl TryFrom<char> for QuoteChar {
 /// with the provided [`StringQuotes`] style.
 ///
 /// Returns the normalized string and whether it contains new lines.
-fn normalize_string(
+pub(crate) fn normalize_string(
     input: &str,
     quotes: StringQuotes,
     prefix: StringPrefix,

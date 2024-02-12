@@ -2,8 +2,7 @@ use ruff_python_ast::FString;
 use ruff_text_size::Ranged;
 
 use crate::prelude::*;
-use crate::preview::is_hex_codes_in_unicode_sequences_enabled;
-use crate::string::{Quoting, StringPart};
+use crate::string::{Quoting, StringNormalizer, StringPart};
 
 /// Formats an f-string which is part of a larger f-string expression.
 ///
@@ -26,13 +25,12 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let locator = f.context().locator();
 
-        let result = StringPart::from_source(self.value.range(), &locator)
+        let result = StringNormalizer::from_context(f.context())
+            .with_quoting(self.quoting)
+            .with_preferred_quote_style(f.options().quote_style())
             .normalize(
-                self.quoting,
+                &StringPart::from_source(self.value.range(), &locator),
                 &locator,
-                f.options().quote_style(),
-                f.context().docstring(),
-                is_hex_codes_in_unicode_sequences_enabled(f.context()),
             )
             .fmt(f);
 
