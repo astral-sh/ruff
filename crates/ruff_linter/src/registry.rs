@@ -82,6 +82,9 @@ pub enum Linter {
     /// [flake8-builtins](https://pypi.org/project/flake8-builtins/)
     #[prefix = "A"]
     Flake8Builtins,
+    /// [flake8-class-newline](https://pypi.org/project/flake8-class-newline/)
+    #[prefix = "CNL"]
+    Flake8ClassNewline,
     /// [flake8-commas](https://pypi.org/project/flake8-commas/)
     #[prefix = "COM"]
     Flake8Commas,

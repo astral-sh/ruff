@@ -9,6 +9,7 @@ pub mod flake8_blind_except;
 pub mod flake8_boolean_trap;
 pub mod flake8_bugbear;
 pub mod flake8_builtins;
+pub mod flake8_class_newline;
 pub mod flake8_commas;
 pub mod flake8_comprehensions;
 pub mod flake8_copyright;

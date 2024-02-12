@@ -972,6 +972,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "007") => (RuleGroup::Preview, rules::flake8_logging::rules::ExceptionWithoutExcInfo),
         (Flake8Logging, "009") => (RuleGroup::Preview, rules::flake8_logging::rules::UndocumentedWarn),
 
+        // flake8-class-newline
+        (Flake8ClassNewline, "100") => (RuleGroup::Preview, rules::flake8_class_newline::rules::ClassNewline),
+
         _ => return None,
     })
 }
