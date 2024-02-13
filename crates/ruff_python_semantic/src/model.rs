@@ -640,9 +640,13 @@ impl<'a> SemanticModel<'a> {
     /// only binding to that name in its scope.
     pub fn only_binding(&self, name: &ast::ExprName) -> Option<BindingId> {
         self.resolve_name(name).filter(|id| {
+            // Find the correct scope.
             let binding = self.binding(*id);
             let scope = &self.scopes[binding.scope];
-            scope.shadowed_binding(*id).is_none()
+
+            // Ensure that the name is only bound once in the scope.
+            let mut bindings = scope.get_all(&name.id);
+            bindings.next().is_some_and(|binding| binding == *id) && bindings.next().is_none()
         })
     }
 
