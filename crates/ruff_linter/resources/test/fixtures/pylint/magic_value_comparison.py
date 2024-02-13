@@ -35,6 +35,15 @@ if argc != 0:  # correct
 if argc != 1:  # correct
     pass
 
+if argc != -1.0:  # correct
+    pass
+
+if argc != 0.0:  # correct
+    pass
+
+if argc != 1.0:  # correct
+    pass
+
 if argc != 2:  # [magic-value-comparison]
     pass
 
@@ -42,6 +51,12 @@ if argc != -2:  # [magic-value-comparison]
     pass
 
 if argc != +2:  # [magic-value-comparison]
+    pass
+
+if argc != -2.0:  # [magic-value-comparison]
+    pass
+
+if argc != +2.0:  # [magic-value-comparison]
     pass
 
 if __name__ == "__main__":  # correct
