@@ -1736,11 +1736,21 @@ impl<'a> Checker<'a> {
             return;
         }
 
+        // A binding within a `for` must be a loop variable, as in:
+        // ```python
+        // for x in range(10):
+        //     ...
+        // ```
         if parent.is_for_stmt() {
             self.add_binding(id, expr.range(), BindingKind::LoopVar, flags);
             return;
         }
 
+        // A binding within a `with` must be an item, as in:
+        // ```python
+        // with open("file.txt") as fp:
+        //     ...
+        // ```
         if parent.is_with_stmt() {
             self.add_binding(id, expr.range(), BindingKind::WithItemVar, flags);
             return;
@@ -1796,14 +1806,39 @@ impl<'a> Checker<'a> {
         }
 
         // If the expression is the left-hand side of a walrus operator, then it's a named
-        // expression assignment.
+        // expression assignment, as in:
+        // ```python
+        // if (x := 10) > 5:
+        //     ...
+        // ```
         if self
             .semantic
             .current_expressions()
             .filter_map(Expr::as_named_expr_expr)
-            .any(|parent| parent.target.as_ref() == expr)
+            .any(|parent| parent.target.range().contains_range(expr.range()))
         {
             self.add_binding(id, expr.range(), BindingKind::NamedExprAssignment, flags);
+            return;
+        }
+
+        // If the expression is part of a comprehension target, then it's a comprehension variable
+        // assignment, as in:
+        // ```python
+        // [x for x in range(10)]
+        // ```
+        if self.semantic.current_expressions().any(|parent| {
+            let generators = match parent {
+                Expr::ListComp(ast::ExprListComp { generators, .. }) => generators,
+                Expr::SetComp(ast::ExprSetComp { generators, .. }) => generators,
+                Expr::DictComp(ast::ExprDictComp { generators, .. }) => generators,
+                Expr::GeneratorExp(ast::ExprGeneratorExp { generators, .. }) => generators,
+                _ => return false,
+            };
+            generators
+                .iter()
+                .any(|generator| generator.target.range().contains_range(expr.range()))
+        }) {
+            self.add_binding(id, expr.range(), BindingKind::ComprehensionVar, flags);
             return;
         }
 
