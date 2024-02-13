@@ -406,7 +406,7 @@ where
 }
 
 /// Abstraction for a type checker, conservatively checks for the intended type(s).
-trait TypeChecker {
+pub trait TypeChecker {
     /// Check annotation expression to match the intended type(s).
     fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool;
     /// Check initializer expression to match the intended type(s).
@@ -437,6 +437,24 @@ fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bo
             // In this situation, we check only the annotation.
             Some(Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })) => {
                 T::match_annotation(annotation.as_ref(), semantic)
+            }
+            _ => false,
+        },
+
+        BindingKind::WithItemVar => match binding.statement(semantic) {
+            // ```python
+            // with open("file.txt") as x:
+            //   ...
+            // ```
+            Some(Stmt::With(ast::StmtWith { items, .. })) => {
+                let Some(item) = items.iter().find(|item| {
+                    item.optional_vars
+                        .as_ref()
+                        .is_some_and(|vars| vars.range().contains_range(binding.range))
+                }) else {
+                    return false;
+                };
+                T::match_initializer(&item.context_expr, semantic)
             }
             _ => false,
         },
@@ -565,33 +583,123 @@ impl BuiltinTypeChecker for TupleChecker {
     const EXPR_TYPE: PythonType = PythonType::Tuple;
 }
 
-/// Test whether the given binding (and the given name) can be considered a list.
+pub struct IoBaseChecker;
+
+impl TypeChecker for IoBaseChecker {
+    fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+        semantic
+            .resolve_call_path(annotation)
+            .is_some_and(|call_path| {
+                if semantic.match_typing_call_path(&call_path, "IO") {
+                    return true;
+                }
+                if semantic.match_typing_call_path(&call_path, "BinaryIO") {
+                    return true;
+                }
+                if semantic.match_typing_call_path(&call_path, "TextIO") {
+                    return true;
+                }
+                matches!(
+                    call_path.as_slice(),
+                    [
+                        "io",
+                        "IOBase"
+                            | "RawIOBase"
+                            | "BufferedIOBase"
+                            | "TextIOBase"
+                            | "BytesIO"
+                            | "StringIO"
+                            | "BufferedReader"
+                            | "BufferedWriter"
+                            | "BufferedRandom"
+                            | "BufferedRWPair"
+                            | "TextIOWrapper"
+                    ] | ["os", "Path" | "PathLike"]
+                        | [
+                            "pathlib",
+                            "Path" | "PurePath" | "PurePosixPath" | "PureWindowsPath"
+                        ]
+                )
+            })
+    }
+
+    fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+        let Expr::Call(ast::ExprCall { func, .. }) = initializer else {
+            return false;
+        };
+
+        // Ex) `pathlib.Path("file.txt")`
+        if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
+            if attr.as_str() == "open" {
+                if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
+                    return semantic.resolve_call_path(func).is_some_and(|call_path| {
+                        matches!(
+                            call_path.as_slice(),
+                            [
+                                "pathlib",
+                                "Path" | "PurePath" | "PurePosixPath" | "PureWindowsPath"
+                            ]
+                        )
+                    });
+                }
+            }
+        }
+
+        // Ex) `open("file.txt")`
+        semantic
+            .resolve_call_path(func.as_ref())
+            .is_some_and(|call_path| {
+                matches!(
+                    call_path.as_slice(),
+                    ["io", "open" | "open_code"] | ["os" | "", "open"]
+                )
+            })
+    }
+}
+
+/// Test whether the given binding can be considered a list.
+///
 /// For this, we check what value might be associated with it through it's initialization and
 /// what annotation it has (we consider `list` and `typing.List`).
 pub fn is_list(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<ListChecker>(binding, semantic)
 }
 
-/// Test whether the given binding (and the given name) can be considered a dictionary.
+/// Test whether the given binding can be considered a dictionary.
+///
 /// For this, we check what value might be associated with it through it's initialization and
 /// what annotation it has (we consider `dict` and `typing.Dict`).
 pub fn is_dict(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<DictChecker>(binding, semantic)
 }
 
-/// Test whether the given binding (and the given name) can be considered a set.
+/// Test whether the given binding can be considered a set.
+///
 /// For this, we check what value might be associated with it through it's initialization and
 /// what annotation it has (we consider `set` and `typing.Set`).
 pub fn is_set(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<SetChecker>(binding, semantic)
 }
 
-/// Test whether the given binding (and the given name) can be considered a
-/// tuple. For this, we check what value might be associated with it through
+/// Test whether the given binding can be considered a tuple.
+///
+/// For this, we check what value might be associated with it through
 /// it's initialization and what annotation it has (we consider `tuple` and
 /// `typing.Tuple`).
 pub fn is_tuple(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<TupleChecker>(binding, semantic)
+}
+
+/// Test whether the given binding can be considered a file-like object (i.e., a type that
+/// implements `io.IOBase`).
+pub fn is_io_base(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<IoBaseChecker>(binding, semantic)
+}
+
+/// Test whether the given expression can be considered a file-like object (i.e., a type that
+/// implements `io.IOBase`).
+pub fn is_io_base_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
+    IoBaseChecker::match_initializer(expr, semantic)
 }
 
 /// Find the [`ParameterWithDefault`] corresponding to the given [`Binding`].
@@ -697,6 +805,18 @@ pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) ->
                     return match_value(binding, target, value.as_ref());
                 }
                 _ => {}
+            }
+        }
+        // Ex) `with open("file.txt") as f:`
+        BindingKind::WithItemVar => {
+            let parent_id = binding.source?;
+            let parent = semantic.statement(parent_id);
+            if let Stmt::With(ast::StmtWith { items, .. }) = parent {
+                return items.iter().find_map(|item| {
+                    let target = item.optional_vars.as_ref()?;
+                    let value = &item.context_expr;
+                    match_value(binding, target, value)
+                });
             }
         }
         _ => {}
