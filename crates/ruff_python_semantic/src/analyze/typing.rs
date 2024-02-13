@@ -421,14 +421,17 @@ pub trait TypeChecker {
 fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bool {
     match binding.kind {
         BindingKind::Assignment => match binding.statement(semantic) {
+            // Given:
+            //
             // ```python
             // x = init_expr
             // ```
             //
             // The type checker might know how to infer the type based on `init_expr`.
-            Some(Stmt::Assign(ast::StmtAssign { value, .. })) => {
-                T::match_initializer(value.as_ref(), semantic)
-            }
+            Some(Stmt::Assign(ast::StmtAssign { targets, value, .. })) => targets
+                .iter()
+                .find_map(|target| match_value(binding, target, value.as_ref()))
+                .is_some_and(|value| T::match_initializer(value, semantic)),
 
             // ```python
             // x: annotation = some_expr
@@ -438,24 +441,40 @@ fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bo
             Some(Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })) => {
                 T::match_annotation(annotation.as_ref(), semantic)
             }
+
             _ => false,
         },
+
+        BindingKind::NamedExprAssignment => {
+            // ```python
+            // if (x := some_expr) is not None:
+            //     ...
+            // ```
+            binding.source.is_some_and(|source| {
+                semantic
+                    .expressions(source)
+                    .find_map(|expr| expr.as_named_expr_expr())
+                    .and_then(|ast::ExprNamedExpr { target, value, .. }| {
+                        match_value(binding, target.as_ref(), value.as_ref())
+                    })
+                    .is_some_and(|value| T::match_initializer(value, semantic))
+            })
+        }
 
         BindingKind::WithItemVar => match binding.statement(semantic) {
             // ```python
             // with open("file.txt") as x:
-            //   ...
+            //     ...
             // ```
-            Some(Stmt::With(ast::StmtWith { items, .. })) => {
-                let Some(item) = items.iter().find(|item| {
-                    item.optional_vars
-                        .as_ref()
-                        .is_some_and(|vars| vars.range().contains_range(binding.range))
-                }) else {
-                    return false;
-                };
-                T::match_initializer(&item.context_expr, semantic)
-            }
+            Some(Stmt::With(ast::StmtWith { items, .. })) => items
+                .iter()
+                .find_map(|item| {
+                    let target = item.optional_vars.as_ref()?;
+                    let value = &item.context_expr;
+                    match_value(binding, target, value)
+                })
+                .is_some_and(|value| T::match_initializer(value, semantic)),
+
             _ => false,
         },
 
@@ -475,6 +494,7 @@ fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bo
                 };
                 T::match_annotation(annotation.as_ref(), semantic)
             }
+
             _ => false,
         },
 
@@ -775,6 +795,7 @@ pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) ->
 ///
 /// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
 /// `StringLiteral` with value `"str"` when called with `bla`.
+#[allow(clippy::single_match)]
 pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) -> Option<&'a Expr> {
     match binding.kind {
         // Ex) `x := 1`
@@ -788,37 +809,32 @@ pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) ->
             }
         }
         // Ex) `x = 1`
-        BindingKind::Assignment => {
-            let parent_id = binding.source?;
-            let parent = semantic.statement(parent_id);
-            match parent {
-                Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
-                    return targets
-                        .iter()
-                        .find_map(|target| match_value(binding, target, value.as_ref()))
-                }
-                Stmt::AnnAssign(ast::StmtAnnAssign {
-                    value: Some(value),
-                    target,
-                    ..
-                }) => {
-                    return match_value(binding, target, value.as_ref());
-                }
-                _ => {}
+        BindingKind::Assignment => match binding.statement(semantic) {
+            Some(Stmt::Assign(ast::StmtAssign { value, targets, .. })) => {
+                return targets
+                    .iter()
+                    .find_map(|target| match_value(binding, target, value.as_ref()))
             }
-        }
+            Some(Stmt::AnnAssign(ast::StmtAnnAssign {
+                value: Some(value),
+                target,
+                ..
+            })) => {
+                return match_value(binding, target, value.as_ref());
+            }
+            _ => {}
+        },
         // Ex) `with open("file.txt") as f:`
-        BindingKind::WithItemVar => {
-            let parent_id = binding.source?;
-            let parent = semantic.statement(parent_id);
-            if let Stmt::With(ast::StmtWith { items, .. }) = parent {
+        BindingKind::WithItemVar => match binding.statement(semantic) {
+            Some(Stmt::With(ast::StmtWith { items, .. })) => {
                 return items.iter().find_map(|item| {
                     let target = item.optional_vars.as_ref()?;
                     let value = &item.context_expr;
                     match_value(binding, target, value)
                 });
             }
-        }
+            _ => {}
+        },
         _ => {}
     }
     None
