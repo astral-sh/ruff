@@ -1489,6 +1489,11 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::TYPE_CHECKING_BLOCK)
     }
 
+    /// Return `true` if the model is in a docstring.
+    pub const fn in_docstring(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::DOCSTRING)
+    }
+
     /// Return `true` if the model has traversed past the "top-of-file" import boundary.
     pub const fn seen_import_boundary(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::IMPORT_BOUNDARY)
@@ -1852,6 +1857,26 @@ bitflags! {
         /// [_ for x in range(10)]
         /// ```
         const COMPREHENSION_ASSIGNMENT = 1 << 19;
+
+
+        /// The model is in a module / class / function docstring.
+        ///
+        /// For example, the model could be visiting either the module, class,
+        /// or function docstring in:
+        /// ```python
+        /// """Module docstring."""
+        ///
+        ///
+        /// class Foo:
+        ///     """Class docstring."""
+        ///     pass
+        ///
+        ///
+        /// def foo():
+        ///     """Function docstring."""
+        ///     pass
+        /// ```
+        const DOCSTRING = 1 << 20;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

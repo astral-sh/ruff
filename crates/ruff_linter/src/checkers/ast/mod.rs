@@ -40,7 +40,7 @@ use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
 use ruff_python_ast::helpers::{
-    collect_import_from_member, extract_handled_exceptions, to_module_path,
+    collect_import_from_member, extract_handled_exceptions, is_docstring_stmt, to_module_path,
 };
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::str::trailing_quote;
@@ -70,6 +70,38 @@ use crate::{docstrings, noqa};
 mod analyze;
 mod annotation;
 mod deferred;
+
+/// State representing whether a docstring is expected or not for the next statement.
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
+enum DocstringState {
+    /// The next statement is expected to be a docstring, but not necessarily so.
+    ///
+    /// For example, in the following code:
+    ///
+    /// ```python
+    /// class Foo:
+    ///     pass
+    ///
+    ///
+    /// def bar(x, y):
+    ///     """Docstring."""
+    ///     return x +  y
+    /// ```
+    ///
+    /// For `Foo`, the state is expected when the checker is visiting the class
+    /// body but isn't going to be present. While, for `bar` function, the docstring
+    /// is expected and present.
+    #[default]
+    Expected,
+    Other,
+}
+
+impl DocstringState {
+    /// Returns `true` if the next statement is expected to be a docstring.
+    const fn is_expected(self) -> bool {
+        matches!(self, DocstringState::Expected)
+    }
+}
 
 pub(crate) struct Checker<'a> {
     /// The [`Path`] to the file under analysis.
@@ -114,6 +146,8 @@ pub(crate) struct Checker<'a> {
     pub(crate) flake8_bugbear_seen: Vec<TextRange>,
     /// The end offset of the last visited statement.
     last_stmt_end: TextSize,
+    /// A state describing if a docstring is expected or not.
+    docstring_state: DocstringState,
 }
 
 impl<'a> Checker<'a> {
@@ -153,6 +187,7 @@ impl<'a> Checker<'a> {
             cell_offsets,
             notebook_index,
             last_stmt_end: TextSize::default(),
+            docstring_state: DocstringState::default(),
         }
     }
 }
@@ -349,6 +384,16 @@ where
         // Store the flags prior to any further descent, so that we can restore them after visiting
         // the node.
         let flags_snapshot = self.semantic.flags;
+
+        // Update the semantic model if it is in a docstring. This should be done after the
+        // flags snapshot to ensure that it gets reset once the statement is analyzed.
+        if self.docstring_state.is_expected() {
+            if is_docstring_stmt(stmt) {
+                self.semantic.flags |= SemanticModelFlags::DOCSTRING;
+            }
+            // Reset the state irrespective of whether the statement is a docstring or not.
+            self.docstring_state = DocstringState::Other;
+        }
 
         // Step 1: Binding
         match stmt {
@@ -651,6 +696,8 @@ where
                     self.semantic.set_globals(globals);
                 }
 
+                // Set the docstring state before visiting the class body.
+                self.docstring_state = DocstringState::Expected;
                 self.visit_body(body);
             }
             Stmt::TypeAlias(ast::StmtTypeAlias {
@@ -1961,6 +2008,8 @@ impl<'a> Checker<'a> {
                 };
 
                 self.visit_parameters(parameters);
+                // Set the docstring state before visiting the function body.
+                self.docstring_state = DocstringState::Expected;
                 self.visit_body(body);
             }
         }
