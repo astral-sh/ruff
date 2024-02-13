@@ -2,9 +2,9 @@ use bitflags::bitflags;
 
 pub(crate) use any::AnyString;
 pub(crate) use normalize::{NormalizedString, StringNormalizer};
-use ruff_formatter::format_args;
+use ruff_formatter::{format_args, write};
 use ruff_source_file::Locator;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
@@ -39,18 +39,120 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
         let comments = f.context().comments().clone();
         let quoting = self.string.quoting(&f.context().locator());
 
-        let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
+        let parts = self.string.parts(quoting);
 
-        for part in self.string.parts(quoting) {
-            joiner.entry(&format_args![
-                line_suffix_boundary(),
-                leading_comments(comments.leading(&part)),
-                part,
-                trailing_comments(comments.trailing(&part))
-            ]);
+        // Don't try the flat layout if it is know that the implicit string remains on multiple lines either because one
+        // part is a multline or a part has a leading or trailing comment.
+        let should_try_flat = !parts.clone().any(|part| {
+            let part_comments = comments.leading_dangling_trailing(&part);
+
+            part.is_multiline(f.context().source())
+                || part_comments.has_leading()
+                || part_comments.has_trailing()
+        });
+
+        let format_flat = format_with(|f: &mut PyFormatter| {
+            let mut merged_prefix = StringPrefix::empty();
+            let mut all_raw = true;
+            let quotes = parts.clone().next().map_or(
+                StringQuotes {
+                    triple: false,
+                    quote_char: QuoteChar::Double,
+                },
+                |part| StringPart::from_source(part.range(), &f.context().locator()).quotes,
+            );
+
+            for part in parts.clone() {
+                let string_part = StringPart::from_source(part.range(), &f.context().locator());
+
+                let prefix = string_part.prefix;
+                merged_prefix = prefix.union(merged_prefix);
+                all_raw &= prefix.is_raw_string();
+
+                // quotes are more complicated. We need to collect the statistics about the used quotes for each string
+                // - number of single quotes
+                // - number of double quotes
+                // - number of triple quotes
+                // And they need to be normalized as a second step
+                // Also requires tracking how many times a simple string uses an escaped triple quoted sequence to avoid
+                // stability issues.
+            }
+
+            // Prefer lower case raw string flags over uppercase if both are present.
+            if merged_prefix.contains(StringPrefix::RAW)
+                && merged_prefix.contains(StringPrefix::RAW_UPPER)
+            {
+                merged_prefix.remove(StringPrefix::RAW_UPPER);
+            }
+
+            // Remove the raw prefix if there's a mixture of raw and non-raw string. The formatting code coming later normalizes raw strings to regular
+            // strings if the flag isn't present.
+            if !all_raw {
+                merged_prefix.remove(StringPrefix::RAW);
+            }
+
+            // We need to find the common prefix and quotes for all parts and use that one.
+            // no prefix: easy
+            // bitflags! {
+            //     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+            //     pub(crate) struct StringPrefix: u8 {
+            //         const UNICODE   = 0b0000_0001;
+            //         /// `r"test"`
+            //         const RAW       = 0b0000_0010;
+            //         /// `R"test"
+            //         const RAW_UPPER = 0b0000_0100;
+            //         const BYTE      = 0b0000_1000;
+            //         const F_STRING  = 0b0001_0000;
+            //     }
+            // }
+            //
+            // Prefix precedence:
+            // - Unicode -> Always remove
+            // - Raw upper -> Remove except when all parts are raw upper
+            // - Raw -> Remove except when all parts are raw or raw upper.
+            // - F-String -> Preserve
+            // - Bytes -> Preserve
+            // Quotes:
+            // - Single quotes: Identify the number of single and double quotes in the string and use the one with the least count.
+            // - single and triple: Use triple quotes
+            // - triples: Use `choose_quote` for every part and use the one with the highest count
+
+            write!(f, [merged_prefix, quotes])?;
+            for part in parts.clone() {
+                let string_part = StringPart::from_source(part.range(), &f.context().locator());
+
+                write!(f, [source_text_slice(string_part.content_range)])?;
+            }
+
+            quotes.fmt(f)
+        });
+
+        let format_expanded = format_with(|f| {
+            let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
+
+            for part in parts.clone() {
+                joiner.entry(&format_args![
+                    line_suffix_boundary(),
+                    leading_comments(comments.leading(&part)),
+                    part,
+                    trailing_comments(comments.trailing(&part))
+                ]);
+            }
+
+            joiner.finish()
+        });
+
+        // TODO: where's the group coming from?
+
+        if should_try_flat {
+            group(&format_args![
+                if_group_fits_on_line(&format_flat),
+                if_group_breaks(&format_expanded)
+            ])
+            .fmt(f)
+        } else {
+            format_expanded.fmt(f)
         }
-
-        joiner.finish()
     }
 }
 

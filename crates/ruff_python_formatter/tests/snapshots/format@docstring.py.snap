@@ -256,7 +256,7 @@ class IndentMeSome:
 
 
 class IgnoreImplicitlyConcatenatedStrings:
-    """""" ""
+    """"""
 
 
 def docstring_that_ends_with_quote_and_a_line_break1():
@@ -432,7 +432,7 @@ class IndentMeSome:
 
 
 class IgnoreImplicitlyConcatenatedStrings:
-  """""" ""
+  """"""
 
 
 def docstring_that_ends_with_quote_and_a_line_break1():
@@ -608,7 +608,7 @@ class IndentMeSome:
 
 
 class IgnoreImplicitlyConcatenatedStrings:
-	"""""" ""
+	""""""
 
 
 def docstring_that_ends_with_quote_and_a_line_break1():
@@ -784,7 +784,7 @@ class IndentMeSome:
 
 
 class IgnoreImplicitlyConcatenatedStrings:
-	"""""" ""
+	""""""
 
 
 def docstring_that_ends_with_quote_and_a_line_break1():
@@ -960,7 +960,7 @@ class IndentMeSome:
 
 
 class IgnoreImplicitlyConcatenatedStrings:
-    """""" ''
+    """"""
 
 
 def docstring_that_ends_with_quote_and_a_line_break1():

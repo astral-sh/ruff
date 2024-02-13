@@ -122,6 +122,7 @@ impl<'a> From<&AnyString<'a>> for ExpressionRef<'a> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub(super) enum AnyStringPartsIter<'a> {
     String(std::slice::Iter<'a, StringLiteral>),
     Bytes(std::slice::Iter<'a, ast::BytesLiteral>),
@@ -177,6 +178,13 @@ pub(super) enum AnyStringPart<'a> {
         part: &'a ast::FString,
         quoting: Quoting,
     },
+}
+
+impl AnyStringPart<'_> {
+    pub(super) fn is_multiline(self, source: &str) -> bool {
+        let text = &source[self.range()];
+        memchr2(b'\n', b'\r', text.as_bytes()).is_some()
+    }
 }
 
 impl<'a> From<&AnyStringPart<'a>> for AnyNodeRef<'a> {
