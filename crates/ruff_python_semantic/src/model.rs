@@ -642,7 +642,9 @@ impl<'a> SemanticModel<'a> {
         self.resolve_name(name).filter(|id| {
             let binding = self.binding(*id);
             let scope = &self.scopes[binding.scope];
-            scope.shadowed_binding(*id).is_none()
+            scope
+                .get(&name.id)
+                .is_some_and(|id| scope.shadowed_binding(id).is_none())
         })
     }
 

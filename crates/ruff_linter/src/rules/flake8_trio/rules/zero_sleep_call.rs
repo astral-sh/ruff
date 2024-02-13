@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, ExprCall, Int, Number};
-use ruff_python_semantic::analyze::typing::find_assigned_value;
+use ruff_python_semantic::analyze::typing::{find_assigned_value, find_binding_value};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -74,10 +74,18 @@ pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
                 return;
             }
         }
-        Expr::Name(ast::ExprName { id, .. }) => {
-            let Some(value) = find_assigned_value(id, checker.semantic()) else {
+        Expr::Name(name) => {
+            let Some(binding) = checker
+                .semantic()
+                .only_binding(name)
+                .map(|id| checker.semantic().binding(id))
+            else {
                 return;
             };
+            let Some(value) = find_binding_value(&name.id, binding, checker.semantic()) else {
+                return;
+            };
+            // If we're in control flow, ignore it. Or run this in a deferred pass?
             if !matches!(
                 value,
                 Expr::NumberLiteral(ast::ExprNumberLiteral {

@@ -64,3 +64,13 @@ def func():
 
     if (walrus := 0) == 0:
         trio.sleep(walrus)  # TRIO115
+
+
+def func() -> None:
+    import trio
+
+    sleep = 0
+    for _ in range(2):
+        # ↓↓↓↓↓ TRIO115 [*] Use `trio.lowlevel.checkpoint()` instead of `trio.sleep(0)`
+        trio.sleep(sleep)
+        sleep = 10
