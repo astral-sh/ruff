@@ -145,7 +145,7 @@ FURB129.py:20:14: FURB129 [*] Instead of calling `readlines()`, iterate over fil
 
 FURB129.py:26:18: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
    |
-24 | def good1():
+24 | def func():
 25 |     f = Path("FURB129.py").open()
 26 |     for _line in f.readlines():
    |                  ^^^^^^^^^^^^^ FURB129
@@ -156,7 +156,7 @@ FURB129.py:26:18: FURB129 [*] Instead of calling `readlines()`, iterate over fil
 
 ℹ Unsafe fix
 23 23 | 
-24 24 | def good1():
+24 24 | def func():
 25 25 |     f = Path("FURB129.py").open()
 26    |-    for _line in f.readlines():
    26 |+    for _line in f:
@@ -166,7 +166,7 @@ FURB129.py:26:18: FURB129 [*] Instead of calling `readlines()`, iterate over fil
 
 FURB129.py:32:18: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
    |
-31 | def good2(f: io.BytesIO):
+31 | def func(f: io.BytesIO):
 32 |     for _line in f.readlines():
    |                  ^^^^^^^^^^^^^ FURB129
 33 |         pass
@@ -176,11 +176,32 @@ FURB129.py:32:18: FURB129 [*] Instead of calling `readlines()`, iterate over fil
 ℹ Unsafe fix
 29 29 | 
 30 30 | 
-31 31 | def good2(f: io.BytesIO):
+31 31 | def func(f: io.BytesIO):
 32    |-    for _line in f.readlines():
    32 |+    for _line in f:
 33 33 |         pass
 34 34 | 
 35 35 | 
+
+FURB129.py:38:22: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+   |
+36 | def func():
+37 |     with (open("FURB129.py") as f, foo as bar):
+38 |         for _line in f.readlines():
+   |                      ^^^^^^^^^^^^^ FURB129
+39 |             pass
+40 |         for _line in bar.readlines():
+   |
+   = help: Remove `readlines()`
+
+ℹ Unsafe fix
+35 35 | 
+36 36 | def func():
+37 37 |     with (open("FURB129.py") as f, foo as bar):
+38    |-        for _line in f.readlines():
+   38 |+        for _line in f:
+39 39 |             pass
+40 40 |         for _line in bar.readlines():
+41 41 |             pass
 
 

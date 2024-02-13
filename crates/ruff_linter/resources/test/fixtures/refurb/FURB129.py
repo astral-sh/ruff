@@ -21,30 +21,38 @@ for _line in Path("FURB129.py").open().readlines():
     pass
 
 
-def good1():
+def func():
     f = Path("FURB129.py").open()
     for _line in f.readlines():
         pass
     f.close()
 
 
-def good2(f: io.BytesIO):
+def func(f: io.BytesIO):
     for _line in f.readlines():
         pass
+
+
+def func():
+    with (open("FURB129.py") as f, foo as bar):
+        for _line in f.readlines():
+            pass
+        for _line in bar.readlines():
+            pass
 
 
 # False positives
-def bad(f):
+def func(f):
     for _line in f.readlines():
         pass
 
 
-def worse(f: codecs.StreamReader):
+def func(f: codecs.StreamReader):
     for _line in f.readlines():
         pass
 
 
-def foo():
+def func():
     class A:
         def readlines(self) -> list[str]:
             return ["a", "b", "c"]
@@ -52,7 +60,7 @@ def foo():
     return A()
 
 
-for _line in foo().readlines():
+for _line in func().readlines():
     pass
 
 # OK
