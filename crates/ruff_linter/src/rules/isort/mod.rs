@@ -108,7 +108,17 @@ pub(crate) fn format_imports(
         output.push_str(block_output.as_str());
     }
 
-    let lines_after_imports = settings.lines_after_imports;
+    let lines_after_imports = if source_type.is_stub() {
+        // Limit the number of lines after imports in stub files to at most 1 to be compatible with the formatter.
+        // `isort` does the same when using the profile `isort`
+        match settings.lines_after_imports {
+            0 => 0,
+            _ => 1,
+        }
+    } else {
+        settings.lines_after_imports
+    };
+
     match trailer {
         None => {}
         Some(Trailer::Sibling) => {
@@ -978,6 +988,7 @@ mod tests {
     }
 
     #[test_case(Path::new("lines_after_imports_nothing_after.py"))]
+    #[test_case(Path::new("lines_after_imports.pyi"))]
     #[test_case(Path::new("lines_after_imports_func_after.py"))]
     #[test_case(Path::new("lines_after_imports_class_after.py"))]
     fn lines_after_imports(path: &Path) -> Result<()> {
@@ -995,6 +1006,27 @@ mod tests {
         )?;
         diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("lines_after_imports.pyi"))]
+    #[test_case(Path::new("lines_after_imports_func_after.py"))]
+    #[test_case(Path::new("lines_after_imports_class_after.py"))]
+    fn lines_after_imports_default_settings(path: &Path) -> Result<()> {
+        let snapshot = path.to_string_lossy();
+        let mut diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    lines_after_imports: -1,
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        diagnostics.sort_by_key(Ranged::start);
+        assert_messages!(*snapshot, diagnostics);
         Ok(())
     }
 
