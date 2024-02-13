@@ -52,14 +52,15 @@ use ruff_text_size::Ranged;
 /// - [The Python Standard Library](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
 #[violation]
 pub struct AsyncioDanglingTask {
+    expr: &'static str,
     method: Method,
 }
 
 impl Violation for AsyncioDanglingTask {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AsyncioDanglingTask { method } = self;
-        format!("Store a reference to the return value of `asyncio.{method}`")
+        let AsyncioDanglingTask { expr, method } = self;
+        format!("Store a reference to the return value of `{expr}.{method}`")
     }
 }
 
@@ -80,19 +81,29 @@ pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Op
             })
     {
         return Some(Diagnostic::new(
-            AsyncioDanglingTask { method },
+            AsyncioDanglingTask {
+                expr: "asyncio",
+                method,
+            },
             expr.range(),
         ));
     }
 
-    // Ex) `loop = asyncio.get_running_loop(); loop.create_task(...)`
+    // Ex) `loop = ...; loop.create_task(...)`
     if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() {
         if attr == "create_task" {
             if typing::resolve_assignment(value, semantic).is_some_and(|call_path| {
-                matches!(call_path.as_slice(), ["asyncio", "get_running_loop"])
+                matches!(
+                    call_path.as_slice(),
+                    [
+                        "asyncio",
+                        "get_event_loop" | "get_running_loop" | "new_event_loop"
+                    ]
+                )
             }) {
                 return Some(Diagnostic::new(
                     AsyncioDanglingTask {
+                        expr: "loop", // TODO: How can you turn `value` into a string?
                         method: Method::CreateTask,
                     },
                     expr.range(),
