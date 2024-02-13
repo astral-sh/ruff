@@ -227,5 +227,88 @@ PERF102.py:106:16: PERF102 [*] When using only the keys of a dict use the `keys(
 106     |-    for(B,D)in A.items():
     106 |+    for B in A.keys():
 107 107 |         if(C:=name_to_value.get(B.name)):A.run(B.set,C)
+108 108 | 
+109 109 | def f():
+
+PERF102.py:113:23: PERF102 [*] When using only the values of a dict use the `values()` method
+    |
+111 |     print(key)
+112 | 
+113 |     for key, value in some_dict.items():  # PERF102
+    |                       ^^^^^^^^^^^^^^^ PERF102
+114 |         print(value)
+    |
+    = help: Replace `.items()` with `.values()`
+
+ℹ Unsafe fix
+110 110 |     key = 2
+111 111 |     print(key)
+112 112 | 
+113     |-    for key, value in some_dict.items():  # PERF102
+    113 |+    for value in some_dict.values():  # PERF102
+114 114 |         print(value)
+115 115 | 
+116 116 | 
+
+PERF102.py:121:23: PERF102 [*] When using only the keys of a dict use the `keys()` method
+    |
+119 |     print(value)
+120 | 
+121 |     for key, value in some_dict.items():  # PERF102
+    |                       ^^^^^^^^^^^^^^^ PERF102
+122 |         print(key)
+    |
+    = help: Replace `.items()` with `.keys()`
+
+ℹ Unsafe fix
+118 118 |     value = 2
+119 119 |     print(value)
+120 120 | 
+121     |-    for key, value in some_dict.items():  # PERF102
+    121 |+    for key in some_dict.keys():  # PERF102
+122 122 |         print(key)
+123 123 | 
+124 124 | 
+
+PERF102.py:157:23: PERF102 [*] When using only the values of a dict use the `values()` method
+    |
+155 |     another_dict = {"e": 1, "f": 2, "g": 3}
+156 | 
+157 |     for key, value in some_dict.items():  # PERF102
+    |                       ^^^^^^^^^^^^^^^ PERF102
+158 |         for key_2, value_2 in another_dict.items():
+159 |             print(key_2)
+    |
+    = help: Replace `.items()` with `.values()`
+
+ℹ Unsafe fix
+154 154 | def f():
+155 155 |     another_dict = {"e": 1, "f": 2, "g": 3}
+156 156 | 
+157     |-    for key, value in some_dict.items():  # PERF102
+    157 |+    for value in some_dict.values():  # PERF102
+158 158 |         for key_2, value_2 in another_dict.items():
+159 159 |             print(key_2)
+160 160 |             print(value_2)
+
+PERF102.py:168:31: PERF102 [*] When using only the values of a dict use the `values()` method
+    |
+167 |     for key, value in some_dict.items():  # PERF102
+168 |         for key_2, value_2 in another_dict.items():
+    |                               ^^^^^^^^^^^^^^^^^^ PERF102
+169 |             print(key)
+170 |             print(value_2)
+    |
+    = help: Replace `.items()` with `.values()`
+
+ℹ Unsafe fix
+165 165 |     another_dict = {"e": 1, "f": 2, "g": 3}
+166 166 | 
+167 167 |     for key, value in some_dict.items():  # PERF102
+168     |-        for key_2, value_2 in another_dict.items():
+    168 |+        for value_2 in another_dict.values():
+169 169 |             print(key)
+170 170 |             print(value_2)
+171 171 |             print(value)
 
 

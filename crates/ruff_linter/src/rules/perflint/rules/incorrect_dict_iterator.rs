@@ -4,6 +4,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Expr};
+use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -88,8 +89,8 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::Stm
     }
 
     match (
-        checker.semantic().is_unused(key),
-        checker.semantic().is_unused(value),
+        is_unused(key, checker.semantic()),
+        is_unused(value, checker.semantic()),
     ) {
         (true, true) => {
             // Both the key and the value are unused.
@@ -137,6 +138,61 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::Stm
             diagnostic.set_fix(Fix::unsafe_edits(replace_attribute, [replace_target]));
             checker.diagnostics.push(diagnostic);
         }
+    }
+}
+
+/// Returns `true` if the given expression is unused.
+/// An expression is considered unused if it is not referenced after its
+/// definition. This way we can avoid false positives for bindings that are
+/// declared before the expression in question. For example, in the following
+/// code, `value` is declared before `for statement`, but it is not used after it
+/// and should be considered unused from the `ForStatement` perspective:
+/// ```python
+/// def f():
+///     value = 2
+///     print(value)
+///
+///     for key, value in some_dict.items():  # PERF102
+///         print(key)
+/// ```
+fn is_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
+    match expr {
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            elts.iter().all(|expr| is_unused(expr, semantic))
+        }
+        Expr::Name(ast::ExprName { id, .. }) => semantic
+            .current_scope()
+            .get_all(id)
+            .filter(|binding_id| {
+                has_references_after_expr(semantic.binding(*binding_id), expr, semantic)
+            })
+            .peekable()
+            .peek()
+            .is_none(),
+        _ => false,
+    }
+}
+
+/// Returns `true` if the given binding is referenced after the given expression.   
+fn has_references_after_expr(binding: &Binding, expr: &Expr, semantic: &SemanticModel) -> bool {
+    let ref_count_before_expr = binding
+        .references
+        .len()
+        .saturating_sub(binding_count_before_expr(expr, semantic));
+    binding.start() >= expr.start() && ref_count_before_expr > 0
+}
+
+/// Returns the number of references to the given binding that occur before the
+/// given expression.
+fn binding_count_before_expr(expr: &Expr, semantic: &SemanticModel) -> usize {
+    match expr {
+        Expr::Name(ast::ExprName { id, .. }) => semantic
+            .current_scope()
+            .get_all(id)
+            .map(|binding_id| semantic.binding(binding_id))
+            .filter(|binding| binding.start() < expr.start())
+            .count(),
+        _ => 0,
     }
 }
 

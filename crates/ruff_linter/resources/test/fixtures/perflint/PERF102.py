@@ -105,3 +105,81 @@ def f():
 def _create_context(name_to_value):
     for(B,D)in A.items():
         if(C:=name_to_value.get(B.name)):A.run(B.set,C)
+
+def f():
+    key = 2
+    print(key)
+
+    for key, value in some_dict.items():  # PERF102
+        print(value)
+
+
+def f():
+    value = 2
+    print(value)
+
+    for key, value in some_dict.items():  # PERF102
+        print(key)
+
+
+def f():
+    key = 2
+    print(key)
+
+    for key, value in some_dict.items():  # OK
+        print(key)
+        print(value)
+
+
+def f():
+    key = 2
+    print(key)
+
+    for key, value in some_dict.items():  # OK
+        print(value)
+
+    print(key)
+
+
+def f():
+    value = 2
+    print(value)
+
+    for key, value in some_dict.items():  # OK
+        print(key)
+
+    print(value)
+
+
+def f():
+    another_dict = {"e": 1, "f": 2, "g": 3}
+
+    for key, value in some_dict.items():  # PERF102
+        for key_2, value_2 in another_dict.items():
+            print(key_2)
+            print(value_2)
+            print(value)
+
+
+def f():
+    another_dict = {"e": 1, "f": 2, "g": 3}
+
+    for key, value in some_dict.items():  # PERF102
+        for key_2, value_2 in another_dict.items():
+            print(key)
+            print(value_2)
+            print(value)
+
+
+def f():
+    another_dict = {"e": 1, "f": 2, "g": 3}
+    key_2 = 2
+    t = [key_2, 3]
+
+    for key, value in some_dict.items():  # OK
+        for key_2, value_2 in another_dict.items():
+            print(key)
+            print(key_2)
+        print(value)
+
+    print(value_2)
