@@ -96,7 +96,7 @@ pub(crate) fn max_instead_of_if(checker: &mut Checker, stmt_if: &ast::StmtIf) {
         && !left.is_subscript_expr()
     ) {return;}
 
-    let ([op], [right_statement]) = (ops.as_slice(), comparators.as_slice()) else {
+    let ([op], [right_statement]) = (&**ops, &**comparators) else {
         return;
     };
 
@@ -112,8 +112,8 @@ pub(crate) fn max_instead_of_if(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     let value_node = ast::ExprCall {
         func: Box::new(func_node.into()),
         arguments: Arguments {
-            args: vec![body_target.clone(), body_value.deref().clone()],
-            keywords: vec![],
+            args: Box::from([body_target.clone(), body_value.deref().clone()]),
+            keywords: Box::from([]),
             range: TextRange::default(),
         },
         range: TextRange::default(),
@@ -169,7 +169,7 @@ fn match_right(right_statement: &Expr, body_value: &Box<Expr>) -> bool {
                 LiteralExpressionRef::BytesLiteral(ast::ExprBytesLiteral{value: value1, ..}),
                 LiteralExpressionRef::BytesLiteral(ast::ExprBytesLiteral{value: value2, ..})
             ) => {
-                return value1.iter().map(|b| b.value.as_slice()).eq(value2.iter().map(|b| b.value.as_slice()))
+                return value1.iter().map(|b| b.as_slice()).eq(value2.iter().map(|b| b.as_slice()))
             },
             (
                 LiteralExpressionRef::StringLiteral(ast::ExprStringLiteral{value: value1, ..}),
