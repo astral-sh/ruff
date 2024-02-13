@@ -3,6 +3,7 @@ use std::fmt;
 use ast::Stmt;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{analyze::typing, Scope, SemanticModel};
 use ruff_text_size::Ranged;
@@ -52,7 +53,7 @@ use ruff_text_size::Ranged;
 /// - [The Python Standard Library](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
 #[violation]
 pub struct AsyncioDanglingTask {
-    expr: &'static str,
+    expr: String,
     method: Method,
 }
 
@@ -82,7 +83,7 @@ pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Op
     {
         return Some(Diagnostic::new(
             AsyncioDanglingTask {
-                expr: "asyncio",
+                expr: "asyncio".to_string(),
                 method,
             },
             expr.range(),
@@ -103,7 +104,7 @@ pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Op
             }) {
                 return Some(Diagnostic::new(
                     AsyncioDanglingTask {
-                        expr: "loop", // TODO: How can you turn `value` into a string?
+                        expr: compose_call_path(value).unwrap_or_else(|| "asyncio".to_string()),
                         method: Method::CreateTask,
                     },
                     expr.range(),
