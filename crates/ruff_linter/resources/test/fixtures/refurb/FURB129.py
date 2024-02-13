@@ -1,28 +1,28 @@
-# Lint
 import codecs
 import io
 from pathlib import Path
 
-with open('FURB129.py') as f:
+# Errors
+with open("FURB129.py") as f:
     for _line in f.readlines():
         pass
     a = [line.lower() for line in f.readlines()]
     b = {line.upper() for line in f.readlines()}
     c = {line.lower(): line.upper() for line in f.readlines()}
 
-with Path('FURB129.py').open() as f:
+with Path("FURB129.py").open() as f:
     for _line in f.readlines():
         pass
 
-for _line in open('FURB129.py').readlines():
+for _line in open("FURB129.py").readlines():
     pass
 
-for _line in Path('FURB129.py').open().readlines():
+for _line in Path("FURB129.py").open().readlines():
     pass
 
 
 def good1():
-    f = Path('FURB129.py').open()
+    f = Path("FURB129.py").open()
     for _line in f.readlines():
         pass
     f.close()
@@ -58,7 +58,7 @@ for _line in foo().readlines():
 # OK
 for _line in ["a", "b", "c"]:
     pass
-with open('FURB129.py') as f:
+with open("FURB129.py") as f:
     for _line in f:
         pass
     for _line in f.readlines(10):

@@ -3,7 +3,8 @@ source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
 FURB129.py:7:18: FURB129 [*] Use of readlines() in for loop
   |
-6 | with open('FURB129.py') as f:
+5 | # Errors
+6 | with open("FURB129.py") as f:
 7 |     for _line in f.readlines():
   |                  ^^^^^^^^^^^^^ FURB129
 8 |         pass
@@ -12,9 +13,9 @@ FURB129.py:7:18: FURB129 [*] Use of readlines() in for loop
   = help: Remove readlines()
 
 ℹ Unsafe fix
-4 4 | from pathlib import Path
-5 5 | 
-6 6 | with open('FURB129.py') as f:
+4 4 | 
+5 5 | # Errors
+6 6 | with open("FURB129.py") as f:
 7   |-    for _line in f.readlines():
   7 |+    for _line in f:
 8 8 |         pass
@@ -33,7 +34,7 @@ FURB129.py:9:35: FURB129 [*] Use of readlines() in for loop
    = help: Remove readlines()
 
 ℹ Unsafe fix
-6  6  | with open('FURB129.py') as f:
+6  6  | with open("FURB129.py") as f:
 7  7  |     for _line in f.readlines():
 8  8  |         pass
 9     |-    a = [line.lower() for line in f.readlines()]
@@ -60,7 +61,7 @@ FURB129.py:10:35: FURB129 [*] Use of readlines() in for loop
    10 |+    b = {line.upper() for line in f}
 11 11 |     c = {line.lower(): line.upper() for line in f.readlines()}
 12 12 | 
-13 13 | with Path('FURB129.py').open() as f:
+13 13 | with Path("FURB129.py").open() as f:
 
 FURB129.py:11:49: FURB129 [*] Use of readlines() in for loop
    |
@@ -69,7 +70,7 @@ FURB129.py:11:49: FURB129 [*] Use of readlines() in for loop
 11 |     c = {line.lower(): line.upper() for line in f.readlines()}
    |                                                 ^^^^^^^^^^^^^ FURB129
 12 | 
-13 | with Path('FURB129.py').open() as f:
+13 | with Path("FURB129.py").open() as f:
    |
    = help: Remove readlines()
 
@@ -80,12 +81,12 @@ FURB129.py:11:49: FURB129 [*] Use of readlines() in for loop
 11    |-    c = {line.lower(): line.upper() for line in f.readlines()}
    11 |+    c = {line.lower(): line.upper() for line in f}
 12 12 | 
-13 13 | with Path('FURB129.py').open() as f:
+13 13 | with Path("FURB129.py").open() as f:
 14 14 |     for _line in f.readlines():
 
 FURB129.py:14:18: FURB129 [*] Use of readlines() in for loop
    |
-13 | with Path('FURB129.py').open() as f:
+13 | with Path("FURB129.py").open() as f:
 14 |     for _line in f.readlines():
    |                  ^^^^^^^^^^^^^ FURB129
 15 |         pass
@@ -95,18 +96,18 @@ FURB129.py:14:18: FURB129 [*] Use of readlines() in for loop
 ℹ Unsafe fix
 11 11 |     c = {line.lower(): line.upper() for line in f.readlines()}
 12 12 | 
-13 13 | with Path('FURB129.py').open() as f:
+13 13 | with Path("FURB129.py").open() as f:
 14    |-    for _line in f.readlines():
    14 |+    for _line in f:
 15 15 |         pass
 16 16 | 
-17 17 | for _line in open('FURB129.py').readlines():
+17 17 | for _line in open("FURB129.py").readlines():
 
 FURB129.py:17:14: FURB129 [*] Use of readlines() in for loop
    |
 15 |         pass
 16 | 
-17 | for _line in open('FURB129.py').readlines():
+17 | for _line in open("FURB129.py").readlines():
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB129
 18 |     pass
    |
@@ -116,28 +117,28 @@ FURB129.py:17:14: FURB129 [*] Use of readlines() in for loop
 14 14 |     for _line in f.readlines():
 15 15 |         pass
 16 16 | 
-17    |-for _line in open('FURB129.py').readlines():
-   17 |+for _line in open('FURB129.py'):
+17    |-for _line in open("FURB129.py").readlines():
+   17 |+for _line in open("FURB129.py"):
 18 18 |     pass
 19 19 | 
-20 20 | for _line in Path('FURB129.py').open().readlines():
+20 20 | for _line in Path("FURB129.py").open().readlines():
 
 FURB129.py:20:14: FURB129 [*] Use of readlines() in for loop
    |
 18 |     pass
 19 | 
-20 | for _line in Path('FURB129.py').open().readlines():
+20 | for _line in Path("FURB129.py").open().readlines():
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB129
 21 |     pass
    |
    = help: Remove readlines()
 
 ℹ Unsafe fix
-17 17 | for _line in open('FURB129.py').readlines():
+17 17 | for _line in open("FURB129.py").readlines():
 18 18 |     pass
 19 19 | 
-20    |-for _line in Path('FURB129.py').open().readlines():
-   20 |+for _line in Path('FURB129.py').open():
+20    |-for _line in Path("FURB129.py").open().readlines():
+   20 |+for _line in Path("FURB129.py").open():
 21 21 |     pass
 22 22 | 
 23 23 | 
@@ -145,7 +146,7 @@ FURB129.py:20:14: FURB129 [*] Use of readlines() in for loop
 FURB129.py:26:18: FURB129 [*] Use of readlines() in for loop
    |
 24 | def good1():
-25 |     f = Path('FURB129.py').open()
+25 |     f = Path("FURB129.py").open()
 26 |     for _line in f.readlines():
    |                  ^^^^^^^^^^^^^ FURB129
 27 |         pass
@@ -156,7 +157,7 @@ FURB129.py:26:18: FURB129 [*] Use of readlines() in for loop
 ℹ Unsafe fix
 23 23 | 
 24 24 | def good1():
-25 25 |     f = Path('FURB129.py').open()
+25 25 |     f = Path("FURB129.py").open()
 26    |-    for _line in f.readlines():
    26 |+    for _line in f:
 27 27 |         pass
