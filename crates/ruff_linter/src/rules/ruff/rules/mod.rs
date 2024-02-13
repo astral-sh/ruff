@@ -48,9 +48,9 @@ mod pairwise_over_zipped;
 mod parenthesize_logical_operators;
 mod quadratic_list_summation;
 mod sequence_sorting;
-mod spurious_async;
 mod sort_dunder_all;
 mod sort_dunder_slots;
+mod spurious_async;
 mod static_key_dict_comprehension;
 #[cfg(feature = "test-rules")]
 pub(crate) mod test_rules;
