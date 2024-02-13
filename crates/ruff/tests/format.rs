@@ -91,6 +91,179 @@ fn format_warn_stdin_filename_with_files() {
 }
 
 #[test]
+fn nonexistent_config_file() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--config", "foo.toml", "."]), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'foo.toml' for '--config <CONFIG_OPTION>'
+
+      tip: A `--config` flag must either be a path to a `.toml` configuration file
+           or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration
+           option
+
+    It looks like you were trying to pass a path to a configuration file.
+    The path `foo.toml` does not exist
+
+    For more information, try '--help'.
+    "###);
+}
+
+#[test]
+fn config_override_rejected_if_invalid_toml() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--config", "foo = bar", "."]), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'foo = bar' for '--config <CONFIG_OPTION>'
+
+      tip: A `--config` flag must either be a path to a `.toml` configuration file
+           or a TOML `<KEY> = <VALUE>` pair overriding a specific configuration
+           option
+
+    The supplied argument is not valid TOML:
+
+    TOML parse error at line 1, column 7
+      |
+    1 | foo = bar
+      |       ^
+    invalid string
+    expected `"`, `'`
+
+    For more information, try '--help'.
+    "###);
+}
+
+#[test]
+fn too_many_config_files() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_dot_toml = tempdir.path().join("ruff.toml");
+    let ruff2_dot_toml = tempdir.path().join("ruff2.toml");
+    fs::File::create(&ruff_dot_toml)?;
+    fs::File::create(&ruff2_dot_toml)?;
+    let expected_stderr = format!(
+        "\
+ruff failed
+  Cause: You cannot specify more than one configuration file on the command line.
+
+  tip: remove either `--config={}` or `--config={}`.
+       For more information, try `--help`.
+
+",
+        ruff_dot_toml.display(),
+        ruff2_dot_toml.display(),
+    );
+    let cmd = Command::new(get_cargo_bin(BIN_NAME))
+        .arg("format")
+        .arg("--config")
+        .arg(&ruff_dot_toml)
+        .arg("--config")
+        .arg(&ruff2_dot_toml)
+        .arg(".")
+        .output()?;
+    let stderr = std::str::from_utf8(&cmd.stderr)?;
+    assert_eq!(stderr, expected_stderr);
+    Ok(())
+}
+
+#[test]
+fn config_file_and_isolated() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_dot_toml = tempdir.path().join("ruff.toml");
+    fs::File::create(&ruff_dot_toml)?;
+    let expected_stderr = format!(
+        "\
+ruff failed
+  Cause: The argument `--config={}` cannot be used with `--isolated`
+
+  tip: You cannot specify a configuration file and also specify `--isolated`,
+       as `--isolated` causes ruff to ignore all configuration files.
+       For more information, try `--help`.
+
+",
+        ruff_dot_toml.display(),
+    );
+    let cmd = Command::new(get_cargo_bin(BIN_NAME))
+        .arg("format")
+        .arg("--config")
+        .arg(&ruff_dot_toml)
+        .arg("--isolated")
+        .arg(".")
+        .output()?;
+    let stderr = std::str::from_utf8(&cmd.stderr)?;
+    assert_eq!(stderr, expected_stderr);
+    Ok(())
+}
+
+#[test]
+fn config_override_via_cli() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(&ruff_toml, "line-length = 100")?;
+    let fixture = r#"
+def foo():
+    print("looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong string")
+
+    "#;
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .arg("format")
+        .arg("--config")
+        .arg(&ruff_toml)
+        // This overrides the long line length set in the config file
+        .args(["--config", "line-length=80"])
+        .arg("-")
+        .pass_stdin(fixture), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    def foo():
+        print(
+            "looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong string"
+        )
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn config_doubly_overridden_via_cli() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(&ruff_toml, "line-length = 70")?;
+    let fixture = r#"
+def foo():
+    print("looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong string")
+
+    "#;
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .arg("format")
+        .arg("--config")
+        .arg(&ruff_toml)
+        // This overrides the long line length set in the config file...
+        .args(["--config", "line-length=80"])
+        // ...but this overrides them both:
+        .args(["--line-length", "100"])
+        .arg("-")
+        .pass_stdin(fixture), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    def foo():
+        print("looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong string")
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
 fn format_options() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_toml = tempdir.path().join("ruff.toml");

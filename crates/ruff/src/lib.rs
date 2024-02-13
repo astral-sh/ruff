@@ -204,24 +204,23 @@ pub fn run(
 }
 
 fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    let (cli, overrides) = args.partition();
+    let (cli, config_arguments) = args.partition()?;
 
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
-        commands::format_stdin::format_stdin(&cli, &overrides)
+        commands::format_stdin::format_stdin(&cli, &config_arguments)
     } else {
-        commands::format::format(cli, &overrides, log_level)
+        commands::format::format(cli, &config_arguments, log_level)
     }
 }
 
 pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    let (cli, overrides) = args.partition();
+    let (cli, config_arguments) = args.partition()?;
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
     let pyproject_config = resolve::resolve(
         cli.isolated,
-        cli.config.as_deref(),
-        &overrides,
+        &config_arguments,
         cli.stdin_filename.as_deref(),
     )?;
 
@@ -239,11 +238,21 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     let files = resolve_default_files(cli.files, is_stdin);
 
     if cli.show_settings {
-        commands::show_settings::show_settings(&files, &pyproject_config, &overrides, &mut writer)?;
+        commands::show_settings::show_settings(
+            &files,
+            &pyproject_config,
+            &config_arguments,
+            &mut writer,
+        )?;
         return Ok(ExitStatus::Success);
     }
     if cli.show_files {
-        commands::show_files::show_files(&files, &pyproject_config, &overrides, &mut writer)?;
+        commands::show_files::show_files(
+            &files,
+            &pyproject_config,
+            &config_arguments,
+            &mut writer,
+        )?;
         return Ok(ExitStatus::Success);
     }
 
@@ -302,7 +311,8 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         if !fix_mode.is_generate() {
             warn_user!("--fix is incompatible with --add-noqa.");
         }
-        let modifications = commands::add_noqa::add_noqa(&files, &pyproject_config, &overrides)?;
+        let modifications =
+            commands::add_noqa::add_noqa(&files, &pyproject_config, &config_arguments)?;
         if modifications > 0 && log_level >= LogLevel::Default {
             let s = if modifications == 1 { "" } else { "s" };
             #[allow(clippy::print_stderr)]
@@ -352,7 +362,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         let messages = commands::check::check(
             &files,
             &pyproject_config,
-            &overrides,
+            &config_arguments,
             cache.into(),
             noqa.into(),
             fix_mode,
@@ -374,8 +384,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                     if matches!(change_kind, ChangeKind::Configuration) {
                         pyproject_config = resolve::resolve(
                             cli.isolated,
-                            cli.config.as_deref(),
-                            &overrides,
+                            &config_arguments,
                             cli.stdin_filename.as_deref(),
                         )?;
                     }
@@ -385,7 +394,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                     let messages = commands::check::check(
                         &files,
                         &pyproject_config,
-                        &overrides,
+                        &config_arguments,
                         cache.into(),
                         noqa.into(),
                         fix_mode,
@@ -402,7 +411,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             commands::check_stdin::check_stdin(
                 cli.stdin_filename.map(fs::normalize_path).as_deref(),
                 &pyproject_config,
-                &overrides,
+                &config_arguments,
                 noqa.into(),
                 fix_mode,
             )?
@@ -410,7 +419,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             commands::check::check(
                 &files,
                 &pyproject_config,
-                &overrides,
+                &config_arguments,
                 cache.into(),
                 noqa.into(),
                 fix_mode,

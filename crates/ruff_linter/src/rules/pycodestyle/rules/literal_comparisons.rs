@@ -139,10 +139,10 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
 
     // Check `left`.
     let mut comparator = compare.left.as_ref();
-    let [op, ..] = compare.ops.as_slice() else {
+    let [op, ..] = &*compare.ops else {
         return;
     };
-    let [next, ..] = compare.comparators.as_slice() else {
+    let [next, ..] = &*compare.comparators else {
         return;
     };
 

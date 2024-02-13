@@ -247,6 +247,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::HardcodedPasswordDefault) {
                 flake8_bandit::rules::hardcoded_password_default(checker, parameters);
             }
+            if checker.enabled(Rule::SuspiciousMarkSafeUsage) {
+                for decorator in decorator_list {
+                    flake8_bandit::rules::suspicious_function_decorator(checker, decorator);
+                }
+            }
             if checker.enabled(Rule::PropertyWithParameters) {
                 pylint::rules::property_with_parameters(checker, stmt, decorator_list, parameters);
             }

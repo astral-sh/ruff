@@ -285,8 +285,8 @@ fn parse_error_from_lalrpop(err: LalrpopError<TextSize, Tok, LexicalError>) -> P
             offset: token.0,
         },
         LalrpopError::User { error } => ParseError {
-            error: ParseErrorType::Lexical(error.error),
-            offset: error.location,
+            offset: error.location(),
+            error: ParseErrorType::Lexical(error.into_error()),
         },
         LalrpopError::UnrecognizedToken { token, expected } => {
             // Hacky, but it's how CPython does it. See PyParser_AddToken,
@@ -359,8 +359,8 @@ impl ParseErrorType {
 impl From<LexicalError> for ParseError {
     fn from(error: LexicalError) -> Self {
         ParseError {
-            error: ParseErrorType::Lexical(error.error),
-            offset: error.location,
+            offset: error.location(),
+            error: ParseErrorType::Lexical(error.into_error()),
         }
     }
 }
@@ -560,20 +560,17 @@ impl From<ExprSlice> for ParenthesizedExpr {
     }
 }
 
-#[cfg(target_pointer_width = "64")]
-mod size_assertions {
-    use static_assertions::assert_eq_size;
-
-    use crate::parser::ParenthesizedExpr;
-
-    assert_eq_size!(ParenthesizedExpr, [u8; 88]);
-}
-
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
 
     use super::*;
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn size_assertions() {
+        assert_eq!(std::mem::size_of::<ParenthesizedExpr>(), 72);
+    }
 
     #[test]
     fn test_parse_empty() {
@@ -1479,6 +1476,7 @@ f"""{
         y
         z
 }"""
+f"{ (  foo )  = }"
 "#
             .trim(),
         )

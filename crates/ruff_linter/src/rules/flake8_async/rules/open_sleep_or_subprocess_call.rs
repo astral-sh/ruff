@@ -118,8 +118,7 @@ fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -> bool {
 
     let binding = semantic.binding(binding_id);
 
-    let Some(Expr::Call(call)) = analyze::typing::find_binding_value(&name.id, binding, semantic)
-    else {
+    let Some(Expr::Call(call)) = analyze::typing::find_binding_value(binding, semantic) else {
         return false;
     };
 

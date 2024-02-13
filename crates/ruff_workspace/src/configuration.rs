@@ -51,7 +51,7 @@ use crate::settings::{
     FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
 };
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct RuleSelection {
     pub select: Option<Vec<RuleSelector>>,
     pub ignore: Vec<RuleSelector>,
@@ -106,7 +106,7 @@ impl RuleSelection {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Configuration {
     // Global options
     pub cache_dir: Option<PathBuf>,
@@ -165,12 +165,6 @@ impl Configuration {
             PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
             PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
         };
-
-        if quote_style == QuoteStyle::Preserve && !format_preview.is_enabled() {
-            return Err(anyhow!(
-                "'quote-style = preserve' is a preview only feature. Run with '--preview' to enable it."
-            ));
-        }
 
         let formatter = FormatterSettings {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
@@ -397,7 +391,13 @@ impl Configuration {
     }
 
     /// Convert the [`Options`] read from the given [`Path`] into a [`Configuration`].
-    pub fn from_options(options: Options, path: &Path, project_root: &Path) -> Result<Self> {
+    /// If `None` is supplied for `path`, it indicates that the `Options` instance
+    /// was created via "inline TOML" from the `--config` flag
+    pub fn from_options(
+        options: Options,
+        path: Option<&Path>,
+        project_root: &Path,
+    ) -> Result<Self> {
         warn_about_deprecated_top_level_lint_options(&options.lint_top_level.0, path);
 
         let lint = if let Some(mut lint) = options.lint {
@@ -578,7 +578,7 @@ impl Configuration {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct LintConfiguration {
     pub exclude: Option<Vec<FilePattern>>,
     pub preview: Option<PreviewMode>,
@@ -1155,7 +1155,7 @@ impl LintConfiguration {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct FormatConfiguration {
     pub exclude: Option<Vec<FilePattern>>,
     pub preview: Option<PreviewMode>,
@@ -1263,7 +1263,7 @@ pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> 
 
 fn warn_about_deprecated_top_level_lint_options(
     top_level_options: &LintCommonOptions,
-    path: &Path,
+    path: Option<&Path>,
 ) {
     let mut used_options = Vec::new();
 
@@ -1454,9 +1454,14 @@ fn warn_about_deprecated_top_level_lint_options(
         .map(|option| format!("- '{option}' -> 'lint.{option}'"))
         .join("\n  ");
 
+    let thing_to_update = path.map_or_else(
+        || String::from("your `--config` CLI arguments"),
+        |path| format!("`{}`", fs::relativize_path(path)),
+    );
+
     warn_user_once_by_message!(
-        "The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `{}`:\n  {options_mapping}",
-        fs::relativize_path(path),
+        "The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. \
+        Please update the following options in {thing_to_update}:\n  {options_mapping}",
     );
 }
 
@@ -1483,6 +1488,12 @@ mod tests {
         Rule::UnnecessaryEnumerate,
         Rule::MathConstant,
         Rule::PreviewTestRule,
+        Rule::BlankLineBetweenMethods,
+        Rule::BlankLinesTopLevel,
+        Rule::TooManyBlankLines,
+        Rule::BlankLineAfterDecorator,
+        Rule::BlankLinesAfterFunctionOrClass,
+        Rule::BlankLinesBeforeNestedDefinition,
     ];
 
     #[allow(clippy::needless_pass_by_value)]

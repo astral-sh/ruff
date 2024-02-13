@@ -654,7 +654,7 @@ pub fn resolve_assignment<'a>(
 pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) -> Option<&'a Expr> {
     let binding_id = semantic.lookup_symbol(symbol)?;
     let binding = semantic.binding(binding_id);
-    find_binding_value(symbol, binding, semantic)
+    find_binding_value(binding, semantic)
 }
 
 /// Find the assigned [`Expr`] for a given [`Binding`], if any.
@@ -667,11 +667,7 @@ pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) ->
 ///
 /// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
 /// `StringLiteral` with value `"str"` when called with `bla`.
-pub fn find_binding_value<'a>(
-    symbol: &str,
-    binding: &Binding,
-    semantic: &'a SemanticModel,
-) -> Option<&'a Expr> {
+pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) -> Option<&'a Expr> {
     match binding.kind {
         // Ex) `x := 1`
         BindingKind::NamedExprAssignment => {
@@ -680,7 +676,7 @@ pub fn find_binding_value<'a>(
                 .expressions(parent_id)
                 .find_map(|expr| expr.as_named_expr_expr());
             if let Some(ast::ExprNamedExpr { target, value, .. }) = parent {
-                return match_value(symbol, target.as_ref(), value.as_ref());
+                return match_value(binding, target.as_ref(), value.as_ref());
             }
         }
         // Ex) `x = 1`
@@ -689,16 +685,16 @@ pub fn find_binding_value<'a>(
             let parent = semantic.statement(parent_id);
             match parent {
                 Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
-                    if let Some(target) = targets.iter().find(|target| defines(symbol, target)) {
-                        return match_value(symbol, target, value.as_ref());
-                    }
+                    return targets
+                        .iter()
+                        .find_map(|target| match_value(binding, target, value.as_ref()))
                 }
                 Stmt::AnnAssign(ast::StmtAnnAssign {
                     value: Some(value),
                     target,
                     ..
                 }) => {
-                    return match_value(symbol, target, value.as_ref());
+                    return match_value(binding, target, value.as_ref());
                 }
                 _ => {}
             }
@@ -709,9 +705,9 @@ pub fn find_binding_value<'a>(
 }
 
 /// Given a target and value, find the value that's assigned to the given symbol.
-fn match_value<'a>(symbol: &str, target: &Expr, value: &'a Expr) -> Option<&'a Expr> {
+fn match_value<'a>(binding: &Binding, target: &Expr, value: &'a Expr) -> Option<&'a Expr> {
     match target {
-        Expr::Name(ast::ExprName { id, .. }) if id.as_str() == symbol => Some(value),
+        Expr::Name(name) if name.range() == binding.range() => Some(value),
         Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
             match value {
                 Expr::Tuple(ast::ExprTuple {
@@ -722,7 +718,7 @@ fn match_value<'a>(symbol: &str, target: &Expr, value: &'a Expr) -> Option<&'a E
                 })
                 | Expr::Set(ast::ExprSet {
                     elts: value_elts, ..
-                }) => get_value_by_id(symbol, elts, value_elts),
+                }) => match_target(binding, elts, value_elts),
                 _ => None,
             }
         }
@@ -730,18 +726,8 @@ fn match_value<'a>(symbol: &str, target: &Expr, value: &'a Expr) -> Option<&'a E
     }
 }
 
-/// Returns `true` if the [`Expr`] defines the symbol.
-fn defines(symbol: &str, expr: &Expr) -> bool {
-    match expr {
-        Expr::Name(ast::ExprName { id, .. }) => id == symbol,
-        Expr::Tuple(ast::ExprTuple { elts, .. })
-        | Expr::List(ast::ExprList { elts, .. })
-        | Expr::Set(ast::ExprSet { elts, .. }) => elts.iter().any(|elt| defines(symbol, elt)),
-        _ => false,
-    }
-}
-
-fn get_value_by_id<'a>(target_id: &str, targets: &[Expr], values: &'a [Expr]) -> Option<&'a Expr> {
+/// Given a target and value, find the value that's assigned to the given symbol.
+fn match_target<'a>(binding: &Binding, targets: &[Expr], values: &'a [Expr]) -> Option<&'a Expr> {
     for (target, value) in targets.iter().zip(values.iter()) {
         match target {
             Expr::Tuple(ast::ExprTuple {
@@ -764,15 +750,15 @@ fn get_value_by_id<'a>(target_id: &str, targets: &[Expr], values: &'a [Expr]) ->
                     | Expr::Set(ast::ExprSet {
                         elts: value_elts, ..
                     }) => {
-                        if let Some(result) = get_value_by_id(target_id, target_elts, value_elts) {
+                        if let Some(result) = match_target(binding, target_elts, value_elts) {
                             return Some(result);
                         }
                     }
                     _ => (),
                 };
             }
-            Expr::Name(ast::ExprName { id, .. }) => {
-                if *id == target_id {
+            Expr::Name(name) => {
+                if name.range() == binding.range() {
                     return Some(value);
                 }
             }

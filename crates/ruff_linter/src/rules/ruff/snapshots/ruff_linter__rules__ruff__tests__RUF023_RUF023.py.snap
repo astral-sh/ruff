@@ -564,10 +564,11 @@ RUF023.py:162:17: RUF023 [*] `BezierBuilder.__slots__` is not sorted
     162 |+    __slots__ = (
     163 |+        'canvas',
     164 |+        'xp',
-    165 |+        'yp',)
-164 166 | 
-165 167 | class BezierBuilder2:
-166 168 |     __slots__ = {'xp', 'yp',
+    165 |+        'yp',
+    166 |+    )
+164 167 | 
+165 168 | class BezierBuilder2:
+166 169 |     __slots__ = {'xp', 'yp',
 
 RUF023.py:166:17: RUF023 [*] `BezierBuilder2.__slots__` is not sorted
     |
@@ -643,7 +644,7 @@ RUF023.py:181:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
 189 | |     )
     | |_____^ RUF023
 190 |   
-191 |   ###################################
+191 |       __slots__ = {"foo", "bar",
     |
     = help: Apply a natural sort to `BezierBuilder4.__slots__`
 
@@ -661,5 +662,36 @@ RUF023.py:181:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
 187 186 |         # strange comment 2
 188 187 |         ,
 189 188 |     )
+
+RUF023.py:191:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
+    |
+189 |       )
+190 |   
+191 |       __slots__ = {"foo", "bar",
+    |  _________________^
+192 | |                  "baz", "bingo"
+193 | |                  }
+    | |__________________^ RUF023
+194 |   
+195 |   ###################################
+    |
+    = help: Apply a natural sort to `BezierBuilder4.__slots__`
+
+ℹ Safe fix
+188 188 |         ,
+189 189 |     )
+190 190 | 
+191     |-    __slots__ = {"foo", "bar",
+192     |-                 "baz", "bingo"
+193     |-                 }
+    191 |+    __slots__ = {
+    192 |+        "bar",
+    193 |+        "baz",
+    194 |+        "bingo",
+    195 |+        "foo"
+    196 |+    }
+194 197 | 
+195 198 | ###################################
+196 199 | # These should all not get flagged:
 
 

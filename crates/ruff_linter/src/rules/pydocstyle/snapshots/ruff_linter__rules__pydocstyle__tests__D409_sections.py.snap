@@ -61,4 +61,39 @@ sections.py:216:5: D409 [*] Section underline should match the length of its nam
 227 227 |     Raises:
 228 228 |     My attention.
 
+sections.py:568:5: D409 [*] Section underline should match the length of its name ("Other Parameters")
+    |
+567 |   def test_method_should_be_correctly_capitalized(parameters: list[str], other_parameters: dict[str, str]): # noqa: D213
+568 |       """Test parameters and attributes sections are capitalized correctly.
+    |  _____^
+569 | | 
+570 | |     Parameters
+571 | |     ----------
+572 | |     parameters:
+573 | |         A list of string parameters
+574 | |     other_parameters:
+575 | |         A dictionary of string attributes
+576 | | 
+577 | |     Other Parameters
+578 | |     ----------
+579 | |     other_parameters:
+580 | |         A dictionary of string attributes
+581 | |     parameters:
+582 | |         A list of string parameters
+583 | | 
+584 | |     """
+    | |_______^ D409
+    |
+    = help: Adjust underline length to match "Other Parameters"
+
+ℹ Safe fix
+575 575 |         A dictionary of string attributes
+576 576 | 
+577 577 |     Other Parameters
+578     |-    ----------
+    578 |+    ----------------
+579 579 |     other_parameters:
+580 580 |         A dictionary of string attributes
+581 581 |     parameters:
+
 

@@ -119,10 +119,10 @@ pub use token::{StringKind, Tok, TokenKind};
 
 use crate::lexer::LexResult;
 
-mod function;
-// Skip flattening lexer to distinguish from full ruff_python_parser
 mod context;
+mod function;
 mod invalid;
+// Skip flattening lexer to distinguish from full ruff_python_parser
 pub mod lexer;
 mod parser;
 mod soft_keywords;

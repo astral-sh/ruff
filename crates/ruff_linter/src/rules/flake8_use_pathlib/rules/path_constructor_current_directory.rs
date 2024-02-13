@@ -1,7 +1,6 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall};
-
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr, ExprCall};
 
 use crate::checkers::ast::Checker;
 
@@ -53,19 +52,15 @@ pub(crate) fn path_constructor_current_directory(checker: &mut Checker, expr: &E
         return;
     }
 
-    let Expr::Call(ExprCall {
-        arguments: Arguments { args, keywords, .. },
-        ..
-    }) = expr
-    else {
+    let Expr::Call(ExprCall { arguments, .. }) = expr else {
         return;
     };
 
-    if !keywords.is_empty() {
+    if !arguments.keywords.is_empty() {
         return;
     }
 
-    let [Expr::StringLiteral(ast::ExprStringLiteral { value, range })] = args.as_slice() else {
+    let [Expr::StringLiteral(ast::ExprStringLiteral { value, range })] = &*arguments.args else {
         return;
     };
 

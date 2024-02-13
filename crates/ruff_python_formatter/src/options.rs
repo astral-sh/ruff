@@ -248,6 +248,12 @@ pub enum QuoteStyle {
     Preserve,
 }
 
+impl QuoteStyle {
+    pub const fn is_preserve(self) -> bool {
+        matches!(self, QuoteStyle::Preserve)
+    }
+}
+
 impl fmt::Display for QuoteStyle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
