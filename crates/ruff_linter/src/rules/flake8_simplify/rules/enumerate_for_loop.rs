@@ -76,8 +76,7 @@ pub(crate) fn enumerate_for_loop(checker: &mut Checker, for_stmt: &ast::StmtFor)
             }
 
             // Ensure that the index variable was initialized to 0.
-            let Some(value) = typing::find_binding_value(&index.id, binding, checker.semantic())
-            else {
+            let Some(value) = typing::find_binding_value(binding, checker.semantic()) else {
                 continue;
             };
             if !matches!(
