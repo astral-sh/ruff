@@ -419,23 +419,20 @@ mod tests {
         Ok(())
     }
 
-    // Test currently disabled as line endings are automatically converted to
-    // platform-appropriate ones in CI/CD #[test_case(Path::new("
-    // line_ending_crlf.py"))] #[test_case(Path::new("line_ending_lf.py"))]
-    // fn source_code_style(path: &Path) -> Result<()> {
-    //     let snapshot = format!("{}", path.to_string_lossy());
-    //     let diagnostics = test_path(
-    //         Path::new("isort")
-    //             .join(path)
-    //             .as_path(),
-    //         &LinterSettings {
-    //             src: vec![test_resource_path("fixtures/isort")],
-    //             ..LinterSettings::for_rule(Rule::UnsortedImports)
-    //         },
-    //     )?;
-    //     crate::assert_messages!(snapshot, diagnostics);
-    //     Ok(())
-    // }
+    #[test_case(Path::new("line_ending_crlf.py"))]
+    #[test_case(Path::new("line_ending_lf.py"))]
+    fn source_code_style(path: &Path) -> Result<()> {
+        let snapshot = format!("{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        crate::assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
 
     #[test_case(Path::new("separate_local_folder_imports.py"))]
     fn known_local_folder(path: &Path) -> Result<()> {
