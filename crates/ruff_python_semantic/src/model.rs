@@ -1511,6 +1511,18 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::FUTURE_ANNOTATIONS)
     }
 
+    /// Return `true` if the model is in a named expression assignment (e.g., `x := 1`).
+    pub const fn in_named_expression_assignment(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::NAMED_EXPRESSION_ASSIGNMENT)
+    }
+
+    /// Return `true` if the model is in a comprehension assignment (e.g., `_ for x in y`).
+    pub const fn in_comprehension_assignment(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::COMPREHENSION_ASSIGNMENT)
+    }
+
     /// Return an iterator over all bindings shadowed by the given [`BindingId`], within the
     /// containing scope, and across scopes.
     pub fn shadowed_bindings(
@@ -1824,6 +1836,22 @@ bitflags! {
         /// Record = TypeVar("Record")
         ///
         const TYPE_PARAM_DEFINITION = 1 << 17;
+
+        /// The model is in a named expression assignment.
+        ///
+        /// For example, the model could be visiting `x` in:
+        /// ```python
+        /// if (x := 1): ...
+        /// ```
+        const NAMED_EXPRESSION_ASSIGNMENT = 1 << 18;
+
+        /// The model is in a comprehension variable assignment.
+        ///
+        /// For example, the model could be visiting `x` in:
+        /// ```python
+        /// [_ for x in range(10)]
+        /// ```
+        const COMPREHENSION_ASSIGNMENT = 1 << 19;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

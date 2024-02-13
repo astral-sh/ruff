@@ -1285,6 +1285,16 @@ where
                 self.semantic.flags |= SemanticModelFlags::F_STRING;
                 visitor::walk_expr(self, expr);
             }
+            Expr::NamedExpr(ast::ExprNamedExpr {
+                target,
+                value,
+                range: _,
+            }) => {
+                self.visit_expr(value);
+
+                self.semantic.flags |= SemanticModelFlags::NAMED_EXPRESSION_ASSIGNMENT;
+                self.visit_expr(target);
+            }
             _ => visitor::walk_expr(self, expr),
         }
 
@@ -1501,6 +1511,8 @@ impl<'a> Checker<'a> {
             unreachable!("Generator expression must contain at least one generator");
         };
 
+        let flags = self.semantic.flags;
+
         // Generators are compiled as nested functions. (This may change with PEP 709.)
         // As such, the `iter` of the first generator is evaluated in the outer scope, while all
         // subsequent nodes are evaluated in the inner scope.
@@ -1530,14 +1542,22 @@ impl<'a> Checker<'a> {
         // `x` is local to `foo`, and the `T` in `y=T` skips the class scope when resolving.
         self.visit_expr(&generator.iter);
         self.semantic.push_scope(ScopeKind::Generator);
+
+        self.semantic.flags = flags | SemanticModelFlags::COMPREHENSION_ASSIGNMENT;
         self.visit_expr(&generator.target);
+        self.semantic.flags = flags;
+
         for expr in &generator.ifs {
             self.visit_boolean_test(expr);
         }
 
         for generator in iterator {
             self.visit_expr(&generator.iter);
+
+            self.semantic.flags = flags | SemanticModelFlags::COMPREHENSION_ASSIGNMENT;
             self.visit_expr(&generator.target);
+            self.semantic.flags = flags;
+
             for expr in &generator.ifs {
                 self.visit_boolean_test(expr);
             }
@@ -1811,12 +1831,7 @@ impl<'a> Checker<'a> {
         // if (x := 10) > 5:
         //     ...
         // ```
-        if self
-            .semantic
-            .current_expressions()
-            .filter_map(Expr::as_named_expr_expr)
-            .any(|parent| parent.target.range().contains_range(expr.range()))
-        {
+        if self.semantic.in_named_expression_assignment() {
             self.add_binding(id, expr.range(), BindingKind::NamedExprAssignment, flags);
             return;
         }
@@ -1826,18 +1841,7 @@ impl<'a> Checker<'a> {
         // ```python
         // [x for x in range(10)]
         // ```
-        if self.semantic.current_expressions().any(|parent| {
-            let generators = match parent {
-                Expr::ListComp(ast::ExprListComp { generators, .. }) => generators,
-                Expr::SetComp(ast::ExprSetComp { generators, .. }) => generators,
-                Expr::DictComp(ast::ExprDictComp { generators, .. }) => generators,
-                Expr::GeneratorExp(ast::ExprGeneratorExp { generators, .. }) => generators,
-                _ => return false,
-            };
-            generators
-                .iter()
-                .any(|generator| generator.target.range().contains_range(expr.range()))
-        }) {
+        if self.semantic.in_comprehension_assignment() {
             self.add_binding(id, expr.range(), BindingKind::ComprehensionVar, flags);
             return;
         }
