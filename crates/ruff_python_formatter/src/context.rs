@@ -107,6 +107,18 @@ impl<'a> PyFormatContext<'a> {
         self.expression_location = expression_location;
     }
 
+    /// Return a new context suitable for formatting an expression inside an
+    /// f-string.
+    ///
+    /// The `quotes` parameter should be the quote information of the f-string
+    /// containing the expression.
+    pub(crate) fn in_f_string(self, quotes: StringQuotes) -> PyFormatContext<'a> {
+        PyFormatContext {
+            expression_location: ExpressionLocation::InsideFString(quotes),
+            ..self
+        }
+    }
+
     /// Returns `true` if preview mode is enabled.
     pub(crate) const fn is_preview(&self) -> bool {
         self.options.preview().is_enabled()

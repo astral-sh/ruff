@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::num::NonZeroU16;
 
 use ruff_formatter::{format_args, write, RemoveSoftLinesBuffer};
 use ruff_python_ast::{
@@ -8,6 +9,7 @@ use ruff_text_size::Ranged;
 
 use crate::comments::{dangling_open_parenthesis_comments, trailing_comments};
 use crate::context::{ExpressionLocation, NodeLevel, WithExprLocation, WithNodeLevel};
+use crate::options::MagicTrailingComma;
 use crate::prelude::*;
 use crate::preview::is_hex_codes_in_unicode_sequences_enabled;
 use crate::string::normalize_string;
@@ -155,7 +157,40 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                     f,
                 );
 
-                write!(f, [line_break_or_space, expression.format()])?;
+                line_break_or_space.fmt(f)?;
+
+                // If we're going to remove the soft line breaks, then there's a chance
+                // that there will be trailing commas in the formatted expression.
+                // Currently, it's difficult to remove that conditionally, because (TODO)
+                // So, we'll manually format the expression with the maximum line width
+                // and disabling the magic trailing comma. This is expensive so we've
+                // implemented some heuristics to avoid this in some cases.
+                if self.context.should_remove_soft_line_breaks()
+                    && !matches!(
+                        &**expression,
+                        Expr::BooleanLiteral(_)
+                            | Expr::BytesLiteral(_)
+                            | Expr::EllipsisLiteral(_)
+                            | Expr::IpyEscapeCommand(_)
+                            | Expr::Name(_)
+                            | Expr::NoneLiteral(_)
+                            | Expr::NumberLiteral(_)
+                            | Expr::StringLiteral(_)
+                    )
+                {
+                    let options = f
+                        .options()
+                        .clone()
+                        .with_line_width(NonZeroU16::MAX.into())
+                        .with_magic_trailing_comma(MagicTrailingComma::Ignore);
+                    let context =
+                        PyFormatContext::new(options, f.context().source(), comments.clone())
+                            .in_f_string(self.context.quotes());
+                    let formatted = crate::format!(context, [expression.format()])?;
+                    text(formatted.print()?.as_code()).fmt(f)?;
+                } else {
+                    expression.format().fmt(f)?;
+                }
 
                 // Conversion comes first, then the format spec.
                 match conversion {
