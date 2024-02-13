@@ -102,6 +102,6 @@ impl FStringContext {
     }
 
     pub(crate) const fn should_remove_soft_line_breaks(self) -> bool {
-        !self.is_multiline
+        !self.quotes.is_triple() && !self.is_multiline
     }
 }

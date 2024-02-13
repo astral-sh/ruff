@@ -422,10 +422,6 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
 -    "A long and ridiculous {}".format(string_key): (
 -        "This is a really really really long string that has to go i,side of a"
 -        " dictionary. It is soooo bad."
--    ),
--    some_func("calling", "some", "stuff"): (
--        "This is a really really really long string that has to go inside of a"
--        " dictionary. It is {soooo} bad (#{x}).".format(sooo="soooo", x=2)
 +    "A long and ridiculous {}".format(
 +        string_key
 +    ): "This is a really really really long string that has to go i,side of a dictionary. It is soooo bad.",
@@ -434,6 +430,10 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
 +    ): "This is a really really really long string that has to go inside of a dictionary. It is {soooo} bad (#{x}).".format(
 +        sooo="soooo", x=2
      ),
+-    some_func("calling", "some", "stuff"): (
+-        "This is a really really really long string that has to go inside of a"
+-        " dictionary. It is {soooo} bad (#{x}).".format(sooo="soooo", x=2)
+-    ),
      "A %s %s"
 -    % ("formatted", "string"): (
 -        "This is a really really really long string that has to go inside of a"
@@ -902,7 +902,7 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
  )
  
  dict_with_lambda_values = {
-@@ -524,65 +383,58 @@
+@@ -524,71 +383,70 @@
  
  # Complex string concatenations with a method call in the middle.
  code = (
@@ -982,16 +982,23 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
  
  log.info(
 -    f"""Skipping: {"a" == 'b'} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
-+    f"""Skipping: {"a" == "b"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
++    f"""Skipping: {"a" == "b"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {
++        desc["status"]
++    } {desc["exposure_max"]}"""
  )
  
  log.info(
-@@ -590,5 +442,5 @@
+-    f"""Skipping: {'a' == "b"=} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
++    f"""Skipping: {'a' == "b"=} {desc["ms_name"]} {money=} {dte=} {pos_share=} {
++        desc["status"]
++    } {desc["exposure_max"]}"""
  )
  
  log.info(
 -    f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share=} {desc['status']} {desc['exposure_max']}"""
-+    f"""Skipping: {"a" == "b"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
++    f"""Skipping: {"a" == "b"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {
++        desc["status"]
++    } {desc["exposure_max"]}"""
  )
 ```
 
@@ -1434,15 +1441,21 @@ log.info(
 )
 
 log.info(
-    f"""Skipping: {"a" == "b"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
+    f"""Skipping: {"a" == "b"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {
+        desc["status"]
+    } {desc["exposure_max"]}"""
 )
 
 log.info(
-    f"""Skipping: {'a' == "b"=} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
+    f"""Skipping: {'a' == "b"=} {desc["ms_name"]} {money=} {dte=} {pos_share=} {
+        desc["status"]
+    } {desc["exposure_max"]}"""
 )
 
 log.info(
-    f"""Skipping: {"a" == "b"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
+    f"""Skipping: {"a" == "b"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {
+        desc["status"]
+    } {desc["exposure_max"]}"""
 )
 ```
 
