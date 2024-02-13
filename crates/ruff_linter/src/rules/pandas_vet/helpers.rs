@@ -47,6 +47,7 @@ pub(super) fn test_expression(expr: &Expr, semantic: &SemanticModel) -> Resoluti
                         | BindingKind::Assignment
                         | BindingKind::NamedExprAssignment
                         | BindingKind::LoopVar
+                        | BindingKind::ComprehensionVar
                         | BindingKind::Global
                         | BindingKind::Nonlocal(_) => Resolution::RelevantLocal,
                         BindingKind::Import(import) if matches!(import.call_path(), ["pandas"]) => {

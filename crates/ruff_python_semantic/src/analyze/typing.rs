@@ -426,16 +426,8 @@ fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bo
             // ```
             //
             // The type checker might know how to infer the type based on `init_expr`.
-            Some(Stmt::Assign(ast::StmtAssign { targets, value, .. })) => {
-                // TODO(charlie): Replace this with `find_binding_value`, which matches the values.
-                if targets
-                    .iter()
-                    .any(|target| target.range().contains_range(binding.range()))
-                {
-                    T::match_initializer(value.as_ref(), semantic)
-                } else {
-                    false
-                }
+            Some(Stmt::Assign(ast::StmtAssign { value, .. })) => {
+                T::match_initializer(value.as_ref(), semantic)
             }
 
             // ```python
@@ -443,15 +435,8 @@ fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bo
             // ```
             //
             // In this situation, we check only the annotation.
-            Some(Stmt::AnnAssign(ast::StmtAnnAssign {
-                target, annotation, ..
-            })) => {
-                // TODO(charlie): Replace this with `find_binding_value`, which matches the values.
-                if target.range().contains_range(binding.range()) {
-                    T::match_annotation(annotation.as_ref(), semantic)
-                } else {
-                    false
-                }
+            Some(Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })) => {
+                T::match_annotation(annotation.as_ref(), semantic)
             }
             _ => false,
         },
@@ -481,15 +466,8 @@ fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bo
             // ```
             //
             // It's a typed declaration, type annotation is the only source of information.
-            Some(Stmt::AnnAssign(ast::StmtAnnAssign {
-                target, annotation, ..
-            })) => {
-                // TODO(charlie): Replace this with `find_binding_value`, which matches the values.
-                if target.range().contains_range(binding.range()) {
-                    T::match_annotation(annotation.as_ref(), semantic)
-                } else {
-                    false
-                }
+            Some(Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })) => {
+                T::match_annotation(annotation.as_ref(), semantic)
             }
             _ => false,
         },
