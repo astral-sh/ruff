@@ -1,8 +1,11 @@
 use std::borrow::Cow;
 
+use ruff_formatter::FormatContext;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::context::FStringState;
+use crate::options::PythonVersion;
 use crate::prelude::*;
 use crate::preview::is_hex_codes_in_unicode_sequences_enabled;
 use crate::string::{QuoteChar, Quoting, StringPart, StringPrefix, StringQuotes};
