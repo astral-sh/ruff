@@ -53,9 +53,24 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
         // as same quotes can be re-used inside an f-string.
         let quotes = normalizer.choose_quotes(&string, &locator);
 
-        let is_multiline =
-            memchr::memchr2(b'\n', b'\r', locator.slice(self.value).as_bytes()).is_some();
-        let context = FStringContext::new(string.prefix(), quotes, is_multiline);
+        // Heuristic: Allow breaking the f-string expressions across multiple lines
+        // only if there already is at least one multiline expression. This puts the
+        // control in the hands of the user to decide if they want to break the
+        // f-string expressions across multiple lines or not. This is similar to
+        // how Prettier does it for template literals in JavaScript.
+        //
+        // If it's single quoted f-string and it contains a multiline expression, then
+        // we assume that the target version of Python supports it (3.12+). If there are
+        // comments used in any of the expression of the f-string, then it's always going
+        // to be multiline and we assume that the target version of Python supports it.
+        let has_multiline_expression = self
+            .value
+            .elements
+            .iter()
+            .filter_map(|element| element.as_expression())
+            .any(|expr| memchr::memchr2(b'\n', b'\r', locator.slice(expr).as_bytes()).is_some());
+
+        let context = FStringContext::new(string.prefix(), quotes, has_multiline_expression);
 
         // Starting prefix and quote
         write!(f, [string.prefix(), quotes])?;
@@ -81,15 +96,19 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
 pub(crate) struct FStringContext {
     prefix: StringPrefix,
     quotes: StringQuotes,
-    is_multiline: bool,
+    has_multiline_expression: bool,
 }
 
 impl FStringContext {
-    const fn new(prefix: StringPrefix, quotes: StringQuotes, is_multiline: bool) -> Self {
+    const fn new(
+        prefix: StringPrefix,
+        quotes: StringQuotes,
+        has_multiline_expression: bool,
+    ) -> Self {
         Self {
             prefix,
             quotes,
-            is_multiline,
+            has_multiline_expression,
         }
     }
 
@@ -102,6 +121,6 @@ impl FStringContext {
     }
 
     pub(crate) const fn should_remove_soft_line_breaks(self) -> bool {
-        !self.quotes.is_triple() && !self.is_multiline
+        !self.has_multiline_expression
     }
 }
