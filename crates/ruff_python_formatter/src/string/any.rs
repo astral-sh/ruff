@@ -1,17 +1,19 @@
-use crate::expression::expr_f_string::f_string_quoting;
-use crate::other::f_string::FormatFString;
-use crate::other::string_literal::{FormatStringLiteral, StringLiteralKind};
-use crate::string::{Quoting, StringPrefix, StringQuotes};
-use crate::{AsFormat, PyFormatContext, PyFormatter};
+use std::iter::FusedIterator;
+
 use memchr::memchr2;
-use ruff_formatter::{Format, FormatResult};
+
 use ruff_python_ast::{
     self as ast, AnyNodeRef, Expr, ExprBytesLiteral, ExprFString, ExprStringLiteral, ExpressionRef,
     StringLiteral,
 };
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange};
-use std::iter::FusedIterator;
+
+use crate::expression::expr_f_string::f_string_quoting;
+use crate::other::f_string::FormatFString;
+use crate::other::string_literal::{FormatStringLiteral, StringLiteralKind};
+use crate::prelude::*;
+use crate::string::{Quoting, StringPrefix, StringQuotes};
 
 /// Represents any kind of string expression. This could be either a string,
 /// bytes or f-string.
