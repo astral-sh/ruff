@@ -287,7 +287,7 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
         let flat_binary = self.flatten(&comments, f.context().source());
 
         if self.is_bool_op() {
-            return in_parentheses_only_group(&&*flat_binary).fmt(f);
+            return in_parentheses_only_group(&flat_binary).fmt(f);
         }
 
         let source = f.context().source();
@@ -481,7 +481,7 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
             // Finish the group that wraps all implicit concatenated strings
             write_in_parentheses_only_group_end_tag(f);
         } else {
-            in_parentheses_only_group(&&*flat_binary).fmt(f)?;
+            in_parentheses_only_group(&flat_binary).fmt(f)?;
         }
 
         Ok(())
@@ -524,6 +524,12 @@ impl<'a> Deref for FlatBinaryExpression<'a> {
 
     fn deref(&self) -> &Self::Target {
         FlatBinaryExpressionSlice::from_slice(&self.0)
+    }
+}
+
+impl Format<PyFormatContext<'_>> for FlatBinaryExpression<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        Format::fmt(&**self, f)
     }
 }
 
@@ -642,7 +648,7 @@ impl<'a> FlatBinaryExpressionSlice<'a> {
 }
 
 /// Formats a binary chain slice by inserting soft line breaks before the lowest-precedence operators.
-/// In other words: It splits the line before by the lowest precedence operators (and it either splits
+/// In other words: It splits the line before the lowest precedence operators (and it either splits
 /// all of them or none). For example, the lowest precedence operator for `a + b * c + d` is the `+` operator.
 /// The expression either gets formatted as `a + b * c + d` if it fits on the line or as
 /// ```python
@@ -678,59 +684,60 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
         let mut last_operator: Option<OperatorIndex> = None;
 
         let lowest_precedence = self.lowest_precedence();
+        let lowest_precedence_operators = self
+            .operators()
+            .filter(|(_, operator)| operator.precedence() == lowest_precedence);
 
-        for (index, operator_part) in self.operators() {
-            if operator_part.precedence() == lowest_precedence {
-                let left = self.between_operators(last_operator, index);
-                let right = self.after_operator(index);
+        for (index, operator_part) in lowest_precedence_operators {
+            let left = self.between_operators(last_operator, index);
+            let right = self.after_operator(index);
 
-                let is_pow = operator_part.symbol.is_pow()
-                    && is_simple_power_expression(
-                        left.last_operand().expression(),
-                        right.first_operand().expression(),
-                        f.context().comments().ranges(),
-                        f.context().source(),
-                    );
+            let is_pow = operator_part.symbol.is_pow()
+                && is_simple_power_expression(
+                    left.last_operand().expression(),
+                    right.first_operand().expression(),
+                    f.context().comments().ranges(),
+                    f.context().source(),
+                );
 
-                if let Some(leading) = left.first_operand().leading_binary_comments() {
-                    leading_comments(leading).fmt(f)?;
-                }
-
-                match &left.0 {
-                    [OperandOrOperator::Operand(operand)] => operand.fmt(f)?,
-                    _ => in_parentheses_only_group(&left).fmt(f)?,
-                }
-
-                if let Some(trailing) = left.last_operand().trailing_binary_comments() {
-                    trailing_comments(trailing).fmt(f)?;
-                }
-
-                if is_pow {
-                    in_parentheses_only_soft_line_break().fmt(f)?;
-                } else {
-                    in_parentheses_only_soft_line_break_or_space().fmt(f)?;
-                }
-
-                operator_part.fmt(f)?;
-
-                // Format the operator on its own line if the right side has any leading comments.
-                if operator_part.has_trailing_comments()
-                    || right.first_operand().has_unparenthesized_leading_comments(
-                        f.context().comments(),
-                        f.context().source(),
-                    )
-                {
-                    hard_line_break().fmt(f)?;
-                } else if is_pow {
-                    if is_fix_power_op_line_length_enabled(f.context()) {
-                        in_parentheses_only_if_group_breaks(&space()).fmt(f)?;
-                    }
-                } else {
-                    space().fmt(f)?;
-                }
-
-                last_operator = Some(index);
+            if let Some(leading) = left.first_operand().leading_binary_comments() {
+                leading_comments(leading).fmt(f)?;
             }
+
+            match &left.0 {
+                [OperandOrOperator::Operand(operand)] => operand.fmt(f)?,
+                _ => in_parentheses_only_group(&left).fmt(f)?,
+            }
+
+            if let Some(trailing) = left.last_operand().trailing_binary_comments() {
+                trailing_comments(trailing).fmt(f)?;
+            }
+
+            if is_pow {
+                in_parentheses_only_soft_line_break().fmt(f)?;
+            } else {
+                in_parentheses_only_soft_line_break_or_space().fmt(f)?;
+            }
+
+            operator_part.fmt(f)?;
+
+            // Format the operator on its own line if the right side has any leading comments.
+            if operator_part.has_trailing_comments()
+                || right.first_operand().has_unparenthesized_leading_comments(
+                    f.context().comments(),
+                    f.context().source(),
+                )
+            {
+                hard_line_break().fmt(f)?;
+            } else if is_pow {
+                if is_fix_power_op_line_length_enabled(f.context()) {
+                    in_parentheses_only_if_group_breaks(&space()).fmt(f)?;
+                }
+            } else {
+                space().fmt(f)?;
+            }
+
+            last_operator = Some(index);
         }
 
         // Format the last right side
