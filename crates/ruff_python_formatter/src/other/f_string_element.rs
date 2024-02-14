@@ -182,7 +182,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                 // expression can't contain a trailing comma.
                 if self.context.should_remove_soft_line_breaks() && {
                     let visitor = &mut CanContainTrailingCommaVisitor::default();
-                    AnyNodeRef::from(&**expression).visit_preorder(visitor);
+                    visitor.visit_expr(expression);
                     visitor.can_have_trailing_comma
                 } {
                     let options = f
@@ -284,13 +284,13 @@ impl<'a> PreorderVisitor<'a> for CanContainTrailingCommaVisitor {
             AnyNodeRef::ExprList(ast::ExprList { elts, .. })
             | AnyNodeRef::ExprTuple(ast::ExprTuple { elts, .. })
             | AnyNodeRef::ExprSet(ast::ExprSet { elts, .. }) => {
-                if elts.len() > 1 {
+                if !elts.is_empty() {
                     self.can_have_trailing_comma = true;
                     return TraversalSignal::Skip;
                 }
             }
             AnyNodeRef::ExprDict(ast::ExprDict { keys, values, .. }) => {
-                if keys.len() > 1 || values.len() > 1 {
+                if !keys.is_empty() || !values.is_empty() {
                     self.can_have_trailing_comma = true;
                     return TraversalSignal::Skip;
                 }
