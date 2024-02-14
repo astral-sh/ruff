@@ -108,18 +108,6 @@ impl<'a> PyFormatContext<'a> {
         self.f_string_state = f_string_state;
     }
 
-    /// Return a new context suitable for formatting an expression inside an
-    /// f-string.
-    ///
-    /// The `quotes` parameter should be the quote information of the f-string
-    /// containing the expression.
-    pub(crate) fn in_f_string(self, quotes: StringQuotes) -> PyFormatContext<'a> {
-        PyFormatContext {
-            f_string_state: FStringState::Inside(quotes),
-            ..self
-        }
-    }
-
     /// Returns a new context with the given set of options.
     pub(crate) fn with_options(mut self, options: PyFormatOptions) -> Self {
         self.options = options;

@@ -190,11 +190,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                         .clone()
                         .with_line_width(NonZeroU16::MAX.into())
                         .with_magic_trailing_comma(MagicTrailingComma::Ignore);
-                    let context = f
-                        .context()
-                        .clone()
-                        .in_f_string(self.context.quotes())
-                        .with_options(options);
+                    let context = f.context().clone().with_options(options);
                     let formatted = crate::format!(context, [expression.format()])?;
                     text(formatted.print()?.as_code()).fmt(f)?;
                 } else {
