@@ -4,7 +4,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::parser::progress::ParserProgress;
-use crate::parser::{Parser, SequenceMatchPatternParentheses, NEWLINE_EOF_SET};
+use crate::parser::{Parser, SequenceMatchPatternParentheses};
 use crate::token_set::TokenSet;
 use crate::{ParseErrorType, Tok, TokenKind};
 
@@ -329,58 +329,91 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_match_pattern_literal(&mut self) -> Pattern {
-        // FIXME: This has the same issue as `parse_atom` had. We consume the token
-        // and then don't know what to do if it is an unexpected token.
-
         let start = self.node_start();
-        let (tok, tok_range) = self.next_token();
-        match tok {
-            Tok::None => Pattern::MatchSingleton(ast::PatternMatchSingleton {
-                value: Singleton::None,
-                range: tok_range,
-            }),
-            Tok::True => Pattern::MatchSingleton(ast::PatternMatchSingleton {
-                value: Singleton::True,
-                range: tok_range,
-            }),
-            Tok::False => Pattern::MatchSingleton(ast::PatternMatchSingleton {
-                value: Singleton::False,
-                range: tok_range,
-            }),
-            tok @ Tok::String { .. } => {
-                let str = self.parse_string_expression((tok, tok_range), start);
+        match self.current_kind() {
+            TokenKind::None => {
+                self.bump(TokenKind::None);
+                Pattern::MatchSingleton(ast::PatternMatchSingleton {
+                    value: Singleton::None,
+                    range: self.node_range(start),
+                })
+            }
+            TokenKind::True => {
+                self.bump(TokenKind::True);
+                Pattern::MatchSingleton(ast::PatternMatchSingleton {
+                    value: Singleton::True,
+                    range: self.node_range(start),
+                })
+            }
+            TokenKind::False => {
+                self.bump(TokenKind::False);
+                Pattern::MatchSingleton(ast::PatternMatchSingleton {
+                    value: Singleton::False,
+                    range: self.node_range(start),
+                })
+            }
+            TokenKind::String => {
+                let (string @ Tok::String { .. }, string_range) = self.bump(TokenKind::String)
+                else {
+                    unreachable!()
+                };
+                let str = self.parse_string_expression((string, string_range), start);
 
                 Pattern::MatchValue(ast::PatternMatchValue {
                     value: Box::new(str),
                     range: self.node_range(start),
                 })
             }
-            Tok::Complex { real, imag } => Pattern::MatchValue(ast::PatternMatchValue {
-                value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: Number::Complex { real, imag },
-                    range: tok_range,
-                })),
-                range: tok_range,
-            }),
-            Tok::Int { value } => Pattern::MatchValue(ast::PatternMatchValue {
-                value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: Number::Int(value),
-                    range: tok_range,
-                })),
-                range: tok_range,
-            }),
-            Tok::Float { value } => Pattern::MatchValue(ast::PatternMatchValue {
-                value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: Number::Float(value),
-                    range: tok_range,
-                })),
-                range: tok_range,
-            }),
-            Tok::Name { name } if self.at(TokenKind::Dot) => {
+            TokenKind::Complex => {
+                let (Tok::Complex { real, imag }, _) = self.bump(TokenKind::Complex) else {
+                    unreachable!()
+                };
+                let range = self.node_range(start);
+
+                Pattern::MatchValue(ast::PatternMatchValue {
+                    value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value: Number::Complex { real, imag },
+                        range,
+                    })),
+                    range,
+                })
+            }
+            TokenKind::Int => {
+                let (Tok::Int { value }, _) = self.bump(TokenKind::Int) else {
+                    unreachable!()
+                };
+                let range = self.node_range(start);
+
+                Pattern::MatchValue(ast::PatternMatchValue {
+                    value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value: Number::Int(value),
+                        range,
+                    })),
+                    range,
+                })
+            }
+            TokenKind::Float => {
+                let (Tok::Float { value }, _) = self.bump(TokenKind::Float) else {
+                    unreachable!()
+                };
+                let range = self.node_range(start);
+
+                Pattern::MatchValue(ast::PatternMatchValue {
+                    value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value: Number::Float(value),
+                        range,
+                    })),
+                    range,
+                })
+            }
+            TokenKind::Name if self.peek_nth(1) == TokenKind::Dot => {
+                let (Tok::Name { name }, _) = self.bump(TokenKind::Name) else {
+                    unreachable!()
+                };
                 let id = Expr::Name(ast::ExprName {
                     id: name.to_string(),
                     ctx: ExprContext::Load,
-                    range: tok_range,
+                    range: self.node_range(start),
                 });
 
                 let attribute = self.parse_attr_expr_for_match_pattern(id, start);
@@ -390,56 +423,59 @@ impl<'src> Parser<'src> {
                     range: self.node_range(start),
                 })
             }
-            Tok::Name { name } => Pattern::MatchAs(ast::PatternMatchAs {
-                range: tok_range,
-                pattern: None,
-                name: if name.contains("_") {
-                    None
-                } else {
-                    Some(ast::Identifier {
-                        id: name.to_string(),
-                        range: tok_range,
-                    })
-                },
-            }),
-            Tok::Minus
+            TokenKind::Name => {
+                let (Tok::Name { name }, _) = self.bump(TokenKind::Name) else {
+                    unreachable!()
+                };
+                let range = self.node_range(start);
+
+                Pattern::MatchAs(ast::PatternMatchAs {
+                    range,
+                    pattern: None,
+                    name: if name.contains("_") {
+                        None
+                    } else {
+                        Some(ast::Identifier {
+                            id: name.to_string(),
+                            range,
+                        })
+                    },
+                })
+            }
+            TokenKind::Minus
                 if matches!(
-                    self.current_kind(),
+                    self.peek_nth(1),
                     TokenKind::Int | TokenKind::Float | TokenKind::Complex
                 ) =>
             {
-                // Since the `Minus` token was consumed `parse_lhs` will not
-                // be able to parse an `UnaryOp`, therefore we create the node
-                // manually.
                 let parsed_expr = self.parse_lhs_expression();
 
                 let range = self.node_range(start);
                 Pattern::MatchValue(ast::PatternMatchValue {
-                    value: Box::new(Expr::UnaryOp(ast::ExprUnaryOp {
-                        range,
-                        op: UnaryOp::USub,
-                        operand: Box::new(parsed_expr.expr),
-                    })),
+                    value: Box::new(parsed_expr.expr),
                     range,
                 })
             }
             kind => {
-                const RECOVERY_SET: TokenSet =
-                    TokenSet::new([TokenKind::Colon]).union(NEWLINE_EOF_SET);
-                self.add_error(
-                    ParseErrorType::InvalidMatchPatternLiteral {
-                        pattern: kind.into(),
-                    },
-                    tok_range,
-                );
+                // Upon encountering an unexpected token, return a `Pattern::MatchValue` containing
+                // an empty `Expr::Name`.
+                let invalid_node = if kind.is_keyword() {
+                    Expr::Name(self.parse_name())
+                } else {
+                    self.add_error(
+                        ParseErrorType::OtherError("Expression expected.".to_string()),
+                        self.current_range(),
+                    );
+                    Expr::Name(ast::ExprName {
+                        range: self.missing_node_range(),
+                        id: String::new(),
+                        ctx: ExprContext::Load,
+                    })
+                };
 
-                #[allow(deprecated)]
-                self.skip_until(RECOVERY_SET);
-
-                #[allow(deprecated)]
-                Pattern::Invalid(ast::PatternMatchInvalid {
-                    value: self.src_text(tok_range).into(),
-                    range: self.node_range(start),
+                Pattern::MatchValue(ast::PatternMatchValue {
+                    value: Box::new(invalid_node),
+                    range: self.missing_node_range(),
                 })
             }
         }
