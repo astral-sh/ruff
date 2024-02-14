@@ -35,9 +35,12 @@ use super::suppression_comment_visitor::{
 /// # fmt: off
 /// def example():
 ///     if True:
-///         expression = 1 + \ # fmt: skip
-///                      # fmt: off
-///                      1
+///         # fmt: skip
+///         expression = [
+///             # fmt: off
+///             1,
+///             2
+///         ]
 ///         # yapf: disable
 ///     # fmt: on
 ///     # yapf: enable
