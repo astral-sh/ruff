@@ -147,6 +147,16 @@ f"""test {"inner"}"""
 # But if the inner string is also triple-quoted then we should preserve the existing quotes.
 f"""test {'''inner'''}"""
 
+# Magic trailing comma
+#
+# The expression formatting will result in breaking it across multiple lines with a
+# trailing comma but as the expression isn't already broken, we will remove all the line
+# breaks which results in the trailing comma being present. This test case makes sure
+# that the trailing comma is removed as well.
+f"aaaaaaa {['aaaaaaaaaaaaaaa', 'bbbbbbbbbbbbb', 'ccccccccccccccccc', 'ddddddddddddddd', 'eeeeeeeeeeeeee']} aaaaaaa"
+# And, if the trailing comma is already present, we still need to remove it.
+f"aaaaaaa {['aaaaaaaaaaaaaaa', 'bbbbbbbbbbbbb', 'ccccccccccccccccc', 'ddddddddddddddd', 'eeeeeeeeeeeeee',]} aaaaaaa"
+
 # Comments
 
 # No comments should be dropped!

@@ -1,14 +1,16 @@
 use std::borrow::Cow;
 use std::num::NonZeroU16;
 
-use ruff_formatter::{format_args, write, RemoveSoftLinesBuffer};
+use ruff_formatter::{format_args, write, Buffer, RemoveSoftLinesBuffer};
+use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
 use ruff_python_ast::{
-    ConversionFlag, Expr, FStringElement, FStringExpressionElement, FStringLiteralElement,
+    self as ast, AnyNodeRef, ConversionFlag, Expr, FStringElement, FStringExpressionElement,
+    FStringLiteralElement,
 };
 use ruff_text_size::Ranged;
 
 use crate::comments::{dangling_open_parenthesis_comments, trailing_comments};
-use crate::context::{ExpressionLocation, NodeLevel, WithExprLocation, WithNodeLevel};
+use crate::context::{FStringState, NodeLevel, WithFStringState, WithNodeLevel};
 use crate::options::MagicTrailingComma;
 use crate::prelude::*;
 use crate::preview::is_hex_codes_in_unicode_sequences_enabled;
@@ -99,9 +101,13 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
         if let Some(debug_text) = debug_text {
             token("{").fmt(f)?;
 
-            // If debug text is present in a f-string, we'll mark all of the comments
-            // in this f-string as formatted.
-            comments.mark_verbatim_node_comments_formatted(self.element.into());
+            // If debug text is present in an f-string, the node is suppressed
+            // marking all of the comments attached to the expression as formatted.
+            // But, the dangling comments are attached to the f-string element
+            // and need to be marked as formatted.
+            for dangling_comment in comments.dangling(self.element) {
+                dangling_comment.mark_formatted();
+            }
 
             write!(
                 f,
@@ -152,40 +158,43 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                     _ => None,
                 };
 
-                let f = &mut WithExprLocation::new(
-                    ExpressionLocation::InsideFString(self.context.quotes()),
-                    f,
-                );
-
                 line_break_or_space.fmt(f)?;
 
+                // Update the context to be inside the f-string.
+                let f = &mut WithFStringState::new(FStringState::Inside(self.context.quotes()), f);
+
                 // If we're going to remove the soft line breaks, then there's a chance
-                // that there will be trailing commas in the formatted expression.
-                // Currently, it's difficult to remove that conditionally, because (TODO)
+                // that there will be trailing commas in the formatted expression. For
+                // example, if the expression is a collection which exceeds the line length:
+                //
+                // ```python
+                // xxxxxxx = f"aaaaaaaa {['aaaaaaaaaaaaa', 'bbbbbbbbbbbb', 'cccccccccccc', 'dddddddddddd']} aaaaaaaaaa"
+                // ```
+                //
+                // Currently, it's difficult to remove that conditionally, because the
+                // context would need to be passed down to all the expressions and the
+                // magic trailing comma builder would need to be updated to handle this.
+                //
                 // So, we'll manually format the expression with the maximum line width
-                // and disabling the magic trailing comma. This is expensive so we've
-                // implemented some heuristics to avoid this in some cases.
-                if self.context.should_remove_soft_line_breaks()
-                    && !matches!(
-                        &**expression,
-                        Expr::BooleanLiteral(_)
-                            | Expr::BytesLiteral(_)
-                            | Expr::EllipsisLiteral(_)
-                            | Expr::IpyEscapeCommand(_)
-                            | Expr::Name(_)
-                            | Expr::NoneLiteral(_)
-                            | Expr::NumberLiteral(_)
-                            | Expr::StringLiteral(_)
-                    )
-                {
+                // and disabling the magic trailing comma. This will ensure that even if
+                // a trailing comma was added by the user, they're removed. This is expensive
+                // so we've implemented some heuristics to avoid this in cases where the
+                // expression can't contain a trailing comma.
+                if self.context.should_remove_soft_line_breaks() && {
+                    let visitor = &mut CanContainTrailingCommaVisitor::default();
+                    AnyNodeRef::from(&**expression).visit_preorder(visitor);
+                    visitor.can_have_trailing_comma
+                } {
                     let options = f
                         .options()
                         .clone()
                         .with_line_width(NonZeroU16::MAX.into())
                         .with_magic_trailing_comma(MagicTrailingComma::Ignore);
-                    let context =
-                        PyFormatContext::new(options, f.context().source(), comments.clone())
-                            .in_f_string(self.context.quotes());
+                    let context = f
+                        .context()
+                        .clone()
+                        .in_f_string(self.context.quotes())
+                        .with_options(options);
                     let formatted = crate::format!(context, [expression.format()])?;
                     text(formatted.print()?.as_code()).fmt(f)?;
                 } else {
@@ -260,5 +269,44 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
 
             write!(f, [token("{"), inner, token("}")])
         }
+    }
+}
+
+/// A visitor to check if an expression can contain a trailing comma.
+#[derive(Default)]
+struct CanContainTrailingCommaVisitor {
+    can_have_trailing_comma: bool,
+}
+
+impl<'a> PreorderVisitor<'a> for CanContainTrailingCommaVisitor {
+    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+        match node {
+            AnyNodeRef::ExprList(ast::ExprList { elts, .. })
+            | AnyNodeRef::ExprTuple(ast::ExprTuple { elts, .. })
+            | AnyNodeRef::ExprSet(ast::ExprSet { elts, .. }) => {
+                if elts.len() > 1 {
+                    self.can_have_trailing_comma = true;
+                    return TraversalSignal::Skip;
+                }
+            }
+            AnyNodeRef::ExprDict(ast::ExprDict { keys, values, .. }) => {
+                if keys.len() > 1 || values.len() > 1 {
+                    self.can_have_trailing_comma = true;
+                    return TraversalSignal::Skip;
+                }
+            }
+            AnyNodeRef::Arguments(arguments) => {
+                if !arguments.is_empty() {
+                    self.can_have_trailing_comma = true;
+                    return TraversalSignal::Skip;
+                }
+            }
+            _ => (),
+        }
+
+        // Any other expression with a trailing comma, assuming that it's a
+        // valid syntax, is basically a tuple. So, we need to traverse into
+        // it to check the inner expressions.
+        TraversalSignal::Traverse
     }
 }

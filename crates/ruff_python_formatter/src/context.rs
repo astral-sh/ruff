@@ -6,15 +6,15 @@ use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 
-/// Location of the expression which is currently being formatted.
 #[derive(Copy, Clone, Debug, Default)]
-pub(crate) enum ExpressionLocation {
-    /// The expression is inside an f-string, in the replacement field i.e., `f"foo {x}"`.
+pub(crate) enum FStringState {
+    /// The formatter is inside an f-string, in the replacement field i.e., `f"foo {x}"`.
     ///
-    /// The containing `StringQuotes` is surrounding f-string quote information.
-    InsideFString(StringQuotes),
+    /// The containing `StringQuotes` is the surrounding f-string quote information.
+    Inside(StringQuotes),
+    /// The formatter is outside an f-string.
     #[default]
-    Other,
+    Outside,
 }
 
 #[derive(Clone)]
@@ -33,7 +33,8 @@ pub struct PyFormatContext<'a> {
     /// quote style that is inverted from the one here in order to ensure that
     /// the formatted Python code will be valid.
     docstring: Option<QuoteChar>,
-    expression_location: ExpressionLocation,
+    /// The state of the formatter with respect to f-strings.
+    f_string_state: FStringState,
 }
 
 impl<'a> PyFormatContext<'a> {
@@ -45,7 +46,7 @@ impl<'a> PyFormatContext<'a> {
             node_level: NodeLevel::TopLevel(TopLevelStatementPosition::Other),
             indent_level: IndentLevel::new(0),
             docstring: None,
-            expression_location: ExpressionLocation::Other,
+            f_string_state: FStringState::Outside,
         }
     }
 
@@ -99,12 +100,12 @@ impl<'a> PyFormatContext<'a> {
         }
     }
 
-    pub(crate) fn expression_location(&self) -> ExpressionLocation {
-        self.expression_location
+    pub(crate) fn f_string_state(&self) -> FStringState {
+        self.f_string_state
     }
 
-    pub(crate) fn set_expression_location(&mut self, expression_location: ExpressionLocation) {
-        self.expression_location = expression_location;
+    pub(crate) fn set_f_string_state(&mut self, f_string_state: FStringState) {
+        self.f_string_state = f_string_state;
     }
 
     /// Return a new context suitable for formatting an expression inside an
@@ -114,9 +115,15 @@ impl<'a> PyFormatContext<'a> {
     /// containing the expression.
     pub(crate) fn in_f_string(self, quotes: StringQuotes) -> PyFormatContext<'a> {
         PyFormatContext {
-            expression_location: ExpressionLocation::InsideFString(quotes),
+            f_string_state: FStringState::Inside(quotes),
             ..self
         }
+    }
+
+    /// Returns a new context with the given set of options.
+    pub(crate) fn with_options(mut self, options: PyFormatOptions) -> Self {
+        self.options = options;
+        self
     }
 
     /// Returns `true` if preview mode is enabled.
@@ -366,25 +373,25 @@ where
     }
 }
 
-pub(crate) struct WithExprLocation<'a, B, D>
+pub(crate) struct WithFStringState<'a, B, D>
 where
     D: DerefMut<Target = B>,
     B: Buffer<Context = PyFormatContext<'a>>,
 {
     buffer: D,
-    saved_location: ExpressionLocation,
+    saved_location: FStringState,
 }
 
-impl<'a, B, D> WithExprLocation<'a, B, D>
+impl<'a, B, D> WithFStringState<'a, B, D>
 where
     D: DerefMut<Target = B>,
     B: Buffer<Context = PyFormatContext<'a>>,
 {
-    pub(crate) fn new(expr_location: ExpressionLocation, mut buffer: D) -> Self {
+    pub(crate) fn new(expr_location: FStringState, mut buffer: D) -> Self {
         let context = buffer.state_mut().context_mut();
-        let saved_location = context.expression_location();
+        let saved_location = context.f_string_state();
 
-        context.set_expression_location(expr_location);
+        context.set_f_string_state(expr_location);
 
         Self {
             buffer,
@@ -393,7 +400,7 @@ where
     }
 }
 
-impl<'a, B, D> Deref for WithExprLocation<'a, B, D>
+impl<'a, B, D> Deref for WithFStringState<'a, B, D>
 where
     D: DerefMut<Target = B>,
     B: Buffer<Context = PyFormatContext<'a>>,
@@ -405,7 +412,7 @@ where
     }
 }
 
-impl<'a, B, D> DerefMut for WithExprLocation<'a, B, D>
+impl<'a, B, D> DerefMut for WithFStringState<'a, B, D>
 where
     D: DerefMut<Target = B>,
     B: Buffer<Context = PyFormatContext<'a>>,
@@ -415,7 +422,7 @@ where
     }
 }
 
-impl<'a, B, D> Drop for WithExprLocation<'a, B, D>
+impl<'a, B, D> Drop for WithFStringState<'a, B, D>
 where
     D: DerefMut<Target = B>,
     B: Buffer<Context = PyFormatContext<'a>>,
@@ -424,6 +431,6 @@ where
         self.buffer
             .state_mut()
             .context_mut()
-            .set_expression_location(self.saved_location);
+            .set_f_string_state(self.saved_location);
     }
 }

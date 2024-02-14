@@ -3,7 +3,7 @@ use ruff_python_ast::FString;
 use ruff_text_size::Ranged;
 
 use crate::prelude::*;
-use crate::preview::is_pep_701_enabled;
+use crate::preview::is_f_string_formatting_enabled;
 use crate::string::{Quoting, StringNormalizer, StringPart, StringPrefix, StringQuotes};
 
 use super::f_string_element::FormatFStringElement;
@@ -30,24 +30,21 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
         let locator = f.context().locator();
         let comments = f.context().comments().clone();
 
+        let string = StringPart::from_source(self.value.range(), &locator);
+
         let normalizer = StringNormalizer::from_context(f.context())
             .with_quoting(self.quoting)
             .with_preferred_quote_style(f.options().quote_style());
 
-        if !is_pep_701_enabled(f.context()) {
-            let result = normalizer
-                .normalize(
-                    &StringPart::from_source(self.value.range(), &locator),
-                    &locator,
-                )
-                .fmt(f);
+        // If f-string formatting is disabled (not in preview), then we will
+        // fall back to the previous behavior of normalizing the f-string.
+        if !is_f_string_formatting_enabled(f.context()) {
+            let result = normalizer.normalize(&string, &locator).fmt(f);
             self.value.elements.iter().for_each(|value| {
                 comments.mark_verbatim_node_comments_formatted(value.into());
             });
             return result;
         }
-
-        let string = StringPart::from_source(self.value.range(), &locator);
 
         // TODO(dhruvmanila): This could probably be simplified for Python 3.12 specifically
         // as same quotes can be re-used inside an f-string.
