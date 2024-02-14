@@ -88,8 +88,10 @@ fn should_be_fstring(
         return false;
     }
 
+    let fstring_expr = format!("f{}", locator.slice(literal.range()));
+
     let Ok(ast::Expr::FString(ast::ExprFString { value, .. })) =
-        parse_expression(&format!("f{}", locator.slice(literal.range())))
+        parse_expression(&fstring_expr)
     else {
         return false;
     };
@@ -159,7 +161,7 @@ fn should_be_fstring(
                 has_name = true;
             }
             if let Some(spec) = &element.format_spec {
-                let spec = locator.slice(spec.range());
+                let spec = &fstring_expr[spec.range()];
                 if FormatSpec::parse(spec).is_err() {
                     return false;
                 }
