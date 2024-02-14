@@ -146,6 +146,40 @@ if (
      # b comment
      None
  )
+@@ -92,20 +91,20 @@
+     # comment1
+     a
+     # comment2
+-    or (
+-        # comment3
+-        (
+-            # comment4
+-            b
+-        )
+-        # comment5
+-        and
+-        # comment6
+-        c
+         or (
+-            # comment7
+-            d
++            # comment3
++            (
++                # comment4
++                b
++            )
++            # comment5
++                and
++                # comment6
++                c
++                or (
++                    # comment7
++                    d
++                )
+         )
+-    )
+ ):
+     print("Foo")
 ```
 
 ## Ruff Output
@@ -244,21 +278,21 @@ if (
     # comment1
     a
     # comment2
-    or (
-        # comment3
-        (
-            # comment4
-            b
-        )
-        # comment5
-        and
-        # comment6
-        c
         or (
-            # comment7
-            d
+            # comment3
+            (
+                # comment4
+                b
+            )
+            # comment5
+                and
+                # comment6
+                c
+                or (
+                    # comment7
+                    d
+                )
         )
-    )
 ):
     print("Foo")
 ```

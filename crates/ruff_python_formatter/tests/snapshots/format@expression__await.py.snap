@@ -78,20 +78,20 @@ result = await self.request(
 
 result = await (
     1
-    + f(
-        1,
-        2,
-        3,
-    )
+        + f(
+            1,
+            2,
+            3,
+        )
 )
 
 result = await (
     1
-    + f(
-        1,
-        2,
-        3,
-    )
+        + f(
+            1,
+            2,
+            3,
+        )
 )
 
 # Optional parentheses.

@@ -505,7 +505,7 @@ def kwarg_with_leading_comments(
 def argument_with_long_default(
     a,
     b=ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-    + [dddddddddddddddddddd, eeeeeeeeeeeeeeeeeeee, ffffffffffffffffffffffff],
+        + [dddddddddddddddddddd, eeeeeeeeeeeeeeeeeeee, ffffffffffffffffffffffff],
     h=[],
 ):
     ...
@@ -514,8 +514,8 @@ def argument_with_long_default(
 def argument_with_long_type_annotation(
     a,
     b: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    | yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
-    | zzzzzzzzzzzzzzzzzzz = [0, 1, 2, 3],
+        | yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+        | zzzzzzzzzzzzzzzzzzz = [0, 1, 2, 3],
     h=[],
 ):
     ...
@@ -1064,7 +1064,7 @@ def function_with_one_argument_and_a_keyword_separator(
  def argument_with_long_default(
 @@ -75,8 +71,7 @@
      b=ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-     + [dddddddddddddddddddd, eeeeeeeeeeeeeeeeeeee, ffffffffffffffffffffffff],
+         + [dddddddddddddddddddd, eeeeeeeeeeeeeeeeeeee, ffffffffffffffffffffffff],
      h=[],
 -):
 -    ...
@@ -1073,8 +1073,8 @@ def function_with_one_argument_and_a_keyword_separator(
  
  def argument_with_long_type_annotation(
 @@ -85,12 +80,10 @@
-     | yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
-     | zzzzzzzzzzzzzzzzzzz = [0, 1, 2, 3],
+         | yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+         | zzzzzzzzzzzzzzzzzzz = [0, 1, 2, 3],
      h=[],
 -):
 -    ...

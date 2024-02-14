@@ -85,21 +85,18 @@ class Random:
 -        a_very_long_variable * and_a_very_long_function_call() / 100000.0
 -    )
 +    "a key in my dict": a_very_long_variable
-+    * and_a_very_long_function_call()
-+    / 100000.0
++        * and_a_very_long_function_call()
++        / 100000.0
  }
  
  my_dict = {
 -    "a key in my dict": (
 -        a_very_long_variable
--        * and_a_very_long_function_call()
--        * and_another_long_func()
--        / 100000.0
--    )
 +    "a key in my dict": a_very_long_variable
-+    * and_a_very_long_function_call()
-+    * and_another_long_func()
-+    / 100000.0
+         * and_a_very_long_function_call()
+         * and_another_long_func()
+         / 100000.0
+-    )
  }
  
  my_dict = {
@@ -140,15 +137,15 @@ my_dict = {
 
 my_dict = {
     "a key in my dict": a_very_long_variable
-    * and_a_very_long_function_call()
-    / 100000.0
+        * and_a_very_long_function_call()
+        / 100000.0
 }
 
 my_dict = {
     "a key in my dict": a_very_long_variable
-    * and_a_very_long_function_call()
-    * and_another_long_func()
-    / 100000.0
+        * and_a_very_long_function_call()
+        * and_another_long_func()
+        / 100000.0
 }
 
 my_dict = {

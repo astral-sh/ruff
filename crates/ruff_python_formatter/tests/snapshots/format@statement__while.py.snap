@@ -65,8 +65,8 @@ while (
 
 while (
     some_condition(unformatted, args)  # trailing some condition
-    and anotherCondition
-    or aThirdCondition  # trailing third condition
+        and anotherCondition
+        or aThirdCondition  # trailing third condition
 ):  # comment
     print("Do something")
 ```

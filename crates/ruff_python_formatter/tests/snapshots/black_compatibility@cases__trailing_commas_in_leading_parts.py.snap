@@ -56,7 +56,12 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
  
  
  # Example from https://github.com/psf/black/issues/3229
-@@ -43,8 +41,6 @@
+@@ -39,12 +37,10 @@
+ # https://github.com/psf/black/pull/3370 causes an infinite recursion.
+ assert (
+     long_module.long_class.long_func().another_func()
+-    == long_module.long_class.long_func()["some_key"].another_func(arg1)
++        == long_module.long_class.long_func()["some_key"].another_func(arg1)
  )
  
  # Regression test for https://github.com/psf/black/issues/3414.
@@ -112,7 +117,7 @@ def refresh_token(self, device_family, refresh_token, api_key):
 # https://github.com/psf/black/pull/3370 causes an infinite recursion.
 assert (
     long_module.long_class.long_func().another_func()
-    == long_module.long_class.long_func()["some_key"].another_func(arg1)
+        == long_module.long_class.long_func()["some_key"].another_func(arg1)
 )
 
 # Regression test for https://github.com/psf/black/issues/3414.

@@ -181,17 +181,17 @@ x6: VeryLongClassNameWithAwkwardGenericSubtype[
 x7: CustomTrainingJob | CustomContainerTrainingJob | CustomPythonPackageTrainingJob
 x8: (
     None
-    | datasets.ImageDataset
-    | datasets.TabularDataset
-    | datasets.TextDataset
-    | datasets.VideoDataset
+        | datasets.ImageDataset
+        | datasets.TabularDataset
+        | datasets.TextDataset
+        | datasets.VideoDataset
 ) = None
 
 x9: None | (
     datasets.ImageDataset
-    | datasets.TabularDataset
-    | datasets.TextDataset
-    | datasets.VideoDataset
+        | datasets.TabularDataset
+        | datasets.TextDataset
+        | datasets.VideoDataset
 ) = None
 
 
@@ -199,11 +199,11 @@ x10: (
     aaaaaaaaaaaaaaaaaaaaaaaa[
         bbbbbbbbbbb,
         Subscript
-        | None
-        | datasets.ImageDataset
-        | datasets.TabularDataset
-        | datasets.TextDataset
-        | datasets.VideoDataset,
+            | None
+            | datasets.ImageDataset
+            | datasets.TabularDataset
+            | datasets.TextDataset
+            | datasets.VideoDataset,
     ],
     bbb[other],
 ) = None
@@ -334,13 +334,13 @@ nested_comment: None | [
 -] | Other | More | AndMore | None = None
 +x1: (
 +    A[b]
-+    | EventHandler
-+    | EventSpec
-+    | list[EventHandler | EventSpec]
-+    | Other
-+    | More
-+    | AndMore
-+    | None
++        | EventHandler
++        | EventSpec
++        | list[EventHandler | EventSpec]
++        | Other
++        | More
++        | AndMore
++        | None
 +) = None
  
 -x2: "VeryLongClassNameWithAwkwardGenericSubtype[int] |" "VeryLongClassNameWithAwkwardGenericSubtype[str]"
@@ -363,13 +363,13 @@ nested_comment: None | [
 -] | Other = None
 +x12: (
 +    None
-+    | [
-+        datasets.ImageDataset,
-+        datasets.TabularDataset,
-+        datasets.TextDataset,
-+        datasets.VideoDataset,
-+    ]
-+    | Other
++        | [
++            datasets.ImageDataset,
++            datasets.TabularDataset,
++            datasets.TextDataset,
++            datasets.VideoDataset,
++        ]
++        | Other
 +) = None
  
  
@@ -396,13 +396,13 @@ nested_comment: None | [
 +        datasets.TextDataset,
 +        datasets.VideoDataset,
 +    ]
-+    | [
-+        datasets.ImageDataset,
-+        datasets.TabularDataset,
-+        datasets.TextDataset,
-+        datasets.VideoDataset,
-+    ]
-+    | Other
++        | [
++            datasets.ImageDataset,
++            datasets.TabularDataset,
++            datasets.TextDataset,
++            datasets.VideoDataset,
++        ]
++        | Other
 +) = None
  
 -x16: None | Literal[
@@ -416,15 +416,15 @@ nested_comment: None | [
 -] = None
 +x16: (
 +    None
-+    | Literal[
-+        "split",
-+        "a bit longer",
-+        "records",
-+        "index",
-+        "table",
-+        "columns",
-+        "values",
-+    ]
++        | Literal[
++            "split",
++            "a bit longer",
++            "records",
++            "index",
++            "table",
++            "columns",
++            "values",
++        ]
 +) = None
  
  x17: None | [

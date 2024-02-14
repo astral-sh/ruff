@@ -195,8 +195,8 @@ def foo():
 
     yield (
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-        + ccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+            + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+            + ccccccccccccccccccccccccccccccccccccccccccccccccccccccc
     )
 
 
@@ -259,20 +259,20 @@ result = yield
 
 result = yield (
     1
-    + f(
-        1,
-        2,
-        3,
-    )
+        + f(
+            1,
+            2,
+            3,
+        )
 )
 
 result = yield (
     1
-    + f(
-        1,
-        2,
-        3,
-    )
+        + f(
+            1,
+            2,
+            3,
+        )
 )
 
 print((yield x))

@@ -13,10 +13,11 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments, Comments, SourceComment};
 use crate::expression::parentheses::{
-    in_parentheses_only_group, in_parentheses_only_if_group_breaks,
-    in_parentheses_only_soft_line_break, in_parentheses_only_soft_line_break_or_space,
-    is_expression_parenthesized, write_in_parentheses_only_group_end_tag,
-    write_in_parentheses_only_group_start_tag, Parentheses,
+    in_parentheses_only_group, in_parentheses_only_if_group_breaks, in_parentheses_only_indent_end,
+    in_parentheses_only_indent_start, in_parentheses_only_soft_line_break,
+    in_parentheses_only_soft_line_break_or_space, is_expression_parenthesized,
+    write_in_parentheses_only_group_end_tag, write_in_parentheses_only_group_start_tag,
+    Parentheses,
 };
 use crate::expression::OperatorPrecedence;
 use crate::prelude::*;
@@ -709,6 +710,10 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
                 _ => in_parentheses_only_group(&left).fmt(f)?,
             }
 
+            if last_operator.is_none() {
+                in_parentheses_only_indent_start().fmt(f)?;
+            }
+
             if let Some(trailing) = left.last_operand().trailing_binary_comments() {
                 trailing_comments(trailing).fmt(f)?;
             }
@@ -752,9 +757,11 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
         }
 
         match &right.0 {
-            [OperandOrOperator::Operand(operand)] => operand.fmt(f),
-            _ => in_parentheses_only_group(&right).fmt(f),
+            [OperandOrOperator::Operand(operand)] => operand.fmt(f)?,
+            _ => in_parentheses_only_group(&right).fmt(f)?,
         }
+
+        in_parentheses_only_indent_end().fmt(f)
     }
 }
 

@@ -201,14 +201,14 @@ a not in b
 
 (
     a
-    ==
-    # comment
-    b
+        ==
+        # comment
+        b
 )
 
 (
     a  # comment
-    == b
+        == b
 )
 
 a < b > c == d
@@ -270,25 +270,25 @@ return 1 == 2 and (
         self_meta_data,
         self_schedule,
     )
-    == (
-        name,
-        description,
-        other_default,
-        othr_selected,
-        othr_auto_generated,
-        othr_parameters,
-        othr_meta_data,
-        othr_schedule,
-    )
+        == (
+            name,
+            description,
+            other_default,
+            othr_selected,
+            othr_auto_generated,
+            othr_parameters,
+            othr_meta_data,
+            othr_schedule,
+        )
 )
 
 [
     (
         a
-        + [
-            bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-        ]
-        >= c
+            + [
+                bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+            ]
+            >= c
     )
 ]
 
@@ -296,7 +296,7 @@ return 1 == 2 and (
 def f():
     return (
         unicodedata.normalize("NFKC", s1).casefold()
-        == unicodedata.normalize("NFKC", s2).casefold()
+            == unicodedata.normalize("NFKC", s2).casefold()
     )
 
 
@@ -336,7 +336,7 @@ ct_match = (aaaaaaaaaaaaaaaa) == self.get_content_type(
 
 ct_match = (
     aaaaaaaaaaact_id
-    == self.get_content_type[obj, rel_obj, using, instance._state.db].id
+        == self.get_content_type[obj, rel_obj, using, instance._state.db].id
 )
 
 ct_match = {aaaaaaaaaaaaaaaa} == self.get_content_type[
@@ -351,10 +351,10 @@ ct_match = (aaaaaaaaaaaaaaaa) == self.get_content_type[
 
 c = (
     1  # 1
-    >
-    # 2
-    3  # 3  # 4
-    > 5  # 5
+        >
+        # 2
+        3  # 3  # 4
+        > 5  # 5
     # 6
 )
 

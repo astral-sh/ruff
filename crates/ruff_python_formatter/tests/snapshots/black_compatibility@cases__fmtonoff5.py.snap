@@ -110,6 +110,15 @@ elif   unformatted:
      },
  )
  
+@@ -19,7 +18,7 @@
+         "-la",
+     ]
+     # fmt: on
+-    + path,
++        + path,
+     check=True,
+ )
+ 
 @@ -82,6 +81,6 @@
  if x:
      return x
@@ -143,7 +152,7 @@ run(
         "-la",
     ]
     # fmt: on
-    + path,
+        + path,
     check=True,
 )
 

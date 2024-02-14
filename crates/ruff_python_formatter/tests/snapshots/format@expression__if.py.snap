@@ -219,9 +219,9 @@ def something():
         NamedValuesListIterable
         if named
         else FlatValuesListIterable
-        + FlatValuesListIterable
-        + FlatValuesListIterable
-        + FlatValuesListIterable
+            + FlatValuesListIterable
+            + FlatValuesListIterable
+            + FlatValuesListIterable
         if flat
         else ValuesListIterable
     )
@@ -233,9 +233,9 @@ def something():
         if named
         else (
             FlatValuesListIterable
-            + FlatValuesListIterable
-            + FlatValuesListIterable
-            + FlatValuesListIterable
+                + FlatValuesListIterable
+                + FlatValuesListIterable
+                + FlatValuesListIterable
             if flat
             else ValuesListIterable
         )

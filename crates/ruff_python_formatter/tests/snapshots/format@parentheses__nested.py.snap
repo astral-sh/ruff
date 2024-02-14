@@ -87,12 +87,12 @@ call(
 
 a = (
     a
-    + b
-    + c
-    + d
-    + (  # Hello
-        e + f + g
-    )
+        + b
+        + c
+        + d
+        + (  # Hello
+            e + f + g
+        )
 )
 
 a = int(  # type: ignore
@@ -106,23 +106,23 @@ a = int(  # type: ignore
 # Stability and correctness checks
 b1 = (
     ()
-    - (  #
-    )
+        - (  #
+        )
 )
 (
     ()
-    - (  #
-    )
+        - (  #
+        )
 )
 b2 = (
     ()
-    - f(  #
-    )
+        - f(  #
+        )
 )
 (
     ()
-    - f(  #
-    )
+        - f(  #
+        )
 )
 b3 = (
     #

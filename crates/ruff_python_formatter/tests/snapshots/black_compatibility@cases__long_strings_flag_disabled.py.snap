@@ -304,7 +304,52 @@ long_unmergable_string_with_pragma = (
 ```diff
 --- Black
 +++ Ruff
-@@ -165,13 +165,9 @@
+@@ -40,11 +40,11 @@
+         sooo="soooo", x=2
+     ),
+     "A %s %s"
+-    % (
+-        "formatted",
+-        "string",
+-    ): "This is a really really really long string that has to go inside of a dictionary. It is %s bad (#%d)."
+-    % ("soooo", 2),
++        % (
++            "formatted",
++            "string",
++        ): "This is a really really really long string that has to go inside of a dictionary. It is %s bad (#%d)."
++        % ("soooo", 2),
+ }
+ 
+ func_with_keywords(
+@@ -123,7 +123,7 @@
+ 
+ old_fmt_string1 = (
+     "While we are on the topic of %s, we should also note that old-style formatting must also be preserved, since some %s still uses it."
+-    % ("formatting", "code")
++        % ("formatting", "code")
+ )
+ 
+ old_fmt_string2 = "This is a %s %s %s %s" % (
+@@ -135,12 +135,12 @@
+ 
+ old_fmt_string3 = (
+     "Whereas only the strings after the percent sign were long in the last example, this example uses a long initial string as well. This is another %s %s %s %s"
+-    % (
+-        "really really really really really",
+-        "old",
+-        "way to format strings!",
+-        "Use f-strings instead!",
+-    )
++        % (
++            "really really really really really",
++            "old",
++            "way to format strings!",
++            "Use f-strings instead!",
++        )
+ )
+ 
+ fstring = f"f-strings definitely make things more {difficult} than they need to be for {{black}}. But boy they sure are handy. The problem is that some lines will need to have the 'f' whereas others do not. This {line}, for example, needs one."
+@@ -165,36 +165,32 @@
  
  triple_quote_string = """This is a really really really long triple quote string assignment and it should not be touched."""
  
@@ -320,6 +365,50 @@ long_unmergable_string_with_pragma = (
      "formatting"
  )
  
+ assert some_type_of_boolean_expression, (
+     "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string %s."
+-    % "formatting"
++        % "formatting"
+ )
+ 
+ assert some_type_of_boolean_expression, (
+     "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic %s %s."
+-    % ("string", "formatting")
++        % ("string", "formatting")
+ )
+ 
+ some_function_call(
+     "With a reallly generic name and with a really really long string that is, at some point down the line, "
+-    + added
+-    + " to a variable and then added to another string."
++        + added
++        + " to a variable and then added to another string."
+ )
+ 
+ some_function_call(
+     "With a reallly generic name and with a really really long string that is, at some point down the line, "
+-    + added
+-    + " to a variable and then added to another string. But then what happens when the final string is also supppppperrrrr long?! Well then that second (realllllllly long) string should be split too.",
++        + added
++        + " to a variable and then added to another string. But then what happens when the final string is also supppppperrrrr long?! Well then that second (realllllllly long) string should be split too.",
+     "and a second argument",
+     and_a_third,
+ )
+@@ -249,10 +245,10 @@
+ 
+ annotated_variable: Final = (
+     "This is a large "
+-    + STRING
+-    + " that has been "
+-    + CONCATENATED
+-    + "using the '+' operator."
++        + STRING
++        + " that has been "
++        + CONCATENATED
++        + "using the '+' operator."
+ )
+ annotated_variable: Final = "This is a large string that has a type annotation attached to it. A type annotation should NOT stop a long string from being wrapped."
+ annotated_variable: Literal[
 ```
 
 ## Ruff Output
@@ -367,11 +456,11 @@ D4 = {
         sooo="soooo", x=2
     ),
     "A %s %s"
-    % (
-        "formatted",
-        "string",
-    ): "This is a really really really long string that has to go inside of a dictionary. It is %s bad (#%d)."
-    % ("soooo", 2),
+        % (
+            "formatted",
+            "string",
+        ): "This is a really really really long string that has to go inside of a dictionary. It is %s bad (#%d)."
+        % ("soooo", 2),
 }
 
 func_with_keywords(
@@ -450,7 +539,7 @@ fmt_string2 = "But what about when the string is {} but {}".format(
 
 old_fmt_string1 = (
     "While we are on the topic of %s, we should also note that old-style formatting must also be preserved, since some %s still uses it."
-    % ("formatting", "code")
+        % ("formatting", "code")
 )
 
 old_fmt_string2 = "This is a %s %s %s %s" % (
@@ -462,12 +551,12 @@ old_fmt_string2 = "This is a %s %s %s %s" % (
 
 old_fmt_string3 = (
     "Whereas only the strings after the percent sign were long in the last example, this example uses a long initial string as well. This is another %s %s %s %s"
-    % (
-        "really really really really really",
-        "old",
-        "way to format strings!",
-        "Use f-strings instead!",
-    )
+        % (
+            "really really really really really",
+            "old",
+            "way to format strings!",
+            "Use f-strings instead!",
+        )
 )
 
 fstring = f"f-strings definitely make things more {difficult} than they need to be for {{black}}. But boy they sure are handy. The problem is that some lines will need to have the 'f' whereas others do not. This {line}, for example, needs one."
@@ -500,24 +589,24 @@ assert some_type_of_boolean_expression, "Followed by a really really really long
 
 assert some_type_of_boolean_expression, (
     "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string %s."
-    % "formatting"
+        % "formatting"
 )
 
 assert some_type_of_boolean_expression, (
     "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic %s %s."
-    % ("string", "formatting")
+        % ("string", "formatting")
 )
 
 some_function_call(
     "With a reallly generic name and with a really really long string that is, at some point down the line, "
-    + added
-    + " to a variable and then added to another string."
+        + added
+        + " to a variable and then added to another string."
 )
 
 some_function_call(
     "With a reallly generic name and with a really really long string that is, at some point down the line, "
-    + added
-    + " to a variable and then added to another string. But then what happens when the final string is also supppppperrrrr long?! Well then that second (realllllllly long) string should be split too.",
+        + added
+        + " to a variable and then added to another string. But then what happens when the final string is also supppppperrrrr long?! Well then that second (realllllllly long) string should be split too.",
     "and a second argument",
     and_a_third,
 )
@@ -572,10 +661,10 @@ func_with_bad_parens(
 
 annotated_variable: Final = (
     "This is a large "
-    + STRING
-    + " that has been "
-    + CONCATENATED
-    + "using the '+' operator."
+        + STRING
+        + " that has been "
+        + CONCATENATED
+        + "using the '+' operator."
 )
 annotated_variable: Final = "This is a large string that has a type annotation attached to it. A type annotation should NOT stop a long string from being wrapped."
 annotated_variable: Literal[

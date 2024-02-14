@@ -1,0 +1,59 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/trailing_comma_optional_parens3.py
+---
+## Input
+
+```python
+if True:
+    if True:
+        if True:
+            return _(
+                "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweas "
+                + "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwegqweasdzxcqweasdzxc.",
+                "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwe",
+            ) % {"reported_username": reported_username, "report_reason": report_reason}
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -3,6 +3,6 @@
+         if True:
+             return _(
+                 "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweas "
+-                + "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwegqweasdzxcqweasdzxc.",
++                    + "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwegqweasdzxcqweasdzxc.",
+                 "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwe",
+             ) % {"reported_username": reported_username, "report_reason": report_reason}
+```
+
+## Ruff Output
+
+```python
+if True:
+    if True:
+        if True:
+            return _(
+                "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweas "
+                    + "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwegqweasdzxcqweasdzxc.",
+                "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwe",
+            ) % {"reported_username": reported_username, "report_reason": report_reason}
+```
+
+## Black Output
+
+```python
+if True:
+    if True:
+        if True:
+            return _(
+                "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweas "
+                + "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwegqweasdzxcqweasdzxc.",
+                "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwe",
+            ) % {"reported_username": reported_username, "report_reason": report_reason}
+```
+
+

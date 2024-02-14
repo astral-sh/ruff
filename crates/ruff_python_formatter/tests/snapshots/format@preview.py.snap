@@ -145,7 +145,7 @@ def f():
     )
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb] = (
         cccccccc.ccccccccccccc.cccccccc
-        + eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+            + eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
     )
 
     self._cache: dict[
@@ -211,7 +211,7 @@ def f():
      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb] = (
          cccccccc.ccccccccccccc(d).cccccccc + e
 @@ -57,9 +56,9 @@
-         + eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+             + eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
      )
  
 -    self._cache: dict[
@@ -300,7 +300,7 @@ def f():
     )
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb] = (
         cccccccc.ccccccccccccc.cccccccc
-        + eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+            + eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
     )
 
     self._cache: dict[DependencyCacheKey, list[list[DependencyPackage]]] = (

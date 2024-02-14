@@ -76,9 +76,9 @@ return (
 def f():
     return (
         self.get_filename()
-        + ".csv"
-        + "text/csv"
-        + output.getvalue().encode("utf-8----------------"),
+            + ".csv"
+            + "text/csv"
+            + output.getvalue().encode("utf-8----------------"),
     )
 
 
@@ -100,9 +100,9 @@ def f():
 def f():
     return (
         self.get_filename()
-        + ".csv"
-        + "text/csv"
-        + output.getvalue().encode("utf-8----------------"),
+            + ".csv"
+            + "text/csv"
+            + output.getvalue().encode("utf-8----------------"),
     )
 
 

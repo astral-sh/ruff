@@ -137,8 +137,8 @@ type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 type X = Ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt
 type X = (
     Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    | Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-    | Ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+        | Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        | Ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 )
 type XXXXXXXXXXXXX = (
     Tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt  # with comment

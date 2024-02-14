@@ -270,10 +270,10 @@ class Test((Aaaa)):
 
 class Test(
     aaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbb
-    + cccccccccccccccccccccccc
-    + dddddddddddddddddddddd
-    + eeeeeeeee,
+        + bbbbbbbbbbbbbbbbbbbbbb
+        + cccccccccccccccccccccccc
+        + dddddddddddddddddddddd
+        + eeeeeeeee,
     ffffffffffffffffff,
     gggggggggggggggggg,
 ):
@@ -282,9 +282,9 @@ class Test(
 
 class Test(
     aaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbb * cccccccccccccccccccccccc
-    + dddddddddddddddddddddd
-    + eeeeeeeee,
+        + bbbbbbbbbbbbbbbbbbbbbb * cccccccccccccccccccccccc
+        + dddddddddddddddddddddd
+        + eeeeeeeee,
     ffffffffffffffffff,
     gggggggggggggggggg,
 ):
