@@ -353,11 +353,7 @@ impl<'src> Parser<'src> {
                 })
             }
             TokenKind::String => {
-                let (string @ Tok::String { .. }, string_range) = self.bump(TokenKind::String)
-                else {
-                    unreachable!()
-                };
-                let str = self.parse_string_expression((string, string_range), start);
+                let str = self.parse_string_expression();
 
                 Pattern::MatchValue(ast::PatternMatchValue {
                     value: Box::new(str),

@@ -6,7 +6,6 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::lexer::Spanned;
 use crate::parser::helpers::token_kind_to_cmp_op;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser, ParserCtxFlags, EXPR_SET, NEWLINE_EOF_SET};
@@ -359,14 +358,7 @@ impl<'src> Parser<'src> {
 
                 Expr::IpyEscapeCommand(command)
             }
-            TokenKind::String => {
-                let start = self.node_start();
-                let (string @ Tok::String { .. }, string_range) = self.bump(TokenKind::String)
-                else {
-                    unreachable!()
-                };
-                self.parse_string_expression((string, string_range), start)
-            }
+            TokenKind::String => self.parse_string_expression(),
             TokenKind::FStringStart => self.parse_fstring_expression(),
             TokenKind::Lpar => {
                 return self.parse_parenthesized_expression();
@@ -746,29 +738,32 @@ impl<'src> Parser<'src> {
         }
     }
 
-    pub(super) fn parse_string_expression(
-        &mut self,
-        (mut tok, mut tok_range): Spanned,
-        start: TextSize,
-    ) -> Expr {
+    pub(super) fn parse_string_expression(&mut self) -> Expr {
+        let start = self.node_start();
         let mut strings = vec![];
         let mut progress = ParserProgress::default();
 
-        while let Tok::String {
-            value,
-            kind,
-            triple_quoted,
-        } = tok
-        {
+        while self.at(TokenKind::String) {
             progress.assert_progressing(self);
-            // TODO: remove clone
-            match parse_string_literal(value.clone(), kind, triple_quoted, tok_range) {
+            let (
+                Tok::String {
+                    value,
+                    kind,
+                    triple_quoted,
+                },
+                tok_range,
+            ) = self.bump(TokenKind::String)
+            else {
+                unreachable!()
+            };
+
+            match parse_string_literal(value, kind, triple_quoted, tok_range) {
                 Ok(string) => {
                     strings.push(string);
                 }
                 Err(error) => {
                     strings.push(StringType::Invalid(ast::StringLiteral {
-                        value,
+                        value: self.src_text(tok_range).to_string().into_boxed_str(),
                         range: tok_range,
                         unicode: kind.is_unicode(),
                     }));
@@ -776,12 +771,6 @@ impl<'src> Parser<'src> {
                     self.add_error(ParseErrorType::Lexical(error.into_error()), location);
                 }
             }
-
-            if !self.at(TokenKind::String) {
-                break;
-            }
-
-            (tok, tok_range) = self.next_token();
         }
 
         // This handles the case where the string is implicit concatenated with
@@ -851,14 +840,13 @@ impl<'src> Parser<'src> {
 
                 let range = self.node_range(start);
 
-                // TODO: remove clone
-                match parse_string_literal(value.clone(), kind, triple_quoted, range) {
+                match parse_string_literal(value, kind, triple_quoted, range) {
                     Ok(string) => {
                         strings.push(string);
                     }
                     Err(error) => {
                         strings.push(StringType::Invalid(ast::StringLiteral {
-                            value,
+                            value: self.src_text(error.location()).to_string().into_boxed_str(),
                             range,
                             unicode: kind.is_unicode(),
                         }));
