@@ -940,7 +940,7 @@ where
     }
 }
 
-/// A [`StatementVisitor`] that collects all `return` statements in a function or method.
+/// A [`Visitor`] that collects all `return` statements in a function or method.
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
     pub returns: Vec<&'a ast::StmtReturn>,

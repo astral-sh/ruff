@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 5f8640440b27dbf8c0461ab439668a6f0c382351e0d376e38be67348a4f29aa5
+// sha3: f073219201ea9e4b419b238c2a2decb70ba7fa52960d3e68dfd973e43302260c
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use super::{
@@ -36467,8 +36467,8 @@ fn __action221<
                 )
             };
             ast::DebugText {
-                leading: source_code[TextRange::new(start_offset, value.start())].to_string(),
-                trailing: source_code[TextRange::new(value.end(), end_offset)].to_string(),
+                leading: source_code[TextRange::new(start_offset, value.expr.start())].to_string(),
+                trailing: source_code[TextRange::new(value.expr.end(), end_offset)].to_string(),
             }
         });
         Ok(

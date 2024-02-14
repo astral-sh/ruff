@@ -26,6 +26,10 @@ Welcome! We're happy to have you here. Thank you in advance for your contributio
 - [`cargo dev`](#cargo-dev)
 - [Subsystems](#subsystems)
     - [Compilation Pipeline](#compilation-pipeline)
+    - [Import Categorization](#import-categorization)
+        - [Project root](#project-root)
+        - [Package root](#package-root)
+        - [Import categorization](#import-categorization-1)
 
 ## The Basics
 
@@ -63,7 +67,7 @@ You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
 cargo install cargo-insta
 ```
 
-and pre-commit to run some validation checks:
+And you'll need pre-commit to run some validation checks:
 
 ```shell
 pipx install pre-commit  # or `pip install pre-commit` if you have a virtualenv
@@ -75,6 +79,16 @@ when making a commit:
 ```shell
 pre-commit install
 ```
+
+We recommend [nextest](https://nexte.st/) to run Ruff's test suite (via `cargo nextest run`),
+though it's not strictly necessary:
+
+```shell
+cargo install cargo-nextest --locked
+```
+
+Throughout this guide, any usages of `cargo test` can be replaced with `cargo nextest run`,
+if you choose to install `nextest`.
 
 ### Development
 
@@ -372,6 +386,11 @@ We have several ways of benchmarking and profiling Ruff:
 - Our main performance benchmark comparing Ruff with other tools on the CPython codebase
 - Microbenchmarks which run the linter or the formatter on individual files. These run on pull requests.
 - Profiling the linter on either the microbenchmarks or entire projects
+
+> \[!NOTE\]
+> When running benchmarks, ensure that your CPU is otherwise idle (e.g., close any background
+> applications, like web browsers). You may also want to switch your CPU to a "performance"
+> mode, if it exists, especially when benchmarking short-lived processes.
 
 ### CPython Benchmark
 

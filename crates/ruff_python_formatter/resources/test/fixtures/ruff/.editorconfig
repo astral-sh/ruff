@@ -5,3 +5,7 @@ ij_formatter_enabled = false
 ["range_formatting/*.py"]
 generated_code = true
 ij_formatter_enabled = false
+
+[docstring_tab_indentation.py]
+generated_code = true
+ij_formatter_enabled = false

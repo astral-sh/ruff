@@ -268,6 +268,9 @@ Instead, apply the `# fmt: off` comment to the entire statement:
 # fmt: on
 ```
 
+Like Black, Ruff will _also_ recognize [YAPF](https://github.com/google/yapf)'s `# yapf: disable` and `# yapf: enable` pragma
+comments, which are treated equivalently to `# fmt: off` and `# fmt: on`, respectively.
+
 `# fmt: skip` comments suppress formatting for a preceding statement, case header, decorator,
 function definition, or class definition:
 
@@ -287,8 +290,30 @@ def test(a, b, c, d, e, f) -> int: # fmt: skip
     pass
 ```
 
-Like Black, Ruff will _also_ recognize [YAPF](https://github.com/google/yapf)'s `# yapf: disable` and `# yapf: enable` pragma
-comments, which are treated equivalently to `# fmt: off` and `# fmt: on`, respectively.
+As such, adding `# fmt: skip` comments at the end of an expressions will have no effect. In
+the following example, the list entry `'1'` will be formatted, despite the `# fmt: skip`:
+
+```python
+a = call(
+    [
+        '1',  # fmt: skip
+        '2',
+    ],
+    b
+)
+```
+
+Instead, apply the `# fmt: skip` comment to the entire statement:
+
+```python
+a = call(
+  [
+    '1',
+    '2',
+  ],
+  b
+)  # fmt: skip
+```
 
 ## Conflicting lint rules
 

@@ -40,7 +40,7 @@ use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
 use ruff_python_ast::helpers::{
-    collect_import_from_member, extract_handled_exceptions, to_module_path,
+    collect_import_from_member, extract_handled_exceptions, is_docstring_stmt, to_module_path,
 };
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::str::trailing_quote;
@@ -70,6 +70,38 @@ use crate::{docstrings, noqa};
 mod analyze;
 mod annotation;
 mod deferred;
+
+/// State representing whether a docstring is expected or not for the next statement.
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
+enum DocstringState {
+    /// The next statement is expected to be a docstring, but not necessarily so.
+    ///
+    /// For example, in the following code:
+    ///
+    /// ```python
+    /// class Foo:
+    ///     pass
+    ///
+    ///
+    /// def bar(x, y):
+    ///     """Docstring."""
+    ///     return x +  y
+    /// ```
+    ///
+    /// For `Foo`, the state is expected when the checker is visiting the class
+    /// body but isn't going to be present. While, for `bar` function, the docstring
+    /// is expected and present.
+    #[default]
+    Expected,
+    Other,
+}
+
+impl DocstringState {
+    /// Returns `true` if the next statement is expected to be a docstring.
+    const fn is_expected(self) -> bool {
+        matches!(self, DocstringState::Expected)
+    }
+}
 
 pub(crate) struct Checker<'a> {
     /// The [`Path`] to the file under analysis.
@@ -114,6 +146,8 @@ pub(crate) struct Checker<'a> {
     pub(crate) flake8_bugbear_seen: Vec<TextRange>,
     /// The end offset of the last visited statement.
     last_stmt_end: TextSize,
+    /// A state describing if a docstring is expected or not.
+    docstring_state: DocstringState,
 }
 
 impl<'a> Checker<'a> {
@@ -153,6 +187,7 @@ impl<'a> Checker<'a> {
             cell_offsets,
             notebook_index,
             last_stmt_end: TextSize::default(),
+            docstring_state: DocstringState::default(),
         }
     }
 }
@@ -305,19 +340,16 @@ where
             self.semantic.flags -= SemanticModelFlags::IMPORT_BOUNDARY;
         }
 
-        // Track whether we've seen docstrings, non-imports, etc.
+        // Track whether we've seen module docstrings, non-imports, etc.
         match stmt {
             Stmt::Expr(ast::StmtExpr { value, .. })
-                if !self
-                    .semantic
-                    .flags
-                    .intersects(SemanticModelFlags::MODULE_DOCSTRING)
+                if !self.semantic.seen_module_docstring_boundary()
                     && value.is_string_literal_expr() =>
             {
-                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING;
+                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
             }
             Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
-                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING;
+                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
 
                 // Allow __future__ imports until we see a non-__future__ import.
                 if let Some("__future__") = module.as_deref() {
@@ -332,11 +364,11 @@ where
                 }
             }
             Stmt::Import(_) => {
-                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING;
+                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
                 self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
             }
             _ => {
-                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING;
+                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
                 self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
                 if !(self.semantic.seen_import_boundary()
                     || helpers::is_assignment_to_a_dunder(stmt)
@@ -352,6 +384,16 @@ where
         // Store the flags prior to any further descent, so that we can restore them after visiting
         // the node.
         let flags_snapshot = self.semantic.flags;
+
+        // Update the semantic model if it is in a docstring. This should be done after the
+        // flags snapshot to ensure that it gets reset once the statement is analyzed.
+        if self.docstring_state.is_expected() {
+            if is_docstring_stmt(stmt) {
+                self.semantic.flags |= SemanticModelFlags::DOCSTRING;
+            }
+            // Reset the state irrespective of whether the statement is a docstring or not.
+            self.docstring_state = DocstringState::Other;
+        }
 
         // Step 1: Binding
         match stmt {
@@ -654,6 +696,8 @@ where
                     self.semantic.set_globals(globals);
                 }
 
+                // Set the docstring state before visiting the class body.
+                self.docstring_state = DocstringState::Expected;
                 self.visit_body(body);
             }
             Stmt::TypeAlias(ast::StmtTypeAlias {
@@ -1289,6 +1333,16 @@ where
                 self.semantic.flags |= SemanticModelFlags::F_STRING;
                 visitor::walk_expr(self, expr);
             }
+            Expr::NamedExpr(ast::ExprNamedExpr {
+                target,
+                value,
+                range: _,
+            }) => {
+                self.visit_expr(value);
+
+                self.semantic.flags |= SemanticModelFlags::NAMED_EXPRESSION_ASSIGNMENT;
+                self.visit_expr(target);
+            }
             _ => visitor::walk_expr(self, expr),
         }
 
@@ -1505,6 +1559,8 @@ impl<'a> Checker<'a> {
             unreachable!("Generator expression must contain at least one generator");
         };
 
+        let flags = self.semantic.flags;
+
         // Generators are compiled as nested functions. (This may change with PEP 709.)
         // As such, the `iter` of the first generator is evaluated in the outer scope, while all
         // subsequent nodes are evaluated in the inner scope.
@@ -1534,14 +1590,22 @@ impl<'a> Checker<'a> {
         // `x` is local to `foo`, and the `T` in `y=T` skips the class scope when resolving.
         self.visit_expr(&generator.iter);
         self.semantic.push_scope(ScopeKind::Generator);
+
+        self.semantic.flags = flags | SemanticModelFlags::COMPREHENSION_ASSIGNMENT;
         self.visit_expr(&generator.target);
+        self.semantic.flags = flags;
+
         for expr in &generator.ifs {
             self.visit_boolean_test(expr);
         }
 
         for generator in iterator {
             self.visit_expr(&generator.iter);
+
+            self.semantic.flags = flags | SemanticModelFlags::COMPREHENSION_ASSIGNMENT;
             self.visit_expr(&generator.target);
+            self.semantic.flags = flags;
+
             for expr in &generator.ifs {
                 self.visit_boolean_test(expr);
             }
@@ -1740,11 +1804,21 @@ impl<'a> Checker<'a> {
             return;
         }
 
+        // A binding within a `for` must be a loop variable, as in:
+        // ```python
+        // for x in range(10):
+        //     ...
+        // ```
         if parent.is_for_stmt() {
             self.add_binding(id, expr.range(), BindingKind::LoopVar, flags);
             return;
         }
 
+        // A binding within a `with` must be an item, as in:
+        // ```python
+        // with open("file.txt") as fp:
+        //     ...
+        // ```
         if parent.is_with_stmt() {
             self.add_binding(id, expr.range(), BindingKind::WithItemVar, flags);
             return;
@@ -1800,14 +1874,23 @@ impl<'a> Checker<'a> {
         }
 
         // If the expression is the left-hand side of a walrus operator, then it's a named
-        // expression assignment.
-        if self
-            .semantic
-            .current_expressions()
-            .filter_map(Expr::as_named_expr_expr)
-            .any(|parent| parent.target.as_ref() == expr)
-        {
+        // expression assignment, as in:
+        // ```python
+        // if (x := 10) > 5:
+        //     ...
+        // ```
+        if self.semantic.in_named_expression_assignment() {
             self.add_binding(id, expr.range(), BindingKind::NamedExprAssignment, flags);
+            return;
+        }
+
+        // If the expression is part of a comprehension target, then it's a comprehension variable
+        // assignment, as in:
+        // ```python
+        // [x for x in range(10)]
+        // ```
+        if self.semantic.in_comprehension_assignment() {
+            self.add_binding(id, expr.range(), BindingKind::ComprehensionVar, flags);
             return;
         }
 
@@ -1926,6 +2009,8 @@ impl<'a> Checker<'a> {
                 };
 
                 self.visit_parameters(parameters);
+                // Set the docstring state before visiting the function body.
+                self.docstring_state = DocstringState::Expected;
                 self.visit_body(body);
             }
         }
