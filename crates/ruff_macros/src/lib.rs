@@ -24,6 +24,10 @@ pub fn derive_options_metadata(input: TokenStream) -> TokenStream {
         .into()
 }
 
+/// Automatically derives a `ruff_workspace::configuration::CombineOptions` implementation for the attributed type
+/// that calls `ruff_workspace::configuration::CombineOptions::combine` for each field.
+///
+/// The derive macro can only be used on structs with named fields.
 #[proc_macro_derive(CombineOptions)]
 pub fn derive_combine_options(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);

@@ -23,7 +23,15 @@ use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
+use ruff_linter::rules::flake8_pytest_style::types::{
+    ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
+};
+use ruff_linter::rules::flake8_quotes::settings::Quote;
+use ruff_linter::rules::flake8_tidy_imports::settings::Strictness;
+use ruff_linter::rules::isort::settings::RelativeImportsOrder;
+use ruff_linter::rules::isort::ImportSection;
 use ruff_linter::rules::pycodestyle;
+use ruff_linter::rules::pydocstyle::settings::Convention;
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
@@ -35,6 +43,7 @@ use ruff_linter::{
     fs, warn_user_once, warn_user_once_by_id, warn_user_once_by_message, RuleSelector,
     RUFF_PKG_VERSION,
 };
+use ruff_macros::CombineOptions;
 use ruff_python_formatter::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, QuoteStyle,
 };
@@ -1151,7 +1160,7 @@ impl LintConfiguration {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, CombineOptions)]
 pub struct FormatConfiguration {
     pub exclude: Option<Vec<FilePattern>>,
     pub preview: Option<PreviewMode>,
@@ -1202,31 +1211,37 @@ impl FormatConfiguration {
             docstring_code_line_width: options.docstring_code_line_length,
         })
     }
-
-    #[must_use]
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn combine(self, config: Self) -> Self {
-        Self {
-            exclude: self.exclude.or(config.exclude),
-            preview: self.preview.or(config.preview),
-            extension: self.extension.or(config.extension),
-            indent_style: self.indent_style.or(config.indent_style),
-            quote_style: self.quote_style.or(config.quote_style),
-            magic_trailing_comma: self.magic_trailing_comma.or(config.magic_trailing_comma),
-            line_ending: self.line_ending.or(config.line_ending),
-            docstring_code_format: self.docstring_code_format.or(config.docstring_code_format),
-            docstring_code_line_width: self
-                .docstring_code_line_width
-                .or(config.docstring_code_line_width),
-        }
-    }
 }
-pub(crate) trait CombinePluginOptions {
+pub(crate) trait CombineOptions {
     #[must_use]
     fn combine(self, other: Self) -> Self;
 }
 
-impl<T: CombinePluginOptions> CombinePluginOptions for Option<T> {
+macro_rules! or_combine_options_impl {
+    ($ty:ident) => {
+        impl CombineOptions for Option<$ty> {
+            #[inline]
+            fn combine(self, other: Self) -> Self {
+                self.or(other)
+            }
+        }
+    };
+}
+
+or_combine_options_impl!(bool);
+or_combine_options_impl!(u8);
+or_combine_options_impl!(u16);
+or_combine_options_impl!(u32);
+or_combine_options_impl!(u64);
+or_combine_options_impl!(usize);
+or_combine_options_impl!(i8);
+or_combine_options_impl!(i16);
+or_combine_options_impl!(i32);
+or_combine_options_impl!(i64);
+or_combine_options_impl!(isize);
+or_combine_options_impl!(String);
+
+impl<T: CombineOptions> CombineOptions for Option<T> {
     fn combine(self, other: Self) -> Self {
         match (self, other) {
             (Some(base), Some(other)) => Some(base.combine(other)),
@@ -1236,6 +1251,47 @@ impl<T: CombinePluginOptions> CombinePluginOptions for Option<T> {
         }
     }
 }
+
+impl<T> CombineOptions for Option<Vec<T>> {
+    fn combine(self, other: Self) -> Self {
+        self.or(other)
+    }
+}
+
+impl<T, S> CombineOptions for Option<std::collections::hash_set::HashSet<T, S>> {
+    fn combine(self, other: Self) -> Self {
+        self.or(other)
+    }
+}
+
+impl<K, V, S> CombineOptions for std::collections::hash_map::HashMap<K, V, S>
+where
+    K: Eq + std::hash::Hash,
+    S: std::hash::BuildHasher,
+{
+    fn combine(mut self, other: Self) -> Self {
+        self.extend(other);
+        self
+    }
+}
+
+or_combine_options_impl!(ParametrizeNameType);
+or_combine_options_impl!(ParametrizeValuesType);
+or_combine_options_impl!(ParametrizeValuesRowType);
+or_combine_options_impl!(Quote);
+or_combine_options_impl!(Strictness);
+or_combine_options_impl!(RelativeImportsOrder);
+or_combine_options_impl!(LineLength);
+or_combine_options_impl!(Convention);
+or_combine_options_impl!(IndentStyle);
+or_combine_options_impl!(QuoteStyle);
+or_combine_options_impl!(LineEnding);
+or_combine_options_impl!(DocstringCodeLineWidth);
+or_combine_options_impl!(ExtensionMapping);
+or_combine_options_impl!(MagicTrailingComma);
+or_combine_options_impl!(DocstringCode);
+or_combine_options_impl!(PreviewMode);
+or_combine_options_impl!(ImportSection);
 
 /// Given a list of source paths, which could include glob patterns, resolve the
 /// matching paths.
