@@ -96,9 +96,8 @@ impl<'ast> PreorderVisitor<'ast> for SuppressionCommentVisitor<'ast, '_> {
                 range,
             };
 
-            self.builder.capture(data);
-            if line_position.is_own_line() {
-                self.comments_in_scope.push((enclosing_node, kind));
+            if let Some(kind) = self.builder.capture(data) {
+                self.comments_in_scope.push((Some(node), kind));
             }
             self.comments.next();
         }
@@ -115,40 +114,28 @@ impl<'ast> PreorderVisitor<'ast> for SuppressionCommentVisitor<'ast, '_> {
     }
 
     fn leave_node(&mut self, node: AnyNodeRef<'ast>) {
-        let parent_node = self.parents.pop();
+        self.parents.pop();
 
         let node_end = node.end();
-
-        for index in (0..self.comments_in_scope.len()).rev() {
-            if self.comments_in_scope[index].0 == parent_node {
-                self.comments_in_scope.pop();
-            } else {
-                break;
-            }
-        }
 
         // Process all comments that start after the `preceding` node and end before this node's end.
         while let Some(SuppressionComment { range, kind }) = self.comments.peek().copied() {
             let line_position = CommentLinePosition::text_position(range, self.locator.contents());
-            // TODO(jane):  We want to catch any own-line comments that have the same indentation
             if range.start() >= node_end {
-                break;
-                /*
                 if !line_position.is_own_line() {
                     break;
                 }
-                let Some(preceding) = self.preceding_node else { break; };
-                // check indent
-                let comment_ident =
-                    own_line_comment_indentation(preceding, range, self.locator);
-                let preceding_indentation =
-                    indentation_at_offset(preceding.start(), self.locator)
-                        .unwrap_or_default()
-                        .text_len();
-                if comment_ident < preceding_indentation {
+                let Some(preceding) = self.preceding_node else {
+                    break;
+                };
+                // check indent of comment against the minimum indentation of a hypothetical body
+                let comment_indent = own_line_comment_indentation(preceding, range, self.locator);
+                let min_indentation = indentation_at_offset(node.start(), self.locator)
+                    .unwrap_or_default()
+                    .text_len();
+                if comment_indent <= min_indentation {
                     break;
                 }
-                */
             }
 
             let previous_state = self.comments_in_scope.last().map(|(_, s)| s).copied();
@@ -164,11 +151,19 @@ impl<'ast> PreorderVisitor<'ast> for SuppressionCommentVisitor<'ast, '_> {
                 range,
             };
 
-            self.builder.capture(data);
-            if line_position.is_own_line() {
+            if let Some(kind) = self.builder.capture(data) {
                 self.comments_in_scope.push((Some(node), kind));
             }
             self.comments.next();
+        }
+
+        // remove comments that are about to become out of scope
+        for index in (0..self.comments_in_scope.len()).rev() {
+            if self.comments_in_scope[index].0 == Some(node) {
+                self.comments_in_scope.pop();
+            } else {
+                break;
+            }
         }
 
         self.preceding_node = Some(node);
@@ -237,7 +232,10 @@ impl<'src> Ranged for SuppressionCommentData<'src> {
 }
 
 pub(super) trait CaptureSuppressionComment<'src> {
-    fn capture(&mut self, comment: SuppressionCommentData<'src>);
+    /// This is the entrypoint for the capturer to analyze the next comment.
+    /// Returning a `Some` value will update the suppression state for future comments.
+    #[must_use]
+    fn capture(&mut self, comment: SuppressionCommentData<'src>) -> Option<SuppressionKind>;
 }
 
 /// Determine the indentation level of an own-line comment, defined as the minimum indentation of

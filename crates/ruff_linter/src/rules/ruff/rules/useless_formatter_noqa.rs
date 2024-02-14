@@ -80,7 +80,8 @@ pub(crate) fn useless_formatter_noqa(checker: &mut Checker, suite: &ast::Suite) 
 }
 
 struct UselessSuppressionComments<'src, 'loc> {
-    captured: BTreeMap<SuppressionCommentData<'src>, Option<UselessReason>>,
+    captured: BTreeMap<SuppressionCommentData<'src>, UselessReason>,
+    comments_in_scope: Vec<(Option<AnyNodeRef<'src>>, SuppressionKind)>,
     locator: &'loc Locator<'src>,
 }
 
@@ -88,33 +89,37 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
     fn new(locator: &'loc Locator<'src>) -> Self {
         Self {
             captured: BTreeMap::default(),
+            comments_in_scope: vec![],
             locator,
         }
     }
     /// This function determines whether or not `comment` is a useful suppression comment.
     /// If it isn't, it will give a reason why the comment is useless. See [`UselessReason`] for more.
-    fn check_suppression_comment(&self, comment: &SuppressionCommentData) -> Option<UselessReason> {
+    fn check_suppression_comment(
+        &self,
+        comment: &SuppressionCommentData,
+    ) -> Result<Option<SuppressionKind>, UselessReason> {
         // check if the comment is inside of an expression.
         if comment
             .enclosing
             .map(AnyNodeRef::is_expression)
             .unwrap_or_default()
         {
-            return Some(UselessReason::InsideExpression);
+            return Err(UselessReason::InsideExpression);
         }
 
         // check if a skip comment is at the end of a line
         if comment.kind == SuppressionKind::Skip && !comment.line_position.is_end_of_line() {
-            return Some(UselessReason::SkipHasToBeTrailing);
+            return Err(UselessReason::SkipHasToBeTrailing);
         }
 
         if comment.kind == SuppressionKind::Off && comment.line_position.is_own_line() {
             // check for a previous `fmt: off`
             if comment.previous_state == Some(SuppressionKind::Off) {
-                return Some(UselessReason::FmtOffUsedEarlier);
+                return Err(UselessReason::FmtOffUsedEarlier);
             }
             let Some(following) = comment.following else {
-                return Some(UselessReason::NoCodeSuppressed);
+                return Err(UselessReason::NoCodeSuppressed);
             };
             if let Some(enclosing) = comment.enclosing {
                 // check if this comment is dangling (in other words, in a block with nothing following it)
@@ -131,7 +136,7 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
                                 .unwrap_or_default()
                                 .text_len();
                         if comment_indentation <= preceding_indentation {
-                            return Some(UselessReason::FmtOffOverElseBlock);
+                            return Err(UselessReason::FmtOffOverElseBlock);
                         }
                     }
                 }
@@ -141,49 +146,51 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
         if comment.kind == SuppressionKind::On {
             // Ensure the comment is not a trailing comment
             if !comment.line_position.is_own_line() {
-                return Some(UselessReason::FmtOnCannotBeTrailing);
+                return Err(UselessReason::FmtOnCannotBeTrailing);
             }
 
             // If the comment turns on formatting, we need to check if another
             // comment turned formatting off within the same scope.
             match comment.previous_state {
-                None | Some(SuppressionKind::On) => return Some(UselessReason::NoFmtOff),
+                None | Some(SuppressionKind::On) => return Err(UselessReason::NoFmtOff),
                 _ => {}
             }
         }
 
         if comment.kind == SuppressionKind::Off || comment.kind == SuppressionKind::On {
-            if let Some(enclosing) = comment.enclosing {
-                match enclosing {
-                    AnyNodeRef::StmtClassDef(class_def) => {
-                        if comment.line_position.is_own_line()
-                            && comment.start() < class_def.name.start()
-                        {
-                            if let Some(decorator) = class_def.decorator_list.last() {
-                                if decorator.end() < comment.start() {
-                                    return Some(UselessReason::BetweenDecorators);
-                                }
-                            }
+            if let Some(AnyNodeRef::StmtClassDef(class_def)) = comment.enclosing {
+                if comment.line_position.is_own_line() && comment.start() < class_def.name.start() {
+                    if let Some(decorator) = class_def.decorator_list.last() {
+                        if decorator.end() < comment.start() {
+                            return Err(UselessReason::BetweenDecorators);
                         }
                     }
-                    _ => {}
                 }
             }
+
+            // at this point, any comment being handled should be considered 'valid'.
+            // on/off suppression comments should be added to the scope
+            return Ok(Some(comment.kind));
         }
-        None
+        Ok(None)
     }
 
     fn useless_comments(
         &self,
     ) -> impl Iterator<Item = (&SuppressionCommentData<'src>, UselessReason)> {
-        self.captured.iter().filter_map(|(c, r)| Some((c, (*r)?)))
+        self.captured.iter().map(|(c, r)| (c, *r))
     }
 }
 
 impl<'src, 'loc> CaptureSuppressionComment<'src> for UselessSuppressionComments<'src, 'loc> {
-    fn capture(&mut self, comment: SuppressionCommentData<'src>) {
-        let possible_reason = self.check_suppression_comment(&comment);
-        self.captured.insert(comment, possible_reason);
+    fn capture(&mut self, comment: SuppressionCommentData<'src>) -> Option<SuppressionKind> {
+        match self.check_suppression_comment(&comment) {
+            Ok(kind) => kind,
+            Err(reason) => {
+                self.captured.insert(comment, reason);
+                None
+            }
+        }
     }
 }
 

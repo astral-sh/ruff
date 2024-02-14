@@ -70,8 +70,10 @@ def dangling_fmt_off2():
     if True:
         if True:
             pass
+            # fmt: off
         else:
             pass
+            # fmt: off
         # fmt: off
     else:
         pass
