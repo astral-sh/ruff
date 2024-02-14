@@ -46,23 +46,23 @@ use super::suppression_comment_visitor::{
 ///     # yapf: enable
 /// ```
 #[violation]
-pub struct UselessFormatterNOQA {
-    reason: UselessReason,
+pub struct IgnoredFormatterNOQA {
+    reason: IgnoredReason,
 }
 
-impl AlwaysFixableViolation for UselessFormatterNOQA {
+impl AlwaysFixableViolation for IgnoredFormatterNOQA {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Suppression comment is useless - {}", self.reason)
+        format!("This comment will be ignored by the formatter because {}", self.reason)
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove this suppression comment")
+        format!("Remove this comment")
     }
 }
 
 /// RUF028
-pub(crate) fn useless_formatter_noqa(checker: &mut Checker, suite: &ast::Suite) {
+pub(crate) fn ignored_formatter_noqa(checker: &mut Checker, suite: &ast::Suite) {
     let indexer = checker.indexer();
     let locator = checker.locator();
     let comment_ranges = indexer.comment_ranges();
@@ -73,9 +73,9 @@ pub(crate) fn useless_formatter_noqa(checker: &mut Checker, suite: &ast::Suite) 
 
     visitor.visit(suite);
 
-    for (comment, reason) in comments.useless_comments() {
+    for (comment, reason) in comments.ignored_comments() {
         checker.diagnostics.push(
-            Diagnostic::new(UselessFormatterNOQA { reason }, comment.range).with_fix(
+            Diagnostic::new(IgnoredFormatterNOQA { reason }, comment.range).with_fix(
                 Fix::unsafe_edit(delete_comment(comment.range, checker.locator())),
             ),
         );
@@ -83,7 +83,7 @@ pub(crate) fn useless_formatter_noqa(checker: &mut Checker, suite: &ast::Suite) 
 }
 
 struct UselessSuppressionComments<'src, 'loc> {
-    captured: BTreeMap<SuppressionCommentData<'src>, UselessReason>,
+    captured: BTreeMap<SuppressionCommentData<'src>, IgnoredReason>,
     comments_in_scope: Vec<(Option<AnyNodeRef<'src>>, SuppressionKind)>,
     locator: &'loc Locator<'src>,
 }
@@ -97,32 +97,32 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
         }
     }
     /// This function determines whether or not `comment` is a useful suppression comment.
-    /// If it isn't, it will give a reason why the comment is useless. See [`UselessReason`] for more.
+    /// If it isn't, it will give a reason why the comment is ignored. See [`IgnoredReason`] for more.
     fn check_suppression_comment(
         &self,
         comment: &SuppressionCommentData,
-    ) -> Result<Option<SuppressionKind>, UselessReason> {
+    ) -> Result<Option<SuppressionKind>, IgnoredReason> {
         // check if the comment is inside of an expression.
         if comment
             .enclosing
             .map(AnyNodeRef::is_expression)
             .unwrap_or_default()
         {
-            return Err(UselessReason::InsideExpression);
+            return Err(IgnoredReason::InsideExpression);
         }
 
         // check if a skip comment is at the end of a line
         if comment.kind == SuppressionKind::Skip && !comment.line_position.is_end_of_line() {
-            return Err(UselessReason::SkipHasToBeTrailing);
+            return Err(IgnoredReason::SkipHasToBeTrailing);
         }
 
         if comment.kind == SuppressionKind::Off && comment.line_position.is_own_line() {
             // check for a previous `fmt: off`
             if comment.previous_state == Some(SuppressionKind::Off) {
-                return Err(UselessReason::FmtOffUsedEarlier);
+                return Err(IgnoredReason::FmtOffUsedEarlier);
             }
             let Some(following) = comment.following else {
-                return Err(UselessReason::NoCodeSuppressed);
+                return Err(IgnoredReason::NoCodeSuppressed);
             };
             if let Some(enclosing) = comment.enclosing {
                 // check if this comment is dangling (in other words, in a block with nothing following it)
@@ -139,7 +139,7 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
                                 .unwrap_or_default()
                                 .text_len();
                         if comment_indentation <= preceding_indentation {
-                            return Err(UselessReason::FmtOffOverElseBlock);
+                            return Err(IgnoredReason::FmtOffAboveBlock);
                         }
                     }
                 }
@@ -149,13 +149,13 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
         if comment.kind == SuppressionKind::On {
             // Ensure the comment is not a trailing comment
             if !comment.line_position.is_own_line() {
-                return Err(UselessReason::FmtOnCannotBeTrailing);
+                return Err(IgnoredReason::FmtOnCannotBeTrailing);
             }
 
             // If the comment turns on formatting, we need to check if another
             // comment turned formatting off within the same scope.
             match comment.previous_state {
-                None | Some(SuppressionKind::On) => return Err(UselessReason::NoFmtOff),
+                None | Some(SuppressionKind::On) => return Err(IgnoredReason::NoFmtOff),
                 _ => {}
             }
         }
@@ -165,7 +165,7 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
                 if comment.line_position.is_own_line() && comment.start() < class_def.name.start() {
                     if let Some(decorator) = class_def.decorator_list.last() {
                         if decorator.end() < comment.start() {
-                            return Err(UselessReason::BetweenDecorators);
+                            return Err(IgnoredReason::BetweenDecorators);
                         }
                     }
                 }
@@ -178,9 +178,9 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
         Ok(None)
     }
 
-    fn useless_comments(
+    fn ignored_comments(
         &self,
-    ) -> impl Iterator<Item = (&SuppressionCommentData<'src>, UselessReason)> {
+    ) -> impl Iterator<Item = (&SuppressionCommentData<'src>, IgnoredReason)> {
         self.captured.iter().map(|(c, r)| (c, *r))
     }
 }
@@ -239,7 +239,7 @@ where
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum UselessReason {
+enum IgnoredReason {
     InsideExpression,
     FmtOffUsedEarlier,
     NoFmtOff,
@@ -247,30 +247,30 @@ enum UselessReason {
     BetweenDecorators,
     FmtOnCannotBeTrailing,
     SkipHasToBeTrailing,
-    FmtOffOverElseBlock,
+    FmtOffAboveBlock,
 }
 
-impl Display for UselessReason {
+impl Display for IgnoredReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InsideExpression => write!(
                 f,
-                "suppression comments inside expressions are not supported"
+                "it's inside an expression"
             ),
             Self::FmtOffUsedEarlier => write!(f, "formatting is already disabled here"),
             Self::NoFmtOff => write!(f, "formatting is already enabled here"),
-            Self::NoCodeSuppressed => write!(f, "no eligible code is suppressed by this comment"),
+            Self::NoCodeSuppressed => write!(f, "it does not suppress formatting for any code"),
             Self::BetweenDecorators => {
-                write!(f, "suppression comment cannot be between decorators")
+                write!(f, "it cannot be between decorators")
             }
             Self::SkipHasToBeTrailing => {
-                write!(f, "'fmt: skip' has to be at the end of a line")
+                write!(f, "it has to be at the end of a line")
             }
             Self::FmtOnCannotBeTrailing => {
-                write!(f, "'fmt: on' cannot be at the end of a line")
+                write!(f, "it cannot be at the end of a line")
             }
-            Self::FmtOffOverElseBlock => {
-                write!(f, "'fmt: off' cannot be in front of an else/elif")
+            Self::FmtOffAboveBlock => {
+                write!(f, "it suppresses formatting for an ambiguous region")
             }
         }
     }

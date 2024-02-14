@@ -9,7 +9,7 @@ pub(crate) fn module(suite: &Suite, checker: &mut Checker) {
     if checker.enabled(Rule::FStringDocstring) {
         flake8_bugbear::rules::f_string_docstring(checker, suite);
     }
-    if checker.enabled(Rule::UselessFormatterNOQA) {
-        ruff::rules::useless_formatter_noqa(checker, suite);
+    if checker.enabled(Rule::IgnoredFormatterNOQA) {
+        ruff::rules::ignored_formatter_noqa(checker, suite);
     }
 }

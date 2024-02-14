@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF028.py:1:1: RUF028 [*] Suppression comment is useless - formatting is already enabled here
+RUF028.py:1:1: RUF028 [*] This comment will be ignored by the formatter because formatting is already enabled here
   |
 1 | # fmt: on
   | ^^^^^^^^^ RUF028
 2 | def fmt_off_used_earlier():
 3 |     if True:
   |
-  = help: Remove this suppression comment
+  = help: Remove this comment
 
 ℹ Unsafe fix
 1   |-# fmt: on
@@ -16,7 +16,7 @@ RUF028.py:1:1: RUF028 [*] Suppression comment is useless - formatting is already
 3 2 |     if True:
 4 3 |         a = 5
 
-RUF028.py:15:9: RUF028 [*] Suppression comment is useless - formatting is already disabled here
+RUF028.py:15:9: RUF028 [*] This comment will be ignored by the formatter because formatting is already disabled here
    |
 13 |     # fmt: off
 14 |     if True:
@@ -25,7 +25,7 @@ RUF028.py:15:9: RUF028 [*] Suppression comment is useless - formatting is alread
 16 |         pass
 17 |     # fmt: off 
    |
-   = help: Remove this suppression comment
+   = help: Remove this comment
 
 ℹ Unsafe fix
 12 12 |         pass
@@ -36,7 +36,7 @@ RUF028.py:15:9: RUF028 [*] Suppression comment is useless - formatting is alread
 17 16 |     # fmt: off 
 18 17 | 
 
-RUF028.py:17:5: RUF028 [*] Suppression comment is useless - no eligible code is suppressed by this comment
+RUF028.py:17:5: RUF028 [*] This comment will be ignored by the formatter because it does not suppress formatting for any code
    |
 15 |         # fmt: off
 16 |         pass
@@ -45,7 +45,7 @@ RUF028.py:17:5: RUF028 [*] Suppression comment is useless - no eligible code is 
 18 | 
 19 | # fmt: off
    |
-   = help: Remove this suppression comment
+   = help: Remove this comment
 
 ℹ Unsafe fix
 14 14 |     if True:
@@ -56,7 +56,7 @@ RUF028.py:17:5: RUF028 [*] Suppression comment is useless - no eligible code is 
 19 18 | # fmt: off
 20 19 | 
 
-RUF028.py:26:9: RUF028 [*] Suppression comment is useless - suppression comments inside expressions are not supported
+RUF028.py:26:9: RUF028 [*] This comment will be ignored by the formatter because it's inside an expression
    |
 24 | def fmt_off_between_lists():
 25 |     test_list = [
@@ -65,7 +65,7 @@ RUF028.py:26:9: RUF028 [*] Suppression comment is useless - suppression comments
 27 |         1,
 28 |         2,
    |
-   = help: Remove this suppression comment
+   = help: Remove this comment
 
 ℹ Unsafe fix
 23 23 | 
@@ -76,7 +76,7 @@ RUF028.py:26:9: RUF028 [*] Suppression comment is useless - suppression comments
 28 27 |         2,
 29 28 |         3,
 
-RUF028.py:37:5: RUF028 [*] Suppression comment is useless - 'fmt: skip' has to be at the end of a line
+RUF028.py:37:5: RUF028 [*] This comment will be ignored by the formatter because it has to be at the end of a line
    |
 35 | @fmt_off_between_lists
 36 | def fmt_off_between_decorators():
@@ -84,7 +84,7 @@ RUF028.py:37:5: RUF028 [*] Suppression comment is useless - 'fmt: skip' has to b
    |     ^^^^^^^^^^^ RUF028
 38 |     pass
    |
-   = help: Remove this suppression comment
+   = help: Remove this comment
 
 ℹ Unsafe fix
 34 34 | # fmt: off
@@ -95,7 +95,7 @@ RUF028.py:37:5: RUF028 [*] Suppression comment is useless - 'fmt: skip' has to b
 39 38 | 
 40 39 | def fmt_on_trailing():
 
-RUF028.py:41:5: RUF028 [*] Suppression comment is useless - no eligible code is suppressed by this comment
+RUF028.py:41:5: RUF028 [*] This comment will be ignored by the formatter because it does not suppress formatting for any code
    |
 40 | def fmt_on_trailing():
 41 |     # fmt: off
@@ -103,7 +103,7 @@ RUF028.py:41:5: RUF028 [*] Suppression comment is useless - no eligible code is 
 42 |     val = 5 # fmt: on
 43 |     pass
    |
-   = help: Remove this suppression comment
+   = help: Remove this comment
 
 ℹ Unsafe fix
 38 38 |     pass
@@ -114,7 +114,7 @@ RUF028.py:41:5: RUF028 [*] Suppression comment is useless - no eligible code is 
 43 42 |     pass
 44 43 | 
 
-RUF028.py:42:13: RUF028 [*] Suppression comment is useless - 'fmt: on' cannot be at the end of a line
+RUF028.py:42:13: RUF028 [*] This comment will be ignored by the formatter because it cannot be at the end of a line
    |
 40 | def fmt_on_trailing():
 41 |     # fmt: off
@@ -122,7 +122,7 @@ RUF028.py:42:13: RUF028 [*] Suppression comment is useless - 'fmt: on' cannot be
    |             ^^^^^^^^^ RUF028
 43 |     pass
    |
-   = help: Remove this suppression comment
+   = help: Remove this comment
 
 ℹ Unsafe fix
 39 39 | 
@@ -134,7 +134,7 @@ RUF028.py:42:13: RUF028 [*] Suppression comment is useless - 'fmt: on' cannot be
 44 44 | 
 45 45 | def fmt_off_in_else():
 
-RUF028.py:49:5: RUF028 [*] Suppression comment is useless - 'fmt: off' cannot be in front of an else/elif
+RUF028.py:49:5: RUF028 [*] This comment will be ignored by the formatter because it suppresses formatting for an ambiguous region
    |
 47 |     for val in x:
 48 |         print(x)
@@ -143,7 +143,7 @@ RUF028.py:49:5: RUF028 [*] Suppression comment is useless - 'fmt: off' cannot be
 50 |     else:
 51 |         print("done")
    |
-   = help: Remove this suppression comment
+   = help: Remove this comment
 
 ℹ Unsafe fix
 46 46 |     x = [1, 2, 3]
@@ -154,7 +154,7 @@ RUF028.py:49:5: RUF028 [*] Suppression comment is useless - 'fmt: off' cannot be
 51 50 |         print("done")
 52 51 |     while False:
 
-RUF028.py:54:5: RUF028 [*] Suppression comment is useless - formatting is already enabled here
+RUF028.py:54:5: RUF028 [*] This comment will be ignored by the formatter because formatting is already enabled here
    |
 52 |     while False:
 53 |         print("while")
@@ -163,7 +163,7 @@ RUF028.py:54:5: RUF028 [*] Suppression comment is useless - formatting is alread
 55 |     # fmt: off
 56 |     else:
    |
-   = help: Remove this suppression comment
+   = help: Remove this comment
 
 ℹ Unsafe fix
 51 51 |         print("done")
@@ -174,7 +174,7 @@ RUF028.py:54:5: RUF028 [*] Suppression comment is useless - formatting is alread
 56 55 |     else:
 57 56 |         print("done")
 
-RUF028.py:55:5: RUF028 [*] Suppression comment is useless - 'fmt: off' cannot be in front of an else/elif
+RUF028.py:55:5: RUF028 [*] This comment will be ignored by the formatter because it suppresses formatting for an ambiguous region
    |
 53 |         print("while")
 54 |     # fmt: on
@@ -183,7 +183,7 @@ RUF028.py:55:5: RUF028 [*] Suppression comment is useless - 'fmt: off' cannot be
 56 |     else:
 57 |         print("done")
    |
-   = help: Remove this suppression comment
+   = help: Remove this comment
 
 ℹ Unsafe fix
 52 52 |     while False:
@@ -194,7 +194,7 @@ RUF028.py:55:5: RUF028 [*] Suppression comment is useless - 'fmt: off' cannot be
 57 56 |         print("done")
 58 57 |     if len(x) > 3:
 
-RUF028.py:60:5: RUF028 [*] Suppression comment is useless - formatting is already enabled here
+RUF028.py:60:5: RUF028 [*] This comment will be ignored by the formatter because formatting is already enabled here
    |
 58 |     if len(x) > 3:
 59 |         print("huh?")
@@ -203,7 +203,7 @@ RUF028.py:60:5: RUF028 [*] Suppression comment is useless - formatting is alread
 61 |     # fmt: off
 62 |     else:
    |
-   = help: Remove this suppression comment
+   = help: Remove this comment
 
 ℹ Unsafe fix
 57 57 |         print("done")
@@ -214,7 +214,7 @@ RUF028.py:60:5: RUF028 [*] Suppression comment is useless - formatting is alread
 62 61 |     else:
 63 62 |         print("expected")
 
-RUF028.py:61:5: RUF028 [*] Suppression comment is useless - 'fmt: off' cannot be in front of an else/elif
+RUF028.py:61:5: RUF028 [*] This comment will be ignored by the formatter because it suppresses formatting for an ambiguous region
    |
 59 |         print("huh?")
 60 |     # fmt: on
@@ -223,7 +223,7 @@ RUF028.py:61:5: RUF028 [*] Suppression comment is useless - 'fmt: off' cannot be
 62 |     else:
 63 |         print("expected")
    |
-   = help: Remove this suppression comment
+   = help: Remove this comment
 
 ℹ Unsafe fix
 58 58 |     if len(x) > 3:
@@ -234,7 +234,7 @@ RUF028.py:61:5: RUF028 [*] Suppression comment is useless - 'fmt: off' cannot be
 63 62 |         print("expected")
 64 63 | 
 
-RUF028.py:67:5: RUF028 [*] Suppression comment is useless - no eligible code is suppressed by this comment
+RUF028.py:67:5: RUF028 [*] This comment will be ignored by the formatter because it does not suppress formatting for any code
    |
 65 | def dangling_fmt_off():
 66 |     pass
@@ -243,7 +243,7 @@ RUF028.py:67:5: RUF028 [*] Suppression comment is useless - no eligible code is 
 68 | 
 69 | def dangling_fmt_off2():
    |
-   = help: Remove this suppression comment
+   = help: Remove this comment
 
 ℹ Unsafe fix
 64 64 | 
@@ -254,7 +254,7 @@ RUF028.py:67:5: RUF028 [*] Suppression comment is useless - no eligible code is 
 69 68 | def dangling_fmt_off2():
 70 69 |     if True:
 
-RUF028.py:73:13: RUF028 [*] Suppression comment is useless - no eligible code is suppressed by this comment
+RUF028.py:73:13: RUF028 [*] This comment will be ignored by the formatter because it does not suppress formatting for any code
    |
 71 |         if True:
 72 |             pass
@@ -263,7 +263,7 @@ RUF028.py:73:13: RUF028 [*] Suppression comment is useless - no eligible code is
 74 |         else:
 75 |             pass
    |
-   = help: Remove this suppression comment
+   = help: Remove this comment
 
 ℹ Unsafe fix
 70 70 |     if True:
@@ -274,7 +274,7 @@ RUF028.py:73:13: RUF028 [*] Suppression comment is useless - no eligible code is
 75 74 |             pass
 76 75 |             # fmt: off
 
-RUF028.py:76:13: RUF028 [*] Suppression comment is useless - no eligible code is suppressed by this comment
+RUF028.py:76:13: RUF028 [*] This comment will be ignored by the formatter because it does not suppress formatting for any code
    |
 74 |         else:
 75 |             pass
@@ -283,7 +283,7 @@ RUF028.py:76:13: RUF028 [*] Suppression comment is useless - no eligible code is
 77 |         # fmt: off
 78 |     else:
    |
-   = help: Remove this suppression comment
+   = help: Remove this comment
 
 ℹ Unsafe fix
 73 73 |             # fmt: off
@@ -294,7 +294,7 @@ RUF028.py:76:13: RUF028 [*] Suppression comment is useless - no eligible code is
 78 77 |     else:
 79 78 |         pass
 
-RUF028.py:77:9: RUF028 [*] Suppression comment is useless - no eligible code is suppressed by this comment
+RUF028.py:77:9: RUF028 [*] This comment will be ignored by the formatter because it does not suppress formatting for any code
    |
 75 |             pass
 76 |             # fmt: off
@@ -303,7 +303,7 @@ RUF028.py:77:9: RUF028 [*] Suppression comment is useless - no eligible code is 
 78 |     else:
 79 |         pass
    |
-   = help: Remove this suppression comment
+   = help: Remove this comment
 
 ℹ Unsafe fix
 74 74 |         else:
@@ -314,14 +314,14 @@ RUF028.py:77:9: RUF028 [*] Suppression comment is useless - no eligible code is 
 79 78 |         pass
 80 79 |     # fmt: off
 
-RUF028.py:80:5: RUF028 [*] Suppression comment is useless - no eligible code is suppressed by this comment
+RUF028.py:80:5: RUF028 [*] This comment will be ignored by the formatter because it does not suppress formatting for any code
    |
 78 |     else:
 79 |         pass
 80 |     # fmt: off
    |     ^^^^^^^^^^ RUF028
    |
-   = help: Remove this suppression comment
+   = help: Remove this comment
 
 ℹ Unsafe fix
 77 77 |         # fmt: off

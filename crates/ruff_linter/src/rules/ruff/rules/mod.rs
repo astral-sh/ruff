@@ -25,7 +25,7 @@ pub(crate) use unnecessary_dict_comprehension_for_iterable::*;
 pub(crate) use unnecessary_iterable_allocation_for_first_element::*;
 pub(crate) use unnecessary_key_check::*;
 pub(crate) use unused_noqa::*;
-pub(crate) use useless_formatter_noqa::*;
+pub(crate) use ignored_formatter_noqa::*;
 
 mod ambiguous_unicode_character;
 mod assignment_in_assert;
@@ -58,7 +58,7 @@ mod unnecessary_dict_comprehension_for_iterable;
 mod unnecessary_iterable_allocation_for_first_element;
 mod unnecessary_key_check;
 mod unused_noqa;
-mod useless_formatter_noqa;
+mod ignored_formatter_noqa;
 
 #[derive(Clone, Copy)]
 pub(crate) enum Context {
