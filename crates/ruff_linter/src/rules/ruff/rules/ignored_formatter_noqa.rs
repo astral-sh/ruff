@@ -31,6 +31,7 @@ use super::suppression_comment_visitor::{
 /// def decorator():
 ///     pass
 ///
+///
 /// @decorator
 /// # fmt: off
 /// def example():
@@ -39,7 +40,7 @@ use super::suppression_comment_visitor::{
 ///         expression = [
 ///             # fmt: off
 ///             1,
-///             2
+///             2,
 ///         ]
 ///         # yapf: disable
 ///     # fmt: on
@@ -53,7 +54,10 @@ pub struct IgnoredFormatterNOQA {
 impl AlwaysFixableViolation for IgnoredFormatterNOQA {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("This comment will be ignored by the formatter because {}", self.reason)
+        format!(
+            "This comment will be ignored by the formatter because {}",
+            self.reason
+        )
     }
 
     fn fix_title(&self) -> String {
@@ -253,10 +257,7 @@ enum IgnoredReason {
 impl Display for IgnoredReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InsideExpression => write!(
-                f,
-                "it's inside an expression"
-            ),
+            Self::InsideExpression => write!(f, "it's inside an expression"),
             Self::FmtOffUsedEarlier => write!(f, "formatting is already disabled here"),
             Self::NoFmtOff => write!(f, "formatting is already enabled here"),
             Self::NoCodeSuppressed => write!(f, "it does not suppress formatting for any code"),
