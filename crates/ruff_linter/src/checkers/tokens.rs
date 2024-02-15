@@ -67,11 +67,11 @@ pub(crate) fn check_tokens(
         .rules
         .enabled(Rule::AmbiguousUnicodeCharacterComment)
     {
-        for &(_, range) in tokens.iter().flatten().filter(|(tok, _)| tok.is_comment()) {
+        for range in indexer.comment_ranges() {
             ruff::rules::ambiguous_unicode_character_comment(
                 &mut diagnostics,
                 locator,
-                range,
+                *range,
                 settings,
             );
         }
