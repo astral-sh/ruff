@@ -20,6 +20,10 @@ pub struct Stylist<'a> {
 }
 
 impl<'a> Stylist<'a> {
+    pub fn locator(&'a self) -> &'a Locator<'a> {
+        self.locator
+    }
+
     pub fn indentation(&'a self) -> &'a Indentation {
         &self.indentation
     }

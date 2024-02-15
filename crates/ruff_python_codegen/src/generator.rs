@@ -2,6 +2,7 @@
 
 use std::ops::Deref;
 
+use ruff_python_ast::str::{is_triple_quote, leading_quote};
 use ruff_python_ast::{
     self as ast, Alias, ArgOrKeyword, BoolOp, CmpOp, Comprehension, ConversionFlag, DebugText,
     ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters, Pattern,
@@ -10,7 +11,7 @@ use ruff_python_ast::{
 };
 use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
-use ruff_source_file::LineEnding;
+use ruff_source_file::{LineEnding, Locator};
 
 use super::stylist::{Indentation, Quote, Stylist};
 
@@ -62,6 +63,7 @@ mod precedence {
 }
 
 pub struct Generator<'a> {
+    locator: Option<&'a Locator<'a>>,
     /// The indentation style to use.
     indent: &'a Indentation,
     /// The quote style to use for string literals.
@@ -77,6 +79,7 @@ pub struct Generator<'a> {
 impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
     fn from(stylist: &'a Stylist<'a>) -> Self {
         Self {
+            locator: Some(stylist.locator()),
             indent: stylist.indentation(),
             quote: stylist.quote(),
             line_ending: stylist.line_ending(),
@@ -91,6 +94,7 @@ impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
 impl<'a> Generator<'a> {
     pub const fn new(indent: &'a Indentation, quote: Quote, line_ending: LineEnding) -> Self {
         Self {
+            locator: None,
             // Style preferences.
             indent,
             quote,
@@ -157,8 +161,8 @@ impl<'a> Generator<'a> {
         escape.bytes_repr().write(&mut self.buffer).unwrap(); // write to string doesn't fail
     }
 
-    fn p_str_repr(&mut self, s: &str) {
-        let escape = UnicodeEscape::with_preferred_quote(s, self.quote.into());
+    fn p_str_repr(&mut self, s: &str, triple: bool) {
+        let escape = UnicodeEscape::with_preferred_quote(s, self.quote.into(), triple);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
@@ -1265,10 +1269,20 @@ impl<'a> Generator<'a> {
     }
 
     fn unparse_string_literal(&mut self, string_literal: &ast::StringLiteral) {
+        let triple = if let Some(locator) = self.locator {
+            let text = locator.slice(string_literal);
+            if let Some(quote) = leading_quote(text) {
+                is_triple_quote(quote)
+            } else {
+                false
+            }
+        } else {
+            false
+        };
         if string_literal.unicode {
             self.p("u");
         }
-        self.p_str_repr(&string_literal.value);
+        self.p_str_repr(&string_literal.value, triple);
     }
 
     fn unparse_string_literal_value(&mut self, value: &ast::StringLiteralValue) {
@@ -1381,7 +1395,7 @@ impl<'a> Generator<'a> {
             );
             generator.unparse_f_string_body(values);
             let body = &generator.buffer;
-            self.p_str_repr(body);
+            self.p_str_repr(body, false);
         }
     }
 

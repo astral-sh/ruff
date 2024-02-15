@@ -33,7 +33,19 @@ impl Quote {
 
 pub struct EscapeLayout {
     pub quote: Quote,
+    pub triple: bool,
     pub len: Option<usize>,
+}
+
+impl EscapeLayout {
+    fn quote_string(&self) -> &'static str {
+        match (self.quote, self.triple) {
+            (Quote::Single, true) => "'''",
+            (Quote::Single, false) => "'",
+            (Quote::Double, true) => "\"\"\"",
+            (Quote::Double, false) => "\"",
+        }
+    }
 }
 
 pub trait Escape {
@@ -82,18 +94,22 @@ pub struct UnicodeEscape<'a> {
 
 impl<'a> UnicodeEscape<'a> {
     #[inline]
-    pub fn with_forced_quote(source: &'a str, quote: Quote) -> Self {
-        let layout = EscapeLayout { quote, len: None };
+    pub fn with_forced_quote(source: &'a str, quote: Quote, triple: bool) -> Self {
+        let layout = EscapeLayout {
+            quote,
+            triple,
+            len: None,
+        };
         Self { source, layout }
     }
     #[inline]
-    pub fn with_preferred_quote(source: &'a str, quote: Quote) -> Self {
-        let layout = Self::repr_layout(source, quote);
+    pub fn with_preferred_quote(source: &'a str, quote: Quote, triple: bool) -> Self {
+        let layout = Self::repr_layout(source, quote, triple);
         Self { source, layout }
     }
     #[inline]
     pub fn new_repr(source: &'a str) -> Self {
-        Self::with_preferred_quote(source, Quote::Single)
+        Self::with_preferred_quote(source, Quote::Single, false)
     }
     #[inline]
     pub fn str_repr<'r>(&'a self) -> StrRepr<'r, 'a> {
@@ -105,10 +121,10 @@ pub struct StrRepr<'r, 'a>(&'r UnicodeEscape<'a>);
 
 impl StrRepr<'_, '_> {
     pub fn write(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
-        let quote = self.0.layout().quote.to_char();
-        formatter.write_char(quote)?;
+        let quote = self.0.layout().quote_string();
+        formatter.write_str(quote)?;
         self.0.write_body(formatter)?;
-        formatter.write_char(quote)
+        formatter.write_str(quote)
     }
 
     pub fn to_string(&self) -> Option<String> {
@@ -125,15 +141,14 @@ impl std::fmt::Display for StrRepr<'_, '_> {
 }
 
 impl UnicodeEscape<'_> {
-    const REPR_RESERVED_LEN: usize = 2; // for quotes
-
     #[allow(
         clippy::cast_possible_wrap,
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss
     )]
-    pub fn repr_layout(source: &str, preferred_quote: Quote) -> EscapeLayout {
-        Self::output_layout_with_checker(source, preferred_quote, |a, b| {
+    pub fn repr_layout(source: &str, preferred_quote: Quote, triple: bool) -> EscapeLayout {
+        let reserved_len = if triple { 6 } else { 2 };
+        Self::output_layout_with_checker(source, preferred_quote, triple, reserved_len, |a, b| {
             Some((a as isize).checked_add(b as isize)? as usize)
         })
     }
@@ -141,9 +156,11 @@ impl UnicodeEscape<'_> {
     fn output_layout_with_checker(
         source: &str,
         preferred_quote: Quote,
+        triple: bool,
+        reserved_len: usize,
         length_add: impl Fn(usize, usize) -> Option<usize>,
     ) -> EscapeLayout {
-        let mut out_len = Self::REPR_RESERVED_LEN;
+        let mut out_len = reserved_len;
         let mut single_count = 0;
         let mut double_count = 0;
 
@@ -157,7 +174,7 @@ impl UnicodeEscape<'_> {
                     double_count += 1;
                     1
                 }
-                c => Self::escaped_char_len(c),
+                c => Self::escaped_char_len(c, triple),
             };
             let Some(new_len) = length_add(out_len, incr) else {
                 #[cold]
@@ -165,13 +182,15 @@ impl UnicodeEscape<'_> {
                     single_count: usize,
                     double_count: usize,
                     preferred_quote: Quote,
+                    triple: bool,
                 ) -> EscapeLayout {
                     EscapeLayout {
                         quote: choose_quote(single_count, double_count, preferred_quote).0,
+                        triple,
                         len: None,
                     }
                 }
-                return stop(single_count, double_count, preferred_quote);
+                return stop(single_count, double_count, preferred_quote, triple);
             };
             out_len = new_len;
         }
@@ -179,18 +198,30 @@ impl UnicodeEscape<'_> {
         let (quote, num_escaped_quotes) = choose_quote(single_count, double_count, preferred_quote);
         // we'll be adding backslashes in front of the existing inner quotes
         let Some(out_len) = length_add(out_len, num_escaped_quotes) else {
-            return EscapeLayout { quote, len: None };
+            return EscapeLayout {
+                quote,
+                triple,
+                len: None,
+            };
         };
 
         EscapeLayout {
             quote,
-            len: Some(out_len - Self::REPR_RESERVED_LEN),
+            triple,
+            len: Some(out_len - reserved_len),
         }
     }
 
-    fn escaped_char_len(ch: char) -> usize {
+    fn escaped_char_len(ch: char, triple: bool) -> usize {
         match ch {
-            '\\' | '\t' | '\r' | '\n' => 2,
+            '\n' => {
+                if triple {
+                    1
+                } else {
+                    2
+                }
+            }
+            '\\' | '\t' | '\r' => 2,
             ch if ch < ' ' || ch as u32 == 0x7f => 4, // \xHH
             ch if ch.is_ascii() => 1,
             ch if crate::char::is_printable(ch) => {
@@ -206,10 +237,17 @@ impl UnicodeEscape<'_> {
     fn write_char(
         ch: char,
         quote: Quote,
+        triple: bool,
         formatter: &mut impl std::fmt::Write,
     ) -> std::fmt::Result {
         match ch {
-            '\n' => formatter.write_str("\\n"),
+            '\n' => {
+                if triple {
+                    formatter.write_char('\n')
+                } else {
+                    formatter.write_str("\\n")
+                }
+            }
             '\t' => formatter.write_str("\\t"),
             '\r' => formatter.write_str("\\r"),
             // these 2 branches *would* be handled below, but we shouldn't have to do a
@@ -253,8 +291,9 @@ impl<'a> Escape for UnicodeEscape<'a> {
 
     #[cold]
     fn write_body_slow(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
+        let layout = self.layout();
         for ch in self.source.chars() {
-            Self::write_char(ch, self.layout().quote, formatter)?;
+            Self::write_char(ch, layout.quote, layout.triple, formatter)?;
         }
         Ok(())
     }
@@ -272,7 +311,11 @@ impl<'a> AsciiEscape<'a> {
     }
     #[inline]
     pub fn with_forced_quote(source: &'a [u8], quote: Quote) -> Self {
-        let layout = EscapeLayout { quote, len: None };
+        let layout = EscapeLayout {
+            quote,
+            triple: false,
+            len: None,
+        };
         Self { source, layout }
     }
     #[inline]
@@ -344,6 +387,7 @@ impl AsciiEscape<'_> {
                 ) -> EscapeLayout {
                     EscapeLayout {
                         quote: choose_quote(single_count, double_count, preferred_quote).0,
+                        triple: false,
                         len: None,
                     }
                 }
@@ -355,11 +399,16 @@ impl AsciiEscape<'_> {
         let (quote, num_escaped_quotes) = choose_quote(single_count, double_count, preferred_quote);
         // we'll be adding backslashes in front of the existing inner quotes
         let Some(out_len) = length_add(out_len, num_escaped_quotes) else {
-            return EscapeLayout { quote, len: None };
+            return EscapeLayout {
+                quote,
+                triple: false,
+                len: None,
+            };
         };
 
         EscapeLayout {
             quote,
+            triple: false,
             len: Some(out_len - reserved_len),
         }
     }
@@ -372,10 +421,21 @@ impl AsciiEscape<'_> {
         }
     }
 
-    fn write_char(ch: u8, quote: Quote, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
+    fn write_char(
+        ch: u8,
+        quote: Quote,
+        triple: bool,
+        formatter: &mut impl std::fmt::Write,
+    ) -> std::fmt::Result {
         match ch {
+            b'\n' => {
+                if triple {
+                    formatter.write_char('\n')
+                } else {
+                    formatter.write_str("\\n")
+                }
+            }
             b'\t' => formatter.write_str("\\t"),
-            b'\n' => formatter.write_str("\\n"),
             b'\r' => formatter.write_str("\\r"),
             0x20..=0x7e => {
                 // printable ascii range
@@ -405,8 +465,9 @@ impl<'a> Escape for AsciiEscape<'a> {
 
     #[cold]
     fn write_body_slow(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
+        let layout = self.layout();
         for ch in self.source {
-            Self::write_char(*ch, self.layout().quote, formatter)?;
+            Self::write_char(*ch, layout.quote, layout.triple, formatter)?;
         }
         Ok(())
     }
