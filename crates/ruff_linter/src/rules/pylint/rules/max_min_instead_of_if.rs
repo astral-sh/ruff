@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use ast::LiteralExpressionRef;
-use ruff_diagnostics::{Diagnostic, FixAvailability, Violation};
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, ExprAttribute, ExprContext, Stmt};
 use ruff_text_size::{Ranged, TextRange};
@@ -9,35 +9,31 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Check for `if`-`else`-blocks that can be replaced with a ternary operator.
+/// Check for an if node that can be refactored as a max python builtin.
 ///
 /// ## Why is this bad?
-/// `if`-`else`-blocks that assign a value to a variable in both branches can
-/// be expressed more concisely by using a ternary operator.
+/// An if block where the test and assignment have the same structure can
+/// be expressed more concisely by using the python builtin max function.
 ///
 /// ## Example
 /// ```python
-/// if foo:
-///     bar = x
-/// else:
-///     bar = y
+/// if value < 10:
+///     value = 10
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// bar = x if foo else y
+/// value = max(value, 10)
 /// ```
 ///
 /// ## References
-/// - [Python documentation: Conditional expressions](https://docs.python.org/3/reference/expressions.html#conditional-expressions)
+/// - [Python documentation: max function](https://docs.python.org/3/library/functions.html#max)
 #[violation]
 pub struct MaxInsteadOfIf {
     contents: String,
 }
 
 impl Violation for MaxInsteadOfIf {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
     #[derive_message_formats]
     fn message(&self) -> String {
         let MaxInsteadOfIf { contents } = self;
@@ -45,19 +41,109 @@ impl Violation for MaxInsteadOfIf {
     }
 }
 
+/// ## What it does
+/// Check for an if node that can be refactored as a min python builtin.
+///
+/// ## Why is this bad?
+/// An if block where the test and assignment have the same structure can
+/// be expressed more concisely by using the python builtin min function.
+///
+/// ## Example
+/// ```python
+/// if value > 10:
+///     value = 10
+/// ```
+///
+/// Use instead:
+/// ```python
+/// value = min(value, 10)
+/// ```
+///
+/// ## References
+/// - [Python documentation: min function](https://docs.python.org/3/library/functions.html#min)
 #[violation]
 pub struct MinInsteadOfIf {
     contents: String,
 }
 
 impl Violation for MinInsteadOfIf {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
     #[derive_message_formats]
     fn message(&self) -> String {
         let MinInsteadOfIf { contents } = self;
-        format!("Use min instead of if `{contents}`")
+        format!("Consider using `{contents}` instead of unnecessary if block")
     }
+}
+
+/// R1730
+pub(crate) fn min_instead_of_if(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+    let ast::StmtIf {
+        test,
+        body,
+        elif_else_clauses,
+        range: _,
+    } = stmt_if;
+    
+    if !elif_else_clauses.is_empty() {return;}
+    
+    let [Stmt::Assign(ast::StmtAssign {
+        targets: body_targets,
+        value: body_value,
+        ..
+    })] = body.as_slice() else {
+        return;
+    };
+    let [body_target] = body_targets.as_slice() else {
+        return;
+    };
+    
+    let Some(ast::ExprCompare {
+        ops,
+        left,
+        comparators,
+        ..
+    }) = test.as_compare_expr() else {
+        return;
+    };
+    
+    if !(
+        !body_target.is_subscript_expr()
+        && !left.is_subscript_expr()
+    ) {return;}
+
+    let ([op], [right_statement]) = (&**ops, &**comparators) else {
+        return;
+    };
+
+    if !matches!(op, CmpOp::Gt | CmpOp::GtE) {return;}
+    if !match_left(left, body_target) {return;}
+    if !match_right(right_statement, body_value) {return;}
+
+    let func_node = ast::ExprName {
+        id: "min".into(),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    };
+    let value_node = ast::ExprCall {
+        func: Box::new(func_node.into()),
+        arguments: Arguments {
+            args: Box::from([body_target.clone(), body_value.deref().clone()]),
+            keywords: Box::from([]),
+            range: TextRange::default(),
+        },
+        range: TextRange::default(),
+    };
+    let assign_node = ast::StmtAssign {
+        targets: vec![body_target.clone()],
+        value: Box::new(value_node.into()),
+        range: TextRange::default(),
+    };
+    let diagnostic = Diagnostic::new(
+        MinInsteadOfIf {
+            contents: checker.generator().stmt(&assign_node.into()),
+        },
+        stmt_if.range(),
+    );
+    checker.diagnostics.push(diagnostic);
 }
 
 /// R1731
@@ -118,16 +204,11 @@ pub(crate) fn max_instead_of_if(checker: &mut Checker, stmt_if: &ast::StmtIf) {
         },
         range: TextRange::default(),
     };
-    /*let expr_node = ast::StmtExpr {
-        value: Box::new(value_node.into()),
-        range: TextRange::default(),
-    };*/
     let assign_node = ast::StmtAssign {
         targets: vec![body_target.clone()],
         value: Box::new(value_node.into()),
         range: TextRange::default(),
     };
-
     let diagnostic = Diagnostic::new(
         MaxInsteadOfIf {
             contents: checker.generator().stmt(&assign_node.into()),
@@ -138,7 +219,7 @@ pub(crate) fn max_instead_of_if(checker: &mut Checker, stmt_if: &ast::StmtIf) {
 }
 
 fn match_left(left: &Expr, body_target: &Expr) -> bool {
-    // Check that assignment is on the same variable
+    // Check that the assignments are on the same variable
     if left.is_name_expr() && body_target.is_name_expr() {
         let Some(left_operand) = left.as_name_expr() else {return false};
         let Some(target_assignation) = body_target.as_name_expr() else {return false};
@@ -155,7 +236,7 @@ fn match_left(left: &Expr, body_target: &Expr) -> bool {
 }
 
 fn match_right(right_statement: &Expr, body_value: &Box<Expr>) -> bool {
-    // Verify the right part of the statement is the same.
+    // Verify that the right part of the statements are the same.
     if right_statement.is_name_expr() && body_value.is_name_expr() {
         let Some(right_statement_value) = right_statement.as_name_expr() else {return false};
         let Some(body_value_value) = body_value.as_name_expr() else {return false};

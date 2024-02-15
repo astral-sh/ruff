@@ -1133,6 +1133,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::MaxInsteadOfIf) {
                 pylint::rules::max_instead_of_if(checker, if_);
             }
+            if checker.enabled(Rule::MinInsteadOfIf) {
+                pylint::rules::min_instead_of_if(checker, if_);
+            }
             if checker.source_type.is_stub() {
                 if checker.any_enabled(&[
                     Rule::UnrecognizedVersionInfoCheck,
