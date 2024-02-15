@@ -6,17 +6,14 @@ use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
 
 use crate::directives::TodoComment;
-use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::BlankLinesChecker;
-use crate::rules::ruff::rules::Context;
 use crate::rules::{
     eradicate, flake8_commas, flake8_executable, flake8_fixme, flake8_implicit_str_concat,
     flake8_pyi, flake8_quotes, flake8_todos, pycodestyle, pygrep_hooks, pylint, pyupgrade, ruff,
@@ -66,31 +63,15 @@ pub(crate) fn check_tokens(
         pylint::rules::empty_comments(&mut diagnostics, indexer, locator);
     }
 
-    if settings.rules.any_enabled(&[
-        Rule::AmbiguousUnicodeCharacterString,
-        Rule::AmbiguousUnicodeCharacterDocstring,
-        Rule::AmbiguousUnicodeCharacterComment,
-    ]) {
-        let mut state_machine = StateMachine::default();
-        for &(ref tok, range) in tokens.iter().flatten() {
-            let is_docstring = state_machine.consume(tok);
-            let context = match tok {
-                Tok::String { .. } => {
-                    if is_docstring {
-                        Context::Docstring
-                    } else {
-                        Context::String
-                    }
-                }
-                Tok::FStringMiddle { .. } => Context::String,
-                Tok::Comment(_) => Context::Comment,
-                _ => continue,
-            };
-            ruff::rules::ambiguous_unicode_character(
+    if settings
+        .rules
+        .enabled(Rule::AmbiguousUnicodeCharacterComment)
+    {
+        for &(_, range) in tokens.iter().flatten().filter(|(tok, _)| tok.is_comment()) {
+            ruff::rules::ambiguous_unicode_character_comment(
                 &mut diagnostics,
                 locator,
                 range,
-                context,
                 settings,
             );
         }
