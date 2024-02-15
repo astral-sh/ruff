@@ -140,6 +140,19 @@ xxxxxxx = f"{
     {'aaaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccccc'}
 }"
 
+# Quotes
+f"foo 'bar' {x}"
+f"foo \"bar\" {x}"
+f'foo "bar" {x}'
+f'foo \'bar\' {x}'
+f"foo {"bar"}"
+f"foo {'\'bar\''}"
+
+# Here, the formatter will remove the escapes which is correct because they aren't allowed
+# pre 3.12. This means we can assume that the f-string is used in the context of 3.12.
+f"foo {'\"bar\"'}"
+
+
 # Triple-quoted strings
 # It's ok to use the same quote char for the inner string if it's single-quoted.
 f"""test {'inner'}"""
@@ -154,8 +167,35 @@ f"""test {'''inner'''}"""
 # breaks which results in the trailing comma being present. This test case makes sure
 # that the trailing comma is removed as well.
 f"aaaaaaa {['aaaaaaaaaaaaaaa', 'bbbbbbbbbbbbb', 'ccccccccccccccccc', 'ddddddddddddddd', 'eeeeeeeeeeeeee']} aaaaaaa"
+
 # And, if the trailing comma is already present, we still need to remove it.
 f"aaaaaaa {['aaaaaaaaaaaaaaa', 'bbbbbbbbbbbbb', 'ccccccccccccccccc', 'ddddddddddddddd', 'eeeeeeeeeeeeee',]} aaaaaaa"
+
+# Keep this Multiline by breaking it at the square brackets.
+f"""aaaaaa {[
+    xxxxxxxx,
+    yyyyyyyy,
+]} ccc"""
+
+# Add the magic trailing comma because the elements don't fit within the line length limit
+# when collapsed.
+f"aaaaaa {[
+    xxxxxxxxxxxx,
+    xxxxxxxxxxxx,
+    xxxxxxxxxxxx,
+    xxxxxxxxxxxx,
+    xxxxxxxxxxxx,
+    xxxxxxxxxxxx,
+    yyyyyyyyyyyy
+]} ccccccc"
+
+# Remove the parenthese because they aren't required
+xxxxxxxxxxxxxxx = (
+    f"aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbb {
+        xxxxxxxxxxx  # comment
+        + yyyyyyyyyy
+    } dddddddddd"
+)
 
 # Comments
 
@@ -214,3 +254,29 @@ f"{  # dangling comment 1
     # dangling comment 2
     # dangling comment 3
 } woah {x}"
+
+# Indentation
+
+# What should be the indentation?
+# https://github.com/astral-sh/ruff/discussions/9785#discussioncomment-8470590
+if indent0:
+    if indent1:
+        if indent2:
+            foo = f"""hello world
+hello {
+          f"aaaaaaa {
+              [
+                  'aaaaaaaaaaaaaaaaaaaaa',
+                  'bbbbbbbbbbbbbbbbbbbbb',
+                  'ccccccccccccccccccccc',
+                  'ddddddddddddddddddddd'
+              ]
+          } bbbbbbbb" +
+          [
+              'aaaaaaaaaaaaaaaaaaaaa',
+              'bbbbbbbbbbbbbbbbbbbbb',
+              'ccccccccccccccccccccc',
+              'ddddddddddddddddddddd'
+          ]
+      } --------
+"""
