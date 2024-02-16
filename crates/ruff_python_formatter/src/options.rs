@@ -466,3 +466,12 @@ pub enum PythonVersion {
     Py311,
     Py312,
 }
+
+impl PythonVersion {
+    /// Return `true` if the current version supports [PEP 701].
+    ///
+    /// [PEP 701]: https://peps.python.org/pep-0701/
+    pub fn supports_pep_701(self) -> bool {
+        self >= Self::Py312
+    }
+}

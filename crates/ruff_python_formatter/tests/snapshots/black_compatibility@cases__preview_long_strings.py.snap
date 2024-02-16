@@ -902,7 +902,7 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
  )
  
  dict_with_lambda_values = {
-@@ -524,61 +383,54 @@
+@@ -524,65 +383,58 @@
  
  # Complex string concatenations with a method call in the middle.
  code = (
@@ -941,7 +941,7 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
  log.info(
 -    "Skipping:"
 -    f" {desc['db_id']} {foo('bar',x=123)} {'foo' != 'bar'} {(x := 'abc=')} {pos_share=} {desc['status']} {desc['exposure_max']}"
-+    f'Skipping: {desc["db_id"]} {foo("bar",x=123)} {"foo" != "bar"} {(x := "abc=")} {pos_share=} {desc["status"]} {desc["exposure_max"]}'
++    f'Skipping: {desc["db_id"]} {foo("bar", x=123)} {"foo" != "bar"} {(x := "abc=")} {pos_share=} {desc["status"]} {desc["exposure_max"]}'
  )
  
  log.info(
@@ -981,6 +981,18 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
  )
  
  log.info(
+-    f"""Skipping: {"a" == 'b'} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
++    f"""Skipping: {"a" == "b"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
+ )
+ 
+ log.info(
+@@ -590,5 +442,5 @@
+ )
+ 
+ log.info(
+-    f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share=} {desc['status']} {desc['exposure_max']}"""
++    f"""Skipping: {"a" == "b"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
+ )
 ```
 
 ## Ruff Output
@@ -1394,7 +1406,7 @@ log.info(
 )
 
 log.info(
-    f'Skipping: {desc["db_id"]} {foo("bar",x=123)} {"foo" != "bar"} {(x := "abc=")} {pos_share=} {desc["status"]} {desc["exposure_max"]}'
+    f'Skipping: {desc["db_id"]} {foo("bar", x=123)} {"foo" != "bar"} {(x := "abc=")} {pos_share=} {desc["status"]} {desc["exposure_max"]}'
 )
 
 log.info(
@@ -1422,7 +1434,7 @@ log.info(
 )
 
 log.info(
-    f"""Skipping: {"a" == 'b'} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
+    f"""Skipping: {"a" == "b"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
 )
 
 log.info(
@@ -1430,7 +1442,7 @@ log.info(
 )
 
 log.info(
-    f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share=} {desc['status']} {desc['exposure_max']}"""
+    f"""Skipping: {"a" == "b"} {desc["ms_name"]} {money=} {dte=} {pos_share=} {desc["status"]} {desc["exposure_max"]}"""
 )
 ```
 

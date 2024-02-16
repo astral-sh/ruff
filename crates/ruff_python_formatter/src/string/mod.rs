@@ -1,7 +1,7 @@
 use bitflags::bitflags;
 
 pub(crate) use any::AnyString;
-pub(crate) use normalize::{NormalizedString, StringNormalizer};
+pub(crate) use normalize::{normalize_string, NormalizedString, StringNormalizer};
 use ruff_formatter::format_args;
 use ruff_source_file::Locator;
 use ruff_text_size::{TextLen, TextRange, TextSize};
