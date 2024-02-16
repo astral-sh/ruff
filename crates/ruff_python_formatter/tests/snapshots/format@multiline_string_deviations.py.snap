@@ -78,7 +78,7 @@ call(
     textwrap.dedent(
         """dove
     coo"""
-        % "cowabunga"
+            % "cowabunga"
     ),
 )
 

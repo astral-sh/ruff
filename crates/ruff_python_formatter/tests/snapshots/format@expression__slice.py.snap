@@ -217,7 +217,7 @@ g2 = "g"[(1):(2):(3)]
 def f():
     return (
         package_version is not None
-        and package_version.split(".")[:2] == package_info.version.split(".")[:2]
+            and package_version.split(".")[:2] == package_info.version.split(".")[:2]
     )
 
 

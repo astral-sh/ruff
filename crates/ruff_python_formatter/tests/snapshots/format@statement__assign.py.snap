@@ -151,7 +151,7 @@ def main() -> None:
         some_very_long_variable_name_abcdefghijk = (
             some_very_long_variable_name_abcdefghijk[
                 some_very_long_variable_name_abcdefghijk.some_very_long_attribute_name
-                == "This is a very long string abcdefghijk"
+                    == "This is a very long string abcdefghijk"
             ]
         )
 

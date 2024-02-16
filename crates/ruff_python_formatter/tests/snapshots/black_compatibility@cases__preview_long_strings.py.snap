@@ -439,11 +439,11 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
 -        "This is a really really really long string that has to go inside of a"
 -        " dictionary. It is %s bad (#%d)." % ("soooo", 2)
 -    ),
-+    % (
-+        "formatted",
-+        "string",
-+    ): "This is a really really really long string that has to go inside of a dictionary. It is %s bad (#%d)."
-+    % ("soooo", 2),
++        % (
++            "formatted",
++            "string",
++        ): "This is a really really really long string that has to go inside of a dictionary. It is %s bad (#%d)."
++        % ("soooo", 2),
  }
  
  D5 = {  # Test for https://github.com/psf/black/issues/3261
@@ -622,22 +622,29 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
 -    "While we are on the topic of %s, we should also note that old-style formatting"
 -    " must also be preserved, since some %s still uses it." % ("formatting", "code")
 +    "While we are on the topic of %s, we should also note that old-style formatting must also be preserved, since some %s still uses it."
-+    % ("formatting", "code")
++        % ("formatting", "code")
  )
  
  old_fmt_string2 = "This is a %s %s %s %s" % (
-@@ -271,8 +201,7 @@
+@@ -271,36 +201,23 @@
  )
  
  old_fmt_string3 = (
 -    "Whereas only the strings after the percent sign were long in the last example,"
 -    " this example uses a long initial string as well. This is another %s %s %s %s"
+-    % (
+-        "really really really really really",
+-        "old",
+-        "way to format strings!",
+-        "Use f-strings instead!",
+-    )
 +    "Whereas only the strings after the percent sign were long in the last example, this example uses a long initial string as well. This is another %s %s %s %s"
-     % (
-         "really really really really really",
-         "old",
-@@ -281,26 +210,14 @@
-     )
++        % (
++            "really really really really really",
++            "old",
++            "way to format strings!",
++            "Use f-strings instead!",
++        )
  )
  
 -fstring = (
@@ -688,33 +695,37 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
 -    "Followed by a really really really long string that is used to provide context to"
 -    " the AssertionError exception, which uses dynamic string %s." % "formatting"
 +    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string %s."
-+    % "formatting"
++        % "formatting"
  )
  
  assert some_type_of_boolean_expression, (
 -    "Followed by a really really really long string that is used to provide context to"
 -    " the AssertionError exception, which uses dynamic %s %s."
+-    % ("string", "formatting")
 +    "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic %s %s."
-     % ("string", "formatting")
++        % ("string", "formatting")
  )
  
  some_function_call(
 -    "With a reallly generic name and with a really really long string that is, at some"
 -    " point down the line, "
+-    + added
+-    + " to a variable and then added to another string."
 +    "With a reallly generic name and with a really really long string that is, at some point down the line, "
-     + added
-     + " to a variable and then added to another string."
++        + added
++        + " to a variable and then added to another string."
  )
  
  some_function_call(
 -    "With a reallly generic name and with a really really long string that is, at some"
 -    " point down the line, "
-+    "With a reallly generic name and with a really really long string that is, at some point down the line, "
-     + added
+-    + added
 -    + " to a variable and then added to another string. But then what happens when the"
 -    " final string is also supppppperrrrr long?! Well then that second (realllllllly"
 -    " long) string should be split too.",
-+    + " to a variable and then added to another string. But then what happens when the final string is also supppppperrrrr long?! Well then that second (realllllllly long) string should be split too.",
++    "With a reallly generic name and with a really really long string that is, at some point down the line, "
++        + added
++        + " to a variable and then added to another string. But then what happens when the final string is also supppppperrrrr long?! Well then that second (realllllllly long) string should be split too.",
      "and a second argument",
      and_a_third,
  )
@@ -772,7 +783,7 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
      x,
      y,
      z,
-@@ -397,7 +306,7 @@
+@@ -397,61 +306,38 @@
  func_with_bad_parens(
      x,
      y,
@@ -781,14 +792,21 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
      z,
  )
  
-@@ -408,50 +317,27 @@
-     + CONCATENATED
-     + "using the '+' operator."
- )
+ annotated_variable: Final = (
+     "This is a large "
+-    + STRING
+-    + " that has been "
+-    + CONCATENATED
+-    + "using the '+' operator."
+-)
 -annotated_variable: Final = (
 -    "This is a large string that has a type annotation attached to it. A type"
 -    " annotation should NOT stop a long string from being wrapped."
--)
++        + STRING
++        + " that has been "
++        + CONCATENATED
++        + "using the '+' operator."
+ )
 +annotated_variable: Final = "This is a large string that has a type annotation attached to it. A type annotation should NOT stop a long string from being wrapped."
  annotated_variable: Literal["fakse_literal"] = (
 -    "This is a large string that has a type annotation attached to it. A type"
@@ -910,15 +928,16 @@ log.info(f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share
 -    + ", \n".join(
 -        "        (%r, self.%s, visitor.%s)" % (attrname, attrname, visit_name)
 -        for attrname, visit_name in names
-+    ("    return [\n")
-+    + (
-+        ", \n".join(
-+            "        (%r, self.%s, visitor.%s)" % (attrname, attrname, visit_name)
-+            for attrname, visit_name in names
-+        )
-     )
+-    )
 -    + "\n    ]\n"
-+    + ("\n    ]\n")
++    ("    return [\n")
++        + (
++            ", \n".join(
++                "        (%r, self.%s, visitor.%s)" % (attrname, attrname, visit_name)
++                for attrname, visit_name in names
++            )
++        )
++        + ("\n    ]\n")
  )
  
  
@@ -1028,11 +1047,11 @@ D4 = {
         sooo="soooo", x=2
     ),
     "A %s %s"
-    % (
-        "formatted",
-        "string",
-    ): "This is a really really really long string that has to go inside of a dictionary. It is %s bad (#%d)."
-    % ("soooo", 2),
+        % (
+            "formatted",
+            "string",
+        ): "This is a really really really long string that has to go inside of a dictionary. It is %s bad (#%d)."
+        % ("soooo", 2),
 }
 
 D5 = {  # Test for https://github.com/psf/black/issues/3261
@@ -1178,7 +1197,7 @@ fmt_string2 = "But what about when the string is {} but {}".format(
 
 old_fmt_string1 = (
     "While we are on the topic of %s, we should also note that old-style formatting must also be preserved, since some %s still uses it."
-    % ("formatting", "code")
+        % ("formatting", "code")
 )
 
 old_fmt_string2 = "This is a %s %s %s %s" % (
@@ -1190,12 +1209,12 @@ old_fmt_string2 = "This is a %s %s %s %s" % (
 
 old_fmt_string3 = (
     "Whereas only the strings after the percent sign were long in the last example, this example uses a long initial string as well. This is another %s %s %s %s"
-    % (
-        "really really really really really",
-        "old",
-        "way to format strings!",
-        "Use f-strings instead!",
-    )
+        % (
+            "really really really really really",
+            "old",
+            "way to format strings!",
+            "Use f-strings instead!",
+        )
 )
 
 fstring = f"f-strings definitely make things more {difficult} than they need to be for {{black}}. But boy they sure are handy. The problem is that some lines will need to have the 'f' whereas others do not. This {line}, for example, needs one."
@@ -1228,24 +1247,24 @@ assert some_type_of_boolean_expression, "Followed by a really really really long
 
 assert some_type_of_boolean_expression, (
     "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic string %s."
-    % "formatting"
+        % "formatting"
 )
 
 assert some_type_of_boolean_expression, (
     "Followed by a really really really long string that is used to provide context to the AssertionError exception, which uses dynamic %s %s."
-    % ("string", "formatting")
+        % ("string", "formatting")
 )
 
 some_function_call(
     "With a reallly generic name and with a really really long string that is, at some point down the line, "
-    + added
-    + " to a variable and then added to another string."
+        + added
+        + " to a variable and then added to another string."
 )
 
 some_function_call(
     "With a reallly generic name and with a really really long string that is, at some point down the line, "
-    + added
-    + " to a variable and then added to another string. But then what happens when the final string is also supppppperrrrr long?! Well then that second (realllllllly long) string should be split too.",
+        + added
+        + " to a variable and then added to another string. But then what happens when the final string is also supppppperrrrr long?! Well then that second (realllllllly long) string should be split too.",
     "and a second argument",
     and_a_third,
 )
@@ -1300,10 +1319,10 @@ func_with_bad_parens(
 
 annotated_variable: Final = (
     "This is a large "
-    + STRING
-    + " that has been "
-    + CONCATENATED
-    + "using the '+' operator."
+        + STRING
+        + " that has been "
+        + CONCATENATED
+        + "using the '+' operator."
 )
 annotated_variable: Final = "This is a large string that has a type annotation attached to it. A type annotation should NOT stop a long string from being wrapped."
 annotated_variable: Literal["fakse_literal"] = (
@@ -1372,13 +1391,13 @@ dict_with_lambda_values = {
 # Complex string concatenations with a method call in the middle.
 code = (
     ("    return [\n")
-    + (
-        ", \n".join(
-            "        (%r, self.%s, visitor.%s)" % (attrname, attrname, visit_name)
-            for attrname, visit_name in names
+        + (
+            ", \n".join(
+                "        (%r, self.%s, visitor.%s)" % (attrname, attrname, visit_name)
+                for attrname, visit_name in names
+            )
         )
-    )
-    + ("\n    ]\n")
+        + ("\n    ]\n")
 )
 
 

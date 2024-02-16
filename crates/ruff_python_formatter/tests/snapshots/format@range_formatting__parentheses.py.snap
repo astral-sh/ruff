@@ -24,8 +24,8 @@ def format_range_after_inserted_parens   ():
 def needs_parentheses( ) -> bool:
     return (
         item.sizing_mode is None
-        and item.width_policy == "auto"
-        and item.height_policy == "automatic"
+            and item.width_policy == "auto"
+            and item.height_policy == "automatic"
     )
 
 def no_longer_needs_parentheses( ) -> bool:

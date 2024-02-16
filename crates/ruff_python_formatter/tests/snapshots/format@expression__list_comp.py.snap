@@ -152,15 +152,15 @@ aaaaaaaaaaaaaaaaaaaaa = [
 
 [
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-    + [dddddddddddddddddd, eeeeeeeeeeeeeeeeeee]
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        + [dddddddddddddddddd, eeeeeeeeeeeeeeeeeee]
     for ccccccccccccccccccccccccccccccccccccccc, ddddddddddddddddddd, [
         eeeeeeeeeeeeeeeeeeeeee,
         fffffffffffffffffffffffff,
     ] in eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
     if fffffffffffffffffffffffffffffffffffffffffff
-    < gggggggggggggggggggggggggggggggggggggggggggggg
-    < hhhhhhhhhhhhhhhhhhhhhhhhhh
+        < gggggggggggggggggggggggggggggggggggggggggggggg
+        < hhhhhhhhhhhhhhhhhhhhhhhhhh
     if gggggggggggggggggggggggggggggggggggggggggggg
 ]
 
@@ -248,7 +248,7 @@ aaaaaaaaaaaaaaaaaaaaa = [
 [
     1
     for components in b  # pylint: disable=undefined-loop-variable  # integer 1 may only have decimal 01-09
-    + c  # negative decimal
+        + c  # negative decimal
 ]
 
 # Parenthesized targets and iterators.

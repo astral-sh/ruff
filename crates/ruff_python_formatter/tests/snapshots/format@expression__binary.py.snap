@@ -430,28 +430,28 @@ if True:
 ```python
 (
     aaaaaaaa
-    +  # trailing operator comment
-    b  # trailing right comment
+        +  # trailing operator comment
+        b  # trailing right comment
 )
 
 
 (
     aaaaaaaa  # trailing left comment
-    +  # trailing operator comment
-    # leading right comment
-    b
+        +  # trailing operator comment
+        # leading right comment
+        b
 )
 
 (
     # leading left most comment
     aaaaaaaa
-    +  # trailing operator comment
-    # leading b comment
-    b  # trailing b comment
-    # trailing b ownline comment
-    +  # trailing second operator comment
-    # leading c comment
-    c  # trailing c comment
+        +  # trailing operator comment
+        # leading b comment
+        b  # trailing b comment
+        # trailing b ownline comment
+        +  # trailing second operator comment
+        # leading c comment
+        c  # trailing c comment
     # trailing own line comment
 )
 
@@ -497,21 +497,24 @@ aaaaaaaaaaaaaa + {
 # Wraps it in parentheses if it needs to break both left and right
 (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + [bbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccc, dddddddddddddddd, eee]
+        + [bbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccc, dddddddddddddddd, eee]
 )  # comment
 
 
 # But only for expressions that have a statement parent.
 not (
     aaaaaaaaaaaaaa
-    + {a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb}
+        + {
+            a
+            for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        }
 )
 [
     a
-    + [
-        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-    ]
-    in c
+        + [
+            bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        ]
+        in c
 ]
 
 
@@ -524,13 +527,13 @@ not (
 
 if (
     aaaaaaaaaaaaaaaaaa
-    +
-    # has the child process finished?
-    bbbbbbbbbbbbbbb
-    +
-    # the child process has finished, but the
-    # transport hasn't been notified yet?
-    ccccccccccc
+        +
+        # has the child process finished?
+        bbbbbbbbbbbbbbb
+        +
+        # the child process has finished, but the
+        # transport hasn't been notified yet?
+        ccccccccccc
 ):
     pass
 
@@ -553,7 +556,7 @@ if (
         dddddddddddddddddddd,
         eeeeeeeeee,
     ]
-    & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ):
     pass
 
@@ -569,13 +572,13 @@ if aaaaaaaaaaaaaaaaaaaaaaaaaa & [
 
 if (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    & [
-        aaaaaaaaaaaaa,
-        bbbbbbbbbbbbbbbbbbbb,
-        cccccccccccccccccccc,
-        dddddddddddddddddddd,
-        eeeeeeeeee,
-    ]
+        & [
+            aaaaaaaaaaaaa,
+            bbbbbbbbbbbbbbbbbbbb,
+            cccccccccccccccccccc,
+            dddddddddddddddddddd,
+            eeeeeeeeee,
+        ]
 ):
     pass
 
@@ -674,9 +677,9 @@ if (
         iiiiiiiiiiiiiiii,
         jjjjjjjjjjjjj,
     ]
-    &
-    # comment
-    a + b
+        &
+        # comment
+        a + b
 ):
     pass
 
@@ -693,14 +696,14 @@ for user_id in set(target_user_ids) - {u.user_id for u in updates}:
 # Keeps parenthesized left hand sides
 (
     log(self.price / self.strike)
-    + (self.risk_free - self.div_cont + 0.5 * (self.sigma**2)) * self.exp_time
+        + (self.risk_free - self.div_cont + 0.5 * (self.sigma**2)) * self.exp_time
 ) / self.sigmaT
 
 # Stability with end-of-line comments between empty tuples and bin op
 x = (
     ()
-    - (  #
-    )
+        - (  #
+        )
 )
 x = (
     () - ()  #
@@ -729,10 +732,10 @@ expected_content = (
 </sitemapindex>
 """
     # Needs parentheses
-    % (
-        self.base_url,
-        date.today(),
-    )
+        % (
+            self.base_url,
+            date.today(),
+        )
 )
 
 expected_content = (
@@ -742,12 +745,12 @@ expected_content = (
 </sitemap>
 </sitemapindex>
 """
-    %
-    # Needs parentheses
-    (
-        self.base_url,
-        date.today(),
-    )
+        %
+        # Needs parentheses
+        (
+            self.base_url,
+            date.today(),
+        )
 )
 
 
@@ -768,8 +771,8 @@ expected_content = (
 </sitemap>
 </sitemapindex>
 """
-    + sssssssssssssssssssssssssssssssssssssssssooooo
-    * looooooooooooooooooooooooooooooongggggggggggg
+        + sssssssssssssssssssssssssssssssssssssssssooooo
+            * looooooooooooooooooooooooooooooongggggggggggg
 )
 
 call(
@@ -796,10 +799,10 @@ expected_content = (
 </sitemap>
 </sitemapindex>
 """
-    % (
-        # Needs parentheses
-        self.base_url
-    )
+        % (
+            # Needs parentheses
+            self.base_url
+        )
 )
 
 # Skip FString content when determining whether to omit optional parentheses or not.0
@@ -807,7 +810,7 @@ expected_content = (
 # (Call expressions at the beginning don't count as parenthesized because they don't start with parens).
 assert (
     format.format_event(spec)
-    == f'Event("_remove_cookie", {{key:`testkey`,options:{json.dumps(options)}}})'
+        == f'Event("_remove_cookie", {{key:`testkey`,options:{json.dumps(options)}}})'
 )
 # Avoid parentheses for this example because it starts with a tuple expression.
 assert (
@@ -817,62 +820,62 @@ assert (
 
 rowuses = [
     (1 << j)  # column ordinal
-    | (1 << (n + i - j + n - 1))  # NW-SE ordinal
-    | (1 << (n + 2 * n - 1 + i + j))  # NE-SW ordinal
+        | (1 << (n + i - j + n - 1))  # NW-SE ordinal
+        | (1 << (n + 2 * n - 1 + i + j))  # NE-SW ordinal
     for j in rangen
 ]
 
 rowuses = [
     (1 << j)  # column ordinal
-    |
-    # comment
-    (1 << (n + i - j + n - 1))  # NW-SE ordinal
-    | (1 << (n + 2 * n - 1 + i + j))  # NE-SW ordinal
+        |
+        # comment
+        (1 << (n + i - j + n - 1))  # NW-SE ordinal
+        | (1 << (n + 2 * n - 1 + i + j))  # NE-SW ordinal
     for j in rangen
 ]
 
 skip_bytes = (
     header.timecnt * 5  # Transition times and types
-    + header.typecnt * 6  # Local time type records
-    + header.charcnt  # Time zone designations
-    + header.leapcnt * 8  # Leap second records
-    + header.isstdcnt  # Standard/wall indicators
-    + header.isutcnt  # UT/local indicators
+        + header.typecnt * 6  # Local time type records
+        + header.charcnt  # Time zone designations
+        + header.leapcnt * 8  # Leap second records
+        + header.isstdcnt  # Standard/wall indicators
+        + header.isutcnt  # UT/local indicators
 )
 
 
 if (
     (1 + 2)  # test
-    or (3 + 4)  # other
-    or (4 + 5)  # more
+        or (3 + 4)  # other
+        or (4 + 5)  # more
 ):
     pass
 
 
 if (
     (1 and 2)  # test
-    + (3 and 4)  # other
-    + (4 and 5)  # more
+        + (3 and 4)  # other
+        + (4 and 5)  # more
 ):
     pass
 
 
 if (
     (1 + 2)  # test
-    < (3 + 4)  # other
-    > (4 + 5)  # more
+        < (3 + 4)  # other
+        > (4 + 5)  # more
 ):
     pass
 
 z = (
     a
-    +
-    # a: extracts this comment
-    # b: and this comment
-    (
-        # c: formats it as part of the expression
-        x and y
-    )
+        +
+        # a: extracts this comment
+        # b: and this comment
+        (
+            # c: formats it as part of the expression
+            x and y
+        )
 )
 
 z = (
@@ -882,7 +885,7 @@ z = (
     )
     # b: extracts this comment
     # c: and this comment
-    + a
+        + a
 )
 
 # Test for https://github.com/astral-sh/ruff/issues/7431

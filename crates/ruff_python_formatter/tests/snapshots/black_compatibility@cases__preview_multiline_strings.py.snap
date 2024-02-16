@@ -201,7 +201,7 @@ this_will_also_become_one_line = (  # comment
 +    textwrap.dedent(
 +        """dove
 +    coo"""
-+        % "cowabunga"
++            % "cowabunga"
 +    ),
  )
  call(
@@ -212,7 +212,7 @@ this_will_also_become_one_line = (  # comment
 +    textwrap.dedent(
 +        """dove
 +coo"""
-+        % "cowabunga"
++            % "cowabunga"
 +    ),
  )
  call(
@@ -222,7 +222,7 @@ this_will_also_become_one_line = (  # comment
 +    textwrap.dedent(
 +        """cow
 +    moo"""
-+        % "cowabunga"
++            % "cowabunga"
 +    ),
      "dogsay",
  )
@@ -234,7 +234,7 @@ this_will_also_become_one_line = (  # comment
 +    textwrap.dedent(
 +        """crow
 +    caw"""
-+        % "cowabunga"
++            % "cowabunga"
 +    ),
  )
  call(
@@ -244,7 +244,7 @@ this_will_also_become_one_line = (  # comment
 +    textwrap.dedent(
 +        """cat
 +    meow"""
-+        % "cowabunga"
++            % "cowabunga"
 +    ),
      {"dog", "say"},
  )
@@ -256,7 +256,7 @@ this_will_also_become_one_line = (  # comment
 +    textwrap.dedent(
 +        """horse
 +    neigh"""
-+        % "cowabunga"
++            % "cowabunga"
 +    ),
  )
  call(
@@ -267,7 +267,7 @@ this_will_also_become_one_line = (  # comment
 +    textwrap.dedent(
 +        """pig
 +    oink"""
-+        % "cowabunga"
++            % "cowabunga"
 +    ),
  )
  textwrap.dedent("""A one-line triple-quoted string.""")
@@ -391,7 +391,7 @@ call(
     textwrap.dedent(
         """dove
     coo"""
-        % "cowabunga"
+            % "cowabunga"
     ),
 )
 call(
@@ -400,7 +400,7 @@ call(
     textwrap.dedent(
         """dove
 coo"""
-        % "cowabunga"
+            % "cowabunga"
     ),
 )
 call(
@@ -408,7 +408,7 @@ call(
     textwrap.dedent(
         """cow
     moo"""
-        % "cowabunga"
+            % "cowabunga"
     ),
     "dogsay",
 )
@@ -418,7 +418,7 @@ call(
     textwrap.dedent(
         """crow
     caw"""
-        % "cowabunga"
+            % "cowabunga"
     ),
 )
 call(
@@ -426,7 +426,7 @@ call(
     textwrap.dedent(
         """cat
     meow"""
-        % "cowabunga"
+            % "cowabunga"
     ),
     {"dog", "say"},
 )
@@ -436,7 +436,7 @@ call(
     textwrap.dedent(
         """horse
     neigh"""
-        % "cowabunga"
+            % "cowabunga"
     ),
 )
 call(
@@ -445,7 +445,7 @@ call(
     textwrap.dedent(
         """pig
     oink"""
-        % "cowabunga"
+            % "cowabunga"
     ),
 )
 textwrap.dedent("""A one-line triple-quoted string.""")

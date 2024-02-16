@@ -95,7 +95,96 @@ def f(
 ```diff
 --- Black
 +++ Ruff
-@@ -63,7 +63,7 @@
+@@ -1,17 +1,17 @@
+ # This has always worked
+ z = (
+     Loooooooooooooooooooooooong
+-    | Loooooooooooooooooooooooong
+-    | Loooooooooooooooooooooooong
+-    | Loooooooooooooooooooooooong
++        | Loooooooooooooooooooooooong
++        | Loooooooooooooooooooooooong
++        | Loooooooooooooooooooooooong
+ )
+ 
+ # "AnnAssign"s now also work
+ z: (
+     Loooooooooooooooooooooooong
+-    | Loooooooooooooooooooooooong
+-    | Loooooooooooooooooooooooong
+-    | Loooooooooooooooooooooooong
++        | Loooooooooooooooooooooooong
++        | Loooooooooooooooooooooooong
++        | Loooooooooooooooooooooooong
+ )
+ z: Short | Short2 | Short3 | Short4
+ z: int
+@@ -20,9 +20,9 @@
+ 
+ z: (
+     Loooooooooooooooooooooooong
+-    | Loooooooooooooooooooooooong
+-    | Loooooooooooooooooooooooong
+-    | Loooooooooooooooooooooooong
++        | Loooooooooooooooooooooooong
++        | Loooooooooooooooooooooooong
++        | Loooooooooooooooooooooooong
+ ) = 7
+ z: Short | Short2 | Short3 | Short4 = 8
+ z: int = 2.3
+@@ -31,39 +31,39 @@
+ # In case I go for not enforcing parantheses, this might get improved at the same time
+ x = (
+     z
+-    == 9999999999999999999999999999999999999999
+-    | 9999999999999999999999999999999999999999
+-    | 9999999999999999999999999999999999999999
+-    | 9999999999999999999999999999999999999999,
++        == 9999999999999999999999999999999999999999
++            | 9999999999999999999999999999999999999999
++            | 9999999999999999999999999999999999999999
++            | 9999999999999999999999999999999999999999,
+     y
+-    == 9999999999999999999999999999999999999999
+-    + 9999999999999999999999999999999999999999
+-    + 9999999999999999999999999999999999999999
+-    + 9999999999999999999999999999999999999999,
++        == 9999999999999999999999999999999999999999
++            + 9999999999999999999999999999999999999999
++            + 9999999999999999999999999999999999999999
++            + 9999999999999999999999999999999999999999,
+ )
+ 
+ x = (
+     z
+-    == (
+-        9999999999999999999999999999999999999999
+-        | 9999999999999999999999999999999999999999
+-        | 9999999999999999999999999999999999999999
+-        | 9999999999999999999999999999999999999999
+-    ),
++        == (
++            9999999999999999999999999999999999999999
++                | 9999999999999999999999999999999999999999
++                | 9999999999999999999999999999999999999999
++                | 9999999999999999999999999999999999999999
++        ),
+     y
+-    == (
+-        9999999999999999999999999999999999999999
+-        + 9999999999999999999999999999999999999999
+-        + 9999999999999999999999999999999999999999
+-        + 9999999999999999999999999999999999999999
+-    ),
++        == (
++            9999999999999999999999999999999999999999
++                + 9999999999999999999999999999999999999999
++                + 9999999999999999999999999999999999999999
++                + 9999999999999999999999999999999999999999
++        ),
+ )
+ 
+ # handle formatting of "tname"s in parameter list
  
  
  # remove unnecessary paren
@@ -110,14 +199,12 @@ def f(
      i: int,
 -    x: (
 -        Loooooooooooooooooooooooong
--        | Looooooooooooooooong
--        | Looooooooooooooooooooong
++    x: Loooooooooooooooooooooooong
+         | Looooooooooooooooong
+         | Looooooooooooooooooooong
 -        | Looooooong
 -    ),
-+    x: Loooooooooooooooooooooooong
-+    | Looooooooooooooooong
-+    | Looooooooooooooooooooong
-+    | Looooooong,
++        | Looooooong,
      *,
      s: str,
  ) -> None:
@@ -138,17 +225,17 @@ def f(
 # This has always worked
 z = (
     Loooooooooooooooooooooooong
-    | Loooooooooooooooooooooooong
-    | Loooooooooooooooooooooooong
-    | Loooooooooooooooooooooooong
+        | Loooooooooooooooooooooooong
+        | Loooooooooooooooooooooooong
+        | Loooooooooooooooooooooooong
 )
 
 # "AnnAssign"s now also work
 z: (
     Loooooooooooooooooooooooong
-    | Loooooooooooooooooooooooong
-    | Loooooooooooooooooooooooong
-    | Loooooooooooooooooooooooong
+        | Loooooooooooooooooooooooong
+        | Loooooooooooooooooooooooong
+        | Loooooooooooooooooooooooong
 )
 z: Short | Short2 | Short3 | Short4
 z: int
@@ -157,9 +244,9 @@ z: int
 
 z: (
     Loooooooooooooooooooooooong
-    | Loooooooooooooooooooooooong
-    | Loooooooooooooooooooooooong
-    | Loooooooooooooooooooooooong
+        | Loooooooooooooooooooooooong
+        | Loooooooooooooooooooooooong
+        | Loooooooooooooooooooooooong
 ) = 7
 z: Short | Short2 | Short3 | Short4 = 8
 z: int = 2.3
@@ -168,32 +255,32 @@ z: int = foo()
 # In case I go for not enforcing parantheses, this might get improved at the same time
 x = (
     z
-    == 9999999999999999999999999999999999999999
-    | 9999999999999999999999999999999999999999
-    | 9999999999999999999999999999999999999999
-    | 9999999999999999999999999999999999999999,
+        == 9999999999999999999999999999999999999999
+            | 9999999999999999999999999999999999999999
+            | 9999999999999999999999999999999999999999
+            | 9999999999999999999999999999999999999999,
     y
-    == 9999999999999999999999999999999999999999
-    + 9999999999999999999999999999999999999999
-    + 9999999999999999999999999999999999999999
-    + 9999999999999999999999999999999999999999,
+        == 9999999999999999999999999999999999999999
+            + 9999999999999999999999999999999999999999
+            + 9999999999999999999999999999999999999999
+            + 9999999999999999999999999999999999999999,
 )
 
 x = (
     z
-    == (
-        9999999999999999999999999999999999999999
-        | 9999999999999999999999999999999999999999
-        | 9999999999999999999999999999999999999999
-        | 9999999999999999999999999999999999999999
-    ),
+        == (
+            9999999999999999999999999999999999999999
+                | 9999999999999999999999999999999999999999
+                | 9999999999999999999999999999999999999999
+                | 9999999999999999999999999999999999999999
+        ),
     y
-    == (
-        9999999999999999999999999999999999999999
-        + 9999999999999999999999999999999999999999
-        + 9999999999999999999999999999999999999999
-        + 9999999999999999999999999999999999999999
-    ),
+        == (
+            9999999999999999999999999999999999999999
+                + 9999999999999999999999999999999999999999
+                + 9999999999999999999999999999999999999999
+                + 9999999999999999999999999999999999999999
+        ),
 )
 
 # handle formatting of "tname"s in parameter list
@@ -210,9 +297,9 @@ def foo(i: (int,)) -> None: ...
 def foo(
     i: int,
     x: Loooooooooooooooooooooooong
-    | Looooooooooooooooong
-    | Looooooooooooooooooooong
-    | Looooooong,
+        | Looooooooooooooooong
+        | Looooooooooooooooooooong
+        | Looooooong,
     *,
     s: str,
 ) -> None:

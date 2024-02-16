@@ -252,8 +252,8 @@ def test():
         ),
         "post_processed": (
             collected["post_processed"]
-            and ", %s post-processed" % post_processed_count
-            or ""
+                and ", %s post-processed" % post_processed_count
+                or ""
         ),
     }
 

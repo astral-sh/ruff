@@ -298,13 +298,13 @@ c1 = (
     ).filter(
         entry__pub_date__year=2008,
     )
-    + Blog.objects.filter(
-        entry__headline__contains="McCartney",
-    )
-    .limit_results[:10]
-    .filter(
-        entry__pub_date__year=2010,
-    )
+        + Blog.objects.filter(
+            entry__headline__contains="McCartney",
+        )
+        .limit_results[:10]
+        .filter(
+            entry__pub_date__year=2010,
+        )
 ).all()
 
 # Test different cases with trailing end of line comments:
@@ -378,10 +378,10 @@ if (
     pass
 h2 = (
     bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-    + ccccccccccccccccccccccccc()
-    .dddddddddddddddddddddd()
-    .eeeeeeeeee()
-    .ffffffffffffffffffffff()
+        + ccccccccccccccccccccccccc()
+        .dddddddddddddddddddddd()
+        .eeeeeeeeee()
+        .ffffffffffffffffffffff()
 )
 
 # Parentheses aren't allowed on statement level, don't use fluent style here

@@ -101,12 +101,12 @@ response = await sync_to_async(
 # Expressions with empty parentheses.
 ct_match = (
     unicodedata.normalize("NFKC", s1).casefold()
-    == unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
+        == unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
 )
 
 ct_match = (
     unicodedata.normalize("NFKC", s1).casefold(1)
-    == unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
+        == unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
 )
 
 ct_match = unicodedata.normalize("NFKC", s1).casefold(0) == unicodedata.normalize(
@@ -121,19 +121,19 @@ ct_match = (
     unicodedata.normalize("NFKC", s1).casefold(
         # foo
     )
-    == unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold(
-        # foo
-    )
+        == unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold(
+            # foo
+        )
 )
 
 ct_match = (
     [].unicodedata.normalize("NFKC", s1).casefold()
-    == [].unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
+        == [].unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
 )
 
 ct_match = (
     [].unicodedata.normalize("NFKC", s1).casefold()
-    == [1].unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
+        == [1].unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
 )
 
 ct_match = [1].unicodedata.normalize("NFKC", s1).casefold() == [].unicodedata.normalize(
@@ -146,12 +146,12 @@ ct_match = [1].unicodedata.normalize("NFKC", s1).casefold() == [
 
 ct_match = (
     {}.unicodedata.normalize("NFKC", s1).casefold()
-    == {}.unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
+        == {}.unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
 )
 
 ct_match = (
     {}.unicodedata.normalize("NFKC", s1).casefold()
-    == {1}.unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
+        == {1}.unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
 )
 
 ct_match = {1}.unicodedata.normalize("NFKC", s1).casefold() == {}.unicodedata.normalize(

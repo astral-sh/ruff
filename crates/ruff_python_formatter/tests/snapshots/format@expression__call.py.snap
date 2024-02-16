@@ -320,7 +320,7 @@ f(
         100000 - 100000000000
     ),
     these_arguments_have_values_that_need_to_break_because_they_are_too_long2="akshfdlakjsdfad"
-    + "asdfasdfa",
+        + "asdfasdfa",
     these_arguments_have_values_that_need_to_break_because_they_are_too_long3=session,
 )
 
@@ -543,14 +543,14 @@ f(  # a
     # f
     *args2
     # g
-    **  # h
-    kwargs,
+        **  # h
+        kwargs,
 )
 
 # Regression test for: https://github.com/astral-sh/ruff/issues/7370
 result = (
     f(111111111111111111111111111111111111111111111111111111111111111111111111111111111)
-    + 1
+        + 1
 )()
 
 

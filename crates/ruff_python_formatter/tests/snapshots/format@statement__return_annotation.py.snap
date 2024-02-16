@@ -486,9 +486,9 @@ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
 
 def double() -> (
     first_item
-    and foo.bar.baz().bop(
-        1,
-    )
+        and foo.bar.baz().bop(
+            1,
+        )
 ):
     return 2 * a
 
@@ -530,9 +530,24 @@ def double(
     a: int,
 ) -> (
     int
-    | list[
-        int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int
-    ]  # Hello
+        | list[
+            int,
+            int,
+            int,
+            int,
+            int,
+            int,
+            int,
+            int,
+            int,
+            int,
+            int,
+            int,
+            int,
+            int,
+            int,
+            int,
+        ]  # Hello
 ):
     pass
 

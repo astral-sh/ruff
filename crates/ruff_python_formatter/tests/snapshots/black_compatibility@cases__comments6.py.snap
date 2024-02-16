@@ -141,6 +141,23 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
      an_element_with_a_long_value = calls() or more_calls() and more()  # type: bool
  
      tup = (
+@@ -61,11 +59,11 @@
+ 
+     a = (
+         element
+-        + another_element
+-        + another_element_with_long_name
+-        + element
+-        + another_element
+-        + another_element_with_long_name
++            + another_element
++            + another_element_with_long_name
++            + element
++            + another_element
++            + another_element_with_long_name
+     )  # type: int
+ 
+ 
 @@ -100,7 +98,13 @@
      )
  
@@ -243,11 +260,11 @@ def f(
 
     a = (
         element
-        + another_element
-        + another_element_with_long_name
-        + element
-        + another_element
-        + another_element_with_long_name
+            + another_element
+            + another_element_with_long_name
+            + element
+            + another_element
+            + another_element_with_long_name
     )  # type: int
 
 

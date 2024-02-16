@@ -100,15 +100,15 @@ selected_choices = {
 
 {
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-    + [dddddddddddddddddd, eeeeeeeeeeeeeeeeeee]
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        + [dddddddddddddddddd, eeeeeeeeeeeeeeeeeee]
     for ccccccccccccccccccccccccccccccccccccccc, ddddddddddddddddddd, [
         eeeeeeeeeeeeeeeeeeeeee,
         fffffffffffffffffffffffff,
     ] in eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
     if fffffffffffffffffffffffffffffffffffffffffff
-    < gggggggggggggggggggggggggggggggggggggggggggggg
-    < hhhhhhhhhhhhhhhhhhhhhhhhhh
+        < gggggggggggggggggggggggggggggggggggggggggggggg
+        < hhhhhhhhhhhhhhhhhhhhhhhhhh
     if gggggggggggggggggggggggggggggggggggggggggggg
 }
 

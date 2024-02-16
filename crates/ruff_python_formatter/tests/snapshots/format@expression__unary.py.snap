@@ -205,7 +205,7 @@ def foo():
 ```python
 if (
     not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
@@ -221,7 +221,7 @@ b = 10
 if not (
     # comment
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
@@ -229,14 +229,14 @@ if not (
 if ~(
     # comment
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 if -(
     # comment
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
@@ -244,14 +244,14 @@ if -(
 if +(
     # comment
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 if (
     # comment
     not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
@@ -259,14 +259,14 @@ if (
 if (
     # comment
     ~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 if (
     # comment
     -aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
@@ -274,7 +274,7 @@ if (
 if (
     # comment
     +aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
@@ -286,21 +286,21 @@ if (
     not (
         # comment
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+            + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     )
 ):
     pass
 
 if not (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 if aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa & (
     not (
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+            + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     )
 ):
     pass
@@ -308,9 +308,9 @@ if aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa & (
 if (
     not (
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+            + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     )
-    & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ):
     pass
 
@@ -319,7 +319,7 @@ if (
 
 if (  # comment
     not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
@@ -327,14 +327,14 @@ if (  # comment
 if (
     # comment
     ~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 if (
     # comment
     -aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
@@ -342,7 +342,7 @@ if (
 if (
     # comment
     +aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
@@ -355,8 +355,8 @@ if not a:
 # Regression test for: https://github.com/astral-sh/ruff/issues/5338
 if (
     a
-    and not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        and not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ):
     pass
 
@@ -377,7 +377,7 @@ if True:
         if True:
             if not yn_question(
                 Fore.RED
-                + "WARNING: Removing listed files. Do you really want to continue. yes/n)? "
+                    + "WARNING: Removing listed files. Do you really want to continue. yes/n)? "
             ):
                 pass
 

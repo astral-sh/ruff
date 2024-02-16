@@ -660,7 +660,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 -    " on one line at alllll." % "formatting",
 +    (
 +        "A long string with {}. This string is so long that it is ridiculous. It can't fit on one line at alllll."
-+        % "formatting"
++            % "formatting"
 +    ),
  )
  
@@ -669,7 +669,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 -    " one line at alllll." % ("formatting", "string"),
 +    (
 +        "A long string with {}. This {} is so long that it is ridiculous. It can't fit on one line at alllll."
-+        % ("formatting", "string")
++            % ("formatting", "string")
 +    ),
  )
  
@@ -688,17 +688,17 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 -                    xxxx.xxxxxxxxxxxxxx(xx),
 +                (
 +                    "xxxxxxxxxx xxxx xx xxxxxx(%x) xx %x xxxx xx xxx %x.xx"
-+                    % (len(self) + 1, xxxx.xxxxxxxxxx, xxxx.xxxxxxxxxx)
-+                )
-+                + (
-+                    " %.3f (%s) to %.3f (%s).\n"
-+                    % (
-+                        xxxx.xxxxxxxxx,
-+                        xxxx.xxxxxxxxxxxxxx(xxxx.xxxxxxxxx),
-+                        x,
-+                        xxxx.xxxxxxxxxxxxxx(xx),
-+                    )
++                        % (len(self) + 1, xxxx.xxxxxxxxxx, xxxx.xxxxxxxxxx)
                  )
++                    + (
++                        " %.3f (%s) to %.3f (%s).\n"
++                            % (
++                                xxxx.xxxxxxxxx,
++                                xxxx.xxxxxxxxxxxxxx(xxxx.xxxxxxxxx),
++                                x,
++                                xxxx.xxxxxxxxxxxxxx(xx),
++                            )
++                    )
              )
  
  
@@ -777,9 +777,9 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 -                + "xx xxxxxx xxxxxx xxxxxx xx xxxxxxx xxx xxx ${0} xx x xxxxxxxx xxxxx"
 -                .xxxxxx(xxxxxx_xxxxxx_xxx)
 +                "xxx xxxxxx xxx xxxxxxxxx.xx xx xxxxxxxx.  xxx xxxxxxxxxxxxx.xx xxxxxxx "
-+                + "xx xxxxxx xxxxxx xxxxxx xx xxxxxxx xxx xxx ${0} xx x xxxxxxxx xxxxx".xxxxxx(
-+                    xxxxxx_xxxxxx_xxx
-+                )
++                    + "xx xxxxxx xxxxxx xxxxxx xx xxxxxxx xxx xxx ${0} xx x xxxxxxxx xxxxx".xxxxxx(
++                        xxxxxx_xxxxxx_xxx
++                    )
              )
  
  
@@ -832,7 +832,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  
  some_commented_string = (  # This comment stays at the top.
      "This string is long but not so long that it needs hahahah toooooo be so greatttt"
-@@ -279,36 +280,25 @@
+@@ -279,37 +280,26 @@
  )
  
  lpar_and_rpar_have_comments = func_call(  # LPAR Comment
@@ -852,32 +852,33 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 -    f" {'' if ID is None else ID} | perl -nE 'print if /^{field}:/'"
 -)
 +cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {'' if ID is None else ID} | perl -nE 'print if /^{field}:/'"
++
++cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {'{{}}' if ID is None else ID} | perl -nE 'print if /^{field}:/'"
  
 -cmd_fstring = (
 -    "sudo -E deluge-console info --detailed --sort-reverse=time_added"
 -    f" {'{{}}' if ID is None else ID} | perl -nE 'print if /^{field}:/'"
 -)
-+cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {'{{}}' if ID is None else ID} | perl -nE 'print if /^{field}:/'"
++cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {{'' if ID is None else ID}} | perl -nE 'print if /^{field}:/'"
  
 -cmd_fstring = (
 -    "sudo -E deluge-console info --detailed --sort-reverse=time_added {'' if ID is"
 -    f" None else ID}} | perl -nE 'print if /^{field}:/'"
 -)
-+cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {{'' if ID is None else ID}} | perl -nE 'print if /^{field}:/'"
- 
 +fstring = f"This string really doesn't need to be an {{{{fstring}}}}, but this one most certainly, absolutely {does}."
-+
+ 
  fstring = (
 -    "This string really doesn't need to be an {{fstring}}, but this one most"
 -    f" certainly, absolutely {does}."
 +    f"We have to remember to escape {braces}." " Like {these}." f" But not {this}."
  )
--
--fstring = f"We have to remember to escape {braces}. Like {{these}}. But not {this}."
  
+-fstring = f"We have to remember to escape {braces}. Like {{these}}. But not {this}."
+-
  
  class A:
-@@ -364,10 +354,7 @@
+     class B:
+@@ -364,11 +354,8 @@
          def foo():
              if not hasattr(module, name):
                  raise ValueError(
@@ -885,9 +886,11 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 -                    " serialize things like inner classes. Please move the object into"
 -                    " the main module body to use migrations.\nFor more information,"
 -                    " see https://docs.djangoproject.com/en/%s/topics/migrations/#serializing-values"
+-                    % (name, module_name, get_docs_version())
 +                    "Could not find object %s in %s.\nPlease note that you cannot serialize things like inner classes. Please move the object into the main module body to use migrations.\nFor more information, see https://docs.djangoproject.com/en/%s/topics/migrations/#serializing-values"
-                     % (name, module_name, get_docs_version())
++                        % (name, module_name, get_docs_version())
                  )
+ 
  
 @@ -382,23 +369,19 @@
  
@@ -927,8 +930,17 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 -            r"for pid in $(ps aux | grep paster | grep -v grep | grep '\-%d' | awk"
 -            r" '{print $2}'); do kill $pid; done" % (i)
 +            r"for pid in $(ps aux | grep paster | grep -v grep | grep '\-%d' | awk '{print $2}'); do kill $pid; done"
-+            % (i)
++                % (i)
          )
+ 
+ 
+@@ -423,7 +406,7 @@
+                         def G():
+                             assert (
+                                 c_float(val[0][0] / val[0][1]).value
+-                                == c_float(value[0][0] / value[0][1]).value
++                                    == c_float(value[0][0] / value[0][1]).value
+                             ), "%s didn't roundtrip" % tag
  
  
 @@ -432,9 +415,7 @@
@@ -1036,14 +1048,14 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 -    in "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', 'grykangaroo$',"
 -    " 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', 'o$', 'oo$', 'roo$', 'rykangaroo$',"
 -    " 'ykangaroo$']"
-+    in "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', 'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', 'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
++        in "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', 'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', 'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
  )
  assert (
      str(suffix_arr)
 -    not in "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', 'grykangaroo$',"
 -    " 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', 'o$', 'oo$', 'roo$',"
 -    " 'rykangaroo$', 'ykangaroo$']"
-+    not in "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', 'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', 'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
++        not in "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', 'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', 'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
  )
  message = (
      f"1. Go to Google Developers Console and log in with your Google account."
@@ -1323,14 +1335,14 @@ func_call_where_string_arg_has_method_call_and_bad_parens(
 func_call_where_string_arg_has_old_fmt_and_bad_parens(
     (
         "A long string with {}. This string is so long that it is ridiculous. It can't fit on one line at alllll."
-        % "formatting"
+            % "formatting"
     ),
 )
 
 func_call_where_string_arg_has_old_fmt_and_bad_parens(
     (
         "A long string with {}. This {} is so long that it is ridiculous. It can't fit on one line at alllll."
-        % ("formatting", "string")
+            % ("formatting", "string")
     ),
 )
 
@@ -1341,17 +1353,17 @@ class A:
             xxxx.xxxxxxx.xxxxx(
                 (
                     "xxxxxxxxxx xxxx xx xxxxxx(%x) xx %x xxxx xx xxx %x.xx"
-                    % (len(self) + 1, xxxx.xxxxxxxxxx, xxxx.xxxxxxxxxx)
+                        % (len(self) + 1, xxxx.xxxxxxxxxx, xxxx.xxxxxxxxxx)
                 )
-                + (
-                    " %.3f (%s) to %.3f (%s).\n"
-                    % (
-                        xxxx.xxxxxxxxx,
-                        xxxx.xxxxxxxxxxxxxx(xxxx.xxxxxxxxx),
-                        x,
-                        xxxx.xxxxxxxxxxxxxx(xx),
+                    + (
+                        " %.3f (%s) to %.3f (%s).\n"
+                            % (
+                                xxxx.xxxxxxxxx,
+                                xxxx.xxxxxxxxxxxxxx(xxxx.xxxxxxxxx),
+                                x,
+                                xxxx.xxxxxxxxxxxxxx(xx),
+                            )
                     )
-                )
             )
 
 
@@ -1401,9 +1413,9 @@ class A:
         if True:
             xxxxx_xxxxxxxxxxxx(
                 "xxx xxxxxx xxx xxxxxxxxx.xx xx xxxxxxxx.  xxx xxxxxxxxxxxxx.xx xxxxxxx "
-                + "xx xxxxxx xxxxxx xxxxxx xx xxxxxxx xxx xxx ${0} xx x xxxxxxxx xxxxx".xxxxxx(
-                    xxxxxx_xxxxxx_xxx
-                )
+                    + "xx xxxxxx xxxxxx xxxxxx xx xxxxxxx xxx xxx ${0} xx x xxxxxxxx xxxxx".xxxxxx(
+                        xxxxxx_xxxxxx_xxx
+                    )
             )
 
 
@@ -1554,7 +1566,7 @@ class A:
             if not hasattr(module, name):
                 raise ValueError(
                     "Could not find object %s in %s.\nPlease note that you cannot serialize things like inner classes. Please move the object into the main module body to use migrations.\nFor more information, see https://docs.djangoproject.com/en/%s/topics/migrations/#serializing-values"
-                    % (name, module_name, get_docs_version())
+                        % (name, module_name, get_docs_version())
                 )
 
 
@@ -1592,7 +1604,7 @@ if __name__ == "__main__":
     for i in range(4, 8):
         cmd = (
             r"for pid in $(ps aux | grep paster | grep -v grep | grep '\-%d' | awk '{print $2}'); do kill $pid; done"
-            % (i)
+                % (i)
         )
 
 
@@ -1605,7 +1617,7 @@ def A():
                         def G():
                             assert (
                                 c_float(val[0][0] / val[0][1]).value
-                                == c_float(value[0][0] / value[0][1]).value
+                                    == c_float(value[0][0] / value[0][1]).value
                             ), "%s didn't roundtrip" % tag
 
 
@@ -1725,11 +1737,11 @@ assert str(suffix_arr) > (
 )
 assert (
     str(suffix_arr)
-    in "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', 'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', 'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
+        in "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', 'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', 'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
 )
 assert (
     str(suffix_arr)
-    not in "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', 'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', 'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
+        not in "['$', 'angaroo$', 'angrykangaroo$', 'aroo$', 'garoo$', 'grykangaroo$', 'kangaroo$', 'ngaroo$', 'ngrykangaroo$', 'o$', 'oo$', 'roo$', 'rykangaroo$', 'ykangaroo$']"
 )
 message = (
     f"1. Go to Google Developers Console and log in with your Google account."

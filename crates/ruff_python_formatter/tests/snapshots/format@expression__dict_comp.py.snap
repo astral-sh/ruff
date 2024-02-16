@@ -224,18 +224,18 @@ query = {
 
 {
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-    + [
-        dddddddddddddddddd,
-        eeeeeeeeeeeeeeeeeee,
-    ]: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        + [
+            dddddddddddddddddd,
+            eeeeeeeeeeeeeeeeeee,
+        ]: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     for ccccccccccccccccccccccccccccccccccccccc, ddddddddddddddddddd, [
         eeeeeeeeeeeeeeeeeeeeee,
         fffffffffffffffffffffffff,
     ] in eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeffffffffffffffffffffffffggggggggggggggggggggghhhhhhhhhhhhhhothermoreeand_even_moreddddddddddddddddddddd
     if fffffffffffffffffffffffffffffffffffffffffff
-    < gggggggggggggggggggggggggggggggggggggggggggggg
-    < hhhhhhhhhhhhhhhhhhhhhhhhhh
+        < gggggggggggggggggggggggggggggggggggggggggggggg
+        < hhhhhhhhhhhhhhhhhhhhhhhhhh
     if gggggggggggggggggggggggggggggggggggggggggggg
 }
 

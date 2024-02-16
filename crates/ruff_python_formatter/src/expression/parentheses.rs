@@ -379,6 +379,42 @@ where
     })
 }
 
+pub(super) fn in_parentheses_only_indent_start<'a>() -> impl Format<PyFormatContext<'a>> {
+    format_with(|f: &mut PyFormatter| {
+        match f.context().node_level() {
+            NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement | NodeLevel::Expression(None) => {
+                // no-op, not parenthesized
+            }
+            NodeLevel::Expression(Some(parentheses_id)) => f.write_element(FormatElement::Tag(
+                Tag::StartIndentIfGroupBreaks(parentheses_id),
+            )),
+            NodeLevel::ParenthesizedExpression => {
+                f.write_element(FormatElement::Tag(Tag::StartIndent))
+            }
+        }
+
+        Ok(())
+    })
+}
+
+pub(super) fn in_parentheses_only_indent_end<'a>() -> impl Format<PyFormatContext<'a>> {
+    format_with(|f: &mut PyFormatter| {
+        match f.context().node_level() {
+            NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement | NodeLevel::Expression(None) => {
+                // no-op, not parenthesized
+            }
+            NodeLevel::Expression(Some(_)) => {
+                f.write_element(FormatElement::Tag(Tag::EndIndentIfGroupBreaks))
+            }
+            NodeLevel::ParenthesizedExpression => {
+                f.write_element(FormatElement::Tag(Tag::EndIndent))
+            }
+        }
+
+        Ok(())
+    })
+}
+
 /// Format comments inside empty parentheses, brackets or curly braces.
 ///
 /// Empty `()`, `[]` and `{}` are special because there can be dangling comments, and they can be in

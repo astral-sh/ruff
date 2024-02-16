@@ -1,7 +1,8 @@
-use crate::format_element::PrintMode;
-use crate::{GroupId, TextSize};
 use std::cell::Cell;
 use std::num::NonZeroU8;
+
+use crate::format_element::PrintMode;
+use crate::{GroupId, TextSize};
 
 /// A Tag marking the start and end of some content to which some special formatting should be applied.
 ///
@@ -99,6 +100,10 @@ pub enum Tag {
 }
 
 impl Tag {
+    pub const fn align(count: NonZeroU8) -> Tag {
+        Tag::StartAlign(Align(count))
+    }
+
     /// Returns `true` if `self` is any start tag.
     pub const fn is_start(&self) -> bool {
         matches!(
