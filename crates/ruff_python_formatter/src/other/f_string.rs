@@ -59,7 +59,7 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
             return result;
         }
 
-        // TODO(dhruvmanila): This could probably be simplified for Python 3.12 specifically
+        // This could probably be simplified for Python 3.12 specifically
         // as same quotes can be re-used inside an f-string.
         let quotes = normalizer.choose_quotes(&string, &locator);
 

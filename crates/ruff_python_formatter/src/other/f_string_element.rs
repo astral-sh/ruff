@@ -15,7 +15,7 @@ use crate::options::MagicTrailingComma;
 use crate::prelude::*;
 use crate::preview::is_hex_codes_in_unicode_sequences_enabled;
 use crate::string::normalize_string;
-use crate::verbatim::suppressed_node;
+use crate::verbatim::verbatim_text;
 
 use super::f_string::FStringContext;
 
@@ -101,19 +101,30 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
 
             let comments = f.context().comments();
 
-            // If debug text is present in an f-string, the node is suppressed
-            // marking all of the comments attached to the expression as formatted.
-            // But, the dangling comments are attached to the f-string element
-            // and need to be marked as formatted.
-            for dangling_comment in comments.dangling(self.element) {
-                dangling_comment.mark_formatted();
+            // If the element has a debug text, preserve the same formatting as
+            // in the source code (`verbatim`). This requires us to mark all of
+            // the surrounding comments as formatted.
+            comments.mark_verbatim_node_comments_formatted(self.element.into());
+
+            // Above method doesn't mark the leading and trailing comments of the element.
+            // There can't be any leading comments for an expression element, but there
+            // can be trailing comments. For example,
+            //
+            // ```python
+            // f"""foo {
+            //     x:.3f
+            //     # trailing comment
+            // }"""
+            // ```
+            for trailing_comment in comments.trailing(self.element) {
+                trailing_comment.mark_formatted();
             }
 
             write!(
                 f,
                 [
                     text(&debug_text.leading),
-                    suppressed_node(&**expression),
+                    verbatim_text(&**expression),
                     text(&debug_text.trailing),
                 ]
             )?;
@@ -128,7 +139,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
             }
 
             if let Some(format_spec) = format_spec.as_deref() {
-                write!(f, [token(":"), suppressed_node(format_spec)])?;
+                write!(f, [token(":"), verbatim_text(format_spec)])?;
             }
 
             token("}").fmt(f)
@@ -137,7 +148,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
             let dangling_item_comments = comments.dangling(self.element);
 
             let item = format_with(|f| {
-                let line_break_or_space = match expression.as_ref() {
+                let bracket_spacing = match expression.as_ref() {
                     // If an expression starts with a `{`, we need to add a space before the
                     // curly brace to avoid turning it into a literal curly with `{{`.
                     //
@@ -147,14 +158,16 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                     // #  ^                ^
                     // ```
                     //
-                    // We need to preserve the space highlighted by `^`.
+                    // We need to preserve the space highlighted by `^`. The whitespace
+                    // before the closing curly brace is not strictly necessary, but it's
+                    // added to maintain consistency.
                     Expr::Dict(_) | Expr::DictComp(_) | Expr::Set(_) | Expr::SetComp(_) => {
                         Some(soft_line_break_or_space())
                     }
                     _ => None,
                 };
 
-                line_break_or_space.fmt(f)?;
+                bracket_spacing.fmt(f)?;
 
                 // Update the context to be inside the f-string.
                 let f = &mut WithFStringState::new(FStringState::Inside(self.context.quotes()), f);
@@ -202,60 +215,59 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                 }
 
                 if let Some(format_spec) = format_spec.as_deref() {
-                    let elements =
-                        format_with(|f| {
-                            f.join()
-                                .entries(format_spec.elements.iter().map(|element| {
-                                    FormatFStringElement::new(element, self.context)
-                                }))
-                                .finish()
-                        });
-                    write!(
-                        f,
-                        [
-                            token(":"),
-                            elements,
-                            trailing_comments(comments.trailing(self.element))
-                        ]
-                    )?;
+                    token(":").fmt(f)?;
+
+                    f.join()
+                        .entries(
+                            format_spec
+                                .elements
+                                .iter()
+                                .map(|element| FormatFStringElement::new(element, self.context)),
+                        )
+                        .finish()?;
+
+                    // These trailing comments can only occur if the format specifier is
+                    // present. For example,
+                    //
+                    // ```python
+                    // f"{
+                    //    x:.3f
+                    //    # comment
+                    // }"
+                    // ```
+                    //
+                    // Any other trailing comments are attached to the expression itself.
+                    trailing_comments(comments.trailing(self.element)).fmt(f)?;
                 }
 
-                line_break_or_space.fmt(f)
+                bracket_spacing.fmt(f)
             });
 
-            let inner = format_with(|f| {
-                let mut buffer = RemoveSoftLinesBuffer::new(f);
+            let open_parenthesis_comments = if dangling_item_comments.is_empty() {
+                None
+            } else {
+                Some(dangling_open_parenthesis_comments(dangling_item_comments))
+            };
 
-                if dangling_item_comments.is_empty() {
-                    if self.context.layout().is_flat() {
-                        write!(buffer, [group(&soft_block_indent(&item))])
-                    } else {
-                        write!(f, [group(&soft_block_indent(&item))])
-                    }
+            token("{").fmt(f)?;
+
+            {
+                let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
+
+                if self.context.layout().is_flat() {
+                    let mut buffer = RemoveSoftLinesBuffer::new(&mut *f);
+
+                    write!(buffer, [open_parenthesis_comments, item])?;
                 } else {
-                    if self.context.layout().is_flat() {
-                        write!(
-                            buffer,
-                            [group(&format_args![
-                                dangling_open_parenthesis_comments(dangling_item_comments),
-                                soft_block_indent(&item),
-                            ])]
-                        )
-                    } else {
-                        write!(
-                            f,
-                            [group(&format_args![
-                                dangling_open_parenthesis_comments(dangling_item_comments),
-                                soft_block_indent(&item),
-                            ])]
-                        )
-                    }
+                    group(&format_args![
+                        open_parenthesis_comments,
+                        soft_block_indent(&item)
+                    ])
+                    .fmt(&mut f)?;
                 }
-            });
+            }
 
-            let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
-
-            write!(f, [token("{"), inner, token("}")])
+            token("}").fmt(f)
         }
     }
 }
