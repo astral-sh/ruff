@@ -42,6 +42,18 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
             let result = normalizer.normalize(&string, &locator).fmt(f);
             self.value.elements.iter().for_each(|value| {
                 comments.mark_verbatim_node_comments_formatted(value.into());
+                // Above method doesn't mark the trailing comments of the f-string elements
+                // as formatted, so we need to do it manually. For example,
+                //
+                // ```python
+                // f"""foo {
+                //     x:.3f
+                //     # comment
+                // }"""
+                // ```
+                for trailing_comment in comments.trailing(value) {
+                    trailing_comment.mark_formatted();
+                }
             });
             return result;
         }

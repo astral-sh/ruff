@@ -95,7 +95,6 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
             format_spec,
             ..
         } = self.element;
-
         let comments = f.context().comments().clone();
 
         if let Some(debug_text) = debug_text {
@@ -134,11 +133,6 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
             token("}").fmt(f)
         } else {
             let dangling_item_comments = comments.dangling(self.element);
-            let (dangling_open_parentheses_comments, trailing_format_spec_comments) =
-                dangling_item_comments.split_at(
-                    dangling_item_comments
-                        .partition_point(|comment| comment.start() < expression.start()),
-                );
 
             let item = format_with(|f| {
                 let line_break_or_space = match expression.as_ref() {
@@ -219,7 +213,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                         [
                             token(":"),
                             elements,
-                            trailing_comments(trailing_format_spec_comments)
+                            trailing_comments(comments.trailing(self.element))
                         ]
                     )?;
                 }
@@ -230,7 +224,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
             let inner = format_with(|f| {
                 let mut buffer = RemoveSoftLinesBuffer::new(f);
 
-                if dangling_open_parentheses_comments.is_empty() {
+                if dangling_item_comments.is_empty() {
                     if self.context.should_remove_soft_line_breaks() {
                         write!(buffer, [group(&soft_block_indent(&item))])
                     } else {
@@ -241,9 +235,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                         write!(
                             buffer,
                             [group(&format_args![
-                                dangling_open_parenthesis_comments(
-                                    dangling_open_parentheses_comments
-                                ),
+                                dangling_open_parenthesis_comments(dangling_item_comments),
                                 soft_block_indent(&item),
                             ])]
                         )
@@ -251,9 +243,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                         write!(
                             f,
                             [group(&format_args![
-                                dangling_open_parenthesis_comments(
-                                    dangling_open_parentheses_comments
-                                ),
+                                dangling_open_parenthesis_comments(dangling_item_comments),
                                 soft_block_indent(&item),
                             ])]
                         )

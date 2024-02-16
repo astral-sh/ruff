@@ -306,7 +306,7 @@ fn handle_enclosed_comment<'a>(
                     AnyNodeRef::FStringExpressionElement(_) | AnyNodeRef::FStringLiteralElement(_)
                 )
             ) {
-                CommentPlacement::dangling(comment.enclosing_node(), comment)
+                CommentPlacement::trailing(comment.enclosing_node(), comment)
             } else {
                 handle_bracketed_end_of_line_comment(comment, locator)
             }
