@@ -30,22 +30,22 @@ result_f = (
 # an expression inside a formatted value
 (
     f'{1}'
-    # comment
+    # comment 1
     ''
 )
 
 (
-    f'{1}'  # comment
+    f'{1}'  # comment 2
     f'{2}'
 )
 
 (
     f'{1}'
-    f'{2}'  # comment
+    f'{2}'  # comment 3
 )
 
 (
-    1, (  # comment
+    1, (  # comment 4
         f'{2}'
     )
 )
@@ -53,7 +53,7 @@ result_f = (
 (
     (
         f'{1}'
-        # comment
+        # comment 5
     ),
     2
 )
@@ -69,9 +69,9 @@ z = f'''a{""}b''' f'''c{1}d"""e'''
 x = f"{a}"
 x = f"{
     a = }"
-x = f"{ # comment
+x = f"{ # comment 6
     a }"
-x = f"{   # comment
+x = f"{   # comment 7
     a = }"
 
 # Remove the parentheses as adding them doesn't make then fit within the line length limit.
@@ -90,9 +90,9 @@ aaaaaaaaaaa = (
 # f-string exceeds the line length limit.
 x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } ccccccccccccccc"
 x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" = } ccccccccccccccc"
-x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { # comment
+x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { # comment 8
                                              "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } ccccccccccccccc"
-x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { # comment
+x = f"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa { # comment 9
                                              "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" = } ccccccccccccccc"
 
 # Multiple larger expressions which exceeds the line length limit. Here, we need to decide
@@ -112,10 +112,10 @@ x = f"aaaaaaaaaaaa { bbbbbbbbbbbbbb } cccccccccccccccccccc { ddddddddddddddd
 
 # But, in case comments are present, we would split at the expression containing the
 # comments:
-x = f"aaaaaaaaaaaa { bbbbbbbbbbbbbb # comment
+x = f"aaaaaaaaaaaa { bbbbbbbbbbbbbb # comment 10
                     } cccccccccccccccccccc { ddddddddddddddd } eeeeeeeeeeeeee"
 x = f"aaaaaaaaaaaa { bbbbbbbbbbbbbb
-                    } cccccccccccccccccccc { # comment
+                    } cccccccccccccccccccc { # comment 11
                                             ddddddddddddddd } eeeeeeeeeeeeee"
 
 # Here, the expression part itself starts with a curly brace so we need to add an extra
@@ -125,9 +125,9 @@ x = f"{ {'x': 1, 'y': 2} }"
 # consistency.
 x = f"{ {'x': 1, 'y': 2}}"
 x = f"{ {'x': 1, 'y': 2} = }"
-x = f"{  # comment
+x = f"{  # comment 12
     {'x': 1, 'y': 2} }"
-x = f"{    # comment
+x = f"{    # comment 13
     {'x': 1, 'y': 2} = }"
 
 # But, in this case, we would split the expression itself because it exceeds the line
@@ -192,7 +192,7 @@ f"aaaaaa {[
 # Remove the parenthese because they aren't required
 xxxxxxxxxxxxxxx = (
     f"aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbb {
-        xxxxxxxxxxx  # comment
+        xxxxxxxxxxx  # comment 14
         + yyyyyyyyyy
     } dddddddddd"
 )
@@ -200,12 +200,12 @@ xxxxxxxxxxxxxxx = (
 # Comments
 
 # No comments should be dropped!
-f"{ # comment 1
-    # comment 2
-    foo # comment 3
-    # comment 4
-}"  # comment 5
-# comment 6
+f"{ # comment 15
+    # comment 16
+    foo # comment 17
+    # comment 18
+}"  # comment 19
+# comment 20
 
 # Conversion flags
 #
@@ -228,31 +228,31 @@ x = f"{x   =   !  s
 # We'll format is as trailing comments.
 x = f"{x  !s
          :>0
-         # comment
+         # comment 21
          }"
 
 x = f"""
-{              # dangling comment 1
- x =   :.0{y # dangling comment 2
+{              # comment 22
+ x =   :.0{y # comment 23
            }f}"""
 
 # Here, the debug expression is in a nested f-string so we should start preserving
 # whitespaces from that point onwards. This means we should format the outer f-string.
-x = f"""{"foo " +    # comment 1
+x = f"""{"foo " +    # comment 24
     f"{   x =
 
-       }"    # comment 2
+       }"    # comment 25
  }
         """
 
 # Mix of various features.
-f"{  # dangling comment 1
+f"{  # comment 26
     foo # after foo
    :>{
           x # after x
           }
-    # dangling comment 2
-    # dangling comment 3
+    # comment 27
+    # comment 28
 } woah {x}"
 
 # Indentation
