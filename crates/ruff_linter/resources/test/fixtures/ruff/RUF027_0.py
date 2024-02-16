@@ -68,3 +68,7 @@ def method_calls():
     first = "Wendy"
     last = "Appleseed"
     value.method("{first} {last}")  # RUF027
+
+def format_specifiers():
+    a = 4
+    b = "{a:b} {a:^5}"
