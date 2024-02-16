@@ -95,10 +95,11 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
             format_spec,
             ..
         } = self.element;
-        let comments = f.context().comments().clone();
 
         if let Some(debug_text) = debug_text {
             token("{").fmt(f)?;
+
+            let comments = f.context().comments();
 
             // If debug text is present in an f-string, the node is suppressed
             // marking all of the comments attached to the expression as formatted.
@@ -132,6 +133,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
 
             token("}").fmt(f)
         } else {
+            let comments = f.context().comments().clone();
             let dangling_item_comments = comments.dangling(self.element);
 
             let item = format_with(|f| {
@@ -174,7 +176,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                 // a trailing comma was added by the user, they're removed. This is expensive
                 // so we've implemented some heuristics to avoid this in cases where the
                 // expression can't contain a trailing comma.
-                if self.context.should_remove_soft_line_breaks() && {
+                if self.context.layout().is_flat() && {
                     let visitor = &mut CanContainTrailingCommaVisitor::default();
                     visitor.visit_expr(expression);
                     visitor.can_have_trailing_comma
@@ -225,13 +227,13 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                 let mut buffer = RemoveSoftLinesBuffer::new(f);
 
                 if dangling_item_comments.is_empty() {
-                    if self.context.should_remove_soft_line_breaks() {
+                    if self.context.layout().is_flat() {
                         write!(buffer, [group(&soft_block_indent(&item))])
                     } else {
                         write!(f, [group(&soft_block_indent(&item))])
                     }
                 } else {
-                    if self.context.should_remove_soft_line_breaks() {
+                    if self.context.layout().is_flat() {
                         write!(
                             buffer,
                             [group(&format_args![
