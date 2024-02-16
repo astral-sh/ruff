@@ -134,10 +134,11 @@ impl Debug for PyFormatContext<'_> {
 
 #[derive(Copy, Clone, Debug, Default)]
 pub(crate) enum FStringState {
-    /// The formatter is inside an f-string, in the replacement field i.e., `f"foo {x}"`.
+    /// The formatter is inside an f-string expression element i.e., between the
+    /// curly brace in `f"foo {x}"`.
     ///
     /// The containing `StringQuotes` is the surrounding f-string quote information.
-    Inside(StringQuotes),
+    InsideExpressionElement(StringQuotes),
     /// The formatter is outside an f-string.
     #[default]
     Outside,

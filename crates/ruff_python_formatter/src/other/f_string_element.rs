@@ -176,7 +176,10 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                 bracket_spacing.fmt(f)?;
 
                 // Update the context to be inside the f-string.
-                let f = &mut WithFStringState::new(FStringState::Inside(self.context.quotes()), f);
+                let f = &mut WithFStringState::new(
+                    FStringState::InsideExpressionElement(self.context.quotes()),
+                    f,
+                );
 
                 // If we're going to remove the soft line breaks, then there's a chance
                 // that there will be trailing commas in the formatted expression. For
