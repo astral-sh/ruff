@@ -8,7 +8,7 @@
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![Actions status](https://github.com/astral-sh/ruff/workflows/CI/badge.svg)](https://github.com/astral-sh/ruff/actions)
 
-[**Discord**](https://discord.gg/c9MhzV8aU5) | [**Docs**](https://docs.astral.sh/ruff/) | [**Playground**](https://play.ruff.rs/)
+[**Discord**](https://discord.com/invite/astral-sh) | [**Docs**](https://docs.astral.sh/ruff/) | [**Playground**](https://play.ruff.rs/)
 
 An extremely fast Python linter and code formatter, written in Rust.
 
@@ -341,14 +341,14 @@ For a complete enumeration of the supported rules, see [_Rules_](https://docs.as
 Contributions are welcome and highly appreciated. To get started, check out the
 [**contributing guidelines**](https://docs.astral.sh/ruff/contributing/).
 
-You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5).
+You can also join us on [**Discord**](https://discord.com/invite/astral-sh).
 
 ## Support
 
 Having trouble? Check out the existing issues on [**GitHub**](https://github.com/astral-sh/ruff/issues),
 or feel free to [**open a new one**](https://github.com/astral-sh/ruff/issues/new).
 
-You can also ask for help on [**Discord**](https://discord.gg/c9MhzV8aU5).
+You can also ask for help on [**Discord**](https://discord.com/invite/astral-sh).
 
 ## Acknowledgements
 
