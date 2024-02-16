@@ -162,7 +162,13 @@ impl Format<PyFormatContext<'_>> for FormatFStringExpressionElement<'_> {
                     // before the closing curly brace is not strictly necessary, but it's
                     // added to maintain consistency.
                     Expr::Dict(_) | Expr::DictComp(_) | Expr::Set(_) | Expr::SetComp(_) => {
-                        Some(soft_line_break_or_space())
+                        Some(format_with(|f| {
+                            if self.context.layout().is_flat() {
+                                space().fmt(f)
+                            } else {
+                                soft_line_break_or_space().fmt(f)
+                            }
+                        }))
                     }
                     _ => None,
                 };
