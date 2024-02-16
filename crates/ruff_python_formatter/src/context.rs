@@ -1,5 +1,6 @@
 use crate::comments::Comments;
-use crate::string::{QuoteChar, StringQuotes};
+use crate::other::f_string::FStringContext;
+use crate::string::QuoteChar;
 use crate::PyFormatOptions;
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
 use ruff_source_file::Locator;
@@ -97,12 +98,6 @@ impl<'a> PyFormatContext<'a> {
         self.f_string_state = f_string_state;
     }
 
-    /// Returns a new context with the given set of options.
-    pub(crate) fn with_options(mut self, options: PyFormatOptions) -> Self {
-        self.options = options;
-        self
-    }
-
     /// Returns `true` if preview mode is enabled.
     pub(crate) const fn is_preview(&self) -> bool {
         self.options.preview().is_enabled()
@@ -137,8 +132,8 @@ pub(crate) enum FStringState {
     /// The formatter is inside an f-string expression element i.e., between the
     /// curly brace in `f"foo {x}"`.
     ///
-    /// The containing `StringQuotes` is the surrounding f-string quote information.
-    InsideExpressionElement(StringQuotes),
+    /// The containing `FStringContext` is the surrounding f-string context.
+    InsideExpressionElement(FStringContext),
     /// The formatter is outside an f-string.
     #[default]
     Outside,

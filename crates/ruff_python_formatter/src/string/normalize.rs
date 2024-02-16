@@ -103,7 +103,7 @@ impl StringNormalizer {
             self.preferred_quote_style
         };
 
-        let quoting = if let FStringState::InsideExpressionElement(quotes) = self.f_string_state {
+        let quoting = if let FStringState::InsideExpressionElement(context) = self.f_string_state {
             // If we're inside an f-string, we need to make sure to preserve the
             // existing quotes unless we're inside a triple-quoted f-string and
             // the inner string itself isn't triple-quoted. For example:
@@ -118,7 +118,7 @@ impl StringNormalizer {
             // The reason to preserve the quotes is based on the assumption that
             // the original f-string is valid in terms of quoting, and we don't
             // want to change that to make it invalid.
-            if (quotes.is_triple() && !string.quotes().is_triple())
+            if (context.quotes().is_triple() && !string.quotes().is_triple())
                 || self.target_version.supports_pep_701()
             {
                 self.quoting

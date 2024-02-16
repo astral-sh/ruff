@@ -1,7 +1,7 @@
 use ruff_formatter::{write, Argument, Arguments};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::context::{NodeLevel, WithNodeLevel};
+use crate::context::{FStringState, NodeLevel, WithNodeLevel};
 use crate::other::commas::has_magic_trailing_comma;
 use crate::prelude::*;
 
@@ -205,6 +205,15 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     }
 
     pub(crate) fn finish(&mut self) -> FormatResult<()> {
+        // If the formatter is inside an f-string expression element, and the layout
+        // is flat, then we don't need to add a trailing comma.
+        if let FStringState::InsideExpressionElement(context) = self.fmt.context().f_string_state()
+        {
+            if context.layout().is_flat() {
+                return Ok(());
+            }
+        }
+
         self.result.and_then(|()| {
             if let Some(last_end) = self.entries.position() {
                 let magic_trailing_comma = has_magic_trailing_comma(
