@@ -6,17 +6,6 @@ use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 
-#[derive(Copy, Clone, Debug, Default)]
-pub(crate) enum FStringState {
-    /// The formatter is inside an f-string, in the replacement field i.e., `f"foo {x}"`.
-    ///
-    /// The containing `StringQuotes` is the surrounding f-string quote information.
-    Inside(StringQuotes),
-    /// The formatter is outside an f-string.
-    #[default]
-    Outside,
-}
-
 #[derive(Clone)]
 pub struct PyFormatContext<'a> {
     options: PyFormatOptions,
@@ -141,6 +130,17 @@ impl Debug for PyFormatContext<'_> {
             .field("source", &self.contents)
             .finish()
     }
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub(crate) enum FStringState {
+    /// The formatter is inside an f-string, in the replacement field i.e., `f"foo {x}"`.
+    ///
+    /// The containing `StringQuotes` is the surrounding f-string quote information.
+    Inside(StringQuotes),
+    /// The formatter is outside an f-string.
+    #[default]
+    Outside,
 }
 
 /// The position of a top-level statement in the module.
