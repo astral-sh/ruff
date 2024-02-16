@@ -1,8 +1,8 @@
 use crate::{
     self as ast, Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator,
-    ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringElement, Keyword, MatchCase,
-    Operator, Parameter, Parameters, Pattern, PatternArguments, PatternKeyword, Stmt,
-    StringLiteral, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp, WithItem,
+    ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringElement, FStringFormatSpec,
+    Keyword, MatchCase, Operator, Parameter, Parameters, Pattern, PatternArguments, PatternKeyword,
+    Stmt, StringLiteral, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp, WithItem,
 };
 
 /// A trait for transforming ASTs. Visits all nodes in the AST recursively in evaluation-order.
@@ -87,6 +87,9 @@ pub trait Transformer {
     }
     fn visit_f_string_element(&self, f_string_element: &mut FStringElement) {
         walk_f_string_element(self, f_string_element);
+    }
+    fn visit_f_string_format_spec(&self, f_string_format_spec: &mut FStringFormatSpec) {
+        walk_f_string_format_spec(self, f_string_format_spec);
     }
     fn visit_string_literal(&self, string_literal: &mut StringLiteral) {
         walk_string_literal(self, string_literal);
@@ -731,6 +734,15 @@ pub fn walk_f_string<V: Transformer + ?Sized>(visitor: &V, f_string: &mut FStrin
     }
 }
 
+pub fn walk_f_string_format_spec<V: Transformer + ?Sized>(
+    visitor: &V,
+    f_string_format_spec: &mut FStringFormatSpec,
+) {
+    for spec_element in &mut f_string_format_spec.elements {
+        visitor.visit_f_string_element(spec_element);
+    }
+}
+
 pub fn walk_f_string_element<V: Transformer + ?Sized>(
     visitor: &V,
     f_string_element: &mut FStringElement,
@@ -743,9 +755,7 @@ pub fn walk_f_string_element<V: Transformer + ?Sized>(
     {
         visitor.visit_expr(expression);
         if let Some(format_spec) = format_spec {
-            for spec_element in &mut format_spec.elements {
-                visitor.visit_f_string_element(spec_element);
-            }
+            visitor.visit_f_string_format_spec(format_spec);
         }
     }
 }

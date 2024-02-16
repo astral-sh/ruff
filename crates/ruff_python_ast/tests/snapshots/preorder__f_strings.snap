@@ -10,9 +10,10 @@ expression: trace
         - FStringLiteralElement
         - FStringExpressionElement
           - ExprName
-          - FStringLiteralElement
-          - FStringExpressionElement
-            - ExprName
-          - FStringLiteralElement
+          - FStringFormatSpec
+            - FStringLiteralElement
+            - FStringExpressionElement
+              - ExprName
+            - FStringLiteralElement
         - FStringLiteralElement
 

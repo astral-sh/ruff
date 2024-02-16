@@ -1,8 +1,8 @@
 use crate::{
     Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator, ElifElseClause,
-    ExceptHandler, Expr, FString, FStringElement, Keyword, MatchCase, Mod, Operator, Parameter,
-    ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword, Singleton, Stmt,
-    StringLiteral, TypeParam, TypeParams, UnaryOp, WithItem,
+    ExceptHandler, Expr, FString, FStringElement, FStringFormatSpec, Keyword, MatchCase, Mod,
+    Operator, Parameter, ParameterWithDefault, Parameters, Pattern, PatternArguments,
+    PatternKeyword, Singleton, Stmt, StringLiteral, TypeParam, TypeParams, UnaryOp, WithItem,
 };
 use crate::{AnyNodeRef, AstNode};
 
@@ -156,6 +156,11 @@ pub trait PreorderVisitor<'a> {
     #[inline]
     fn visit_f_string_element(&mut self, f_string_element: &'a FStringElement) {
         walk_f_string_element(self, f_string_element);
+    }
+
+    #[inline]
+    fn visit_f_string_format_spec(&mut self, f_string_format_spec: &'a FStringFormatSpec) {
+        walk_f_string_format_spec(self, f_string_format_spec);
     }
 
     #[inline]
@@ -566,6 +571,20 @@ where
     let node = AnyNodeRef::from(f_string);
     if visitor.enter_node(node).is_traverse() {
         f_string.visit_preorder(visitor);
+    }
+    visitor.leave_node(node);
+}
+
+#[inline]
+pub fn walk_f_string_format_spec<'a, V>(
+    visitor: &mut V,
+    f_string_format_spec: &'a FStringFormatSpec,
+) where
+    V: PreorderVisitor<'a> + ?Sized,
+{
+    let node = AnyNodeRef::from(f_string_format_spec);
+    if visitor.enter_node(node).is_traverse() {
+        f_string_format_spec.visit_preorder(visitor);
     }
     visitor.leave_node(node);
 }

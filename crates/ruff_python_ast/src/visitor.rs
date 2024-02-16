@@ -5,9 +5,10 @@ pub mod transformer;
 
 use crate::{
     self as ast, Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator,
-    ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringElement, FStringPart,
-    Keyword, MatchCase, Operator, Parameter, Parameters, Pattern, PatternArguments, PatternKeyword,
-    Stmt, StringLiteral, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp, WithItem,
+    ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringElement, FStringFormatSpec,
+    FStringPart, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern, PatternArguments,
+    PatternKeyword, Stmt, StringLiteral, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp,
+    WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -100,6 +101,9 @@ pub trait Visitor<'a> {
     }
     fn visit_f_string_element(&mut self, f_string_element: &'a FStringElement) {
         walk_f_string_element(self, f_string_element);
+    }
+    fn visit_f_string_format_spec(&mut self, f_string_format_spec: &'a FStringFormatSpec) {
+        walk_f_string_format_spec(self, f_string_format_spec);
     }
     fn visit_string_literal(&mut self, string_literal: &'a StringLiteral) {
         walk_string_literal(self, string_literal);
@@ -745,6 +749,15 @@ pub fn walk_f_string<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, f_string: &'a
     }
 }
 
+pub fn walk_f_string_format_spec<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &mut V,
+    f_string_format_spec: &'a FStringFormatSpec,
+) {
+    for f_string_element in &f_string_format_spec.elements {
+        visitor.visit_f_string_element(f_string_element);
+    }
+}
+
 pub fn walk_f_string_element<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
     f_string_element: &'a FStringElement,
@@ -757,9 +770,7 @@ pub fn walk_f_string_element<'a, V: Visitor<'a> + ?Sized>(
     {
         visitor.visit_expr(expression);
         if let Some(format_spec) = format_spec {
-            for spec_element in &format_spec.elements {
-                visitor.visit_f_string_element(spec_element);
-            }
+            visitor.visit_f_string_format_spec(format_spec);
         }
     }
 }
