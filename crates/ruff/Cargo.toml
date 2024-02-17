@@ -1,7 +1,8 @@
 [package]
 name = "ruff"
+description = "An extremely fast Python linter and code formatter, written in Rust."
 version = "0.2.1"
-publish = false
+publish = true
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
