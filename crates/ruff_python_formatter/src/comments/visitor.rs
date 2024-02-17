@@ -90,7 +90,7 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 preceding: self.preceding_node,
                 following: Some(node),
                 parent: self.parents.iter().rev().nth(1).copied(),
-                line_position: CommentLinePosition::text_position(
+                line_position: CommentLinePosition::for_range(
                     *comment_range,
                     self.source_code.as_str(),
                 ),
@@ -133,7 +133,7 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 parent: self.parents.last().copied(),
                 preceding: self.preceding_node,
                 following: None,
-                line_position: CommentLinePosition::text_position(
+                line_position: CommentLinePosition::for_range(
                     *comment_range,
                     self.source_code.as_str(),
                 ),

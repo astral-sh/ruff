@@ -13,11 +13,15 @@ pub enum SuppressionKind {
 }
 
 impl SuppressionKind {
-    /// Given a `slice`
-    pub fn from_slice(slice: &str) -> Option<Self> {
+    /// Attempts to identify the `kind` of a `comment`.
+    /// The comment string should be the full line with the comment on it.
+    pub fn from_comment(comment: &str) -> Option<Self> {
         // Match against `# fmt: on`, `# fmt: off`, `# yapf: disable`, and `# yapf: enable`, which
         // must be on their own lines.
-        let trimmed = slice.strip_prefix('#').unwrap_or(slice).trim_whitespace();
+        let trimmed = comment
+            .strip_prefix('#')
+            .unwrap_or(comment)
+            .trim_whitespace();
         if let Some(command) = trimmed.strip_prefix("fmt:") {
             match command.trim_whitespace_start() {
                 "off" => return Some(Self::Off),
@@ -35,7 +39,7 @@ impl SuppressionKind {
 
         // Search for `# fmt: skip` comments, which can be interspersed with other comments (e.g.,
         // `# fmt: skip # noqa: E501`).
-        for segment in slice.split('#') {
+        for segment in comment.split('#') {
             let trimmed = segment.trim_whitespace();
             if let Some(command) = trimmed.strip_prefix("fmt:") {
                 if command.trim_whitespace_start() == "skip" {
@@ -49,12 +53,12 @@ impl SuppressionKind {
 
     /// Returns true if this comment is a `fmt: off` or `yapf: disable` own line suppression comment.
     pub fn is_suppression_on(slice: &str, position: CommentLinePosition) -> bool {
-        position.is_own_line() && matches!(Self::from_slice(slice), Some(Self::Off))
+        position.is_own_line() && matches!(Self::from_comment(slice), Some(Self::Off))
     }
 
     /// Returns true if this comment is a `fmt: on` or `yapf: enable` own line suppression comment.
     pub fn is_suppression_off(slice: &str, position: CommentLinePosition) -> bool {
-        position.is_own_line() && matches!(Self::from_slice(slice), Some(Self::On))
+        position.is_own_line() && matches!(Self::from_comment(slice), Some(Self::On))
     }
 }
 /// The position of a comment in the source text.
@@ -98,7 +102,9 @@ impl CommentLinePosition {
         matches!(self, Self::EndOfLine)
     }
 
-    pub fn text_position(comment_range: TextRange, source_code: &str) -> Self {
+    /// Finds the line position of a comment given a range with
+    ///
+    pub fn for_range(comment_range: TextRange, source_code: &str) -> Self {
         let before = &source_code[TextRange::up_to(comment_range.start())];
 
         for c in before.chars().rev() {

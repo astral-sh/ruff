@@ -168,16 +168,16 @@ impl SourceComment {
         DebugComment::new(self, source_code)
     }
 
-    pub(crate) fn is_suppression_off_comment(&self, source: &str) -> bool {
-        SuppressionKind::is_suppression_off(self.slice_source(source), self.line_position)
+    pub(crate) fn is_suppression_off_comment(&self, text: &str) -> bool {
+        SuppressionKind::is_suppression_off(self.text(text), self.line_position)
     }
 
-    pub(crate) fn is_suppression_on_comment(&self, source: &str) -> bool {
-        SuppressionKind::is_suppression_on(self.slice_source(source), self.line_position)
+    pub(crate) fn is_suppression_on_comment(&self, text: &str) -> bool {
+        SuppressionKind::is_suppression_on(self.text(text), self.line_position)
     }
 
-    fn slice_source<'a>(&self, source: &'a str) -> &'a str {
-        self.slice.text(SourceCode::new(source))
+    fn text<'a>(&self, text: &'a str) -> &'a str {
+        self.slice.text(SourceCode::new(text))
     }
 }
 
@@ -462,6 +462,16 @@ impl<'a> PreorderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
 
         TraversalSignal::Traverse
     }
+}
+
+pub(crate) fn has_skip_comment(trailing_comments: &[SourceComment], source: &str) -> bool {
+    trailing_comments.iter().any(|comment| {
+        comment.line_position().is_end_of_line()
+            && matches!(
+                SuppressionKind::from_comment(comment.slice().text(SourceCode::new(source))),
+                Some(SuppressionKind::Skip | SuppressionKind::Off)
+            )
+    })
 }
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-use std::iter::{FilterMap, Peekable};
+use std::iter::Peekable;
 
 use ruff_python_ast::{
     visitor::preorder::{self, PreorderVisitor, TraversalSignal},
@@ -17,17 +17,29 @@ struct SuppressionComment {
     kind: SuppressionKind,
 }
 
-type MapCommentFn<'src> = Box<dyn Fn(&'src TextRange) -> Option<SuppressionComment> + 'src>;
-type CommentIter<'src> = Peekable<FilterMap<std::slice::Iter<'src, TextRange>, MapCommentFn<'src>>>;
+fn suppression_comments<'src>(
+    ranges: &'src CommentRanges,
+    locator: &'src Locator<'src>,
+) -> Box<dyn Iterator<Item = SuppressionComment> + 'src> {
+    Box::new(ranges.iter().filter_map(|range| {
+        Some(SuppressionComment {
+            range: *range,
+            kind: SuppressionKind::from_comment(locator.slice(range))?,
+        })
+    }))
+}
 
 /// Visitor that captures AST data for suppression comments. This uses a similar approach
 /// to `CommentsVisitor` in the formatter crate.
 pub(super) struct SuppressionCommentVisitor<'src, 'builder> {
-    comments: CommentIter<'src>,
+    comments: Peekable<Box<dyn Iterator<Item = SuppressionComment> + 'src>>,
 
     parents: Vec<AnyNodeRef<'src>>,
     preceding_node: Option<AnyNodeRef<'src>>,
-    comments_in_scope: Vec<(Option<AnyNodeRef<'src>>, SuppressionKind)>,
+    // A stack of comment states in scope at the current visited node.
+    // The last comment state in the list is the top of the stack,
+    // and is essentially the 'current' state.
+    comments_in_scope: Vec<(AnyNodeRef<'src>, SuppressionKind)>,
 
     builder: &'builder mut (dyn CaptureSuppressionComment<'src> + 'src),
     locator: &'src Locator<'src>,
@@ -39,17 +51,11 @@ impl<'src, 'builder> SuppressionCommentVisitor<'src, 'builder> {
         builder: &'builder mut (dyn CaptureSuppressionComment<'src> + 'src),
         locator: &'src Locator<'src>,
     ) -> Self {
-        let map_fn: MapCommentFn<'_> = Box::new(|range: &'src TextRange| {
-            Some(SuppressionComment {
-                range: *range,
-                kind: SuppressionKind::from_slice(locator.slice(range))?,
-            })
-        });
         Self {
-            comments: comment_ranges.iter().filter_map(map_fn).peekable(),
+            comments: suppression_comments(comment_ranges, locator).peekable(),
             parents: Vec::default(),
             preceding_node: Option::default(),
-            comments_in_scope: Vec::with_capacity(comment_ranges.len()),
+            comments_in_scope: Vec::default(),
             builder,
             locator,
         }
@@ -81,7 +87,7 @@ impl<'ast> PreorderVisitor<'ast> for SuppressionCommentVisitor<'ast, '_> {
                 break;
             }
 
-            let line_position = CommentLinePosition::text_position(range, self.locator.contents());
+            let line_position = CommentLinePosition::for_range(range, self.locator.contents());
 
             let previous_state = self.comments_in_scope.last().map(|(_, s)| s).copied();
 
@@ -89,7 +95,6 @@ impl<'ast> PreorderVisitor<'ast> for SuppressionCommentVisitor<'ast, '_> {
                 enclosing: enclosing_node,
                 preceding: self.preceding_node,
                 following: Some(node),
-                parent: self.parents.iter().rev().nth(1).copied(),
                 previous_state,
                 line_position,
                 kind,
@@ -97,7 +102,7 @@ impl<'ast> PreorderVisitor<'ast> for SuppressionCommentVisitor<'ast, '_> {
             };
 
             if let Some(kind) = self.builder.capture(data) {
-                self.comments_in_scope.push((Some(node), kind));
+                self.comments_in_scope.push((node, kind));
             }
             self.comments.next();
         }
@@ -120,7 +125,7 @@ impl<'ast> PreorderVisitor<'ast> for SuppressionCommentVisitor<'ast, '_> {
 
         // Process all comments that start after the `preceding` node and end before this node's end.
         while let Some(SuppressionComment { range, kind }) = self.comments.peek().copied() {
-            let line_position = CommentLinePosition::text_position(range, self.locator.contents());
+            let line_position = CommentLinePosition::for_range(range, self.locator.contents());
             if range.start() >= node_end {
                 if !line_position.is_own_line() {
                     break;
@@ -144,7 +149,6 @@ impl<'ast> PreorderVisitor<'ast> for SuppressionCommentVisitor<'ast, '_> {
                 enclosing: Some(node),
                 preceding: self.preceding_node,
                 following: None,
-                parent: self.parents.last().copied(),
                 previous_state,
                 line_position,
                 kind,
@@ -152,14 +156,14 @@ impl<'ast> PreorderVisitor<'ast> for SuppressionCommentVisitor<'ast, '_> {
             };
 
             if let Some(kind) = self.builder.capture(data) {
-                self.comments_in_scope.push((Some(node), kind));
+                self.comments_in_scope.push((node, kind));
             }
             self.comments.next();
         }
 
         // remove comments that are about to become out of scope
         for index in (0..self.comments_in_scope.len()).rev() {
-            if self.comments_in_scope[index].0 == Some(node) {
+            if AnyNodeRef::ptr_eq(self.comments_in_scope[index].0, node) {
                 self.comments_in_scope.pop();
             } else {
                 break;
@@ -192,13 +196,11 @@ impl<'ast> PreorderVisitor<'ast> for SuppressionCommentVisitor<'ast, '_> {
 }
 
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
 pub(super) struct SuppressionCommentData<'src> {
     /// If `enclosing` is `None`, this comment is top-level
     pub(super) enclosing: Option<AnyNodeRef<'src>>,
     pub(super) preceding: Option<AnyNodeRef<'src>>,
     pub(super) following: Option<AnyNodeRef<'src>>,
-    pub(super) parent: Option<AnyNodeRef<'src>>,
     pub(super) previous_state: Option<SuppressionKind>,
     pub(super) line_position: CommentLinePosition,
     pub(super) kind: SuppressionKind,

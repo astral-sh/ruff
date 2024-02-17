@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::{collections::BTreeMap, fmt::Display};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
@@ -8,7 +7,8 @@ use ruff_python_trivia::{indentation_at_offset, SuppressionKind};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen};
 
-use crate::checkers::{ast::Checker, noqa::delete_comment};
+use crate::checkers::ast::Checker;
+use crate::fix::edits::delete_comment;
 
 use super::suppression_comment_visitor::{
     own_line_comment_indentation, CaptureSuppressionComment, SuppressionCommentData,
@@ -55,7 +55,7 @@ impl AlwaysFixableViolation for IgnoredFormatterNOQA {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "This comment will be ignored by the formatter because {}",
+            "This suppression comment will be ignored by the formatter because {}",
             self.reason
         )
     }
@@ -88,7 +88,6 @@ pub(crate) fn ignored_formatter_noqa(checker: &mut Checker, suite: &ast::Suite) 
 
 struct UselessSuppressionComments<'src, 'loc> {
     captured: BTreeMap<SuppressionCommentData<'src>, IgnoredReason>,
-    comments_in_scope: Vec<(Option<AnyNodeRef<'src>>, SuppressionKind)>,
     locator: &'loc Locator<'src>,
 }
 
@@ -96,7 +95,6 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
     fn new(locator: &'loc Locator<'src>) -> Self {
         Self {
             captured: BTreeMap::default(),
-            comments_in_scope: vec![],
             locator,
         }
     }
@@ -225,13 +223,6 @@ fn is_first_statement_in_alternate_body(statement: AnyNodeRef, has_body: AnyNode
         }) => are_same_optional(statement, elif_else_clauses.first()),
         _ => false,
     }
-}
-
-/// Returns `true` if the parameters are parenthesized (as in a function definition), or `false` if
-/// not (as in a lambda).
-fn are_parameters_parenthesized(parameters: &ast::Parameters, contents: &str) -> bool {
-    // A lambda never has parentheses around its parameters, but a function definition always does.
-    contents[parameters.range()].starts_with('(')
 }
 
 /// Returns `true` if `right` is `Some` and `left` and `right` are referentially equal.
