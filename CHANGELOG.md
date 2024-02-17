@@ -1,5 +1,66 @@
 # Changelog
 
+## 0.2.2
+
+Highlights include:
+
+- Initial support formatting f-strings (in `--preview`).
+- Support for overriding arbitrary configuration options via the CLI through an expanded `--config`
+    argument (e.g., `--config "lint.isort.combine-as-imports=false"`).
+- Significant performance improvements in Ruff's lexer, parser, and lint rules.
+
+### Preview features
+
+- Implement minimal f-string formatting ([#9642](https://github.com/astral-sh/ruff/pull/9642))
+- \[`pycodestyle`\] Add blank line(s) rules (`E301`, `E302`, `E303`, `E304`, `E305`, `E306`) ([#9266](https://github.com/astral-sh/ruff/pull/9266))
+- \[`refurb`\] Implement `readlines_in_for` (`FURB129`) ([#9880](https://github.com/astral-sh/ruff/pull/9880))
+
+### Rule changes
+
+- \[`ruff`\] Ensure closing parentheses for multiline sequences are always on their own line (`RUF022`, `RUF023`) ([#9793](https://github.com/astral-sh/ruff/pull/9793))
+- \[`numpy`\] Add missing deprecation violations (`NPY002`) ([#9862](https://github.com/astral-sh/ruff/pull/9862))
+- \[`flake8-bandit`\] Detect `mark_safe` usages in decorators ([#9887](https://github.com/astral-sh/ruff/pull/9887))
+- \[`ruff`\] Expand `asyncio-dangling-task` (`RUF006`) to include `new_event_loop` ([#9976](https://github.com/astral-sh/ruff/pull/9976))
+- \[`flake8-pyi`\] Ignore 'unused' private type dicts in class scopes ([#9952](https://github.com/astral-sh/ruff/pull/9952))
+
+### Formatter
+
+- Docstring formatting: Preserve tab indentation when using `indent-style=tabs` ([#9915](https://github.com/astral-sh/ruff/pull/9915))
+- Disable top-level docstring formatting for notebooks ([#9957](https://github.com/astral-sh/ruff/pull/9957))
+- Stabilize quote-style's `preserve` mode ([#9922](https://github.com/astral-sh/ruff/pull/9922))
+
+### CLI
+
+- Allow arbitrary configuration options to be overridden via the CLI ([#9599](https://github.com/astral-sh/ruff/pull/9599))
+
+### Bug fixes
+
+- Make `show-settings` filters directory-agnostic ([#9866](https://github.com/astral-sh/ruff/pull/9866))
+- Respect duplicates when rewriting type aliases ([#9905](https://github.com/astral-sh/ruff/pull/9905))
+- Respect tuple assignments in typing analyzer ([#9969](https://github.com/astral-sh/ruff/pull/9969))
+- Use atomic write when persisting cache ([#9981](https://github.com/astral-sh/ruff/pull/9981))
+- Use non-parenthesized range for `DebugText` ([#9953](https://github.com/astral-sh/ruff/pull/9953))
+- \[`flake8-simplify`\] Avoid false positive with `async` for loops (`SIM113`) ([#9996](https://github.com/astral-sh/ruff/pull/9996))
+- \[`flake8-trio`\] Respect `async with` in `timeout-without-await` ([#9859](https://github.com/astral-sh/ruff/pull/9859))
+- \[`perflint`\] Catch a wider range of mutations in `PERF101` ([#9955](https://github.com/astral-sh/ruff/pull/9955))
+- \[`pycodestyle`\] Fix `E30X` panics on blank lines with trailing white spaces ([#9907](https://github.com/astral-sh/ruff/pull/9907))
+- \[`pydocstyle`\] Allow using `parameters` as a subsection header (`D405`) ([#9894](https://github.com/astral-sh/ruff/pull/9894))
+- \[`pydocstyle`\] Fix blank-line docstring rules for module-level docstrings ([#9878](https://github.com/astral-sh/ruff/pull/9878))
+- \[`pylint`\] Accept 0.0 and 1.0 as common magic values (`PLR2004`) ([#9964](https://github.com/astral-sh/ruff/pull/9964))
+- \[`pylint`\] Avoid suggesting set rewrites for non-hashable types ([#9956](https://github.com/astral-sh/ruff/pull/9956))
+- \[`ruff`\] Avoid false negatives with string literals inside of method calls (`RUF027`) ([#9865](https://github.com/astral-sh/ruff/pull/9865))
+- \[`ruff`\] Fix panic on with f-string detection (`RUF027`) ([#9990](https://github.com/astral-sh/ruff/pull/9990))
+- \[`ruff`\] Ignore builtins when detecting missing f-strings ([#9849](https://github.com/astral-sh/ruff/pull/9849))
+
+### Performance
+
+- Use `memchr` for string lexing ([#9888](https://github.com/astral-sh/ruff/pull/9888))
+- Use `memchr` for tab-indentation detection ([#9853](https://github.com/astral-sh/ruff/pull/9853))
+- Reduce `Result<Tok, LexicalError>` size by using `Box<str>` instead of `String` ([#9885](https://github.com/astral-sh/ruff/pull/9885))
+- Reduce size of `Expr` from 80 to 64 bytes ([#9900](https://github.com/astral-sh/ruff/pull/9900))
+- Improve trailing comma rule performance ([#9867](https://github.com/astral-sh/ruff/pull/9867))
+- Remove unnecessary string cloning from the parser ([#9884](https://github.com/astral-sh/ruff/pull/9884))
+
 ## 0.2.1
 
 This release includes support for range formatting (i.e., the ability to format specific lines
