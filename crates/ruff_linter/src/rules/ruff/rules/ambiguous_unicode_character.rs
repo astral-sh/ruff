@@ -4,9 +4,11 @@ use bitflags::bitflags;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::StringLike;
 use ruff_source_file::Locator;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::ruff::rules::confusables::confusable;
 use crate::rules::ruff::rules::Context;
@@ -171,16 +173,59 @@ impl Violation for AmbiguousUnicodeCharacterComment {
     }
 }
 
-/// RUF001, RUF002, RUF003
-pub(crate) fn ambiguous_unicode_character(
+/// RUF003
+pub(crate) fn ambiguous_unicode_character_comment(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
+    range: TextRange,
+    settings: &LinterSettings,
+) {
+    let text = locator.slice(range);
+    ambiguous_unicode_character(diagnostics, text, range, Context::Comment, settings);
+}
+
+/// RUF001, RUF002
+pub(crate) fn ambiguous_unicode_character_string(checker: &mut Checker, string_like: StringLike) {
+    let context = if checker.semantic().in_docstring() {
+        Context::Docstring
+    } else {
+        Context::String
+    };
+
+    match string_like {
+        StringLike::StringLiteral(string_literal) => {
+            for string in &string_literal.value {
+                let text = checker.locator().slice(string);
+                ambiguous_unicode_character(
+                    &mut checker.diagnostics,
+                    text,
+                    string.range(),
+                    context,
+                    checker.settings,
+                );
+            }
+        }
+        StringLike::FStringLiteral(f_string_literal) => {
+            let text = checker.locator().slice(f_string_literal);
+            ambiguous_unicode_character(
+                &mut checker.diagnostics,
+                text,
+                f_string_literal.range(),
+                context,
+                checker.settings,
+            );
+        }
+        StringLike::BytesLiteral(_) => (),
+    }
+}
+
+fn ambiguous_unicode_character(
+    diagnostics: &mut Vec<Diagnostic>,
+    text: &str,
     range: TextRange,
     context: Context,
     settings: &LinterSettings,
 ) {
-    let text = locator.slice(range);
-
     // Most of the time, we don't need to check for ambiguous unicode characters at all.
     if text.is_ascii() {
         return;

@@ -256,8 +256,6 @@ impl Rule {
             | Rule::MixedSpacesAndTabs
             | Rule::TrailingWhitespace => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
-            | Rule::AmbiguousUnicodeCharacterDocstring
-            | Rule::AmbiguousUnicodeCharacterString
             | Rule::AvoidableEscapedQuote
             | Rule::BadQuotesDocstring
             | Rule::BadQuotesInlineString
