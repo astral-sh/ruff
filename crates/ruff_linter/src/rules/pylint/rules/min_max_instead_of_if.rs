@@ -1,9 +1,9 @@
 use std::ops::Deref;
 
-use ast::LiteralExpressionRef;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, ExprAttribute, ExprContext, Stmt};
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::{self as ast, Arguments, CmpOp, ExprContext, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -120,10 +120,12 @@ pub(crate) fn min_instead_of_if(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     if !matches!(op, CmpOp::Gt | CmpOp::GtE) {
         return;
     }
-    if !match_left(left, body_target) {
-        return;
-    }
-    if !match_right(right_statement, body_value) {
+
+    let left_cmp = ComparableExpr::from(left);
+    let body_target_cmp = ComparableExpr::from(body_target);
+    let right_statement_cmp = ComparableExpr::from(right_statement);
+    let body_value_cmp = ComparableExpr::from(body_value);
+    if left_cmp != body_target_cmp || right_statement_cmp != body_value_cmp {
         return;
     }
 
@@ -201,10 +203,12 @@ pub(crate) fn max_instead_of_if(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     if !matches!(op, CmpOp::Lt | CmpOp::LtE) {
         return;
     }
-    if !match_left(left, body_target) {
-        return;
-    }
-    if !match_right(right_statement, body_value) {
+
+    let left_cmp = ComparableExpr::from(left);
+    let body_target_cmp = ComparableExpr::from(body_target);
+    let right_statement_cmp = ComparableExpr::from(right_statement);
+    let body_value_cmp = ComparableExpr::from(body_value);
+    if left_cmp != body_target_cmp || right_statement_cmp != body_value_cmp {
         return;
     }
 
@@ -234,107 +238,4 @@ pub(crate) fn max_instead_of_if(checker: &mut Checker, stmt_if: &ast::StmtIf) {
         stmt_if.range(),
     );
     checker.diagnostics.push(diagnostic);
-}
-
-fn match_left(left: &Expr, body_target: &Expr) -> bool {
-    // Check that the assignments are on the same variable
-    if left.is_name_expr() && body_target.is_name_expr() {
-        let Some(left_operand) = left.as_name_expr() else {
-            return false;
-        };
-        let Some(target_assignation) = body_target.as_name_expr() else {
-            return false;
-        };
-        return left_operand.id == target_assignation.id;
-    }
-
-    if left.is_attribute_expr() && body_target.is_attribute_expr() {
-        let Some(left_operand) = left.as_attribute_expr() else {
-            return false;
-        };
-        let Some(target_assignation) = body_target.as_attribute_expr() else {
-            return false;
-        };
-        return match_attributes(left_operand, target_assignation);
-    }
-
-    false
-}
-
-fn match_right(right_statement: &Expr, body_value: &Expr) -> bool {
-    // Verify that the right part of the statements are the same.
-    if right_statement.is_name_expr() && body_value.is_name_expr() {
-        let Some(right_statement_value) = right_statement.as_name_expr() else {
-            return false;
-        };
-        let Some(body_value_value) = body_value.as_name_expr() else {
-            return false;
-        };
-        return right_statement_value.id == body_value_value.id;
-    }
-    if right_statement.is_literal_expr() && body_value.is_literal_expr() {
-        let Some(right_statement_value) = right_statement.as_literal_expr() else {
-            return false;
-        };
-        let Some(body_value_value) = body_value.as_literal_expr() else {
-            return false;
-        };
-        match (right_statement_value, body_value_value) {
-            (
-                LiteralExpressionRef::BytesLiteral(ast::ExprBytesLiteral { value: value1, .. }),
-                LiteralExpressionRef::BytesLiteral(ast::ExprBytesLiteral { value: value2, .. }),
-            ) => {
-                return value1
-                    .iter()
-                    .map(ruff_python_ast::BytesLiteral::as_slice)
-                    .eq(value2.iter().map(ruff_python_ast::BytesLiteral::as_slice))
-            }
-            (
-                LiteralExpressionRef::StringLiteral(ast::ExprStringLiteral {
-                    value: value1, ..
-                }),
-                LiteralExpressionRef::StringLiteral(ast::ExprStringLiteral {
-                    value: value2, ..
-                }),
-            ) => return value1.to_str() == value2.to_str(),
-            (
-                LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral {
-                    value: value1, ..
-                }),
-                LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral {
-                    value: value2, ..
-                }),
-            ) => return value1 == value2,
-            (_, _) => return false,
-        }
-    }
-    false
-}
-
-fn match_attributes(expr1: &ExprAttribute, expr2: &ExprAttribute) -> bool {
-    if expr1.attr.as_str() != expr2.attr.as_str() {
-        return false;
-    }
-
-    if expr1.value.is_name_expr() && expr2.value.is_name_expr() {
-        let Some(ast::ExprName { id: id1, .. }) = expr1.value.as_name_expr() else {
-            return false;
-        };
-        let Some(ast::ExprName { id: id2, .. }) = expr2.value.as_name_expr() else {
-            return false;
-        };
-        return id1 == id2;
-    }
-
-    if expr1.value.is_attribute_expr() && expr2.value.is_attribute_expr() {
-        let Some(expr1) = expr1.value.as_attribute_expr() else {
-            return false;
-        };
-        let Some(expr2) = expr2.value.as_attribute_expr() else {
-            return false;
-        };
-        return match_attributes(expr1, expr2);
-    }
-
-    false
 }
