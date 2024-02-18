@@ -150,21 +150,23 @@ def quuz():
  
  
  class Baz(Qux):
-@@ -49,12 +44,10 @@
+@@ -49,14 +44,8 @@
          pass
  
  
 -def bar():
 -    ...
-+def bar(): ...
- 
- 
+-
+-
 -def baz():
 -    ...
+-
+-
++def bar(): ...
 +def baz(): ...
- 
- 
  def quux():
+     """Some docstring."""
+ 
 ```
 
 

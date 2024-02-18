@@ -39,10 +39,15 @@ class Foo:
     TCLS = typing.TypeVar["TCLS"]
     y: typing.TypeAlias = list[TCLS]
 
-# UP040 wont add generics in fix
+# UP040 won't add generics in fix
 T = typing.TypeVar(*args)
 x: typing.TypeAlias = list[T]
 
 # OK
 x: TypeAlias
 x: int = 1
+
+# Ensure that "T" appears only once  in the type parameters for the modernized
+# type alias.
+T = typing.TypeVar["T"]
+Decorator: TypeAlias = typing.Callable[[T], T]

@@ -53,7 +53,7 @@ impl Violation for UnnecessaryComprehensionAnyAll {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary list comprehension.")
+        format!("Unnecessary list comprehension")
     }
 
     fn fix_title(&self) -> Option<String> {

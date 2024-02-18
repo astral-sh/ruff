@@ -139,10 +139,10 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
 
     // Check `left`.
     let mut comparator = compare.left.as_ref();
-    let [op, ..] = compare.ops.as_slice() else {
+    let [op, ..] = &*compare.ops else {
         return;
     };
-    let [next, ..] = compare.comparators.as_slice() else {
+    let [next, ..] = &*compare.comparators else {
         return;
     };
 
@@ -200,39 +200,37 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
             continue;
         }
 
-        let Some(op) = EqCmpOp::try_from(*op) else {
-            continue;
-        };
-
-        if checker.enabled(Rule::NoneComparison) && next.is_none_literal_expr() {
-            match op {
-                EqCmpOp::Eq => {
-                    let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
-                    bad_ops.insert(index, CmpOp::Is);
-                    diagnostics.push(diagnostic);
-                }
-                EqCmpOp::NotEq => {
-                    let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
-                    bad_ops.insert(index, CmpOp::IsNot);
-                    diagnostics.push(diagnostic);
-                }
-            }
-        }
-
-        if checker.enabled(Rule::TrueFalseComparison) {
-            if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = next {
+        if let Some(op) = EqCmpOp::try_from(*op) {
+            if checker.enabled(Rule::NoneComparison) && next.is_none_literal_expr() {
                 match op {
                     EqCmpOp::Eq => {
-                        let diagnostic =
-                            Diagnostic::new(TrueFalseComparison(*value, op), next.range());
+                        let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
                         bad_ops.insert(index, CmpOp::Is);
                         diagnostics.push(diagnostic);
                     }
                     EqCmpOp::NotEq => {
-                        let diagnostic =
-                            Diagnostic::new(TrueFalseComparison(*value, op), next.range());
+                        let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
                         bad_ops.insert(index, CmpOp::IsNot);
                         diagnostics.push(diagnostic);
+                    }
+                }
+            }
+
+            if checker.enabled(Rule::TrueFalseComparison) {
+                if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = next {
+                    match op {
+                        EqCmpOp::Eq => {
+                            let diagnostic =
+                                Diagnostic::new(TrueFalseComparison(*value, op), next.range());
+                            bad_ops.insert(index, CmpOp::Is);
+                            diagnostics.push(diagnostic);
+                        }
+                        EqCmpOp::NotEq => {
+                            let diagnostic =
+                                Diagnostic::new(TrueFalseComparison(*value, op), next.range());
+                            bad_ops.insert(index, CmpOp::IsNot);
+                            diagnostics.push(diagnostic);
+                        }
                     }
                 }
             }

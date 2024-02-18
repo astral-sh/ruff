@@ -259,7 +259,27 @@ if True:
 # empty line(s) at the end of the file due to nested function
 if True:
     def nested_trailing_function():
-        pass```
+        pass
+
+
+def overload1(): ...  # trailing comment
+def overload1(a: int): ...
+
+def overload2(): ...  # trailing comment
+
+def overload2(a: int): ...
+
+def overload3():
+    ...
+    # trailing comment
+def overload3(a: int): ...
+
+def overload4():
+    ...
+    # trailing comment
+
+def overload4(a: int): ...
+```
 
 ## Output
 ```python
@@ -546,6 +566,40 @@ if True:
 
     def nested_trailing_function():
         pass
+
+
+def overload1():
+    ...  # trailing comment
+
+
+def overload1(a: int):
+    ...
+
+
+def overload2():
+    ...  # trailing comment
+
+
+def overload2(a: int):
+    ...
+
+
+def overload3():
+    ...
+    # trailing comment
+
+
+def overload3(a: int):
+    ...
+
+
+def overload4():
+    ...
+    # trailing comment
+
+
+def overload4(a: int):
+    ...
 ```
 
 
@@ -569,6 +623,48 @@ if True:
  
  
  def fakehttp():
+@@ -283,20 +281,14 @@
+         pass
+ 
+ 
+-def overload1():
+-    ...  # trailing comment
++def overload1(): ...  # trailing comment
++def overload1(a: int): ...
+ 
+ 
+-def overload1(a: int):
+-    ...
++def overload2(): ...  # trailing comment
+ 
+ 
+-def overload2():
+-    ...  # trailing comment
+-
+-
+-def overload2(a: int):
+-    ...
++def overload2(a: int): ...
+ 
+ 
+ def overload3():
+@@ -304,8 +296,7 @@
+     # trailing comment
+ 
+ 
+-def overload3(a: int):
+-    ...
++def overload3(a: int): ...
+ 
+ 
+ def overload4():
+@@ -313,5 +304,4 @@
+     # trailing comment
+ 
+ 
+-def overload4(a: int):
+-    ...
++def overload4(a: int): ...
 ```
 
 

@@ -1,0 +1,11 @@
+{
+  "execution_count": null,
+  "cell_type": "code",
+  "id": "1",
+  "metadata": {},
+  "outputs": [],
+  "source": [
+    "%%timeit\n",
+    "print('hello world')"
+  ]
+}

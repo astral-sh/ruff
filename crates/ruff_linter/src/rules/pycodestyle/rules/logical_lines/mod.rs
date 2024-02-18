@@ -381,20 +381,16 @@ impl Whitespace {
             }
         }
 
-        if has_tabs {
+        if len == content.text_len() {
+            // All whitespace up to the start of the line -> Indent
+            (Self::None, TextSize::default())
+        } else if has_tabs {
             (Self::Tab, len)
         } else {
             match count {
                 0 => (Self::None, TextSize::default()),
                 1 => (Self::Single, len),
-                _ => {
-                    if len == content.text_len() {
-                        // All whitespace up to the start of the line -> Indent
-                        (Self::None, TextSize::default())
-                    } else {
-                        (Self::Many, len)
-                    }
-                }
+                _ => (Self::Many, len),
             }
         }
     }

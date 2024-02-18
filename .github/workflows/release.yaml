@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
@@ -63,7 +63,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
@@ -73,7 +73,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: x86_64
-          args: --release --out dist
+          args: --release --locked --out dist
       - name: "Test wheel - x86_64"
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
@@ -86,7 +86,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-x86_64-apple-darwin.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-x86_64-apple-darwin.tar.gz
           tar czvf $ARCHIVE_FILE -C target/x86_64-apple-darwin/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -103,7 +103,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
@@ -112,7 +112,7 @@ jobs:
       - name: "Build wheels - universal2"
         uses: PyO3/maturin-action@v1
         with:
-          args: --release --target universal2-apple-darwin --out dist
+          args: --release --locked --target universal2-apple-darwin --out dist
       - name: "Test wheel - universal2"
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*universal2.whl --force-reinstall
@@ -125,7 +125,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-aarch64-apple-darwin.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-aarch64-apple-darwin.tar.gz
           tar czvf $ARCHIVE_FILE -C target/aarch64-apple-darwin/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -151,7 +151,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.platform.arch }}
@@ -161,7 +161,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist
+          args: --release --locked --out dist
       - name: "Test wheel"
         if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
         shell: bash
@@ -177,7 +177,7 @@ jobs:
       - name: "Archive binary"
         shell: bash
         run: |
-          ARCHIVE_FILE=ruff-${{ matrix.platform.target }}.zip
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.platform.target }}.zip
           7z a $ARCHIVE_FILE ./target/${{ matrix.platform.target }}/release/ruff.exe
           sha256sum $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -199,7 +199,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
@@ -210,7 +210,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --release --out dist
+          args: --release --locked --out dist
       - name: "Test wheel"
         if: ${{ startsWith(matrix.target, 'x86_64') }}
         run: |
@@ -224,7 +224,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-${{ matrix.target }}.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.target }}.tar.gz
           tar czvf $ARCHIVE_FILE -C target/${{ matrix.target }}/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -258,7 +258,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
@@ -269,7 +269,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           manylinux: auto
           docker-options: ${{ matrix.platform.maturin_docker_options }}
-          args: --release --out dist
+          args: --release --locked --out dist
       - uses: uraimo/run-on-arch-action@v2
         if: matrix.platform.arch != 'ppc64'
         name: Test wheel
@@ -291,7 +291,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-${{ matrix.platform.target }}.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.platform.target }}.tar.gz
           tar czvf $ARCHIVE_FILE -C target/${{ matrix.platform.target }}/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -313,7 +313,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
@@ -324,7 +324,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
-          args: --release --out dist
+          args: --release --locked --out dist
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
         uses: addnab/docker-run-action@v3
@@ -332,10 +332,10 @@ jobs:
           image: alpine:latest
           options: -v ${{ github.workspace }}:/io -w /io
           run: |
-            apk add py3-pip
-            pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links /io/dist/ --force-reinstall
-            ruff --help
-            python -m ruff --help
+            apk add python3
+            python -m venv .venv
+            .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
+            .venv/bin/ruff check --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
@@ -343,7 +343,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-${{ matrix.target }}.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.target }}.tar.gz
           tar czvf $ARCHIVE_FILE -C target/${{ matrix.target }}/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -369,7 +369,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
@@ -379,7 +379,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
-          args: --release --out dist
+          args: --release --locked --out dist
           docker-options: ${{ matrix.platform.maturin_docker_options }}
       - uses: uraimo/run-on-arch-action@v2
         name: Test wheel
@@ -388,10 +388,11 @@ jobs:
           distro: alpine_latest
           githubToken: ${{ github.token }}
           install: |
-            apk add py3-pip
+            apk add python3
           run: |
-            pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
-            ruff check --help
+            python -m venv .venv
+            .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
+            .venv/bin/ruff check --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
@@ -399,7 +400,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-${{ matrix.platform.target }}.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.platform.target }}.tar.gz
           tar czvf $ARCHIVE_FILE -C target/${{ matrix.platform.target }}/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"

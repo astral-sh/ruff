@@ -14,7 +14,6 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_generator_exp::is_generator_parenthesized;
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
-use crate::expression::expr_tuple::is_tuple_parenthesized;
 use crate::other::parameters::{
     assign_argument_separator_comment_placement, find_parameter_separators,
 };
@@ -290,11 +289,33 @@ fn handle_enclosed_comment<'a>(
             }
         }
         AnyNodeRef::FString(fstring) => CommentPlacement::dangling(fstring, comment),
+        AnyNodeRef::FStringExpressionElement(_) => {
+            // Handle comments after the format specifier (should be rare):
+            //
+            // ```python
+            // f"literal {
+            //     expr:.3f
+            //     # comment
+            // }"
+            // ```
+            //
+            // This is a valid comment placement.
+            if matches!(
+                comment.preceding_node(),
+                Some(
+                    AnyNodeRef::FStringExpressionElement(_) | AnyNodeRef::FStringLiteralElement(_)
+                )
+            ) {
+                CommentPlacement::trailing(comment.enclosing_node(), comment)
+            } else {
+                handle_bracketed_end_of_line_comment(comment, locator)
+            }
+        }
         AnyNodeRef::ExprList(_)
         | AnyNodeRef::ExprSet(_)
         | AnyNodeRef::ExprListComp(_)
         | AnyNodeRef::ExprSetComp(_) => handle_bracketed_end_of_line_comment(comment, locator),
-        AnyNodeRef::ExprTuple(tuple) if is_tuple_parenthesized(tuple, locator.contents()) => {
+        AnyNodeRef::ExprTuple(tuple) if tuple.is_parenthesized(locator.contents()) => {
             handle_bracketed_end_of_line_comment(comment, locator)
         }
         AnyNodeRef::ExprGeneratorExp(generator)

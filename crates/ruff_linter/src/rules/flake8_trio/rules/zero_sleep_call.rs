@@ -1,7 +1,8 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Stmt;
-use ruff_python_ast::{self as ast, Expr, ExprCall, Int};
+use ruff_python_ast::{self as ast, Expr, ExprCall, Int, Number};
+use ruff_python_semantic::analyze::typing::find_assigned_value;
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -47,11 +48,7 @@ impl AlwaysFixableViolation for TrioZeroSleepCall {
 
 /// TRIO115
 pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
-    if !checker
-        .semantic()
-        .resolve_call_path(call.func.as_ref())
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["trio", "sleep"]))
-    {
+    if !checker.semantic().seen_module(Modules::TRIO) {
         return;
     }
 
@@ -63,38 +60,32 @@ pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
+    if !checker
+        .semantic()
+        .resolve_call_path(call.func.as_ref())
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["trio", "sleep"]))
+    {
+        return;
+    }
+
     match arg {
         Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
-            let Some(int) = value.as_int() else { return };
-            if *int != Int::ZERO {
+            if !matches!(value, Number::Int(Int::ZERO)) {
                 return;
             }
         }
         Expr::Name(ast::ExprName { id, .. }) => {
-            let scope = checker.semantic().current_scope();
-            if let Some(binding_id) = scope.get(id) {
-                let binding = checker.semantic().binding(binding_id);
-                if binding.kind.is_assignment() || binding.kind.is_named_expr_assignment() {
-                    if let Some(parent_id) = binding.source {
-                        let parent = checker.semantic().statement(parent_id);
-                        if let Stmt::Assign(ast::StmtAssign { value, .. })
-                        | Stmt::AnnAssign(ast::StmtAnnAssign {
-                            value: Some(value), ..
-                        })
-                        | Stmt::AugAssign(ast::StmtAugAssign { value, .. }) = parent
-                        {
-                            let Expr::NumberLiteral(ast::ExprNumberLiteral { value: num, .. }) =
-                                value.as_ref()
-                            else {
-                                return;
-                            };
-                            let Some(int) = num.as_int() else { return };
-                            if *int != Int::ZERO {
-                                return;
-                            }
-                        }
-                    }
-                }
+            let Some(value) = find_assigned_value(id, checker.semantic()) else {
+                return;
+            };
+            if !matches!(
+                value,
+                Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: Number::Int(Int::ZERO),
+                    ..
+                })
+            ) {
+                return;
             }
         }
         _ => return,

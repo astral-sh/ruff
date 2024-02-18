@@ -2,7 +2,7 @@ use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_source_file::OneIndexed;
+use ruff_source_file::SourceRow;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -43,14 +43,14 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct LoadBeforeGlobalDeclaration {
     name: String,
-    line: OneIndexed,
+    row: SourceRow,
 }
 
 impl Violation for LoadBeforeGlobalDeclaration {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let LoadBeforeGlobalDeclaration { name, line } = self;
-        format!("Name `{name}` is used prior to global declaration on line {line}")
+        let LoadBeforeGlobalDeclaration { name, row } = self;
+        format!("Name `{name}` is used prior to global declaration on {row}")
     }
 }
 
@@ -58,12 +58,10 @@ impl Violation for LoadBeforeGlobalDeclaration {
 pub(crate) fn load_before_global_declaration(checker: &mut Checker, name: &str, expr: &Expr) {
     if let Some(stmt) = checker.semantic().global(name) {
         if expr.start() < stmt.start() {
-            #[allow(deprecated)]
-            let location = checker.locator().compute_source_location(stmt.start());
             checker.diagnostics.push(Diagnostic::new(
                 LoadBeforeGlobalDeclaration {
                     name: name.to_string(),
-                    line: location.row,
+                    row: checker.compute_source_row(stmt.start()),
                 },
                 expr.range(),
             ));

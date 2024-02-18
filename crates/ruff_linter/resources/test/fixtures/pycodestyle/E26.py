@@ -72,3 +72,15 @@ a = 42  #  (Two spaces)
 # EF  Means test is giving error and Failing
 #!   Means test is segfaulting
 # 8   Means test runs forever
+
+#: Colon prefix is okay
+
+###This is a variable ###
+
+# We should strip the space, but preserve the hashes.
+#: E266:1:3
+##  Foo
+
+a = 1  ## Foo
+
+a = 1  #:Foo

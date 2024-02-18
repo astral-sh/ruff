@@ -14,19 +14,11 @@ expression: parse_ast
                             FString(
                                 FString {
                                     range: 0..14,
-                                    values: [
-                                        StringLiteral(
-                                            ExprStringLiteral {
+                                    elements: [
+                                        Literal(
+                                            FStringLiteralElement {
                                                 range: 2..13,
-                                                value: StringLiteralValue {
-                                                    inner: Single(
-                                                        StringLiteral {
-                                                            range: 2..13,
-                                                            value: "Hello world",
-                                                            unicode: false,
-                                                        },
-                                                    ),
-                                                },
+                                                value: "Hello world",
                                             },
                                         ),
                                     ],

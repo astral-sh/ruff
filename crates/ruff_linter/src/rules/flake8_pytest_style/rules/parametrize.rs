@@ -26,7 +26,7 @@ use super::helpers::{is_pytest_parametrize, split_names};
 /// The `argnames` argument of `pytest.mark.parametrize` takes a string or
 /// a sequence of strings. For a single parameter, it's preferable to use a
 /// string. For multiple parameters, it's preferable to use the style
-/// configured via the [`flake8-pytest-style.parametrize-names-type`] setting.
+/// configured via the [`lint.flake8-pytest-style.parametrize-names-type`] setting.
 ///
 /// ## Example
 /// ```python
@@ -67,7 +67,7 @@ use super::helpers::{is_pytest_parametrize, split_names};
 /// ```
 ///
 /// ## Options
-/// - `flake8-pytest-style.parametrize-names-type`
+/// - `lint.flake8-pytest-style.parametrize-names-type`
 ///
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
@@ -103,17 +103,17 @@ impl Violation for PytestParametrizeNamesWrongType {
 /// of values.
 ///
 /// The style for the list of values rows can be configured via the
-/// the [`flake8-pytest-style.parametrize-values-type`] setting, while the
+/// the [`lint.flake8-pytest-style.parametrize-values-type`] setting, while the
 /// style for each row of values can be configured via the
-/// the [`flake8-pytest-style.parametrize-values-row-type`] setting.
+/// the [`lint.flake8-pytest-style.parametrize-values-row-type`] setting.
 ///
-/// For example, [`flake8-pytest-style.parametrize-values-type`] will lead to
+/// For example, [`lint.flake8-pytest-style.parametrize-values-type`] will lead to
 /// the following expectations:
 ///
 /// - `tuple`: `@pytest.mark.parametrize("value", ("a", "b", "c"))`
 /// - `list`: `@pytest.mark.parametrize("value", ["a", "b", "c"])`
 ///
-/// Similarly, [`flake8-pytest-style.parametrize-values-row-type`] will lead to
+/// Similarly, [`lint.flake8-pytest-style.parametrize-values-row-type`] will lead to
 /// the following expectations:
 ///
 /// - `tuple`: `@pytest.mark.parametrize(("key", "value"), [("a", "b"), ("c", "d")])`
@@ -170,8 +170,8 @@ impl Violation for PytestParametrizeNamesWrongType {
 /// ```
 ///
 /// ## Options
-/// - `flake8-pytest-style.parametrize-values-type`
-/// - `flake8-pytest-style.parametrize-values-row-type`
+/// - `lint.flake8-pytest-style.parametrize-values-type`
+/// - `lint.flake8-pytest-style.parametrize-values-row-type`
 ///
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
@@ -226,6 +226,10 @@ impl Violation for PytestParametrizeValuesWrongType {
 ///     ...
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as tests that rely on mutable global
+/// state may be affected by removing duplicate test cases.
+///
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[violation]
@@ -253,15 +257,18 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
     }
 
     let node = Expr::from(ast::StringLiteral {
-        value: elts.iter().fold(String::new(), |mut acc, elt| {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
-                if !acc.is_empty() {
-                    acc.push(',');
+        value: elts
+            .iter()
+            .fold(String::new(), |mut acc, elt| {
+                if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
+                    if !acc.is_empty() {
+                        acc.push(',');
+                    }
+                    acc.push_str(value.to_str());
                 }
-                acc.push_str(value.to_str());
-            }
-            acc
-        }),
+                acc
+            })
+            .into_boxed_str(),
         ..ast::StringLiteral::default()
     });
     Some(generator.expr(&node))
@@ -323,7 +330,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 .iter()
                                 .map(|name| {
                                     Expr::from(ast::StringLiteral {
-                                        value: (*name).to_string(),
+                                        value: (*name).to_string().into_boxed_str(),
                                         ..ast::StringLiteral::default()
                                     })
                                 })
@@ -356,7 +363,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 .iter()
                                 .map(|name| {
                                     Expr::from(ast::StringLiteral {
-                                        value: (*name).to_string(),
+                                        value: (*name).to_string().into_boxed_str(),
                                         ..ast::StringLiteral::default()
                                     })
                                 })
@@ -631,17 +638,17 @@ pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Decorator]) {
             }) = &decorator.expression
             {
                 if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
-                    if let [names, ..] = args.as_slice() {
+                    if let [names, ..] = &**args {
                         check_names(checker, decorator, names);
                     }
                 }
                 if checker.enabled(Rule::PytestParametrizeValuesWrongType) {
-                    if let [names, values, ..] = args.as_slice() {
+                    if let [names, values, ..] = &**args {
                         check_values(checker, names, values);
                     }
                 }
                 if checker.enabled(Rule::PytestDuplicateParametrizeTestCases) {
-                    if let [_, values, ..] = args.as_slice() {
+                    if let [_, values, ..] = &**args {
                         check_duplicates(checker, values);
                     }
                 }

@@ -32,7 +32,7 @@ def import_fixture(fixture: Path, fixture_set: str):
                 input.append(line)
 
         if not expected:
-            # If there's no output marker, tread the whole file as already pre-formatted
+            # If there's no output marker, treat the whole file as already pre-formatted
             expected = input
 
         options = {}
@@ -45,10 +45,20 @@ def import_fixture(fixture: Path, fixture_set: str):
             if "--pyi" in flags:
                 extension = "pyi"
 
+            if "--line-ranges=" in flags:
+                # Black preserves the flags for line-ranges tests to not mess up the line numbers
+                input.insert(0, flags)
+
             if "--line-length=" in flags:
                 [_, length_and_rest] = flags.split("--line-length=", 1)
                 length = length_and_rest.split(" ", 1)[0]
-                options["line_length"] = int(length)
+                length = int(length)
+                options["line_width"] = 1 if length == 0 else length
+
+            if "--minimum-version=" in flags:
+                [_, version] = flags.split("--minimum-version=", 1)
+                # Convert 3.10 to py310
+                options["target_version"] = f"py{version.strip().replace('.', '')}"
 
             if "--skip-magic-trailing-comma" in flags:
                 options["magic_trailing_comma"] = "ignore"
@@ -58,6 +68,9 @@ def import_fixture(fixture: Path, fixture_set: str):
         options_path = fixture_path.with_suffix(".options.json")
 
         if len(options) > 0:
+            if extension == "pyi":
+                options["source_type"] = "Stub"
+
             with options_path.open("w") as options_file:
                 json.dump(options, options_file)
         elif os.path.exists(options_path):
@@ -90,9 +103,6 @@ IGNORE_LIST = [
 
     # Uses a different output format
     "decorators.py",
-
-    # Ruff fails to parse because of a parser bug
-    "type_aliases.py"  # #8900 #8899
 ]
 
 

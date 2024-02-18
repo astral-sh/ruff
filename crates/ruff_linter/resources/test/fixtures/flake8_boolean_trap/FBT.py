@@ -71,6 +71,8 @@ foo.is_(True)
 bar.is_not(False)
 next(iter([]), False)
 sa.func.coalesce(tbl.c.valid, False)
+setVisible(True)
+set_visible(True)
 
 
 class Registry:
@@ -114,3 +116,19 @@ from typing import override
 @override
 def func(x: bool):
     pass
+
+
+settings(True)
+
+
+from dataclasses import dataclass, InitVar
+
+
+@dataclass
+class Fit:
+    force: InitVar[bool] = False
+
+    def __post_init__(self, force: bool) -> None:
+        print(force)
+
+Fit(force=True)

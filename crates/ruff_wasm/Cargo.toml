@@ -13,13 +13,13 @@ description = "WebAssembly bindings for Ruff"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+doctest = false
 
 [features]
 default = ["console_error_panic_hook"]
 
 [dependencies]
 ruff_linter = { path = "../ruff_linter" }
-ruff_diagnostics = { path = "../ruff_diagnostics" }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_codegen = { path = "../ruff_python_codegen" }
 ruff_formatter = { path = "../ruff_formatter" }
@@ -31,17 +31,16 @@ ruff_text_size = { path = "../ruff_text_size" }
 ruff_python_trivia = { path = "../ruff_python_trivia" }
 ruff_workspace = { path = "../ruff_workspace" }
 
-console_error_panic_hook = { version = "0.1.7", optional = true }
-console_log = { version = "1.0.0" }
+console_error_panic_hook = { workspace = true, optional = true }
+console_log = { workspace = true }
+js-sys = { workspace = true }
 log = { workspace = true }
-
 serde = { workspace = true }
-serde-wasm-bindgen = { version = "0.6.1" }
-wasm-bindgen = { version = "0.2.84" }
-js-sys = { version = "0.3.66" }
+serde-wasm-bindgen = { workspace = true }
+wasm-bindgen = { workspace = true }
 
 [dev-dependencies]
-wasm-bindgen-test = { version = "0.3.38" }
+wasm-bindgen-test = { workspace = true }
 
 [lints]
 workspace = true

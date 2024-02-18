@@ -12,14 +12,14 @@ mod tests {
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
-    use crate::assert_messages;
     use crate::registry::Rule;
     use crate::rules::pylint;
+
+    use crate::assert_messages;
     use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
-    #[test_case(Rule::AndOrTernary, Path::new("and_or_ternary.py"))]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
     #[test_case(Rule::BadOpenMode, Path::new("bad_open_mode.py"))]
@@ -40,6 +40,7 @@ mod tests {
     )]
     #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
     #[test_case(Rule::EqWithoutHash, Path::new("eq_without_hash.py"))]
+    #[test_case(Rule::EmptyComment, Path::new("empty_comment.py"))]
     #[test_case(Rule::ManualFromImport, Path::new("import_aliasing.py"))]
     #[test_case(Rule::SingleStringSlots, Path::new("single_string_slots.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_0.py"))]
@@ -62,6 +63,10 @@ mod tests {
         Path::new("global_variable_not_assigned.py")
     )]
     #[test_case(Rule::ImportOutsideTopLevel, Path::new("import_outside_top_level.py"))]
+    #[test_case(
+        Rule::ImportPrivateName,
+        Path::new("import_private_name/submodule/__main__.py")
+    )]
     #[test_case(Rule::ImportSelf, Path::new("import_self/module.py"))]
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"))]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"))]
@@ -86,6 +91,7 @@ mod tests {
         Path::new("named_expr_without_context.py")
     )]
     #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"))]
+    #[test_case(Rule::NonSlotAssignment, Path::new("non_slot_assignment.py"))]
     #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"))]
     #[test_case(
         Rule::RedefinedArgumentFromLocal,
@@ -160,7 +166,11 @@ mod tests {
         Path::new("unnecessary_list_index_lookup.py")
     )]
     #[test_case(Rule::NoClassmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::UnnecessaryDunderCall, Path::new("unnecessary_dunder_call.py"))]
     #[test_case(Rule::NoStaticmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::PotentialIndexError, Path::new("potential_index_error.py"))]
+    #[test_case(Rule::SuperWithoutBrackets, Path::new("super_without_brackets.py"))]
+    #[test_case(Rule::TooManyNestedBlocks, Path::new("too_many_nested_blocks.py"))]
     #[test_case(
         Rule::UnnecessaryDictIndexLookup,
         Path::new("unnecessary_dict_index_lookup.py")
@@ -340,6 +350,22 @@ mod tests {
                     ..pylint::settings::Settings::default()
                 },
                 ..LinterSettings::for_rules(vec![Rule::TooManyPublicMethods])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn too_many_locals() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_locals.py"),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    max_locals: 15,
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules(vec![Rule::TooManyLocals])
             },
         )?;
         assert_messages!(diagnostics);

@@ -32,11 +32,15 @@ class Diff(Serializable):
             line[2:]
             for line in self.lines
             if line.startswith("+" + " " * leading_spaces)
+            # Do not include patch headers
+            and not line.startswith("+++")
         )
         self.removed = list(
             line[2:]
             for line in self.lines
             if line.startswith("-" + " " * leading_spaces)
+            # Do not include patch headers
+            and not line.startswith("---")
         )
 
     def __bool__(self) -> bool:

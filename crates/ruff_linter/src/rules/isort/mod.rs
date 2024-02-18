@@ -180,7 +180,7 @@ fn format_import_block(
             continue;
         };
 
-        let imports = order_imports(import_block, settings);
+        let imports = order_imports(import_block, import_section, settings);
 
         // Add a blank line between every section.
         if is_first_block {
@@ -200,6 +200,7 @@ fn format_import_block(
                     // Add a blank lines between direct and from imports.
                     if settings.from_first
                         && lines_between_types > 0
+                        && !settings.force_sort_within_sections
                         && line_insertion == Some(LineInsertion::Necessary)
                     {
                         for _ in 0..lines_between_types {
@@ -225,6 +226,7 @@ fn format_import_block(
                     // Add a blank lines between direct and from imports.
                     if !settings.from_first
                         && lines_between_types > 0
+                        && !settings.force_sort_within_sections
                         && line_insertion == Some(LineInsertion::Necessary)
                     {
                         for _ in 0..lines_between_types {
@@ -291,6 +293,7 @@ mod tests {
     #[test_case(Path::new("force_sort_within_sections.py"))]
     #[test_case(Path::new("force_to_top.py"))]
     #[test_case(Path::new("force_wrap_aliases.py"))]
+    #[test_case(Path::new("future_from.py"))]
     #[test_case(Path::new("if_elif_else.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
     #[test_case(Path::new("inline_comments.py"))]
@@ -416,23 +419,20 @@ mod tests {
         Ok(())
     }
 
-    // Test currently disabled as line endings are automatically converted to
-    // platform-appropriate ones in CI/CD #[test_case(Path::new("
-    // line_ending_crlf.py"))] #[test_case(Path::new("line_ending_lf.py"))]
-    // fn source_code_style(path: &Path) -> Result<()> {
-    //     let snapshot = format!("{}", path.to_string_lossy());
-    //     let diagnostics = test_path(
-    //         Path::new("isort")
-    //             .join(path)
-    //             .as_path(),
-    //         &LinterSettings {
-    //             src: vec![test_resource_path("fixtures/isort")],
-    //             ..LinterSettings::for_rule(Rule::UnsortedImports)
-    //         },
-    //     )?;
-    //     crate::assert_messages!(snapshot, diagnostics);
-    //     Ok(())
-    // }
+    #[test_case(Path::new("line_ending_crlf.py"))]
+    #[test_case(Path::new("line_ending_lf.py"))]
+    fn source_code_style(path: &Path) -> Result<()> {
+        let snapshot = format!("{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        crate::assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
 
     #[test_case(Path::new("separate_local_folder_imports.py"))]
     fn known_local_folder(path: &Path) -> Result<()> {
@@ -701,6 +701,7 @@ mod tests {
 
     #[test_case(Path::new("force_sort_within_sections.py"))]
     #[test_case(Path::new("force_sort_within_sections_with_as_names.py"))]
+    #[test_case(Path::new("force_sort_within_sections_future.py"))]
     fn force_sort_within_sections(path: &Path) -> Result<()> {
         let snapshot = format!("force_sort_within_sections_{}", path.to_string_lossy());
         let mut diagnostics = test_path(
@@ -709,6 +710,26 @@ mod tests {
                 isort: super::settings::Settings {
                     force_sort_within_sections: true,
                     force_to_top: BTreeSet::from(["z".to_string()]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        diagnostics.sort_by_key(Ranged::start);
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("force_sort_within_sections_lines_between.py"))]
+    fn force_sort_within_sections_lines_between(path: &Path) -> Result<()> {
+        let snapshot = format!("force_sort_within_sections_{}", path.to_string_lossy());
+        let mut diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    force_sort_within_sections: true,
+                    lines_between_types: 2,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],

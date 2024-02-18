@@ -4,10 +4,11 @@ use std::cell::OnceCell;
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
+use std::slice::{Iter, IterMut};
 
-use itertools::Either::{Left, Right};
 use itertools::Itertools;
 
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::{int, LiteralExpressionRef};
@@ -159,7 +160,7 @@ pub enum Stmt {
 pub struct StmtIpyEscapeCommand {
     pub range: TextRange,
     pub kind: IpyEscapeKind,
-    pub value: String,
+    pub value: Box<str>,
 }
 
 impl From<StmtIpyEscapeCommand> for Stmt {
@@ -590,8 +591,6 @@ pub enum Expr {
     Compare(ExprCompare),
     #[is(name = "call_expr")]
     Call(ExprCall),
-    #[is(name = "formatted_value_expr")]
-    FormattedValue(ExprFormattedValue),
     #[is(name = "f_string_expr")]
     FString(ExprFString),
     #[is(name = "string_literal_expr")]
@@ -672,7 +671,7 @@ impl Expr {
 pub struct ExprIpyEscapeCommand {
     pub range: TextRange,
     pub kind: IpyEscapeKind,
-    pub value: String,
+    pub value: Box<str>,
 }
 
 impl From<ExprIpyEscapeCommand> for Expr {
@@ -895,8 +894,8 @@ impl From<ExprYieldFrom> for Expr {
 pub struct ExprCompare {
     pub range: TextRange,
     pub left: Box<Expr>,
-    pub ops: Vec<CmpOp>,
-    pub comparators: Vec<Expr>,
+    pub ops: Box<[CmpOp]>,
+    pub comparators: Box<[Expr]>,
 }
 
 impl From<ExprCompare> for Expr {
@@ -919,19 +918,51 @@ impl From<ExprCall> for Expr {
     }
 }
 
-/// See also [FormattedValue](https://docs.python.org/3/library/ast.html#ast.FormattedValue)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprFormattedValue {
+pub struct FStringFormatSpec {
     pub range: TextRange,
-    pub value: Box<Expr>,
-    pub debug_text: Option<DebugText>,
-    pub conversion: ConversionFlag,
-    pub format_spec: Option<Box<Expr>>,
+    pub elements: Vec<FStringElement>,
 }
 
-impl From<ExprFormattedValue> for Expr {
-    fn from(payload: ExprFormattedValue) -> Self {
-        Expr::FormattedValue(payload)
+impl Ranged for FStringFormatSpec {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+/// See also [FormattedValue](https://docs.python.org/3/library/ast.html#ast.FormattedValue)
+#[derive(Clone, Debug, PartialEq)]
+pub struct FStringExpressionElement {
+    pub range: TextRange,
+    pub expression: Box<Expr>,
+    pub debug_text: Option<DebugText>,
+    pub conversion: ConversionFlag,
+    pub format_spec: Option<Box<FStringFormatSpec>>,
+}
+
+impl Ranged for FStringExpressionElement {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FStringLiteralElement {
+    pub range: TextRange,
+    pub value: Box<str>,
+}
+
+impl Ranged for FStringLiteralElement {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+impl Deref for FStringLiteralElement {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
     }
 }
 
@@ -1021,21 +1052,31 @@ impl FStringValue {
         matches!(self.inner, FStringValueInner::Concatenated(_))
     }
 
-    /// Returns an iterator over all the [`FStringPart`]s contained in this value.
-    pub fn parts(&self) -> impl Iterator<Item = &FStringPart> {
+    /// Returns a slice of all the [`FStringPart`]s contained in this value.
+    pub fn as_slice(&self) -> &[FStringPart] {
         match &self.inner {
-            FStringValueInner::Single(part) => Left(std::iter::once(part)),
-            FStringValueInner::Concatenated(parts) => Right(parts.iter()),
+            FStringValueInner::Single(part) => std::slice::from_ref(part),
+            FStringValueInner::Concatenated(parts) => parts,
         }
+    }
+
+    /// Returns a mutable slice of all the [`FStringPart`]s contained in this value.
+    fn as_mut_slice(&mut self) -> &mut [FStringPart] {
+        match &mut self.inner {
+            FStringValueInner::Single(part) => std::slice::from_mut(part),
+            FStringValueInner::Concatenated(parts) => parts,
+        }
+    }
+
+    /// Returns an iterator over all the [`FStringPart`]s contained in this value.
+    pub fn iter(&self) -> Iter<FStringPart> {
+        self.as_slice().iter()
     }
 
     /// Returns an iterator over all the [`FStringPart`]s contained in this value
     /// that allows modification.
-    pub(crate) fn parts_mut(&mut self) -> impl Iterator<Item = &mut FStringPart> {
-        match &mut self.inner {
-            FStringValueInner::Single(part) => Left(std::iter::once(part)),
-            FStringValueInner::Concatenated(parts) => Right(parts.iter_mut()),
-        }
+    pub(crate) fn iter_mut(&mut self) -> IterMut<FStringPart> {
+        self.as_mut_slice().iter_mut()
     }
 
     /// Returns an iterator over the [`StringLiteral`] parts contained in this value.
@@ -1048,7 +1089,7 @@ impl FStringValue {
     ///
     /// Here, the string literal parts returned would be `"foo"` and `"baz"`.
     pub fn literals(&self) -> impl Iterator<Item = &StringLiteral> {
-        self.parts().filter_map(|part| part.as_literal())
+        self.iter().filter_map(|part| part.as_literal())
     }
 
     /// Returns an iterator over the [`FString`] parts contained in this value.
@@ -1061,10 +1102,10 @@ impl FStringValue {
     ///
     /// Here, the f-string parts returned would be `f"bar {x}"` and `f"qux"`.
     pub fn f_strings(&self) -> impl Iterator<Item = &FString> {
-        self.parts().filter_map(|part| part.as_f_string())
+        self.iter().filter_map(|part| part.as_f_string())
     }
 
-    /// Returns an iterator over all the f-string elements contained in this value.
+    /// Returns an iterator over all the [`FStringElement`] contained in this value.
     ///
     /// An f-string element is what makes up an [`FString`] i.e., it is either a
     /// string literal or an expression. In the following example,
@@ -1075,8 +1116,25 @@ impl FStringValue {
     ///
     /// The f-string elements returned would be string literal (`"bar "`),
     /// expression (`x`) and string literal (`"qux"`).
-    pub fn elements(&self) -> impl Iterator<Item = &Expr> {
-        self.f_strings().flat_map(|fstring| fstring.values.iter())
+    pub fn elements(&self) -> impl Iterator<Item = &FStringElement> {
+        self.f_strings().flat_map(|fstring| fstring.elements.iter())
+    }
+}
+
+impl<'a> IntoIterator for &'a FStringValue {
+    type Item = &'a FStringPart;
+    type IntoIter = Iter<'a, FStringPart>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut FStringValue {
+    type Item = &'a mut FStringPart;
+    type IntoIter = IterMut<'a, FStringPart>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
     }
 }
 
@@ -1113,7 +1171,7 @@ impl Ranged for FStringPart {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FString {
     pub range: TextRange,
-    pub values: Vec<Expr>,
+    pub elements: Vec<FStringElement>,
 }
 
 impl Ranged for FString {
@@ -1129,6 +1187,21 @@ impl From<FString> for Expr {
             value: FStringValue::single(payload),
         }
         .into()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
+pub enum FStringElement {
+    Literal(FStringLiteralElement),
+    Expression(FStringExpressionElement),
+}
+
+impl Ranged for FStringElement {
+    fn range(&self) -> TextRange {
+        match self {
+            FStringElement::Literal(node) => node.range(),
+            FStringElement::Expression(node) => node.range(),
+        }
     }
 }
 
@@ -1193,24 +1266,34 @@ impl StringLiteralValue {
     /// For an implicitly concatenated string, it returns `true` only if the first
     /// string literal is a unicode string.
     pub fn is_unicode(&self) -> bool {
-        self.parts().next().map_or(false, |part| part.unicode)
+        self.iter().next().map_or(false, |part| part.unicode)
+    }
+
+    /// Returns a slice of all the [`StringLiteral`] parts contained in this value.
+    pub fn as_slice(&self) -> &[StringLiteral] {
+        match &self.inner {
+            StringLiteralValueInner::Single(value) => std::slice::from_ref(value),
+            StringLiteralValueInner::Concatenated(value) => value.strings.as_slice(),
+        }
+    }
+
+    /// Returns a mutable slice of all the [`StringLiteral`] parts contained in this value.
+    fn as_mut_slice(&mut self) -> &mut [StringLiteral] {
+        match &mut self.inner {
+            StringLiteralValueInner::Single(value) => std::slice::from_mut(value),
+            StringLiteralValueInner::Concatenated(value) => value.strings.as_mut_slice(),
+        }
     }
 
     /// Returns an iterator over all the [`StringLiteral`] parts contained in this value.
-    pub fn parts(&self) -> impl Iterator<Item = &StringLiteral> {
-        match &self.inner {
-            StringLiteralValueInner::Single(value) => Left(std::iter::once(value)),
-            StringLiteralValueInner::Concatenated(value) => Right(value.strings.iter()),
-        }
+    pub fn iter(&self) -> Iter<StringLiteral> {
+        self.as_slice().iter()
     }
 
     /// Returns an iterator over all the [`StringLiteral`] parts contained in this value
     /// that allows modification.
-    pub(crate) fn parts_mut(&mut self) -> impl Iterator<Item = &mut StringLiteral> {
-        match &mut self.inner {
-            StringLiteralValueInner::Single(value) => Left(std::iter::once(value)),
-            StringLiteralValueInner::Concatenated(value) => Right(value.strings.iter_mut()),
-        }
+    pub(crate) fn iter_mut(&mut self) -> IterMut<StringLiteral> {
+        self.as_mut_slice().iter_mut()
     }
 
     /// Returns `true` if the string literal value is empty.
@@ -1221,12 +1304,12 @@ impl StringLiteralValue {
     /// Returns the total length of the string literal value, in bytes, not
     /// [`char`]s or graphemes.
     pub fn len(&self) -> usize {
-        self.parts().fold(0, |acc, part| acc + part.value.len())
+        self.iter().fold(0, |acc, part| acc + part.value.len())
     }
 
     /// Returns an iterator over the [`char`]s of each string literal part.
     pub fn chars(&self) -> impl Iterator<Item = char> + '_ {
-        self.parts().flat_map(|part| part.value.chars())
+        self.iter().flat_map(|part| part.value.chars())
     }
 
     /// Returns the concatenated string value as a [`str`].
@@ -1238,6 +1321,23 @@ impl StringLiteralValue {
             StringLiteralValueInner::Single(value) => value.as_str(),
             StringLiteralValueInner::Concatenated(value) => value.to_str(),
         }
+    }
+}
+
+impl<'a> IntoIterator for &'a StringLiteralValue {
+    type Item = &'a StringLiteral;
+    type IntoIter = Iter<'a, StringLiteral>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut StringLiteralValue {
+    type Item = &'a mut StringLiteral;
+    type IntoIter = IterMut<'a, StringLiteral>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
     }
 }
 
@@ -1284,7 +1384,7 @@ impl Default for StringLiteralValueInner {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StringLiteral {
     pub range: TextRange,
-    pub value: String,
+    pub value: Box<str>,
     pub unicode: bool,
 }
 
@@ -1298,7 +1398,7 @@ impl Deref for StringLiteral {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        self.value.as_str()
+        &self.value
     }
 }
 
@@ -1326,14 +1426,16 @@ struct ConcatenatedStringLiteral {
     /// Each string literal that makes up the concatenated string.
     strings: Vec<StringLiteral>,
     /// The concatenated string value.
-    value: OnceCell<String>,
+    value: OnceCell<Box<str>>,
 }
 
 impl ConcatenatedStringLiteral {
     /// Extracts a string slice containing the entire concatenated string.
     fn to_str(&self) -> &str {
-        self.value
-            .get_or_init(|| self.strings.iter().map(StringLiteral::as_str).collect())
+        self.value.get_or_init(|| {
+            let concatenated: String = self.strings.iter().map(StringLiteral::as_str).collect();
+            concatenated.into_boxed_str()
+        })
     }
 }
 
@@ -1412,37 +1514,63 @@ impl BytesLiteralValue {
         matches!(self.inner, BytesLiteralValueInner::Concatenated(_))
     }
 
-    /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value.
-    pub fn parts(&self) -> impl Iterator<Item = &BytesLiteral> {
+    /// Returns a slice of all the [`BytesLiteral`] parts contained in this value.
+    pub fn as_slice(&self) -> &[BytesLiteral] {
         match &self.inner {
-            BytesLiteralValueInner::Single(value) => Left(std::iter::once(value)),
-            BytesLiteralValueInner::Concatenated(values) => Right(values.iter()),
+            BytesLiteralValueInner::Single(value) => std::slice::from_ref(value),
+            BytesLiteralValueInner::Concatenated(value) => value.as_slice(),
         }
+    }
+
+    /// Returns a mutable slice of all the [`BytesLiteral`] parts contained in this value.
+    fn as_mut_slice(&mut self) -> &mut [BytesLiteral] {
+        match &mut self.inner {
+            BytesLiteralValueInner::Single(value) => std::slice::from_mut(value),
+            BytesLiteralValueInner::Concatenated(value) => value.as_mut_slice(),
+        }
+    }
+
+    /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value.
+    pub fn iter(&self) -> Iter<BytesLiteral> {
+        self.as_slice().iter()
     }
 
     /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value
     /// that allows modification.
-    pub(crate) fn parts_mut(&mut self) -> impl Iterator<Item = &mut BytesLiteral> {
-        match &mut self.inner {
-            BytesLiteralValueInner::Single(value) => Left(std::iter::once(value)),
-            BytesLiteralValueInner::Concatenated(values) => Right(values.iter_mut()),
-        }
+    pub(crate) fn iter_mut(&mut self) -> IterMut<BytesLiteral> {
+        self.as_mut_slice().iter_mut()
     }
 
     /// Returns `true` if the concatenated bytes has a length of zero.
     pub fn is_empty(&self) -> bool {
-        self.parts().all(|part| part.is_empty())
+        self.iter().all(|part| part.is_empty())
     }
 
     /// Returns the length of the concatenated bytes.
     pub fn len(&self) -> usize {
-        self.parts().map(|part| part.len()).sum()
+        self.iter().map(|part| part.len()).sum()
     }
 
     /// Returns an iterator over the bytes of the concatenated bytes.
     fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
-        self.parts()
-            .flat_map(|part| part.as_slice().iter().copied())
+        self.iter().flat_map(|part| part.as_slice().iter().copied())
+    }
+}
+
+impl<'a> IntoIterator for &'a BytesLiteralValue {
+    type Item = &'a BytesLiteral;
+    type IntoIter = Iter<'a, BytesLiteral>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut BytesLiteralValue {
+    type Item = &'a mut BytesLiteral;
+    type IntoIter = IterMut<'a, BytesLiteral>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
     }
 }
 
@@ -1479,7 +1607,7 @@ impl Default for BytesLiteralValueInner {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct BytesLiteral {
     pub range: TextRange,
-    pub value: Vec<u8>,
+    pub value: Box<[u8]>,
 }
 
 impl Ranged for BytesLiteral {
@@ -1492,7 +1620,7 @@ impl Deref for BytesLiteral {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        self.value.as_slice()
+        &self.value
     }
 }
 
@@ -1673,6 +1801,37 @@ pub struct ExprTuple {
 impl From<ExprTuple> for Expr {
     fn from(payload: ExprTuple) -> Self {
         Expr::Tuple(payload)
+    }
+}
+
+impl ExprTuple {
+    /// Return `true` if a tuple is parenthesized in the source code.
+    pub fn is_parenthesized(&self, source: &str) -> bool {
+        let Some(elt) = self.elts.first() else {
+            return true;
+        };
+
+        // Count the number of open parentheses between the start of the tuple and the first element.
+        let open_parentheses_count =
+            SimpleTokenizer::new(source, TextRange::new(self.start(), elt.start()))
+                .skip_trivia()
+                .filter(|token| token.kind() == SimpleTokenKind::LParen)
+                .count();
+        if open_parentheses_count == 0 {
+            return false;
+        }
+
+        // Count the number of parentheses between the end of the first element and its trailing comma.
+        let close_parentheses_count =
+            SimpleTokenizer::new(source, TextRange::new(elt.end(), self.end()))
+                .skip_trivia()
+                .take_while(|token| token.kind() != SimpleTokenKind::Comma)
+                .filter(|token| token.kind() == SimpleTokenKind::RParen)
+                .count();
+
+        // If the number of open parentheses is greater than the number of close parentheses, the tuple
+        // is parenthesized.
+        open_parentheses_count > close_parentheses_count
     }
 }
 
@@ -2828,8 +2987,8 @@ pub struct ParameterWithDefault {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arguments {
     pub range: TextRange,
-    pub args: Vec<Expr>,
-    pub keywords: Vec<Keyword>,
+    pub args: Box<[Expr]>,
+    pub keywords: Box<[Keyword]>,
 }
 
 /// An entry in the argument list of a function call.
@@ -3483,11 +3642,6 @@ impl Ranged for crate::nodes::ExprCall {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprFormattedValue {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
 impl Ranged for crate::nodes::ExprFString {
     fn range(&self) -> TextRange {
         self.range
@@ -3553,7 +3707,6 @@ impl Ranged for crate::Expr {
             Self::YieldFrom(node) => node.range(),
             Self::Compare(node) => node.range(),
             Self::Call(node) => node.range(),
-            Self::FormattedValue(node) => node.range(),
             Self::FString(node) => node.range(),
             Self::StringLiteral(node) => node.range(),
             Self::BytesLiteral(node) => node.range(),
@@ -3729,18 +3882,54 @@ impl Ranged for crate::nodes::ParameterWithDefault {
     }
 }
 
-#[cfg(target_pointer_width = "64")]
-mod size_assertions {
-    use static_assertions::assert_eq_size;
-
+#[cfg(test)]
+mod tests {
     #[allow(clippy::wildcard_imports)]
     use super::*;
 
-    assert_eq_size!(Stmt, [u8; 144]);
-    assert_eq_size!(StmtFunctionDef, [u8; 144]);
-    assert_eq_size!(StmtClassDef, [u8; 104]);
-    assert_eq_size!(StmtTry, [u8; 112]);
-    assert_eq_size!(Expr, [u8; 80]);
-    assert_eq_size!(Pattern, [u8; 96]);
-    assert_eq_size!(Mod, [u8; 32]);
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn size() {
+        assert!(std::mem::size_of::<Stmt>() <= 144);
+        assert!(std::mem::size_of::<StmtFunctionDef>() <= 144);
+        assert!(std::mem::size_of::<StmtClassDef>() <= 104);
+        assert!(std::mem::size_of::<StmtTry>() <= 112);
+        assert!(std::mem::size_of::<Mod>() <= 32);
+        // 96 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<Pattern>(), 88 | 96));
+
+        assert_eq!(std::mem::size_of::<Expr>(), 64);
+        assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
+        assert_eq!(std::mem::size_of::<ExprAwait>(), 16);
+        assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
+        assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 12);
+        assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 40);
+        assert_eq!(std::mem::size_of::<ExprCall>(), 56);
+        assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
+        assert_eq!(std::mem::size_of::<ExprDict>(), 56);
+        assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
+        assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
+        assert_eq!(std::mem::size_of::<ExprFString>(), 48);
+        assert_eq!(std::mem::size_of::<ExprGeneratorExp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprIfExp>(), 32);
+        assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
+        assert_eq!(std::mem::size_of::<ExprLambda>(), 24);
+        assert_eq!(std::mem::size_of::<ExprList>(), 40);
+        assert_eq!(std::mem::size_of::<ExprListComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprName>(), 40);
+        assert_eq!(std::mem::size_of::<ExprNamedExpr>(), 24);
+        assert_eq!(std::mem::size_of::<ExprNoneLiteral>(), 8);
+        assert_eq!(std::mem::size_of::<ExprNumberLiteral>(), 32);
+        assert_eq!(std::mem::size_of::<ExprSet>(), 32);
+        assert_eq!(std::mem::size_of::<ExprSetComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprSlice>(), 32);
+        assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
+        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 48);
+        assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
+        assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
+        assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
+        assert_eq!(std::mem::size_of::<ExprYield>(), 16);
+        assert_eq!(std::mem::size_of::<ExprYieldFrom>(), 16);
+    }
 }

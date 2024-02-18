@@ -71,7 +71,7 @@ impl<'a> FormatSummaryValues<'a> {
         let mut extracted_args: Vec<&Expr> = Vec::new();
         let mut extracted_kwargs: FxHashMap<&str, &Expr> = FxHashMap::default();
 
-        for arg in &call.arguments.args {
+        for arg in call.arguments.args.iter() {
             if matches!(arg, Expr::Starred(..))
                 || contains_quotes(locator.slice(arg))
                 || locator.contains_line_break(arg.range())
@@ -80,7 +80,7 @@ impl<'a> FormatSummaryValues<'a> {
             }
             extracted_args.push(arg);
         }
-        for keyword in &call.arguments.keywords {
+        for keyword in call.arguments.keywords.iter() {
             let Keyword {
                 arg,
                 value,
@@ -137,10 +137,9 @@ enum FormatContext {
     Accessed,
 }
 
-/// Given an [`Expr`], format it for use in a formatted expression within an f-string.
-fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>) -> Cow<'a, str> {
-    let text = locator.slice(expr);
-    let parenthesize = match (context, expr) {
+/// Returns `true` if the expression should be parenthesized when used in an f-string.
+fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
+    match (context, expr) {
         // E.g., `x + y` should be parenthesized in `f"{(x + y)[0]}"`.
         (
             FormatContext::Accessed,
@@ -173,9 +172,44 @@ fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>
             | Expr::SetComp(_)
             | Expr::DictComp(_),
         ) => true,
+        (_, Expr::Subscript(ast::ExprSubscript { value, .. })) => {
+            matches!(
+                value.as_ref(),
+                Expr::GeneratorExp(_)
+                    | Expr::Dict(_)
+                    | Expr::Set(_)
+                    | Expr::SetComp(_)
+                    | Expr::DictComp(_)
+            )
+        }
+        (_, Expr::Attribute(ast::ExprAttribute { value, .. })) => {
+            matches!(
+                value.as_ref(),
+                Expr::GeneratorExp(_)
+                    | Expr::Dict(_)
+                    | Expr::Set(_)
+                    | Expr::SetComp(_)
+                    | Expr::DictComp(_)
+            )
+        }
+        (_, Expr::Call(ast::ExprCall { func, .. })) => {
+            matches!(
+                func.as_ref(),
+                Expr::GeneratorExp(_)
+                    | Expr::Dict(_)
+                    | Expr::Set(_)
+                    | Expr::SetComp(_)
+                    | Expr::DictComp(_)
+            )
+        }
         _ => false,
-    };
-    if parenthesize && !text.starts_with('(') && !text.ends_with(')') {
+    }
+}
+
+/// Given an [`Expr`], format it for use in a formatted expression within an f-string.
+fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>) -> Cow<'a, str> {
+    let text = locator.slice(expr);
+    if parenthesize(expr, text, context) && !(text.starts_with('(') && text.ends_with(')')) {
         Cow::Owned(format!("({text})"))
     } else {
         Cow::Borrowed(text)
@@ -264,7 +298,7 @@ fn try_convert_to_f_string(
                             converted.push(']');
                         }
                         FieldNamePart::StringIndex(index) => {
-                            let quote = match *trailing_quote {
+                            let quote = match trailing_quote {
                                 "'" | "'''" | "\"\"\"" => '"',
                                 "\"" => '\'',
                                 _ => unreachable!("invalid trailing quote"),

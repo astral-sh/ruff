@@ -68,9 +68,6 @@ impl Transformer for Relocator {
             Expr::Call(nodes::ExprCall { range, .. }) => {
                 *range = self.range;
             }
-            Expr::FormattedValue(nodes::ExprFormattedValue { range, .. }) => {
-                *range = self.range;
-            }
             Expr::FString(nodes::ExprFString { range, .. }) => {
                 *range = self.range;
             }

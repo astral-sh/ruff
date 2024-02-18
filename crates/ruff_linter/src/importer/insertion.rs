@@ -333,7 +333,7 @@ mod tests {
     #[test]
     fn start_of_file() -> Result<()> {
         fn insert(contents: &str) -> Result<Insertion> {
-            let program = parse_suite(contents, "<filename>")?;
+            let program = parse_suite(contents)?;
             let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, Mode::Module);
             let locator = Locator::new(contents);
             let stylist = Stylist::from_tokens(&tokens, &locator);

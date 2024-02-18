@@ -4,7 +4,7 @@ use drop_bomb::DebugDropBomb;
 use unicode_width::UnicodeWidthChar;
 
 pub use printer_options::*;
-use ruff_text_size::{Ranged, TextLen, TextSize};
+use ruff_text_size::{TextLen, TextSize};
 
 use crate::format_element::document::Document;
 use crate::format_element::tag::{Condition, GroupMode};
@@ -60,7 +60,10 @@ impl<'a> Printer<'a> {
         document: &'a Document,
         indent: u16,
     ) -> PrintResult<Printed> {
-        let mut stack = PrintCallStack::new(PrintElementArgs::new(Indention::Level(indent)));
+        let indentation = Indention::Level(indent);
+        self.state.pending_indent = indentation;
+
+        let mut stack = PrintCallStack::new(PrintElementArgs::new(indentation));
         let mut queue: PrintQueue<'a> = PrintQueue::new(document.as_ref());
 
         loop {
@@ -72,6 +75,9 @@ impl<'a> Printer<'a> {
                 }
             }
         }
+
+        // Push any pending marker
+        self.push_marker();
 
         Ok(Printed::new(
             self.state.buffer,
@@ -94,42 +100,38 @@ impl<'a> Printer<'a> {
         let args = stack.top();
 
         match element {
-            FormatElement::Space => self.print_text(Text::Token(" "), None),
-            FormatElement::Token { text } => self.print_text(Text::Token(text), None),
-            FormatElement::Text { text, text_width } => self.print_text(
-                Text::Text {
-                    text,
-                    text_width: *text_width,
-                },
-                None,
-            ),
+            FormatElement::Space => self.print_text(Text::Token(" ")),
+            FormatElement::Token { text } => self.print_text(Text::Token(text)),
+            FormatElement::Text { text, text_width } => self.print_text(Text::Text {
+                text,
+                text_width: *text_width,
+            }),
             FormatElement::SourceCodeSlice { slice, text_width } => {
                 let text = slice.text(self.source_code);
-                self.print_text(
-                    Text::Text {
-                        text,
-                        text_width: *text_width,
-                    },
-                    Some(slice.range()),
-                );
+                self.print_text(Text::Text {
+                    text,
+                    text_width: *text_width,
+                });
             }
             FormatElement::Line(line_mode) => {
                 if args.mode().is_flat()
                     && matches!(line_mode, LineMode::Soft | LineMode::SoftOrSpace)
                 {
                     if line_mode == &LineMode::SoftOrSpace {
-                        self.print_text(Text::Token(" "), None);
+                        self.print_text(Text::Token(" "));
                     }
                 } else if self.state.line_suffixes.has_pending() {
                     self.flush_line_suffixes(queue, stack, Some(element));
                 } else {
                     // Only print a newline if the current line isn't already empty
                     if self.state.line_width > 0 {
+                        self.push_marker();
                         self.print_char('\n');
                     }
 
                     // Print a second line break if this is an empty line
                     if line_mode == &LineMode::Empty {
+                        self.push_marker();
                         self.print_char('\n');
                     }
 
@@ -142,8 +144,11 @@ impl<'a> Printer<'a> {
             }
 
             FormatElement::SourcePosition(position) => {
-                self.state.source_position = *position;
-                self.push_marker();
+                // The printer defers printing indents until the next text
+                // is printed. Pushing the marker now would mean that the
+                // mapped range includes the indent range, which we don't want.
+                // Queue the source map position and emit it when printing the next character
+                self.state.pending_source_position = Some(*position);
             }
 
             FormatElement::LineSuffixBoundary => {
@@ -435,7 +440,7 @@ impl<'a> Printer<'a> {
         Ok(print_mode)
     }
 
-    fn print_text(&mut self, text: Text, source_range: Option<TextRange>) {
+    fn print_text(&mut self, text: Text) {
         if !self.state.pending_indent.is_empty() {
             let (indent_char, repeat_count) = match self.options.indent_style() {
                 IndentStyle::Tab => ('\t', 1),
@@ -456,19 +461,6 @@ impl<'a> Printer<'a> {
             for _ in 0..indent.align() {
                 self.print_char(' ');
             }
-        }
-
-        // Insert source map markers before and after the token
-        //
-        // If the token has source position information the start marker
-        // will use the start position of the original token, and the end
-        // marker will use that position + the text length of the token
-        //
-        // If the token has no source position (was created by the formatter)
-        // both the start and end marker will use the last known position
-        // in the input source (from state.source_position)
-        if let Some(range) = source_range {
-            self.state.source_position = range.start();
         }
 
         self.push_marker();
@@ -493,29 +485,24 @@ impl<'a> Printer<'a> {
                 }
             }
         }
-
-        if let Some(range) = source_range {
-            self.state.source_position = range.end();
-        }
-
-        self.push_marker();
     }
 
     fn push_marker(&mut self) {
-        if self.options.source_map_generation.is_disabled() {
+        let Some(source_position) = self.state.pending_source_position.take() else {
             return;
-        }
+        };
 
         let marker = SourceMarker {
-            source: self.state.source_position,
+            source: source_position,
             dest: self.state.buffer.text_len(),
         };
 
-        if let Some(last) = self.state.source_markers.last() {
-            if last != &marker {
-                self.state.source_markers.push(marker);
-            }
-        } else {
+        if self
+            .state
+            .source_markers
+            .last()
+            .map_or(true, |last| last != &marker)
+        {
             self.state.source_markers.push(marker);
         }
     }
@@ -887,7 +874,7 @@ enum FillPairLayout {
 struct PrinterState<'a> {
     buffer: String,
     source_markers: Vec<SourceMarker>,
-    source_position: TextSize,
+    pending_source_position: Option<TextSize>,
     pending_indent: Indention,
     measured_group_fits: bool,
     line_width: u32,
@@ -1472,6 +1459,11 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
     }
 
     fn fits_text(&mut self, text: Text, args: PrintElementArgs) -> Fits {
+        fn exceeds_width(fits: &FitsMeasurer, args: PrintElementArgs) -> bool {
+            fits.state.line_width > fits.options().line_width.into()
+                && !args.measure_mode().allows_text_overflow()
+        }
+
         let indent = std::mem::take(&mut self.state.pending_indent);
         self.state.line_width +=
             u32::from(indent.level()) * self.options().indent_width() + u32::from(indent.align());
@@ -1493,7 +1485,13 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                                     return Fits::No;
                                 }
                                 match args.measure_mode() {
-                                    MeasureMode::FirstLine => return Fits::Yes,
+                                    MeasureMode::FirstLine => {
+                                        return if exceeds_width(self, args) {
+                                            Fits::No
+                                        } else {
+                                            Fits::Yes
+                                        };
+                                    }
                                     MeasureMode::AllLines
                                     | MeasureMode::AllLinesAllowTextOverflow => {
                                         self.state.line_width = 0;
@@ -1511,9 +1509,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             }
         }
 
-        if self.state.line_width > self.options().line_width.into()
-            && !args.measure_mode().allows_text_overflow()
-        {
+        if exceeds_width(self, args) {
             return Fits::No;
         }
 
@@ -1733,7 +1729,7 @@ a",
         let result = format_with_options(
             &format_args![
                 token("function main() {"),
-                block_indent(&text("let x = `This is a multiline\nstring`;", None)),
+                block_indent(&text("let x = `This is a multiline\nstring`;")),
                 token("}"),
                 hard_line_break()
             ],
@@ -1750,7 +1746,7 @@ a",
     fn it_breaks_a_group_if_a_string_contains_a_newline() {
         let result = format(&FormatArrayElements {
             items: vec![
-                &text("`This is a string spanning\ntwo lines`", None),
+                &text("`This is a string spanning\ntwo lines`"),
                 &token("\"b\""),
             ],
         });

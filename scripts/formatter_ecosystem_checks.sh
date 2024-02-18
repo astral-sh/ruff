@@ -67,19 +67,13 @@ git -C "$dir/home-assistant" checkout -q 88296c1998fd1943576e0167ab190d25af17525
 if [ ! -d "$dir/poetry/.git" ]; then
   git clone --filter=tree:0 https://github.com/python-poetry/poetry "$dir/poetry"
 fi
-git -C "$dir/poetry" checkout -q f5cb9f0fb19063cf280faf5e39c82d5691da9939
+git -C "$dir/poetry" checkout -q f310a592ad3ab41bb8d635af6bacaf044a1fefef
 
 # cpython itself
 if [ ! -d "$dir/cpython/.git" ]; then
   git clone --filter=tree:0 https://github.com/python/cpython "$dir/cpython"
 fi
 git -C "$dir/cpython" checkout -q b75186f69edcf54615910a5cd707996144163ef7
-
-# poetry itself
-if [ ! -d "$dir/poetry/.git" ]; then
-  git clone --filter=tree:0 https://github.com/python-poetry/poetry "$dir/poetry"
-fi
-git -C "$dir/poetry" checkout -q 611033a7335f3c8e2b74dd58688fb9021cf84a5b
 
 # Uncomment if you want to update the hashes
 #for i in "$dir"/*/; do git -C "$i" switch main && git -C "$i" pull; done

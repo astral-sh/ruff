@@ -1,16 +1,23 @@
-use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
+use ruff_formatter::{
+    write, FormatContext, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions,
+};
 use ruff_python_ast::helpers::is_compound_statement;
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt, Suite};
+use ruff_python_ast::{AnyNodeRef, StmtExpr};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_end_of_line_trivia, lines_before};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{
     leading_comments, trailing_comments, Comments, LeadingDanglingTrailingComments,
 };
-use crate::context::{NodeLevel, TopLevelStatementPosition, WithNodeLevel};
-use crate::expression::string::StringLayout;
+use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
+use crate::expression::expr_string_literal::ExprStringLiteralKind;
 use crate::prelude::*;
+use crate::preview::{
+    is_blank_line_after_nested_stub_class_enabled, is_dummy_implementations_enabled,
+    is_format_module_docstring_enabled, is_module_docstring_newlines_enabled,
+    is_no_blank_line_before_class_docstring_enabled,
+};
 use crate::statement::stmt_expr::FormatStmtExpr;
 use crate::verbatim::{
     suppressed_node, write_suppressed_statements_starting_with_leading_comment,
@@ -71,7 +78,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         let source = f.context().source();
         let source_type = f.options().source_type();
 
-        let f = &mut WithNodeLevel::new(node_level, f);
+        let f = WithNodeLevel::new(node_level, f);
+        let f = &mut WithIndentLevel::new(f.context().indent_level().increment(), f);
 
         // Format the first statement in the body, which often has special formatting rules.
         let first = match self.kind {
@@ -95,7 +103,9 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             }
 
             SuiteKind::Function => {
-                if let Some(docstring) = DocstringStmt::try_from_statement(first, self.kind) {
+                if let Some(docstring) =
+                    DocstringStmt::try_from_statement(first, self.kind, source_type)
+                {
                     SuiteChildStatement::Docstring(docstring)
                 } else {
                     SuiteChildStatement::Other(first)
@@ -103,17 +113,29 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             }
 
             SuiteKind::Class => {
-                if let Some(docstring) = DocstringStmt::try_from_statement(first, self.kind) {
+                if let Some(docstring) =
+                    DocstringStmt::try_from_statement(first, self.kind, source_type)
+                {
                     if !comments.has_leading(first)
                         && lines_before(first.start(), source) > 1
                         && !source_type.is_stub()
+                        && !is_no_blank_line_before_class_docstring_enabled(f.context())
                     {
                         // Allow up to one empty line before a class docstring, e.g., this is
                         // stable formatting:
+                        //
                         // ```python
                         // class Test:
                         //
                         //     """Docstring"""
+                        // ```
+                        //
+                        // But, in preview mode, we don't want to allow any empty lines before a
+                        // class docstring, e.g., this is preview formatting:
+                        //
+                        // ```python
+                        // class Test:
+                        //   """Docstring"""
                         // ```
                         empty_line().fmt(f)?;
                     }
@@ -123,7 +145,19 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     SuiteChildStatement::Other(first)
                 }
             }
-            SuiteKind::TopLevel => SuiteChildStatement::Other(first),
+            SuiteKind::TopLevel => {
+                if is_format_module_docstring_enabled(f.context()) {
+                    if let Some(docstring) =
+                        DocstringStmt::try_from_statement(first, self.kind, source_type)
+                    {
+                        SuiteChildStatement::Docstring(docstring)
+                    } else {
+                        SuiteChildStatement::Other(first)
+                    }
+                } else {
+                    SuiteChildStatement::Other(first)
+                }
+            }
         };
 
         let first_comments = comments.leading_dangling_trailing(first);
@@ -154,9 +188,10 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 && self.kind == SuiteKind::Class
             {
                 true
-            } else if f.options().preview().is_enabled()
+            } else if is_module_docstring_newlines_enabled(f.context())
                 && self.kind == SuiteKind::TopLevel
-                && DocstringStmt::try_from_statement(first.statement(), self.kind).is_some()
+                && DocstringStmt::try_from_statement(first.statement(), self.kind, source_type)
+                    .is_some()
             {
                 // Only in preview mode, insert a newline after a module level docstring, but treat
                 // it as a docstring otherwise. See: https://github.com/psf/black/pull/3932.
@@ -247,12 +282,31 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         f,
                     )?;
                 } else {
-                    match self.kind {
-                        SuiteKind::TopLevel => {
-                            write!(f, [empty_line(), empty_line()])?;
-                        }
-                        SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
-                            empty_line().fmt(f)?;
+                    // Preserve empty lines after a stub implementation but don't insert a new one if there isn't any present in the source.
+                    // This is useful when having multiple function overloads that should be grouped to getter by omitting new lines between them.
+                    let is_preceding_stub_function_without_empty_line =
+                        is_dummy_implementations_enabled(f.context())
+                            && following.is_function_def_stmt()
+                            && preceding
+                                .as_function_def_stmt()
+                                .is_some_and(|preceding_stub| {
+                                    contains_only_an_ellipsis(
+                                        &preceding_stub.body,
+                                        f.context().comments(),
+                                    ) && lines_after_ignoring_end_of_line_trivia(
+                                        preceding_stub.end(),
+                                        f.context().source(),
+                                    ) < 2
+                                });
+
+                    if !is_preceding_stub_function_without_empty_line {
+                        match self.kind {
+                            SuiteKind::TopLevel => {
+                                write!(f, [empty_line(), empty_line()])?;
+                            }
+                            SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
+                                empty_line().fmt(f)?;
+                            }
                         }
                     }
                 }
@@ -436,22 +490,144 @@ fn stub_file_empty_lines(
     let empty_line_condition = preceding_comments.has_trailing()
         || following_comments.has_leading()
         || !stub_suite_can_omit_empty_line(preceding, following, f);
+    let require_empty_line = should_insert_blank_line_after_class_in_stub_file(
+        preceding.into(),
+        Some(following.into()),
+        f.context(),
+    );
     match kind {
         SuiteKind::TopLevel => {
-            if empty_line_condition {
+            if empty_line_condition || require_empty_line {
                 empty_line().fmt(f)
             } else {
                 hard_line_break().fmt(f)
             }
         }
         SuiteKind::Class | SuiteKind::Other | SuiteKind::Function => {
-            if empty_line_condition
-                && lines_after_ignoring_end_of_line_trivia(preceding.end(), source) > 1
+            if (empty_line_condition
+                && lines_after_ignoring_end_of_line_trivia(preceding.end(), source) > 1)
+                || require_empty_line
             {
                 empty_line().fmt(f)
             } else {
                 hard_line_break().fmt(f)
             }
+        }
+    }
+}
+
+/// Checks if an empty line should be inserted after a class definition.
+///
+/// This is only valid if the [`blank_line_after_nested_stub_class`](https://github.com/astral-sh/ruff/issues/8891)
+/// preview rule is enabled and the source to be formatted is a stub file.
+///
+/// If `following` is `None`, then the preceding node is the last one in a suite. The
+/// caller needs to make sure that the suite which the preceding node is part of is
+/// followed by an alternate branch and shouldn't be a top-level suite.
+pub(crate) fn should_insert_blank_line_after_class_in_stub_file(
+    preceding: AnyNodeRef<'_>,
+    following: Option<AnyNodeRef<'_>>,
+    context: &PyFormatContext,
+) -> bool {
+    if !(is_blank_line_after_nested_stub_class_enabled(context)
+        && context.options().source_type().is_stub())
+    {
+        return false;
+    }
+    let comments = context.comments();
+    match preceding.as_stmt_class_def() {
+        Some(class) if contains_only_an_ellipsis(&class.body, comments) => {
+            let Some(following) = following else {
+                // The formatter is at the start of an alternate branch such as
+                // an `else` block.
+                //
+                // ```python
+                // if foo:
+                //     class Nested:
+                //         pass
+                // else:
+                //     pass
+                // ```
+                //
+                // In the above code, the preceding node is the `Nested` class
+                // which has no following node.
+                return true;
+            };
+
+            // If the preceding class has decorators, then we need to add an empty
+            // line even if it only contains ellipsis.
+            //
+            // ```python
+            // class Top:
+            //     @decorator
+            //     class Nested1: ...
+            //     foo = 1
+            // ```
+            let preceding_has_decorators = !class.decorator_list.is_empty();
+
+            // If the following statement is a class definition, then an empty line
+            // should be inserted if it (1) doesn't just contain ellipsis, or (2) has decorators.
+            //
+            // ```python
+            // class Top:
+            //     class Nested1: ...
+            //     class Nested2:
+            //         pass
+            //
+            // class Top:
+            //     class Nested1: ...
+            //     @decorator
+            //     class Nested2: ...
+            // ```
+            //
+            // Both of the above examples should add a blank line in between.
+            let following_is_class_without_only_ellipsis_or_has_decorators =
+                following.as_stmt_class_def().is_some_and(|following| {
+                    !contains_only_an_ellipsis(&following.body, comments)
+                        || !following.decorator_list.is_empty()
+                });
+
+            preceding_has_decorators
+                || following_is_class_without_only_ellipsis_or_has_decorators
+                || following.is_stmt_function_def()
+        }
+        Some(_) => {
+            // Preceding statement is a class definition whose body isn't only an ellipsis.
+            // Here, we should only add a blank line if the class doesn't have a trailing
+            // own line comment as that's handled by the class formatting itself.
+            !comments.has_trailing_own_line(preceding)
+        }
+        None => {
+            // If preceding isn't a class definition, let's check if the last statement
+            // in the body, going all the way down, is a class definition.
+            //
+            // ```python
+            // if foo:
+            //     if bar:
+            //         class Nested:
+            //             pass
+            // if other:
+            //     pass
+            // ```
+            //
+            // But, if it contained a trailing own line comment, then it's handled
+            // by the class formatting itself.
+            //
+            // ```python
+            // if foo:
+            //     if bar:
+            //         class Nested:
+            //             pass
+            //         # comment
+            // if other:
+            //     pass
+            // ```
+            std::iter::successors(
+                preceding.last_child_in_body(),
+                AnyNodeRef::last_child_in_body,
+            )
+            .take_while(|last_child| !comments.has_trailing_own_line(*last_child))
+            .any(|last_child| last_child.is_stmt_class_def())
         }
     }
 }
@@ -565,7 +741,16 @@ pub(crate) struct DocstringStmt<'a> {
 
 impl<'a> DocstringStmt<'a> {
     /// Checks if the statement is a simple string that can be formatted as a docstring
-    fn try_from_statement(stmt: &'a Stmt, suite_kind: SuiteKind) -> Option<DocstringStmt<'a>> {
+    fn try_from_statement(
+        stmt: &'a Stmt,
+        suite_kind: SuiteKind,
+        source_type: PySourceType,
+    ) -> Option<DocstringStmt<'a>> {
+        // Notebooks don't have a concept of modules, therefore, don't recognise the first string as the module docstring.
+        if source_type.is_ipynb() && suite_kind == SuiteKind::TopLevel {
+            return None;
+        }
+
         let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
             return None;
         };
@@ -580,6 +765,18 @@ impl<'a> DocstringStmt<'a> {
                 })
             }
             _ => None,
+        }
+    }
+
+    pub(crate) fn is_docstring_statement(stmt: &StmtExpr, source_type: PySourceType) -> bool {
+        if source_type.is_ipynb() {
+            return false;
+        }
+
+        if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = stmt.value.as_ref() {
+            !value.is_implicit_concatenated()
+        } else {
+            false
         }
     }
 }
@@ -606,9 +803,17 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
                 f,
                 [
                     leading_comments(node_comments.leading),
+                    f.options()
+                        .source_map_generation()
+                        .is_enabled()
+                        .then_some(source_position(self.docstring.start())),
                     string_literal
                         .format()
-                        .with_options(StringLayout::DocString),
+                        .with_options(ExprStringLiteralKind::Docstring),
+                    f.options()
+                        .source_map_generation()
+                        .is_enabled()
+                        .then_some(source_position(self.docstring.end())),
                 ]
             )?;
 
@@ -712,7 +917,7 @@ def trailing_func():
     pass
 ";
 
-        let statements = parse_suite(source, "test.py").unwrap();
+        let statements = parse_suite(source).unwrap();
 
         let comment_ranges = CommentRanges::default();
         let context = PyFormatContext::new(

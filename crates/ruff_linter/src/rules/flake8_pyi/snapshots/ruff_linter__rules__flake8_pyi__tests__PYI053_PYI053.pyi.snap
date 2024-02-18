@@ -1,107 +1,148 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI053.pyi:3:14: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+PYI053.pyi:7:14: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
   |
-1 | def f1(x: str = "50 character stringggggggggggggggggggggggggggggggg") -> None: ...  # OK
-2 | def f2(
-3 |     x: str = "51 character stringgggggggggggggggggggggggggggggggg",  # Error: PYI053
+5 | def f1(x: str = "50 character stringggggggggggggggggggggggggggggggg") -> None: ...  # OK
+6 | def f2(
+7 |     x: str = "51 character stringgggggggggggggggggggggggggggggggg",  # Error: PYI053
   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
-4 | ) -> None: ...
-5 | def f3(
+8 | ) -> None: ...
+9 | def f3(
   |
   = help: Replace with `...`
 
 ℹ Safe fix
-1 1 | def f1(x: str = "50 character stringggggggggggggggggggggggggggggggg") -> None: ...  # OK
-2 2 | def f2(
-3   |-    x: str = "51 character stringgggggggggggggggggggggggggggggggg",  # Error: PYI053
-  3 |+    x: str = ...,  # Error: PYI053
-4 4 | ) -> None: ...
-5 5 | def f3(
-6 6 |     x: str = "50 character stringgggggggggggggggggggggggggggggg\U0001f600",  # OK
+4 4 | 
+5 5 | def f1(x: str = "50 character stringggggggggggggggggggggggggggggggg") -> None: ...  # OK
+6 6 | def f2(
+7   |-    x: str = "51 character stringgggggggggggggggggggggggggggggggg",  # Error: PYI053
+  7 |+    x: str = ...,  # Error: PYI053
+8 8 | ) -> None: ...
+9 9 | def f3(
+10 10 |     x: str = "50 character stringgggggggggggggggggggggggggggggg\U0001f600",  # OK
 
-PYI053.pyi:9:14: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+PYI053.pyi:13:14: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
    |
- 7 | ) -> None: ...
- 8 | def f4(
- 9 |     x: str = "51 character stringggggggggggggggggggggggggggggggg\U0001f600",  # Error: PYI053
+11 | ) -> None: ...
+12 | def f4(
+13 |     x: str = "51 character stringggggggggggggggggggggggggggggggg\U0001f600",  # Error: PYI053
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
-10 | ) -> None: ...
-11 | def f5(
+14 | ) -> None: ...
+15 | def f5(
    |
    = help: Replace with `...`
 
 ℹ Safe fix
-6  6  |     x: str = "50 character stringgggggggggggggggggggggggggggggg\U0001f600",  # OK
-7  7  | ) -> None: ...
-8  8  | def f4(
-9     |-    x: str = "51 character stringggggggggggggggggggggggggggggggg\U0001f600",  # Error: PYI053
-   9  |+    x: str = ...,  # Error: PYI053
-10 10 | ) -> None: ...
-11 11 | def f5(
-12 12 |     x: bytes = b"50 character byte stringgggggggggggggggggggggggggg",  # OK
+10 10 |     x: str = "50 character stringgggggggggggggggggggggggggggggg\U0001f600",  # OK
+11 11 | ) -> None: ...
+12 12 | def f4(
+13    |-    x: str = "51 character stringggggggggggggggggggggggggggggggg\U0001f600",  # Error: PYI053
+   13 |+    x: str = ...,  # Error: PYI053
+14 14 | ) -> None: ...
+15 15 | def f5(
+16 16 |     x: bytes = b"50 character byte stringgggggggggggggggggggggggggg",  # OK
 
-PYI053.pyi:21:16: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+PYI053.pyi:25:16: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
    |
-19 | ) -> None: ...
-20 | def f8(
-21 |     x: bytes = b"51 character byte stringgggggggggggggggggggggggggg\xff",  # Error: PYI053
+23 | ) -> None: ...
+24 | def f8(
+25 |     x: bytes = b"51 character byte stringgggggggggggggggggggggggggg\xff",  # Error: PYI053
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
-22 | ) -> None: ...
+26 | ) -> None: ...
    |
    = help: Replace with `...`
 
 ℹ Safe fix
-18 18 |     x: bytes = b"50 character byte stringggggggggggggggggggggggggg\xff",  # OK
-19 19 | ) -> None: ...
-20 20 | def f8(
-21    |-    x: bytes = b"51 character byte stringgggggggggggggggggggggggggg\xff",  # Error: PYI053
-   21 |+    x: bytes = ...,  # Error: PYI053
-22 22 | ) -> None: ...
-23 23 | 
-24 24 | foo: str = "50 character stringggggggggggggggggggggggggggggggg"  # OK
-
-PYI053.pyi:26:12: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
-   |
-24 | foo: str = "50 character stringggggggggggggggggggggggggggggggg"  # OK
-25 | 
-26 | bar: str = "51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053
-   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
-27 | 
-28 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
-   |
-   = help: Replace with `...`
-
-ℹ Safe fix
-23 23 | 
-24 24 | foo: str = "50 character stringggggggggggggggggggggggggggggggg"  # OK
-25 25 | 
-26    |-bar: str = "51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053
-   26 |+bar: str = ...  # Error: PYI053
+22 22 |     x: bytes = b"50 character byte stringggggggggggggggggggggggggg\xff",  # OK
+23 23 | ) -> None: ...
+24 24 | def f8(
+25    |-    x: bytes = b"51 character byte stringgggggggggggggggggggggggggg\xff",  # Error: PYI053
+   25 |+    x: bytes = ...,  # Error: PYI053
+26 26 | ) -> None: ...
 27 27 | 
-28 28 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
-29 29 | 
+28 28 | foo: str = "50 character stringggggggggggggggggggggggggggggggg"  # OK
 
-PYI053.pyi:30:14: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+PYI053.pyi:30:12: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
    |
-28 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
+28 | foo: str = "50 character stringggggggggggggggggggggggggggggggg"  # OK
 29 | 
-30 | qux: bytes = b"51 character byte stringggggggggggggggggggggggggggg\xff"  # Error: PYI053
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
+30 | bar: str = "51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
 31 | 
-32 | class Demo:
+32 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
    |
    = help: Replace with `...`
 
 ℹ Safe fix
 27 27 | 
-28 28 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
+28 28 | foo: str = "50 character stringggggggggggggggggggggggggggggggg"  # OK
 29 29 | 
-30    |-qux: bytes = b"51 character byte stringggggggggggggggggggggggggggg\xff"  # Error: PYI053
-   30 |+qux: bytes = ...  # Error: PYI053
+30    |-bar: str = "51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053
+   30 |+bar: str = ...  # Error: PYI053
 31 31 | 
-32 32 | class Demo:
-33 33 |     """Docstrings are excluded from this rule. Some padding."""  # OK
+32 32 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
+33 33 | 
+
+PYI053.pyi:34:14: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+   |
+32 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
+33 | 
+34 | qux: bytes = b"51 character byte stringggggggggggggggggggggggggggg\xff"  # Error: PYI053
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
+35 | 
+36 | ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
+   |
+   = help: Replace with `...`
+
+ℹ Safe fix
+31 31 | 
+32 32 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
+33 33 | 
+34    |-qux: bytes = b"51 character byte stringggggggggggggggggggggggggggg\xff"  # Error: PYI053
+   34 |+qux: bytes = ...  # Error: PYI053
+35 35 | 
+36 36 | ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
+37 37 | 
+
+PYI053.pyi:38:15: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+   |
+36 | ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
+37 | 
+38 | fbar: str = f"51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
+39 | 
+40 | class Demo:
+   |
+   = help: Replace with `...`
+
+ℹ Safe fix
+35 35 | 
+36 36 | ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
+37 37 | 
+38    |-fbar: str = f"51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053
+   38 |+fbar: str = f"..."  # Error: PYI053
+39 39 | 
+40 40 | class Demo:
+41 41 |     """Docstrings are excluded from this rule. Some padding."""  # OK
+
+PYI053.pyi:64:5: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+   |
+63 | @not_warnings_dot_deprecated(
+64 |     "Not warnings.deprecated, so this one *should* lead to PYI053 in a stub!"  # Error: PYI053
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
+65 | )
+66 | def not_a_deprecated_function() -> None: ...
+   |
+   = help: Replace with `...`
+
+ℹ Safe fix
+61 61 | ) -> Callable[[Callable[[], None]], Callable[[], None]]: ...
+62 62 | 
+63 63 | @not_warnings_dot_deprecated(
+64    |-    "Not warnings.deprecated, so this one *should* lead to PYI053 in a stub!"  # Error: PYI053
+   64 |+    ...  # Error: PYI053
+65 65 | )
+66 66 | def not_a_deprecated_function() -> None: ...
 
 

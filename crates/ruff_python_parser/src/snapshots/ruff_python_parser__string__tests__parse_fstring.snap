@@ -14,11 +14,11 @@ expression: parse_ast
                             FString(
                                 FString {
                                     range: 0..18,
-                                    values: [
-                                        FormattedValue(
-                                            ExprFormattedValue {
+                                    elements: [
+                                        Expression(
+                                            FStringExpressionElement {
                                                 range: 2..5,
-                                                value: Name(
+                                                expression: Name(
                                                     ExprName {
                                                         range: 3..4,
                                                         id: "a",
@@ -30,10 +30,10 @@ expression: parse_ast
                                                 format_spec: None,
                                             },
                                         ),
-                                        FormattedValue(
-                                            ExprFormattedValue {
+                                        Expression(
+                                            FStringExpressionElement {
                                                 range: 5..10,
-                                                value: Name(
+                                                expression: Name(
                                                     ExprName {
                                                         range: 7..8,
                                                         id: "b",
@@ -45,18 +45,10 @@ expression: parse_ast
                                                 format_spec: None,
                                             },
                                         ),
-                                        StringLiteral(
-                                            ExprStringLiteral {
+                                        Literal(
+                                            FStringLiteralElement {
                                                 range: 10..17,
-                                                value: StringLiteralValue {
-                                                    inner: Single(
-                                                        StringLiteral {
-                                                            range: 10..17,
-                                                            value: "{foo}",
-                                                            unicode: false,
-                                                        },
-                                                    ),
-                                                },
+                                                value: "{foo}",
                                             },
                                         ),
                                     ],

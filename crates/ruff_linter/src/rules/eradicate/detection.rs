@@ -1,14 +1,16 @@
 /// See: [eradicate.py](https://github.com/myint/eradicate/blob/98f199940979c94447a461d50d27862b118b282d/eradicate.py)
 use aho_corasick::AhoCorasick;
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexSet};
 
 use ruff_python_parser::parse_suite;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::TextSize;
 
 static CODE_INDICATORS: Lazy<AhoCorasick> = Lazy::new(|| {
     AhoCorasick::new([
-        "(", ")", "[", "]", "{", "}", ":", "=", "%", "print", "return", "break", "continue",
-        "import",
+        "(", ")", "[", "]", "{", "}", ":", "=", "%", "return", "break", "continue", "import",
     ])
     .unwrap()
 });
@@ -44,6 +46,14 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
         return false;
     }
 
+    // Fast path: if the comment contains consecutive identifiers, we know it won't parse.
+    let tokenizer = SimpleTokenizer::starts_at(TextSize::default(), line).skip_trivia();
+    if tokenizer.tuple_windows().any(|(first, second)| {
+        first.kind == SimpleTokenKind::Name && second.kind == SimpleTokenKind::Name
+    }) {
+        return false;
+    }
+
     // Ignore task tag comments (e.g., "# TODO(tom): Refactor").
     if line
         .split(&[' ', ':', '('])
@@ -74,7 +84,7 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
     }
 
     // Finally, compile the source code.
-    parse_suite(line, "<filename>").is_ok()
+    parse_suite(line).is_ok()
 }
 
 #[cfg(test)]
@@ -123,9 +133,10 @@ mod tests {
 
     #[test]
     fn comment_contains_code_with_print() {
-        assert!(comment_contains_code("#print", &[]));
         assert!(comment_contains_code("#print(1)", &[]));
 
+        assert!(!comment_contains_code("#print", &[]));
+        assert!(!comment_contains_code("#print 1", &[]));
         assert!(!comment_contains_code("#to print", &[]));
     }
 

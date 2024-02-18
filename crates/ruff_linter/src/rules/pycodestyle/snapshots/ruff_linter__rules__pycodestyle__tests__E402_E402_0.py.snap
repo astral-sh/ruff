@@ -1,0 +1,28 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E402_0.py:35:1: E402 Module level import not at top of file
+   |
+33 | __some__magic = 1
+34 | 
+35 | import h
+   | ^^^^^^^^ E402
+   |
+
+E402_0.py:45:1: E402 Module level import not at top of file
+   |
+43 |     import j
+44 | 
+45 | import k; import l
+   | ^^^^^^^^ E402
+   |
+
+E402_0.py:45:11: E402 Module level import not at top of file
+   |
+43 |     import j
+44 | 
+45 | import k; import l
+   |           ^^^^^^^^ E402
+   |
+
+

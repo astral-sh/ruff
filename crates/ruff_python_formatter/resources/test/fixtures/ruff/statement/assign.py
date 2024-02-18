@@ -67,3 +67,12 @@ def main() -> None:
                 db_request.POST["name"]
             )
         )[0]
+
+
+c = b[dddddd, aaaaaa] =  (
+    a[
+        aaaaaaa,
+        bbbbbbbbbbbbbbbbbbb
+    ]
+    # comment
+) = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

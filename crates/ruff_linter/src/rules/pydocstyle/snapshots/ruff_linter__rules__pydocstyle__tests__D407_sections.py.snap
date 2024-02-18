@@ -498,4 +498,101 @@ sections.py:527:5: D407 [*] Missing dashed underline after section ("Parameters"
 531 532 |     """
 532 533 | 
 
+sections.py:548:5: D407 [*] Missing dashed underline after section ("Args")
+    |
+547 |   def lowercase_sub_section_header():
+548 |       """Below, `returns:` should _not_ be considered a section header.
+    |  _____^
+549 | | 
+550 | |     Args:
+551 | |         Here's a note.
+552 | | 
+553 | |         returns:
+554 | |     """
+    | |_______^ D407
+    |
+    = help: Add dashed line under "Args"
+
+ℹ Safe fix
+548 548 |     """Below, `returns:` should _not_ be considered a section header.
+549 549 | 
+550 550 |     Args:
+    551 |+    ----
+551 552 |         Here's a note.
+552 553 | 
+553 554 |         returns:
+
+sections.py:558:5: D407 [*] Missing dashed underline after section ("Args")
+    |
+557 |   def titlecase_sub_section_header():
+558 |       """Below, `Returns:` should be considered a section header.
+    |  _____^
+559 | | 
+560 | |     Args:
+561 | |         Here's a note.
+562 | | 
+563 | |         Returns:
+564 | |     """
+    | |_______^ D407
+    |
+    = help: Add dashed line under "Args"
+
+ℹ Safe fix
+558 558 |     """Below, `Returns:` should be considered a section header.
+559 559 | 
+560 560 |     Args:
+    561 |+    ----
+561 562 |         Here's a note.
+562 563 | 
+563 564 |         Returns:
+
+sections.py:558:5: D407 [*] Missing dashed underline after section ("Returns")
+    |
+557 |   def titlecase_sub_section_header():
+558 |       """Below, `Returns:` should be considered a section header.
+    |  _____^
+559 | | 
+560 | |     Args:
+561 | |         Here's a note.
+562 | | 
+563 | |         Returns:
+564 | |     """
+    | |_______^ D407
+    |
+    = help: Add dashed line under "Returns"
+
+ℹ Safe fix
+561 561 |         Here's a note.
+562 562 | 
+563 563 |         Returns:
+    564 |+    -------
+564 565 |     """
+565 566 | 
+566 567 | 
+
+sections.py:600:4: D407 [*] Missing dashed underline after section ("Parameters")
+    |
+599 |   def test_lowercase_sub_section_header_different_kind(returns: int):
+600 |      """Test that lower case subsection header is valid even if it is of a different kind.
+    |  ____^
+601 | | 
+602 | |    Parameters
+603 | |    -‐-----------------
+604 | |    returns:
+605 | |        some value
+606 | | 
+607 | |    """
+    | |______^ D407
+    |
+    = help: Add dashed line under "Parameters"
+
+ℹ Safe fix
+600 600 |    """Test that lower case subsection header is valid even if it is of a different kind.
+601 601 | 
+602 602 |    Parameters
+    603 |+   ----------
+603 604 |    -‐-----------------
+604 605 |    returns:
+605 606 |        some value
+
 

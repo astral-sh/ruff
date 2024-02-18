@@ -14,11 +14,11 @@ expression: parse_ast
                             FString(
                                 FString {
                                     range: 0..11,
-                                    values: [
-                                        FormattedValue(
-                                            ExprFormattedValue {
+                                    elements: [
+                                        Expression(
+                                            FStringExpressionElement {
                                                 range: 2..10,
-                                                value: Compare(
+                                                expression: Compare(
                                                     ExprCompare {
                                                         range: 3..9,
                                                         left: NumberLiteral(

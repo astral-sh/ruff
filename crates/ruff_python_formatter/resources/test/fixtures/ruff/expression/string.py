@@ -133,3 +133,8 @@ x = (b"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""" b"""bbbbbbbbbbbbbbbbbbbbbbbbbbb
 
 # https://github.com/astral-sh/ruff/issues/7460
 trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
+
+a = f"""\x1F"""
+a = """\x1F"""
+a = """\\x1F"""
+a = """\\\x1F"""

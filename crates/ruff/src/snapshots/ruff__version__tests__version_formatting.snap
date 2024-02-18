@@ -1,0 +1,5 @@
+---
+source: crates/ruff/src/version.rs
+expression: version
+---
+0.0.0

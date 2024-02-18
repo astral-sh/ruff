@@ -91,3 +91,12 @@ from typing_extensions import dataclass_transform
 
 # UP035
 from backports.strenum import StrEnum
+
+# UP035
+from typing_extensions import override
+
+# UP035
+from typing_extensions import Buffer
+
+# UP035
+from typing_extensions import get_original_bases

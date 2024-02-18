@@ -1,7 +1,10 @@
 # The Ruff Formatter
 
 The Ruff formatter is an extremely fast Python code formatter designed as a drop-in replacement for
-[Black](https://pypi.org/project/black/), available as part of the `ruff` CLI (as of Ruff v0.0.289).
+[Black](https://pypi.org/project/black/), available as part of the `ruff` CLI via `ruff format`.
+
+The Ruff formatter is available as a [production-ready Beta](https://astral.sh/blog/the-ruff-formatter)
+as of Ruff v0.1.2.
 
 ## `ruff format`
 
@@ -100,10 +103,12 @@ Going forward, the Ruff Formatter will support Black's preview style under Ruff'
 ## Configuration
 
 The Ruff Formatter exposes a small set of configuration options, some of which are also supported
-by Black (like line width), some of which are unique to Ruff (like quote and indentation style).
+by Black (like line width), some of which are unique to Ruff (like quote, indentation style and
+formatting code examples in docstrings).
 
-For example, to configure the formatter to use single quotes, a line width of 100, and
-tab indentation, add the following to your configuration file:
+For example, to configure the formatter to use single quotes, format code
+examples in docstrings, a line width of 100, and tab indentation, add the
+following to your configuration file:
 
 === "pyproject.toml"
 
@@ -114,6 +119,7 @@ tab indentation, add the following to your configuration file:
     [tool.ruff.format]
     quote-style = "single"
     indent-style = "tab"
+    docstring-code-format = true
     ```
 
 === "ruff.toml"
@@ -124,6 +130,7 @@ tab indentation, add the following to your configuration file:
     [format]
     quote-style = "single"
     indent-style = "tab"
+    docstring-code-format = true
     ```
 
 
@@ -131,8 +138,98 @@ For the full list of supported settings, see [_Settings_](settings.md#format). F
 configuring Ruff via `pyproject.toml`, see [_Configuring Ruff_](configuration.md).
 
 Given the focus on Black compatibility (and unlike formatters like [YAPF](https://github.com/google/yapf)),
-Ruff does not currently expose any configuration options to modify core formatting behavior outside
-of these trivia-related settings.
+Ruff does not currently expose any other configuration options.
+
+## Docstring formatting
+
+The Ruff formatter provides an opt-in feature for automatically formatting
+Python code examples in docstrings. The Ruff formatter currently recognizes
+code examples in the following formats:
+
+* The Python [doctest] format.
+* CommonMark [fenced code blocks] with the following info strings: `python`,
+`py`, `python3`, or `py3`. Fenced code blocks without an info string are
+assumed to be Python code examples and also formatted.
+* reStructuredText [literal blocks]. While literal blocks may contain things
+other than Python, this is meant to reflect a long-standing convention in the
+Python ecosystem where literal blocks often contain Python code.
+* reStructuredText [`code-block` and `sourcecode` directives]. As with
+Markdown, the language names recognized for Python are `python`, `py`,
+`python3`, or `py3`.
+
+If a code example is recognized and treated as Python, the Ruff formatter will
+automatically skip it if the code does not parse as valid Python or if the
+reformatted code would produce an invalid Python program.
+
+Users may also configure the line length limit used for reformatting Python
+code examples in docstrings. The default is a special value, `dynamic`, which
+instructs the formatter to respect the line length limit setting for the
+surrounding Python code. The `dynamic` setting ensures that even when code
+examples are found inside indented docstrings, the line length limit configured
+for the surrounding Python code will not be exceeded. Users may also configure
+a fixed line length limit for code examples in docstrings.
+
+For example, this configuration shows how to enable docstring code formatting
+with a fixed line length limit:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.format]
+    docstring-code-format = true
+    docstring-code-line-length = 20
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [format]
+    docstring-code-format = true
+    docstring-code-line-length = 20
+    ```
+
+With the above configuration, this code:
+
+```python
+def f(x):
+    '''
+    Something about `f`. And an example:
+
+    .. code-block:: python
+
+        foo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear)
+    '''
+    pass
+```
+
+... will be reformatted (assuming the rest of the options are set
+to their defaults) as:
+
+```python
+def f(x):
+    """
+    Something about `f`. And an example:
+
+    .. code-block:: python
+
+        (
+            foo,
+            bar,
+            quux,
+        ) = this_is_a_long_line(
+            lion,
+            hippo,
+            lemur,
+            bear,
+        )
+    """
+    pass
+```
+
+[doctest]: https://docs.python.org/3/library/doctest.html
+[fenced code blocks]: https://spec.commonmark.org/0.30/#fenced-code-blocks
+[literal blocks]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#literal-blocks
+[`code-block` and `sourcecode` directives]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
 
 ## Format suppression
 
@@ -171,6 +268,9 @@ Instead, apply the `# fmt: off` comment to the entire statement:
 # fmt: on
 ```
 
+Like Black, Ruff will _also_ recognize [YAPF](https://github.com/google/yapf)'s `# yapf: disable` and `# yapf: enable` pragma
+comments, which are treated equivalently to `# fmt: off` and `# fmt: on`, respectively.
+
 `# fmt: skip` comments suppress formatting for a preceding statement, case header, decorator,
 function definition, or class definition:
 
@@ -190,8 +290,30 @@ def test(a, b, c, d, e, f) -> int: # fmt: skip
     pass
 ```
 
-Like Black, Ruff will _also_ recognize [YAPF](https://github.com/google/yapf)'s `# yapf: disable` and `# yapf: enable` pragma
-comments, which are treated equivalently to `# fmt: off` and `# fmt: on`, respectively.
+As such, adding `# fmt: skip` comments at the end of an expressions will have no effect. In
+the following example, the list entry `'1'` will be formatted, despite the `# fmt: skip`:
+
+```python
+a = call(
+    [
+        '1',  # fmt: skip
+        '2',
+    ],
+    b
+)
+```
+
+Instead, apply the `# fmt: skip` comment to the entire statement:
+
+```python
+a = call(
+  [
+    '1',
+    '2',
+  ],
+  b
+)  # fmt: skip
+```
 
 ## Conflicting lint rules
 
@@ -224,16 +346,16 @@ leading to [`line-too-long`](rules/line-too-long.md) (`E501`) errors.
 
 None of the above are included in Ruff's default configuration. However, if you've enabled
 any of these rules or their parent categories (like `Q`), we recommend disabling them via the
-linter's [`ignore`](settings.md#ignore) setting.
+linter's [`lint.ignore`](settings.md#lint_ignore) setting.
 
 Similarly, we recommend avoiding the following isort settings, which are incompatible with the
 formatter's treatment of import statements when set to non-default values:
 
-- [`force-single-line`](settings.md#isort-force-single-line)
-- [`force-wrap-aliases`](settings.md#isort-force-wrap-aliases)
-- [`lines-after-imports`](settings.md#isort-lines-after-imports)
-- [`lines-between-types`](settings.md#isort-lines-between-types)
-- [`split-on-trailing-comma`](settings.md#isort-split-on-trailing-comma)
+- [`force-single-line`](settings.md#lint_isort_force-single-line)
+- [`force-wrap-aliases`](settings.md#lint_isort_force-wrap-aliases)
+- [`lines-after-imports`](settings.md#lint_isort_lines-after-imports)
+- [`lines-between-types`](settings.md#lint_isort_lines-between-types)
+- [`split-on-trailing-comma`](settings.md#lint_isort_split-on-trailing-comma)
 
 If you've configured any of these settings to take on non-default values, we recommend removing
 them from your Ruff configuration.
@@ -294,3 +416,15 @@ flag.
 Black promotes some of its preview styling to stable at the end of each year. Ruff will similarly
 implement formatting changes under the [`preview`](https://docs.astral.sh/ruff/settings/#preview)
 flag, promoting them to stable through minor releases, in accordance with our [versioning policy](https://github.com/astral-sh/ruff/discussions/6998#discussioncomment-7016766).
+
+## Sorting imports
+
+Currently, the Ruff formatter does not sort imports. In order to both sort imports and format,
+call the Ruff linter and then the formatter:
+
+```shell
+ruff check --select I --fix .
+ruff format .
+```
+
+A unified command for both linting and formatting is [planned](https://github.com/astral-sh/ruff/issues/8232).

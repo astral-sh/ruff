@@ -1,7 +1,6 @@
-use ruff_python_ast::{self as ast, Arguments, Expr};
-
 use ruff_python_ast::helpers::{map_callable, map_subscript};
-use ruff_python_semantic::{BindingKind, SemanticModel};
+use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::{analyze, BindingKind, Modules, SemanticModel};
 
 /// Return `true` if the given [`Expr`] is a special class attribute, like `__slots__`.
 ///
@@ -21,6 +20,10 @@ pub(super) fn is_special_attribute(value: &Expr) -> bool {
 
 /// Returns `true` if the given [`Expr`] is a `dataclasses.field` call.
 pub(super) fn is_dataclass_field(func: &Expr, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_module(Modules::DATACLASSES) {
+        return false;
+    }
+
     semantic
         .resolve_call_path(func)
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["dataclasses", "field"]))
@@ -28,6 +31,10 @@ pub(super) fn is_dataclass_field(func: &Expr, semantic: &SemanticModel) -> bool 
 
 /// Returns `true` if the given [`Expr`] is a `typing.ClassVar` annotation.
 pub(super) fn is_class_var_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_typing() {
+        return false;
+    }
+
     // ClassVar can be used either with a subscript `ClassVar[...]` or without (the type is
     // inferred).
     semantic.match_typing_expr(map_subscript(annotation), "ClassVar")
@@ -35,6 +42,10 @@ pub(super) fn is_class_var_annotation(annotation: &Expr, semantic: &SemanticMode
 
 /// Returns `true` if the given [`Expr`] is a `typing.Final` annotation.
 pub(super) fn is_final_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_typing() {
+        return false;
+    }
+
     // Final can be used either with a subscript `Final[...]` or without (the type is
     // inferred).
     semantic.match_typing_expr(map_subscript(annotation), "Final")
@@ -42,6 +53,10 @@ pub(super) fn is_final_annotation(annotation: &Expr, semantic: &SemanticModel) -
 
 /// Returns `true` if the given class is a dataclass.
 pub(super) fn is_dataclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_module(Modules::DATACLASSES) {
+        return false;
+    }
+
     class_def.decorator_list.iter().any(|decorator| {
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
@@ -57,19 +72,13 @@ pub(super) fn has_default_copy_semantics(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
 ) -> bool {
-    let Some(Arguments { args: bases, .. }) = class_def.arguments.as_deref() else {
-        return false;
-    };
-
-    bases.iter().any(|expr| {
-        semantic.resolve_call_path(expr).is_some_and(|call_path| {
-            matches!(
-                call_path.as_slice(),
-                ["pydantic", "BaseModel" | "BaseSettings"]
-                    | ["pydantic_settings", "BaseSettings"]
-                    | ["msgspec", "Struct"]
-            )
-        })
+    analyze::class::any_call_path(class_def, semantic, &|call_path| {
+        matches!(
+            call_path.as_slice(),
+            ["pydantic", "BaseModel" | "BaseSettings" | "BaseConfig"]
+                | ["pydantic_settings", "BaseSettings"]
+                | ["msgspec", "Struct"]
+        )
     })
 }
 

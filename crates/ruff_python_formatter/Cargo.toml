@@ -10,6 +10,9 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[lib]
+doctest= false
+
 [dependencies]
 ruff_cache = { path = "../ruff_cache" }
 ruff_formatter = { path = "../ruff_formatter" }
@@ -24,10 +27,11 @@ ruff_text_size = { path = "../ruff_text_size" }
 anyhow = { workspace = true }
 bitflags = { workspace = true }
 clap = { workspace = true }
-countme = "3.0.1"
+countme = { workspace = true }
 itertools = { workspace = true }
 memchr = { workspace = true }
 once_cell = { workspace = true }
+regex = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }

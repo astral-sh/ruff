@@ -1,7 +1,9 @@
-use crate::{ElifElseClause, Expr, Stmt, StmtIf};
+use std::iter;
+
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
-use std::iter;
+
+use crate::{ElifElseClause, Expr, Stmt, StmtIf};
 
 /// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.
 pub fn elif_else_range(clause: &ElifElseClause, contents: &str) -> Option<TextRange> {
@@ -17,11 +19,12 @@ pub enum BranchKind {
     Elif,
 }
 
+#[derive(Debug)]
 pub struct IfElifBranch<'a> {
     pub kind: BranchKind,
     pub test: &'a Expr,
     pub body: &'a [Stmt],
-    pub range: TextRange,
+    range: TextRange,
 }
 
 impl Ranged for IfElifBranch<'_> {

@@ -29,13 +29,15 @@ mod tests {
     #[test_case(Rule::LambdaAssignment, Path::new("E731.py"))]
     #[test_case(Rule::BareExcept, Path::new("E722.py"))]
     #[test_case(Rule::BlankLineWithWhitespace, Path::new("W29.py"))]
+    #[test_case(Rule::BlankLineWithWhitespace, Path::new("W293.py"))]
     #[test_case(Rule::InvalidEscapeSequence, Path::new("W605_0.py"))]
     #[test_case(Rule::InvalidEscapeSequence, Path::new("W605_1.py"))]
     #[test_case(Rule::LineTooLong, Path::new("E501.py"))]
     #[test_case(Rule::LineTooLong, Path::new("E501_3.py"))]
     #[test_case(Rule::MixedSpacesAndTabs, Path::new("E101.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E40.py"))]
-    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_0.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_1.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402.ipynb"))]
     #[test_case(Rule::MultipleImportsOnOneLine, Path::new("E40.py"))]
     #[test_case(Rule::MultipleStatementsOnOneLineColon, Path::new("E70.py"))]
@@ -50,6 +52,7 @@ mod tests {
     #[test_case(Rule::SyntaxError, Path::new("E999.py"))]
     #[test_case(Rule::TabIndentation, Path::new("W19.py"))]
     #[test_case(Rule::TrailingWhitespace, Path::new("W29.py"))]
+    #[test_case(Rule::TrailingWhitespace, Path::new("W291.py"))]
     #[test_case(Rule::TrueFalseComparison, Path::new("E712.py"))]
     #[test_case(Rule::TypeComparison, Path::new("E721.py"))]
     #[test_case(Rule::UselessSemicolon, Path::new("E70.py"))]
@@ -133,6 +136,13 @@ mod tests {
         Path::new("E25.py")
     )]
     #[test_case(Rule::MissingWhitespaceAroundParameterEquals, Path::new("E25.py"))]
+    #[test_case(Rule::BlankLineBetweenMethods, Path::new("E30.py"))]
+    #[test_case(Rule::BlankLinesTopLevel, Path::new("E30.py"))]
+    #[test_case(Rule::TooManyBlankLines, Path::new("E30.py"))]
+    #[test_case(Rule::BlankLineAfterDecorator, Path::new("E30.py"))]
+    #[test_case(Rule::BlankLinesAfterFunctionOrClass, Path::new("E30.py"))]
+    #[test_case(Rule::BlankLinesBeforeNestedDefinition, Path::new("E30.py"))]
+
     fn logical(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

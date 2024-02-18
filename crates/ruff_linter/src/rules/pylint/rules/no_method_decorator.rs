@@ -53,7 +53,7 @@ impl AlwaysFixableViolation for NoClassmethodDecorator {
 /// ## Example
 /// ```python
 /// class Foo:
-///     def bar(cls):
+///     def bar(arg1, arg2):
 ///         ...
 ///
 ///     bar = staticmethod(bar)
@@ -63,7 +63,7 @@ impl AlwaysFixableViolation for NoClassmethodDecorator {
 /// ```python
 /// class Foo:
 ///     @staticmethod
-///     def bar(cls):
+///     def bar(arg1, arg2):
 ///         ...
 /// ```
 #[violation]

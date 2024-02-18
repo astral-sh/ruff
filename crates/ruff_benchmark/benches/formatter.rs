@@ -7,7 +7,7 @@ use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
 use ruff_python_formatter::{format_module_ast, PreviewMode, PyFormatOptions};
 use ruff_python_index::CommentRangesBuilder;
 use ruff_python_parser::lexer::lex;
-use ruff_python_parser::{parse_tokens, Mode};
+use ruff_python_parser::{allocate_tokens_vec, parse_tokens, Mode};
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -52,7 +52,7 @@ fn benchmark_formatter(criterion: &mut Criterion) {
             BenchmarkId::from_parameter(case.name()),
             &case,
             |b, case| {
-                let mut tokens = Vec::new();
+                let mut tokens = allocate_tokens_vec(case.code());
                 let mut comment_ranges = CommentRangesBuilder::default();
 
                 for result in lex(case.code(), Mode::Module) {
@@ -65,7 +65,7 @@ fn benchmark_formatter(criterion: &mut Criterion) {
                 let comment_ranges = comment_ranges.finish();
 
                 // Parse the AST.
-                let module = parse_tokens(tokens, case.code(), Mode::Module, "<filename>")
+                let module = parse_tokens(tokens, case.code(), Mode::Module)
                     .expect("Input to be a valid python program");
 
                 b.iter(|| {

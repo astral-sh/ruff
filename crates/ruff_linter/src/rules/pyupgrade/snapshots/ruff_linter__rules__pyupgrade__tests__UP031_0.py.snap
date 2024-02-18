@@ -896,7 +896,7 @@ UP031_0.py:104:5: UP031 [*] Use format specifiers instead of percent format
 109 108 | 
 110 109 | "%s" % (
 
-UP031_0.py:110:1: UP031 Use format specifiers instead of percent format
+UP031_0.py:110:1: UP031 [*] Use format specifiers instead of percent format
     |
 108 |   )
 109 |   
@@ -906,5 +906,37 @@ UP031_0.py:110:1: UP031 Use format specifiers instead of percent format
     | |_^ UP031
     |
     = help: Replace with format specifiers
+
+ℹ Unsafe fix
+107 107 |     % (x,)
+108 108 | )
+109 109 | 
+110     |-"%s" % (
+    110 |+"{}".format(
+111 111 |     x,  # comment
+112 112 | )
+113 113 | 
+
+UP031_0.py:115:8: UP031 [*] Use format specifiers instead of percent format
+    |
+115 |   path = "%s-%s-%s.pem" % (
+    |  ________^
+116 | |     safe_domain_name(cn), # common name, which should be filename safe because it is IDNA-encoded, but in case of a malformed cert make sure it's ok to use as a filename
+117 | |     cert.not_valid_after.date().isoformat().replace("-", ""), # expiration date
+118 | |     hexlify(cert.fingerprint(hashes.SHA256())).decode("ascii")[0:8], # fingerprint prefix
+119 | | )
+    | |_^ UP031
+    |
+    = help: Replace with format specifiers
+
+ℹ Unsafe fix
+112 112 | )
+113 113 | 
+114 114 | 
+115     |-path = "%s-%s-%s.pem" % (
+    115 |+path = "{}-{}-{}.pem".format(
+116 116 |     safe_domain_name(cn), # common name, which should be filename safe because it is IDNA-encoded, but in case of a malformed cert make sure it's ok to use as a filename
+117 117 |     cert.not_valid_after.date().isoformat().replace("-", ""), # expiration date
+118 118 |     hexlify(cert.fingerprint(hashes.SHA256())).decode("ascii")[0:8], # fingerprint prefix
 
 

@@ -490,18 +490,10 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     contents.push_str(&format!(".format{params_string}"));
 
     let mut diagnostic = Diagnostic::new(PrintfStringFormatting, expr.range());
-    // Avoid fix if there are comments within the right-hand side:
-    // ```
-    // "%s" % (
-    //     0,  # 0
-    // )
-    // ```
-    if !checker.indexer().comment_ranges().intersects(right.range()) {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            contents,
-            expr.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        contents,
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 

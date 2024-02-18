@@ -1,10 +1,8 @@
-use itertools::Itertools;
-
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
-use ruff_python_parser::lexer::{LexResult, Spanned};
+use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -12,20 +10,20 @@ use ruff_text_size::{Ranged, TextRange};
 /// Simplified token type.
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum TokenType {
-    Irrelevant,
-    NonLogicalNewline,
-    Newline,
-    Comma,
-    OpeningBracket,
-    OpeningSquareBracket,
-    OpeningCurlyBracket,
-    ClosingBracket,
-    For,
     Named,
-    Def,
-    Lambda,
-    Colon,
     String,
+    Newline,
+    NonLogicalNewline,
+    OpeningBracket,
+    ClosingBracket,
+    OpeningSquareBracket,
+    Colon,
+    Comma,
+    OpeningCurlyBracket,
+    Def,
+    For,
+    Lambda,
+    Irrelevant,
 }
 
 /// Simplified token specialized for the task.
@@ -54,30 +52,30 @@ impl Token {
     }
 }
 
-impl From<&Spanned> for Token {
-    fn from(spanned: &Spanned) -> Self {
-        let r#type = match &spanned.0 {
-            Tok::NonLogicalNewline => TokenType::NonLogicalNewline,
+impl From<(&Tok, TextRange)> for Token {
+    fn from((tok, range): (&Tok, TextRange)) -> Self {
+        let r#type = match tok {
+            Tok::Name { .. } => TokenType::Named,
+            Tok::String { .. } => TokenType::String,
             Tok::Newline => TokenType::Newline,
-            Tok::For => TokenType::For,
+            Tok::NonLogicalNewline => TokenType::NonLogicalNewline,
+            Tok::Lpar => TokenType::OpeningBracket,
+            Tok::Rpar => TokenType::ClosingBracket,
+            Tok::Lsqb => TokenType::OpeningSquareBracket,
+            Tok::Rsqb => TokenType::ClosingBracket,
+            Tok::Colon => TokenType::Colon,
+            Tok::Comma => TokenType::Comma,
+            Tok::Lbrace => TokenType::OpeningCurlyBracket,
+            Tok::Rbrace => TokenType::ClosingBracket,
             Tok::Def => TokenType::Def,
+            Tok::For => TokenType::For,
             Tok::Lambda => TokenType::Lambda,
             // Import treated like a function.
             Tok::Import => TokenType::Named,
-            Tok::Name { .. } => TokenType::Named,
-            Tok::String { .. } => TokenType::String,
-            Tok::Comma => TokenType::Comma,
-            Tok::Lpar => TokenType::OpeningBracket,
-            Tok::Lsqb => TokenType::OpeningSquareBracket,
-            Tok::Lbrace => TokenType::OpeningCurlyBracket,
-            Tok::Rpar | Tok::Rsqb | Tok::Rbrace => TokenType::ClosingBracket,
-            Tok::Colon => TokenType::Colon,
             _ => TokenType::Irrelevant,
         };
-        Self {
-            range: spanned.1,
-            r#type,
-        }
+        #[allow(clippy::inconsistent_struct_constructor)]
+        Self { range, r#type }
     }
 }
 
@@ -237,10 +235,12 @@ pub(crate) fn trailing_commas(
     indexer: &Indexer,
 ) {
     let mut fstrings = 0u32;
-    let tokens = tokens
-        .iter()
-        .flatten()
-        .filter_map(|spanned @ (tok, tok_range)| match tok {
+    let tokens = tokens.iter().filter_map(|result| {
+        let Ok((tok, tok_range)) = result else {
+            return None;
+        };
+
+        match tok {
             // Completely ignore comments -- they just interfere with the logic.
             Tok::Comment(_) => None,
             // F-strings are handled as `String` token type with the complete range
@@ -263,69 +263,30 @@ pub(crate) fn trailing_commas(
             }
             _ => {
                 if fstrings == 0 {
-                    Some(Token::from(spanned))
+                    Some(Token::from((tok, *tok_range)))
                 } else {
                     None
                 }
             }
-        });
-    let tokens = [Token::irrelevant(), Token::irrelevant()]
-        .into_iter()
-        .chain(tokens);
-    // Collapse consecutive newlines to the first one -- trailing commas are
-    // added before the first newline.
-    let tokens = tokens.coalesce(|previous, current| {
-        if previous.r#type == TokenType::NonLogicalNewline
-            && current.r#type == TokenType::NonLogicalNewline
-        {
-            Ok(previous)
-        } else {
-            Err((previous, current))
         }
     });
 
-    // The current nesting of the comma contexts.
+    let mut prev = Token::irrelevant();
+    let mut prev_prev = Token::irrelevant();
+
     let mut stack = vec![Context::new(ContextType::No)];
 
-    for (prev_prev, prev, token) in tokens.tuple_windows() {
-        // Update the comma context stack.
-        match token.r#type {
-            TokenType::OpeningBracket => match (prev.r#type, prev_prev.r#type) {
-                (TokenType::Named, TokenType::Def) => {
-                    stack.push(Context::new(ContextType::FunctionParameters));
-                }
-                (TokenType::Named | TokenType::ClosingBracket, _) => {
-                    stack.push(Context::new(ContextType::CallArguments));
-                }
-                _ => {
-                    stack.push(Context::new(ContextType::Tuple));
-                }
-            },
-            TokenType::OpeningSquareBracket => match prev.r#type {
-                TokenType::ClosingBracket | TokenType::Named | TokenType::String => {
-                    stack.push(Context::new(ContextType::Subscript));
-                }
-                _ => {
-                    stack.push(Context::new(ContextType::List));
-                }
-            },
-            TokenType::OpeningCurlyBracket => {
-                stack.push(Context::new(ContextType::Dict));
-            }
-            TokenType::Lambda => {
-                stack.push(Context::new(ContextType::LambdaParameters));
-            }
-            TokenType::For => {
-                let len = stack.len();
-                stack[len - 1] = Context::new(ContextType::No);
-            }
-            TokenType::Comma => {
-                let len = stack.len();
-                stack[len - 1].inc();
-            }
-            _ => {}
+    for token in tokens {
+        if prev.r#type == TokenType::NonLogicalNewline
+            && token.r#type == TokenType::NonLogicalNewline
+        {
+            // Collapse consecutive newlines to the first one -- trailing commas are
+            // added before the first newline.
+            continue;
         }
-        let context = &stack[stack.len() - 1];
+
+        // Update the comma context stack.
+        let context = update_context(token, prev, prev_prev, &mut stack);
 
         // Is it allowed to have a trailing comma before this token?
         let comma_allowed = token.r#type == TokenType::ClosingBracket
@@ -412,5 +373,47 @@ pub(crate) fn trailing_commas(
         if pop_context && stack.len() > 1 {
             stack.pop();
         }
+
+        prev_prev = prev;
+        prev = token;
     }
+}
+
+fn update_context(
+    token: Token,
+    prev: Token,
+    prev_prev: Token,
+    stack: &mut Vec<Context>,
+) -> Context {
+    let new_context = match token.r#type {
+        TokenType::OpeningBracket => match (prev.r#type, prev_prev.r#type) {
+            (TokenType::Named, TokenType::Def) => Context::new(ContextType::FunctionParameters),
+            (TokenType::Named | TokenType::ClosingBracket, _) => {
+                Context::new(ContextType::CallArguments)
+            }
+            _ => Context::new(ContextType::Tuple),
+        },
+        TokenType::OpeningSquareBracket => match prev.r#type {
+            TokenType::ClosingBracket | TokenType::Named | TokenType::String => {
+                Context::new(ContextType::Subscript)
+            }
+            _ => Context::new(ContextType::List),
+        },
+        TokenType::OpeningCurlyBracket => Context::new(ContextType::Dict),
+        TokenType::Lambda => Context::new(ContextType::LambdaParameters),
+        TokenType::For => {
+            let last = stack.last_mut().expect("Stack to never be empty");
+            *last = Context::new(ContextType::No);
+            return *last;
+        }
+        TokenType::Comma => {
+            let last = stack.last_mut().expect("Stack to never be empty");
+            last.inc();
+            return *last;
+        }
+        _ => return stack.last().copied().expect("Stack to never be empty"),
+    };
+
+    stack.push(new_context);
+    new_context
 }

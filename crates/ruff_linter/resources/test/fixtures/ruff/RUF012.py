@@ -59,3 +59,23 @@ class F(BaseSettings):
     without_annotation = []
     class_variable: ClassVar[list[int]] = []
     final_variable: Final[list[int]] = []
+
+
+class G(F):
+    mutable_default: list[int] = []
+    immutable_annotation: Sequence[int] = []
+    without_annotation = []
+    class_variable: ClassVar[list[int]] = []
+    final_variable: Final[list[int]] = []
+
+
+from pydantic import BaseConfig
+
+
+class H(BaseModel):
+    class Config(BaseConfig):
+        mutable_default: list[int] = []
+        immutable_annotation: Sequence[int] = []
+        without_annotation = []
+        class_variable: ClassVar[list[int]] = []
+        final_variable: Final[list[int]] = []

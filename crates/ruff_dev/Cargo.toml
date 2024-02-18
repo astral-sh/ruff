@@ -11,45 +11,43 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-ruff_linter = { path = "../ruff_linter", features = ["schemars"] }
-ruff_cli = { path = "../ruff_cli" }
+ruff = { path = "../ruff" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
 ruff_formatter = { path = "../ruff_formatter" }
+ruff_linter = { path = "../ruff_linter", features = ["schemars"] }
+ruff_notebook = { path = "../ruff_notebook" }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_codegen = { path = "../ruff_python_codegen" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
-ruff_notebook = { path = "../ruff_notebook" }
-ruff_python_literal = { path = "../ruff_python_literal" }
 ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_python_trivia = { path = "../ruff_python_trivia" }
 ruff_workspace = { path = "../ruff_workspace", features = ["schemars"]}
 
 anyhow = { workspace = true }
-clap = { workspace = true }
+clap = { workspace = true, features = ["wrap_help"] }
 ignore = { workspace = true }
-indicatif = "0.17.7"
+imara-diff = { workspace = true }
+indicatif = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
 once_cell = { workspace = true }
-pretty_assertions = { version = "1.3.0" }
-rayon = "1.8.0"
+pretty_assertions = { workspace = true }
+rayon = { workspace = true }
 regex = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 similar = { workspace = true }
 strum = { workspace = true }
-strum_macros = { workspace = true }
-tempfile = "3.8.1"
+tempfile = { workspace = true }
 toml = { workspace = true, features = ["parse"] }
 tracing = { workspace = true }
 tracing-indicatif = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
-imara-diff = "0.1.5"
 
 [dev-dependencies]
-indoc = "2.0.4"
+indoc = { workspace = true }
 
 [features]
 # Turn off rayon for profiling

@@ -18,14 +18,17 @@ def doctest_line_ending():
 ## Outputs
 ### Output 1
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 4
-quote-style             = Double
-line-ending             = CarriageReturnLineFeed
-magic-trailing-comma    = Respect
-docstring-code          = Enabled
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = CarriageReturnLineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Enabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
+source_type                = Python
 ```
 
 ```python

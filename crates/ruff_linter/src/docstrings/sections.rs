@@ -5,7 +5,7 @@ use ruff_python_ast::docstrings::{leading_space, leading_words};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use strum_macros::EnumIter;
 
-use ruff_source_file::{Line, UniversalNewlineIterator, UniversalNewlines};
+use ruff_source_file::{Line, NewlineWithTrailingNewline, UniversalNewlines};
 
 use crate::docstrings::styles::SectionStyle;
 use crate::docstrings::{Docstring, DocstringBody};
@@ -130,6 +130,34 @@ impl SectionKind {
             Self::Yields => "Yields",
         }
     }
+
+    /// Returns `true` if a section can contain subsections, as in:
+    /// ```python
+    /// Yields
+    /// ------
+    /// int
+    ///     Description of the anonymous integer return value.
+    /// ```
+    ///
+    /// For NumPy, see: <https://numpydoc.readthedocs.io/en/latest/format.html>
+    ///
+    /// For Google, see: <https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings>
+    pub(crate) fn has_subsections(self) -> bool {
+        matches!(
+            self,
+            Self::Args
+                | Self::Arguments
+                | Self::OtherArgs
+                | Self::OtherParameters
+                | Self::OtherParams
+                | Self::Parameters
+                | Self::Raises
+                | Self::Returns
+                | Self::SeeAlso
+                | Self::Warns
+                | Self::Yields
+        )
+    }
 }
 
 pub(crate) struct SectionContexts<'a> {
@@ -153,13 +181,17 @@ impl<'a> SectionContexts<'a> {
         while let Some(line) = lines.next() {
             if let Some(section_kind) = suspected_as_section(&line, style) {
                 let indent = leading_space(&line);
-                let section_name = leading_words(&line);
+                let indent_size = indent.text_len();
 
-                let section_name_range = TextRange::at(indent.text_len(), section_name.text_len());
+                let section_name = leading_words(&line);
+                let section_name_size = section_name.text_len();
 
                 if is_docstring_section(
                     &line,
-                    section_name_range,
+                    indent_size,
+                    section_name_size,
+                    section_kind,
+                    last.as_ref(),
                     previous_line.as_ref(),
                     lines.peek(),
                 ) {
@@ -170,7 +202,8 @@ impl<'a> SectionContexts<'a> {
 
                     last = Some(SectionContextData {
                         kind: section_kind,
-                        name_range: section_name_range + line.start(),
+                        indent_size: indent.text_len(),
+                        name_range: TextRange::at(line.start() + indent_size, section_name_size),
                         range: TextRange::empty(line.start()),
                         summary_full_end: line.full_end(),
                     });
@@ -204,8 +237,8 @@ impl<'a> SectionContexts<'a> {
 }
 
 impl<'a> IntoIterator for &'a SectionContexts<'a> {
-    type IntoIter = SectionContextsIter<'a>;
     type Item = SectionContext<'a>;
+    type IntoIter = SectionContextsIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -256,6 +289,9 @@ impl ExactSizeIterator for SectionContextsIter<'_> {}
 #[derive(Debug)]
 struct SectionContextData {
     kind: SectionKind,
+
+    /// The size of the indentation of the section name.
+    indent_size: TextSize,
 
     /// Range of the section name, relative to the [`Docstring::body`]
     name_range: TextRange,
@@ -348,13 +384,16 @@ impl<'a> SectionContext<'a> {
     pub(crate) fn previous_line(&self) -> Option<&'a str> {
         let previous =
             &self.docstring_body.as_str()[TextRange::up_to(self.range_relative().start())];
-        previous.universal_newlines().last().map(|l| l.as_str())
+        previous
+            .universal_newlines()
+            .last()
+            .map(|line| line.as_str())
     }
 
     /// Returns the lines belonging to this section after the summary line.
-    pub(crate) fn following_lines(&self) -> UniversalNewlineIterator<'a> {
+    pub(crate) fn following_lines(&self) -> NewlineWithTrailingNewline<'a> {
         let lines = self.following_lines_str();
-        UniversalNewlineIterator::with_offset(lines, self.offset() + self.data.summary_full_end)
+        NewlineWithTrailingNewline::with_offset(lines, self.offset() + self.data.summary_full_end)
     }
 
     fn following_lines_str(&self) -> &'a str {
@@ -401,12 +440,15 @@ fn suspected_as_section(line: &str, style: SectionStyle) -> Option<SectionKind> 
 /// Check if the suspected context is really a section header.
 fn is_docstring_section(
     line: &Line,
-    section_name_range: TextRange,
+    indent_size: TextSize,
+    section_name_size: TextSize,
+    section_kind: SectionKind,
+    previous_section: Option<&SectionContextData>,
     previous_line: Option<&Line>,
     next_line: Option<&Line>,
 ) -> bool {
     // Determine whether the current line looks like a section header, e.g., "Args:".
-    let section_name_suffix = line[usize::from(section_name_range.end())..].trim();
+    let section_name_suffix = line[usize::from(indent_size + section_name_size)..].trim();
     let this_looks_like_a_section_name =
         section_name_suffix == ":" || section_name_suffix.is_empty();
     if !this_looks_like_a_section_name {
@@ -437,6 +479,67 @@ fn is_docstring_section(
     });
     if !previous_line_looks_like_end_of_paragraph {
         return false;
+    }
+
+    // Determine if this is a sub-section within another section, like `args` in:
+    // ```python
+    // def func(args: tuple[int]):
+    //     """Toggle the gizmo.
+    //
+    //     Args:
+    //         args: The arguments to the function.
+    //     """
+    // ```
+    // Or `parameters` in:
+    // ```python
+    // def func(parameters: tuple[int]):
+    //     """Toggle the gizmo.
+    //
+    //     Parameters:
+    //     -----
+    //     parameters:
+    //         The arguments to the function.
+    //     """
+    // ```
+    // However, if the header is an _exact_ match (like `Returns:`, as opposed to `returns:`), then
+    // continue to treat it as a section header.
+    if section_kind.has_subsections() {
+        if let Some(previous_section) = previous_section {
+            let verbatim = &line[TextRange::at(indent_size, section_name_size)];
+
+            // If the section is more deeply indented, assume it's a subsection, as in:
+            // ```python
+            // def func(args: tuple[int]):
+            //     """Toggle the gizmo.
+            //
+            //     Args:
+            //         args: The arguments to the function.
+            //     """
+            // ```
+            if previous_section.indent_size < indent_size {
+                if section_kind.as_str() != verbatim {
+                    return false;
+                }
+            }
+
+            // If the section isn't underlined, and isn't title-cased, assume it's a subsection,
+            // as in:
+            // ```python
+            // def func(parameters: tuple[int]):
+            //     """Toggle the gizmo.
+            //
+            //     Parameters:
+            //     -----
+            //     parameters:
+            //         The arguments to the function.
+            //     """
+            // ```
+            if !next_line_is_underline && verbatim.chars().next().is_some_and(char::is_lowercase) {
+                if section_kind.as_str() != verbatim {
+                    return false;
+                }
+            }
+        }
     }
 
     true

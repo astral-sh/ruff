@@ -11,6 +11,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\n# not a comment ",
             is_raw: false,
+            triple_quoted: true,
         },
         4..21,
     ),
@@ -46,6 +47,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: " # not a comment\n",
             is_raw: false,
+            triple_quoted: true,
         },
         42..59,
     ),

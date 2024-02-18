@@ -107,10 +107,10 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let result = match self.inner.next()? {
             Ok((tok, range)) => Ok((tok, range + self.start_offset)),
-            Err(error) => Err(LexicalError {
-                location: error.location + self.start_offset,
-                ..error
-            }),
+            Err(error) => {
+                let location = error.location() + self.start_offset;
+                Err(LexicalError::new(error.into_error(), location))
+            }
         };
 
         Some(result)
@@ -241,7 +241,7 @@ impl<'source> Lexer<'source> {
             "yield" => Tok::Yield,
             _ => {
                 return Ok(Tok::Name {
-                    name: text.to_string(),
+                    name: text.to_string().into_boxed_str(),
                 })
             }
         };
@@ -284,10 +284,10 @@ impl<'source> Lexer<'source> {
         let value = match Int::from_str_radix(number.as_str(), radix.as_u32(), token) {
             Ok(int) => int,
             Err(err) => {
-                return Err(LexicalError {
-                    error: LexicalErrorType::OtherError(format!("{err:?}")),
-                    location: self.token_range().start(),
-                });
+                return Err(LexicalError::new(
+                    LexicalErrorType::OtherError(format!("{err:?}").into_boxed_str()),
+                    self.token_range().start(),
+                ));
             }
         };
         Ok(Tok::Int { value })
@@ -309,10 +309,10 @@ impl<'source> Lexer<'source> {
             number.push('.');
 
             if self.cursor.eat_char('_') {
-                return Err(LexicalError {
-                    error: LexicalErrorType::OtherError("Invalid Syntax".to_owned()),
-                    location: self.offset() - TextSize::new(1),
-                });
+                return Err(LexicalError::new(
+                    LexicalErrorType::OtherError("Invalid Syntax".to_string().into_boxed_str()),
+                    self.offset() - TextSize::new(1),
+                ));
             }
 
             self.radix_run(&mut number, Radix::Decimal);
@@ -340,9 +340,13 @@ impl<'source> Lexer<'source> {
 
         if is_float {
             // Improvement: Use `Cow` instead of pushing to value text
-            let value = f64::from_str(number.as_str()).map_err(|_| LexicalError {
-                error: LexicalErrorType::OtherError("Invalid decimal literal".to_owned()),
-                location: self.token_start(),
+            let value = f64::from_str(number.as_str()).map_err(|_| {
+                LexicalError::new(
+                    LexicalErrorType::OtherError(
+                        "Invalid decimal literal".to_string().into_boxed_str(),
+                    ),
+                    self.token_start(),
+                )
             })?;
 
             // Parse trailing 'j':
@@ -364,18 +368,20 @@ impl<'source> Lexer<'source> {
                     Ok(value) => {
                         if start_is_zero && value.as_u8() != Some(0) {
                             // Leading zeros in decimal integer literals are not permitted.
-                            return Err(LexicalError {
-                                error: LexicalErrorType::OtherError("Invalid Token".to_owned()),
-                                location: self.token_range().start(),
-                            });
+                            return Err(LexicalError::new(
+                                LexicalErrorType::OtherError(
+                                    "Invalid Token".to_string().into_boxed_str(),
+                                ),
+                                self.token_range().start(),
+                            ));
                         }
                         value
                     }
                     Err(err) => {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::OtherError(format!("{err:?}")),
-                            location: self.token_range().start(),
-                        })
+                        return Err(LexicalError::new(
+                            LexicalErrorType::OtherError(format!("{err:?}").into_boxed_str()),
+                            self.token_range().start(),
+                        ))
                     }
                 };
                 Ok(Tok::Int { value })
@@ -411,7 +417,7 @@ impl<'source> Lexer<'source> {
         let offset = memchr::memchr2(b'\n', b'\r', bytes).unwrap_or(bytes.len());
         self.cursor.skip_bytes(offset);
 
-        Tok::Comment(self.token_text().to_string())
+        Tok::Comment(self.token_text().to_string().into_boxed_str())
     }
 
     /// Lex a single IPython escape command.
@@ -508,12 +514,15 @@ impl<'source> Lexer<'source> {
                         2 => IpyEscapeKind::Help2,
                         _ => unreachable!("`question_count` is always 1 or 2"),
                     };
-                    return Tok::IpyEscapeCommand { kind, value };
+                    return Tok::IpyEscapeCommand {
+                        kind,
+                        value: value.into_boxed_str(),
+                    };
                 }
                 '\n' | '\r' | EOF_CHAR => {
                     return Tok::IpyEscapeCommand {
                         kind: escape_kind,
-                        value,
+                        value: value.into_boxed_str(),
                     };
                 }
                 c => {
@@ -584,10 +593,10 @@ impl<'source> Lexer<'source> {
                     } else {
                         FStringErrorType::UnterminatedString
                     };
-                    return Err(LexicalError {
-                        error: LexicalErrorType::FStringError(error),
-                        location: self.offset(),
-                    });
+                    return Err(LexicalError::new(
+                        LexicalErrorType::FStringError(error),
+                        self.offset(),
+                    ));
                 }
                 '\n' | '\r' if !fstring.is_triple_quoted() => {
                     // If we encounter a newline while we're in a format spec, then
@@ -597,10 +606,10 @@ impl<'source> Lexer<'source> {
                     if in_format_spec {
                         break;
                     }
-                    return Err(LexicalError {
-                        error: LexicalErrorType::FStringError(FStringErrorType::UnterminatedString),
-                        location: self.offset(),
-                    });
+                    return Err(LexicalError::new(
+                        LexicalErrorType::FStringError(FStringErrorType::UnterminatedString),
+                        self.offset(),
+                    ));
                 }
                 '\\' => {
                     self.cursor.bump(); // '\'
@@ -673,8 +682,9 @@ impl<'source> Lexer<'source> {
             normalized
         };
         Ok(Some(Tok::FStringMiddle {
-            value,
+            value: value.into_boxed_str(),
             is_raw: fstring.is_raw_string(),
+            triple_quoted: fstring.is_triple_quoted(),
         }))
     }
 
@@ -689,81 +699,141 @@ impl<'source> Lexer<'source> {
 
         let value_start = self.offset();
 
-        let value_end = loop {
-            match self.cursor.bump() {
-                Some('\\') => {
-                    if self.cursor.eat_char('\r') {
-                        self.cursor.eat_char('\n');
-                    } else {
-                        self.cursor.bump();
-                    }
-                }
-                Some('\r' | '\n') if !triple_quoted => {
-                    if let Some(fstring) = self.fstrings.current() {
-                        // When we are in an f-string, check whether does the initial quote
-                        // matches with f-strings quotes and if it is, then this must be a
-                        // missing '}' token so raise the proper error.
-                        if fstring.quote_char() == quote && !fstring.is_triple_quoted() {
-                            return Err(LexicalError {
-                                error: LexicalErrorType::FStringError(
-                                    FStringErrorType::UnclosedLbrace,
-                                ),
-                                location: self.offset() - fstring.quote_size(),
-                            });
-                        }
-                    }
-                    return Err(LexicalError {
-                        error: LexicalErrorType::OtherError(
-                            "EOL while scanning string literal".to_owned(),
-                        ),
-                        location: self.offset() - TextSize::new(1),
-                    });
-                }
-                Some(c) if c == quote => {
-                    if triple_quoted {
-                        if self.cursor.eat_char2(quote, quote) {
-                            break self.offset() - TextSize::new(3);
-                        }
-                    } else {
-                        break self.offset() - TextSize::new(1);
-                    }
-                }
+        let quote_byte = u8::try_from(quote).expect("char that fits in u8");
+        let value_end = if triple_quoted {
+            // For triple-quoted strings, scan until we find the closing quote (ignoring escaped
+            // quotes) or the end of the file.
+            loop {
+                let Some(index) = memchr::memchr(quote_byte, self.cursor.rest().as_bytes()) else {
+                    self.cursor.skip_to_end();
 
-                Some(_) => {}
-                None => {
                     if let Some(fstring) = self.fstrings.current() {
-                        // When we are in an f-string, check whether does the initial quote
+                        // When we are in an f-string, check whether the initial quote
                         // matches with f-strings quotes and if it is, then this must be a
                         // missing '}' token so raise the proper error.
                         if fstring.quote_char() == quote
                             && fstring.is_triple_quoted() == triple_quoted
                         {
-                            return Err(LexicalError {
-                                error: LexicalErrorType::FStringError(
-                                    FStringErrorType::UnclosedLbrace,
-                                ),
-                                location: self.offset() - fstring.quote_size(),
-                            });
+                            return Err(LexicalError::new(
+                                LexicalErrorType::FStringError(FStringErrorType::UnclosedLbrace),
+                                self.cursor.text_len(),
+                            ));
                         }
                     }
-                    return Err(LexicalError {
-                        error: if triple_quoted {
-                            LexicalErrorType::Eof
-                        } else {
-                            LexicalErrorType::StringError
-                        },
-                        location: self.offset(),
-                    });
+                    return Err(LexicalError::new(
+                        LexicalErrorType::Eof,
+                        self.cursor.text_len(),
+                    ));
+                };
+
+                // Rare case: if there are an odd number of backslashes before the quote, then
+                // the quote is escaped and we should continue scanning.
+                let num_backslashes = self.cursor.rest().as_bytes()[..index]
+                    .iter()
+                    .rev()
+                    .take_while(|&&c| c == b'\\')
+                    .count();
+
+                // Advance the cursor past the quote and continue scanning.
+                self.cursor.skip_bytes(index + 1);
+
+                // If the character is escaped, continue scanning.
+                if num_backslashes % 2 == 1 {
+                    continue;
+                }
+
+                // Otherwise, if it's followed by two more quotes, then we're done.
+                if self.cursor.eat_char2(quote, quote) {
+                    break self.offset() - TextSize::new(3);
+                }
+            }
+        } else {
+            // For non-triple-quoted strings, scan until we find the closing quote, but end early
+            // if we encounter a newline or the end of the file.
+            loop {
+                let Some(index) =
+                    memchr::memchr3(quote_byte, b'\r', b'\n', self.cursor.rest().as_bytes())
+                else {
+                    self.cursor.skip_to_end();
+
+                    if let Some(fstring) = self.fstrings.current() {
+                        // When we are in an f-string, check whether the initial quote
+                        // matches with f-strings quotes and if it is, then this must be a
+                        // missing '}' token so raise the proper error.
+                        if fstring.quote_char() == quote
+                            && fstring.is_triple_quoted() == triple_quoted
+                        {
+                            return Err(LexicalError::new(
+                                LexicalErrorType::FStringError(FStringErrorType::UnclosedLbrace),
+                                self.offset(),
+                            ));
+                        }
+                    }
+                    return Err(LexicalError::new(
+                        LexicalErrorType::StringError,
+                        self.offset(),
+                    ));
+                };
+
+                // Rare case: if there are an odd number of backslashes before the quote, then
+                // the quote is escaped and we should continue scanning.
+                let num_backslashes = self.cursor.rest().as_bytes()[..index]
+                    .iter()
+                    .rev()
+                    .take_while(|&&c| c == b'\\')
+                    .count();
+
+                // Skip up to the current character.
+                self.cursor.skip_bytes(index);
+                let ch = self.cursor.bump();
+
+                // If the character is escaped, continue scanning.
+                if num_backslashes % 2 == 1 {
+                    if ch == Some('\r') {
+                        self.cursor.eat_char('\n');
+                    }
+                    continue;
+                }
+
+                match ch {
+                    Some('\r' | '\n') => {
+                        if let Some(fstring) = self.fstrings.current() {
+                            // When we are in an f-string, check whether the initial quote
+                            // matches with f-strings quotes and if it is, then this must be a
+                            // missing '}' token so raise the proper error.
+                            if fstring.quote_char() == quote && !fstring.is_triple_quoted() {
+                                return Err(LexicalError::new(
+                                    LexicalErrorType::FStringError(
+                                        FStringErrorType::UnclosedLbrace,
+                                    ),
+                                    self.offset() - TextSize::new(1),
+                                ));
+                            }
+                        }
+                        return Err(LexicalError::new(
+                            LexicalErrorType::OtherError(
+                                "EOL while scanning string literal"
+                                    .to_string()
+                                    .into_boxed_str(),
+                            ),
+                            self.offset() - TextSize::new(1),
+                        ));
+                    }
+                    Some(ch) if ch == quote => {
+                        break self.offset() - TextSize::new(1);
+                    }
+                    _ => unreachable!("memchr2 returned an index that is not a quote or a newline"),
                 }
             }
         };
 
-        let tok = Tok::String {
-            value: self.source[TextRange::new(value_start, value_end)].to_string(),
+        Ok(Tok::String {
+            value: self.source[TextRange::new(value_start, value_end)]
+                .to_string()
+                .into_boxed_str(),
             kind,
             triple_quoted,
-        };
-        Ok(tok)
+        })
     }
 
     // This is the main entry point. Call this function to retrieve the next token.
@@ -828,10 +898,10 @@ impl<'source> Lexer<'source> {
 
                 Ok((identifier, self.token_range()))
             } else {
-                Err(LexicalError {
-                    error: LexicalErrorType::UnrecognizedToken { tok: c },
-                    location: self.token_start(),
-                })
+                Err(LexicalError::new(
+                    LexicalErrorType::UnrecognizedToken { tok: c },
+                    self.token_start(),
+                ))
             }
         } else {
             // Reached the end of the file. Emit a trailing newline token if not at the beginning of a logical line,
@@ -854,15 +924,12 @@ impl<'source> Lexer<'source> {
                     if self.cursor.eat_char('\r') {
                         self.cursor.eat_char('\n');
                     } else if self.cursor.is_eof() {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::Eof,
-                            location: self.token_start(),
-                        });
+                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_start()));
                     } else if !self.cursor.eat_char('\n') {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::LineContinuationError,
-                            location: self.token_start(),
-                        });
+                        return Err(LexicalError::new(
+                            LexicalErrorType::LineContinuationError,
+                            self.token_start(),
+                        ));
                     }
                 }
                 // Form feed
@@ -895,15 +962,12 @@ impl<'source> Lexer<'source> {
                     if self.cursor.eat_char('\r') {
                         self.cursor.eat_char('\n');
                     } else if self.cursor.is_eof() {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::Eof,
-                            location: self.token_start(),
-                        });
+                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_start()));
                     } else if !self.cursor.eat_char('\n') {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::LineContinuationError,
-                            location: self.token_start(),
-                        });
+                        return Err(LexicalError::new(
+                            LexicalErrorType::LineContinuationError,
+                            self.token_start(),
+                        ));
                     }
                     indentation = Indentation::root();
                 }
@@ -954,10 +1018,10 @@ impl<'source> Lexer<'source> {
                 Some((Tok::Indent, self.token_range()))
             }
             Err(_) => {
-                return Err(LexicalError {
-                    error: LexicalErrorType::IndentationError,
-                    location: self.offset(),
-                });
+                return Err(LexicalError::new(
+                    LexicalErrorType::IndentationError,
+                    self.offset(),
+                ));
             }
         };
 
@@ -970,10 +1034,7 @@ impl<'source> Lexer<'source> {
         if self.nesting > 0 {
             // Reset the nesting to avoid going into infinite loop.
             self.nesting = 0;
-            return Err(LexicalError {
-                error: LexicalErrorType::Eof,
-                location: self.offset(),
-            });
+            return Err(LexicalError::new(LexicalErrorType::Eof, self.offset()));
         }
 
         // Next, insert a trailing newline, if required.
@@ -1138,10 +1199,10 @@ impl<'source> Lexer<'source> {
             '}' => {
                 if let Some(fstring) = self.fstrings.current_mut() {
                     if fstring.nesting() == self.nesting {
-                        return Err(LexicalError {
-                            error: LexicalErrorType::FStringError(FStringErrorType::SingleRbrace),
-                            location: self.token_start(),
-                        });
+                        return Err(LexicalError::new(
+                            LexicalErrorType::FStringError(FStringErrorType::SingleRbrace),
+                            self.token_start(),
+                        ));
                     }
                     fstring.try_end_format_spec(self.nesting);
                 }
@@ -1232,10 +1293,10 @@ impl<'source> Lexer<'source> {
             _ => {
                 self.state = State::Other;
 
-                return Err(LexicalError {
-                    error: LexicalErrorType::UnrecognizedToken { tok: c },
-                    location: self.token_start(),
-                });
+                return Err(LexicalError::new(
+                    LexicalErrorType::UnrecognizedToken { tok: c },
+                    self.token_start(),
+                ));
             }
         };
 
@@ -1293,12 +1354,12 @@ impl FusedIterator for Lexer<'_> {}
 /// [lexer] implementation.
 ///
 /// [lexer]: crate::lexer
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LexicalError {
     /// The type of error that occurred.
-    pub error: LexicalErrorType,
+    error: LexicalErrorType,
     /// The location of the error.
-    pub location: TextSize,
+    location: TextSize,
 }
 
 impl LexicalError {
@@ -1306,11 +1367,51 @@ impl LexicalError {
     pub fn new(error: LexicalErrorType, location: TextSize) -> Self {
         Self { error, location }
     }
+
+    pub fn error(&self) -> &LexicalErrorType {
+        &self.error
+    }
+
+    pub fn into_error(self) -> LexicalErrorType {
+        self.error
+    }
+
+    pub fn location(&self) -> TextSize {
+        self.location
+    }
+}
+
+impl std::ops::Deref for LexicalError {
+    type Target = LexicalErrorType;
+
+    fn deref(&self) -> &Self::Target {
+        self.error()
+    }
+}
+
+impl std::error::Error for LexicalError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.error())
+    }
+}
+
+impl std::fmt::Display for LexicalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{} at byte offset {}",
+            self.error(),
+            u32::from(self.location())
+        )
+    }
 }
 
 /// Represents the different types of errors that can occur during lexing.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LexicalErrorType {
+    /// A duplicate argument was found in a function definition.
+    DuplicateArgumentError(Box<str>),
+
     // TODO: Can probably be removed, the places it is used seem to be able
     // to use the `UnicodeError` variant instead.
     #[doc(hidden)]
@@ -1328,14 +1429,13 @@ pub enum LexicalErrorType {
     TabsAfterSpaces,
     /// A non-default argument follows a default argument.
     DefaultArgumentError,
-    /// A duplicate argument was found in a function definition.
-    DuplicateArgumentError(String),
+
     /// A positional argument follows a keyword argument.
     PositionalArgumentError,
     /// An iterable argument unpacking `*args` follows keyword argument unpacking `**kwargs`.
     UnpackedArgumentError,
     /// A keyword argument was repeated.
-    DuplicateKeywordArgumentError(String),
+    DuplicateKeywordArgumentError(Box<str>),
     /// An unrecognized token was encountered.
     UnrecognizedToken { tok: char },
     /// An f-string error containing the [`FStringErrorType`].
@@ -1347,8 +1447,10 @@ pub enum LexicalErrorType {
     /// Occurs when a syntactically invalid assignment was encountered.
     AssignmentError,
     /// An unexpected error occurred.
-    OtherError(String),
+    OtherError(Box<str>),
 }
+
+impl std::error::Error for LexicalErrorType {}
 
 impl std::fmt::Display for LexicalErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -1449,7 +1551,7 @@ impl Radix {
             Radix::Binary => matches!(c, '0'..='1'),
             Radix::Octal => matches!(c, '0'..='7'),
             Radix::Decimal => c.is_ascii_digit(),
-            Radix::Hex => matches!(c, '0'..='9' | 'a'..='f' | 'A'..='F'),
+            Radix::Hex => c.is_ascii_hexdigit(),
         }
     }
 }
@@ -1471,9 +1573,12 @@ fn is_unicode_identifier_start(c: char) -> bool {
 // Checks if the character c is a valid continuation character as described
 // in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
 fn is_identifier_continuation(c: char) -> bool {
-    match c {
-        'a'..='z' | 'A'..='Z' | '_' | '0'..='9' => true,
-        c => is_xid_continue(c),
+    // Arrange things such that ASCII codepoints never
+    // result in the slower `is_xid_continue` getting called.
+    if c.is_ascii() {
+        matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')
+    } else {
+        is_xid_continue(c)
     }
 }
 
@@ -1962,8 +2067,8 @@ def f(arg=%timeit a = b):
         match lexed.as_slice() {
             [Err(error)] => {
                 assert_eq!(
-                    error.error,
-                    LexicalErrorType::UnrecognizedToken { tok: '🐦' }
+                    error.error(),
+                    &LexicalErrorType::UnrecognizedToken { tok: '🐦' }
                 );
             }
             result => panic!("Expected an error token but found {result:?}"),
@@ -2168,13 +2273,17 @@ f"{(lambda x:{x})}"
         assert_debug_snapshot!(lex_jupyter_source(source));
     }
 
+    fn lex_error(source: &str) -> LexicalError {
+        match lex(source, Mode::Module).find_map(Result::err) {
+            Some(err) => err,
+            _ => panic!("Expected at least one error"),
+        }
+    }
+
     fn lex_fstring_error(source: &str) -> FStringErrorType {
-        match lex(source, Mode::Module).find_map(std::result::Result::err) {
-            Some(err) => match err.error {
-                LexicalErrorType::FStringError(error) => error,
-                _ => panic!("Expected FStringError: {err:?}"),
-            },
-            _ => panic!("Expected atleast one FStringError"),
+        match lex_error(source).into_error() {
+            LexicalErrorType::FStringError(error) => error,
+            err => panic!("Expected FStringError: {err:?}"),
         }
     }
 
@@ -2218,5 +2327,26 @@ f"{(lambda x:{x})}"
             lex_fstring_error(r#"f""""""#),
             UnterminatedTripleQuotedString
         );
+    }
+
+    #[test]
+    fn test_fstring_error_location() {
+        assert_debug_snapshot!(lex_error("f'{'"), @r###"
+        LexicalError {
+            error: FStringError(
+                UnclosedLbrace,
+            ),
+            location: 4,
+        }
+        "###);
+
+        assert_debug_snapshot!(lex_error("f'{'α"), @r###"
+        LexicalError {
+            error: FStringError(
+                UnclosedLbrace,
+            ),
+            location: 6,
+        }
+        "###);
     }
 }

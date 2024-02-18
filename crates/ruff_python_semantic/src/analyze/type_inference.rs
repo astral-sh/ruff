@@ -323,7 +323,6 @@ impl From<&Expr> for ResolvedPythonType {
             | Expr::YieldFrom(_)
             | Expr::Compare(_)
             | Expr::Call(_)
-            | Expr::FormattedValue(_)
             | Expr::Attribute(_)
             | Expr::Subscript(_)
             | Expr::Starred(_)
@@ -437,7 +436,7 @@ mod tests {
     use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 
     fn parse(expression: &str) -> Expr {
-        parse_expression(expression, "").unwrap()
+        parse_expression(expression).unwrap()
     }
 
     #[test]

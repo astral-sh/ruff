@@ -23,7 +23,7 @@ mod tests {
     use ruff_source_file::Locator;
     use ruff_text_size::Ranged;
 
-    use crate::linter::{check_path, LinterResult};
+    use crate::linter::{check_path, LinterResult, TokenSource};
     use crate::registry::{AsRule, Linter, Rule};
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
@@ -52,9 +52,14 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_17.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_18.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_19.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_20.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_21.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_22.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"))]
+    #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.ipynb"))]
     #[test_case(Rule::UndefinedLocalWithImportStar, Path::new("F403.py"))]
-    #[test_case(Rule::LateFutureImport, Path::new("F404.py"))]
+    #[test_case(Rule::LateFutureImport, Path::new("F404_0.py"))]
+    #[test_case(Rule::LateFutureImport, Path::new("F404_1.py"))]
     #[test_case(Rule::UndefinedLocalWithImportStarUsage, Path::new("F405.py"))]
     #[test_case(Rule::UndefinedLocalWithNestedImportStarUsage, Path::new("F406.py"))]
     #[test_case(Rule::FutureFeatureNotDefined, Path::new("F407.py"))]
@@ -117,6 +122,7 @@ mod tests {
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_24.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_25.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_26.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_27.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_0.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_1.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_2.py"))]
@@ -141,6 +147,8 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_21.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_22.ipynb"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_23.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_24.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_25.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_2.py"))]
@@ -557,7 +565,6 @@ mod tests {
         } = check_path(
             Path::new("<filename>"),
             None,
-            tokens,
             &locator,
             &stylist,
             &indexer,
@@ -566,6 +573,7 @@ mod tests {
             flags::Noqa::Enabled,
             &source_kind,
             source_type,
+            TokenSource::Tokens(tokens),
         );
         diagnostics.sort_by_key(Ranged::start);
         let actual = diagnostics

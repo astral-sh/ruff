@@ -11,6 +11,7 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::fstring_ranges::{FStringRanges, FStringRangesBuilder};
+use crate::multiline_ranges::{MultilineRanges, MultilineRangesBuilder};
 use crate::CommentRangesBuilder;
 
 pub struct Indexer {
@@ -21,6 +22,9 @@ pub struct Indexer {
 
     /// The range of all f-string in the source document.
     fstring_ranges: FStringRanges,
+
+    /// The range of all multiline strings in the source document.
+    multiline_ranges: MultilineRanges,
 }
 
 impl Indexer {
@@ -29,6 +33,7 @@ impl Indexer {
 
         let mut comment_ranges_builder = CommentRangesBuilder::default();
         let mut fstring_ranges_builder = FStringRangesBuilder::default();
+        let mut multiline_ranges_builder = MultilineRangesBuilder::default();
         let mut continuation_lines = Vec::new();
         // Token, end
         let mut prev_end = TextSize::default();
@@ -61,18 +66,29 @@ impl Indexer {
 
             comment_ranges_builder.visit_token(tok, *range);
             fstring_ranges_builder.visit_token(tok, *range);
+            multiline_ranges_builder.visit_token(tok, *range);
 
-            if matches!(tok, Tok::Newline | Tok::NonLogicalNewline) {
-                line_start = range.end();
+            match tok {
+                Tok::Newline | Tok::NonLogicalNewline => {
+                    line_start = range.end();
+                }
+                Tok::String { .. } => {
+                    // If the previous token was a string, find the start of the line that contains
+                    // the closing delimiter, since the token itself can span multiple lines.
+                    line_start = locator.line_start(range.end());
+                }
+                _ => {}
             }
 
             prev_token = Some(tok);
             prev_end = range.end();
         }
+
         Self {
             comment_ranges: comment_ranges_builder.finish(),
             continuation_lines,
             fstring_ranges: fstring_ranges_builder.finish(),
+            multiline_ranges: multiline_ranges_builder.finish(),
         }
     }
 
@@ -84,6 +100,11 @@ impl Indexer {
     /// Returns the byte offset ranges of f-strings.
     pub const fn fstring_ranges(&self) -> &FStringRanges {
         &self.fstring_ranges
+    }
+
+    /// Returns the byte offset ranges of multiline strings.
+    pub const fn multiline_ranges(&self) -> &MultilineRanges {
+        &self.multiline_ranges
     }
 
     /// Returns the line start positions of continuations (backslash).

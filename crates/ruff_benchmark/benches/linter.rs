@@ -2,7 +2,7 @@ use ruff_benchmark::criterion::{
     criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
 };
 use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
-use ruff_linter::linter::lint_only;
+use ruff_linter::linter::{lint_only, ParseSource};
 use ruff_linter::rule_selector::PreviewOptions;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::PreviewMode;
@@ -10,6 +10,7 @@ use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{registry::Rule, RuleSelector};
 use ruff_python_ast::PySourceType;
+use ruff_python_parser::{lexer, parse_program_tokens, Mode};
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -53,7 +54,12 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
             BenchmarkId::from_parameter(case.name()),
             &case,
             |b, case| {
-                let kind = SourceKind::Python(case.code().to_string());
+                // Tokenize the source.
+                let tokens: Vec<_> = lexer::lex(case.code(), Mode::Module).collect();
+
+                // Parse the source.
+                let ast = parse_program_tokens(tokens.clone(), case.code(), false).unwrap();
+
                 b.iter(|| {
                     let path = case.path();
                     let result = lint_only(
@@ -61,8 +67,12 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
                         None,
                         settings,
                         flags::Noqa::Enabled,
-                        &kind,
+                        &SourceKind::Python(case.code().to_string()),
                         PySourceType::from(path.as_path()),
+                        ParseSource::Precomputed {
+                            tokens: &tokens,
+                            ast: &ast,
+                        },
                     );
 
                     // Assert that file contains no parse errors

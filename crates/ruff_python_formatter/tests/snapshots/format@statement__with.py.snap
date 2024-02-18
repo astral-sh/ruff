@@ -309,9 +309,28 @@ if True:
 if True:
     with anyio.CancelScope(shield=True) if get_running_loop() else contextlib.nullcontext():
         pass
+
+
+with Child(aaaaaaaaa, bbbbbbbbbbbbbbb, cccccc), Document(aaaaa, bbbbbbbbbb, ddddddddddddd):
+    pass
 ```
 
-## Output
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
+source_type                = Python
+```
+
 ```python
 with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
     pass
@@ -640,6 +659,423 @@ if True:
         shield=True
     ) if get_running_loop() else contextlib.nullcontext():
         pass
+
+
+with Child(aaaaaaaaa, bbbbbbbbbbbbbbb, cccccc), Document(
+    aaaaa, bbbbbbbbbb, ddddddddddddd
+):
+    pass
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -295,8 +295,9 @@
+     pass
+ 
+ with (
+-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b,
++    (
++        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
++    ) as b,
+     c as d,
+ ):
+     pass
+```
+
+
+### Output 2
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Enabled
+target_version             = Py39
+source_type                = Python
+```
+
+```python
+with (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+):
+    pass
+    # trailing
+
+with a, a:  # after colon
+    pass
+    # trailing
+
+with (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+):
+    pass
+    # trailing
+
+
+with (
+    a,  # a  # comma
+    b,  # c
+):  # colon
+    pass
+
+
+with (
+    a as (  # a  # as
+        # own line
+        b
+    ),  # b  # comma
+    c,  # c
+):  # colon
+    pass  # body
+    # body trailing own
+
+with (
+    a as (  # a  # as
+        # own line
+        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    )  # b
+):
+    pass
+
+
+with (
+    a,
+):  # magic trailing comma
+    pass
+
+
+with a:  # should remove brackets
+    pass
+
+with (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as c
+):
+    pass
+
+
+# currently unparsable by black: https://github.com/psf/black/issues/3678
+with (name_2 for name_0 in name_4):
+    pass
+with (a, *b):
+    pass
+
+with (
+    # leading comment
+    a
+) as b:
+    pass
+
+with (
+    # leading comment
+    a as b
+):
+    pass
+
+with (
+    a as b
+    # trailing comment
+):
+    pass
+
+with (
+    a as (
+        # leading comment
+        b
+    )
+):
+    pass
+
+with (
+    a as (
+        b
+        # trailing comment
+    )
+):
+    pass
+
+with (
+    a as b  # trailing same line comment
+    # trailing own line comment
+):
+    pass
+
+with (
+    a  # trailing same line comment
+    # trailing own line comment
+) as b:
+    pass
+
+with (
+    (
+        a
+        # trailing own line comment
+    ) as (  # trailing as same line comment
+        b
+    )  # trailing b same line comment
+):
+    pass
+
+with (
+    # comment
+    a
+):
+    pass
+
+with (
+    a  # comment
+):
+    pass
+
+with (
+    a
+    # comment
+):
+    pass
+
+with (
+    # comment
+    a as b
+):
+    pass
+
+with (
+    a as b  # comment
+):
+    pass
+
+with (
+    a as b
+    # comment
+):
+    pass
+
+with (
+    [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bbbbbbbbbb",
+        "cccccccccccccccccccccccccccccccccccccccccc",
+        dddddddddddddddddddddddddddddddd,
+    ] as example1,
+    aaaaaaaaaaaaaaaaaaaaaaaaaa
+    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    + cccccccccccccccccccccccccccc
+    + ddddddddddddddddd as example2,
+    CtxManager2() as example2,
+    CtxManager2() as example2,
+    CtxManager2() as example2,
+):
+    pass
+
+with (
+    [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bbbbbbbbbb",
+        "cccccccccccccccccccccccccccccccccccccccccc",
+        dddddddddddddddddddddddddddddddd,
+    ] as example1,
+    aaaaaaaaaaaaaaaaaaaaaaaaaa
+    * bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    * cccccccccccccccccccccccccccc
+    + ddddddddddddddddd as example2,
+    CtxManager222222222222222() as example2,
+):
+    pass
+
+# Comments on open parentheses
+with (  # comment
+    CtxManager1() as example1,
+    CtxManager2() as example2,
+    CtxManager3() as example3,
+):
+    pass
+
+with (  # outer comment
+    (  # inner comment
+        CtxManager1()
+    ) as example1,
+    CtxManager2() as example2,
+    CtxManager3() as example3,
+):
+    pass
+
+with (  # outer comment
+    CtxManager()
+) as example:
+    pass
+
+with (
+    (  # outer comment
+        CtxManager()
+    ) as example,
+    (  # inner comment
+        CtxManager2()
+    ) as example2,
+):
+    pass
+
+with (  # outer comment
+    CtxManager1(),
+    CtxManager2(),
+) as example:
+    pass
+
+with (  # outer comment
+    (  # inner comment
+        CtxManager1()
+    ),
+    CtxManager2(),
+) as example:
+    pass
+
+# Breaking of with items.
+with (
+    test as (  # bar  # foo
+        # test
+        foo
+    )
+):
+    pass
+
+with (
+    test as (
+        # test
+        foo
+    )
+):
+    pass
+
+with (
+    test as (  # bar  # foo  # baz
+        # test
+        foo
+    )
+):
+    pass
+
+with a as b, c as d:
+    pass
+
+with (
+    a as b,
+    # foo
+    c as d,
+):
+    pass
+
+with (
+    a as (  # foo
+        b
+    )
+):
+    pass
+
+with f(
+    a,
+) as b:
+    pass
+
+with (x := 1) as d:
+    pass
+
+with x[
+    1,
+    2,
+] as d:
+    pass
+
+with (
+    f(
+        a,
+    ) as b,
+    c as d,
+):
+    pass
+
+with (
+    f(
+        a,
+    ) as b,
+    c as d,
+):
+    pass
+
+with (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+) as b:
+    pass
+
+with (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b
+):
+    pass
+
+with (
+    (
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    ) as b,
+    c as d,
+):
+    pass
+
+with (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b,
+    c as d,
+):
+    pass
+
+with (
+    (
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    ) as b,
+    c as d,
+):
+    pass
+
+with foo() as bar, baz() as bop:
+    pass
+
+if True:
+    with (
+        anyio.CancelScope(shield=True)
+        if get_running_loop()
+        else contextlib.nullcontext()
+    ):
+        pass
+
+if True:
+    with (
+        anyio.CancelScope(shield=True)
+        and B
+        and [aaaaaaaa, bbbbbbbbbbbbb, cccccccccc, dddddddddddd, eeeeeeeeeeeee]
+    ):
+        pass
+
+if True:
+    with (
+        anyio.CancelScope(shield=True)
+        if get_running_loop()
+        else contextlib.nullcontext()
+    ):
+        pass
+
+
+with (
+    Child(aaaaaaaaa, bbbbbbbbbbbbbbb, cccccc),
+    Document(aaaaa, bbbbbbbbbb, ddddddddddddd),
+):
+    pass
 ```
 
 

@@ -1,0 +1,24 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+super_without_brackets.py:10:26: PLW0245 [*] `super` call is missing parentheses
+   |
+ 8 |     @staticmethod
+ 9 |     def speak():
+10 |         original_speak = super.speak()  # PLW0245
+   |                          ^^^^^ PLW0245
+11 |         return f"{original_speak} But as a dog, it barks!"
+   |
+   = help: Add parentheses to `super` call
+
+ℹ Safe fix
+7  7  | class BadDog(Animal):
+8  8  |     @staticmethod
+9  9  |     def speak():
+10    |-        original_speak = super.speak()  # PLW0245
+   10 |+        original_speak = super().speak()  # PLW0245
+11 11 |         return f"{original_speak} But as a dog, it barks!"
+12 12 | 
+13 13 | 
+
+

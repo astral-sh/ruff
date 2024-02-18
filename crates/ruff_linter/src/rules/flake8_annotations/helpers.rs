@@ -3,10 +3,11 @@ use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{
-    implicit_return, pep_604_union, typing_optional, typing_union, ReturnStatementVisitor,
+    pep_604_union, typing_optional, typing_union, ReturnStatementVisitor,
 };
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
+use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Definition, SemanticModel};
@@ -57,6 +58,14 @@ pub(crate) fn auto_return_type(function: &ast::StmtFunctionDef) -> Option<AutoPy
         visitor.returns
     };
 
+    // Determine the terminal behavior (i.e., implicit return, no return, etc.).
+    let terminal = Terminal::from_function(function);
+
+    // If every control flow path raises an exception, return `NoReturn`.
+    if terminal == Terminal::Raise {
+        return Some(AutoPythonType::Never);
+    }
+
     // Determine the return type of the first `return` statement.
     let Some((return_statement, returns)) = returns.split_first() else {
         return Some(AutoPythonType::Atom(PythonType::None));
@@ -80,7 +89,7 @@ pub(crate) fn auto_return_type(function: &ast::StmtFunctionDef) -> Option<AutoPy
     //     if x > 0:
     //         return 1
     // ```
-    if implicit_return(function) {
+    if terminal.has_implicit_return() {
         return_type = return_type.union(ResolvedPythonType::Atom(PythonType::None));
     }
 
@@ -94,6 +103,7 @@ pub(crate) fn auto_return_type(function: &ast::StmtFunctionDef) -> Option<AutoPy
 
 #[derive(Debug)]
 pub(crate) enum AutoPythonType {
+    Never,
     Atom(PythonType),
     Union(FxHashSet<PythonType>),
 }
@@ -111,6 +121,28 @@ impl AutoPythonType {
         target_version: PythonVersion,
     ) -> Option<(Expr, Vec<Edit>)> {
         match self {
+            AutoPythonType::Never => {
+                let (no_return_edit, binding) = importer
+                    .get_or_import_symbol(
+                        &ImportRequest::import_from(
+                            "typing",
+                            if target_version >= PythonVersion::Py311 {
+                                "Never"
+                            } else {
+                                "NoReturn"
+                            },
+                        ),
+                        at,
+                        semantic,
+                    )
+                    .ok()?;
+                let expr = Expr::Name(ast::ExprName {
+                    id: binding,
+                    range: TextRange::default(),
+                    ctx: ExprContext::Load,
+                });
+                Some((expr, vec![no_return_edit]))
+            }
             AutoPythonType::Atom(python_type) => {
                 let expr = type_expr(python_type)?;
                 Some((expr, vec![]))

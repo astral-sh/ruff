@@ -14,25 +14,17 @@ expression: parse_ast
                             FString(
                                 FString {
                                     range: 0..9,
-                                    values: [
-                                        StringLiteral(
-                                            ExprStringLiteral {
+                                    elements: [
+                                        Literal(
+                                            FStringLiteralElement {
                                                 range: 3..5,
-                                                value: StringLiteralValue {
-                                                    inner: Single(
-                                                        StringLiteral {
-                                                            range: 3..5,
-                                                            value: "\\\n",
-                                                            unicode: false,
-                                                        },
-                                                    ),
-                                                },
+                                                value: "\\\n",
                                             },
                                         ),
-                                        FormattedValue(
-                                            ExprFormattedValue {
+                                        Expression(
+                                            FStringExpressionElement {
                                                 range: 5..8,
-                                                value: Name(
+                                                expression: Name(
                                                     ExprName {
                                                         range: 6..7,
                                                         id: "x",

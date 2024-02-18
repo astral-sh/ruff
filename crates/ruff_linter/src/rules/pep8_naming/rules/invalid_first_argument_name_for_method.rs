@@ -22,10 +22,10 @@ use crate::checkers::ast::Checker;
 /// > append a single trailing underscore rather than use an abbreviation or spelling corruption.
 /// > Thus `class_` is better than `clss`. (Perhaps better is to avoid such clashes by using a synonym.)
 ///
-/// Names can be excluded from this rule using the [`pep8-naming.ignore-names`]
-/// or [`pep8-naming.extend-ignore-names`] configuration options. For example,
+/// Names can be excluded from this rule using the [`lint.pep8-naming.ignore-names`]
+/// or [`lint.pep8-naming.extend-ignore-names`] configuration options. For example,
 /// to allow the use of `this` as the first argument to instance methods, set
-/// the [`pep8-naming.extend-ignore-names`] option to `["this"]`.
+/// the [`lint.pep8-naming.extend-ignore-names`] option to `["this"]`.
 ///
 /// ## Example
 /// ```python
@@ -42,10 +42,10 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Options
-/// - `pep8-naming.classmethod-decorators`
-/// - `pep8-naming.staticmethod-decorators`
-/// - `pep8-naming.ignore-names`
-/// - `pep8-naming.extend-ignore-names`
+/// - `lint.pep8-naming.classmethod-decorators`
+/// - `lint.pep8-naming.staticmethod-decorators`
+/// - `lint.pep8-naming.ignore-names`
+/// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[violation]
@@ -86,13 +86,7 @@ pub(crate) fn invalid_first_argument_name_for_method(
     if &arg.parameter.name == "self" {
         return None;
     }
-    if checker
-        .settings
-        .pep8_naming
-        .ignore_names
-        .iter()
-        .any(|ignore_name| ignore_name.matches(name))
-    {
+    if checker.settings.pep8_naming.ignore_names.matches(name) {
         return None;
     }
     Some(Diagnostic::new(

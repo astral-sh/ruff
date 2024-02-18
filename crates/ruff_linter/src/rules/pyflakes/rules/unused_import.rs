@@ -28,6 +28,15 @@ enum UnusedImportContext {
 /// If an import statement is used to check for the availability or existence
 /// of a module, consider using `importlib.util.find_spec` instead.
 ///
+/// If an import statement is used to re-export a symbol as part of a module's
+/// public interface, consider using a "redundant" import alias, which
+/// instructs Ruff (and other tools) to respect the re-export, and avoid
+/// marking it as unused, as in:
+///
+/// ```python
+/// from module import member as member
+/// ```
+///
 /// ## Example
 /// ```python
 /// import numpy as np  # unused import
@@ -54,11 +63,12 @@ enum UnusedImportContext {
 /// ```
 ///
 /// ## Options
-/// - `pyflakes.extend-generics`
+/// - `lint.ignore-init-module-imports`
 ///
 /// ## References
 /// - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 /// - [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
+/// - [Typing documentation: interface conventions](https://typing.readthedocs.io/en/latest/source/libraries.html#library-interface-public-and-private-symbols)
 #[violation]
 pub struct UnusedImport {
     name: String,

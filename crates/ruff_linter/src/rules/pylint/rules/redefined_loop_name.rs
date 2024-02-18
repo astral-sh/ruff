@@ -233,6 +233,10 @@ impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
 /// x = cast(int, x)
 /// ```
 fn assignment_is_cast_expr(value: &Expr, target: &Expr, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_typing() {
+        return false;
+    }
+
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, .. },

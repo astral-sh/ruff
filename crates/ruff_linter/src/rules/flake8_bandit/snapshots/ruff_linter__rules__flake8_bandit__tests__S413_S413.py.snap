@@ -1,0 +1,38 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S413.py:1:8: S413 `pycrypto` library is known to have publicly disclosed buffer overflow vulnerability
+  |
+1 | import Crypto.Hash  # S413
+  |        ^^^^^^^^^^^ S413
+2 | from Crypto.Hash import MD2  # S413
+3 | import Crypto.PublicKey  # S413
+  |
+
+S413.py:2:6: S413 `pycrypto` library is known to have publicly disclosed buffer overflow vulnerability
+  |
+1 | import Crypto.Hash  # S413
+2 | from Crypto.Hash import MD2  # S413
+  |      ^^^^^^^^^^^ S413
+3 | import Crypto.PublicKey  # S413
+4 | from Crypto.PublicKey import RSA  # S413
+  |
+
+S413.py:3:8: S413 `pycrypto` library is known to have publicly disclosed buffer overflow vulnerability
+  |
+1 | import Crypto.Hash  # S413
+2 | from Crypto.Hash import MD2  # S413
+3 | import Crypto.PublicKey  # S413
+  |        ^^^^^^^^^^^^^^^^ S413
+4 | from Crypto.PublicKey import RSA  # S413
+  |
+
+S413.py:4:6: S413 `pycrypto` library is known to have publicly disclosed buffer overflow vulnerability
+  |
+2 | from Crypto.Hash import MD2  # S413
+3 | import Crypto.PublicKey  # S413
+4 | from Crypto.PublicKey import RSA  # S413
+  |      ^^^^^^^^^^^^^^^^ S413
+  |
+
+

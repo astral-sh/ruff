@@ -44,10 +44,25 @@ impl From<Linter> for RuleSelector {
     }
 }
 
+impl Ord for RuleSelector {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // TODO(zanieb): We ought to put "ALL" and "Linter" selectors
+        // above those that are rule specific but it's not critical for now
+        self.prefix_and_code().cmp(&other.prefix_and_code())
+    }
+}
+
+impl PartialOrd for RuleSelector {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl FromStr for RuleSelector {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // **Changes should be reflected in `parse_no_redirect` as well**
         match s {
             "ALL" => Ok(Self::All),
             #[allow(deprecated)]
@@ -67,7 +82,6 @@ impl FromStr for RuleSelector {
                     return Ok(Self::Linter(linter));
                 }
 
-                // Does the selector select a single rule?
                 let prefix = RuleCodePrefix::parse(&linter, code)
                     .map_err(|_| ParseError::Unknown(s.to_string()))?;
 
@@ -108,7 +122,7 @@ pub(crate) fn is_single_rule_selector(prefix: &RuleCodePrefix) -> bool {
 pub enum ParseError {
     #[error("Unknown rule selector: `{0}`")]
     // TODO(martin): tell the user how to discover rule codes via the CLI once such a command is
-    // implemented (but that should of course be done only in ruff_cli and not here)
+    // implemented (but that should of course be done only in ruff and not here)
     Unknown(String),
 }
 
@@ -172,7 +186,7 @@ impl Visitor<'_> for SelectorVisitor {
 }
 
 impl RuleSelector {
-    /// Return all matching rules, regardless of whether they're in preview.
+    /// Return all matching rules, regardless of rule group filters like preview and deprecated.
     pub fn all_rules(&self) -> impl Iterator<Item = Rule> + '_ {
         match self {
             RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
@@ -198,20 +212,29 @@ impl RuleSelector {
         }
     }
 
-    /// Returns rules matching the selector, taking into account preview options enabled.
+    /// Returns rules matching the selector, taking into account rule groups like preview and deprecated.
     pub fn rules<'a>(&'a self, preview: &PreviewOptions) -> impl Iterator<Item = Rule> + 'a {
         let preview_enabled = preview.mode.is_enabled();
         let preview_require_explicit = preview.require_explicit;
         #[allow(deprecated)]
         self.all_rules().filter(move |rule| {
-            // Always include rules that are not in preview or the nursery
-            !(rule.is_preview() || rule.is_nursery())
+            // Always include stable rules
+            rule.is_stable()
             // Backwards compatibility allows selection of nursery rules by exact code or dedicated group
-            || ((matches!(self, RuleSelector::Rule { .. }) || matches!(self, RuleSelector::Nursery { .. })) && rule.is_nursery())
+            || ((self.is_exact() || matches!(self, RuleSelector::Nursery { .. })) && rule.is_nursery())
             // Enabling preview includes all preview or nursery rules unless explicit selection
             // is turned on
-            || (preview_enabled && (matches!(self, RuleSelector::Rule { .. }) || !preview_require_explicit))
+            || ((rule.is_preview() || rule.is_nursery()) && preview_enabled && (self.is_exact() || !preview_require_explicit))
+            // Deprecated rules are excluded in preview mode unless explicitly selected
+            || (rule.is_deprecated() && (!preview_enabled || self.is_exact()))
+            // Removed rules are included if explicitly selected but will error downstream
+            || (rule.is_removed() && self.is_exact())
         })
+    }
+
+    /// Returns true if this selector is exact i.e. selects a single rule by code
+    pub fn is_exact(&self) -> bool {
+        matches!(self, Self::Rule { .. })
     }
 }
 
@@ -267,7 +290,6 @@ mod schema {
                     [
                         // Include the non-standard "ALL" and "NURSERY" selectors.
                         "ALL".to_string(),
-                        "NURSERY".to_string(),
                         // Include the legacy "C" and "T" selectors.
                         "C".to_string(),
                         "T".to_string(),
@@ -289,9 +311,26 @@ mod schema {
                                 (!prefix.is_empty()).then(|| prefix.to_string())
                             })),
                     )
-                    // Filter out rule gated behind `#[cfg(feature = "unreachable-code")]`, which is
-                    // off-by-default
-                    .filter(|prefix| prefix != "RUF014")
+                    .filter(|p| {
+                        // Exclude any prefixes where all of the rules are removed
+                        if let Ok(Self::Rule { prefix, .. } | Self::Prefix { prefix, .. }) =
+                            RuleSelector::parse_no_redirect(p)
+                        {
+                            !prefix.rules().all(|rule| rule.is_removed())
+                        } else {
+                            true
+                        }
+                    })
+                    .filter(|_rule| {
+                        // Filter out all test-only rules
+                        #[cfg(feature = "test-rules")]
+                        #[allow(clippy::used_underscore_binding)]
+                        if _rule.starts_with("RUF9") {
+                            return false;
+                        }
+
+                        true
+                    })
                     .sorted()
                     .map(Value::String)
                     .collect(),
@@ -320,6 +359,41 @@ impl RuleSelector {
                     3 => Specificity::Prefix3Chars,
                     4 => Specificity::Prefix4Chars,
                     _ => panic!("RuleSelector::specificity doesn't yet support codes with so many characters"),
+                }
+            }
+        }
+    }
+
+    /// Parse [`RuleSelector`] from a string; but do not follow redirects.
+    pub fn parse_no_redirect(s: &str) -> Result<Self, ParseError> {
+        // **Changes should be reflected in `from_str` as well**
+        match s {
+            "ALL" => Ok(Self::All),
+            #[allow(deprecated)]
+            "NURSERY" => Ok(Self::Nursery),
+            "C" => Ok(Self::C),
+            "T" => Ok(Self::T),
+            _ => {
+                let (linter, code) =
+                    Linter::parse_code(s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
+
+                if code.is_empty() {
+                    return Ok(Self::Linter(linter));
+                }
+
+                let prefix = RuleCodePrefix::parse(&linter, code)
+                    .map_err(|_| ParseError::Unknown(s.to_string()))?;
+
+                if is_single_rule_selector(&prefix) {
+                    Ok(Self::Rule {
+                        prefix,
+                        redirected_from: None,
+                    })
+                } else {
+                    Ok(Self::Prefix {
+                        prefix,
+                        redirected_from: None,
+                    })
                 }
             }
         }
@@ -407,40 +481,28 @@ pub mod clap_completion {
                             let prefix = l.common_prefix();
                             (!prefix.is_empty()).then(|| PossibleValue::new(prefix).help(l.name()))
                         })
-                        .chain(
-                            RuleCodePrefix::iter()
-                                // Filter out rule gated behind `#[cfg(feature = "unreachable-code")]`, which is
-                                // off-by-default
-                                .filter(|prefix| {
-                                    format!(
-                                        "{}{}",
-                                        prefix.linter().common_prefix(),
-                                        prefix.short_code()
-                                    ) != "RUF014"
-                                })
-                                .filter_map(|prefix| {
-                                    // Ex) `UP`
-                                    if prefix.short_code().is_empty() {
-                                        let code = prefix.linter().common_prefix();
-                                        let name = prefix.linter().name();
-                                        return Some(PossibleValue::new(code).help(name));
-                                    }
+                        .chain(RuleCodePrefix::iter().filter_map(|prefix| {
+                            // Ex) `UP`
+                            if prefix.short_code().is_empty() {
+                                let code = prefix.linter().common_prefix();
+                                let name = prefix.linter().name();
+                                return Some(PossibleValue::new(code).help(name));
+                            }
 
-                                    // Ex) `UP004`
-                                    if is_single_rule_selector(&prefix) {
-                                        let rule = prefix.rules().next()?;
-                                        let code = format!(
-                                            "{}{}",
-                                            prefix.linter().common_prefix(),
-                                            prefix.short_code()
-                                        );
-                                        let name: &'static str = rule.into();
-                                        return Some(PossibleValue::new(code).help(name));
-                                    }
+                            // Ex) `UP004`
+                            if is_single_rule_selector(&prefix) {
+                                let rule = prefix.rules().next()?;
+                                let code = format!(
+                                    "{}{}",
+                                    prefix.linter().common_prefix(),
+                                    prefix.short_code()
+                                );
+                                let name: &'static str = rule.into();
+                                return Some(PossibleValue::new(code).help(name));
+                            }
 
-                                    None
-                                }),
-                        ),
+                            None
+                        })),
                 ),
             ))
         }

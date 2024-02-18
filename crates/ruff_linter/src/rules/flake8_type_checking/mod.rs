@@ -1,5 +1,6 @@
 //! Rules from [flake8-type-checking](https://pypi.org/project/flake8-type-checking/).
 pub(crate) mod helpers;
+mod imports;
 pub(crate) mod rules;
 pub mod settings;
 
@@ -33,10 +34,15 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_7.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_8.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_9.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TCH010_1.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TCH010_2.py"))]
     #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TCH001.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TCH003.py"))]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("init_var.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("snapshot.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TCH002.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("singledispatch.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("typing_modules_1.py"))]
@@ -51,8 +57,28 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
+    fn quote(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("quote_{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                flake8_type_checking: super::settings::Settings {
+                    quote_annotations: true,
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"))]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("init_var.py"))]
     fn strict(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("strict_{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
@@ -63,7 +89,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -80,6 +106,35 @@ mod tests {
             },
         )?;
         assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test_case(
+        Rule::TypingOnlyStandardLibraryImport,
+        Path::new("exempt_type_checking_1.py")
+    )]
+    #[test_case(
+        Rule::TypingOnlyStandardLibraryImport,
+        Path::new("exempt_type_checking_2.py")
+    )]
+    #[test_case(
+        Rule::TypingOnlyStandardLibraryImport,
+        Path::new("exempt_type_checking_3.py")
+    )]
+    fn exempt_type_checking(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                flake8_type_checking: super::settings::Settings {
+                    exempt_modules: vec![],
+                    strict: true,
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -109,7 +164,7 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
-                    runtime_evaluated_base_classes: vec![
+                    runtime_required_base_classes: vec![
                         "pydantic.BaseModel".to_string(),
                         "sqlalchemy.orm.DeclarativeBase".to_string(),
                     ],
@@ -140,9 +195,10 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
-                    runtime_evaluated_decorators: vec![
+                    runtime_required_decorators: vec![
                         "attrs.define".to_string(),
                         "attrs.frozen".to_string(),
+                        "pydantic.validate_call".to_string(),
                     ],
                     ..Default::default()
                 },
@@ -165,7 +221,7 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
-                    runtime_evaluated_base_classes: vec!["module.direct.MyBaseClass".to_string()],
+                    runtime_required_base_classes: vec!["module.direct.MyBaseClass".to_string()],
                     ..Default::default()
                 },
                 ..settings::LinterSettings::for_rule(rule_code)

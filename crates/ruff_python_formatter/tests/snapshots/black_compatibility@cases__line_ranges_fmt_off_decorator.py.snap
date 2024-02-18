@@ -5,6 +5,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/lin
 ## Input
 
 ```python
+# flags: --line-ranges=12-12 --line-ranges=21-21
 # NOTE: If you need to modify this file, pay special attention to the --line-ranges=
 # flag above as it's formatting specifically these lines.
 
@@ -16,6 +17,15 @@ class MyClass:
     # fmt: on
     def method():
         print   ( "str" )
+
+    @decor(
+        a=1,
+        # fmt: off
+        b=(2,   3),
+        # fmt: on
+    )
+    def func():
+          pass
 ```
 
 ## Black Differences
@@ -23,41 +33,53 @@ class MyClass:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,12 +1,10 @@
--# flags: --line-ranges=12-12
- # NOTE: If you need to modify this file, pay special attention to the --line-ranges=
- # flag above as it's formatting specifically these lines.
- 
- # Regression test for an edge case involving decorators and fmt: off/on.
- class MyClass:
--
-     # fmt: off
+@@ -9,7 +9,7 @@
      @decorator  (  )
      # fmt: on
      def method():
 -        print("str")
 +        print   ( "str" )
+ 
+     @decor(
+         a=1,
+@@ -18,4 +18,4 @@
+         # fmt: on
+     )
+     def func():
+-        pass
++          pass
 ```
 
 ## Ruff Output
 
 ```python
+# flags: --line-ranges=12-12 --line-ranges=21-21
 # NOTE: If you need to modify this file, pay special attention to the --line-ranges=
 # flag above as it's formatting specifically these lines.
 
 # Regression test for an edge case involving decorators and fmt: off/on.
 class MyClass:
+
     # fmt: off
     @decorator  (  )
     # fmt: on
     def method():
         print   ( "str" )
+
+    @decor(
+        a=1,
+        # fmt: off
+        b=(2,   3),
+        # fmt: on
+    )
+    def func():
+          pass
 ```
 
 ## Black Output
 
 ```python
-# flags: --line-ranges=12-12
+# flags: --line-ranges=12-12 --line-ranges=21-21
 # NOTE: If you need to modify this file, pay special attention to the --line-ranges=
 # flag above as it's formatting specifically these lines.
 
@@ -69,6 +91,15 @@ class MyClass:
     # fmt: on
     def method():
         print("str")
+
+    @decor(
+        a=1,
+        # fmt: off
+        b=(2,   3),
+        # fmt: on
+    )
+    def func():
+        pass
 ```
 
 

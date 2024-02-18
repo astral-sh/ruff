@@ -87,12 +87,17 @@ impl Violation for IndentWithSpaces {
 ///     """
 /// ```
 ///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent indentation, making the rule redundant.
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
+/// [formatter]: https://docs.astral.sh/ruff/formatter/
 #[violation]
 pub struct UnderIndentation;
 
@@ -254,14 +259,26 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
                     Edit::range_deletion(TextRange::at(line.start(), line_indent.text_len()))
                 } else {
                     // Convert the character count to an offset within the source.
+                    // Example, where `[]` is a 2 byte non-breaking space:
+                    // ```
+                    // def f():
+                    //     """ Docstring header
+                    // ^^^^ Real indentation is 4 chars
+                    //       docstring body, over-indented
+                    // ^^^^^^ Over-indentation is 6 - 4 = 2 chars due to this line
+                    //    [] []  docstring body 2, further indented
+                    // ^^^^^ We take these 4 chars/5 bytes to match the docstring ...
+                    //      ^^^ ... and these 2 chars/3 bytes to remove the `over_indented_size` ...
+                    //         ^^ ... but preserve this real indent
+                    // ```
                     let offset = checker
                         .locator()
-                        .after(line.start() + indent.text_len())
+                        .after(line.start())
                         .chars()
-                        .take(over_indented_size)
+                        .take(docstring.indentation.chars().count() + over_indented_size)
                         .map(TextLen::text_len)
                         .sum::<TextSize>();
-                    let range = TextRange::at(line.start(), indent.text_len() + offset);
+                    let range = TextRange::at(line.start(), offset);
                     Edit::range_replacement(indent, range)
                 };
                 diagnostic.set_fix(Fix::safe_edit(edit));

@@ -662,7 +662,7 @@ D.py:712:5: D213 [*] Multi-line docstring summary should start at the second lin
 713 | | 
 714 | |     This is not overindented
 715 | |         This is overindented, but since one line is not overindented this should not raise
-716 | |             And so is this, but it we should preserve the extra space on this line relative 
+716 | |             And so is this, but it we should preserve the extra space on this line relative
 717 | |     """
     | |_______^ D213
     |
@@ -678,5 +678,28 @@ D.py:712:5: D213 [*] Multi-line docstring summary should start at the second lin
 713 714 | 
 714 715 |     This is not overindented
 715 716 |         This is overindented, but since one line is not overindented this should not raise
+
+D.py:721:5: D213 [*] Multi-line docstring summary should start at the second line
+    |
+720 |   def inconsistent_indent_byte_size():
+721 |       """There's a non-breaking space (2-bytes) after 3 spaces (https://github.com/astral-sh/ruff/issues/9080).
+    |  _____^
+722 | | 
+723 | |        Returns:
+724 | |     """
+    | |_______^ D213
+    |
+    = help: Insert line break and indentation after opening quotes
+
+ℹ Safe fix
+718 718 | 
+719 719 | 
+720 720 | def inconsistent_indent_byte_size():
+721     |-    """There's a non-breaking space (2-bytes) after 3 spaces (https://github.com/astral-sh/ruff/issues/9080).
+    721 |+    """
+    722 |+    There's a non-breaking space (2-bytes) after 3 spaces (https://github.com/astral-sh/ruff/issues/9080).
+722 723 | 
+723 724 |        Returns:
+724 725 |     """
 
 

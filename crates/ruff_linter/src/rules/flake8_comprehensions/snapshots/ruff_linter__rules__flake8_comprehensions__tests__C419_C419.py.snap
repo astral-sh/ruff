@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-C419.py:1:5: C419 [*] Unnecessary list comprehension.
+C419.py:1:5: C419 [*] Unnecessary list comprehension
   |
 1 | any([x.id for x in bar])
   |     ^^^^^^^^^^^^^^^^^^^ C419
@@ -17,7 +17,7 @@ C419.py:1:5: C419 [*] Unnecessary list comprehension.
 3 3 | any(  # first comment
 4 4 |     [x.id for x in bar],  # second comment
 
-C419.py:2:5: C419 [*] Unnecessary list comprehension.
+C419.py:2:5: C419 [*] Unnecessary list comprehension
   |
 1 | any([x.id for x in bar])
 2 | all([x.id for x in bar])
@@ -35,7 +35,7 @@ C419.py:2:5: C419 [*] Unnecessary list comprehension.
 4 4 |     [x.id for x in bar],  # second comment
 5 5 | )  # third comment
 
-C419.py:4:5: C419 [*] Unnecessary list comprehension.
+C419.py:4:5: C419 [*] Unnecessary list comprehension
   |
 2 | all([x.id for x in bar])
 3 | any(  # first comment
@@ -56,7 +56,7 @@ C419.py:4:5: C419 [*] Unnecessary list comprehension.
 6 6 | all(  # first comment
 7 7 |     [x.id for x in bar],  # second comment
 
-C419.py:7:5: C419 [*] Unnecessary list comprehension.
+C419.py:7:5: C419 [*] Unnecessary list comprehension
   |
 5 | )  # third comment
 6 | all(  # first comment
@@ -77,7 +77,7 @@ C419.py:7:5: C419 [*] Unnecessary list comprehension.
 9 9 | any({x.id for x in bar})
 10 10 | 
 
-C419.py:9:5: C419 [*] Unnecessary list comprehension.
+C419.py:9:5: C419 [*] Unnecessary list comprehension
    |
  7 |     [x.id for x in bar],  # second comment
  8 | )  # third comment
@@ -98,7 +98,7 @@ C419.py:9:5: C419 [*] Unnecessary list comprehension.
 11 11 | # OK
 12 12 | all(x.id for x in bar)
 
-C419.py:24:5: C419 [*] Unnecessary list comprehension.
+C419.py:24:5: C419 [*] Unnecessary list comprehension
    |
 22 |   # Special comment handling
 23 |   any(
@@ -133,7 +133,7 @@ C419.py:24:5: C419 [*] Unnecessary list comprehension.
 31 30 | )
 32 31 | 
 
-C419.py:35:5: C419 [*] Unnecessary list comprehension.
+C419.py:35:5: C419 [*] Unnecessary list comprehension
    |
 33 |   # Weird case where the function call, opening bracket, and comment are all
 34 |   # on the same line.

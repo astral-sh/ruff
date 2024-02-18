@@ -33,7 +33,7 @@ use super::unittest_assert::UnittestAssert;
 /// Checks for assertions that combine multiple independent conditions.
 ///
 /// ## Why is this bad?
-/// Composite assertion statements are harder debug upon failure, as the
+/// Composite assertion statements are harder to debug upon failure, as the
 /// failure message will not indicate which condition failed.
 ///
 /// ## Example
@@ -411,7 +411,7 @@ fn to_pytest_raises_args<'a>(
 ) -> Option<Cow<'a, str>> {
     let args = match attr {
         "assertRaises" | "failUnlessRaises" => {
-            match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+            match (&*arguments.args, &*arguments.keywords) {
                 // Ex) `assertRaises(Exception)`
                 ([arg], []) => Cow::Borrowed(checker.locator().slice(arg)),
                 // Ex) `assertRaises(expected_exception=Exception)`
@@ -427,7 +427,7 @@ fn to_pytest_raises_args<'a>(
             }
         }
         "assertRaisesRegex" | "assertRaisesRegexp" => {
-            match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+            match (&*arguments.args, &*arguments.keywords) {
                 // Ex) `assertRaisesRegex(Exception, regex)`
                 ([arg1, arg2], []) => Cow::Owned(format!(
                     "{}, match={}",

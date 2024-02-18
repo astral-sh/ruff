@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 
 use anyhow::Result;
+
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::map_subscript;
@@ -10,9 +11,7 @@ use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Int, StmtIf};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::delete_stmt;
-
-use crate::rules::pyupgrade::fixes::adjust_indentation;
+use crate::fix::edits::{adjust_indentation, delete_stmt};
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
@@ -91,7 +90,7 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
             continue;
         };
 
-        let ([op], [comparison]) = (ops.as_slice(), comparators.as_slice()) else {
+        let ([op], [comparison]) = (&**ops, &**comparators) else {
             continue;
         };
 
@@ -303,6 +302,7 @@ fn fix_always_false_branch(
                                 ),
                                 indentation,
                                 checker.locator(),
+                                checker.indexer(),
                                 checker.stylist(),
                             )
                             .ok()
@@ -377,6 +377,7 @@ fn fix_always_true_branch(
                             TextRange::new(checker.locator().line_start(start.start()), end.end()),
                             indentation,
                             checker.locator(),
+                            checker.indexer(),
                             checker.stylist(),
                         )
                         .ok()

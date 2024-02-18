@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufReader, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -6,10 +7,10 @@ use std::{io, iter};
 
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
+use rand::{Rng, SeedableRng};
 use serde::Serialize;
 use serde_json::error::Category;
 use thiserror::Error;
-use uuid::Uuid;
 
 use ruff_diagnostics::{SourceMap, SourceMarker};
 use ruff_source_file::{NewlineWithTrailingNewline, OneIndexed, UniversalNewlineIterator};
@@ -145,7 +146,23 @@ impl Notebook {
         // Add cell ids to 4.5+ notebooks if they are missing
         // https://github.com/astral-sh/ruff/issues/6834
         // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#required-field
+        // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#questions
         if raw_notebook.nbformat == 4 && raw_notebook.nbformat_minor >= 5 {
+            // We use a insecure random number generator to generate deterministic uuids
+            let mut rng = rand::rngs::StdRng::seed_from_u64(0);
+            let mut existing_ids = HashSet::new();
+
+            for cell in &raw_notebook.cells {
+                let id = match cell {
+                    Cell::Code(cell) => &cell.id,
+                    Cell::Markdown(cell) => &cell.id,
+                    Cell::Raw(cell) => &cell.id,
+                };
+                if let Some(id) = id {
+                    existing_ids.insert(id.clone());
+                }
+            }
+
             for cell in &mut raw_notebook.cells {
                 let id = match cell {
                     Cell::Code(cell) => &mut cell.id,
@@ -153,8 +170,17 @@ impl Notebook {
                     Cell::Raw(cell) => &mut cell.id,
                 };
                 if id.is_none() {
-                    // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#questions
-                    *id = Some(Uuid::new_v4().to_string());
+                    loop {
+                        let new_id = uuid::Builder::from_random_bytes(rng.gen())
+                            .into_uuid()
+                            .as_simple()
+                            .to_string();
+
+                        if existing_ids.insert(new_id.clone()) {
+                            *id = Some(new_id);
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -421,16 +447,19 @@ mod tests {
         ));
     }
 
-    #[test_case(Path::new("markdown.json"), false; "markdown")]
-    #[test_case(Path::new("only_magic.json"), true; "only_magic")]
-    #[test_case(Path::new("code_and_magic.json"), true; "code_and_magic")]
-    #[test_case(Path::new("only_code.json"), true; "only_code")]
-    #[test_case(Path::new("cell_magic.json"), false; "cell_magic")]
-    #[test_case(Path::new("automagic.json"), false; "automagic")]
-    #[test_case(Path::new("automagics.json"), false; "automagics")]
-    #[test_case(Path::new("automagic_before_code.json"), false; "automagic_before_code")]
-    #[test_case(Path::new("automagic_after_code.json"), true; "automagic_after_code")]
-    fn test_is_valid_code_cell(path: &Path, expected: bool) -> Result<()> {
+    #[test_case("markdown", false)]
+    #[test_case("only_magic", true)]
+    #[test_case("code_and_magic", true)]
+    #[test_case("only_code", true)]
+    #[test_case("cell_magic", false)]
+    #[test_case("valid_cell_magic", true)]
+    #[test_case("automagic", false)]
+    #[test_case("automagic_assignment", true)]
+    #[test_case("automagics", false)]
+    #[test_case("automagic_before_code", false)]
+    #[test_case("automagic_after_code", true)]
+    #[test_case("unicode_magic_gh9145", true)]
+    fn test_is_valid_code_cell(cell: &str, expected: bool) -> Result<()> {
         /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
         fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
             let path = notebook_path("cell").join(path);
@@ -438,7 +467,10 @@ mod tests {
             Ok(serde_json::from_str(&source_code)?)
         }
 
-        assert_eq!(read_jupyter_cell(path)?.is_valid_code_cell(), expected);
+        assert_eq!(
+            read_jupyter_cell(format!("{cell}.json"))?.is_valid_code_cell(),
+            expected
+        );
         Ok(())
     }
 

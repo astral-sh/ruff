@@ -191,7 +191,16 @@ fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel)
         }
         // Ex) `typing.Union[bool, int]`
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-            if semantic.match_typing_expr(value, "Union") {
+            // If the typing modules were never imported, we'll never match below.
+            if !semantic.seen_typing() {
+                return false;
+            }
+
+            let call_path = semantic.resolve_call_path(value);
+            if call_path
+                .as_ref()
+                .is_some_and(|call_path| semantic.match_typing_call_path(call_path, "Union"))
+            {
                 if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                     elts.iter()
                         .any(|elt| match_annotation_to_complex_bool(elt, semantic))
@@ -199,7 +208,10 @@ fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel)
                     // Union with a single type is an invalid type annotation
                     false
                 }
-            } else if semantic.match_typing_expr(value, "Optional") {
+            } else if call_path
+                .as_ref()
+                .is_some_and(|call_path| semantic.match_typing_call_path(call_path, "Optional"))
+            {
                 match_annotation_to_complex_bool(slice, semantic)
             } else {
                 false

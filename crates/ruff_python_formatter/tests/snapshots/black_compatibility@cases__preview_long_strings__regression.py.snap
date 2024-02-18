@@ -832,7 +832,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  
  some_commented_string = (  # This comment stays at the top.
      "This string is long but not so long that it needs hahahah toooooo be so greatttt"
-@@ -279,38 +280,27 @@
+@@ -279,37 +280,26 @@
  )
  
  lpar_and_rpar_have_comments = func_call(  # LPAR Comment
@@ -874,11 +874,10 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  )
  
 -fstring = f"We have to remember to escape {braces}. Like {{these}}. But not {this}."
- 
 -
+ 
  class A:
      class B:
-         def foo():
 @@ -364,10 +354,7 @@
          def foo():
              if not hasattr(module, name):
@@ -933,7 +932,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
          )
  
  
-@@ -432,14 +415,12 @@
+@@ -432,9 +415,7 @@
          assert xxxxxxx_xxxx in [
              x.xxxxx.xxxxxx.xxxxx.xxxxxx,
              x.xxxxx.xxxxxx.xxxxx.xxxx,
@@ -943,15 +942,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 +        ], "xxxxxxxxxxx xxxxxxx xxxx (xxxxxx xxxx) %x xxx xxxxx" % xxxxxxx_xxxx
  
  
--value.__dict__[key] = (
--    "test"  # set some Thrift field to non-None in the struct aa bb cc dd ee
--)
-+value.__dict__[
-+    key
-+] = "test"  # set some Thrift field to non-None in the struct aa bb cc dd ee
- 
- RE_ONE_BACKSLASH = {
-     "asdf_hjkl_jkl": re.compile(
+ value.__dict__[key] = (
 @@ -449,8 +430,7 @@
  
  RE_TWO_BACKSLASHES = {
@@ -989,7 +980,13 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  )
  
  # The parens should NOT be removed in this case.
-@@ -518,88 +494,78 @@
+@@ -513,93 +489,83 @@
+ 
+ 
+ temp_msg = (
+-    f"{f'{humanize_number(pos)}.': <{pound_len+2}} "
++    f"{f'{humanize_number(pos)}.': <{pound_len + 2}} "
+     f"{balance: <{bal_len + 5}} "
      f"<<{author.display_name}>>\n"
  )
  
@@ -1113,7 +1110,13 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
      "6. Click on Create Credential at the top."
      '7. At the top click the link for "API key".'
      "8. No application restrictions are needed. Click Create at the bottom."
-@@ -613,55 +579,40 @@
+@@ -608,60 +574,45 @@
+ 
+ # It shouldn't matter if the string prefixes are capitalized.
+ temp_msg = (
+-    f"{F'{humanize_number(pos)}.': <{pound_len+2}} "
++    f"{f'{humanize_number(pos)}.': <{pound_len + 2}} "
+     f"{balance: <{bal_len + 5}} "
      f"<<{author.display_name}>>\n"
  )
  
@@ -1627,9 +1630,9 @@ class xxxxxxxxxxxxxxxxxxxxx(xxxx.xxxxxxxxxxxxx):
         ], "xxxxxxxxxxx xxxxxxx xxxx (xxxxxx xxxx) %x xxx xxxxx" % xxxxxxx_xxxx
 
 
-value.__dict__[
-    key
-] = "test"  # set some Thrift field to non-None in the struct aa bb cc dd ee
+value.__dict__[key] = (
+    "test"  # set some Thrift field to non-None in the struct aa bb cc dd ee
+)
 
 RE_ONE_BACKSLASH = {
     "asdf_hjkl_jkl": re.compile(
@@ -1698,7 +1701,7 @@ class X:
 
 
 temp_msg = (
-    f"{f'{humanize_number(pos)}.': <{pound_len+2}} "
+    f"{f'{humanize_number(pos)}.': <{pound_len + 2}} "
     f"{balance: <{bal_len + 5}} "
     f"<<{author.display_name}>>\n"
 )
@@ -1783,7 +1786,7 @@ message = (
 
 # It shouldn't matter if the string prefixes are capitalized.
 temp_msg = (
-    f"{F'{humanize_number(pos)}.': <{pound_len+2}} "
+    f"{f'{humanize_number(pos)}.': <{pound_len + 2}} "
     f"{balance: <{bal_len + 5}} "
     f"<<{author.display_name}>>\n"
 )

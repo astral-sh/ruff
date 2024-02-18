@@ -135,7 +135,7 @@ pub(crate) fn add_required_imports(
         .required_imports
         .iter()
         .flat_map(|required_import| {
-            let Ok(body) = parse_suite(required_import, "<filename>") else {
+            let Ok(body) = parse_suite(required_import) else {
                 error!("Failed to parse required import: `{}`", required_import);
                 return vec![];
             };

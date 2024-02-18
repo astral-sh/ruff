@@ -76,7 +76,7 @@ use crate::rules::pydocstyle::settings::Convention;
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -175,7 +175,7 @@ impl AlwaysFixableViolation for SectionNotOverIndented {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -253,7 +253,7 @@ impl AlwaysFixableViolation for SectionUnderlineNotOverIndented {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -350,7 +350,7 @@ impl AlwaysFixableViolation for CapitalizeSectionName {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -446,7 +446,7 @@ impl AlwaysFixableViolation for NewLineAfterSectionName {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -548,7 +548,7 @@ impl AlwaysFixableViolation for DashedUnderlineAfterSection {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -647,7 +647,7 @@ impl AlwaysFixableViolation for SectionUnderlineAfterName {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -741,7 +741,7 @@ impl AlwaysFixableViolation for SectionUnderlineMatchesSectionLength {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -835,7 +835,7 @@ impl AlwaysFixableViolation for NoBlankLineAfterSection {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -931,7 +931,7 @@ impl AlwaysFixableViolation for NoBlankLineBeforeSection {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -1021,7 +1021,7 @@ impl AlwaysFixableViolation for BlankLineAfterLastSection {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -1098,7 +1098,7 @@ impl Violation for EmptyDocstringSection {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -1180,7 +1180,7 @@ impl AlwaysFixableViolation for SectionNameEndsInColon {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -1264,7 +1264,7 @@ impl Violation for UndocumentedParam {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -1632,10 +1632,15 @@ fn common_section(
     }
 
     let line_end = checker.stylist().line_ending().as_str();
-    let last_line = context.following_lines().last();
-    if last_line.map_or(true, |line| !line.trim().is_empty()) {
-        if let Some(next) = next {
-            if checker.enabled(Rule::NoBlankLineAfterSection) {
+
+    if let Some(next) = next {
+        if checker.enabled(Rule::NoBlankLineAfterSection) {
+            let num_blank_lines = context
+                .following_lines()
+                .rev()
+                .take_while(|line| line.trim().is_empty())
+                .count();
+            if num_blank_lines < 2 {
                 let mut diagnostic = Diagnostic::new(
                     NoBlankLineAfterSection {
                         name: context.section_name().to_string(),
@@ -1649,8 +1654,17 @@ fn common_section(
                 )));
                 checker.diagnostics.push(diagnostic);
             }
-        } else {
-            if checker.enabled(Rule::BlankLineAfterLastSection) {
+        }
+    } else {
+        // The first blank line is the line containing the closing triple quotes, so we need at
+        // least two.
+        if checker.enabled(Rule::BlankLineAfterLastSection) {
+            let num_blank_lines = context
+                .following_lines()
+                .rev()
+                .take_while(|line| line.trim().is_empty())
+                .count();
+            if num_blank_lines < 2 {
                 let mut diagnostic = Diagnostic::new(
                     BlankLineAfterLastSection {
                         name: context.section_name().to_string(),
@@ -1659,7 +1673,11 @@ fn common_section(
                 );
                 // Add a newline after the section.
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    format!("{}{}", line_end, docstring.indentation),
+                    format!(
+                        "{}{}",
+                        line_end.repeat(2 - num_blank_lines),
+                        docstring.indentation
+                    ),
                     context.end(),
                 )));
                 checker.diagnostics.push(diagnostic);

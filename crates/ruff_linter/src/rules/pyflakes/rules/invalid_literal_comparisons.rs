@@ -4,11 +4,10 @@ use ruff_python_ast::{CmpOp, Expr};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
-use ruff_python_parser::locate_cmp_ops;
-use ruff_text_size::Ranged;
+use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::settings::types::PreviewMode;
 
 /// ## What it does
 /// Checks for `is` and `is not` comparisons against constant literals, like
@@ -91,7 +90,7 @@ pub(crate) fn invalid_literal_comparison(
         if matches!(op, CmpOp::Is | CmpOp::IsNot)
             && (helpers::is_constant_non_singleton(left)
                 || helpers::is_constant_non_singleton(right)
-                || (matches!(checker.settings.preview, PreviewMode::Enabled)
+                || (checker.settings.preview.is_enabled()
                     && (helpers::is_mutable_iterable_initializer(left)
                         || helpers::is_mutable_iterable_initializer(right))))
         {
@@ -136,5 +135,209 @@ impl From<&CmpOp> for IsCmpOp {
             CmpOp::IsNot => IsCmpOp::IsNot,
             _ => panic!("Expected CmpOp::Is | CmpOp::IsNot"),
         }
+    }
+}
+
+/// Extract all [`CmpOp`] operators from an expression snippet, with appropriate
+/// ranges.
+///
+/// `RustPython` doesn't include line and column information on [`CmpOp`] nodes.
+/// `CPython` doesn't either. This method iterates over the token stream and
+/// re-identifies [`CmpOp`] nodes, annotating them with valid ranges.
+fn locate_cmp_ops(expr: &Expr, source: &str) -> Vec<LocatedCmpOp> {
+    // If `Expr` is a multi-line expression, we need to parenthesize it to
+    // ensure that it's lexed correctly.
+    let contents = &source[expr.range()];
+    let parenthesized_contents = format!("({contents})");
+    let mut tok_iter = lexer::lex(&parenthesized_contents, Mode::Expression)
+        .flatten()
+        .skip(1)
+        .map(|(tok, range)| (tok, range - TextSize::from(1)))
+        .filter(|(tok, _)| !matches!(tok, Tok::NonLogicalNewline | Tok::Comment(_)))
+        .peekable();
+
+    let mut ops: Vec<LocatedCmpOp> = vec![];
+
+    // Track the bracket depth.
+    let mut par_count = 0u32;
+    let mut sqb_count = 0u32;
+    let mut brace_count = 0u32;
+
+    loop {
+        let Some((tok, range)) = tok_iter.next() else {
+            break;
+        };
+
+        match tok {
+            Tok::Lpar => {
+                par_count = par_count.saturating_add(1);
+            }
+            Tok::Rpar => {
+                par_count = par_count.saturating_sub(1);
+            }
+            Tok::Lsqb => {
+                sqb_count = sqb_count.saturating_add(1);
+            }
+            Tok::Rsqb => {
+                sqb_count = sqb_count.saturating_sub(1);
+            }
+            Tok::Lbrace => {
+                brace_count = brace_count.saturating_add(1);
+            }
+            Tok::Rbrace => {
+                brace_count = brace_count.saturating_sub(1);
+            }
+            _ => {}
+        }
+
+        if par_count > 0 || sqb_count > 0 || brace_count > 0 {
+            continue;
+        }
+
+        match tok {
+            Tok::Not => {
+                if let Some((_, next_range)) = tok_iter.next_if(|(tok, _)| tok.is_in()) {
+                    ops.push(LocatedCmpOp::new(
+                        TextRange::new(range.start(), next_range.end()),
+                        CmpOp::NotIn,
+                    ));
+                }
+            }
+            Tok::In => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::In));
+            }
+            Tok::Is => {
+                let op = if let Some((_, next_range)) = tok_iter.next_if(|(tok, _)| tok.is_not()) {
+                    LocatedCmpOp::new(
+                        TextRange::new(range.start(), next_range.end()),
+                        CmpOp::IsNot,
+                    )
+                } else {
+                    LocatedCmpOp::new(range, CmpOp::Is)
+                };
+                ops.push(op);
+            }
+            Tok::NotEqual => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::NotEq));
+            }
+            Tok::EqEqual => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::Eq));
+            }
+            Tok::GreaterEqual => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::GtE));
+            }
+            Tok::Greater => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::Gt));
+            }
+            Tok::LessEqual => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::LtE));
+            }
+            Tok::Less => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::Lt));
+            }
+            _ => {}
+        }
+    }
+    ops
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LocatedCmpOp {
+    range: TextRange,
+    op: CmpOp,
+}
+
+impl LocatedCmpOp {
+    fn new<T: Into<TextRange>>(range: T, op: CmpOp) -> Self {
+        Self {
+            range: range.into(),
+            op,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+
+    use ruff_python_ast::CmpOp;
+    use ruff_python_parser::parse_expression;
+    use ruff_text_size::TextSize;
+
+    use super::{locate_cmp_ops, LocatedCmpOp};
+
+    #[test]
+    fn extract_cmp_op_location() -> Result<()> {
+        let contents = "x == 1";
+        let expr = parse_expression(contents)?;
+        assert_eq!(
+            locate_cmp_ops(&expr, contents),
+            vec![LocatedCmpOp::new(
+                TextSize::from(2)..TextSize::from(4),
+                CmpOp::Eq
+            )]
+        );
+
+        let contents = "x != 1";
+        let expr = parse_expression(contents)?;
+        assert_eq!(
+            locate_cmp_ops(&expr, contents),
+            vec![LocatedCmpOp::new(
+                TextSize::from(2)..TextSize::from(4),
+                CmpOp::NotEq
+            )]
+        );
+
+        let contents = "x is 1";
+        let expr = parse_expression(contents)?;
+        assert_eq!(
+            locate_cmp_ops(&expr, contents),
+            vec![LocatedCmpOp::new(
+                TextSize::from(2)..TextSize::from(4),
+                CmpOp::Is
+            )]
+        );
+
+        let contents = "x is not 1";
+        let expr = parse_expression(contents)?;
+        assert_eq!(
+            locate_cmp_ops(&expr, contents),
+            vec![LocatedCmpOp::new(
+                TextSize::from(2)..TextSize::from(8),
+                CmpOp::IsNot
+            )]
+        );
+
+        let contents = "x in 1";
+        let expr = parse_expression(contents)?;
+        assert_eq!(
+            locate_cmp_ops(&expr, contents),
+            vec![LocatedCmpOp::new(
+                TextSize::from(2)..TextSize::from(4),
+                CmpOp::In
+            )]
+        );
+
+        let contents = "x not in 1";
+        let expr = parse_expression(contents)?;
+        assert_eq!(
+            locate_cmp_ops(&expr, contents),
+            vec![LocatedCmpOp::new(
+                TextSize::from(2)..TextSize::from(8),
+                CmpOp::NotIn
+            )]
+        );
+
+        let contents = "x != (1 is not 2)";
+        let expr = parse_expression(contents)?;
+        assert_eq!(
+            locate_cmp_ops(&expr, contents),
+            vec![LocatedCmpOp::new(
+                TextSize::from(2)..TextSize::from(4),
+                CmpOp::NotEq
+            )]
+        );
+
+        Ok(())
     }
 }

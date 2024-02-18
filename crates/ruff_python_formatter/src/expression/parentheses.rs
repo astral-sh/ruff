@@ -126,7 +126,7 @@ where
     FormatParenthesized {
         left,
         comments: &[],
-        indent: true,
+        hug: false,
         content: Argument::new(content),
         right,
     }
@@ -135,7 +135,7 @@ where
 pub(crate) struct FormatParenthesized<'content, 'ast> {
     left: &'static str,
     comments: &'content [SourceComment],
-    indent: bool,
+    hug: bool,
     content: Argument<'content, PyFormatContext<'ast>>,
     right: &'static str,
 }
@@ -158,8 +158,8 @@ impl<'content, 'ast> FormatParenthesized<'content, 'ast> {
     }
 
     /// Whether to indent the content within the parentheses.
-    pub(crate) fn with_indent(self, indent: bool) -> FormatParenthesized<'content, 'ast> {
-        FormatParenthesized { indent, ..self }
+    pub(crate) fn with_hugging(self, hug: bool) -> FormatParenthesized<'content, 'ast> {
+        FormatParenthesized { hug, ..self }
     }
 }
 
@@ -167,17 +167,21 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         let current_level = f.context().node_level();
 
-        let content = format_with(|f| {
-            group(&format_with(|f| {
-                dangling_open_parenthesis_comments(self.comments).fmt(f)?;
-                if self.indent || !self.comments.is_empty() {
-                    soft_block_indent(&Arguments::from(&self.content)).fmt(f)?;
+        let indented = format_with(|f| {
+            let content = Arguments::from(&self.content);
+            if self.comments.is_empty() {
+                if self.hug {
+                    content.fmt(f)
                 } else {
-                    Arguments::from(&self.content).fmt(f)?;
+                    group(&soft_block_indent(&content)).fmt(f)
                 }
-                Ok(())
-            }))
-            .fmt(f)
+            } else {
+                group(&format_args![
+                    dangling_open_parenthesis_comments(self.comments),
+                    soft_block_indent(&content),
+                ])
+                .fmt(f)
+            }
         });
 
         let inner = format_with(|f| {
@@ -186,12 +190,12 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
                 // This ensures that expanding this parenthesized expression does not expand the optional parentheses group.
                 write!(
                     f,
-                    [fits_expanded(&content)
+                    [fits_expanded(&indented)
                         .with_condition(Some(Condition::if_group_fits_on_line(group_id)))]
                 )
             } else {
                 // It's not necessary to wrap the content if it is not inside of an optional_parentheses group.
-                content.fmt(f)
+                indented.fmt(f)
             }
         });
 
@@ -447,7 +451,7 @@ mod tests {
     #[test]
     fn test_has_parentheses() {
         let expression = r#"(b().c("")).d()"#;
-        let expr = parse_expression(expression, "<filename>").unwrap();
+        let expr = parse_expression(expression).unwrap();
         assert!(!is_expression_parenthesized(
             ExpressionRef::from(&expr),
             &CommentRanges::default(),

@@ -91,25 +91,25 @@ mod tests {
     #[test]
     fn trailing_content() -> Result<(), ParseError> {
         let contents = "x = 1";
-        let program = parse_suite(contents, "<filename>")?;
+        let program = parse_suite(contents)?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(!has_trailing_content(stmt.end(), &locator));
 
         let contents = "x = 1; y = 2";
-        let program = parse_suite(contents, "<filename>")?;
+        let program = parse_suite(contents)?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(has_trailing_content(stmt.end(), &locator));
 
         let contents = "x = 1  ";
-        let program = parse_suite(contents, "<filename>")?;
+        let program = parse_suite(contents)?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(!has_trailing_content(stmt.end(), &locator));
 
         let contents = "x = 1  # Comment";
-        let program = parse_suite(contents, "<filename>")?;
+        let program = parse_suite(contents)?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(!has_trailing_content(stmt.end(), &locator));
@@ -119,7 +119,7 @@ x = 1
 y = 2
 "
         .trim();
-        let program = parse_suite(contents, "<filename>")?;
+        let program = parse_suite(contents)?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(!has_trailing_content(stmt.end(), &locator));

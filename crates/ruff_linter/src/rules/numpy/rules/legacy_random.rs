@@ -2,6 +2,7 @@ use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -59,6 +60,10 @@ impl Violation for NumpyLegacyRandom {
 
 /// NPY002
 pub(crate) fn legacy_random(checker: &mut Checker, expr: &Expr) {
+    if !checker.semantic().seen_module(Modules::NUMPY) {
+        return;
+    }
+
     if let Some(method_name) = checker
         .semantic()
         .resolve_call_path(expr)
@@ -75,8 +80,11 @@ pub(crate) fn legacy_random(checker: &mut Checker, expr: &Expr) {
                     "set_state" |
                     // Simple random data
                     "rand" |
+                    "ranf" |
+                    "sample" |
                     "randn" |
                     "randint" |
+                    "random" |
                     "random_integers" |
                     "random_sample" |
                     "choice" |

@@ -1,21 +1,22 @@
 use std::cmp::Ordering;
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
-use ruff_text_size::{Ranged, TextRange, TextSize};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-pub mod line_index;
-mod locator;
-pub mod newlines;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub use crate::line_index::{LineIndex, OneIndexed};
-pub use locator::Locator;
-pub use newlines::{
+pub use crate::locator::Locator;
+pub use crate::newlines::{
     find_newline, Line, LineEnding, NewlineWithTrailingNewline, UniversalNewlineIterator,
     UniversalNewlines,
 };
+
+mod line_index;
+mod locator;
+mod newlines;
 
 /// Gives access to the source code of a file and allows mapping between [`TextSize`] and [`SourceLocation`].
 #[derive(Debug)]
@@ -250,5 +251,22 @@ impl Debug for SourceLocation {
             .field("row", &self.row.get())
             .field("column", &self.column.get())
             .finish()
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum SourceRow {
+    /// A row within a cell in a Jupyter Notebook.
+    Notebook { cell: OneIndexed, line: OneIndexed },
+    /// A row within a source file.
+    SourceFile { line: OneIndexed },
+}
+
+impl Display for SourceRow {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SourceRow::Notebook { cell, line } => write!(f, "cell {cell}, line {line}"),
+            SourceRow::SourceFile { line } => write!(f, "line {line}"),
+        }
     }
 }

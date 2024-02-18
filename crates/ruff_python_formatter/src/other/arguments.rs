@@ -1,7 +1,7 @@
 use ruff_formatter::{write, FormatContext};
 use ruff_python_ast::{ArgOrKeyword, Arguments, Expr};
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_python_trivia::{PythonWhitespace, SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::SourceComment;
 use crate::expression::expr_generator_exp::GeneratorExpParentheses;
@@ -9,7 +9,8 @@ use crate::expression::is_expression_huggable;
 use crate::expression::parentheses::{empty_parenthesized, parenthesized, Parentheses};
 use crate::other::commas;
 use crate::prelude::*;
-use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
+use crate::preview::is_multiline_string_handling_enabled;
+use crate::string::AnyString;
 
 #[derive(Default)]
 pub struct FormatArguments;
@@ -37,7 +38,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         let all_arguments = format_with(|f: &mut PyFormatter| {
             let source = f.context().source();
             let mut joiner = f.join_comma_separated(range.end());
-            match args.as_slice() {
+            match args.as_ref() {
                 [arg] if keywords.is_empty() => {
                     match arg {
                         Expr::GeneratorExp(generator_exp) => joiner.entry(
@@ -107,7 +108,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 // )
                 // ```
                 parenthesized("(", &group(&all_arguments), ")")
-                    .with_indent(!is_argument_huggable(item, f.context()))
+                    .with_hugging(is_arguments_huggable(item, f.context()))
                     .with_dangling_comments(dangling_comments)
             ]
         )
@@ -177,13 +178,9 @@ fn is_single_argument_parenthesized(argument: &Expr, call_end: TextSize, source:
 ///
 /// Hugging should only be applied to single-argument collections, like lists, or starred versions
 /// of those collections.
-fn is_argument_huggable(item: &Arguments, context: &PyFormatContext) -> bool {
-    if !is_hug_parens_with_braces_and_square_brackets_enabled(context) {
-        return false;
-    }
-
+fn is_arguments_huggable(arguments: &Arguments, context: &PyFormatContext) -> bool {
     // Find the lone argument or `**kwargs` keyword.
-    let arg = match (item.args.as_slice(), item.keywords.as_slice()) {
+    let arg = match (arguments.args.as_ref(), arguments.keywords.as_ref()) {
         ([arg], []) => arg,
         ([], [keyword]) if keyword.arg.is_none() && !context.comments().has(keyword) => {
             &keyword.value
@@ -192,7 +189,10 @@ fn is_argument_huggable(item: &Arguments, context: &PyFormatContext) -> bool {
     };
 
     // If the expression itself isn't huggable, then we can't hug it.
-    if !is_expression_huggable(arg, context) {
+    if !(is_expression_huggable(arg, context)
+        || AnyString::from_expression(arg)
+            .is_some_and(|string| is_huggable_string_argument(string, arguments, context)))
+    {
         return false;
     }
 
@@ -206,10 +206,47 @@ fn is_argument_huggable(item: &Arguments, context: &PyFormatContext) -> bool {
 
     // If the expression has a trailing comma, then we can't hug it.
     if options.magic_trailing_comma().is_respect()
-        && commas::has_magic_trailing_comma(TextRange::new(arg.end(), item.end()), options, context)
+        && commas::has_magic_trailing_comma(
+            TextRange::new(arg.end(), arguments.end()),
+            options,
+            context,
+        )
     {
         return false;
     }
 
     true
+}
+
+/// Returns `true` if `string` is a multiline string that is not implicitly concatenated and there's no
+/// newline between the opening parentheses of arguments and the quotes of the string:
+///
+/// ```python
+/// # Hug this string
+/// call("""test
+/// multiline""")
+///
+/// # Don't hug because there's a newline between the opening parentheses and the quotes:
+/// call(
+///     """"
+///     test
+///     """"
+/// )
+/// ```
+fn is_huggable_string_argument(
+    string: AnyString,
+    arguments: &Arguments,
+    context: &PyFormatContext,
+) -> bool {
+    if !is_multiline_string_handling_enabled(context) {
+        return false;
+    }
+
+    if string.is_implicit_concatenated() || !string.is_multiline(context.source()) {
+        return false;
+    }
+
+    let between_parens_range = TextRange::new(arguments.start() + '('.text_len(), string.start());
+    let between_parens = &context.source()[between_parens_range];
+    !between_parens.trim_whitespace_end().ends_with(['\n', '\r'])
 }

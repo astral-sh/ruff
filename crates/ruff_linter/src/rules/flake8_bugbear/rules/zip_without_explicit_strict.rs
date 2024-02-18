@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use ruff_python_ast::{self as ast, Arguments, Expr};
@@ -6,6 +6,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::add_argument;
 
 /// ## What it does
 /// Checks for `zip` calls without an explicit `strict` parameter.
@@ -28,15 +29,24 @@ use crate::checkers::ast::Checker;
 /// zip(a, b, strict=True)
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe for `zip` calls that contain
+/// `**kwargs`, as adding a `check` keyword argument to such a call may lead
+/// to a duplicate keyword argument error.
+///
 /// ## References
 /// - [Python documentation: `zip`](https://docs.python.org/3/library/functions.html#zip)
 #[violation]
 pub struct ZipWithoutExplicitStrict;
 
-impl Violation for ZipWithoutExplicitStrict {
+impl AlwaysFixableViolation for ZipWithoutExplicitStrict {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`zip()` without an explicit `strict=` parameter")
+    }
+
+    fn fix_title(&self) -> String {
+        "Add explicit `strict=False`".to_string()
     }
 }
 
@@ -52,9 +62,27 @@ pub(crate) fn zip_without_explicit_strict(checker: &mut Checker, call: &ast::Exp
                 .iter()
                 .any(|arg| is_infinite_iterator(arg, checker.semantic()))
         {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(ZipWithoutExplicitStrict, call.range()));
+            let mut diagnostic = Diagnostic::new(ZipWithoutExplicitStrict, call.range());
+            diagnostic.set_fix(Fix::applicable_edit(
+                add_argument(
+                    "strict=False",
+                    &call.arguments,
+                    checker.indexer().comment_ranges(),
+                    checker.locator().contents(),
+                ),
+                // If the function call contains `**kwargs`, mark the fix as unsafe.
+                if call
+                    .arguments
+                    .keywords
+                    .iter()
+                    .any(|keyword| keyword.arg.is_none())
+                {
+                    Applicability::Unsafe
+                } else {
+                    Applicability::Safe
+                },
+            ));
+            checker.diagnostics.push(diagnostic);
         }
     }
 }
@@ -86,7 +114,7 @@ fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
                 }
 
                 // Ex) `iterools.repeat(1, times=None)`
-                for keyword in keywords {
+                for keyword in keywords.iter() {
                     if keyword.arg.as_ref().is_some_and(|name| name == "times") {
                         if keyword.value.is_none_literal_expr() {
                             return true;

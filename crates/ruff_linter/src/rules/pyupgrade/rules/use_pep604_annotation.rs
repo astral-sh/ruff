@@ -23,7 +23,7 @@ use crate::settings::types::PythonVersion;
 /// `__future__` annotations are not evaluated at runtime. If your code relies
 /// on runtime type annotations (either directly or via a library like
 /// Pydantic), you can disable this behavior for Python versions prior to 3.10
-/// by setting [`pyupgrade.keep-runtime-typing`] to `true`.
+/// by setting [`lint.pyupgrade.keep-runtime-typing`] to `true`.
 ///
 /// ## Example
 /// ```python
@@ -40,11 +40,13 @@ use crate::settings::types::PythonVersion;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may lead to runtime errors when
 /// alongside libraries that rely on runtime type annotations, like Pydantic,
-/// on Python versions prior to Python 3.10.
+/// on Python versions prior to Python 3.10. It may also lead to runtime errors
+/// in unusual and likely incorrect type annotations where the type does not
+/// support the `|` operator.
 ///
 /// ## Options
 /// - `target-version`
-/// - `pyupgrade.keep-runtime-typing`
+/// - `lint.pyupgrade.keep-runtime-typing`
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[violation]
@@ -76,12 +78,8 @@ pub(crate) fn use_pep604_annotation(
         && !checker.semantic().in_complex_string_type_definition()
         && is_allowed_value(slice);
 
-    let applicability = if checker.settings.preview.is_enabled() {
-        if checker.settings.target_version >= PythonVersion::Py310 {
-            Applicability::Safe
-        } else {
-            Applicability::Unsafe
-        }
+    let applicability = if checker.settings.target_version >= PythonVersion::Py310 {
+        Applicability::Safe
     } else {
         Applicability::Unsafe
     };
@@ -180,7 +178,6 @@ fn is_allowed_value(expr: &Expr) -> bool {
         | Expr::GeneratorExp(_)
         | Expr::Compare(_)
         | Expr::Call(_)
-        | Expr::FormattedValue(_)
         | Expr::FString(_)
         | Expr::StringLiteral(_)
         | Expr::BytesLiteral(_)

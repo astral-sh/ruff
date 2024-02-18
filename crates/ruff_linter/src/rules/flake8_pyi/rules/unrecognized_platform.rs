@@ -101,7 +101,7 @@ pub(crate) fn unrecognized_platform(checker: &mut Checker, test: &Expr) {
         return;
     };
 
-    let ([op], [right]) = (ops.as_slice(), comparators.as_slice()) else {
+    let ([op], [right]) = (&**ops, &**comparators) else {
         return;
     };
 

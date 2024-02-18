@@ -9,7 +9,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, FixAvailability};
+use ruff_diagnostics::{Applicability, Diagnostic, FixAvailability};
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -21,7 +21,7 @@ use ruff_text_size::Ranged;
 
 use crate::directives;
 use crate::fix::{fix_file, FixResult};
-use crate::linter::{check_path, LinterResult};
+use crate::linter::{check_path, LinterResult, TokenSource};
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
 use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
@@ -129,7 +129,6 @@ pub(crate) fn test_contents<'a>(
         path,
         path.parent()
             .and_then(|parent| detect_package_root(parent, &settings.namespace_packages)),
-        tokens,
         &locator,
         &stylist,
         &indexer,
@@ -138,6 +137,7 @@ pub(crate) fn test_contents<'a>(
         flags::Noqa::Enabled,
         source_kind,
         source_type,
+        TokenSource::Tokens(tokens),
     );
 
     let source_has_errors = error.is_some();
@@ -195,7 +195,6 @@ pub(crate) fn test_contents<'a>(
             } = check_path(
                 path,
                 None,
-                tokens,
                 &locator,
                 &stylist,
                 &indexer,
@@ -204,6 +203,7 @@ pub(crate) fn test_contents<'a>(
                 flags::Noqa::Enabled,
                 &transformed,
                 source_type,
+                TokenSource::Tokens(tokens),
             );
 
             if let Some(fixed_error) = fixed_error {
@@ -241,7 +241,7 @@ Source with applied fixes:
         .into_iter()
         .map(|diagnostic| {
             let rule = diagnostic.kind.rule();
-            let fixable = diagnostic.fix.is_some();
+            let fixable = diagnostic.fix.as_ref().is_some_and(|fix| matches!(fix.applicability(), Applicability::Safe | Applicability::Unsafe));
 
             match (fixable, rule.fixable()) {
                 (true, FixAvailability::Sometimes | FixAvailability::Always)

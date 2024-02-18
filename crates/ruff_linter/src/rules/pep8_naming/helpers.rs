@@ -39,6 +39,10 @@ pub(super) fn is_named_tuple_assignment(stmt: &Stmt, semantic: &SemanticModel) -
 
 /// Returns `true` if the statement is an assignment to a `TypedDict`.
 pub(super) fn is_typed_dict_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_typing() {
+        return false;
+    }
+
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
@@ -50,6 +54,10 @@ pub(super) fn is_typed_dict_assignment(stmt: &Stmt, semantic: &SemanticModel) ->
 
 /// Returns `true` if the statement is an assignment to a `TypeVar` or `NewType`.
 pub(super) fn is_type_var_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_typing() {
+        return false;
+    }
+
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
@@ -75,6 +83,10 @@ pub(super) fn is_type_alias_assignment(stmt: &Stmt, semantic: &SemanticModel) ->
 
 /// Returns `true` if the statement is an assignment to a `TypedDict`.
 pub(super) fn is_typed_dict_class(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_typing() {
+        return false;
+    }
+
     arguments.is_some_and(|arguments| {
         arguments
             .args
@@ -112,7 +124,11 @@ pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &Semanti
                     arguments.find_argument("model_name", arguments.args.len().saturating_sub(1))
                 {
                     if let Some(string_literal) = argument.as_string_literal_expr() {
-                        return string_literal.value.to_str() == name;
+                        if string_literal.value.to_str() == name {
+                            return true;
+                        }
+                    } else {
+                        return true;
                     }
                 }
             }
@@ -127,7 +143,9 @@ pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &Semanti
                 if let Some(argument) = arguments.find_argument("dotted_path", 0) {
                     if let Some(string_literal) = argument.as_string_literal_expr() {
                         if let Some((.., model)) = string_literal.value.to_str().rsplit_once('.') {
-                            return model == name;
+                            if model == name {
+                                return true;
+                            }
                         }
                     }
                 }

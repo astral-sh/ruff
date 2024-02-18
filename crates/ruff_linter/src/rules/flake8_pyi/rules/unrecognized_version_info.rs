@@ -129,7 +129,7 @@ pub(crate) fn unrecognized_version_info(checker: &mut Checker, test: &Expr) {
         return;
     };
 
-    let ([op], [comparator]) = (ops.as_slice(), comparators.as_slice()) else {
+    let ([op], [comparator]) = (&**ops, &**comparators) else {
         return;
     };
 

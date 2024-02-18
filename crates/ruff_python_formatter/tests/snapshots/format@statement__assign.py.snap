@@ -73,6 +73,15 @@ def main() -> None:
                 db_request.POST["name"]
             )
         )[0]
+
+
+c = b[dddddd, aaaaaa] =  (
+    a[
+        aaaaaaa,
+        bbbbbbbbbbbbbbbbbbb
+    ]
+    # comment
+) = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 ## Output
@@ -151,6 +160,48 @@ def main() -> None:
                 db_request.POST["name"]
             )
         )[0]
+
+
+c = b[dddddd, aaaaaa] = (
+    a[aaaaaaa, bbbbbbbbbbbbbbbbbbb]
+    # comment
+) = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,7 +1,5 @@
+ # break left hand side
+-a1akjdshflkjahdslkfjlasfdahjlfds = (
+-    bakjdshflkjahdslkfjlasfdahjlfds
+-) = (
++a1akjdshflkjahdslkfjlasfdahjlfds = bakjdshflkjahdslkfjlasfdahjlfds = (
+     cakjdshflkjahdslkfjlasfdahjlfds
+ ) = kjaödkjaföjfahlfdalfhaöfaöfhaöfha = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = 3
+ 
+@@ -9,15 +7,13 @@
+ a2 = b2 = 2
+ 
+ # Break the last element
+-a = (
+-    asdf
+-) = (
++a = asdf = (
+     fjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfal
+ ) = 1
+ 
+-aa = [
+-    bakjdshflkjahdslkfjlasfdahjlfds
+-] = dddd = ddd = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = [3]
++aa = [bakjdshflkjahdslkfjlasfdahjlfds] = dddd = ddd = (
++    fkjaödkjaföjfahlfdalfhaöfaöfhaöfha
++) = g = [3]
+ 
+ aa = [] = dddd = ddd = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = [3]
+ 
 ```
 
 

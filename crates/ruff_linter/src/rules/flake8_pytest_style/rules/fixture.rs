@@ -24,7 +24,7 @@ use super::helpers::{
 
 /// ## What it does
 /// Checks for argument-free `@pytest.fixture()` decorators with or without
-/// parentheses, depending on the `flake8-pytest-style.fixture-parentheses`
+/// parentheses, depending on the [`lint.flake8-pytest-style.fixture-parentheses`]
 /// setting.
 ///
 /// ## Why is this bad?
@@ -55,7 +55,7 @@ use super::helpers::{
 /// ```
 ///
 /// ## Options
-/// - `flake8-pytest-style.fixture-parentheses`
+/// - `lint.flake8-pytest-style.fixture-parentheses`
 ///
 /// ## References
 /// - [`pytest` documentation: API Reference: Fixtures](https://docs.pytest.org/en/latest/reference/reference.html#fixtures-api)

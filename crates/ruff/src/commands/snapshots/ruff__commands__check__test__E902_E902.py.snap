@@ -1,0 +1,7 @@
+---
+source: crates/ruff/src/commands/check.rs
+---
+/home/ferris/project/code.py:1:1: E902 Permission denied (os error 13)
+/home/ferris/project/notebook.ipynb:1:1: E902 Permission denied (os error 13)
+/home/ferris/project/pyproject.toml:1:1: E902 Permission denied (os error 13)
+

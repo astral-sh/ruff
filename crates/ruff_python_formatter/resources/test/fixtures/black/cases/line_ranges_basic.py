@@ -1,3 +1,4 @@
+# flags: --line-ranges=5-6
 # NOTE: If you need to modify this file, pay special attention to the --line-ranges=
 # flag above as it's formatting specifically these lines.
 def foo1(parameter_1, parameter_2, parameter_3, parameter_4, parameter_5, parameter_6, parameter_7): pass

@@ -30,7 +30,10 @@ impl FormatNodeRule<StmtReturn> for FormatStmtReturn {
             Some(value) => {
                 write!(
                     f,
-                    [space(), FormatStatementsLastExpression::new(value, item)]
+                    [
+                        space(),
+                        FormatStatementsLastExpression::left_to_right(value, item)
+                    ]
                 )
             }
             None => Ok(()),

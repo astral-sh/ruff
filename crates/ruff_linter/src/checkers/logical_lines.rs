@@ -1,4 +1,5 @@
-use ruff_diagnostics::{Diagnostic, DiagnosticKind};
+use crate::line_width::IndentWidth;
+use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::TokenKind;
@@ -15,14 +16,15 @@ use crate::rules::pycodestyle::rules::logical_lines::{
 use crate::rules::flake8_class_newline::rules::missing_class_newline;
 use crate::settings::LinterSettings;
 
-/// Return the amount of indentation, expanding tabs to the next multiple of 8.
-fn expand_indent(line: &str) -> usize {
+/// Return the amount of indentation, expanding tabs to the next multiple of the settings' tab size.
+pub(crate) fn expand_indent(line: &str, indent_width: IndentWidth) -> usize {
     let line = line.trim_end_matches(['\n', '\r']);
 
     let mut indent = 0;
+    let tab_size = indent_width.as_usize();
     for c in line.bytes() {
         match c {
-            b'\t' => indent = (indent / 8) * 8 + 8,
+            b'\t' => indent = (indent / tab_size) * tab_size + tab_size,
             b' ' => indent += 1,
             _ => break,
         }
@@ -86,7 +88,7 @@ pub(crate) fn check_logical_lines(
             TextRange::new(locator.line_start(first_token.start()), first_token.start())
         };
 
-        let indent_level = expand_indent(locator.slice(range));
+        let indent_level = expand_indent(locator.slice(range), settings.tab_size);
 
         let indent_size = 4;
 
@@ -99,7 +101,7 @@ pub(crate) fn check_logical_lines(
             indent_size,
         ) {
             if settings.rules.enabled(kind.rule()) {
-                context.push(kind, range);
+                context.push_diagnostic(Diagnostic::new(kind, range));
             }
         }
 
@@ -122,18 +124,6 @@ impl<'a> LogicalLinesContext<'a> {
         Self {
             settings,
             diagnostics: Vec::new(),
-        }
-    }
-
-    pub(crate) fn push<K: Into<DiagnosticKind>>(&mut self, kind: K, range: TextRange) {
-        let kind = kind.into();
-        if self.settings.rules.enabled(kind.rule()) {
-            self.diagnostics.push(Diagnostic {
-                kind,
-                range,
-                fix: None,
-                parent: None,
-            });
         }
     }
 

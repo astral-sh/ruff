@@ -410,3 +410,13 @@ def default_arg_comments2(#
         #
 ):
     print(x)
+
+def function_with_one_argument_and_a_positional_separator(
+    argument: str, /
+) -> ReallyReallyReallyReallyReallyReallyReallyReallyLongName:
+    pass
+
+def function_with_one_argument_and_a_keyword_separator(
+    *, argument: str
+) -> ReallyReallyReallyReallyReallyReallyReallyReallyLongName:
+    pass

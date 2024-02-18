@@ -1,0 +1,47 @@
+---
+source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+---
+SIM113.py:6:9: SIM113 Use `enumerate()` for index variable `idx` in `for` loop
+  |
+4 |     for x in range(5):
+5 |         g(x, idx)
+6 |         idx += 1
+  |         ^^^^^^^^ SIM113
+7 |         h(x)
+  |
+
+SIM113.py:17:9: SIM113 Use `enumerate()` for index variable `idx` in `for` loop
+   |
+15 |         if g(x):
+16 |             break
+17 |         idx += 1
+   |         ^^^^^^^^ SIM113
+18 |         sum += h(x, idx)
+   |
+
+SIM113.py:27:9: SIM113 Use `enumerate()` for index variable `idx` in `for` loop
+   |
+25 |         g(x)
+26 |         h(x, y)
+27 |         idx += 1
+   |         ^^^^^^^^ SIM113
+   |
+
+SIM113.py:36:9: SIM113 Use `enumerate()` for index variable `idx` in `for` loop
+   |
+34 |     for x in range(5):
+35 |         sum += h(x, idx)
+36 |         idx += 1
+   |         ^^^^^^^^ SIM113
+   |
+
+SIM113.py:44:9: SIM113 Use `enumerate()` for index variable `idx` in `for` loop
+   |
+42 |     for x in range(5):
+43 |         g(x, idx)
+44 |         idx += 1
+   |         ^^^^^^^^ SIM113
+45 |         h(x)
+   |
+
+

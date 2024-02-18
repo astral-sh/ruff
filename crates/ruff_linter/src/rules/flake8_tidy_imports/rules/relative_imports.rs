@@ -42,7 +42,7 @@ use crate::rules::flake8_tidy_imports::settings::Strictness;
 /// ```
 ///
 /// ## Options
-/// - `flake8-tidy-imports.ban-relative-imports`
+/// - `lint.flake8-tidy-imports.ban-relative-imports`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[violation]
@@ -56,8 +56,10 @@ impl Violation for RelativeImports {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.strictness {
-            Strictness::Parents => format!("Relative imports from parent modules are banned"),
-            Strictness::All => format!("Relative imports are banned"),
+            Strictness::Parents => {
+                format!("Prefer absolute imports over relative imports from parent modules")
+            }
+            Strictness::All => format!("Prefer absolute imports over relative imports"),
         }
     }
 

@@ -10,7 +10,7 @@ use ruff_python_ast::visitor::Visitor;
 /// Checks for functions or methods with too many return statements.
 ///
 /// By default, this rule allows up to six return statements, as configured by
-/// the [`pylint.max-returns`] option.
+/// the [`lint.pylint.max-returns`] option.
 ///
 /// ## Why is this bad?
 /// Functions or methods with many return statements are harder to understand
@@ -50,7 +50,7 @@ use ruff_python_ast::visitor::Visitor;
 /// ```
 ///
 /// ## Options
-/// - `pylint.max-returns`
+/// - `lint.pylint.max-returns`
 #[violation]
 pub struct TooManyReturnStatements {
     returns: usize,
@@ -103,7 +103,7 @@ mod tests {
     use super::num_returns;
 
     fn test_helper(source: &str, expected: usize) -> Result<()> {
-        let stmts = parse_suite(source, "<filename>")?;
+        let stmts = parse_suite(source)?;
         assert_eq!(num_returns(&stmts), expected);
         Ok(())
     }

@@ -243,3 +243,12 @@ raise ValueError(
 ).format(a, b)
 
 ("{}" "{{{}}}").format(a, b)
+
+# The dictionary should be parenthesized.
+"{}".format({0: 1}[0])
+
+# The dictionary should be parenthesized.
+"{}".format({0: 1}.bar)
+
+# The dictionary should be parenthesized.
+"{}".format({0: 1}())

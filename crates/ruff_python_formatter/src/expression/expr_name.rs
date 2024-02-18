@@ -52,7 +52,7 @@ mod tests {
 
     #[test]
     fn name_range_with_comments() {
-        let source = parse_program("a # comment", "file.py").unwrap();
+        let source = parse_program("a # comment").unwrap();
 
         let expression_statement = source
             .body

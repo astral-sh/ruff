@@ -5,6 +5,7 @@
   "properties": {
     "allowed-confusables": {
       "description": "A list of allowed \"confusable\" Unicode characters to ignore when enforcing `RUF001`, `RUF002`, and `RUF003`.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -34,6 +35,7 @@
     },
     "dummy-variable-rgx": {
       "description": "A regular expression used to identify \"dummy\" variables, or those which should be ignored when enforcing (e.g.) unused-variable rules. The default expression matches `_`, `__`, and `_var`, but not `_var_`.",
+      "deprecated": true,
       "type": [
         "string",
         "null"
@@ -51,6 +53,7 @@
     },
     "explicit-preview-rules": {
       "description": "Whether to require exact codes to select preview rules. When enabled, preview rules will not be selected by prefixes — the full code of each preview rule will be required to enable the rule.",
+      "deprecated": true,
       "type": [
         "boolean",
         "null"
@@ -75,6 +78,7 @@
     },
     "extend-fixable": {
       "description": "A list of rule codes or prefixes to consider fixable, in addition to those specified by `fixable`.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -106,6 +110,7 @@
     },
     "extend-per-file-ignores": {
       "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, in addition to any rules excluded by `per-file-ignores`.",
+      "deprecated": true,
       "type": [
         "object",
         "null"
@@ -119,6 +124,7 @@
     },
     "extend-safe-fixes": {
       "description": "A list of rule codes or prefixes for which unsafe fixes should be considered safe.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -129,6 +135,7 @@
     },
     "extend-select": {
       "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -150,6 +157,7 @@
     },
     "extend-unsafe-fixes": {
       "description": "A list of rule codes or prefixes for which safe fixes should be considered unsafe.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -160,6 +168,7 @@
     },
     "external": {
       "description": "A list of rule codes or prefixes that are unsupported by Ruff, but should be preserved when (e.g.) validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not yet implemented by Ruff.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -184,6 +193,7 @@
     },
     "fixable": {
       "description": "A list of rule codes or prefixes to consider fixable. By default, all rules are considered fixable.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -194,6 +204,7 @@
     },
     "flake8-annotations": {
       "description": "Options for the `flake8-annotations` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8AnnotationsOptions"
@@ -205,6 +216,7 @@
     },
     "flake8-bandit": {
       "description": "Options for the `flake8-bandit` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8BanditOptions"
@@ -216,6 +228,7 @@
     },
     "flake8-bugbear": {
       "description": "Options for the `flake8-bugbear` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8BugbearOptions"
@@ -227,6 +240,7 @@
     },
     "flake8-builtins": {
       "description": "Options for the `flake8-builtins` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8BuiltinsOptions"
@@ -238,6 +252,7 @@
     },
     "flake8-comprehensions": {
       "description": "Options for the `flake8-comprehensions` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8ComprehensionsOptions"
@@ -249,6 +264,7 @@
     },
     "flake8-copyright": {
       "description": "Options for the `flake8-copyright` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8CopyrightOptions"
@@ -260,6 +276,7 @@
     },
     "flake8-errmsg": {
       "description": "Options for the `flake8-errmsg` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8ErrMsgOptions"
@@ -271,6 +288,7 @@
     },
     "flake8-gettext": {
       "description": "Options for the `flake8-gettext` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8GetTextOptions"
@@ -282,6 +300,7 @@
     },
     "flake8-implicit-str-concat": {
       "description": "Options for the `flake8-implicit-str-concat` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8ImplicitStrConcatOptions"
@@ -293,6 +312,7 @@
     },
     "flake8-import-conventions": {
       "description": "Options for the `flake8-import-conventions` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8ImportConventionsOptions"
@@ -304,6 +324,7 @@
     },
     "flake8-pytest-style": {
       "description": "Options for the `flake8-pytest-style` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8PytestStyleOptions"
@@ -315,6 +336,7 @@
     },
     "flake8-quotes": {
       "description": "Options for the `flake8-quotes` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8QuotesOptions"
@@ -326,6 +348,7 @@
     },
     "flake8-self": {
       "description": "Options for the `flake8_self` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8SelfOptions"
@@ -337,6 +360,7 @@
     },
     "flake8-tidy-imports": {
       "description": "Options for the `flake8-tidy-imports` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8TidyImportsOptions"
@@ -348,6 +372,7 @@
     },
     "flake8-type-checking": {
       "description": "Options for the `flake8-type-checking` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8TypeCheckingOptions"
@@ -359,6 +384,7 @@
     },
     "flake8-unused-arguments": {
       "description": "Options for the `flake8-unused-arguments` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8UnusedArgumentsOptions"
@@ -388,6 +414,7 @@
     },
     "ignore": {
       "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -398,6 +425,7 @@
     },
     "ignore-init-module-imports": {
       "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).",
+      "deprecated": true,
       "type": [
         "boolean",
         "null"
@@ -426,6 +454,7 @@
     },
     "isort": {
       "description": "Options for the `isort` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/IsortOptions"
@@ -458,6 +487,7 @@
     },
     "logger-objects": {
       "description": "A list of objects that should be treated equivalently to a `logging.Logger` object.\n\nThis is useful for ensuring proper diagnostics (e.g., to identify `logging` deprecations and other best-practices) for projects that re-export a `logging.Logger` object from a common module.\n\nFor example, if you have a module `logging_setup.py` with the following contents: ```python import logging\n\nlogger = logging.getLogger(__name__) ```\n\nAdding `\"logging_setup.logger\"` to `logger-objects` will ensure that `logging_setup.logger` is treated as a `logging.Logger` object when imported from other modules (e.g., `from logging_setup import logger`).",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -468,6 +498,7 @@
     },
     "mccabe": {
       "description": "Options for the `mccabe` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/McCabeOptions"
@@ -488,7 +519,7 @@
       }
     },
     "output-format": {
-      "description": "The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).",
+      "description": "The style in which violation messages should be formatted: `\"full\"` (shows source),`\"concise\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).",
       "anyOf": [
         {
           "$ref": "#/definitions/SerializationFormat"
@@ -500,6 +531,7 @@
     },
     "pep8-naming": {
       "description": "Options for the `pep8-naming` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/Pep8NamingOptions"
@@ -511,6 +543,7 @@
     },
     "per-file-ignores": {
       "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, when considering any matching files.",
+      "deprecated": true,
       "type": [
         "object",
         "null"
@@ -531,6 +564,7 @@
     },
     "pycodestyle": {
       "description": "Options for the `pycodestyle` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/PycodestyleOptions"
@@ -542,6 +576,7 @@
     },
     "pydocstyle": {
       "description": "Options for the `pydocstyle` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/PydocstyleOptions"
@@ -553,6 +588,7 @@
     },
     "pyflakes": {
       "description": "Options for the `pyflakes` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/PyflakesOptions"
@@ -564,6 +600,7 @@
     },
     "pylint": {
       "description": "Options for the `pylint` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/PylintOptions"
@@ -575,6 +612,7 @@
     },
     "pyupgrade": {
       "description": "Options for the `pyupgrade` plugin.",
+      "deprecated": true,
       "anyOf": [
         {
           "$ref": "#/definitions/PyUpgradeOptions"
@@ -604,6 +642,7 @@
     },
     "select": {
       "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -621,6 +660,7 @@
     },
     "show-source": {
       "description": "Whether to show source code snippets when reporting lint violations (overridden by the `--show-source` command-line flag).",
+      "deprecated": true,
       "type": [
         "boolean",
         "null"
@@ -661,6 +701,7 @@
     },
     "task-tags": {
       "description": "A list of task tags to recognize (e.g., \"TODO\", \"FIXME\", \"XXX\").\n\nComments starting with these tags will be ignored by commented-out code detection (`ERA`), and skipped by line-length rules (`E501`) if `ignore-overlong-task-comments` is set to `true`.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -671,6 +712,7 @@
     },
     "typing-modules": {
       "description": "A list of modules whose exports should be treated equivalently to members of the `typing` module.\n\nThis is useful for ensuring proper type annotation inference for projects that re-export `typing` and `typing_extensions` members from a compatibility module. If omitted, any members imported from modules apart from `typing` and `typing_extensions` will be treated as ordinary Python objects.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -681,6 +723,7 @@
     },
     "unfixable": {
       "description": "A list of rule codes or prefixes to consider non-fixable.",
+      "deprecated": true,
       "type": [
         "array",
         "null"
@@ -690,7 +733,7 @@
       }
     },
     "unsafe-fixes": {
-      "description": "Enable application of unsafe fixes.",
+      "description": "Enable application of unsafe fixes. If excluded, a hint will be displayed when unsafe fixes are available. If set to false, the hint will be hidden.",
       "type": [
         "boolean",
         "null"
@@ -746,6 +789,30 @@
           ]
         }
       ]
+    },
+    "DocstringCodeLineWidth": {
+      "anyOf": [
+        {
+          "description": "Wrap docstring code examples at a fixed line width.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/LineWidth"
+            }
+          ]
+        },
+        {
+          "description": "Respect the line length limit setting for the surrounding Python code.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Dynamic"
+            }
+          ]
+        }
+      ]
+    },
+    "Dynamic": {
+      "type": "string",
+      "const": "dynamic"
     },
     "Flake8AnnotationsOptions": {
       "type": "object",
@@ -1194,6 +1261,13 @@
             "type": "string"
           }
         },
+        "quote-annotations": {
+          "description": "Whether to add quotes around type annotations, if doing so would allow the corresponding import to be moved into a type-checking block.\n\nFor example, in the following, Python requires that `Sequence` be available at runtime, despite the fact that it's only used in a type annotation:\n\n```python from collections.abc import Sequence\n\ndef func(value: Sequence[int]) -> None: ... ```\n\nIn other words, moving `from collections.abc import Sequence` into an `if TYPE_CHECKING:` block above would cause a runtime error, as the type would no longer be available at runtime.\n\nBy default, Ruff will respect such runtime semantics and avoid moving the import to prevent such runtime errors.\n\nSetting `quote-annotations` to `true` will instruct Ruff to add quotes around the annotation (e.g., `\"Sequence[int]\"`), which in turn enables Ruff to move the import into an `if TYPE_CHECKING:` block, like so:\n\n```python from typing import TYPE_CHECKING\n\nif TYPE_CHECKING: from collections.abc import Sequence\n\ndef func(value: \"Sequence[int]\") -> None: ... ```\n\nNote that this setting has no effect when `from __future__ import annotations` is present, as `__future__` annotations are always treated equivalently to quoted annotations.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "runtime-evaluated-base-classes": {
           "description": "Exempt classes that list any of the enumerated classes as a base class from needing to be moved into type-checking blocks.\n\nCommon examples include Pydantic's `pydantic.BaseModel` and SQLAlchemy's `sqlalchemy.orm.DeclarativeBase`, but can also support user-defined classes that inherit from those base classes. For example, if you define a common `DeclarativeBase` subclass that's used throughout your project (e.g., `class Base(DeclarativeBase) ...` in `base.py`), you can add it to this list (`runtime-evaluated-base-classes = [\"base.Base\"]`) to exempt models from being moved into type-checking blocks.",
           "type": [
@@ -1205,7 +1279,7 @@
           }
         },
         "runtime-evaluated-decorators": {
-          "description": "Exempt classes decorated with any of the enumerated decorators from needing to be moved into type-checking blocks.",
+          "description": "Exempt classes and functions decorated with any of the enumerated decorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator (for functions) and attrs' `@attrs.define` decorator (for classes).",
           "type": [
             "array",
             "null"
@@ -1238,9 +1312,27 @@
       "additionalProperties": false
     },
     "FormatOptions": {
-      "description": "Experimental: Configures how `ruff format` formats your code.\n\nPlease provide feedback in [this discussion](https://github.com/astral-sh/ruff/discussions/7310).",
+      "description": "Configures the way ruff formats your code.",
       "type": "object",
       "properties": {
+        "docstring-code-format": {
+          "description": "Whether to format code snippets in docstrings.\n\nWhen this is enabled, Python code examples within docstrings are automatically reformatted.\n\nFor example, when this is enabled, the following code:\n\n```python def f(x): \"\"\" Something about `f`. And an example in doctest format:\n\n>>> f(  x  )\n\nMarkdown is also supported:\n\n```py f(  x  ) ```\n\nAs are reStructuredText literal blocks::\n\nf(  x  )\n\nAnd reStructuredText code blocks:\n\n.. code-block:: python\n\nf(  x  ) \"\"\" pass ```\n\n... will be reformatted (assuming the rest of the options are set to their defaults) as:\n\n```python def f(x): \"\"\" Something about `f`. And an example in doctest format:\n\n>>> f(x)\n\nMarkdown is also supported:\n\n```py f(x) ```\n\nAs are reStructuredText literal blocks::\n\nf(x)\n\nAnd reStructuredText code blocks:\n\n.. code-block:: python\n\nf(x) \"\"\" pass ```\n\nIf a code snippt in a docstring contains invalid Python code or if the formatter would otherwise write invalid Python code, then the code example is ignored by the formatter and kept as-is.\n\nCurrently, doctest, Markdown, reStructuredText literal blocks, and reStructuredText code blocks are all supported and automatically recognized. In the case of unlabeled fenced code blocks in Markdown and reStructuredText literal blocks, the contents are assumed to be Python and reformatted. As with any other format, if the contents aren't valid Python, then the block is left untouched automatically.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "docstring-code-line-length": {
+          "description": "Set the line length used when formatting code snippets in docstrings.\n\nThis only has an effect when the `docstring-code-format` setting is enabled.\n\nThe default value for this setting is `\"dynamic\"`, which has the effect of ensuring that any reformatted code examples in docstrings adhere to the global line length configuration that is used for the surrounding Python code. The point of this setting is that it takes the indentation of the docstring into account when reformatting code examples.\n\nAlternatively, this can be set to a fixed integer, which will result in the same line length limit being applied to all reformatted code examples in docstrings. When set to a fixed integer, the indent of the docstring is not taken into account. That is, this may result in lines in the reformatted code example that exceed the globally configured line length limit.\n\nFor example, when this is set to `20` and `docstring-code-format` is enabled, then this code:\n\n```python def f(x): ''' Something about `f`. And an example:\n\n.. code-block:: python\n\nfoo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear) ''' pass ```\n\n... will be reformatted (assuming the rest of the options are set to their defaults) as:\n\n```python def f(x): \"\"\" Something about `f`. And an example:\n\n.. code-block:: python\n\n( foo, bar, quux, ) = this_is_a_long_line( lion, hippo, lemur, bear, ) \"\"\" pass ```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/DocstringCodeLineWidth"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "exclude": {
           "description": "A list of file patterns to exclude from formatting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
@@ -1281,7 +1373,7 @@
           ]
         },
         "quote-style": {
-          "description": "Whether to prefer single `'` or double `\"` quotes for strings. Defaults to double quotes.\n\nIn compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/), Ruff prefers double quotes for multiline strings and docstrings, regardless of the configured quote style.\n\nRuff may also deviate from this option if using the configured quotes would require escaping quote characters within the string. For example, given:\n\n```python a = \"a string without any quotes\" b = \"It's monday morning\" ```\n\nRuff will change `a` to use single quotes when using `quote-style = \"single\"`. However, `b` will be unchanged, as converting to single quotes would require the inner `'` to be escaped, which leads to less readable code: `'It\\'s monday morning'`.",
+          "description": "Configures the preferred quote character for strings. The recommended options are * `double` (default): Use double quotes `\"` * `single`: Use single quotes `'`\n\nIn compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/), Ruff prefers double quotes for triple quoted strings and docstrings even when using `quote-style = \"single\"`.\n\nRuff deviates from using the configured quotes if doing so prevents the need for escaping quote characters inside the string:\n\n```python a = \"a string without any quotes\" b = \"It's monday morning\" ```\n\nRuff will change the quotes of the string assigned to `a` to single quotes when using `quote-style = \"single\"`. However, ruff uses double quotes for he string assigned to `b` because using single quotes would require escaping the `'`, which leads to the less readable code: `'It\\'s monday morning'`.\n\nIn addition, Ruff supports the quote style `preserve` for projects that already use a mixture of single and double quotes and can't migrate to the `double` or `single` style. The quote style `preserve` leaves the quotes of all strings unchanged.",
           "anyOf": [
             {
               "$ref": "#/definitions/QuoteStyle"
@@ -1645,8 +1737,14 @@
       "maximum": 320.0,
       "minimum": 1.0
     },
+    "LineWidth": {
+      "description": "The maximum visual width to which the formatter should try to limit a line.",
+      "type": "integer",
+      "format": "uint16",
+      "minimum": 1.0
+    },
     "LintOptions": {
-      "description": "Experimental section to configure Ruff's linting. This new section will eventually replace the top-level linting options.\n\nOptions specified in the `lint` section take precedence over the top-level settings.",
+      "description": "Configures how ruff checks your code.\n\nOptions specified in the `lint` section take precedence over the deprecated top-level settings.",
       "type": "object",
       "properties": {
         "allowed-confusables": {
@@ -2369,6 +2467,24 @@
           "format": "uint",
           "minimum": 0.0
         },
+        "max-locals": {
+          "description": "Maximum number of local variables allowed for a function or method body (see: `PLR0914`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "max-nested-blocks": {
+          "description": "Maximum number of nested blocks allowed within a function or method body (see: `PLR1702`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
         "max-positional-args": {
           "description": "Maximum number of positional arguments allowed for a function or method definition (see: `PLR0917`).\n\nIf not specified, defaults to the value of `max-args`.",
           "type": [
@@ -2441,7 +2557,8 @@
       "type": "string",
       "enum": [
         "single",
-        "double"
+        "double",
+        "preserve"
       ]
     },
     "RelativeImportsOrder": {
@@ -2549,6 +2666,7 @@
         "B032",
         "B033",
         "B034",
+        "B035",
         "B9",
         "B90",
         "B904",
@@ -2720,6 +2838,14 @@
         "E273",
         "E274",
         "E275",
+        "E3",
+        "E30",
+        "E301",
+        "E302",
+        "E303",
+        "E304",
+        "E305",
+        "E306",
         "E4",
         "E40",
         "E401",
@@ -2861,6 +2987,9 @@
         "FURB105",
         "FURB11",
         "FURB113",
+        "FURB118",
+        "FURB12",
+        "FURB129",
         "FURB13",
         "FURB131",
         "FURB132",
@@ -2872,12 +3001,17 @@
         "FURB15",
         "FURB152",
         "FURB16",
+        "FURB161",
         "FURB163",
+        "FURB167",
         "FURB168",
         "FURB169",
         "FURB17",
         "FURB171",
         "FURB177",
+        "FURB18",
+        "FURB180",
+        "FURB181",
         "G",
         "G0",
         "G00",
@@ -2959,7 +3093,6 @@
         "NPY2",
         "NPY20",
         "NPY201",
-        "NURSERY",
         "PD",
         "PD0",
         "PD00",
@@ -2997,8 +3130,6 @@
         "PGH",
         "PGH0",
         "PGH00",
-        "PGH001",
-        "PGH002",
         "PGH003",
         "PGH004",
         "PGH005",
@@ -3042,6 +3173,12 @@
         "PLC240",
         "PLC2401",
         "PLC2403",
+        "PLC27",
+        "PLC270",
+        "PLC2701",
+        "PLC28",
+        "PLC280",
+        "PLC2801",
         "PLC3",
         "PLC30",
         "PLC300",
@@ -3057,6 +3194,8 @@
         "PLE0117",
         "PLE0118",
         "PLE02",
+        "PLE023",
+        "PLE0237",
         "PLE024",
         "PLE0241",
         "PLE03",
@@ -3067,6 +3206,8 @@
         "PLE060",
         "PLE0604",
         "PLE0605",
+        "PLE064",
+        "PLE0643",
         "PLE07",
         "PLE070",
         "PLE0704",
@@ -3124,6 +3265,7 @@
         "PLR0911",
         "PLR0912",
         "PLR0913",
+        "PLR0914",
         "PLR0915",
         "PLR0916",
         "PLR0917",
@@ -3131,8 +3273,8 @@
         "PLR17",
         "PLR170",
         "PLR1701",
+        "PLR1702",
         "PLR1704",
-        "PLR1706",
         "PLR171",
         "PLR1711",
         "PLR1714",
@@ -3145,6 +3287,8 @@
         "PLR20",
         "PLR200",
         "PLR2004",
+        "PLR204",
+        "PLR2044",
         "PLR5",
         "PLR55",
         "PLR550",
@@ -3167,6 +3311,9 @@
         "PLW0129",
         "PLW013",
         "PLW0131",
+        "PLW02",
+        "PLW024",
+        "PLW0245",
         "PLW04",
         "PLW040",
         "PLW0406",
@@ -3330,6 +3477,7 @@
         "PYI054",
         "PYI055",
         "PYI056",
+        "PYI058",
         "Q",
         "Q0",
         "Q00",
@@ -3366,7 +3514,6 @@
         "RUF009",
         "RUF01",
         "RUF010",
-        "RUF011",
         "RUF012",
         "RUF013",
         "RUF015",
@@ -3374,6 +3521,15 @@
         "RUF017",
         "RUF018",
         "RUF019",
+        "RUF02",
+        "RUF020",
+        "RUF021",
+        "RUF022",
+        "RUF023",
+        "RUF024",
+        "RUF025",
+        "RUF026",
+        "RUF027",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -3425,9 +3581,29 @@
         "S321",
         "S323",
         "S324",
+        "S4",
+        "S40",
+        "S401",
+        "S402",
+        "S403",
+        "S404",
+        "S405",
+        "S406",
+        "S407",
+        "S408",
+        "S409",
+        "S41",
+        "S410",
+        "S411",
+        "S412",
+        "S413",
+        "S415",
         "S5",
         "S50",
         "S501",
+        "S502",
+        "S503",
+        "S504",
         "S505",
         "S506",
         "S507",
@@ -3464,6 +3640,7 @@
         "SIM11",
         "SIM110",
         "SIM112",
+        "SIM113",
         "SIM114",
         "SIM115",
         "SIM116",
@@ -3492,6 +3669,7 @@
         "SIM9",
         "SIM91",
         "SIM910",
+        "SIM911",
         "SLF",
         "SLF0",
         "SLF00",
@@ -3518,6 +3696,8 @@
         "TCH003",
         "TCH004",
         "TCH005",
+        "TCH01",
+        "TCH010",
         "TD",
         "TD0",
         "TD00",
@@ -3551,7 +3731,6 @@
         "TRY004",
         "TRY2",
         "TRY20",
-        "TRY200",
         "TRY201",
         "TRY3",
         "TRY30",
@@ -3646,6 +3825,8 @@
       "type": "string",
       "enum": [
         "text",
+        "concise",
+        "full",
         "json",
         "json-lines",
         "junit",
@@ -3653,7 +3834,8 @@
         "github",
         "gitlab",
         "pylint",
-        "azure"
+        "azure",
+        "sarif"
       ]
     },
     "Strictness": {

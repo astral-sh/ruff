@@ -8,7 +8,7 @@
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![Actions status](https://github.com/astral-sh/ruff/workflows/CI/badge.svg)](https://github.com/astral-sh/ruff/actions)
 
-[**Discord**](https://discord.gg/c9MhzV8aU5) | [**Docs**](https://docs.astral.sh/ruff/) | [**Playground**](https://play.ruff.rs/)
+[**Discord**](https://discord.com/invite/astral-sh) | [**Docs**](https://docs.astral.sh/ruff/) | [**Playground**](https://play.ruff.rs/)
 
 An extremely fast Python linter and code formatter, written in Rust.
 
@@ -150,7 +150,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.7
+  rev: v0.2.2
   hooks:
     # Run the linter.
     - id: ruff
@@ -194,20 +194,25 @@ exclude = [
     ".git",
     ".git-rewrite",
     ".hg",
+    ".ipynb_checkpoints",
     ".mypy_cache",
     ".nox",
     ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
     ".pytype",
     ".ruff_cache",
     ".svn",
     ".tox",
     ".venv",
+    ".vscode",
     "__pypackages__",
     "_build",
     "buck-out",
     "build",
     "dist",
     "node_modules",
+    "site-packages",
     "venv",
 ]
 
@@ -336,14 +341,14 @@ For a complete enumeration of the supported rules, see [_Rules_](https://docs.as
 Contributions are welcome and highly appreciated. To get started, check out the
 [**contributing guidelines**](https://docs.astral.sh/ruff/contributing/).
 
-You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5).
+You can also join us on [**Discord**](https://discord.com/invite/astral-sh).
 
 ## Support
 
 Having trouble? Check out the existing issues on [**GitHub**](https://github.com/astral-sh/ruff/issues),
 or feel free to [**open a new one**](https://github.com/astral-sh/ruff/issues/new).
 
-You can also ask for help on [**Discord**](https://discord.gg/c9MhzV8aU5).
+You can also ask for help on [**Discord**](https://discord.com/invite/astral-sh).
 
 ## Acknowledgements
 
@@ -381,6 +386,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - Benchling ([Refac](https://github.com/benchling/refac))
 - [Bokeh](https://github.com/bokeh/bokeh)
 - [Cryptography (PyCA)](https://github.com/pyca/cryptography)
+- CERN ([Indico](https://getindico.io/))
 - [DVC](https://github.com/iterative/dvc)
 - [Dagger](https://github.com/dagger/dagger)
 - [Dagster](https://github.com/dagster-io/dagster)
@@ -396,6 +402,7 @@ Ruff is used by a number of major open-source projects and companies, including:
     [Diffusers](https://github.com/huggingface/diffusers))
 - ING Bank ([popmon](https://github.com/ing-bank/popmon), [probatus](https://github.com/ing-bank/probatus))
 - [Ibis](https://github.com/ibis-project/ibis)
+- [ivy](https://github.com/unifyai/ivy)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
 - [LangChain](https://github.com/hwchase17/langchain)
 - [Litestar](https://litestar.dev/)
@@ -412,6 +419,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
 - [Neon](https://github.com/neondatabase/neon)
 - [NoneBot](https://github.com/nonebot/nonebot2)
+- [NumPyro](https://github.com/pyro-ppl/numpyro)
 - [ONNX](https://github.com/onnx/onnx)
 - [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
 - [PDM](https://github.com/pdm-project/pdm)
@@ -423,10 +431,13 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [PostHog](https://github.com/PostHog/posthog)
 - Prefect ([Python SDK](https://github.com/PrefectHQ/prefect), [Marvin](https://github.com/PrefectHQ/marvin))
 - [PyInstaller](https://github.com/pyinstaller/pyinstaller)
+- [PyMC](https://github.com/pymc-devs/pymc/)
 - [PyMC-Marketing](https://github.com/pymc-labs/pymc-marketing)
+- [pytest](https://github.com/pytest-dev/pytest)
 - [PyTorch](https://github.com/pytorch/pytorch)
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Pylint](https://github.com/PyCQA/pylint)
+- [PyVista](https://github.com/pyvista/pyvista)
 - [Reflex](https://github.com/reflex-dev/reflex)
 - [River](https://github.com/online-ml/river)
 - [Rippling](https://rippling.com)
@@ -453,7 +464,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 
 ### Show Your Support
 
-If you're using Ruff, consider adding the Ruff badge to project's `README.md`:
+If you're using Ruff, consider adding the Ruff badge to your project's `README.md`:
 
 ```md
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -479,6 +490,6 @@ MIT
 
 <div align="center">
   <a target="_blank" href="https://astral.sh" style="background:none">
-    <img src="https://raw.githubusercontent.com/astral-sh/ruff/main/assets/svg/Astral.svg">
+    <img src="https://raw.githubusercontent.com/astral-sh/ruff/main/assets/svg/Astral.svg" alt="Made by Astral">
   </a>
 </div>

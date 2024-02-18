@@ -43,7 +43,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Options
-/// - `flake8-self.ignore-names`
+/// - `lint.flake8-self.ignore-names`
 ///
 /// ## References
 /// - [_What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)
@@ -65,6 +65,10 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr else {
         return;
     };
+
+    if checker.semantic().in_annotation() {
+        return;
+    }
 
     if (attr.starts_with("__") && !attr.ends_with("__"))
         || (attr.starts_with('_') && !attr.starts_with("__"))
