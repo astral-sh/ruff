@@ -304,39 +304,39 @@ impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {
 }
 
 #[derive(Debug)]
-struct LogicalLineInfo {
-    kind: LogicalLineKind,
-    first_token_range: TextRange,
+pub(crate) struct LogicalLineInfo {
+    pub(crate) kind: LogicalLineKind,
+    pub(crate) first_token_range: TextRange,
 
     // The token's kind right before the newline ending the logical line.
-    last_token: TokenKind,
+    pub(crate) last_token: TokenKind,
 
     // The end of the logical line including the newline.
-    logical_line_end: TextSize,
+    pub(crate) logical_line_end: TextSize,
 
     // `true` if this is not a blank but only consists of a comment.
-    is_comment_only: bool,
+    pub(crate) is_comment_only: bool,
 
     /// `true` if the line is a string only (including trivia tokens) line, which is a docstring if coming right after a class/function definition.
-    is_docstring: bool,
+    pub(crate) is_docstring: bool,
 
     /// The indentation length in columns. See [`expand_indent`] for the computation of the indent.
-    indent_length: usize,
+    pub(crate) indent_length: usize,
 
     /// The number of blank lines preceding the current line.
-    blank_lines: BlankLines,
+    pub(crate) blank_lines: BlankLines,
 
     /// The maximum number of consecutive blank lines between the current line
     /// and the previous non-comment logical line.
     /// One of its main uses is to allow a comments to directly precede or follow a class/function definition.
     /// As such, `preceding_blank_lines` is used for rules that cannot trigger on comments (all rules except E303),
     /// and `blank_lines` is used for the rule that can trigger on comments (E303).
-    preceding_blank_lines: BlankLines,
+    pub(crate) preceding_blank_lines: BlankLines,
 }
 
 /// Iterator that processes tokens until a full logical line (or comment line) is "built".
 /// It then returns characteristics of that logical line (see `LogicalLineInfo`).
-struct LinePreprocessor<'a> {
+pub(crate) struct LinePreprocessor<'a> {
     tokens: Iter<'a, Result<(Tok, TextRange), LexicalError>>,
     locator: &'a Locator<'a>,
     indent_width: IndentWidth,
@@ -348,7 +348,7 @@ struct LinePreprocessor<'a> {
 }
 
 impl<'a> LinePreprocessor<'a> {
-    fn new(
+    pub(crate) fn new(
         tokens: &'a [LexResult],
         locator: &'a Locator,
         indent_width: IndentWidth,
@@ -482,7 +482,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-enum BlankLines {
+pub(crate) enum BlankLines {
     /// No blank lines
     #[default]
     Zero,
@@ -564,7 +564,7 @@ enum Follows {
 }
 
 #[derive(Copy, Clone, Debug, Default)]
-enum Status {
+pub(crate) enum Status {
     /// Stores the indent level where the nesting started.
     Inside(usize),
     /// This is used to rectify a Inside switched to a Outside because of a dedented comment.
@@ -872,7 +872,7 @@ impl BlankLinesChecker {
 }
 
 #[derive(Copy, Clone, Debug)]
-enum LogicalLineKind {
+pub(crate) enum LogicalLineKind {
     /// The clause header of a class definition
     Class,
     /// A decorator

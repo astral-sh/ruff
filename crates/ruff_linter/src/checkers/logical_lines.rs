@@ -13,7 +13,6 @@ use crate::rules::pycodestyle::rules::logical_lines::{
     whitespace_around_keywords, whitespace_around_named_parameter_equals,
     whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
 };
-use crate::rules::flake8_class_newline::rules::missing_class_newline;
 use crate::settings::LinterSettings;
 
 /// Return the amount of indentation, expanding tabs to the next multiple of the settings' tab size.
@@ -66,7 +65,6 @@ pub(crate) fn check_logical_lines(
         if line.flags().contains(TokenFlags::KEYWORD) {
             whitespace_around_keywords(&line, &mut context);
             missing_whitespace_after_keyword(&line, &mut context);
-            missing_class_newline(&line, &prev_line, &mut context);
         }
 
         if line.flags().contains(TokenFlags::COMMENT) {

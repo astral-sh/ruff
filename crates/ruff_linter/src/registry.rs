@@ -84,7 +84,7 @@ pub enum Linter {
     Flake8Builtins,
     /// [flake8-class-newline](https://pypi.org/project/flake8-class-newline/)
     #[prefix = "CNL"]
-    Flake8ClassNewline,
+    Flake8ClassNewLine,
     /// [flake8-commas](https://pypi.org/project/flake8-commas/)
     #[prefix = "COM"]
     Flake8Commas,
@@ -285,6 +285,7 @@ impl Rule {
             | Rule::LineContainsHack
             | Rule::LineContainsTodo
             | Rule::LineContainsXxx
+            | Rule::MissingClassNewLine
             | Rule::MissingSpaceAfterTodoColon
             | Rule::MissingTodoAuthor
             | Rule::MissingTodoColon

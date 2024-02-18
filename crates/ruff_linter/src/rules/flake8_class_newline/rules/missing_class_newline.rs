@@ -1,64 +1,92 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::AlwaysFixableViolation;
+use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::Edit;
+use ruff_diagnostics::Fix;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_parser::TokenKind;
-use ruff_text_size::Ranged;
+use ruff_python_codegen::Stylist;
+use ruff_python_parser::lexer::LexResult;
+use ruff_source_file::{Locator};
+use ruff_text_size::TextSize;
 
-use crate::checkers::logical_lines::LogicalLinesContext;
-use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine};
+use crate::line_width::IndentWidth;
+use crate::rules::pycodestyle::rules::{
+    LogicalLineInfo, LogicalLineKind, LinePreprocessor, Status};
 
-/// ## What it does
-/// Checks for a newline after a class definition.
-///
-/// ## Why is this important?
-/// Adhering to PEP 8 guidelines helps maintain consistent and readable code.
-/// Having a newline after a class definition is recommended by PEP 8.
-///
-/// ## Example
-/// ```python
-/// class MyClass:
-///     def method(self):
-///         return 'example'
-/// ```
-///
-/// Use instead:
-/// ```python
-/// class MyClass:
-///
-///     def method(self):
-///         return 'example'
-/// ```
-///
-/// ## References
-/// - [PEP 8 - Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
+
 #[violation]
-pub struct ClassNewline;
+pub struct MissingClassNewLine;
 
-impl Violation for ClassNewline {
+impl AlwaysFixableViolation for MissingClassNewLine {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Class definition does not have a new line")
+        format!("Expected 1 blank line after class declaration, found 0")
+    }
+
+    fn fix_title(&self) -> String {
+        "Add missing blank line".to_string()
     }
 }
 
-/// CNL100
-pub(crate) fn missing_class_newline(
-    line: &LogicalLine,
-    prev_line: Option<&LogicalLine>,
-    context: &mut LogicalLinesContext
-) {
-    if let Some(prev_line) = prev_line {
-        if let Some(token) = line.tokens_trimmed().first() {
-            if matches!(token.kind(), TokenKind::Def | TokenKind::At) {
-                if let Some(token) = prev_line.tokens_trimmed().first() {
-                    if matches!(token.kind(), TokenKind::Class) {
-                        let diagnostic = Diagnostic::new(
-                            ClassNewline,
-                            token.range(),
-                        );
-                        context.push_diagnostic(diagnostic);
-                    }
-                }
-            }
+
+#[derive(Copy, Clone, Debug, Default)]
+enum Follows {
+    #[default]
+    Class,
+    Other,
+}
+
+
+/// Contains variables used for the linting of blank lines.
+#[derive(Debug, Default)]
+pub(crate) struct BlankLinesChecker {
+    follows: Follows,
+}
+
+impl BlankLinesChecker {
+    pub(crate) fn check_lines(
+        &mut self,
+        tokens: &[LexResult],
+        locator: &Locator,
+        stylist: &Stylist,
+        indent_width: IndentWidth,
+        diagnostics: &mut Vec<Diagnostic>,
+    ) {
+        let line_preprocessor = LinePreprocessor::new(tokens, locator, indent_width);
+
+        for logical_line in line_preprocessor {
+            self.check_new_line_after_class_declaration(
+                &logical_line,
+                locator,
+                stylist,
+                diagnostics
+            );
+        }
+    }
+
+    fn check_new_line_after_class_declaration(
+        &mut self,
+        line: &LogicalLineInfo,
+        locator: &Locator,
+        stylist: &Stylist,
+        diagnostics: &mut Vec<Diagnostic>,
+    ) {
+        if (matches!(self.follows, Follows::Class) && matches!(line.kind, LogicalLineKind::Function | LogicalLineKind::Decorator) && line.preceding_blank_lines == 0) {
+            let mut diagnostic = Diagnostic::new(
+                MissingClassNewLine,
+                line.first_token_range
+            );
+            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                stylist.line_ending().to_string(),
+                locator.line_start(line.first_token_range.start()),
+            )));
+
+            diagnostics.push(diagnostic);
+        }
+
+        // Update the `self.follows` state based on the current line
+        match line.kind {
+            LogicalLineKind::Class => self.follows = Follows::Class,
+            _ => self.follows = Follows::Other,
         }
     }
 }
