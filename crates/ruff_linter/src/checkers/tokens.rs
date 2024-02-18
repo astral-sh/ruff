@@ -15,8 +15,9 @@ use crate::directives::TodoComment;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::BlankLinesChecker;
 use crate::rules::{
-    eradicate, flake8_class_newline, flake8_commas, flake8_executable, flake8_fixme, flake8_implicit_str_concat,
-    flake8_pyi, flake8_quotes, flake8_todos, pycodestyle, pygrep_hooks, pylint, pyupgrade, ruff,
+    eradicate, flake8_class_newline, flake8_commas, flake8_executable, flake8_fixme,
+    flake8_implicit_str_concat, flake8_pyi, flake8_quotes, flake8_todos, pycodestyle, pygrep_hooks,
+    pylint, pyupgrade, ruff,
 };
 use crate::settings::LinterSettings;
 

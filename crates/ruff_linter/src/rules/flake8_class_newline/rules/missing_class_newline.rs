@@ -5,11 +5,10 @@ use ruff_diagnostics::Fix;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::lexer::LexResult;
-use ruff_source_file::{Locator};
+use ruff_source_file::Locator;
 
 use crate::line_width::IndentWidth;
-use crate::rules::pycodestyle::rules::{
-    LogicalLineInfo, LogicalLineKind, LinePreprocessor};
+use crate::rules::pycodestyle::rules::{LinePreprocessor, LogicalLineInfo, LogicalLineKind};
 
 /// ## What it does
 /// Checks for a missing blank line between a class definition and its first method.
@@ -50,14 +49,12 @@ impl AlwaysFixableViolation for MissingClassNewLine {
     }
 }
 
-
 #[derive(Copy, Clone, Debug, Default)]
 enum Follows {
     #[default]
     Class,
     Other,
 }
-
 
 /// Contains variables used for the linting of blank lines.
 #[derive(Debug, Default)]
@@ -81,7 +78,7 @@ impl BlankLinesChecker {
                 &logical_line,
                 locator,
                 stylist,
-                diagnostics
+                diagnostics,
             );
         }
     }
@@ -93,11 +90,14 @@ impl BlankLinesChecker {
         stylist: &Stylist,
         diagnostics: &mut Vec<Diagnostic>,
     ) {
-        if (matches!(self.follows, Follows::Class) && matches!(line.kind, LogicalLineKind::Function | LogicalLineKind::Decorator) && line.preceding_blank_lines == 0) {
-            let mut diagnostic = Diagnostic::new(
-                MissingClassNewLine,
-                line.first_token_range
-            );
+        if (matches!(self.follows, Follows::Class)
+            && matches!(
+                line.kind,
+                LogicalLineKind::Function | LogicalLineKind::Decorator
+            )
+            && line.preceding_blank_lines == 0)
+        {
+            let mut diagnostic = Diagnostic::new(MissingClassNewLine, line.first_token_range);
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 stylist.line_ending().to_string(),
                 locator.line_start(line.first_token_range.start()),
