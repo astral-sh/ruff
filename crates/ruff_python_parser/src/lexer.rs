@@ -170,27 +170,28 @@ impl<'source> Lexer<'source> {
     /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
     fn lex_identifier(&mut self, first: char) -> Result<Tok, LexicalError> {
         // Detect potential string like rb'' b'' f'' u'' r''
-        match (first, self.cursor.first()) {
-            ('f' | 'F', quote @ ('\'' | '"')) => {
+        match (first, self.cursor.rest().as_bytes()) {
+            ('f' | 'F', &[quote @ (b'\'' | b'"'), ..]) => {
                 self.cursor.bump();
-                return Ok(self.lex_fstring_start(quote, false));
+                return Ok(self.lex_fstring_start(quote.into(), false));
             }
-            ('r' | 'R', 'f' | 'F') | ('f' | 'F', 'r' | 'R') if is_quote(self.cursor.second()) => {
+            ('r' | 'R', &[b'f' | b'F', quote @ (b'\'' | b'"'), ..])
+            | ('f' | 'F', &[b'r' | b'R', quote @ (b'\'' | b'"'), ..]) => {
                 self.cursor.bump();
-                let quote = self.cursor.bump().unwrap();
-                return Ok(self.lex_fstring_start(quote, true));
+                self.cursor.bump();
+                return Ok(self.lex_fstring_start(quote.into(), true));
             }
-            (_, quote @ ('\'' | '"')) => {
+            (_, &[quote @ (b'\'' | b'"'), ..]) => {
                 if let Ok(string_kind) = StringKind::try_from(first) {
                     self.cursor.bump();
-                    return self.lex_string(string_kind, quote);
+                    return self.lex_string(string_kind, quote.into());
                 }
             }
-            (_, second @ ('r' | 'R' | 'b' | 'B')) if is_quote(self.cursor.second()) => {
+            (_, &[second @ (b'r' | b'R' | b'b' | b'B'), quote @ (b'\'' | b'"'), ..]) => {
                 self.cursor.bump();
-                if let Ok(string_kind) = StringKind::try_from([first, second]) {
+                if let Ok(string_kind) = StringKind::try_from([first, second.into()]) {
                     let quote = self.cursor.bump().unwrap();
-                    return self.lex_string(string_kind, quote);
+                    return self.lex_string(string_kind, quote.into());
                 }
             }
             _ => {}
@@ -1573,13 +1574,7 @@ fn is_unicode_identifier_start(c: char) -> bool {
 // Checks if the character c is a valid continuation character as described
 // in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
 fn is_identifier_continuation(c: char) -> bool {
-    // Arrange things such that ASCII codepoints never
-    // result in the slower `is_xid_continue` getting called.
-    if c.is_ascii() {
-        matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')
-    } else {
-        is_xid_continue(c)
-    }
+    is_xid_continue(c)
 }
 
 /// Returns `true` for [whitespace](https://docs.python.org/3/reference/lexical_analysis.html#whitespace-between-tokens)
