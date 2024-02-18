@@ -485,10 +485,9 @@ pub(crate) fn concatenated_strings(
                 _ => unreachable!("Unexpected non-bytes literal."),
             }
         }
-        return Ok(Expr::from(ast::ExprBytesLiteral {
-            value: ast::BytesLiteralValue::concatenated(values),
-            range,
-        }));
+        return Ok(Expr::from(ast::ExprBytesLiteral::concatenated(
+            values, range,
+        )));
     }
 
     if !has_fstring {
@@ -499,10 +498,9 @@ pub(crate) fn concatenated_strings(
                 _ => unreachable!("Unexpected non-string literal."),
             }
         }
-        return Ok(Expr::from(ast::ExprStringLiteral {
-            value: ast::StringLiteralValue::concatenated(values),
-            range,
-        }));
+        return Ok(Expr::from(ast::ExprStringLiteral::concatenated(
+            values, range,
+        )));
     }
 
     let mut parts = Vec::with_capacity(strings.len());
@@ -514,11 +512,7 @@ pub(crate) fn concatenated_strings(
         }
     }
 
-    Ok(ast::ExprFString {
-        value: ast::FStringValue::concatenated(parts),
-        range,
-    }
-    .into())
+    Ok(Expr::from(ast::ExprFString::concatenated(parts, range)))
 }
 
 // TODO: consolidate these with ParseError
