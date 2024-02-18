@@ -190,7 +190,7 @@ impl<'source> Lexer<'source> {
             (_, &[second @ (b'r' | b'R' | b'b' | b'B'), quote @ (b'\'' | b'"'), ..]) => {
                 self.cursor.bump();
                 if let Ok(string_kind) = StringKind::try_from([first, second.into()]) {
-                    let quote = self.cursor.bump().unwrap();
+                    self.cursor.bump();
                     return self.lex_string(string_kind, quote.into());
                 }
             }
@@ -1555,10 +1555,6 @@ impl Radix {
             Radix::Hex => c.is_ascii_hexdigit(),
         }
     }
-}
-
-const fn is_quote(c: char) -> bool {
-    matches!(c, '\'' | '"')
 }
 
 const fn is_ascii_identifier_start(c: char) -> bool {
