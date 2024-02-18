@@ -6,11 +6,10 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::lexer::LexResult;
 use ruff_source_file::{Locator};
-use ruff_text_size::TextSize;
 
 use crate::line_width::IndentWidth;
 use crate::rules::pycodestyle::rules::{
-    LogicalLineInfo, LogicalLineKind, LinePreprocessor, Status};
+    LogicalLineInfo, LogicalLineKind, LinePreprocessor};
 
 
 #[violation]
