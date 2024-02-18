@@ -11,7 +11,31 @@ use crate::line_width::IndentWidth;
 use crate::rules::pycodestyle::rules::{
     LogicalLineInfo, LogicalLineKind, LinePreprocessor};
 
-
+/// ## What it does
+/// Checks for a missing blank line between a class definition and its first method.
+///
+/// ## Why is this bad?
+/// PEP8 says we should surround every class method with a single blank line.
+/// However it is ambiguous about the first method having a blank line above it.
+/// This rule enforces a single blank line, for consistency across classes.
+///
+/// ## Example
+/// ```python
+/// class MyClass(object):
+///     def func1():
+///         pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class MyClass(object):
+///
+///     def func1():
+///         pass
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 #[violation]
 pub struct MissingClassNewLine;
 
