@@ -1,0 +1,38 @@
+---
+source: crates/ruff_linter/src/rules/flake8_class_newline/mod.rs
+---
+CNL100.py:2:5: CNL100 [*] Expected 1 blank line after class declaration, found 0
+  |
+1 | class A:  # CNL100
+2 |     def __init__(self):
+  |     ^^^ CNL100
+3 |         pass
+  |
+  = help: Add missing blank line
+
+ℹ Safe fix
+1 1 | class A:  # CNL100
+  2 |+
+2 3 |     def __init__(self):
+3 4 |         pass
+4 5 | 
+
+CNL100.py:13:5: CNL100 [*] Expected 1 blank line after class declaration, found 0
+   |
+12 | class C:  # CNL100
+13 |     async def foo(self):
+   |     ^^^^^ CNL100
+14 |         pass
+   |
+   = help: Add missing blank line
+
+ℹ Safe fix
+10 10 | 
+11 11 | 
+12 12 | class C:  # CNL100
+   13 |+
+13 14 |     async def foo(self):
+14 15 |         pass
+15 16 | 
+
+
