@@ -24,8 +24,8 @@ pub enum ExpressionRef<'a> {
     Compare(&'a ast::ExprCompare),
     Call(&'a ast::ExprCall),
     FString(&'a ast::ExprFString),
-    StringLiteral(&'a ast::ExprStringLiteral),
-    BytesLiteral(&'a ast::ExprBytesLiteral),
+    StringLiteral(&'a ast::ExprString),
+    BytesLiteral(&'a ast::ExprBytes),
     NumberLiteral(&'a ast::ExprNumberLiteral),
     BooleanLiteral(&'a ast::ExprBooleanLiteral),
     NoneLiteral(&'a ast::ExprNoneLiteral),
@@ -67,8 +67,8 @@ impl<'a> From<&'a Expr> for ExpressionRef<'a> {
             Expr::Compare(value) => ExpressionRef::Compare(value),
             Expr::Call(value) => ExpressionRef::Call(value),
             Expr::FString(value) => ExpressionRef::FString(value),
-            Expr::StringLiteral(value) => ExpressionRef::StringLiteral(value),
-            Expr::BytesLiteral(value) => ExpressionRef::BytesLiteral(value),
+            Expr::String(value) => ExpressionRef::StringLiteral(value),
+            Expr::Bytes(value) => ExpressionRef::BytesLiteral(value),
             Expr::NumberLiteral(value) => ExpressionRef::NumberLiteral(value),
             Expr::BooleanLiteral(value) => ExpressionRef::BooleanLiteral(value),
             Expr::NoneLiteral(value) => ExpressionRef::NoneLiteral(value),
@@ -175,13 +175,13 @@ impl<'a> From<&'a ast::ExprFString> for ExpressionRef<'a> {
         Self::FString(value)
     }
 }
-impl<'a> From<&'a ast::ExprStringLiteral> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprStringLiteral) -> Self {
+impl<'a> From<&'a ast::ExprString> for ExpressionRef<'a> {
+    fn from(value: &'a ast::ExprString) -> Self {
         Self::StringLiteral(value)
     }
 }
-impl<'a> From<&'a ast::ExprBytesLiteral> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprBytesLiteral) -> Self {
+impl<'a> From<&'a ast::ExprBytes> for ExpressionRef<'a> {
+    fn from(value: &'a ast::ExprBytes) -> Self {
         Self::BytesLiteral(value)
     }
 }
@@ -332,8 +332,8 @@ impl Ranged for ExpressionRef<'_> {
 /// reference instead of an owned value.
 #[derive(Copy, Clone, Debug, PartialEq, is_macro::Is)]
 pub enum LiteralExpressionRef<'a> {
-    StringLiteral(&'a ast::ExprStringLiteral),
-    BytesLiteral(&'a ast::ExprBytesLiteral),
+    StringLiteral(&'a ast::ExprString),
+    BytesLiteral(&'a ast::ExprBytes),
     NumberLiteral(&'a ast::ExprNumberLiteral),
     BooleanLiteral(&'a ast::ExprBooleanLiteral),
     NoneLiteral(&'a ast::ExprNoneLiteral),
@@ -399,19 +399,19 @@ impl LiteralExpressionRef<'_> {
 /// f-strings.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum StringLike<'a> {
-    StringLiteral(&'a ast::ExprStringLiteral),
-    BytesLiteral(&'a ast::ExprBytesLiteral),
+    StringLiteral(&'a ast::ExprString),
+    BytesLiteral(&'a ast::ExprBytes),
     FStringLiteral(&'a ast::FStringLiteralElement),
 }
 
-impl<'a> From<&'a ast::ExprStringLiteral> for StringLike<'a> {
-    fn from(value: &'a ast::ExprStringLiteral) -> Self {
+impl<'a> From<&'a ast::ExprString> for StringLike<'a> {
+    fn from(value: &'a ast::ExprString) -> Self {
         StringLike::StringLiteral(value)
     }
 }
 
-impl<'a> From<&'a ast::ExprBytesLiteral> for StringLike<'a> {
-    fn from(value: &'a ast::ExprBytesLiteral) -> Self {
+impl<'a> From<&'a ast::ExprBytes> for StringLike<'a> {
+    fn from(value: &'a ast::ExprBytes) -> Self {
         StringLike::BytesLiteral(value)
     }
 }

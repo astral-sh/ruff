@@ -72,8 +72,8 @@ pub enum AnyNode {
     ExprCompare(ast::ExprCompare),
     ExprCall(ast::ExprCall),
     ExprFString(ast::ExprFString),
-    ExprStringLiteral(ast::ExprStringLiteral),
-    ExprBytesLiteral(ast::ExprBytesLiteral),
+    ExprStringLiteral(ast::ExprString),
+    ExprBytesLiteral(ast::ExprBytes),
     ExprNumberLiteral(ast::ExprNumberLiteral),
     ExprBooleanLiteral(ast::ExprBooleanLiteral),
     ExprNoneLiteral(ast::ExprNoneLiteral),
@@ -238,8 +238,8 @@ impl AnyNode {
             AnyNode::ExprCompare(node) => Some(Expr::Compare(node)),
             AnyNode::ExprCall(node) => Some(Expr::Call(node)),
             AnyNode::ExprFString(node) => Some(Expr::FString(node)),
-            AnyNode::ExprStringLiteral(node) => Some(Expr::StringLiteral(node)),
-            AnyNode::ExprBytesLiteral(node) => Some(Expr::BytesLiteral(node)),
+            AnyNode::ExprStringLiteral(node) => Some(Expr::String(node)),
+            AnyNode::ExprBytesLiteral(node) => Some(Expr::Bytes(node)),
             AnyNode::ExprNumberLiteral(node) => Some(Expr::NumberLiteral(node)),
             AnyNode::ExprBooleanLiteral(node) => Some(Expr::BooleanLiteral(node)),
             AnyNode::ExprNoneLiteral(node) => Some(Expr::NoneLiteral(node)),
@@ -2788,7 +2788,7 @@ impl AstNode for ast::ExprFString {
 
         for f_string_part in value {
             match f_string_part {
-                ast::FStringPart::Literal(string_literal) => {
+                ast::FStringPart::String(string_literal) => {
                     visitor.visit_string_literal(string_literal);
                 }
                 ast::FStringPart::FString(f_string) => {
@@ -2798,7 +2798,7 @@ impl AstNode for ast::ExprFString {
         }
     }
 }
-impl AstNode for ast::ExprStringLiteral {
+impl AstNode for ast::ExprString {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2830,14 +2830,14 @@ impl AstNode for ast::ExprStringLiteral {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::ExprStringLiteral { value, range: _ } = self;
+        let ast::ExprString { value, range: _ } = self;
 
         for string_literal in value {
             visitor.visit_string_literal(string_literal);
         }
     }
 }
-impl AstNode for ast::ExprBytesLiteral {
+impl AstNode for ast::ExprBytes {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
@@ -2869,7 +2869,7 @@ impl AstNode for ast::ExprBytesLiteral {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::ExprBytesLiteral { value, range: _ } = self;
+        let ast::ExprBytes { value, range: _ } = self;
 
         for bytes_literal in value {
             visitor.visit_bytes_literal(bytes_literal);
@@ -4557,8 +4557,8 @@ impl From<Expr> for AnyNode {
             Expr::Compare(node) => AnyNode::ExprCompare(node),
             Expr::Call(node) => AnyNode::ExprCall(node),
             Expr::FString(node) => AnyNode::ExprFString(node),
-            Expr::StringLiteral(node) => AnyNode::ExprStringLiteral(node),
-            Expr::BytesLiteral(node) => AnyNode::ExprBytesLiteral(node),
+            Expr::String(node) => AnyNode::ExprStringLiteral(node),
+            Expr::Bytes(node) => AnyNode::ExprBytesLiteral(node),
             Expr::NumberLiteral(node) => AnyNode::ExprNumberLiteral(node),
             Expr::BooleanLiteral(node) => AnyNode::ExprBooleanLiteral(node),
             Expr::NoneLiteral(node) => AnyNode::ExprNoneLiteral(node),
@@ -4910,14 +4910,14 @@ impl From<ast::ExprFString> for AnyNode {
     }
 }
 
-impl From<ast::ExprStringLiteral> for AnyNode {
-    fn from(node: ast::ExprStringLiteral) -> Self {
+impl From<ast::ExprString> for AnyNode {
+    fn from(node: ast::ExprString) -> Self {
         AnyNode::ExprStringLiteral(node)
     }
 }
 
-impl From<ast::ExprBytesLiteral> for AnyNode {
-    fn from(node: ast::ExprBytesLiteral) -> Self {
+impl From<ast::ExprBytes> for AnyNode {
+    fn from(node: ast::ExprBytes) -> Self {
         AnyNode::ExprBytesLiteral(node)
     }
 }
@@ -5299,8 +5299,8 @@ pub enum AnyNodeRef<'a> {
     FStringLiteralElement(&'a ast::FStringLiteralElement),
     FStringFormatSpec(&'a ast::FStringFormatSpec),
     ExprFString(&'a ast::ExprFString),
-    ExprStringLiteral(&'a ast::ExprStringLiteral),
-    ExprBytesLiteral(&'a ast::ExprBytesLiteral),
+    ExprStringLiteral(&'a ast::ExprString),
+    ExprBytesLiteral(&'a ast::ExprBytes),
     ExprNumberLiteral(&'a ast::ExprNumberLiteral),
     ExprBooleanLiteral(&'a ast::ExprBooleanLiteral),
     ExprNoneLiteral(&'a ast::ExprNoneLiteral),
@@ -6492,14 +6492,14 @@ impl<'a> From<&'a ast::ExprFString> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ExprStringLiteral> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::ExprStringLiteral) -> Self {
+impl<'a> From<&'a ast::ExprString> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::ExprString) -> Self {
         AnyNodeRef::ExprStringLiteral(node)
     }
 }
 
-impl<'a> From<&'a ast::ExprBytesLiteral> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::ExprBytesLiteral) -> Self {
+impl<'a> From<&'a ast::ExprBytes> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::ExprBytes) -> Self {
         AnyNodeRef::ExprBytesLiteral(node)
     }
 }
@@ -6742,8 +6742,8 @@ impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
             Expr::Compare(node) => AnyNodeRef::ExprCompare(node),
             Expr::Call(node) => AnyNodeRef::ExprCall(node),
             Expr::FString(node) => AnyNodeRef::ExprFString(node),
-            Expr::StringLiteral(node) => AnyNodeRef::ExprStringLiteral(node),
-            Expr::BytesLiteral(node) => AnyNodeRef::ExprBytesLiteral(node),
+            Expr::String(node) => AnyNodeRef::ExprStringLiteral(node),
+            Expr::Bytes(node) => AnyNodeRef::ExprBytesLiteral(node),
             Expr::NumberLiteral(node) => AnyNodeRef::ExprNumberLiteral(node),
             Expr::BooleanLiteral(node) => AnyNodeRef::ExprBooleanLiteral(node),
             Expr::NoneLiteral(node) => AnyNodeRef::ExprNoneLiteral(node),
