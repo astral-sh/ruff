@@ -16,6 +16,7 @@ pub(crate) mod pattern_arguments;
 pub(crate) mod pattern_keyword;
 pub(crate) mod pattern_match_as;
 pub(crate) mod pattern_match_class;
+pub(crate) mod pattern_match_invalid;
 pub(crate) mod pattern_match_mapping;
 pub(crate) mod pattern_match_or;
 pub(crate) mod pattern_match_sequence;
@@ -48,6 +49,8 @@ impl FormatRule<Pattern, PyFormatContext<'_>> for FormatPattern {
             Pattern::MatchStar(pattern) => pattern.format().fmt(f),
             Pattern::MatchAs(pattern) => pattern.format().fmt(f),
             Pattern::MatchOr(pattern) => pattern.format().fmt(f),
+            #[allow(deprecated)]
+            Pattern::Invalid(pattern) => pattern.format().fmt(f),
         });
 
         let parenthesize = match self.parentheses {
@@ -147,6 +150,8 @@ impl NeedsParentheses for Pattern {
             Pattern::MatchStar(pattern) => pattern.needs_parentheses(parent, context),
             Pattern::MatchAs(pattern) => pattern.needs_parentheses(parent, context),
             Pattern::MatchOr(pattern) => pattern.needs_parentheses(parent, context),
+            #[allow(deprecated)]
+            Pattern::Invalid(pattern) => pattern.needs_parentheses(parent, context),
         }
     }
 }

@@ -1,0 +1,85 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/if_missing_body.py
+---
+## AST
+
+ ```
+Module(
+    ModModule {
+        range: 0..84,
+        body: [
+            If(
+                StmtIf {
+                    range: 0..8,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 3..7,
+                            value: true,
+                        },
+                    ),
+                    body: [],
+                    elif_else_clauses: [],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 11..16,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 11..16,
+                            left: Name(
+                                ExprName {
+                                    range: 11..12,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Add,
+                            right: Name(
+                                ExprName {
+                                    range: 15..16,
+                                    id: "b",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            If(
+                StmtIf {
+                    range: 18..27,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 21..26,
+                            value: false,
+                        },
+                    ),
+                    body: [],
+                    elif_else_clauses: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+4 | a + b
+  | ^ Syntax Error: expected a single statement or an indented body after `if` statement
+5 | 
+6 | if False: # This if statement has neither an indent nor a newline.
+  |
+
+
+  |
+4 | a + b
+5 | 
+6 | if False: # This if statement has neither an indent nor a newline.
+  |                                                                    Syntax Error: expected a single statement or an indented body after `if` statement
+  |
+
+
+
