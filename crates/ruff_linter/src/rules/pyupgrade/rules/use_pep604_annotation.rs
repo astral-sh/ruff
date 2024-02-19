@@ -200,5 +200,7 @@ fn is_allowed_value(expr: &Expr) -> bool {
         | Expr::Starred(_)
         | Expr::Slice(_)
         | Expr::IpyEscapeCommand(_) => false,
+        #[allow(deprecated)]
+        Expr::Invalid(_) => false,
     }
 }
