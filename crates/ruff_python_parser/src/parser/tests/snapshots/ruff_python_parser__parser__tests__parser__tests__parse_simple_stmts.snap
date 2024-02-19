@@ -1,0 +1,1174 @@
+---
+source: crates/ruff_python_parser/src/parser/tests/parser.rs
+expression: "parse(\"\nif x: ...\nif True: pass\n1; 2; pass\n1; ...; a if b else c\n\ncontinue\n\nbreak\n\ndel a\ndel a, b, 1, 1 + 2,\ndel a, (b, c), d\n\nassert 1 < 2\nassert f()\nassert a and b\nassert x, 'error'\n\nglobal a\nglobal a, b, c\n\nreturn\nreturn a and b\nreturn 1 < 2\nreturn None\nreturn 1, 2,\nreturn x\nreturn f()\nreturn a.f()\n\nnonlocal a\nnonlocal a, b, c\n\nraise\nraise a\nraise 1 < 2\nraise a and b\nraise a from b\n\nimport a\nimport a.b.c\nimport a.b.c as d\nimport a, b, c\nimport foo.bar as a, a.b.c.d as abcd\n\nfrom a import b # comment\nfrom . import a\nfrom foo.bar import baz as b, FooBar as fb\nfrom .a import b\nfrom ... import c\nfrom .......................... import d\nfrom ..........................a.b.c import d\nfrom module import (a, b as B, c,)\nfrom a import *\n\nif c: B; del A\nelse: C\nif x: yield x;\n\")"
+---
+Program {
+    ast: Module(
+        ModModule {
+            range: 0..772,
+            body: [
+                If(
+                    StmtIf {
+                        range: 1..10,
+                        test: Name(
+                            ExprName {
+                                range: 4..5,
+                                id: "x",
+                                ctx: Load,
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 7..10,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 7..10,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                        elif_else_clauses: [],
+                    },
+                ),
+                If(
+                    StmtIf {
+                        range: 11..24,
+                        test: BooleanLiteral(
+                            ExprBooleanLiteral {
+                                range: 14..18,
+                                value: true,
+                            },
+                        ),
+                        body: [
+                            Pass(
+                                StmtPass {
+                                    range: 20..24,
+                                },
+                            ),
+                        ],
+                        elif_else_clauses: [],
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 25..26,
+                        value: NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 25..26,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 28..29,
+                        value: NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 28..29,
+                                value: Int(
+                                    2,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+                Pass(
+                    StmtPass {
+                        range: 31..35,
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 36..37,
+                        value: NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 36..37,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 39..42,
+                        value: EllipsisLiteral(
+                            ExprEllipsisLiteral {
+                                range: 39..42,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 44..57,
+                        value: IfExp(
+                            ExprIfExp {
+                                range: 44..57,
+                                test: Name(
+                                    ExprName {
+                                        range: 49..50,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                                body: Name(
+                                    ExprName {
+                                        range: 44..45,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                                orelse: Name(
+                                    ExprName {
+                                        range: 56..57,
+                                        id: "c",
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                ),
+                Continue(
+                    StmtContinue {
+                        range: 59..67,
+                    },
+                ),
+                Break(
+                    StmtBreak {
+                        range: 69..74,
+                    },
+                ),
+                Delete(
+                    StmtDelete {
+                        range: 76..81,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    range: 80..81,
+                                    id: "a",
+                                    ctx: Del,
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                Delete(
+                    StmtDelete {
+                        range: 82..101,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    range: 86..87,
+                                    id: "a",
+                                    ctx: Del,
+                                },
+                            ),
+                            Name(
+                                ExprName {
+                                    range: 89..90,
+                                    id: "b",
+                                    ctx: Del,
+                                },
+                            ),
+                            NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 92..93,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            BinOp(
+                                ExprBinOp {
+                                    range: 95..100,
+                                    left: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 95..96,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    op: Add,
+                                    right: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 99..100,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                Delete(
+                    StmtDelete {
+                        range: 102..118,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    range: 106..107,
+                                    id: "a",
+                                    ctx: Del,
+                                },
+                            ),
+                            Tuple(
+                                ExprTuple {
+                                    range: 109..115,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                range: 110..111,
+                                                id: "b",
+                                                ctx: Del,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 113..114,
+                                                id: "c",
+                                                ctx: Del,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Del,
+                                    parenthesized: true,
+                                },
+                            ),
+                            Name(
+                                ExprName {
+                                    range: 117..118,
+                                    id: "d",
+                                    ctx: Del,
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                Assert(
+                    StmtAssert {
+                        range: 120..132,
+                        test: Compare(
+                            ExprCompare {
+                                range: 127..132,
+                                left: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 127..128,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                ops: [
+                                    Lt,
+                                ],
+                                comparators: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 131..132,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        msg: None,
+                    },
+                ),
+                Assert(
+                    StmtAssert {
+                        range: 133..143,
+                        test: Call(
+                            ExprCall {
+                                range: 140..143,
+                                func: Name(
+                                    ExprName {
+                                        range: 140..141,
+                                        id: "f",
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 141..143,
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                        msg: None,
+                    },
+                ),
+                Assert(
+                    StmtAssert {
+                        range: 144..158,
+                        test: BoolOp(
+                            ExprBoolOp {
+                                range: 151..158,
+                                op: And,
+                                values: [
+                                    Name(
+                                        ExprName {
+                                            range: 151..152,
+                                            id: "a",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 157..158,
+                                            id: "b",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        msg: None,
+                    },
+                ),
+                Assert(
+                    StmtAssert {
+                        range: 159..176,
+                        test: Name(
+                            ExprName {
+                                range: 166..167,
+                                id: "x",
+                                ctx: Load,
+                            },
+                        ),
+                        msg: Some(
+                            StringLiteral(
+                                ExprStringLiteral {
+                                    range: 169..176,
+                                    value: StringLiteralValue {
+                                        inner: Single(
+                                            StringLiteral {
+                                                range: 169..176,
+                                                value: "error",
+                                                unicode: false,
+                                            },
+                                        ),
+                                    },
+                                },
+                            ),
+                        ),
+                    },
+                ),
+                Global(
+                    StmtGlobal {
+                        range: 178..186,
+                        names: [
+                            Identifier {
+                                id: "a",
+                                range: 185..186,
+                            },
+                        ],
+                    },
+                ),
+                Global(
+                    StmtGlobal {
+                        range: 187..201,
+                        names: [
+                            Identifier {
+                                id: "a",
+                                range: 194..195,
+                            },
+                            Identifier {
+                                id: "b",
+                                range: 197..198,
+                            },
+                            Identifier {
+                                id: "c",
+                                range: 200..201,
+                            },
+                        ],
+                    },
+                ),
+                Return(
+                    StmtReturn {
+                        range: 203..209,
+                        value: None,
+                    },
+                ),
+                Return(
+                    StmtReturn {
+                        range: 210..224,
+                        value: Some(
+                            BoolOp(
+                                ExprBoolOp {
+                                    range: 217..224,
+                                    op: And,
+                                    values: [
+                                        Name(
+                                            ExprName {
+                                                range: 217..218,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 223..224,
+                                                id: "b",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        ),
+                    },
+                ),
+                Return(
+                    StmtReturn {
+                        range: 225..237,
+                        value: Some(
+                            Compare(
+                                ExprCompare {
+                                    range: 232..237,
+                                    left: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 232..233,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    ops: [
+                                        Lt,
+                                    ],
+                                    comparators: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 236..237,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        ),
+                    },
+                ),
+                Return(
+                    StmtReturn {
+                        range: 238..249,
+                        value: Some(
+                            NoneLiteral(
+                                ExprNoneLiteral {
+                                    range: 245..249,
+                                },
+                            ),
+                        ),
+                    },
+                ),
+                Return(
+                    StmtReturn {
+                        range: 250..262,
+                        value: Some(
+                            Tuple(
+                                ExprTuple {
+                                    range: 257..262,
+                                    elts: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 257..258,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 260..261,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: false,
+                                },
+                            ),
+                        ),
+                    },
+                ),
+                Return(
+                    StmtReturn {
+                        range: 263..271,
+                        value: Some(
+                            Name(
+                                ExprName {
+                                    range: 270..271,
+                                    id: "x",
+                                    ctx: Load,
+                                },
+                            ),
+                        ),
+                    },
+                ),
+                Return(
+                    StmtReturn {
+                        range: 272..282,
+                        value: Some(
+                            Call(
+                                ExprCall {
+                                    range: 279..282,
+                                    func: Name(
+                                        ExprName {
+                                            range: 279..280,
+                                            id: "f",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 280..282,
+                                        args: [],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                        ),
+                    },
+                ),
+                Return(
+                    StmtReturn {
+                        range: 283..295,
+                        value: Some(
+                            Call(
+                                ExprCall {
+                                    range: 290..295,
+                                    func: Attribute(
+                                        ExprAttribute {
+                                            range: 290..293,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 290..291,
+                                                    id: "a",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: "f",
+                                                range: 292..293,
+                                            },
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 293..295,
+                                        args: [],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                        ),
+                    },
+                ),
+                Nonlocal(
+                    StmtNonlocal {
+                        range: 297..307,
+                        names: [
+                            Identifier {
+                                id: "a",
+                                range: 306..307,
+                            },
+                        ],
+                    },
+                ),
+                Nonlocal(
+                    StmtNonlocal {
+                        range: 308..324,
+                        names: [
+                            Identifier {
+                                id: "a",
+                                range: 317..318,
+                            },
+                            Identifier {
+                                id: "b",
+                                range: 320..321,
+                            },
+                            Identifier {
+                                id: "c",
+                                range: 323..324,
+                            },
+                        ],
+                    },
+                ),
+                Raise(
+                    StmtRaise {
+                        range: 326..331,
+                        exc: None,
+                        cause: None,
+                    },
+                ),
+                Raise(
+                    StmtRaise {
+                        range: 332..339,
+                        exc: Some(
+                            Name(
+                                ExprName {
+                                    range: 338..339,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                        ),
+                        cause: None,
+                    },
+                ),
+                Raise(
+                    StmtRaise {
+                        range: 340..351,
+                        exc: Some(
+                            Compare(
+                                ExprCompare {
+                                    range: 346..351,
+                                    left: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 346..347,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    ops: [
+                                        Lt,
+                                    ],
+                                    comparators: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 350..351,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        ),
+                        cause: None,
+                    },
+                ),
+                Raise(
+                    StmtRaise {
+                        range: 352..365,
+                        exc: Some(
+                            BoolOp(
+                                ExprBoolOp {
+                                    range: 358..365,
+                                    op: And,
+                                    values: [
+                                        Name(
+                                            ExprName {
+                                                range: 358..359,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 364..365,
+                                                id: "b",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        ),
+                        cause: None,
+                    },
+                ),
+                Raise(
+                    StmtRaise {
+                        range: 366..380,
+                        exc: Some(
+                            Name(
+                                ExprName {
+                                    range: 372..373,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                        ),
+                        cause: Some(
+                            Name(
+                                ExprName {
+                                    range: 379..380,
+                                    id: "b",
+                                    ctx: Load,
+                                },
+                            ),
+                        ),
+                    },
+                ),
+                Import(
+                    StmtImport {
+                        range: 382..390,
+                        names: [
+                            Alias {
+                                range: 389..390,
+                                name: Identifier {
+                                    id: "a",
+                                    range: 389..390,
+                                },
+                                asname: None,
+                            },
+                        ],
+                    },
+                ),
+                Import(
+                    StmtImport {
+                        range: 391..403,
+                        names: [
+                            Alias {
+                                range: 398..403,
+                                name: Identifier {
+                                    id: "a.b.c",
+                                    range: 398..403,
+                                },
+                                asname: None,
+                            },
+                        ],
+                    },
+                ),
+                Import(
+                    StmtImport {
+                        range: 404..421,
+                        names: [
+                            Alias {
+                                range: 411..421,
+                                name: Identifier {
+                                    id: "a.b.c",
+                                    range: 411..416,
+                                },
+                                asname: Some(
+                                    Identifier {
+                                        id: "d",
+                                        range: 420..421,
+                                    },
+                                ),
+                            },
+                        ],
+                    },
+                ),
+                Import(
+                    StmtImport {
+                        range: 422..436,
+                        names: [
+                            Alias {
+                                range: 429..430,
+                                name: Identifier {
+                                    id: "a",
+                                    range: 429..430,
+                                },
+                                asname: None,
+                            },
+                            Alias {
+                                range: 432..433,
+                                name: Identifier {
+                                    id: "b",
+                                    range: 432..433,
+                                },
+                                asname: None,
+                            },
+                            Alias {
+                                range: 435..436,
+                                name: Identifier {
+                                    id: "c",
+                                    range: 435..436,
+                                },
+                                asname: None,
+                            },
+                        ],
+                    },
+                ),
+                Import(
+                    StmtImport {
+                        range: 437..473,
+                        names: [
+                            Alias {
+                                range: 444..456,
+                                name: Identifier {
+                                    id: "foo.bar",
+                                    range: 444..451,
+                                },
+                                asname: Some(
+                                    Identifier {
+                                        id: "a",
+                                        range: 455..456,
+                                    },
+                                ),
+                            },
+                            Alias {
+                                range: 458..473,
+                                name: Identifier {
+                                    id: "a.b.c.d",
+                                    range: 458..465,
+                                },
+                                asname: Some(
+                                    Identifier {
+                                        id: "abcd",
+                                        range: 469..473,
+                                    },
+                                ),
+                            },
+                        ],
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        range: 475..490,
+                        module: Some(
+                            Identifier {
+                                id: "a",
+                                range: 480..481,
+                            },
+                        ),
+                        names: [
+                            Alias {
+                                range: 489..490,
+                                name: Identifier {
+                                    id: "b",
+                                    range: 489..490,
+                                },
+                                asname: None,
+                            },
+                        ],
+                        level: Some(
+                            0,
+                        ),
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        range: 501..516,
+                        module: None,
+                        names: [
+                            Alias {
+                                range: 515..516,
+                                name: Identifier {
+                                    id: "a",
+                                    range: 515..516,
+                                },
+                                asname: None,
+                            },
+                        ],
+                        level: Some(
+                            1,
+                        ),
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        range: 517..559,
+                        module: Some(
+                            Identifier {
+                                id: "foo.bar",
+                                range: 522..529,
+                            },
+                        ),
+                        names: [
+                            Alias {
+                                range: 537..545,
+                                name: Identifier {
+                                    id: "baz",
+                                    range: 537..540,
+                                },
+                                asname: Some(
+                                    Identifier {
+                                        id: "b",
+                                        range: 544..545,
+                                    },
+                                ),
+                            },
+                            Alias {
+                                range: 547..559,
+                                name: Identifier {
+                                    id: "FooBar",
+                                    range: 547..553,
+                                },
+                                asname: Some(
+                                    Identifier {
+                                        id: "fb",
+                                        range: 557..559,
+                                    },
+                                ),
+                            },
+                        ],
+                        level: Some(
+                            0,
+                        ),
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        range: 560..576,
+                        module: Some(
+                            Identifier {
+                                id: "a",
+                                range: 566..567,
+                            },
+                        ),
+                        names: [
+                            Alias {
+                                range: 575..576,
+                                name: Identifier {
+                                    id: "b",
+                                    range: 575..576,
+                                },
+                                asname: None,
+                            },
+                        ],
+                        level: Some(
+                            1,
+                        ),
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        range: 577..594,
+                        module: None,
+                        names: [
+                            Alias {
+                                range: 593..594,
+                                name: Identifier {
+                                    id: "c",
+                                    range: 593..594,
+                                },
+                                asname: None,
+                            },
+                        ],
+                        level: Some(
+                            3,
+                        ),
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        range: 595..635,
+                        module: None,
+                        names: [
+                            Alias {
+                                range: 634..635,
+                                name: Identifier {
+                                    id: "d",
+                                    range: 634..635,
+                                },
+                                asname: None,
+                            },
+                        ],
+                        level: Some(
+                            26,
+                        ),
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        range: 636..681,
+                        module: Some(
+                            Identifier {
+                                id: "a.b.c",
+                                range: 667..672,
+                            },
+                        ),
+                        names: [
+                            Alias {
+                                range: 680..681,
+                                name: Identifier {
+                                    id: "d",
+                                    range: 680..681,
+                                },
+                                asname: None,
+                            },
+                        ],
+                        level: Some(
+                            26,
+                        ),
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        range: 682..716,
+                        module: Some(
+                            Identifier {
+                                id: "module",
+                                range: 687..693,
+                            },
+                        ),
+                        names: [
+                            Alias {
+                                range: 702..703,
+                                name: Identifier {
+                                    id: "a",
+                                    range: 702..703,
+                                },
+                                asname: None,
+                            },
+                            Alias {
+                                range: 705..711,
+                                name: Identifier {
+                                    id: "b",
+                                    range: 705..706,
+                                },
+                                asname: Some(
+                                    Identifier {
+                                        id: "B",
+                                        range: 710..711,
+                                    },
+                                ),
+                            },
+                            Alias {
+                                range: 713..714,
+                                name: Identifier {
+                                    id: "c",
+                                    range: 713..714,
+                                },
+                                asname: None,
+                            },
+                        ],
+                        level: Some(
+                            0,
+                        ),
+                    },
+                ),
+                ImportFrom(
+                    StmtImportFrom {
+                        range: 717..732,
+                        module: Some(
+                            Identifier {
+                                id: "a",
+                                range: 722..723,
+                            },
+                        ),
+                        names: [
+                            Alias {
+                                range: 731..732,
+                                name: Identifier {
+                                    id: "*",
+                                    range: 731..732,
+                                },
+                                asname: None,
+                            },
+                        ],
+                        level: Some(
+                            0,
+                        ),
+                    },
+                ),
+                If(
+                    StmtIf {
+                        range: 734..756,
+                        test: Name(
+                            ExprName {
+                                range: 737..738,
+                                id: "c",
+                                ctx: Load,
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 740..741,
+                                    value: Name(
+                                        ExprName {
+                                            range: 740..741,
+                                            id: "B",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            Delete(
+                                StmtDelete {
+                                    range: 743..748,
+                                    targets: [
+                                        Name(
+                                            ExprName {
+                                                range: 747..748,
+                                                id: "A",
+                                                ctx: Del,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        ],
+                        elif_else_clauses: [
+                            ElifElseClause {
+                                range: 749..756,
+                                test: None,
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 755..756,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 755..756,
+                                                    id: "C",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ],
+                    },
+                ),
+                If(
+                    StmtIf {
+                        range: 757..770,
+                        test: Name(
+                            ExprName {
+                                range: 760..761,
+                                id: "x",
+                                ctx: Load,
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 763..770,
+                                    value: Yield(
+                                        ExprYield {
+                                            range: 763..770,
+                                            value: Some(
+                                                Name(
+                                                    ExprName {
+                                                        range: 769..770,
+                                                        id: "x",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                        elif_else_clauses: [],
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}

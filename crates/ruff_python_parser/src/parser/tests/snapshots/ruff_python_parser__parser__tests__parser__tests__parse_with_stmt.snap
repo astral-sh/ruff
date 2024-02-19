@@ -1,0 +1,827 @@
+---
+source: crates/ruff_python_parser/src/parser/tests/parser.rs
+expression: "parse(\"\nwith x:\n    ...\nwith x, y:\n    ...\nwith open() as f:\n    ...\nwith f() as x.attr:\n    pass\nwith x as X, y as Y, z as Z:\n    ...\nwith (x, z as Y, y,):\n    ...\nwith (a) as f:\n    ...\nwith ((a) as f, 1):\n    ...\nwith a:\n    yield a, b\nwith (yield 1):\n    ...\nwith (yield from 1):\n    ...\nwith (a := 1):\n    ...\nwith (open('bla.txt')), (open('bla.txt')):\n    pass\nwith (a := 1, x):\n    ...\nwith (p / 'new_file').open('wb'): ...\n\")"
+---
+Program {
+    ast: Module(
+        ModModule {
+            range: 0..424,
+            body: [
+                With(
+                    StmtWith {
+                        range: 1..16,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 6..7,
+                                context_expr: Name(
+                                    ExprName {
+                                        range: 6..7,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 13..16,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 13..16,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                With(
+                    StmtWith {
+                        range: 17..35,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 22..23,
+                                context_expr: Name(
+                                    ExprName {
+                                        range: 22..23,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                            WithItem {
+                                range: 25..26,
+                                context_expr: Name(
+                                    ExprName {
+                                        range: 25..26,
+                                        id: "y",
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 32..35,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 32..35,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                With(
+                    StmtWith {
+                        range: 36..61,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 41..52,
+                                context_expr: Call(
+                                    ExprCall {
+                                        range: 41..47,
+                                        func: Name(
+                                            ExprName {
+                                                range: 41..45,
+                                                id: "open",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 45..47,
+                                            args: [],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 51..52,
+                                            id: "f",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 58..61,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 58..61,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                With(
+                    StmtWith {
+                        range: 62..90,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 67..80,
+                                context_expr: Call(
+                                    ExprCall {
+                                        range: 67..70,
+                                        func: Name(
+                                            ExprName {
+                                                range: 67..68,
+                                                id: "f",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 68..70,
+                                            args: [],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Attribute(
+                                        ExprAttribute {
+                                            range: 74..80,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 74..75,
+                                                    id: "x",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: "attr",
+                                                range: 76..80,
+                                            },
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        body: [
+                            Pass(
+                                StmtPass {
+                                    range: 86..90,
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                With(
+                    StmtWith {
+                        range: 91..127,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 96..102,
+                                context_expr: Name(
+                                    ExprName {
+                                        range: 96..97,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 101..102,
+                                            id: "X",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                            WithItem {
+                                range: 104..110,
+                                context_expr: Name(
+                                    ExprName {
+                                        range: 104..105,
+                                        id: "y",
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 109..110,
+                                            id: "Y",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                            WithItem {
+                                range: 112..118,
+                                context_expr: Name(
+                                    ExprName {
+                                        range: 112..113,
+                                        id: "z",
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 117..118,
+                                            id: "Z",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 124..127,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 124..127,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                With(
+                    StmtWith {
+                        range: 128..157,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 134..135,
+                                context_expr: Name(
+                                    ExprName {
+                                        range: 134..135,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                            WithItem {
+                                range: 137..143,
+                                context_expr: Name(
+                                    ExprName {
+                                        range: 137..138,
+                                        id: "z",
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 142..143,
+                                            id: "Y",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                            WithItem {
+                                range: 145..146,
+                                context_expr: Name(
+                                    ExprName {
+                                        range: 145..146,
+                                        id: "y",
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 154..157,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 154..157,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                With(
+                    StmtWith {
+                        range: 158..180,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 163..171,
+                                context_expr: Name(
+                                    ExprName {
+                                        range: 164..165,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 170..171,
+                                            id: "f",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 177..180,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 177..180,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                With(
+                    StmtWith {
+                        range: 181..208,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 187..195,
+                                context_expr: Name(
+                                    ExprName {
+                                        range: 188..189,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 194..195,
+                                            id: "f",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ),
+                            },
+                            WithItem {
+                                range: 197..198,
+                                context_expr: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 197..198,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 205..208,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 205..208,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                With(
+                    StmtWith {
+                        range: 209..231,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 214..215,
+                                context_expr: Name(
+                                    ExprName {
+                                        range: 214..215,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 221..231,
+                                    value: Yield(
+                                        ExprYield {
+                                            range: 221..231,
+                                            value: Some(
+                                                Tuple(
+                                                    ExprTuple {
+                                                        range: 227..231,
+                                                        elts: [
+                                                            Name(
+                                                                ExprName {
+                                                                    range: 227..228,
+                                                                    id: "a",
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            Name(
+                                                                ExprName {
+                                                                    range: 230..231,
+                                                                    id: "b",
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                        ],
+                                                        ctx: Load,
+                                                        parenthesized: false,
+                                                    },
+                                                ),
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                With(
+                    StmtWith {
+                        range: 232..255,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 238..245,
+                                context_expr: Yield(
+                                    ExprYield {
+                                        range: 238..245,
+                                        value: Some(
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 244..245,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 252..255,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 252..255,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                With(
+                    StmtWith {
+                        range: 256..284,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 262..274,
+                                context_expr: YieldFrom(
+                                    ExprYieldFrom {
+                                        range: 262..274,
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 273..274,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 281..284,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 281..284,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                With(
+                    StmtWith {
+                        range: 285..307,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 291..297,
+                                context_expr: NamedExpr(
+                                    ExprNamedExpr {
+                                        range: 291..297,
+                                        target: Name(
+                                            ExprName {
+                                                range: 291..292,
+                                                id: "a",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 296..297,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 304..307,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 304..307,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                With(
+                    StmtWith {
+                        range: 308..359,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 313..330,
+                                context_expr: Call(
+                                    ExprCall {
+                                        range: 314..329,
+                                        func: Name(
+                                            ExprName {
+                                                range: 314..318,
+                                                id: "open",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 318..329,
+                                            args: [
+                                                StringLiteral(
+                                                    ExprStringLiteral {
+                                                        range: 319..328,
+                                                        value: StringLiteralValue {
+                                                            inner: Single(
+                                                                StringLiteral {
+                                                                    range: 319..328,
+                                                                    value: "bla.txt",
+                                                                    unicode: false,
+                                                                },
+                                                            ),
+                                                        },
+                                                    },
+                                                ),
+                                            ],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                            WithItem {
+                                range: 332..349,
+                                context_expr: Call(
+                                    ExprCall {
+                                        range: 333..348,
+                                        func: Name(
+                                            ExprName {
+                                                range: 333..337,
+                                                id: "open",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 337..348,
+                                            args: [
+                                                StringLiteral(
+                                                    ExprStringLiteral {
+                                                        range: 338..347,
+                                                        value: StringLiteralValue {
+                                                            inner: Single(
+                                                                StringLiteral {
+                                                                    range: 338..347,
+                                                                    value: "bla.txt",
+                                                                    unicode: false,
+                                                                },
+                                                            ),
+                                                        },
+                                                    },
+                                                ),
+                                            ],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: [
+                            Pass(
+                                StmtPass {
+                                    range: 355..359,
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                With(
+                    StmtWith {
+                        range: 360..385,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 365..376,
+                                context_expr: Tuple(
+                                    ExprTuple {
+                                        range: 365..376,
+                                        elts: [
+                                            NamedExpr(
+                                                ExprNamedExpr {
+                                                    range: 366..372,
+                                                    target: Name(
+                                                        ExprName {
+                                                            range: 366..367,
+                                                            id: "a",
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 371..372,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 374..375,
+                                                    id: "x",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: true,
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 382..385,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 382..385,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                With(
+                    StmtWith {
+                        range: 386..423,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 391..418,
+                                context_expr: Call(
+                                    ExprCall {
+                                        range: 391..418,
+                                        func: Attribute(
+                                            ExprAttribute {
+                                                range: 391..412,
+                                                value: BinOp(
+                                                    ExprBinOp {
+                                                        range: 392..406,
+                                                        left: Name(
+                                                            ExprName {
+                                                                range: 392..393,
+                                                                id: "p",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        op: Div,
+                                                        right: StringLiteral(
+                                                            ExprStringLiteral {
+                                                                range: 396..406,
+                                                                value: StringLiteralValue {
+                                                                    inner: Single(
+                                                                        StringLiteral {
+                                                                            range: 396..406,
+                                                                            value: "new_file",
+                                                                            unicode: false,
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                                attr: Identifier {
+                                                    id: "open",
+                                                    range: 408..412,
+                                                },
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 412..418,
+                                            args: [
+                                                StringLiteral(
+                                                    ExprStringLiteral {
+                                                        range: 413..417,
+                                                        value: StringLiteralValue {
+                                                            inner: Single(
+                                                                StringLiteral {
+                                                                    range: 413..417,
+                                                                    value: "wb",
+                                                                    unicode: false,
+                                                                },
+                                                            ),
+                                                        },
+                                                    },
+                                                ),
+                                            ],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 420..423,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 420..423,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}

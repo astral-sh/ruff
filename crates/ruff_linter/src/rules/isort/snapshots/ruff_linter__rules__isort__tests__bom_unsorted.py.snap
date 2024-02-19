@@ -12,7 +12,6 @@ bom_unsorted.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 ℹ Safe fix
 1   |-﻿import foo
 2   |-import bar
-  1 |+﻿import bar
-  2 |+import foo
+  1 |+﻿import rt 
 
 

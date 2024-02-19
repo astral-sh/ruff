@@ -38,6 +38,7 @@ pub enum ExpressionRef<'a> {
     Tuple(&'a ast::ExprTuple),
     Slice(&'a ast::ExprSlice),
     IpyEscapeCommand(&'a ast::ExprIpyEscapeCommand),
+    Invalid(&'a ast::ExprInvalid),
 }
 
 impl<'a> From<&'a Box<Expr>> for ExpressionRef<'a> {
@@ -81,6 +82,8 @@ impl<'a> From<&'a Expr> for ExpressionRef<'a> {
             Expr::Tuple(value) => ExpressionRef::Tuple(value),
             Expr::Slice(value) => ExpressionRef::Slice(value),
             Expr::IpyEscapeCommand(value) => ExpressionRef::IpyEscapeCommand(value),
+            #[allow(deprecated)]
+            Expr::Invalid(value) => ExpressionRef::Invalid(value),
         }
     }
 }
@@ -285,6 +288,7 @@ impl<'a> From<ExpressionRef<'a>> for AnyNodeRef<'a> {
             ExpressionRef::IpyEscapeCommand(expression) => {
                 AnyNodeRef::ExprIpyEscapeCommand(expression)
             }
+            ExpressionRef::Invalid(expression) => AnyNodeRef::ExprInvalid(expression),
         }
     }
 }
@@ -324,6 +328,7 @@ impl Ranged for ExpressionRef<'_> {
             ExpressionRef::Tuple(expression) => expression.range(),
             ExpressionRef::Slice(expression) => expression.range(),
             ExpressionRef::IpyEscapeCommand(expression) => expression.range(),
+            ExpressionRef::Invalid(expression) => expression.range(),
         }
     }
 }

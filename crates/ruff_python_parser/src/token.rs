@@ -4,11 +4,12 @@
 //! loosely based on the token definitions found in the [CPython source].
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h;
-use crate::Mode;
 
-use ruff_python_ast::{Int, IpyEscapeKind};
+use ruff_python_ast::{BoolOp, Int, IpyEscapeKind, Operator, UnaryOp};
 use ruff_text_size::TextSize;
 use std::fmt;
+
+use crate::Mode;
 
 /// The set of tokens the Python source code can be tokenized in.
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -220,6 +221,7 @@ pub enum Tok {
     With,
     Yield,
 
+    Unknown,
     // RustPython specific.
     StartModule,
     StartExpression,
@@ -239,9 +241,9 @@ impl fmt::Display for Tok {
         #[allow(clippy::enum_glob_use)]
         use Tok::*;
         match self {
-            Name { name } => write!(f, "'{name}'"),
-            Int { value } => write!(f, "'{value}'"),
-            Float { value } => write!(f, "'{value}'"),
+            Name { name } => write!(f, "{name}"),
+            Int { value } => write!(f, "{value}"),
+            Float { value } => write!(f, "{value}"),
             Complex { real, imag } => write!(f, "{real}j{imag}"),
             String {
                 value,
@@ -262,94 +264,95 @@ impl fmt::Display for Tok {
             StartModule => f.write_str("StartProgram"),
             StartExpression => f.write_str("StartExpression"),
             EndOfFile => f.write_str("EOF"),
-            Question => f.write_str("'?'"),
-            Exclamation => f.write_str("'!'"),
-            Lpar => f.write_str("'('"),
-            Rpar => f.write_str("')'"),
-            Lsqb => f.write_str("'['"),
-            Rsqb => f.write_str("']'"),
-            Colon => f.write_str("':'"),
-            Comma => f.write_str("','"),
+            Question => f.write_str("?"),
+            Exclamation => f.write_str("!"),
+            Lpar => f.write_str("("),
+            Rpar => f.write_str(")"),
+            Lsqb => f.write_str("["),
+            Rsqb => f.write_str("]"),
+            Colon => f.write_str(":"),
+            Comma => f.write_str(","),
             Comment(value) => f.write_str(value),
-            Semi => f.write_str("';'"),
-            Plus => f.write_str("'+'"),
-            Minus => f.write_str("'-'"),
-            Star => f.write_str("'*'"),
-            Slash => f.write_str("'/'"),
-            Vbar => f.write_str("'|'"),
-            Amper => f.write_str("'&'"),
-            Less => f.write_str("'<'"),
-            Greater => f.write_str("'>'"),
-            Equal => f.write_str("'='"),
-            Dot => f.write_str("'.'"),
-            Percent => f.write_str("'%'"),
-            Lbrace => f.write_str("'{'"),
-            Rbrace => f.write_str("'}'"),
-            EqEqual => f.write_str("'=='"),
-            NotEqual => f.write_str("'!='"),
-            LessEqual => f.write_str("'<='"),
-            GreaterEqual => f.write_str("'>='"),
-            Tilde => f.write_str("'~'"),
-            CircumFlex => f.write_str("'^'"),
-            LeftShift => f.write_str("'<<'"),
-            RightShift => f.write_str("'>>'"),
-            DoubleStar => f.write_str("'**'"),
-            DoubleStarEqual => f.write_str("'**='"),
-            PlusEqual => f.write_str("'+='"),
-            MinusEqual => f.write_str("'-='"),
-            StarEqual => f.write_str("'*='"),
-            SlashEqual => f.write_str("'/='"),
-            PercentEqual => f.write_str("'%='"),
-            AmperEqual => f.write_str("'&='"),
-            VbarEqual => f.write_str("'|='"),
-            CircumflexEqual => f.write_str("'^='"),
-            LeftShiftEqual => f.write_str("'<<='"),
-            RightShiftEqual => f.write_str("'>>='"),
-            DoubleSlash => f.write_str("'//'"),
-            DoubleSlashEqual => f.write_str("'//='"),
-            At => f.write_str("'@'"),
-            AtEqual => f.write_str("'@='"),
-            Rarrow => f.write_str("'->'"),
-            Ellipsis => f.write_str("'...'"),
-            False => f.write_str("'False'"),
-            None => f.write_str("'None'"),
-            True => f.write_str("'True'"),
-            And => f.write_str("'and'"),
-            As => f.write_str("'as'"),
-            Assert => f.write_str("'assert'"),
-            Async => f.write_str("'async'"),
-            Await => f.write_str("'await'"),
-            Break => f.write_str("'break'"),
-            Class => f.write_str("'class'"),
-            Continue => f.write_str("'continue'"),
-            Def => f.write_str("'def'"),
-            Del => f.write_str("'del'"),
-            Elif => f.write_str("'elif'"),
-            Else => f.write_str("'else'"),
-            Except => f.write_str("'except'"),
-            Finally => f.write_str("'finally'"),
-            For => f.write_str("'for'"),
-            From => f.write_str("'from'"),
-            Global => f.write_str("'global'"),
-            If => f.write_str("'if'"),
-            Import => f.write_str("'import'"),
-            In => f.write_str("'in'"),
-            Is => f.write_str("'is'"),
-            Lambda => f.write_str("'lambda'"),
-            Nonlocal => f.write_str("'nonlocal'"),
-            Not => f.write_str("'not'"),
-            Or => f.write_str("'or'"),
-            Pass => f.write_str("'pass'"),
-            Raise => f.write_str("'raise'"),
-            Return => f.write_str("'return'"),
-            Try => f.write_str("'try'"),
-            While => f.write_str("'while'"),
-            Match => f.write_str("'match'"),
-            Type => f.write_str("'type'"),
-            Case => f.write_str("'case'"),
-            With => f.write_str("'with'"),
-            Yield => f.write_str("'yield'"),
-            ColonEqual => f.write_str("':='"),
+            Semi => f.write_str(";"),
+            Plus => f.write_str("+"),
+            Minus => f.write_str("-"),
+            Star => f.write_str("*"),
+            Slash => f.write_str("/"),
+            Vbar => f.write_str("|"),
+            Amper => f.write_str("&"),
+            Less => f.write_str("<"),
+            Greater => f.write_str(">"),
+            Equal => f.write_str("="),
+            Dot => f.write_str("."),
+            Percent => f.write_str("%"),
+            Lbrace => f.write_str("{"),
+            Rbrace => f.write_str("}"),
+            EqEqual => f.write_str("=="),
+            NotEqual => f.write_str("!="),
+            LessEqual => f.write_str("<="),
+            GreaterEqual => f.write_str(">="),
+            Tilde => f.write_str("~"),
+            CircumFlex => f.write_str("^"),
+            LeftShift => f.write_str("<<"),
+            RightShift => f.write_str(">>"),
+            DoubleStar => f.write_str("**"),
+            DoubleStarEqual => f.write_str("**="),
+            PlusEqual => f.write_str("+="),
+            MinusEqual => f.write_str("-="),
+            StarEqual => f.write_str("*="),
+            SlashEqual => f.write_str("/="),
+            PercentEqual => f.write_str("%="),
+            AmperEqual => f.write_str("&="),
+            VbarEqual => f.write_str("|="),
+            CircumflexEqual => f.write_str("^="),
+            LeftShiftEqual => f.write_str("<<="),
+            RightShiftEqual => f.write_str(">>="),
+            DoubleSlash => f.write_str("//"),
+            DoubleSlashEqual => f.write_str("//="),
+            At => f.write_str("@"),
+            AtEqual => f.write_str("@="),
+            Rarrow => f.write_str("->"),
+            Ellipsis => f.write_str("..."),
+            False => f.write_str("False"),
+            None => f.write_str("None"),
+            True => f.write_str("True"),
+            And => f.write_str("and"),
+            As => f.write_str("as"),
+            Assert => f.write_str("assert"),
+            Async => f.write_str("async"),
+            Await => f.write_str("await"),
+            Break => f.write_str("break"),
+            Class => f.write_str("class"),
+            Continue => f.write_str("continue"),
+            Def => f.write_str("def"),
+            Del => f.write_str("del"),
+            Elif => f.write_str("elif"),
+            Else => f.write_str("else"),
+            Except => f.write_str("except"),
+            Finally => f.write_str("finally"),
+            For => f.write_str("for"),
+            From => f.write_str("from"),
+            Global => f.write_str("global"),
+            If => f.write_str("if"),
+            Import => f.write_str("import"),
+            In => f.write_str("in"),
+            Is => f.write_str("is"),
+            Lambda => f.write_str("lambda"),
+            Nonlocal => f.write_str("nonlocal"),
+            Not => f.write_str("not"),
+            Or => f.write_str("or"),
+            Pass => f.write_str("pass"),
+            Raise => f.write_str("raise"),
+            Return => f.write_str("return"),
+            Try => f.write_str("try"),
+            While => f.write_str("while"),
+            Match => f.write_str("match"),
+            Type => f.write_str("type"),
+            Case => f.write_str("case"),
+            With => f.write_str("with"),
+            Yield => f.write_str("yield"),
+            ColonEqual => f.write_str(":="),
+            Unknown => f.write_str("<Unknown>>"),
         }
     }
 }
@@ -450,7 +453,6 @@ impl StringKind {
     }
 }
 
-// TODO move to ruff_python_parser?
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TokenKind {
     /// Token value for a name, commonly known as an identifier.
@@ -626,6 +628,7 @@ pub enum TokenKind {
     With,
     Yield,
 
+    Unknown,
     // RustPython specific.
     StartModule,
     StartInteractive,
@@ -797,6 +800,27 @@ impl TokenKind {
         matches!(self, TokenKind::Match | TokenKind::Case)
     }
 
+    #[inline]
+    pub const fn is_compare_operator(&self) -> bool {
+        matches!(
+            self,
+            TokenKind::Not
+                | TokenKind::In
+                | TokenKind::Is
+                | TokenKind::EqEqual
+                | TokenKind::NotEqual
+                | TokenKind::Less
+                | TokenKind::LessEqual
+                | TokenKind::Greater
+                | TokenKind::GreaterEqual
+        )
+    }
+
+    #[inline]
+    pub const fn is_bool_operator(&self) -> bool {
+        matches!(self, TokenKind::And | TokenKind::Or)
+    }
+
     pub const fn from_token(token: &Tok) -> Self {
         match token {
             Tok::Name { .. } => TokenKind::Name,
@@ -901,6 +925,7 @@ impl TokenKind {
             Tok::Type => TokenKind::Type,
             Tok::With => TokenKind::With,
             Tok::Yield => TokenKind::Yield,
+            Tok::Unknown => TokenKind::Unknown,
             Tok::StartModule => TokenKind::StartModule,
             Tok::StartExpression => TokenKind::StartExpression,
         }
@@ -910,6 +935,69 @@ impl TokenKind {
 impl From<&Tok> for TokenKind {
     fn from(value: &Tok) -> Self {
         Self::from_token(value)
+    }
+}
+
+impl From<Tok> for TokenKind {
+    fn from(value: Tok) -> Self {
+        Self::from_token(&value)
+    }
+}
+
+impl TryFrom<TokenKind> for Operator {
+    type Error = ();
+
+    fn try_from(value: TokenKind) -> Result<Self, Self::Error> {
+        Ok(match value {
+            TokenKind::At | TokenKind::AtEqual => Operator::MatMult,
+            TokenKind::Plus | TokenKind::PlusEqual => Operator::Add,
+            TokenKind::Star | TokenKind::StarEqual => Operator::Mult,
+            TokenKind::Vbar | TokenKind::VbarEqual => Operator::BitOr,
+            TokenKind::Minus | TokenKind::MinusEqual => Operator::Sub,
+            TokenKind::Slash | TokenKind::SlashEqual => Operator::Div,
+            TokenKind::Amper | TokenKind::AmperEqual => Operator::BitAnd,
+            TokenKind::Percent | TokenKind::PercentEqual => Operator::Mod,
+            TokenKind::DoubleStar | TokenKind::DoubleStarEqual => Operator::Pow,
+            TokenKind::LeftShift | TokenKind::LeftShiftEqual => Operator::LShift,
+            TokenKind::CircumFlex | TokenKind::CircumflexEqual => Operator::BitXor,
+            TokenKind::RightShift | TokenKind::RightShiftEqual => Operator::RShift,
+            TokenKind::DoubleSlash | TokenKind::DoubleSlashEqual => Operator::FloorDiv,
+            _ => return Err(()),
+        })
+    }
+}
+
+impl TryFrom<TokenKind> for BoolOp {
+    type Error = ();
+
+    fn try_from(value: TokenKind) -> Result<Self, Self::Error> {
+        Ok(match value {
+            TokenKind::And => BoolOp::And,
+            TokenKind::Or => BoolOp::Or,
+            _ => return Err(()),
+        })
+    }
+}
+
+impl TryFrom<&Tok> for UnaryOp {
+    type Error = ();
+
+    fn try_from(value: &Tok) -> Result<Self, Self::Error> {
+        TokenKind::from_token(value).try_into()
+    }
+}
+
+impl TryFrom<TokenKind> for UnaryOp {
+    type Error = ();
+
+    fn try_from(value: TokenKind) -> Result<Self, Self::Error> {
+        Ok(match value {
+            TokenKind::Plus => UnaryOp::UAdd,
+            TokenKind::Minus => UnaryOp::USub,
+            TokenKind::Tilde => UnaryOp::Invert,
+            TokenKind::Not => UnaryOp::Not,
+            _ => return Err(()),
+        })
     }
 }
 

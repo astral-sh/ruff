@@ -36,12 +36,12 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 use ruff_python_ast::{Int, IpyEscapeKind};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
+use crate::error::FStringErrorType;
 use crate::lexer::cursor::{Cursor, EOF_CHAR};
 use crate::lexer::fstring::{FStringContext, FStringContextFlags, FStrings};
 use crate::lexer::indentation::{Indentation, Indentations};
 use crate::{
     soft_keywords::SoftKeywordTransformer,
-    string::FStringErrorType,
     token::{StringKind, Tok},
     Mode,
 };
@@ -286,7 +286,7 @@ impl<'source> Lexer<'source> {
             Err(err) => {
                 return Err(LexicalError::new(
                     LexicalErrorType::OtherError(format!("{err:?}").into_boxed_str()),
-                    self.token_range().start(),
+                    self.token_range(),
                 ));
             }
         };
@@ -311,7 +311,7 @@ impl<'source> Lexer<'source> {
             if self.cursor.eat_char('_') {
                 return Err(LexicalError::new(
                     LexicalErrorType::OtherError("Invalid Syntax".to_string().into_boxed_str()),
-                    self.offset() - TextSize::new(1),
+                    TextRange::new(self.offset() - TextSize::new(1), self.offset()),
                 ));
             }
 
@@ -345,7 +345,7 @@ impl<'source> Lexer<'source> {
                     LexicalErrorType::OtherError(
                         "Invalid decimal literal".to_string().into_boxed_str(),
                     ),
-                    self.token_start(),
+                    self.token_range(),
                 )
             })?;
 
@@ -370,9 +370,11 @@ impl<'source> Lexer<'source> {
                             // Leading zeros in decimal integer literals are not permitted.
                             return Err(LexicalError::new(
                                 LexicalErrorType::OtherError(
-                                    "Invalid Token".to_string().into_boxed_str(),
+                                    "Invalid decimal integer literal"
+                                        .to_string()
+                                        .into_boxed_str(),
                                 ),
-                                self.token_range().start(),
+                                self.token_range(),
                             ));
                         }
                         value
@@ -380,7 +382,7 @@ impl<'source> Lexer<'source> {
                     Err(err) => {
                         return Err(LexicalError::new(
                             LexicalErrorType::OtherError(format!("{err:?}").into_boxed_str()),
-                            self.token_range().start(),
+                            self.token_range(),
                         ))
                     }
                 };
@@ -595,7 +597,7 @@ impl<'source> Lexer<'source> {
                     };
                     return Err(LexicalError::new(
                         LexicalErrorType::FStringError(error),
-                        self.offset(),
+                        self.token_range(),
                     ));
                 }
                 '\n' | '\r' if !fstring.is_triple_quoted() => {
@@ -608,7 +610,7 @@ impl<'source> Lexer<'source> {
                     }
                     return Err(LexicalError::new(
                         LexicalErrorType::FStringError(FStringErrorType::UnterminatedString),
-                        self.offset(),
+                        self.token_range(),
                     ));
                 }
                 '\\' => {
@@ -716,13 +718,13 @@ impl<'source> Lexer<'source> {
                         {
                             return Err(LexicalError::new(
                                 LexicalErrorType::FStringError(FStringErrorType::UnclosedLbrace),
-                                self.cursor.text_len(),
+                                self.token_range(),
                             ));
                         }
                     }
                     return Err(LexicalError::new(
-                        LexicalErrorType::Eof,
-                        self.cursor.text_len(),
+                        LexicalErrorType::UnclosedStringError,
+                        self.token_range(),
                     ));
                 };
 
@@ -765,13 +767,13 @@ impl<'source> Lexer<'source> {
                         {
                             return Err(LexicalError::new(
                                 LexicalErrorType::FStringError(FStringErrorType::UnclosedLbrace),
-                                self.offset(),
+                                self.token_range(),
                             ));
                         }
                     }
                     return Err(LexicalError::new(
                         LexicalErrorType::StringError,
-                        self.offset(),
+                        self.token_range(),
                     ));
                 };
 
@@ -806,17 +808,13 @@ impl<'source> Lexer<'source> {
                                     LexicalErrorType::FStringError(
                                         FStringErrorType::UnclosedLbrace,
                                     ),
-                                    self.offset() - TextSize::new(1),
+                                    self.token_range(),
                                 ));
                             }
                         }
                         return Err(LexicalError::new(
-                            LexicalErrorType::OtherError(
-                                "EOL while scanning string literal"
-                                    .to_string()
-                                    .into_boxed_str(),
-                            ),
-                            self.offset() - TextSize::new(1),
+                            LexicalErrorType::UnclosedStringError,
+                            self.token_range(),
                         ));
                     }
                     Some(ch) if ch == quote => {
@@ -866,7 +864,7 @@ impl<'source> Lexer<'source> {
                     self.pending_indentation = Some(indentation);
                     let offset = self.offset();
                     self.indentations.dedent_one(indentation).map_err(|_| {
-                        LexicalError::new(LexicalErrorType::IndentationError, offset)
+                        LexicalError::new(LexicalErrorType::IndentationError, self.token_range())
                     })?;
                     return Ok((Tok::Dedent, TextRange::empty(offset)));
                 }
@@ -874,7 +872,7 @@ impl<'source> Lexer<'source> {
                 Err(_) => {
                     return Err(LexicalError::new(
                         LexicalErrorType::IndentationError,
-                        self.offset(),
+                        self.token_range(),
                     ));
                 }
             }
@@ -900,7 +898,7 @@ impl<'source> Lexer<'source> {
             } else {
                 Err(LexicalError::new(
                     LexicalErrorType::UnrecognizedToken { tok: c },
-                    self.token_start(),
+                    self.token_range(),
                 ))
             }
         } else {
@@ -924,11 +922,11 @@ impl<'source> Lexer<'source> {
                     if self.cursor.eat_char('\r') {
                         self.cursor.eat_char('\n');
                     } else if self.cursor.is_eof() {
-                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_start()));
+                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
                     } else if !self.cursor.eat_char('\n') {
                         return Err(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
-                            self.token_start(),
+                            self.token_range(),
                         ));
                     }
                 }
@@ -962,11 +960,11 @@ impl<'source> Lexer<'source> {
                     if self.cursor.eat_char('\r') {
                         self.cursor.eat_char('\n');
                     } else if self.cursor.is_eof() {
-                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_start()));
+                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
                     } else if !self.cursor.eat_char('\n') {
                         return Err(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
-                            self.token_start(),
+                            self.token_range(),
                         ));
                     }
                     indentation = Indentation::root();
@@ -1004,7 +1002,7 @@ impl<'source> Lexer<'source> {
                 self.pending_indentation = Some(indentation);
 
                 self.indentations.dedent_one(indentation).map_err(|_| {
-                    LexicalError::new(LexicalErrorType::IndentationError, self.offset())
+                    LexicalError::new(LexicalErrorType::IndentationError, self.token_range())
                 })?;
 
                 Some((Tok::Dedent, TextRange::empty(self.offset())))
@@ -1020,7 +1018,7 @@ impl<'source> Lexer<'source> {
             Err(_) => {
                 return Err(LexicalError::new(
                     LexicalErrorType::IndentationError,
-                    self.offset(),
+                    self.token_range(),
                 ));
             }
         };
@@ -1034,7 +1032,7 @@ impl<'source> Lexer<'source> {
         if self.nesting > 0 {
             // Reset the nesting to avoid going into infinite loop.
             self.nesting = 0;
-            return Err(LexicalError::new(LexicalErrorType::Eof, self.offset()));
+            return Err(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
         }
 
         // Next, insert a trailing newline, if required.
@@ -1201,7 +1199,7 @@ impl<'source> Lexer<'source> {
                     if fstring.nesting() == self.nesting {
                         return Err(LexicalError::new(
                             LexicalErrorType::FStringError(FStringErrorType::SingleRbrace),
-                            self.token_start(),
+                            self.token_range(),
                         ));
                     }
                     fstring.try_end_format_spec(self.nesting);
@@ -1295,7 +1293,7 @@ impl<'source> Lexer<'source> {
 
                 return Err(LexicalError::new(
                     LexicalErrorType::UnrecognizedToken { tok: c },
-                    self.token_start(),
+                    self.token_range(),
                 ));
             }
         };
@@ -1359,12 +1357,12 @@ pub struct LexicalError {
     /// The type of error that occurred.
     error: LexicalErrorType,
     /// The location of the error.
-    location: TextSize,
+    location: TextRange,
 }
 
 impl LexicalError {
     /// Creates a new `LexicalError` with the given error type and location.
-    pub fn new(error: LexicalErrorType, location: TextSize) -> Self {
+    pub fn new(error: LexicalErrorType, location: TextRange) -> Self {
         Self { error, location }
     }
 
@@ -1376,7 +1374,7 @@ impl LexicalError {
         self.error
     }
 
-    pub fn location(&self) -> TextSize {
+    pub fn location(&self) -> TextRange {
         self.location
     }
 }
@@ -1401,7 +1399,7 @@ impl std::fmt::Display for LexicalError {
             f,
             "{} at byte offset {}",
             self.error(),
-            u32::from(self.location())
+            u32::from(self.location().start())
         )
     }
 }
@@ -1416,9 +1414,14 @@ pub enum LexicalErrorType {
     // to use the `UnicodeError` variant instead.
     #[doc(hidden)]
     StringError,
-    // TODO: Should take a start/end position to report.
+    /// A string literal without the closing quote.
+    UnclosedStringError,
     /// Decoding of a unicode escape sequence in a string literal failed.
     UnicodeError,
+    /// Missing the `{` for unicode escape sequence.
+    MissingUnicodeLbrace,
+    /// Missing the `}` for unicode escape sequence.
+    MissingUnicodeRbrace,
     /// The nesting of brackets/braces/parentheses is not balanced.
     NestingError,
     /// The indentation is not consistent.
@@ -1495,6 +1498,15 @@ impl std::fmt::Display for LexicalErrorType {
             LexicalErrorType::Eof => write!(f, "unexpected EOF while parsing"),
             LexicalErrorType::AssignmentError => write!(f, "invalid assignment target"),
             LexicalErrorType::OtherError(msg) => write!(f, "{msg}"),
+            LexicalErrorType::UnclosedStringError => {
+                write!(f, "missing closing quote in string literal")
+            }
+            LexicalErrorType::MissingUnicodeLbrace => {
+                write!(f, "Missing `{{` in Unicode escape sequence")
+            }
+            LexicalErrorType::MissingUnicodeRbrace => {
+                write!(f, "Missing `}}` in Unicode escape sequence")
+            }
         }
     }
 }
@@ -2301,7 +2313,6 @@ f"{(lambda x:{x})}"
         assert_eq!(lex_fstring_error("f'{a:b}}'"), SingleRbrace);
         assert_eq!(lex_fstring_error("f'{3:}}>10}'"), SingleRbrace);
         assert_eq!(lex_fstring_error(r"f'\{foo}\}'"), SingleRbrace);
-
         assert_eq!(lex_fstring_error("f'{'"), UnclosedLbrace);
         assert_eq!(lex_fstring_error("f'{foo!r'"), UnclosedLbrace);
         assert_eq!(lex_fstring_error("f'{foo='"), UnclosedLbrace);
@@ -2336,7 +2347,7 @@ f"{(lambda x:{x})}"
             error: FStringError(
                 UnclosedLbrace,
             ),
-            location: 4,
+            location: 3..4,
         }
         "###);
 
@@ -2345,7 +2356,7 @@ f"{(lambda x:{x})}"
             error: FStringError(
                 UnclosedLbrace,
             ),
-            location: 6,
+            location: 3..6,
         }
         "###);
     }

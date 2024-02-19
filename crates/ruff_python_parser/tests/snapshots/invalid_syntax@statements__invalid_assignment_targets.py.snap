@@ -1,0 +1,1672 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/invalid_assignment_targets.py
+---
+## AST
+
+ ```
+Module(
+    ModModule {
+        range: 0..1289,
+        body: [
+            Assign(
+                StmtAssign {
+                    range: 201..206,
+                    targets: [
+                        NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 201..202,
+                                value: Int(
+                                    5,
+                                ),
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 205..206,
+                            value: Int(
+                                3,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 208..214,
+                    target: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 208..209,
+                            value: Int(
+                                5,
+                            ),
+                        },
+                    ),
+                    op: Add,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 213..214,
+                            value: Int(
+                                3,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 216..228,
+                    target: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 217..218,
+                            value: Int(
+                                5,
+                            ),
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 221..224,
+                            id: "int",
+                            ctx: Load,
+                        },
+                    ),
+                    value: Some(
+                        NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 227..228,
+                                value: Int(
+                                    3,
+                                ),
+                            },
+                        ),
+                    ),
+                    simple: false,
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 303..314,
+                    targets: [
+                        BoolOp(
+                            ExprBoolOp {
+                                range: 303..309,
+                                op: Or,
+                                values: [
+                                    Name(
+                                        ExprName {
+                                            range: 303..304,
+                                            id: "x",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 308..309,
+                                            id: "y",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 312..314,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 315..328,
+                    targets: [
+                        NamedExpr(
+                            ExprNamedExpr {
+                                range: 316..322,
+                                target: Name(
+                                    ExprName {
+                                        range: 316..317,
+                                        id: "x",
+                                        ctx: Store,
+                                    },
+                                ),
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 321..322,
+                                        value: Int(
+                                            5,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 326..328,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 329..339,
+                    targets: [
+                        BinOp(
+                            ExprBinOp {
+                                range: 329..334,
+                                left: Name(
+                                    ExprName {
+                                        range: 329..330,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                op: Add,
+                                right: Name(
+                                    ExprName {
+                                        range: 333..334,
+                                        id: "y",
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 337..339,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 340..347,
+                    targets: [
+                        UnaryOp(
+                            ExprUnaryOp {
+                                range: 340..342,
+                                op: USub,
+                                operand: Name(
+                                    ExprName {
+                                        range: 341..342,
+                                        id: "x",
+                                        ctx: Store,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 345..347,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 348..366,
+                    targets: [
+                        Lambda(
+                            ExprLambda {
+                                range: 349..360,
+                                parameters: Some(
+                                    Parameters {
+                                        range: 356..357,
+                                        posonlyargs: [],
+                                        args: [
+                                            ParameterWithDefault {
+                                                range: 356..357,
+                                                parameter: Parameter {
+                                                    range: 356..357,
+                                                    name: Identifier {
+                                                        id: "_",
+                                                        range: 356..357,
+                                                    },
+                                                    annotation: None,
+                                                },
+                                                default: None,
+                                            },
+                                        ],
+                                        vararg: None,
+                                        kwonlyargs: [],
+                                        kwarg: None,
+                                    },
+                                ),
+                                body: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 359..360,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 364..366,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 367..385,
+                    targets: [
+                        IfExp(
+                            ExprIfExp {
+                                range: 367..380,
+                                test: Name(
+                                    ExprName {
+                                        range: 372..373,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                                body: Name(
+                                    ExprName {
+                                        range: 367..368,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                                orelse: Name(
+                                    ExprName {
+                                        range: 379..380,
+                                        id: "c",
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 383..385,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 386..399,
+                    targets: [
+                        Dict(
+                            ExprDict {
+                                range: 386..394,
+                                keys: [
+                                    Some(
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 387..390,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 387..390,
+                                                            value: "a",
+                                                            unicode: false,
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                    ),
+                                ],
+                                values: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 392..393,
+                                            value: Int(
+                                                5,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 397..399,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 400..408,
+                    targets: [
+                        Set(
+                            ExprSet {
+                                range: 400..403,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            range: 401..402,
+                                            id: "a",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 406..408,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 409..429,
+                    targets: [
+                        ListComp(
+                            ExprListComp {
+                                range: 409..424,
+                                elt: Name(
+                                    ExprName {
+                                        range: 410..411,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                generators: [
+                                    Comprehension {
+                                        range: 412..423,
+                                        target: Name(
+                                            ExprName {
+                                                range: 416..417,
+                                                id: "x",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        iter: Name(
+                                            ExprName {
+                                                range: 421..423,
+                                                id: "xs",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ifs: [],
+                                        is_async: false,
+                                    },
+                                ],
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 427..429,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 430..450,
+                    targets: [
+                        SetComp(
+                            ExprSetComp {
+                                range: 430..445,
+                                elt: Name(
+                                    ExprName {
+                                        range: 431..432,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                generators: [
+                                    Comprehension {
+                                        range: 433..444,
+                                        target: Name(
+                                            ExprName {
+                                                range: 437..438,
+                                                id: "x",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        iter: Name(
+                                            ExprName {
+                                                range: 442..444,
+                                                id: "xs",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ifs: [],
+                                        is_async: false,
+                                    },
+                                ],
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 448..450,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 451..478,
+                    targets: [
+                        DictComp(
+                            ExprDictComp {
+                                range: 451..473,
+                                key: Name(
+                                    ExprName {
+                                        range: 452..453,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                value: BinOp(
+                                    ExprBinOp {
+                                        range: 455..460,
+                                        left: Name(
+                                            ExprName {
+                                                range: 455..456,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        op: Mult,
+                                        right: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 459..460,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                generators: [
+                                    Comprehension {
+                                        range: 461..472,
+                                        target: Name(
+                                            ExprName {
+                                                range: 465..466,
+                                                id: "x",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        iter: Name(
+                                            ExprName {
+                                                range: 470..472,
+                                                id: "xs",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ifs: [],
+                                        is_async: false,
+                                    },
+                                ],
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 476..478,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 479..499,
+                    targets: [
+                        GeneratorExp(
+                            ExprGeneratorExp {
+                                range: 479..494,
+                                elt: Name(
+                                    ExprName {
+                                        range: 480..481,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                generators: [
+                                    Comprehension {
+                                        range: 482..493,
+                                        target: Name(
+                                            ExprName {
+                                                range: 486..487,
+                                                id: "x",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        iter: Name(
+                                            ExprName {
+                                                range: 491..493,
+                                                id: "xs",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ifs: [],
+                                        is_async: false,
+                                    },
+                                ],
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 497..499,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 500..512,
+                    targets: [
+                        Await(
+                            ExprAwait {
+                                range: 500..507,
+                                value: Name(
+                                    ExprName {
+                                        range: 506..507,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 510..512,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 513..527,
+                    targets: [
+                        Yield(
+                            ExprYield {
+                                range: 514..521,
+                                value: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 520..521,
+                                            id: "x",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 525..527,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 528..548,
+                    targets: [
+                        YieldFrom(
+                            ExprYieldFrom {
+                                range: 529..542,
+                                value: Name(
+                                    ExprName {
+                                        range: 540..542,
+                                        id: "xs",
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 546..548,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 549..563,
+                    targets: [
+                        Compare(
+                            ExprCompare {
+                                range: 549..558,
+                                left: Name(
+                                    ExprName {
+                                        range: 549..550,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                                ops: [
+                                    Lt,
+                                    Lt,
+                                ],
+                                comparators: [
+                                    Name(
+                                        ExprName {
+                                            range: 553..554,
+                                            id: "b",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 557..558,
+                                            id: "c",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 561..563,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 564..574,
+                    targets: [
+                        Call(
+                            ExprCall {
+                                range: 564..569,
+                                func: Name(
+                                    ExprName {
+                                        range: 564..567,
+                                        id: "foo",
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 567..569,
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 572..574,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 1077..1091,
+                    targets: [
+                        FString(
+                            ExprFString {
+                                range: 1077..1086,
+                                value: FStringValue {
+                                    inner: Single(
+                                        FString(
+                                            FString {
+                                                range: 1077..1086,
+                                                elements: [
+                                                    Expression(
+                                                        FStringExpressionElement {
+                                                            range: 1079..1085,
+                                                            expression: Name(
+                                                                ExprName {
+                                                                    range: 1080..1084,
+                                                                    id: "quux",
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            debug_text: None,
+                                                            conversion: None,
+                                                            format_spec: None,
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                    ),
+                                },
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 1089..1091,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 1092..1115,
+                    targets: [
+                        FString(
+                            ExprFString {
+                                range: 1092..1110,
+                                value: FStringValue {
+                                    inner: Single(
+                                        FString(
+                                            FString {
+                                                range: 1092..1110,
+                                                elements: [
+                                                    Expression(
+                                                        FStringExpressionElement {
+                                                            range: 1094..1099,
+                                                            expression: Name(
+                                                                ExprName {
+                                                                    range: 1095..1098,
+                                                                    id: "foo",
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            debug_text: None,
+                                                            conversion: None,
+                                                            format_spec: None,
+                                                        },
+                                                    ),
+                                                    Literal(
+                                                        FStringLiteralElement {
+                                                            range: 1099..1104,
+                                                            value: " and ",
+                                                        },
+                                                    ),
+                                                    Expression(
+                                                        FStringExpressionElement {
+                                                            range: 1104..1109,
+                                                            expression: Name(
+                                                                ExprName {
+                                                                    range: 1105..1108,
+                                                                    id: "bar",
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            debug_text: None,
+                                                            conversion: None,
+                                                            format_spec: None,
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                    ),
+                                },
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 1113..1115,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 1117..1127,
+                    targets: [
+                        StringLiteral(
+                            ExprStringLiteral {
+                                range: 1117..1122,
+                                value: StringLiteralValue {
+                                    inner: Single(
+                                        StringLiteral {
+                                            range: 1117..1122,
+                                            value: "foo",
+                                            unicode: false,
+                                        },
+                                    ),
+                                },
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 1125..1127,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 1128..1139,
+                    targets: [
+                        BytesLiteral(
+                            ExprBytesLiteral {
+                                range: 1128..1134,
+                                value: BytesLiteralValue {
+                                    inner: Single(
+                                        BytesLiteral {
+                                            range: 1128..1134,
+                                            value: [
+                                                102,
+                                                111,
+                                                111,
+                                            ],
+                                        },
+                                    ),
+                                },
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 1137..1139,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 1140..1148,
+                    targets: [
+                        NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 1140..1143,
+                                value: Int(
+                                    123,
+                                ),
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 1146..1148,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 1149..1158,
+                    targets: [
+                        BooleanLiteral(
+                            ExprBooleanLiteral {
+                                range: 1149..1153,
+                                value: true,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 1156..1158,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 1159..1168,
+                    targets: [
+                        NoneLiteral(
+                            ExprNoneLiteral {
+                                range: 1159..1163,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 1166..1168,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 1169..1177,
+                    targets: [
+                        EllipsisLiteral(
+                            ExprEllipsisLiteral {
+                                range: 1169..1172,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 1175..1177,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 1178..1189,
+                    targets: [
+                        Starred(
+                            ExprStarred {
+                                range: 1178..1184,
+                                value: Call(
+                                    ExprCall {
+                                        range: 1179..1184,
+                                        func: Name(
+                                            ExprName {
+                                                range: 1179..1182,
+                                                id: "foo",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 1182..1184,
+                                            args: [],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 1187..1189,
+                            value: Int(
+                                42,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 1190..1218,
+                    targets: [
+                        List(
+                            ExprList {
+                                range: 1190..1203,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            range: 1191..1192,
+                                            id: "x",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    Call(
+                                        ExprCall {
+                                            range: 1194..1199,
+                                            func: Name(
+                                                ExprName {
+                                                    range: 1194..1197,
+                                                    id: "foo",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 1197..1199,
+                                                args: [],
+                                                keywords: [],
+                                            },
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 1201..1202,
+                                            id: "y",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ],
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: List(
+                        ExprList {
+                            range: 1206..1218,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 1207..1209,
+                                        value: Int(
+                                            42,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 1211..1213,
+                                        value: Int(
+                                            42,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 1215..1217,
+                                        value: Int(
+                                            42,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 1219..1259,
+                    targets: [
+                        List(
+                            ExprList {
+                                range: 1219..1238,
+                                elts: [
+                                    List(
+                                        ExprList {
+                                            range: 1220..1226,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 1221..1222,
+                                                        id: "a",
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 1224..1225,
+                                                        id: "b",
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    List(
+                                        ExprList {
+                                            range: 1228..1234,
+                                            elts: [
+                                                List(
+                                                    ExprList {
+                                                        range: 1229..1233,
+                                                        elts: [
+                                                            NumberLiteral(
+                                                                ExprNumberLiteral {
+                                                                    range: 1230..1232,
+                                                                    value: Int(
+                                                                        42,
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        ],
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 1236..1237,
+                                            id: "d",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ],
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: List(
+                        ExprList {
+                            range: 1241..1259,
+                            elts: [
+                                List(
+                                    ExprList {
+                                        range: 1242..1248,
+                                        elts: [
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 1243..1244,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 1246..1247,
+                                                    value: Int(
+                                                        2,
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                    },
+                                ),
+                                List(
+                                    ExprList {
+                                        range: 1250..1255,
+                                        elts: [
+                                            List(
+                                                ExprList {
+                                                    range: 1251..1254,
+                                                    elts: [
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 1252..1253,
+                                                                value: Int(
+                                                                    3,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ],
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 1257..1258,
+                                        value: Int(
+                                            4,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 1260..1288,
+                    targets: [
+                        Tuple(
+                            ExprTuple {
+                                range: 1260..1273,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            range: 1261..1262,
+                                            id: "x",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    Call(
+                                        ExprCall {
+                                            range: 1264..1269,
+                                            func: Name(
+                                                ExprName {
+                                                    range: 1264..1267,
+                                                    id: "foo",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 1267..1269,
+                                                args: [],
+                                                keywords: [],
+                                            },
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 1271..1272,
+                                            id: "y",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ],
+                                ctx: Store,
+                                parenthesized: true,
+                            },
+                        ),
+                    ],
+                    value: Tuple(
+                        ExprTuple {
+                            range: 1276..1288,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 1277..1279,
+                                        value: Int(
+                                            42,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 1281..1283,
+                                        value: Int(
+                                            42,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 1285..1287,
+                                        value: Int(
+                                            42,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+3 | # rejected by the parser. e.g., `5 = 3`, `5 += 3`, `(5): int = 3`.
+4 | 
+5 | 5 = 3
+  | ^ Syntax Error: invalid assignment target
+6 | 
+7 | 5 += 3
+  |
+
+
+  |
+5 | 5 = 3
+6 | 
+7 | 5 += 3
+  | ^ Syntax Error: invalid augmented assignment target
+8 | 
+9 | (5): int = 3
+  |
+
+
+   |
+ 7 | 5 += 3
+ 8 | 
+ 9 | (5): int = 3
+   |  ^ Syntax Error: invalid assignment target
+10 | 
+11 | # Now we exhaustively test all possible cases where assignment can fail.
+   |
+
+
+   |
+11 | # Now we exhaustively test all possible cases where assignment can fail.
+12 | x or y = 42
+   | ^^^^^^ Syntax Error: invalid assignment target
+13 | (x := 5) = 42
+14 | x + y = 42
+   |
+
+
+   |
+11 | # Now we exhaustively test all possible cases where assignment can fail.
+12 | x or y = 42
+13 | (x := 5) = 42
+   |  ^^^^^^ Syntax Error: invalid assignment target
+14 | x + y = 42
+15 | -x = 42
+   |
+
+
+   |
+12 | x or y = 42
+13 | (x := 5) = 42
+14 | x + y = 42
+   | ^^^^^ Syntax Error: invalid assignment target
+15 | -x = 42
+16 | (lambda _: 1) = 42
+   |
+
+
+   |
+13 | (x := 5) = 42
+14 | x + y = 42
+15 | -x = 42
+   | ^^ Syntax Error: invalid assignment target
+16 | (lambda _: 1) = 42
+17 | a if b else c = 42
+   |
+
+
+   |
+14 | x + y = 42
+15 | -x = 42
+16 | (lambda _: 1) = 42
+   |  ^^^^^^^^^^^ Syntax Error: invalid assignment target
+17 | a if b else c = 42
+18 | {"a": 5} = 42
+   |
+
+
+   |
+15 | -x = 42
+16 | (lambda _: 1) = 42
+17 | a if b else c = 42
+   | ^^^^^^^^^^^^^ Syntax Error: invalid assignment target
+18 | {"a": 5} = 42
+19 | {a} = 42
+   |
+
+
+   |
+16 | (lambda _: 1) = 42
+17 | a if b else c = 42
+18 | {"a": 5} = 42
+   | ^^^^^^^^ Syntax Error: invalid assignment target
+19 | {a} = 42
+20 | [x for x in xs] = 42
+   |
+
+
+   |
+17 | a if b else c = 42
+18 | {"a": 5} = 42
+19 | {a} = 42
+   | ^^^ Syntax Error: invalid assignment target
+20 | [x for x in xs] = 42
+21 | {x for x in xs} = 42
+   |
+
+
+   |
+18 | {"a": 5} = 42
+19 | {a} = 42
+20 | [x for x in xs] = 42
+   | ^^^^^^^^^^^^^^^ Syntax Error: invalid assignment target
+21 | {x for x in xs} = 42
+22 | {x: x * 2 for x in xs} = 42
+   |
+
+
+   |
+19 | {a} = 42
+20 | [x for x in xs] = 42
+21 | {x for x in xs} = 42
+   | ^^^^^^^^^^^^^^^ Syntax Error: invalid assignment target
+22 | {x: x * 2 for x in xs} = 42
+23 | (x for x in xs) = 42
+   |
+
+
+   |
+20 | [x for x in xs] = 42
+21 | {x for x in xs} = 42
+22 | {x: x * 2 for x in xs} = 42
+   | ^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: invalid assignment target
+23 | (x for x in xs) = 42
+24 | await x = 42
+   |
+
+
+   |
+21 | {x for x in xs} = 42
+22 | {x: x * 2 for x in xs} = 42
+23 | (x for x in xs) = 42
+   | ^^^^^^^^^^^^^^^ Syntax Error: invalid assignment target
+24 | await x = 42
+25 | (yield x) = 42
+   |
+
+
+   |
+22 | {x: x * 2 for x in xs} = 42
+23 | (x for x in xs) = 42
+24 | await x = 42
+   | ^^^^^^^ Syntax Error: invalid assignment target
+25 | (yield x) = 42
+26 | (yield from xs) = 42
+   |
+
+
+   |
+23 | (x for x in xs) = 42
+24 | await x = 42
+25 | (yield x) = 42
+   |  ^^^^^^^ Syntax Error: invalid assignment target
+26 | (yield from xs) = 42
+27 | a < b < c = 42
+   |
+
+
+   |
+24 | await x = 42
+25 | (yield x) = 42
+26 | (yield from xs) = 42
+   |  ^^^^^^^^^^^^^ Syntax Error: invalid assignment target
+27 | a < b < c = 42
+28 | foo() = 42
+   |
+
+
+   |
+25 | (yield x) = 42
+26 | (yield from xs) = 42
+27 | a < b < c = 42
+   | ^^^^^^^^^ Syntax Error: invalid assignment target
+28 | foo() = 42
+   |
+
+
+   |
+26 | (yield from xs) = 42
+27 | a < b < c = 42
+28 | foo() = 42
+   | ^^^^^ Syntax Error: invalid assignment target
+29 | 
+30 | # N.B. It looks like the parser can't generate a top-level
+   |
+
+
+   |
+39 | #
+40 | # See: https://docs.python.org/3/library/ast.html#ast.FormattedValue
+41 | f"{quux}" = 42
+   | ^^^^^^^^^ Syntax Error: invalid assignment target
+42 | f"{foo} and {bar}" = 42
+   |
+
+
+   |
+40 | # See: https://docs.python.org/3/library/ast.html#ast.FormattedValue
+41 | f"{quux}" = 42
+42 | f"{foo} and {bar}" = 42
+   | ^^^^^^^^^^^^^^^^^^ Syntax Error: invalid assignment target
+43 | 
+44 | "foo" = 42
+   |
+
+
+   |
+42 | f"{foo} and {bar}" = 42
+43 | 
+44 | "foo" = 42
+   | ^^^^^ Syntax Error: invalid assignment target
+45 | b"foo" = 42
+46 | 123 = 42
+   |
+
+
+   |
+44 | "foo" = 42
+45 | b"foo" = 42
+   | ^^^^^^ Syntax Error: invalid assignment target
+46 | 123 = 42
+47 | True = 42
+   |
+
+
+   |
+44 | "foo" = 42
+45 | b"foo" = 42
+46 | 123 = 42
+   | ^^^ Syntax Error: invalid assignment target
+47 | True = 42
+48 | None = 42
+   |
+
+
+   |
+45 | b"foo" = 42
+46 | 123 = 42
+47 | True = 42
+   | ^^^^ Syntax Error: invalid assignment target
+48 | None = 42
+49 | ... = 42
+   |
+
+
+   |
+46 | 123 = 42
+47 | True = 42
+48 | None = 42
+   | ^^^^ Syntax Error: invalid assignment target
+49 | ... = 42
+50 | *foo() = 42
+   |
+
+
+   |
+47 | True = 42
+48 | None = 42
+49 | ... = 42
+   | ^^^ Syntax Error: invalid assignment target
+50 | *foo() = 42
+51 | [x, foo(), y] = [42, 42, 42]
+   |
+
+
+   |
+48 | None = 42
+49 | ... = 42
+50 | *foo() = 42
+   | ^^^^^^ Syntax Error: invalid assignment target
+51 | [x, foo(), y] = [42, 42, 42]
+52 | [[a, b], [[42]], d] = [[1, 2], [[3]], 4]
+   |
+
+
+   |
+49 | ... = 42
+50 | *foo() = 42
+51 | [x, foo(), y] = [42, 42, 42]
+   | ^^^^^^^^^^^^^ Syntax Error: invalid assignment target
+52 | [[a, b], [[42]], d] = [[1, 2], [[3]], 4]
+53 | (x, foo(), y) = (42, 42, 42)
+   |
+
+
+   |
+50 | *foo() = 42
+51 | [x, foo(), y] = [42, 42, 42]
+52 | [[a, b], [[42]], d] = [[1, 2], [[3]], 4]
+   | ^^^^^^^^^^^^^^^^^^^ Syntax Error: invalid assignment target
+53 | (x, foo(), y) = (42, 42, 42)
+   |
+
+
+   |
+51 | [x, foo(), y] = [42, 42, 42]
+52 | [[a, b], [[42]], d] = [[1, 2], [[3]], 4]
+53 | (x, foo(), y) = (42, 42, 42)
+   | ^^^^^^^^^^^^^ Syntax Error: invalid assignment target
+   |
+
+
+
