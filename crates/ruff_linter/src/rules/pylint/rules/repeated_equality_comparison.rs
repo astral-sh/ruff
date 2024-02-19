@@ -196,6 +196,14 @@ fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
         return false;
     }
 
+    for comparator in comparators.iter() {
+        if let Some(expr_str) = comparator.to_str() {
+            if expr_str.starts_with("sys.platform") || expr_str.starts_with("sys.version") {
+                return false;
+            }
+        }
+    }
+
     true
 }
 
