@@ -1,0 +1,225 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/import_from.py
+---
+## AST
+
+ ```
+Module(
+    ModModule {
+        range: 0..98,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    range: 0..21,
+                    module: Some(
+                        Identifier {
+                            id: "abc",
+                            range: 5..8,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 16..17,
+                            name: Identifier {
+                                id: "a",
+                                range: 16..17,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 19..20,
+                            name: Identifier {
+                                id: "b",
+                                range: 19..20,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: Some(
+                        0,
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 23..28,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 23..28,
+                            left: Name(
+                                ExprName {
+                                    range: 23..24,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Add,
+                            right: Name(
+                                ExprName {
+                                    range: 27..28,
+                                    id: "b",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 30..48,
+                    module: Some(
+                        Identifier {
+                            id: "abc",
+                            range: 35..38,
+                        },
+                    ),
+                    names: [],
+                    level: Some(
+                        0,
+                    ),
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 50..65,
+                    module: Some(
+                        Identifier {
+                            id: "abc",
+                            range: 55..58,
+                        },
+                    ),
+                    names: [],
+                    level: Some(
+                        0,
+                    ),
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 67..94,
+                    module: Some(
+                        Identifier {
+                            id: "abc",
+                            range: 72..75,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 84..85,
+                            name: Identifier {
+                                id: "a",
+                                range: 84..85,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 87..88,
+                            name: Identifier {
+                                id: "b",
+                                range: 87..88,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 90..91,
+                            name: Identifier {
+                                id: "c",
+                                range: 90..91,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 93..94,
+                            name: Identifier {
+                                id: "a",
+                                range: 93..94,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: Some(
+                        0,
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 95..98,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 95..98,
+                            op: UAdd,
+                            operand: Name(
+                                ExprName {
+                                    range: 97..98,
+                                    id: "b",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+3 | a + b
+4 | 
+5 | from abc import ,,
+  |                 ^ Syntax Error: Expected an import name or a ')'
+6 | 
+7 | from abc import
+  |
+
+
+  |
+3 | a + b
+4 | 
+5 | from abc import ,,
+  |                  ^ Syntax Error: Expected an import name or a ')'
+6 | 
+7 | from abc import
+  |
+
+
+   |
+ 9 | from abc import (a, b, c
+10 | 
+11 | a + b
+   | ^ Syntax Error: expected Comma, found Name
+   |
+
+
+   |
+ 9 | from abc import (a, b, c
+10 | 
+11 | a + b
+   |   ^ Syntax Error: expected Comma, found Plus
+   |
+
+
+   |
+ 7 |   from abc import
+ 8 |   
+ 9 | / from abc import (a, b, c
+10 | | 
+11 | | a + b
+   | |___^ Syntax Error: use `;` to separate simple statements
+   |
+
+
+   |
+ 9 | from abc import (a, b, c
+10 | 
+11 | a + b
+   |       Syntax Error: unexpected EOF while parsing
+   |
+
+
+
