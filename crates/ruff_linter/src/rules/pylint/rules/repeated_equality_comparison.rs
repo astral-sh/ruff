@@ -2,6 +2,7 @@ use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 
 use itertools::{any, Itertools};
+use regex::Regex;
 use rustc_hash::FxHashMap;
 
 use ast::ExprContext;
@@ -196,12 +197,16 @@ fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
         return false;
     }
 
-    for comparator in comparators.iter() {
-        if let Some(expr_str) = comparator.to_str() {
-            if expr_str.starts_with("sys.platform") || expr_str.starts_with("sys.version") {
-                return false;
-            }
-        }
+    if left.is_attribute_expr()
+        && left
+            .to_owned()
+            .expect_attribute_expr()
+            .value
+            .name_expr()
+            .is_some_and(|f| f.id == "sys")
+    {
+        let excluder = Regex::new(r"^(platform|version)").unwrap();
+        return !excluder.is_match(left.clone().expect_attribute_expr().attr.as_str());
     }
 
     true

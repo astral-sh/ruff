@@ -51,3 +51,5 @@ foo == foo or foo == bar  # Self-comparison.
 foo[0] == "a" or foo[0] == "b"  # Subscripts.
 
 foo() == "a" or foo() == "b"  # Calls.
+
+sys.platform == "win32" or sys.platform == "emscripten" # sys attributes
