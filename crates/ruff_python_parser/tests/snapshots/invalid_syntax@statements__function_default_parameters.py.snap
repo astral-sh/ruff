@@ -1,0 +1,99 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/function_default_parameters.py
+---
+## AST
+
+ ```
+Module(
+    ModModule {
+        range: 0..95,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 71..94,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "f",
+                        range: 75..76,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 76..88,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 77..78,
+                                parameter: Parameter {
+                                    range: 77..78,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 77..78,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 80..84,
+                                parameter: Parameter {
+                                    range: 80..81,
+                                    name: Identifier {
+                                        id: "b",
+                                        range: 80..81,
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 82..84,
+                                            value: Int(
+                                                20,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                            ParameterWithDefault {
+                                range: 86..87,
+                                parameter: Parameter {
+                                    range: 86..87,
+                                    name: Identifier {
+                                        id: "c",
+                                        range: 86..87,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 90..94,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # TODO(micha): The range of the generated error message is off by one.
+2 | def f(a, b=20, c): pass
+  |                 ^ Syntax Error: non-default argument follows default argument
+  |
+
+
+

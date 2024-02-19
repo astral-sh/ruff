@@ -1,0 +1,196 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/call_invalid_argument_ordering.py
+---
+## AST
+
+ ```
+Module(
+    ModModule {
+        range: 0..67,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..10,
+                    value: Call(
+                        ExprCall {
+                            range: 0..10,
+                            func: Name(
+                                ExprName {
+                                    range: 0..1,
+                                    id: "f",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 1..10,
+                                args: [
+                                    Name(
+                                        ExprName {
+                                            range: 8..9,
+                                            id: "c",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [
+                                    Keyword {
+                                        range: 2..6,
+                                        arg: Some(
+                                            Identifier {
+                                                id: "b",
+                                                range: 2..3,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 4..6,
+                                                value: Int(
+                                                    20,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 12..22,
+                    value: Call(
+                        ExprCall {
+                            range: 12..22,
+                            func: Name(
+                                ExprName {
+                                    range: 12..13,
+                                    id: "f",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 13..22,
+                                args: [
+                                    Starred(
+                                        ExprStarred {
+                                            range: 19..21,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 20..21,
+                                                    id: "c",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [
+                                    Keyword {
+                                        range: 14..17,
+                                        arg: None,
+                                        value: Name(
+                                            ExprName {
+                                                range: 16..17,
+                                                id: "b",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 53..66,
+                    value: Call(
+                        ExprCall {
+                            range: 53..66,
+                            func: Name(
+                                ExprName {
+                                    range: 53..54,
+                                    id: "f",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 54..66,
+                                args: [],
+                                keywords: [
+                                    Keyword {
+                                        range: 55..59,
+                                        arg: Some(
+                                            Identifier {
+                                                id: "a",
+                                                range: 55..56,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 57..59,
+                                                value: Int(
+                                                    20,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    Keyword {
+                                        range: 61..65,
+                                        arg: Some(
+                                            Identifier {
+                                                id: "a",
+                                                range: 61..62,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 63..65,
+                                                value: Int(
+                                                    30,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | f(b=20, c)
+  |         ^ Syntax Error: positional argument follows keyword argument unpacking
+2 | 
+3 | f(**b, *c)
+  |
+
+
+  |
+1 | f(b=20, c)
+2 | 
+3 | f(**b, *c)
+  |        ^^ Syntax Error: iterable argument unpacking follows keyword argument unpacking
+4 | 
+5 | # Duplicate keyword argument
+  |
+
+
+  |
+5 | # Duplicate keyword argument
+6 | f(a=20, a=30)
+  |         ^^^^ Syntax Error: keyword argument repeated: a
+  |
+
+
+

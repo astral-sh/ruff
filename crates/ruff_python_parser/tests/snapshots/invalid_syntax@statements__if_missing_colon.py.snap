@@ -1,0 +1,68 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/if_missing_colon.py
+---
+## AST
+
+ ```
+Module(
+    ModModule {
+        range: 0..25,
+        body: [
+            If(
+                StmtIf {
+                    range: 0..16,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 3..7,
+                            value: true,
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 12..16,
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 18..24,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 18..19,
+                                id: "a",
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 22..24,
+                            value: Int(
+                                10,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | if True
+  |        ^ Syntax Error: expected Colon, found Newline
+2 |     pass
+3 | 
+4 | a = 10
+  |
+
+
+
