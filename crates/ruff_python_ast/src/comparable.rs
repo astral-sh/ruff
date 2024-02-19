@@ -234,6 +234,7 @@ pub enum ComparablePattern<'a> {
     MatchStar(PatternMatchStar<'a>),
     MatchAs(PatternMatchAs<'a>),
     MatchOr(PatternMatchOr<'a>),
+    Invalid,
 }
 
 impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
@@ -286,6 +287,8 @@ impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
                     patterns: patterns.iter().map(Into::into).collect(),
                 })
             }
+            #[allow(deprecated)]
+            ast::Pattern::Invalid(_) => Self::Invalid,
         }
     }
 }
@@ -513,6 +516,7 @@ impl<'a> From<&'a ast::ExceptHandler> for ComparableExceptHandler<'a> {
 pub enum ComparableFStringElement<'a> {
     Literal(&'a str),
     FStringExpressionElement(FStringExpressionElement<'a>),
+    Invalid,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -540,6 +544,8 @@ impl<'a> From<&'a ast::FStringElement> for ComparableFStringElement<'a> {
                         .map(|spec| spec.elements.iter().map(Into::into).collect()),
                 })
             }
+            #[allow(deprecated)]
+            ast::FStringElement::Invalid(_) => Self::Invalid,
         }
     }
 }
@@ -864,6 +870,7 @@ pub enum ComparableExpr<'a> {
     Tuple(ExprTuple<'a>),
     Slice(ExprSlice<'a>),
     IpyEscapeCommand(ExprIpyEscapeCommand<'a>),
+    Invalid,
 }
 
 impl<'a> From<&'a Box<ast::Expr>> for Box<ComparableExpr<'a>> {
@@ -1092,6 +1099,8 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 value,
                 range: _,
             }) => Self::IpyEscapeCommand(ExprIpyEscapeCommand { kind: *kind, value }),
+            #[allow(deprecated)]
+            ast::Expr::Invalid(_) => Self::Invalid,
         }
     }
 }

@@ -113,6 +113,10 @@ impl Transformer for Relocator {
             Expr::IpyEscapeCommand(nodes::ExprIpyEscapeCommand { range, .. }) => {
                 *range = self.range;
             }
+            #[allow(deprecated)]
+            Expr::Invalid(nodes::ExprInvalid { range, .. }) => {
+                *range = self.range;
+            }
         }
         walk_expr(self, expr);
     }
