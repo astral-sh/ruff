@@ -86,9 +86,11 @@ pub enum AnyNode {
     ExprTuple(ast::ExprTuple),
     ExprSlice(ast::ExprSlice),
     ExprIpyEscapeCommand(ast::ExprIpyEscapeCommand),
+    ExprInvalid(ast::ExprInvalid),
     ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler),
     FStringExpressionElement(ast::FStringExpressionElement),
     FStringLiteralElement(ast::FStringLiteralElement),
+    FStringInvalidElement(ast::FStringInvalidElement),
     FStringFormatSpec(ast::FStringFormatSpec),
     PatternMatchValue(ast::PatternMatchValue),
     PatternMatchSingleton(ast::PatternMatchSingleton),
@@ -100,6 +102,7 @@ pub enum AnyNode {
     PatternMatchOr(ast::PatternMatchOr),
     PatternArguments(PatternArguments),
     PatternKeyword(PatternKeyword),
+    PatternMatchInvalid(ast::PatternMatchInvalid),
     Comprehension(Comprehension),
     Arguments(Arguments),
     Parameters(Parameters),
@@ -170,6 +173,7 @@ impl AnyNode {
             | AnyNode::ExprCall(_)
             | AnyNode::FStringExpressionElement(_)
             | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringInvalidElement(_)
             | AnyNode::FStringFormatSpec(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprStringLiteral(_)
@@ -186,6 +190,7 @@ impl AnyNode {
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
             | AnyNode::ExprIpyEscapeCommand(_)
+            | AnyNode::ExprInvalid(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
@@ -197,6 +202,7 @@ impl AnyNode {
             | AnyNode::PatternMatchOr(_)
             | AnyNode::PatternArguments(_)
             | AnyNode::PatternKeyword(_)
+            | AnyNode::PatternMatchInvalid(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
@@ -252,6 +258,8 @@ impl AnyNode {
             AnyNode::ExprTuple(node) => Some(Expr::Tuple(node)),
             AnyNode::ExprSlice(node) => Some(Expr::Slice(node)),
             AnyNode::ExprIpyEscapeCommand(node) => Some(Expr::IpyEscapeCommand(node)),
+            #[allow(deprecated)]
+            AnyNode::ExprInvalid(range) => Some(Expr::Invalid(range)),
 
             AnyNode::ModModule(_)
             | AnyNode::ModExpression(_)
@@ -283,6 +291,7 @@ impl AnyNode {
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::FStringExpressionElement(_)
             | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringInvalidElement(_)
             | AnyNode::FStringFormatSpec(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
@@ -294,6 +303,7 @@ impl AnyNode {
             | AnyNode::PatternMatchOr(_)
             | AnyNode::PatternArguments(_)
             | AnyNode::PatternKeyword(_)
+            | AnyNode::PatternMatchInvalid(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
@@ -364,6 +374,7 @@ impl AnyNode {
             | AnyNode::ExprCall(_)
             | AnyNode::FStringExpressionElement(_)
             | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringInvalidElement(_)
             | AnyNode::FStringFormatSpec(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprStringLiteral(_)
@@ -380,6 +391,7 @@ impl AnyNode {
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
             | AnyNode::ExprIpyEscapeCommand(_)
+            | AnyNode::ExprInvalid(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
@@ -391,6 +403,7 @@ impl AnyNode {
             | AnyNode::PatternMatchOr(_)
             | AnyNode::PatternArguments(_)
             | AnyNode::PatternKeyword(_)
+            | AnyNode::PatternMatchInvalid(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
@@ -422,6 +435,8 @@ impl AnyNode {
             AnyNode::PatternMatchStar(node) => Some(Pattern::MatchStar(node)),
             AnyNode::PatternMatchAs(node) => Some(Pattern::MatchAs(node)),
             AnyNode::PatternMatchOr(node) => Some(Pattern::MatchOr(node)),
+            #[allow(deprecated)]
+            AnyNode::PatternMatchInvalid(node) => Some(Pattern::Invalid(node)),
 
             AnyNode::ModModule(_)
             | AnyNode::ModExpression(_)
@@ -469,6 +484,7 @@ impl AnyNode {
             | AnyNode::ExprCall(_)
             | AnyNode::FStringExpressionElement(_)
             | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringInvalidElement(_)
             | AnyNode::FStringFormatSpec(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprStringLiteral(_)
@@ -485,6 +501,7 @@ impl AnyNode {
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
             | AnyNode::ExprIpyEscapeCommand(_)
+            | AnyNode::ExprInvalid(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::PatternArguments(_)
             | AnyNode::PatternKeyword(_)
@@ -559,6 +576,7 @@ impl AnyNode {
             | AnyNode::ExprCall(_)
             | AnyNode::FStringExpressionElement(_)
             | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringInvalidElement(_)
             | AnyNode::FStringFormatSpec(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprStringLiteral(_)
@@ -575,6 +593,7 @@ impl AnyNode {
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
             | AnyNode::ExprIpyEscapeCommand(_)
+            | AnyNode::ExprInvalid(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
             | AnyNode::PatternMatchSequence(_)
@@ -585,6 +604,7 @@ impl AnyNode {
             | AnyNode::PatternMatchOr(_)
             | AnyNode::PatternArguments(_)
             | AnyNode::PatternKeyword(_)
+            | AnyNode::PatternMatchInvalid(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
@@ -674,6 +694,7 @@ impl AnyNode {
             Self::ExprCall(node) => AnyNodeRef::ExprCall(node),
             Self::FStringExpressionElement(node) => AnyNodeRef::FStringExpressionElement(node),
             Self::FStringLiteralElement(node) => AnyNodeRef::FStringLiteralElement(node),
+            Self::FStringInvalidElement(node) => AnyNodeRef::FStringInvalidElement(node),
             Self::FStringFormatSpec(node) => AnyNodeRef::FStringFormatSpec(node),
             Self::ExprFString(node) => AnyNodeRef::ExprFString(node),
             Self::ExprStringLiteral(node) => AnyNodeRef::ExprStringLiteral(node),
@@ -690,6 +711,7 @@ impl AnyNode {
             Self::ExprTuple(node) => AnyNodeRef::ExprTuple(node),
             Self::ExprSlice(node) => AnyNodeRef::ExprSlice(node),
             Self::ExprIpyEscapeCommand(node) => AnyNodeRef::ExprIpyEscapeCommand(node),
+            Self::ExprInvalid(node) => AnyNodeRef::ExprInvalid(node),
             Self::ExceptHandlerExceptHandler(node) => AnyNodeRef::ExceptHandlerExceptHandler(node),
             Self::PatternMatchValue(node) => AnyNodeRef::PatternMatchValue(node),
             Self::PatternMatchSingleton(node) => AnyNodeRef::PatternMatchSingleton(node),
@@ -701,6 +723,7 @@ impl AnyNode {
             Self::PatternMatchOr(node) => AnyNodeRef::PatternMatchOr(node),
             Self::PatternArguments(node) => AnyNodeRef::PatternArguments(node),
             Self::PatternKeyword(node) => AnyNodeRef::PatternKeyword(node),
+            Self::PatternMatchInvalid(node) => AnyNodeRef::PatternMatchInvalid(node),
             Self::Comprehension(node) => AnyNodeRef::Comprehension(node),
             Self::Arguments(node) => AnyNodeRef::Arguments(node),
             Self::Parameters(node) => AnyNodeRef::Parameters(node),
@@ -3354,6 +3377,40 @@ impl AstNode for ast::ExprIpyEscapeCommand {
         } = self;
     }
 }
+impl AstNode for ast::ExprInvalid {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::ExprInvalid(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::ExprInvalid(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+    }
+}
 impl AstNode for ast::ExceptHandlerExceptHandler {
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -3795,6 +3852,40 @@ impl AstNode for PatternKeyword {
         } = self;
 
         visitor.visit_pattern(pattern);
+    }
+}
+impl AstNode for ast::PatternMatchInvalid {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::PatternMatchInvalid(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::PatternMatchInvalid(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
     }
 }
 
@@ -4577,6 +4668,8 @@ impl From<Expr> for AnyNode {
             Expr::Tuple(node) => AnyNode::ExprTuple(node),
             Expr::Slice(node) => AnyNode::ExprSlice(node),
             Expr::IpyEscapeCommand(node) => AnyNode::ExprIpyEscapeCommand(node),
+            #[allow(deprecated)]
+            Expr::Invalid(range) => AnyNode::ExprInvalid(range),
         }
     }
 }
@@ -4595,6 +4688,8 @@ impl From<FStringElement> for AnyNode {
         match element {
             FStringElement::Literal(node) => AnyNode::FStringLiteralElement(node),
             FStringElement::Expression(node) => AnyNode::FStringExpressionElement(node),
+            #[allow(deprecated)]
+            FStringElement::Invalid(node) => AnyNode::FStringInvalidElement(node),
         }
     }
 }
@@ -4610,6 +4705,8 @@ impl From<Pattern> for AnyNode {
             Pattern::MatchStar(node) => AnyNode::PatternMatchStar(node),
             Pattern::MatchAs(node) => AnyNode::PatternMatchAs(node),
             Pattern::MatchOr(node) => AnyNode::PatternMatchOr(node),
+            #[allow(deprecated)]
+            Pattern::Invalid(node) => AnyNode::PatternMatchInvalid(node),
         }
     }
 }
@@ -5000,6 +5097,12 @@ impl From<ast::ExprIpyEscapeCommand> for AnyNode {
     }
 }
 
+impl From<ast::ExprInvalid> for AnyNode {
+    fn from(node: ast::ExprInvalid) -> Self {
+        AnyNode::ExprInvalid(node)
+    }
+}
+
 impl From<ast::ExceptHandlerExceptHandler> for AnyNode {
     fn from(node: ast::ExceptHandlerExceptHandler) -> Self {
         AnyNode::ExceptHandlerExceptHandler(node)
@@ -5051,6 +5154,12 @@ impl From<ast::PatternMatchAs> for AnyNode {
 impl From<ast::PatternMatchOr> for AnyNode {
     fn from(node: ast::PatternMatchOr) -> Self {
         AnyNode::PatternMatchOr(node)
+    }
+}
+
+impl From<ast::PatternMatchInvalid> for AnyNode {
+    fn from(node: ast::PatternMatchInvalid) -> Self {
+        AnyNode::PatternMatchInvalid(node)
     }
 }
 
@@ -5206,6 +5315,7 @@ impl Ranged for AnyNode {
             AnyNode::ExprCall(node) => node.range(),
             AnyNode::FStringExpressionElement(node) => node.range(),
             AnyNode::FStringLiteralElement(node) => node.range(),
+            AnyNode::FStringInvalidElement(node) => node.range(),
             AnyNode::FStringFormatSpec(node) => node.range(),
             AnyNode::ExprFString(node) => node.range(),
             AnyNode::ExprStringLiteral(node) => node.range(),
@@ -5222,6 +5332,7 @@ impl Ranged for AnyNode {
             AnyNode::ExprTuple(node) => node.range(),
             AnyNode::ExprSlice(node) => node.range(),
             AnyNode::ExprIpyEscapeCommand(node) => node.range(),
+            AnyNode::ExprInvalid(node) => node.range(),
             AnyNode::ExceptHandlerExceptHandler(node) => node.range(),
             AnyNode::PatternMatchValue(node) => node.range(),
             AnyNode::PatternMatchSingleton(node) => node.range(),
@@ -5233,6 +5344,7 @@ impl Ranged for AnyNode {
             AnyNode::PatternMatchOr(node) => node.range(),
             AnyNode::PatternArguments(node) => node.range(),
             AnyNode::PatternKeyword(node) => node.range(),
+            AnyNode::PatternMatchInvalid(node) => node.range(),
             AnyNode::Comprehension(node) => node.range(),
             AnyNode::Arguments(node) => node.range(),
             AnyNode::Parameters(node) => node.range(),
@@ -5303,6 +5415,7 @@ pub enum AnyNodeRef<'a> {
     ExprCall(&'a ast::ExprCall),
     FStringExpressionElement(&'a ast::FStringExpressionElement),
     FStringLiteralElement(&'a ast::FStringLiteralElement),
+    FStringInvalidElement(&'a ast::FStringInvalidElement),
     FStringFormatSpec(&'a ast::FStringFormatSpec),
     ExprFString(&'a ast::ExprFString),
     ExprStringLiteral(&'a ast::ExprStringLiteral),
@@ -5319,6 +5432,7 @@ pub enum AnyNodeRef<'a> {
     ExprTuple(&'a ast::ExprTuple),
     ExprSlice(&'a ast::ExprSlice),
     ExprIpyEscapeCommand(&'a ast::ExprIpyEscapeCommand),
+    ExprInvalid(&'a ast::ExprInvalid),
     ExceptHandlerExceptHandler(&'a ast::ExceptHandlerExceptHandler),
     PatternMatchValue(&'a ast::PatternMatchValue),
     PatternMatchSingleton(&'a ast::PatternMatchSingleton),
@@ -5330,6 +5444,7 @@ pub enum AnyNodeRef<'a> {
     PatternMatchOr(&'a ast::PatternMatchOr),
     PatternArguments(&'a ast::PatternArguments),
     PatternKeyword(&'a ast::PatternKeyword),
+    PatternMatchInvalid(&'a ast::PatternMatchInvalid),
     Comprehension(&'a Comprehension),
     Arguments(&'a Arguments),
     Parameters(&'a Parameters),
@@ -5399,6 +5514,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::ExprCall(node) => NonNull::from(*node).cast(),
             AnyNodeRef::FStringExpressionElement(node) => NonNull::from(*node).cast(),
             AnyNodeRef::FStringLiteralElement(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::FStringInvalidElement(node) => NonNull::from(*node).cast(),
             AnyNodeRef::FStringFormatSpec(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprFString(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprStringLiteral(node) => NonNull::from(*node).cast(),
@@ -5415,6 +5531,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::ExprTuple(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprSlice(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprIpyEscapeCommand(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprInvalid(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchValue(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternMatchSingleton(node) => NonNull::from(*node).cast(),
@@ -5426,6 +5543,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::PatternMatchOr(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternArguments(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternKeyword(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::PatternMatchInvalid(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Comprehension(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Arguments(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Parameters(node) => NonNull::from(*node).cast(),
@@ -5501,6 +5619,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::ExprCall(_) => NodeKind::ExprCall,
             AnyNodeRef::FStringExpressionElement(_) => NodeKind::FStringExpressionElement,
             AnyNodeRef::FStringLiteralElement(_) => NodeKind::FStringLiteralElement,
+            AnyNodeRef::FStringInvalidElement(_) => NodeKind::FStringInvalidElement,
             AnyNodeRef::FStringFormatSpec(_) => NodeKind::FStringFormatSpec,
             AnyNodeRef::ExprFString(_) => NodeKind::ExprFString,
             AnyNodeRef::ExprStringLiteral(_) => NodeKind::ExprStringLiteral,
@@ -5517,6 +5636,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::ExprTuple(_) => NodeKind::ExprTuple,
             AnyNodeRef::ExprSlice(_) => NodeKind::ExprSlice,
             AnyNodeRef::ExprIpyEscapeCommand(_) => NodeKind::ExprIpyEscapeCommand,
+            AnyNodeRef::ExprInvalid(_) => NodeKind::ExprInvalid,
             AnyNodeRef::ExceptHandlerExceptHandler(_) => NodeKind::ExceptHandlerExceptHandler,
             AnyNodeRef::PatternMatchValue(_) => NodeKind::PatternMatchValue,
             AnyNodeRef::PatternMatchSingleton(_) => NodeKind::PatternMatchSingleton,
@@ -5528,6 +5648,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::PatternMatchOr(_) => NodeKind::PatternMatchOr,
             AnyNodeRef::PatternArguments(_) => NodeKind::PatternArguments,
             AnyNodeRef::PatternKeyword(_) => NodeKind::PatternKeyword,
+            AnyNodeRef::PatternMatchInvalid(_) => NodeKind::PatternInvalid,
             AnyNodeRef::Comprehension(_) => NodeKind::Comprehension,
             AnyNodeRef::Arguments(_) => NodeKind::Arguments,
             AnyNodeRef::Parameters(_) => NodeKind::Parameters,
@@ -5598,6 +5719,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::FStringExpressionElement(_)
             | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringInvalidElement(_)
             | AnyNodeRef::FStringFormatSpec(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
@@ -5614,6 +5736,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
             | AnyNodeRef::ExprIpyEscapeCommand(_)
+            | AnyNodeRef::ExprInvalid(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
@@ -5625,6 +5748,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::PatternArguments(_)
             | AnyNodeRef::PatternKeyword(_)
+            | AnyNodeRef::PatternMatchInvalid(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
@@ -5679,7 +5803,8 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExprList(_)
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
-            | AnyNodeRef::ExprIpyEscapeCommand(_) => true,
+            | AnyNodeRef::ExprIpyEscapeCommand(_)
+            | AnyNodeRef::ExprInvalid(_) => true,
 
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModExpression(_)
@@ -5711,6 +5836,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::FStringExpressionElement(_)
             | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringInvalidElement(_)
             | AnyNodeRef::FStringFormatSpec(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
@@ -5722,6 +5848,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::PatternArguments(_)
             | AnyNodeRef::PatternKeyword(_)
+            | AnyNodeRef::PatternMatchInvalid(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
@@ -5791,6 +5918,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::FStringExpressionElement(_)
             | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringInvalidElement(_)
             | AnyNodeRef::FStringFormatSpec(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
@@ -5807,6 +5935,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
             | AnyNodeRef::ExprIpyEscapeCommand(_)
+            | AnyNodeRef::ExprInvalid(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
@@ -5818,6 +5947,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::PatternArguments(_)
             | AnyNodeRef::PatternKeyword(_)
+            | AnyNodeRef::PatternMatchInvalid(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
@@ -5848,7 +5978,8 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::PatternMatchClass(_)
             | AnyNodeRef::PatternMatchStar(_)
             | AnyNodeRef::PatternMatchAs(_)
-            | AnyNodeRef::PatternMatchOr(_) => true,
+            | AnyNodeRef::PatternMatchOr(_)
+            | AnyNodeRef::PatternMatchInvalid(_) => true,
 
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModExpression(_)
@@ -5896,6 +6027,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::FStringExpressionElement(_)
             | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringInvalidElement(_)
             | AnyNodeRef::FStringFormatSpec(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
@@ -5912,6 +6044,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
             | AnyNodeRef::ExprIpyEscapeCommand(_)
+            | AnyNodeRef::ExprInvalid(_)
             | AnyNodeRef::PatternArguments(_)
             | AnyNodeRef::PatternKeyword(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
@@ -5986,6 +6119,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::FStringExpressionElement(_)
             | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringInvalidElement(_)
             | AnyNodeRef::FStringFormatSpec(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
@@ -6002,6 +6136,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExprTuple(_)
             | AnyNodeRef::ExprSlice(_)
             | AnyNodeRef::ExprIpyEscapeCommand(_)
+            | AnyNodeRef::ExprInvalid(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -6012,6 +6147,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::PatternArguments(_)
             | AnyNodeRef::PatternKeyword(_)
+            | AnyNodeRef::PatternMatchInvalid(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
@@ -6122,6 +6258,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::PatternMatchOr(node) => node.visit_preorder(visitor),
             AnyNodeRef::PatternArguments(node) => node.visit_preorder(visitor),
             AnyNodeRef::PatternKeyword(node) => node.visit_preorder(visitor),
+            AnyNodeRef::PatternMatchInvalid(_) => {}
             AnyNodeRef::Comprehension(node) => node.visit_preorder(visitor),
             AnyNodeRef::Arguments(node) => node.visit_preorder(visitor),
             AnyNodeRef::Parameters(node) => node.visit_preorder(visitor),
@@ -6140,6 +6277,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::StringLiteral(node) => node.visit_preorder(visitor),
             AnyNodeRef::BytesLiteral(node) => node.visit_preorder(visitor),
             AnyNodeRef::ElifElseClause(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprInvalid(_) | AnyNodeRef::FStringInvalidElement(_) => {}
         }
     }
 
@@ -6696,6 +6834,12 @@ impl<'a> From<&'a ast::ExprIpyEscapeCommand> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a ast::ExprInvalid> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::ExprInvalid) -> Self {
+        AnyNodeRef::ExprInvalid(node)
+    }
+}
+
 impl<'a> From<&'a ast::ExceptHandlerExceptHandler> for AnyNodeRef<'a> {
     fn from(node: &'a ast::ExceptHandlerExceptHandler) -> Self {
         AnyNodeRef::ExceptHandlerExceptHandler(node)
@@ -6747,6 +6891,12 @@ impl<'a> From<&'a ast::PatternMatchAs> for AnyNodeRef<'a> {
 impl<'a> From<&'a ast::PatternMatchOr> for AnyNodeRef<'a> {
     fn from(node: &'a ast::PatternMatchOr) -> Self {
         AnyNodeRef::PatternMatchOr(node)
+    }
+}
+
+impl<'a> From<&'a ast::PatternMatchInvalid> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::PatternMatchInvalid) -> Self {
+        AnyNodeRef::PatternMatchInvalid(node)
     }
 }
 
@@ -6876,6 +7026,8 @@ impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
             Expr::Tuple(node) => AnyNodeRef::ExprTuple(node),
             Expr::Slice(node) => AnyNodeRef::ExprSlice(node),
             Expr::IpyEscapeCommand(node) => AnyNodeRef::ExprIpyEscapeCommand(node),
+            #[allow(deprecated)]
+            Expr::Invalid(node) => AnyNodeRef::ExprInvalid(node),
         }
     }
 }
@@ -6894,6 +7046,8 @@ impl<'a> From<&'a FStringElement> for AnyNodeRef<'a> {
         match element {
             FStringElement::Expression(node) => AnyNodeRef::FStringExpressionElement(node),
             FStringElement::Literal(node) => AnyNodeRef::FStringLiteralElement(node),
+            #[allow(deprecated)]
+            FStringElement::Invalid(node) => AnyNodeRef::FStringInvalidElement(node),
         }
     }
 }
@@ -6909,6 +7063,8 @@ impl<'a> From<&'a Pattern> for AnyNodeRef<'a> {
             Pattern::MatchStar(node) => AnyNodeRef::PatternMatchStar(node),
             Pattern::MatchAs(node) => AnyNodeRef::PatternMatchAs(node),
             Pattern::MatchOr(node) => AnyNodeRef::PatternMatchOr(node),
+            #[allow(deprecated)]
+            Pattern::Invalid(node) => AnyNodeRef::PatternMatchInvalid(node),
         }
     }
 }
@@ -7028,6 +7184,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::ExprCall(node) => node.range(),
             AnyNodeRef::FStringExpressionElement(node) => node.range(),
             AnyNodeRef::FStringLiteralElement(node) => node.range(),
+            AnyNodeRef::FStringInvalidElement(node) => node.range(),
             AnyNodeRef::FStringFormatSpec(node) => node.range(),
             AnyNodeRef::ExprFString(node) => node.range(),
             AnyNodeRef::ExprStringLiteral(node) => node.range(),
@@ -7044,6 +7201,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::ExprTuple(node) => node.range(),
             AnyNodeRef::ExprSlice(node) => node.range(),
             AnyNodeRef::ExprIpyEscapeCommand(node) => node.range(),
+            AnyNodeRef::ExprInvalid(node) => node.range(),
             AnyNodeRef::ExceptHandlerExceptHandler(node) => node.range(),
             AnyNodeRef::PatternMatchValue(node) => node.range(),
             AnyNodeRef::PatternMatchSingleton(node) => node.range(),
@@ -7055,6 +7213,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchOr(node) => node.range(),
             AnyNodeRef::PatternArguments(node) => node.range(),
             AnyNodeRef::PatternKeyword(node) => node.range(),
+            AnyNodeRef::PatternMatchInvalid(node) => node.range(),
             AnyNodeRef::Comprehension(node) => node.range(),
             AnyNodeRef::Arguments(node) => node.range(),
             AnyNodeRef::Parameters(node) => node.range(),
@@ -7127,6 +7286,7 @@ pub enum NodeKind {
     ExprCall,
     FStringExpressionElement,
     FStringLiteralElement,
+    FStringInvalidElement,
     FStringFormatSpec,
     ExprFString,
     ExprStringLiteral,
@@ -7143,6 +7303,7 @@ pub enum NodeKind {
     ExprTuple,
     ExprSlice,
     ExprIpyEscapeCommand,
+    ExprInvalid,
     ExceptHandlerExceptHandler,
     PatternMatchValue,
     PatternMatchSingleton,
@@ -7154,6 +7315,7 @@ pub enum NodeKind {
     PatternMatchOr,
     PatternArguments,
     PatternKeyword,
+    PatternInvalid,
     TypeIgnoreTypeIgnore,
     Comprehension,
     Arguments,
