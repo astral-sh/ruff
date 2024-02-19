@@ -73,7 +73,7 @@ pub fn format_range(
 
     let (tokens, comment_ranges) =
         tokens_and_ranges(source, options.source_type()).map_err(|err| ParseError {
-            offset: err.location(),
+            location: err.location(),
             error: ParseErrorType::Lexical(err.into_error()),
         })?;
 
@@ -646,6 +646,8 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
             AnyNodeRef::MatchCase(node) => node.format().fmt(f),
             AnyNodeRef::Decorator(node) => node.format().fmt(f),
             AnyNodeRef::ElifElseClause(node) => node.format().fmt(f),
+            AnyNodeRef::ExprInvalid(node) => node.format().fmt(f),
+            AnyNodeRef::PatternMatchInvalid(node) => node.format().fmt(f),
 
             AnyNodeRef::ExprBoolOp(_)
             | AnyNodeRef::ExprNamed(_)
@@ -706,7 +708,8 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
-            | AnyNodeRef::BytesLiteral(_) => {
+            | AnyNodeRef::BytesLiteral(_)
+            | AnyNodeRef::FStringInvalidElement(_) => {
                 panic!("Range formatting only supports formatting logical lines")
             }
         }

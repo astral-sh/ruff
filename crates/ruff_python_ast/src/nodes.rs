@@ -1,6 +1,7 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
 use std::cell::OnceCell;
+
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
@@ -555,6 +556,7 @@ impl From<StmtContinue> for Stmt {
 }
 
 /// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)
+#[allow(deprecated)]
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Expr {
     #[is(name = "bool_op_expr")]
@@ -623,6 +625,11 @@ pub enum Expr {
     // Jupyter notebook specific
     #[is(name = "ipy_escape_command_expr")]
     IpyEscapeCommand(ExprIpyEscapeCommand),
+
+    #[is(name = "invalid_expr")]
+    #[deprecated]
+    #[allow(deprecated)]
+    Invalid(ExprInvalid),
 }
 
 impl Expr {
@@ -653,6 +660,25 @@ impl Expr {
             Expr::EllipsisLiteral(expr) => Some(LiteralExpressionRef::EllipsisLiteral(expr)),
             _ => None,
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprInvalid {
+    pub value: String,
+    pub range: TextRange,
+}
+
+impl From<ExprInvalid> for Expr {
+    fn from(payload: ExprInvalid) -> Self {
+        #[allow(deprecated)]
+        Expr::Invalid(payload)
+    }
+}
+
+impl Ranged for ExprInvalid {
+    fn range(&self) -> TextRange {
+        self.range
     }
 }
 
@@ -964,6 +990,18 @@ impl Deref for FStringLiteralElement {
 
     fn deref(&self) -> &Self::Target {
         &self.value
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FStringInvalidElement {
+    pub value: String,
+    pub range: TextRange,
+}
+
+impl Ranged for FStringInvalidElement {
+    fn range(&self) -> TextRange {
+        self.range
     }
 }
 
@@ -1281,9 +1319,14 @@ impl From<FString> for Expr {
 }
 
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
+#[allow(deprecated)]
 pub enum FStringElement {
     Literal(FStringLiteralElement),
     Expression(FStringExpressionElement),
+
+    #[allow(deprecated)]
+    #[deprecated]
+    Invalid(FStringInvalidElement),
 }
 
 impl Ranged for FStringElement {
@@ -1291,6 +1334,8 @@ impl Ranged for FStringElement {
         match self {
             FStringElement::Literal(node) => node.range(),
             FStringElement::Expression(node) => node.range(),
+            #[allow(deprecated)]
+            FStringElement::Invalid(node) => node.range(),
         }
     }
 }
@@ -2944,6 +2989,7 @@ pub struct MatchCase {
 
 /// See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
+#[allow(deprecated)]
 pub enum Pattern {
     MatchValue(PatternMatchValue),
     MatchSingleton(PatternMatchSingleton),
@@ -2953,6 +2999,8 @@ pub enum Pattern {
     MatchStar(PatternMatchStar),
     MatchAs(PatternMatchAs),
     MatchOr(PatternMatchOr),
+    #[deprecated]
+    Invalid(PatternMatchInvalid),
 }
 
 /// See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)
@@ -3082,6 +3130,19 @@ pub struct PatternMatchOr {
 impl From<PatternMatchOr> for Pattern {
     fn from(payload: PatternMatchOr) -> Self {
         Pattern::MatchOr(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PatternMatchInvalid {
+    pub value: String,
+    pub range: TextRange,
+}
+
+#[allow(deprecated)]
+impl From<PatternMatchInvalid> for Pattern {
+    fn from(payload: PatternMatchInvalid) -> Self {
+        Pattern::Invalid(payload)
     }
 }
 
@@ -3535,10 +3596,17 @@ impl IpyEscapeKind {
     }
 }
 
+/// An `Identifier` with an empty `id` is invalid.
+///
+/// For example, in the following code `id` will be empty.
+/// ```python
+/// def 1():
+///     ...
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Identifier {
-    id: String,
-    range: TextRange,
+    pub id: String,
+    pub range: TextRange,
 }
 
 impl Identifier {
@@ -3548,6 +3616,10 @@ impl Identifier {
             id: id.into(),
             range,
         }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        !self.id.is_empty()
     }
 }
 
@@ -3976,6 +4048,8 @@ impl Ranged for crate::Expr {
             Self::Tuple(node) => node.range(),
             Self::Slice(node) => node.range(),
             Self::IpyEscapeCommand(node) => node.range(),
+            #[allow(deprecated)]
+            Self::Invalid(node) => node.range(),
         }
     }
 }
@@ -4061,6 +4135,11 @@ impl Ranged for crate::nodes::PatternMatchOr {
         self.range
     }
 }
+impl Ranged for crate::nodes::PatternMatchInvalid {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
 impl Ranged for crate::Pattern {
     fn range(&self) -> TextRange {
         match self {
@@ -4072,6 +4151,8 @@ impl Ranged for crate::Pattern {
             Self::MatchStar(node) => node.range(),
             Self::MatchAs(node) => node.range(),
             Self::MatchOr(node) => node.range(),
+            #[allow(deprecated)]
+            Self::Invalid(node) => node.range(),
         }
     }
 }
