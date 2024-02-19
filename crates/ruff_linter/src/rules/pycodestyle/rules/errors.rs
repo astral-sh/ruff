@@ -81,7 +81,7 @@ pub(crate) fn syntax_error(
     parse_error: &ParseError,
     locator: &Locator,
 ) {
-    let rest = locator.after(parse_error.offset);
+    let rest = locator.after(parse_error.location.start());
 
     // Try to create a non-empty range so that the diagnostic can print a caret at the
     // right position. This requires that we retrieve the next character, if any, and take its length
@@ -95,6 +95,6 @@ pub(crate) fn syntax_error(
         SyntaxError {
             message: format!("{}", DisplayParseErrorType::new(&parse_error.error)),
         },
-        TextRange::at(parse_error.offset, len),
+        TextRange::at(parse_error.location.start(), len),
     ));
 }

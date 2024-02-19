@@ -1,0 +1,149 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/assignment_keyword_target.py
+---
+## AST
+
+ ```
+Module(
+    ModModule {
+        range: 0..44,
+        body: [
+            Assign(
+                StmtAssign {
+                    range: 0..12,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 0..1,
+                                id: "a",
+                                ctx: Store,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 4..8,
+                                id: "pass",
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Name(
+                        ExprName {
+                            range: 11..12,
+                            id: "c",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 14..19,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 14..19,
+                            left: Name(
+                                ExprName {
+                                    range: 14..15,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Add,
+                            right: Name(
+                                ExprName {
+                                    range: 18..19,
+                                    id: "b",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 21..37,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 21..22,
+                                id: "a",
+                                ctx: Store,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 25..26,
+                                id: "b",
+                                ctx: Store,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 29..33,
+                                id: "pass",
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Name(
+                        ExprName {
+                            range: 36..37,
+                            id: "c",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 39..44,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 39..44,
+                            left: Name(
+                                ExprName {
+                                    range: 39..40,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Add,
+                            right: Name(
+                                ExprName {
+                                    range: 43..44,
+                                    id: "b",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | a = pass = c
+  |     ^^^^ Syntax Error: Identifier expected. 'pass' is a keyword that cannot be used here.
+2 | 
+3 | a + b
+  |
+
+
+  |
+3 | a + b
+4 | 
+5 | a = b = pass = c
+  |         ^^^^ Syntax Error: Identifier expected. 'pass' is a keyword that cannot be used here.
+6 | 
+7 | a + b
+  |
+
+
+

@@ -1,12 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E999.py:3:1: E999 SyntaxError: unindent does not match any outer indentation level
-  |
-2 | def x():
-3 | 
-  | ^ E999
-4 | 
-  |
+E999.py:5:1: E999 SyntaxError: expected a single statement or an indented body after function definition
+ |
+ |
 
 
