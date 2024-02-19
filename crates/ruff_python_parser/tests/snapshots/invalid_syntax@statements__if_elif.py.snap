@@ -1,0 +1,105 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/if_elif.py
+---
+## AST
+
+ ```
+Module(
+    ModModule {
+        range: 0..54,
+        body: [
+            If(
+                StmtIf {
+                    range: 0..38,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            range: 3..7,
+                            value: true,
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 13..17,
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [
+                        ElifElseClause {
+                            range: 18..38,
+                            test: Some(
+                                BooleanLiteral(
+                                    ExprBooleanLiteral {
+                                        range: 23..28,
+                                        value: false,
+                                    },
+                                ),
+                            ),
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 34..38,
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 39..43,
+                    target: Name(
+                        ExprName {
+                            range: 39..42,
+                            id: "elf",
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 43..43,
+                            id: "",
+                            ctx: Load,
+                        },
+                    ),
+                    value: None,
+                    simple: true,
+                },
+            ),
+            Pass(
+                StmtPass {
+                    range: 48..52,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+3 | elif False:
+4 |     pass
+5 | elf:
+  |     ^ Syntax Error: Expression expected.
+6 |     pass
+  |
+
+
+  |
+4 |     pass
+5 | elf:
+6 |     pass
+  | ^^^^ Syntax Error: unexpected indentation
+  |
+
+
+  |
+6 |     pass
+7 | 
+  |
+
+
+

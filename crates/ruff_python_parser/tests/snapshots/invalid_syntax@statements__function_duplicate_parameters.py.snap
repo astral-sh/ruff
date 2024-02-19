@@ -1,0 +1,403 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/function_duplicate_parameters.py
+---
+## AST
+
+ ```
+Module(
+    ModModule {
+        range: 0..225,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..17,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "f",
+                        range: 4..5,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 5..11,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 6..7,
+                                parameter: Parameter {
+                                    range: 6..7,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 6..7,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 9..10,
+                                parameter: Parameter {
+                                    range: 9..10,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 9..10,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 13..17,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 19..40,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "f2",
+                        range: 23..25,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 25..34,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 26..27,
+                                parameter: Parameter {
+                                    range: 26..27,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 26..27,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [
+                            ParameterWithDefault {
+                                range: 32..33,
+                                parameter: Parameter {
+                                    range: 32..33,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 32..33,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 36..40,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 42..63,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "f3",
+                        range: 46..48,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 48..57,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 49..50,
+                                parameter: Parameter {
+                                    range: 49..50,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 49..50,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 52..56,
+                                parameter: Parameter {
+                                    range: 52..53,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 52..53,
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 54..56,
+                                            value: Int(
+                                                20,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 59..63,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 65..84,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "f4",
+                        range: 69..71,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 71..78,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 72..73,
+                                parameter: Parameter {
+                                    range: 72..73,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 72..73,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: Some(
+                            Parameter {
+                                range: 76..77,
+                                name: Identifier {
+                                    id: "a",
+                                    range: 76..77,
+                                },
+                                annotation: None,
+                            },
+                        ),
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 80..84,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 86..109,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "f5",
+                        range: 90..92,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 92..103,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 93..94,
+                                parameter: Parameter {
+                                    range: 93..94,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 93..94,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: Some(
+                            Parameter {
+                                range: 101..102,
+                                name: Identifier {
+                                    id: "a",
+                                    range: 101..102,
+                                },
+                                annotation: None,
+                            },
+                        ),
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 105..109,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 201..224,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "f6",
+                        range: 205..207,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 207..218,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 208..209,
+                                parameter: Parameter {
+                                    range: 208..209,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 208..209,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 211..217,
+                                parameter: Parameter {
+                                    range: 211..217,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 211..212,
+                                    },
+                                    annotation: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 214..217,
+                                                id: "str",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 220..224,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | def f(a, a): pass
+  |          ^ Syntax Error: duplicate argument 'a' in function definition
+2 | 
+3 | def f2(a, *, a): pass
+  |
+
+
+  |
+1 | def f(a, a): pass
+2 | 
+3 | def f2(a, *, a): pass
+  |              ^ Syntax Error: duplicate argument 'a' in function definition
+4 | 
+5 | def f3(a, a=20): pass
+  |
+
+
+  |
+3 | def f2(a, *, a): pass
+4 | 
+5 | def f3(a, a=20): pass
+  |           ^ Syntax Error: duplicate argument 'a' in function definition
+6 | 
+7 | def f4(a, *a): pass
+  |
+
+
+  |
+5 | def f3(a, a=20): pass
+6 | 
+7 | def f4(a, *a): pass
+  |            ^ Syntax Error: duplicate argument 'a' in function definition
+8 | 
+9 | def f5(a, *, **a): pass
+  |
+
+
+   |
+ 7 | def f4(a, *a): pass
+ 8 | 
+ 9 | def f5(a, *, **a): pass
+   |                ^ Syntax Error: duplicate argument 'a' in function definition
+10 | 
+11 | # TODO(micha): This is inconsistent. All other examples only highlight the argument name.
+   |
+
+
+   |
+11 | # TODO(micha): This is inconsistent. All other examples only highlight the argument name.
+12 | def f6(a, a: str): pass
+   |           ^^^^^^ Syntax Error: duplicate argument 'a' in function definition
+   |
+
+
+
