@@ -5,7 +5,7 @@ use ruff_python_ast::str;
 use ruff_python_ast::Expr;
 use ruff_text_size::{TextLen, TextRange};
 
-#[derive(is_macro::Is, Copy, Clone)]
+#[derive(is_macro::Is, Copy, Clone, Debug)]
 pub enum AnnotationKind {
     /// The annotation is defined as part a simple string literal,
     /// e.g. `x: "List[int]" = []`. Annotations within simple literals

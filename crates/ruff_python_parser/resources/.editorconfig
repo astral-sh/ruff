@@ -1,0 +1,6 @@
+# Check http://editorconfig.org for more information
+# This is the main config file for this project:
+root = true
+
+[*.py]
+insert_final_newline = false
