@@ -374,7 +374,9 @@ where
                     || helpers::is_assignment_to_a_dunder(stmt)
                     || helpers::in_nested_block(self.semantic.current_statements())
                     || imports::is_matplotlib_activation(stmt, self.semantic())
-                    || imports::is_sys_path_modification(stmt, self.semantic()))
+                    || imports::is_sys_path_modification(stmt, self.semantic())
+                    || (self.settings.preview.is_enabled()
+                        && imports::is_os_environ_modification(stmt, self.semantic())))
                 {
                     self.semantic.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }

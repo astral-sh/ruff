@@ -1,3 +1,4 @@
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use crate::SemanticModel;
@@ -34,6 +35,50 @@ pub fn is_sys_path_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
                 ]
             )
         })
+}
+
+/// Returns `true` if a [`Stmt`] is an `os.environ` modification, as in:
+/// ```python
+/// import os
+///
+/// os.environ["CUDA_VISIBLE_DEVICES"] = "4"
+/// ```
+pub fn is_os_environ_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+    match stmt {
+        Stmt::Expr(ast::StmtExpr { value, .. }) => match value.as_ref() {
+            Expr::Call(ast::ExprCall { func, .. }) => semantic
+                .resolve_call_path(func.as_ref())
+                .is_some_and(|call_path| {
+                    matches!(
+                        call_path.as_slice(),
+                        ["os", "putenv" | "unsetenv"]
+                            | [
+                                "os",
+                                "environ",
+                                "update" | "pop" | "clear" | "setdefault" | "popitem"
+                            ]
+                    )
+                }),
+            _ => false,
+        },
+        Stmt::Delete(ast::StmtDelete { targets, .. }) => targets.iter().any(|target| {
+            semantic
+                .resolve_call_path(map_subscript(target))
+                .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "environ"]))
+        }),
+        Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.iter().any(|target| {
+            semantic
+                .resolve_call_path(map_subscript(target))
+                .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "environ"]))
+        }),
+        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => semantic
+            .resolve_call_path(map_subscript(target))
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "environ"])),
+        Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => semantic
+            .resolve_call_path(map_subscript(target))
+            .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "environ"])),
+        _ => false,
+    }
 }
 
 /// Returns `true` if a [`Stmt`] is a `matplotlib.use` activation, as in:

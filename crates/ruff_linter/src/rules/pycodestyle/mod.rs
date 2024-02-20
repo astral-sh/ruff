@@ -38,6 +38,7 @@ mod tests {
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E40.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_0.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_1.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_2.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402.ipynb"))]
     #[test_case(Rule::MultipleImportsOnOneLine, Path::new("E40.py"))]
     #[test_case(Rule::MultipleStatementsOnOneLineColon, Path::new("E70.py"))]
@@ -69,6 +70,7 @@ mod tests {
 
     #[test_case(Rule::IsLiteral, Path::new("constant_literals.py"))]
     #[test_case(Rule::TypeComparison, Path::new("E721.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_2.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
