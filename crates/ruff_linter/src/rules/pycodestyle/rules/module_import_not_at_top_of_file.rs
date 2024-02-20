@@ -17,6 +17,9 @@ use crate::checkers::ast::Checker;
 /// `sys.path.insert`, `sys.path.append`, and similar modifications between import
 /// statements.
 ///
+/// In [preview], this rule also allows `os.environ` modifications between import
+/// statements.
+///
 /// ## Example
 /// ```python
 /// "One string"
@@ -37,6 +40,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct ModuleImportNotAtTopOfFile {
     source_type: PySourceType,
