@@ -30,7 +30,3 @@ dictionary = {
 #import os  # noqa
 
 # case 1:
-# case "foo": print()
-# try: A()
-# except Exception as e: print(e)
-# finally: print("done")

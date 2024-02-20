@@ -26,7 +26,7 @@ static HASH_NUMBER: Lazy<Regex> = Lazy::new(|| Regex::new(r"#\d").unwrap());
 static POSITIVE_CASES: Lazy<RegexSet> = Lazy::new(|| {
     RegexSet::new([
         // Keywords
-        r"^(?:elif\s+.*\s*:.*|else\s*:.*|try\s*:.*|finally\s*:.*|except.*:.*|case\s+.*\s*:.*)$",
+        r"^(?:elif\s+.*\s*:|else\s*:|try\s*:|finally\s*:|except.*:|case\s+.*\s*:)$",
         // Partial dictionary
         r#"^['"]\w+['"]\s*:.+[,{]\s*(#.*)?$"#,
         // Multiline assignment
@@ -145,27 +145,6 @@ mod tests {
         assert!(comment_contains_code("#return x", &[]));
 
         assert!(!comment_contains_code("#to print", &[]));
-    }
-
-    #[test]
-    fn comment_contains_code_single_line() {
-        assert!(comment_contains_code("# case 1: print()", &[]));
-        assert!(comment_contains_code("# try: get(1, 2, 3)", &[]));
-        assert!(comment_contains_code("# else: print()", &[]));
-        assert!(comment_contains_code("# elif x == 10: print()", &[]));
-        assert!(comment_contains_code(
-            "# except Exception as e: print(e)",
-            &[]
-        ));
-        assert!(comment_contains_code("# except: print()", &[]));
-        assert!(comment_contains_code("# finally: close_handle()", &[]));
-
-        assert!(!comment_contains_code("# try: use cache", &[]));
-        assert!(!comment_contains_code("# else: we should return", &[]));
-        assert!(!comment_contains_code(
-            "# call function except: without cache",
-            &[]
-        ));
     }
 
     #[test]
