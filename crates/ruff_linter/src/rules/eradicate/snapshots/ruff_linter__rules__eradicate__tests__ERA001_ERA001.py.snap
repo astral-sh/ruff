@@ -148,4 +148,92 @@ ERA001.py:27:5: ERA001 Found commented-out code
 29 28 | 
 30 29 | #import os  # noqa
 
+ERA001.py:32:1: ERA001 Found commented-out code
+   |
+30 | #import os  # noqa
+31 | 
+32 | # case 1:
+   | ^^^^^^^^^ ERA001
+33 | # case "foo": print()
+34 | # try: A()
+   |
+   = help: Remove commented-out code
 
+ℹ Display-only fix
+29 29 | 
+30 30 | #import os  # noqa
+31 31 | 
+32    |-# case 1:
+33 32 | # case "foo": print()
+34 33 | # try: A()
+35 34 | # except Exception as e: print(e)
+
+ERA001.py:33:1: ERA001 Found commented-out code
+   |
+32 | # case 1:
+33 | # case "foo": print()
+   | ^^^^^^^^^^^^^^^^^^^^^ ERA001
+34 | # try: A()
+35 | # except Exception as e: print(e)
+   |
+   = help: Remove commented-out code
+
+ℹ Display-only fix
+30 30 | #import os  # noqa
+31 31 | 
+32 32 | # case 1:
+33    |-# case "foo": print()
+34 33 | # try: A()
+35 34 | # except Exception as e: print(e)
+36 35 | # finally: print("done")
+
+ERA001.py:34:1: ERA001 Found commented-out code
+   |
+32 | # case 1:
+33 | # case "foo": print()
+34 | # try: A()
+   | ^^^^^^^^^^ ERA001
+35 | # except Exception as e: print(e)
+36 | # finally: print("done")
+   |
+   = help: Remove commented-out code
+
+ℹ Display-only fix
+31 31 | 
+32 32 | # case 1:
+33 33 | # case "foo": print()
+34    |-# try: A()
+35 34 | # except Exception as e: print(e)
+36 35 | # finally: print("done")
+
+ERA001.py:35:1: ERA001 Found commented-out code
+   |
+33 | # case "foo": print()
+34 | # try: A()
+35 | # except Exception as e: print(e)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ERA001
+36 | # finally: print("done")
+   |
+   = help: Remove commented-out code
+
+ℹ Display-only fix
+32 32 | # case 1:
+33 33 | # case "foo": print()
+34 34 | # try: A()
+35    |-# except Exception as e: print(e)
+36 35 | # finally: print("done")
+
+ERA001.py:36:1: ERA001 Found commented-out code
+   |
+34 | # try: A()
+35 | # except Exception as e: print(e)
+36 | # finally: print("done")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ ERA001
+   |
+   = help: Remove commented-out code
+
+ℹ Display-only fix
+33 33 | # case "foo": print()
+34 34 | # try: A()
+35 35 | # except Exception as e: print(e)
+36    |-# finally: print("done")
