@@ -28,3 +28,6 @@ dictionary = {
 }
 
 #import os  # noqa
+
+# case 1:
+# case "foo": print()
