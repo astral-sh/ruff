@@ -148,4 +148,17 @@ ERA001.py:27:5: ERA001 Found commented-out code
 29 28 | 
 30 29 | #import os  # noqa
 
+ERA001.py:32:1: ERA001 Found commented-out code
+   |
+30 | #import os  # noqa
+31 | 
+32 | # case 1:
+   | ^^^^^^^^^ ERA001
+   |
+   = help: Remove commented-out code
 
+ℹ Display-only fix
+29 29 | 
+30 30 | #import os  # noqa
+31 31 | 
+32    |-# case 1:

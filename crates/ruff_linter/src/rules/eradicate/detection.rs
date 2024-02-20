@@ -26,7 +26,7 @@ static HASH_NUMBER: Lazy<Regex> = Lazy::new(|| Regex::new(r"#\d").unwrap());
 static POSITIVE_CASES: Lazy<RegexSet> = Lazy::new(|| {
     RegexSet::new([
         // Keywords
-        r"^(?:elif\s+.*\s*:|else\s*:|try\s*:|finally\s*:|except\s+.*\s*:)$",
+        r"^(?:elif\s+.*\s*:|else\s*:|try\s*:|finally\s*:|except\s+.*\s*|case\s+.*\s*:)$",
         // Partial dictionary
         r#"^['"]\w+['"]\s*:.+[,{]\s*(#.*)?$"#,
         // Multiline assignment
@@ -155,11 +155,14 @@ mod tests {
         assert!(comment_contains_code("#elif True:", &[]));
         assert!(comment_contains_code("#x = foo(", &[]));
         assert!(comment_contains_code("#except Exception:", &[]));
+        assert!(comment_contains_code("# case 1:", &[]));
+        assert!(comment_contains_code("#case 1:", &[]));
 
         assert!(!comment_contains_code("# this is = to that :(", &[]));
         assert!(!comment_contains_code("#else", &[]));
         assert!(!comment_contains_code("#or else:", &[]));
         assert!(!comment_contains_code("#else True:", &[]));
+        assert!(!comment_contains_code("# in that case:", &[]));
 
         // Unpacking assignments
         assert!(comment_contains_code(
