@@ -202,9 +202,8 @@ pub(crate) fn native_literals(
                 // Skip implicit concatenated strings.
                 if literal_expr.is_implicit_concatenated() {
                     return;
-                } else {
-                    literal_expr
                 }
+                literal_expr
             } else if let Expr::UnaryOp(ast::ExprUnaryOp {
                 op: UnaryOp::UAdd | UnaryOp::USub,
                 operand,
@@ -217,6 +216,7 @@ pub(crate) fn native_literals(
                 {
                     literal_expr
                 } else {
+                    // Only allow unary operators for numbers.
                     return;
                 }
             } else {
