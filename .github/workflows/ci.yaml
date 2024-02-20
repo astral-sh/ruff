@@ -250,6 +250,7 @@ jobs:
         with:
           name: ruff
           branch: ${{ github.event.pull_request.base.ref }}
+          workflow: "ci.yaml"
           check_artifacts: true
 
       - name: Install ruff-ecosystem
