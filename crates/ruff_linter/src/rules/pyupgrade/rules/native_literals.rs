@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, LiteralExpressionRef};
+use ruff_python_ast::{self as ast, Expr, LiteralExpressionRef, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -198,7 +198,20 @@ pub(crate) fn native_literals(
             checker.diagnostics.push(diagnostic);
         }
         Some(arg) => {
-            let Some(literal_expr) = arg.as_literal_expr() else {
+            let (literal_expr, unary) = if let Some(literal_expr) = arg.as_literal_expr() {
+                (literal_expr, false)
+            } else if let Expr::UnaryOp(ast::ExprUnaryOp {
+                op: UnaryOp::UAdd | UnaryOp::USub,
+                operand,
+                ..
+            }) = arg
+            {
+                if let Some(literal_expr) = operand.as_literal_expr() {
+                    (literal_expr, true)
+                } else {
+                    return;
+                }
+            } else {
                 return;
             };
 
@@ -215,20 +228,20 @@ pub(crate) fn native_literals(
                 return;
             }
 
+            if unary {
+                if !matches!(literal_type, LiteralType::Int | LiteralType::Float) {
+                    return;
+                }
+            }
+
             let arg_code = checker.locator().slice(arg);
 
             // Attribute access on an integer requires the integer to be parenthesized to disambiguate from a float
             // Ex) `(7).denominator` is valid but `7.denominator` is not
             // Note that floats do not have this problem
             // Ex) `(1.0).real` is valid and `1.0.real` is too
-            let content = match (parent_expr, arg) {
-                (
-                    Some(Expr::Attribute(_)),
-                    Expr::NumberLiteral(ast::ExprNumberLiteral {
-                        value: ast::Number::Int(_),
-                        ..
-                    }),
-                ) => format!("({arg_code})"),
+            let content = match (parent_expr, literal_type) {
+                (Some(Expr::Attribute(_)), LiteralType::Int) => format!("({arg_code})"),
                 _ => arg_code.to_string(),
             };
 
