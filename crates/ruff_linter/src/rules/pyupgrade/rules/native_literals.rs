@@ -198,16 +198,24 @@ pub(crate) fn native_literals(
             checker.diagnostics.push(diagnostic);
         }
         Some(arg) => {
-            let (literal_expr, unary) = if let Some(literal_expr) = arg.as_literal_expr() {
-                (literal_expr, false)
+            let literal_expr = if let Some(literal_expr) = arg.as_literal_expr() {
+                // Skip implicit concatenated strings.
+                if literal_expr.is_implicit_concatenated() {
+                    return;
+                } else {
+                    literal_expr
+                }
             } else if let Expr::UnaryOp(ast::ExprUnaryOp {
                 op: UnaryOp::UAdd | UnaryOp::USub,
                 operand,
                 ..
             }) = arg
             {
-                if let Some(literal_expr) = operand.as_literal_expr() {
-                    (literal_expr, true)
+                if let Some(literal_expr) = operand
+                    .as_literal_expr()
+                    .filter(|expr| matches!(expr, LiteralExpressionRef::NumberLiteral(_)))
+                {
+                    literal_expr
                 } else {
                     return;
                 }
@@ -215,23 +223,12 @@ pub(crate) fn native_literals(
                 return;
             };
 
-            // Skip implicit string concatenations.
-            if literal_expr.is_implicit_concatenated() {
-                return;
-            }
-
             let Ok(arg_literal_type) = LiteralType::try_from(literal_expr) else {
                 return;
             };
 
             if arg_literal_type != literal_type {
                 return;
-            }
-
-            if unary {
-                if !matches!(literal_type, LiteralType::Int | LiteralType::Float) {
-                    return;
-                }
             }
 
             let arg_code = checker.locator().slice(arg);
