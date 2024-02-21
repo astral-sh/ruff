@@ -386,10 +386,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             },
         ) => {
             if checker.enabled(Rule::NoClassmethodDecorator) {
-                pylint::rules::no_classmethod_decorator(checker, class_def);
+                pylint::rules::no_classmethod_decorator(checker, stmt);
             }
             if checker.enabled(Rule::NoStaticmethodDecorator) {
-                pylint::rules::no_staticmethod_decorator(checker, class_def);
+                pylint::rules::no_staticmethod_decorator(checker, stmt);
             }
             if checker.enabled(Rule::DjangoNullableModelStringField) {
                 flake8_django::rules::nullable_model_string_field(checker, body);
