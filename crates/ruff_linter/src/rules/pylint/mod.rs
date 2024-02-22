@@ -32,6 +32,10 @@ mod tests {
     #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"))]
     #[test_case(Rule::BinaryOpException, Path::new("binary_op_exception.py"))]
     #[test_case(Rule::CollapsibleElseIf, Path::new("collapsible_else_if.py"))]
+    #[test_case(
+        Rule::ConfusingConsecutiveElif,
+        Path::new("confusing_consecutive_elif.py")
+    )]
     #[test_case(Rule::CompareToEmptyString, Path::new("compare_to_empty_string.py"))]
     #[test_case(Rule::ComparisonOfConstant, Path::new("comparison_of_constant.py"))]
     #[test_case(

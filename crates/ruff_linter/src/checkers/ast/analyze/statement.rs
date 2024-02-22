@@ -1124,6 +1124,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::CollapsibleElseIf) {
                 pylint::rules::collapsible_else_if(checker, stmt);
             }
+            if checker.enabled(Rule::ConfusingConsecutiveElif) {
+                pylint::rules::confusing_consecutive_elif(checker, if_);
+            }
             if checker.enabled(Rule::CheckAndRemoveFromSet) {
                 refurb::rules::check_and_remove_from_set(checker, if_);
             }

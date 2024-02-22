@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+confusing_consecutive_elif.py:14:5: PLR5601 Consecutive elif with differing indentation level, consider creating a function to separate the inner elif
+   |
+12 |               machine.disable()
+13 |               machine.enable(new_conf.value)
+14 |       elif new_conf:  # [confusing-consecutive-elif]
+   |  _____^
+15 | |         machine.enable(new_conf.value)
+   | |______________________________________^ PLR5601
+   |
+
+confusing_consecutive_elif.py:75:5: PLR5601 Consecutive elif with differing indentation level, consider creating a function to separate the inner elif
+   |
+73 |               machine.disable()
+74 |               machine.enable(new_conf.value)
+75 |       elif new_conf:  # [confusing-consecutive-elif]
+   |  _____^
+76 | |         machine.enable(new_conf.value)
+   | |______________________________________^ PLR5601
+   |
+
+confusing_consecutive_elif.py:89:5: PLR5601 Consecutive elif with differing indentation level, consider creating a function to separate the inner elif
+   |
+87 |           if new_new_conf:
+88 |               machine.disable()
+89 |       elif new_conf:  # [confusing-consecutive-elif]
+   |  _____^
+90 | |         machine.enable(new_conf.value)
+   | |______________________________________^ PLR5601
+   |
+
+
