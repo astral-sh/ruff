@@ -43,10 +43,8 @@ no_method_decorator.py:22:5: PLR0202 [*] Class method defined without decorator
 22 23 |     def class_method(cls):
 23 24 |         pass
 24 25 | 
-25    |-    class_method = classmethod(class_method);
-   26 |+    
+25    |-    class_method = classmethod(class_method);another_statement
+   26 |+    another_statement
 26 27 | 
 27 28 |     def static_method():
 28 29 |         pass
-
-

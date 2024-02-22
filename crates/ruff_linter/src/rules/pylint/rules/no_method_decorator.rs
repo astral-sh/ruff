@@ -101,7 +101,7 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
         return;
     };
 
-    let mut explicit_decorator_calls: HashMap<String, usize> = HashMap::default();
+    let mut explicit_decorator_calls: HashMap<String, &Stmt> = HashMap::default();
 
     let (method_name, diagnostic_type): (&str, DiagnosticKind) = match method_type {
         MethodType::Classmethod => ("classmethod", NoClassmethodDecorator.into()),
@@ -109,7 +109,7 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
     };
 
     // gather all explicit *method calls
-    for (i, stmt) in class_def.body.iter().enumerate() {
+    for stmt in &class_def.body {
         if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = stmt {
             if let Expr::Call(ast::ExprCall {
                 func, arguments, ..
@@ -132,7 +132,7 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
 
                         if let Expr::Name(ast::ExprName { id, .. }) = &arguments.args[0] {
                             if target_name == *id {
-                                explicit_decorator_calls.insert(id.clone(), i);
+                                explicit_decorator_calls.insert(id.clone(), stmt);
                             }
                         };
                     }
@@ -152,7 +152,7 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
             ..
         }) = stmt
         {
-            if !explicit_decorator_calls.contains_key(name.as_str()) {
+            let Some(decorator_call_statement) = explicit_decorator_calls.get(name.as_str()) else {
                 continue;
             };
 
@@ -178,14 +178,13 @@ fn get_undecorated_methods(checker: &mut Checker, class_stmt: &Stmt, method_type
 
             match indentation {
                 Some(indentation) => {
-                    let i = explicit_decorator_calls[name.as_str()];
                     diagnostic.set_fix(Fix::safe_edits(
                         Edit::insertion(
                             format!("@{method_name}\n{indentation}"),
                             stmt.range().start(),
                         ),
                         [fix::edits::delete_stmt(
-                            &class_def.body[i],
+                            decorator_call_statement,
                             Some(class_stmt),
                             checker.locator(),
                             checker.indexer(),

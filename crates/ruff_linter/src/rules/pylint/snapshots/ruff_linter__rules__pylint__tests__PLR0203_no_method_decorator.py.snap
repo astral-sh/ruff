@@ -28,7 +28,7 @@ no_method_decorator.py:15:5: PLR0203 [*] Static method defined without decorator
 
 no_method_decorator.py:27:5: PLR0203 [*] Static method defined without decorator
    |
-25 |     class_method = classmethod(class_method);
+25 |     class_method = classmethod(class_method);another_statement
 26 | 
 27 |     def static_method():
    |      PLR0203
@@ -38,13 +38,11 @@ no_method_decorator.py:27:5: PLR0203 [*] Static method defined without decorator
 
 ℹ Safe fix
 24 24 | 
-25 25 |     class_method = classmethod(class_method);
+25 25 |     class_method = classmethod(class_method);another_statement
 26 26 | 
    27 |+    @staticmethod
 27 28 |     def static_method():
 28 29 |         pass
 29 30 | 
 30    |-    static_method = staticmethod(static_method);
-   31 |+    
-
-
+   31 |+
