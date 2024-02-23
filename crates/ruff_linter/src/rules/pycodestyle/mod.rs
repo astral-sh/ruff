@@ -16,7 +16,7 @@ mod tests {
 
     use crate::line_width::LineLength;
     use crate::registry::Rule;
-    use crate::rules::pycodestyle;
+    use crate::rules::{isort, pycodestyle};
     use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
@@ -138,18 +138,47 @@ mod tests {
         Path::new("E25.py")
     )]
     #[test_case(Rule::MissingWhitespaceAroundParameterEquals, Path::new("E25.py"))]
+    fn logical(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pycodestyle").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::BlankLineBetweenMethods, Path::new("E30.py"))]
     #[test_case(Rule::BlankLinesTopLevel, Path::new("E30.py"))]
     #[test_case(Rule::TooManyBlankLines, Path::new("E30.py"))]
     #[test_case(Rule::BlankLineAfterDecorator, Path::new("E30.py"))]
     #[test_case(Rule::BlankLinesAfterFunctionOrClass, Path::new("E30.py"))]
     #[test_case(Rule::BlankLinesBeforeNestedDefinition, Path::new("E30.py"))]
-
-    fn logical(rule_code: Rule, path: &Path) -> Result<()> {
+    fn blank_lines(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pycodestyle").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    /// Tests the compatibility of the blank line rules and isort.
+    #[test_case(Rule::BlankLinesTopLevel)]
+    #[test_case(Rule::TooManyBlankLines)]
+    fn blank_lines_isort(rule_code: Rule) -> Result<()> {
+        let snapshot = format!("blank_lines_{}_isort", rule_code.noqa_code());
+        let diagnostics = test_path(
+            Path::new("pycodestyle").join("E30_isort.py"),
+            &settings::LinterSettings {
+                isort: isort::settings::Settings {
+                    lines_after_imports: 1,
+                    lines_between_types: 1,
+                    ..isort::settings::Settings::default()
+                },
+                ..settings::LinterSettings::for_rules([rule_code, Rule::UnsortedImports])
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
