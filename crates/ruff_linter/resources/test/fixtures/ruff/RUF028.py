@@ -1,26 +1,3 @@
-# fmt: on
-def fmt_off_used_earlier():
-    if True:
-        a = 5
-        with a:
-            # fmt: off
-            pass
-    elif False:
-        # fmt: off
-        pass
-    else:
-        pass
-    # fmt: off
-    if True:
-        # fmt: off
-        pass
-    # fmt: off 
-
-# fmt: off
-
-# fmt: on
-
-
 def fmt_off_between_lists():
     test_list = [
         # fmt: off
@@ -29,18 +6,23 @@ def fmt_off_between_lists():
         3,
     ]
 
+# note: the second `fmt: skip`` should be OK
+def fmt_skip_on_own_line():
+    # fmt: skip
+    pass # fmt: skip
 
-@fmt_on_after_func
+
+@fmt_skip_on_own_line
 # fmt: off
 @fmt_off_between_lists
 def fmt_off_between_decorators():
-    # fmt: skip
     pass
 
-def fmt_on_trailing():
-    # fmt: off
-    val = 5 # fmt: on
-    pass
+@fmt_off_between_decorators
+# fmt: off
+@fmt_off_between_lists
+class FmtOffBetweenClassDecorators:
+    ...
 
 def fmt_off_in_else():
     x = [1, 2, 3]
@@ -51,7 +33,7 @@ def fmt_off_in_else():
         print("done")
     while False:
         print("while")
-    # fmt: on
+        # fmt: off
     # fmt: off
     else:
         print("done")
@@ -62,19 +44,7 @@ def fmt_off_in_else():
     else:
         print("expected")
 
-def dangling_fmt_off():
-    pass
+def fmt_on_trailing():
     # fmt: off
-
-def dangling_fmt_off2():
-    if True:
-        if True:
-            pass
-            # fmt: off
-        else:
-            pass
-            # fmt: off
-        # fmt: off
-    else:
-        pass
-    # fmt: off
+    val = 5 # fmt: on
+    pass # fmt: on

@@ -102,8 +102,8 @@ impl CommentLinePosition {
         matches!(self, Self::EndOfLine)
     }
 
-    /// Finds the line position of a comment given a range with
-    ///
+    /// Finds the line position of a comment given a range over a valid
+    /// comment.
     pub fn for_range(comment_range: TextRange, source_code: &str) -> Self {
         let before = &source_code[TextRange::up_to(comment_range.start())];
 

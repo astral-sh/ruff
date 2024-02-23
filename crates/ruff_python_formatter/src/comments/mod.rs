@@ -468,7 +468,7 @@ pub(crate) fn has_skip_comment(trailing_comments: &[SourceComment], source: &str
     trailing_comments.iter().any(|comment| {
         comment.line_position().is_end_of_line()
             && matches!(
-                SuppressionKind::from_comment(comment.slice().text(SourceCode::new(source))),
+                SuppressionKind::from_comment(comment.text(source)),
                 Some(SuppressionKind::Skip | SuppressionKind::Off)
             )
     })

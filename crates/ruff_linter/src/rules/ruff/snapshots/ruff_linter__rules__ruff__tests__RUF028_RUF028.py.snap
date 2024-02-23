@@ -1,332 +1,174 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF028.py:1:1: RUF028 [*] This comment will be ignored by the formatter because formatting is already enabled here
+RUF028.py:3:9: RUF028 [*] This suppression comment is invalid because it cannot be inside an expression
   |
-1 | # fmt: on
-  | ^^^^^^^^^ RUF028
-2 | def fmt_off_used_earlier():
-3 |     if True:
+1 | def fmt_off_between_lists():
+2 |     test_list = [
+3 |         # fmt: off
+  |         ^^^^^^^^^^ RUF028
+4 |         1,
+5 |         2,
   |
   = help: Remove this comment
 
 ℹ Unsafe fix
-1   |-# fmt: on
-2 1 | def fmt_off_used_earlier():
-3 2 |     if True:
-4 3 |         a = 5
+1 1 | def fmt_off_between_lists():
+2 2 |     test_list = [
+3   |-        # fmt: off
+4 3 |         1,
+5 4 |         2,
+6 5 |         3,
 
-RUF028.py:15:9: RUF028 [*] This comment will be ignored by the formatter because formatting is already disabled here
+RUF028.py:11:5: RUF028 [*] This suppression comment is invalid because it cannot be on its own line
    |
-13 |     # fmt: off
-14 |     if True:
-15 |         # fmt: off
-   |         ^^^^^^^^^^ RUF028
-16 |         pass
-17 |     # fmt: off 
-   |
-   = help: Remove this comment
-
-ℹ Unsafe fix
-12 12 |         pass
-13 13 |     # fmt: off
-14 14 |     if True:
-15    |-        # fmt: off
-16 15 |         pass
-17 16 |     # fmt: off 
-18 17 | 
-
-RUF028.py:17:5: RUF028 [*] This comment will be ignored by the formatter because it does not suppress formatting for any code
-   |
-15 |         # fmt: off
-16 |         pass
-17 |     # fmt: off 
+ 9 | # note: the second `fmt: skip`` should be OK
+10 | def fmt_skip_on_own_line():
+11 |     # fmt: skip
    |     ^^^^^^^^^^^ RUF028
-18 | 
-19 | # fmt: off
+12 |     pass # fmt: skip
    |
    = help: Remove this comment
 
 ℹ Unsafe fix
-14 14 |     if True:
-15 15 |         # fmt: off
-16 16 |         pass
-17    |-    # fmt: off 
-18 17 | 
-19 18 | # fmt: off
-20 19 | 
+8  8  | 
+9  9  | # note: the second `fmt: skip`` should be OK
+10 10 | def fmt_skip_on_own_line():
+11    |-    # fmt: skip
+12 11 |     pass # fmt: skip
+13 12 | 
+14 13 | 
 
-RUF028.py:26:9: RUF028 [*] This comment will be ignored by the formatter because it's inside an expression
+RUF028.py:16:1: RUF028 [*] This suppression comment is invalid because it cannot be between decorators
    |
-24 | def fmt_off_between_lists():
-25 |     test_list = [
-26 |         # fmt: off
-   |         ^^^^^^^^^^ RUF028
-27 |         1,
-28 |         2,
-   |
-   = help: Remove this comment
-
-ℹ Unsafe fix
-23 23 | 
-24 24 | def fmt_off_between_lists():
-25 25 |     test_list = [
-26    |-        # fmt: off
-27 26 |         1,
-28 27 |         2,
-29 28 |         3,
-
-RUF028.py:37:5: RUF028 [*] This comment will be ignored by the formatter because it has to be at the end of a line
-   |
-35 | @fmt_off_between_lists
-36 | def fmt_off_between_decorators():
-37 |     # fmt: skip
-   |     ^^^^^^^^^^^ RUF028
-38 |     pass
+15 | @fmt_skip_on_own_line
+16 | # fmt: off
+   | ^^^^^^^^^^ RUF028
+17 | @fmt_off_between_lists
+18 | def fmt_off_between_decorators():
    |
    = help: Remove this comment
 
 ℹ Unsafe fix
-34 34 | # fmt: off
-35 35 | @fmt_off_between_lists
-36 36 | def fmt_off_between_decorators():
-37    |-    # fmt: skip
-38 37 |     pass
-39 38 | 
-40 39 | def fmt_on_trailing():
+13 13 | 
+14 14 | 
+15 15 | @fmt_skip_on_own_line
+16    |-# fmt: off
+17 16 | @fmt_off_between_lists
+18 17 | def fmt_off_between_decorators():
+19 18 |     pass
 
-RUF028.py:41:5: RUF028 [*] This comment will be ignored by the formatter because it does not suppress formatting for any code
+RUF028.py:22:1: RUF028 [*] This suppression comment is invalid because it cannot be between decorators
    |
-40 | def fmt_on_trailing():
-41 |     # fmt: off
+21 | @fmt_off_between_decorators
+22 | # fmt: off
+   | ^^^^^^^^^^ RUF028
+23 | @fmt_off_between_lists
+24 | class FmtOffBetweenClassDecorators:
+   |
+   = help: Remove this comment
+
+ℹ Unsafe fix
+19 19 |     pass
+20 20 | 
+21 21 | @fmt_off_between_decorators
+22    |-# fmt: off
+23 22 | @fmt_off_between_lists
+24 23 | class FmtOffBetweenClassDecorators:
+25 24 |     ...
+
+RUF028.py:31:5: RUF028 [*] This suppression comment is invalid because it cannot suppress formatting for an ambiguous region
+   |
+29 |     for val in x:
+30 |         print(x)
+31 |     # fmt: off
    |     ^^^^^^^^^^ RUF028
-42 |     val = 5 # fmt: on
-43 |     pass
+32 |     else:
+33 |         print("done")
    |
    = help: Remove this comment
 
 ℹ Unsafe fix
-38 38 |     pass
-39 39 | 
-40 40 | def fmt_on_trailing():
-41    |-    # fmt: off
-42 41 |     val = 5 # fmt: on
-43 42 |     pass
-44 43 | 
+28 28 |     x = [1, 2, 3]
+29 29 |     for val in x:
+30 30 |         print(x)
+31    |-    # fmt: off
+32 31 |     else:
+33 32 |         print("done")
+34 33 |     while False:
 
-RUF028.py:42:13: RUF028 [*] This comment will be ignored by the formatter because it cannot be at the end of a line
+RUF028.py:37:5: RUF028 [*] This suppression comment is invalid because it cannot suppress formatting for an ambiguous region
    |
-40 | def fmt_on_trailing():
-41 |     # fmt: off
-42 |     val = 5 # fmt: on
+35 |         print("while")
+36 |         # fmt: off
+37 |     # fmt: off
+   |     ^^^^^^^^^^ RUF028
+38 |     else:
+39 |         print("done")
+   |
+   = help: Remove this comment
+
+ℹ Unsafe fix
+34 34 |     while False:
+35 35 |         print("while")
+36 36 |         # fmt: off
+37    |-    # fmt: off
+38 37 |     else:
+39 38 |         print("done")
+40 39 |     if len(x) > 3:
+
+RUF028.py:43:5: RUF028 [*] This suppression comment is invalid because it cannot suppress formatting for an ambiguous region
+   |
+41 |         print("huh?")
+42 |     # fmt: on
+43 |     # fmt: off
+   |     ^^^^^^^^^^ RUF028
+44 |     else:
+45 |         print("expected")
+   |
+   = help: Remove this comment
+
+ℹ Unsafe fix
+40 40 |     if len(x) > 3:
+41 41 |         print("huh?")
+42 42 |     # fmt: on
+43    |-    # fmt: off
+44 43 |     else:
+45 44 |         print("expected")
+46 45 | 
+
+RUF028.py:49:13: RUF028 [*] This suppression comment is invalid because it cannot be at the end of a line
+   |
+47 | def fmt_on_trailing():
+48 |     # fmt: off
+49 |     val = 5 # fmt: on
    |             ^^^^^^^^^ RUF028
-43 |     pass
+50 |     pass # fmt: on
    |
    = help: Remove this comment
 
 ℹ Unsafe fix
-39 39 | 
-40 40 | def fmt_on_trailing():
-41 41 |     # fmt: off
-42    |-    val = 5 # fmt: on
-   42 |+    val = 5
-43 43 |     pass
-44 44 | 
-45 45 | def fmt_off_in_else():
+46 46 | 
+47 47 | def fmt_on_trailing():
+48 48 |     # fmt: off
+49    |-    val = 5 # fmt: on
+   49 |+    val = 5
+50 50 |     pass # fmt: on
 
-RUF028.py:49:5: RUF028 [*] This comment will be ignored by the formatter because it suppresses formatting for an ambiguous region
+RUF028.py:50:10: RUF028 [*] This suppression comment is invalid because it cannot be at the end of a line
    |
-47 |     for val in x:
-48 |         print(x)
-49 |     # fmt: off
-   |     ^^^^^^^^^^ RUF028
-50 |     else:
-51 |         print("done")
+48 |     # fmt: off
+49 |     val = 5 # fmt: on
+50 |     pass # fmt: on
+   |          ^^^^^^^^^ RUF028
    |
    = help: Remove this comment
 
 ℹ Unsafe fix
-46 46 |     x = [1, 2, 3]
-47 47 |     for val in x:
-48 48 |         print(x)
-49    |-    # fmt: off
-50 49 |     else:
-51 50 |         print("done")
-52 51 |     while False:
-
-RUF028.py:54:5: RUF028 [*] This comment will be ignored by the formatter because formatting is already enabled here
-   |
-52 |     while False:
-53 |         print("while")
-54 |     # fmt: on
-   |     ^^^^^^^^^ RUF028
-55 |     # fmt: off
-56 |     else:
-   |
-   = help: Remove this comment
-
-ℹ Unsafe fix
-51 51 |         print("done")
-52 52 |     while False:
-53 53 |         print("while")
-54    |-    # fmt: on
-55 54 |     # fmt: off
-56 55 |     else:
-57 56 |         print("done")
-
-RUF028.py:55:5: RUF028 [*] This comment will be ignored by the formatter because it suppresses formatting for an ambiguous region
-   |
-53 |         print("while")
-54 |     # fmt: on
-55 |     # fmt: off
-   |     ^^^^^^^^^^ RUF028
-56 |     else:
-57 |         print("done")
-   |
-   = help: Remove this comment
-
-ℹ Unsafe fix
-52 52 |     while False:
-53 53 |         print("while")
-54 54 |     # fmt: on
-55    |-    # fmt: off
-56 55 |     else:
-57 56 |         print("done")
-58 57 |     if len(x) > 3:
-
-RUF028.py:60:5: RUF028 [*] This comment will be ignored by the formatter because formatting is already enabled here
-   |
-58 |     if len(x) > 3:
-59 |         print("huh?")
-60 |     # fmt: on
-   |     ^^^^^^^^^ RUF028
-61 |     # fmt: off
-62 |     else:
-   |
-   = help: Remove this comment
-
-ℹ Unsafe fix
-57 57 |         print("done")
-58 58 |     if len(x) > 3:
-59 59 |         print("huh?")
-60    |-    # fmt: on
-61 60 |     # fmt: off
-62 61 |     else:
-63 62 |         print("expected")
-
-RUF028.py:61:5: RUF028 [*] This comment will be ignored by the formatter because it suppresses formatting for an ambiguous region
-   |
-59 |         print("huh?")
-60 |     # fmt: on
-61 |     # fmt: off
-   |     ^^^^^^^^^^ RUF028
-62 |     else:
-63 |         print("expected")
-   |
-   = help: Remove this comment
-
-ℹ Unsafe fix
-58 58 |     if len(x) > 3:
-59 59 |         print("huh?")
-60 60 |     # fmt: on
-61    |-    # fmt: off
-62 61 |     else:
-63 62 |         print("expected")
-64 63 | 
-
-RUF028.py:67:5: RUF028 [*] This comment will be ignored by the formatter because it does not suppress formatting for any code
-   |
-65 | def dangling_fmt_off():
-66 |     pass
-67 |     # fmt: off
-   |     ^^^^^^^^^^ RUF028
-68 | 
-69 | def dangling_fmt_off2():
-   |
-   = help: Remove this comment
-
-ℹ Unsafe fix
-64 64 | 
-65 65 | def dangling_fmt_off():
-66 66 |     pass
-67    |-    # fmt: off
-68 67 | 
-69 68 | def dangling_fmt_off2():
-70 69 |     if True:
-
-RUF028.py:73:13: RUF028 [*] This comment will be ignored by the formatter because it does not suppress formatting for any code
-   |
-71 |         if True:
-72 |             pass
-73 |             # fmt: off
-   |             ^^^^^^^^^^ RUF028
-74 |         else:
-75 |             pass
-   |
-   = help: Remove this comment
-
-ℹ Unsafe fix
-70 70 |     if True:
-71 71 |         if True:
-72 72 |             pass
-73    |-            # fmt: off
-74 73 |         else:
-75 74 |             pass
-76 75 |             # fmt: off
-
-RUF028.py:76:13: RUF028 [*] This comment will be ignored by the formatter because it does not suppress formatting for any code
-   |
-74 |         else:
-75 |             pass
-76 |             # fmt: off
-   |             ^^^^^^^^^^ RUF028
-77 |         # fmt: off
-78 |     else:
-   |
-   = help: Remove this comment
-
-ℹ Unsafe fix
-73 73 |             # fmt: off
-74 74 |         else:
-75 75 |             pass
-76    |-            # fmt: off
-77 76 |         # fmt: off
-78 77 |     else:
-79 78 |         pass
-
-RUF028.py:77:9: RUF028 [*] This comment will be ignored by the formatter because it does not suppress formatting for any code
-   |
-75 |             pass
-76 |             # fmt: off
-77 |         # fmt: off
-   |         ^^^^^^^^^^ RUF028
-78 |     else:
-79 |         pass
-   |
-   = help: Remove this comment
-
-ℹ Unsafe fix
-74 74 |         else:
-75 75 |             pass
-76 76 |             # fmt: off
-77    |-        # fmt: off
-78 77 |     else:
-79 78 |         pass
-80 79 |     # fmt: off
-
-RUF028.py:80:5: RUF028 [*] This comment will be ignored by the formatter because it does not suppress formatting for any code
-   |
-78 |     else:
-79 |         pass
-80 |     # fmt: off
-   |     ^^^^^^^^^^ RUF028
-   |
-   = help: Remove this comment
-
-ℹ Unsafe fix
-77 77 |         # fmt: off
-78 78 |     else:
-79 79 |         pass
-80    |-    # fmt: off
+47 47 | def fmt_on_trailing():
+48 48 |     # fmt: off
+49 49 |     val = 5 # fmt: on
+50    |-    pass # fmt: on
+   50 |+    pass
 
 
