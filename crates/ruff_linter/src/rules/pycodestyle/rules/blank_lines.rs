@@ -18,6 +18,7 @@ use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
 
 use crate::checkers::logical_lines::expand_indent;
+use crate::codes::Rule;
 use crate::line_width::IndentWidth;
 use ruff_python_trivia::PythonWhitespace;
 
@@ -411,10 +412,11 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     TokenKind::Def => LogicalLineKind::Function,
                     // Lookahead to distinguish `async def` from `async with`.
                     TokenKind::Async
-                    if matches!(self.tokens.as_slice().first(), Some(Ok((Tok::Def, _)))) =>
-                        {
-                            LogicalLineKind::Function
-                        }
+                        if matches!(self.tokens.as_slice().first(), Some(Ok((Tok::Def, _)))) =>
+                    {
+                        LogicalLineKind::Function
+                    }
+                    TokenKind::Import | TokenKind::From => LogicalLineKind::Import,
                     _ => LogicalLineKind::Other,
                 };
 
@@ -560,7 +562,14 @@ enum Follows {
     Other,
     Decorator,
     Def,
+    Import,
     Docstring,
+}
+
+impl Follows {
+    const fn is_import(self) -> bool {
+        matches!(self, Follows::Import)
+    }
 }
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -607,18 +616,20 @@ pub(crate) struct BlankLinesChecker<'a> {
     stylist: &'a Stylist<'a>,
     locator: &'a Locator<'a>,
     indent_width: IndentWidth,
+    isort_enabled: bool,
 }
 
 impl<'a> BlankLinesChecker<'a> {
     pub(crate) fn new(
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
-        indent_width: IndentWidth,
+        settings: &crate::settings::LinterSettings,
     ) -> BlankLinesChecker<'a> {
         BlankLinesChecker {
             stylist,
             locator,
-            indent_width,
+            indent_width: settings.tab_size,
+            isort_enabled: settings.rules.enabled(Rule::UnsortedImports),
         }
     }
 
@@ -629,7 +640,55 @@ impl<'a> BlankLinesChecker<'a> {
         let line_preprocessor = LinePreprocessor::new(tokens, self.locator, self.indent_width);
 
         for logical_line in line_preprocessor {
-            state = self.check_line(&logical_line, state, prev_indent_length, diagnostics);
+            state.class_status.update(&logical_line);
+            state.fn_status.update(&logical_line);
+
+            // Leave checking of empty lines after imports to isort if it is enabled.
+            // This is to avoid conflicts where isort e.g. requires one empty line but blank lines
+            // requires two empty lines.
+            if !state.follows.is_import() || !self.isort_enabled || logical_line.indent_length != 0
+            {
+                self.check_line(&logical_line, &state, prev_indent_length, diagnostics);
+            }
+
+            match logical_line.kind {
+                LogicalLineKind::Class => {
+                    if matches!(state.class_status, Status::Outside) {
+                        state.class_status = Status::Inside(logical_line.indent_length);
+                    }
+                    state.follows = Follows::Other;
+                }
+                LogicalLineKind::Decorator => {
+                    state.follows = Follows::Decorator;
+                }
+                LogicalLineKind::Function => {
+                    if matches!(state.fn_status, Status::Outside) {
+                        state.fn_status = Status::Inside(logical_line.indent_length);
+                    }
+                    state.follows = Follows::Def;
+                }
+                LogicalLineKind::Comment => {}
+                LogicalLineKind::Import => {
+                    state.follows = Follows::Import;
+                }
+                LogicalLineKind::Other => {
+                    state.follows = Follows::Other;
+                }
+            }
+
+            if logical_line.is_docstring {
+                state.follows = Follows::Docstring;
+            }
+
+            if !logical_line.is_comment_only {
+                state.is_not_first_logical_line = true;
+
+                state.last_non_comment_line_end = logical_line.logical_line_end;
+
+                if logical_line.indent_length == 0 {
+                    state.previous_unindented_line_kind = Some(logical_line.kind);
+                }
+            }
 
             if !logical_line.is_comment_only {
                 prev_indent_length = Some(logical_line.indent_length);
@@ -641,13 +700,10 @@ impl<'a> BlankLinesChecker<'a> {
     fn check_line(
         &self,
         line: &LogicalLineInfo,
-        mut state: BlankLinesState,
+        state: &BlankLinesState,
         prev_indent_length: Option<usize>,
         diagnostics: &mut Vec<Diagnostic>,
-    ) -> BlankLinesState {
-        state.class_status.update(line);
-        state.fn_status.update(line);
-
+    ) {
         // Don't expect blank lines before the first non comment line.
         if state.is_not_first_logical_line {
             if line.preceding_blank_lines == 0
@@ -780,8 +836,8 @@ impl<'a> BlankLinesChecker<'a> {
 
             if line.preceding_blank_lines < BLANK_LINES_TOP_LEVEL
                 && state
-                .previous_unindented_line_kind
-                .is_some_and(LogicalLineKind::is_top_level)
+                    .previous_unindented_line_kind
+                    .is_some_and(LogicalLineKind::is_top_level)
                 && line.indent_length == 0
                 && !line.is_comment_only
                 && !line.kind.is_top_level()
@@ -838,44 +894,6 @@ impl<'a> BlankLinesChecker<'a> {
                 diagnostics.push(diagnostic);
             }
         }
-
-        match line.kind {
-            LogicalLineKind::Class => {
-                if matches!(state.class_status, Status::Outside) {
-                    state.class_status = Status::Inside(line.indent_length);
-                }
-                state.follows = Follows::Other;
-            }
-            LogicalLineKind::Decorator => {
-                state.follows = Follows::Decorator;
-            }
-            LogicalLineKind::Function => {
-                if matches!(state.fn_status, Status::Outside) {
-                    state.fn_status = Status::Inside(line.indent_length);
-                }
-                state.follows = Follows::Def;
-            }
-            LogicalLineKind::Comment => {}
-            LogicalLineKind::Other => {
-                state.follows = Follows::Other;
-            }
-        }
-
-        if line.is_docstring {
-            state.follows = Follows::Docstring;
-        }
-
-        if !line.is_comment_only {
-            state.is_not_first_logical_line = true;
-
-            state.last_non_comment_line_end = line.logical_line_end;
-
-            if line.indent_length == 0 {
-                state.previous_unindented_line_kind = Some(line.kind);
-            }
-        }
-
-        state
     }
 }
 
@@ -902,6 +920,8 @@ enum LogicalLineKind {
     Function,
     /// A comment only line
     Comment,
+    /// An import statement
+    Import,
     /// Any other statement or clause header
     Other,
 }

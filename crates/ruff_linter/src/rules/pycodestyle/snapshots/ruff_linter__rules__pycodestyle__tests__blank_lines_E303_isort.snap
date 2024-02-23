@@ -1,0 +1,44 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E30_isort.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+  |
+1 | / import json
+2 | | 
+3 | | 
+4 | | 
+5 | | from typing import Any, Sequence
+6 | | 
+7 | | 
+8 | | class MissingCommand(TypeError): ...  # noqa: N818
+  | |_^ I001
+  |
+  = help: Organize imports
+
+ℹ Safe fix
+1 1 | import json
+2 2 | 
+3   |-
+4   |-
+5 3 | from typing import Any, Sequence
+6   |-
+7 4 | 
+8 5 | class MissingCommand(TypeError): ...  # noqa: N818
+9 6 | 
+
+E30_isort.py:22:5: E303 [*] Too many blank lines (3)
+   |
+22 |     abcd.foo()
+   |     ^^^^ E303
+   |
+   = help: Remove extraneous blank line(s)
+
+ℹ Safe fix
+17 17 | if __name__ == "__main__":
+18 18 |     import abcd
+19 19 | 
+20    |-
+21    |-
+22 20 |     abcd.foo()
+23 21 | 
+24 22 |
