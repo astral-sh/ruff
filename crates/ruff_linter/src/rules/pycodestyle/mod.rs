@@ -222,6 +222,38 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::BlankLineBetweenMethods)]
+    #[test_case(Rule::BlankLinesTopLevel)]
+    #[test_case(Rule::TooManyBlankLines)]
+    #[test_case(Rule::BlankLineAfterDecorator)]
+    #[test_case(Rule::BlankLinesAfterFunctionOrClass)]
+    #[test_case(Rule::BlankLinesBeforeNestedDefinition)]
+    fn blank_lines_typing_stub(rule_code: Rule) -> Result<()> {
+        let snapshot = format!("blank_lines_{}_typing_stub", rule_code.noqa_code());
+        let diagnostics = test_path(
+            Path::new("pycodestyle").join("E30.pyi"),
+            &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn blank_lines_typing_stub_isort() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pycodestyle").join("E30_isort.pyi"),
+            &settings::LinterSettings {
+                ..settings::LinterSettings::for_rules([
+                    Rule::TooManyBlankLines,
+                    Rule::BlankLinesTopLevel,
+                    Rule::UnsortedImports,
+                ])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn constant_literals() -> Result<()> {
         let diagnostics = test_path(
