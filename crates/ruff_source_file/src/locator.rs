@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::newlines::find_newline;
 use crate::{LineIndex, OneIndexed, SourceCode, SourceLocation};
 
+#[derive(Debug)]
 pub struct Locator<'a> {
     contents: &'a str,
     index: OnceCell<LineIndex>,

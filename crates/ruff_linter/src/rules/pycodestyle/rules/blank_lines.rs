@@ -411,10 +411,10 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     TokenKind::Def => LogicalLineKind::Function,
                     // Lookahead to distinguish `async def` from `async with`.
                     TokenKind::Async
-                        if matches!(self.tokens.as_slice().first(), Some(Ok((Tok::Def, _)))) =>
-                    {
-                        LogicalLineKind::Function
-                    }
+                    if matches!(self.tokens.as_slice().first(), Some(Ok((Tok::Def, _)))) =>
+                        {
+                            LogicalLineKind::Function
+                        }
                     _ => LogicalLineKind::Other,
                 };
 
@@ -602,40 +602,35 @@ impl Status {
 }
 
 /// Contains variables used for the linting of blank lines.
-#[derive(Debug, Default)]
-pub(crate) struct BlankLinesChecker {
-    follows: Follows,
-    fn_status: Status,
-    class_status: Status,
-    /// First line that is not a comment.
-    is_not_first_logical_line: bool,
-    /// Used for the fix in case a comment separates two non-comment logical lines to make the comment "stick"
-    /// to the second line instead of the first.
-    last_non_comment_line_end: TextSize,
-    previous_unindented_line_kind: Option<LogicalLineKind>,
+#[derive(Debug)]
+pub(crate) struct BlankLinesChecker<'a> {
+    stylist: &'a Stylist<'a>,
+    locator: &'a Locator<'a>,
+    indent_width: IndentWidth,
 }
 
-impl BlankLinesChecker {
-    /// E301, E302, E303, E304, E305, E306
-    pub(crate) fn check_lines(
-        &mut self,
-        tokens: &[LexResult],
-        locator: &Locator,
-        stylist: &Stylist,
+impl<'a> BlankLinesChecker<'a> {
+    pub(crate) fn new(
+        locator: &'a Locator<'a>,
+        stylist: &'a Stylist<'a>,
         indent_width: IndentWidth,
-        diagnostics: &mut Vec<Diagnostic>,
-    ) {
+    ) -> BlankLinesChecker<'a> {
+        BlankLinesChecker {
+            stylist,
+            locator,
+            indent_width,
+        }
+    }
+
+    /// E301, E302, E303, E304, E305, E306
+    pub(crate) fn check_lines(&self, tokens: &[LexResult], diagnostics: &mut Vec<Diagnostic>) {
         let mut prev_indent_length: Option<usize> = None;
-        let line_preprocessor = LinePreprocessor::new(tokens, locator, indent_width);
+        let mut state = BlankLinesState::default();
+        let line_preprocessor = LinePreprocessor::new(tokens, self.locator, self.indent_width);
 
         for logical_line in line_preprocessor {
-            self.check_line(
-                &logical_line,
-                prev_indent_length,
-                locator,
-                stylist,
-                diagnostics,
-            );
+            state = self.check_line(&logical_line, state, prev_indent_length, diagnostics);
+
             if !logical_line.is_comment_only {
                 prev_indent_length = Some(logical_line.indent_length);
             }
@@ -644,27 +639,26 @@ impl BlankLinesChecker {
 
     #[allow(clippy::nonminimal_bool)]
     fn check_line(
-        &mut self,
+        &self,
         line: &LogicalLineInfo,
+        mut state: BlankLinesState,
         prev_indent_length: Option<usize>,
-        locator: &Locator,
-        stylist: &Stylist,
         diagnostics: &mut Vec<Diagnostic>,
-    ) {
-        self.class_status.update(line);
-        self.fn_status.update(line);
+    ) -> BlankLinesState {
+        state.class_status.update(line);
+        state.fn_status.update(line);
 
         // Don't expect blank lines before the first non comment line.
-        if self.is_not_first_logical_line {
+        if state.is_not_first_logical_line {
             if line.preceding_blank_lines == 0
                 // Only applies to methods.
                 && matches!(line.kind,  LogicalLineKind::Function | LogicalLineKind::Decorator)
                 // Allow groups of one-liners.
-                && !(matches!(self.follows, Follows::Def) && !matches!(line.last_token, TokenKind::Colon))
-                && matches!(self.class_status, Status::Inside(_))
+                && !(matches!(state.follows, Follows::Def) && !matches!(line.last_token, TokenKind::Colon))
+                && matches!(state.class_status, Status::Inside(_))
                 // The class/parent method's docstring can directly precede the def.
                 // Allow following a decorator (if there is an error it will be triggered on the first decorator).
-                && !matches!(self.follows, Follows::Docstring | Follows::Decorator)
+                && !matches!(state.follows, Follows::Docstring | Follows::Decorator)
                 // Do not trigger when the def follows an if/while/etc...
                 && prev_indent_length.is_some_and(|prev_indent_length| prev_indent_length >= line.indent_length)
             {
@@ -672,8 +666,8 @@ impl BlankLinesChecker {
                 let mut diagnostic =
                     Diagnostic::new(BlankLineBetweenMethods, line.first_token_range);
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    stylist.line_ending().to_string(),
-                    locator.line_start(self.last_non_comment_line_end),
+                    self.stylist.line_ending().to_string(),
+                    self.locator.line_start(state.last_non_comment_line_end),
                 )));
 
                 diagnostics.push(diagnostic);
@@ -681,9 +675,9 @@ impl BlankLinesChecker {
 
             if line.preceding_blank_lines < BLANK_LINES_TOP_LEVEL
                 // Allow following a decorator (if there is an error it will be triggered on the first decorator).
-                && !matches!(self.follows, Follows::Decorator)
+                && !matches!(state.follows, Follows::Decorator)
                 // Allow groups of one-liners.
-                && !(matches!(self.follows, Follows::Def) && !matches!(line.last_token, TokenKind::Colon))
+                && !(matches!(state.follows, Follows::Def) && !matches!(line.last_token, TokenKind::Colon))
                 // Only trigger on non-indented classes and functions (for example functions within an if are ignored)
                 && line.indent_length == 0
                 // Only apply to functions or classes.
@@ -699,13 +693,17 @@ impl BlankLinesChecker {
 
                 if let Some(blank_lines_range) = line.blank_lines.range() {
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        stylist.line_ending().repeat(BLANK_LINES_TOP_LEVEL as usize),
+                        self.stylist
+                            .line_ending()
+                            .repeat(BLANK_LINES_TOP_LEVEL as usize),
                         blank_lines_range,
                     )));
                 } else {
                     diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                        stylist.line_ending().repeat(BLANK_LINES_TOP_LEVEL as usize),
-                        locator.line_start(self.last_non_comment_line_end),
+                        self.stylist
+                            .line_ending()
+                            .repeat(BLANK_LINES_TOP_LEVEL as usize),
+                        self.locator.line_start(state.last_non_comment_line_end),
                     )));
                 }
 
@@ -729,7 +727,9 @@ impl BlankLinesChecker {
 
                 if let Some(blank_lines_range) = line.blank_lines.range() {
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        stylist.line_ending().repeat(expected_blank_lines as usize),
+                        self.stylist
+                            .line_ending()
+                            .repeat(expected_blank_lines as usize),
                         blank_lines_range,
                     )));
                 }
@@ -737,7 +737,7 @@ impl BlankLinesChecker {
                 diagnostics.push(diagnostic);
             }
 
-            if matches!(self.follows, Follows::Decorator)
+            if matches!(state.follows, Follows::Decorator)
                 && !line.is_comment_only
                 && line.preceding_blank_lines > 0
             {
@@ -752,21 +752,21 @@ impl BlankLinesChecker {
                 // Get all the lines between the last decorator line (included) and the current line (included).
                 // Then remove all blank lines.
                 let trivia_range = TextRange::new(
-                    self.last_non_comment_line_end,
-                    locator.line_start(line.first_token_range.start()),
+                    state.last_non_comment_line_end,
+                    self.locator.line_start(line.first_token_range.start()),
                 );
-                let trivia_text = locator.slice(trivia_range);
+                let trivia_text = self.locator.slice(trivia_range);
                 let mut trivia_without_blank_lines = trivia_text
                     .universal_newlines()
                     .filter_map(|line| {
                         (!line.trim_whitespace().is_empty()).then_some(line.as_str())
                     })
-                    .join(&stylist.line_ending());
+                    .join(&self.stylist.line_ending());
 
                 let fix = if trivia_without_blank_lines.is_empty() {
                     Fix::safe_edit(Edit::range_deletion(trivia_range))
                 } else {
-                    trivia_without_blank_lines.push_str(&stylist.line_ending());
+                    trivia_without_blank_lines.push_str(&self.stylist.line_ending());
                     Fix::safe_edit(Edit::range_replacement(
                         trivia_without_blank_lines,
                         trivia_range,
@@ -779,9 +779,9 @@ impl BlankLinesChecker {
             }
 
             if line.preceding_blank_lines < BLANK_LINES_TOP_LEVEL
-                && self
-                    .previous_unindented_line_kind
-                    .is_some_and(LogicalLineKind::is_top_level)
+                && state
+                .previous_unindented_line_kind
+                .is_some_and(LogicalLineKind::is_top_level)
                 && line.indent_length == 0
                 && !line.is_comment_only
                 && !line.kind.is_top_level()
@@ -796,13 +796,17 @@ impl BlankLinesChecker {
 
                 if let Some(blank_lines_range) = line.blank_lines.range() {
                     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        stylist.line_ending().repeat(BLANK_LINES_TOP_LEVEL as usize),
+                        self.stylist
+                            .line_ending()
+                            .repeat(BLANK_LINES_TOP_LEVEL as usize),
                         blank_lines_range,
                     )));
                 } else {
                     diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                        stylist.line_ending().repeat(BLANK_LINES_TOP_LEVEL as usize),
-                        locator.line_start(line.first_token_range.start()),
+                        self.stylist
+                            .line_ending()
+                            .repeat(BLANK_LINES_TOP_LEVEL as usize),
+                        self.locator.line_start(line.first_token_range.start()),
                     )));
                 }
 
@@ -811,24 +815,24 @@ impl BlankLinesChecker {
 
             if line.preceding_blank_lines == 0
                 // Only apply to nested functions.
-                && matches!(self.fn_status, Status::Inside(_))
+                && matches!(state.fn_status, Status::Inside(_))
                 && line.kind.is_top_level()
                 // Allow following a decorator (if there is an error it will be triggered on the first decorator).
-                && !matches!(self.follows, Follows::Decorator)
+                && !matches!(state.follows, Follows::Decorator)
                 // The class's docstring can directly precede the first function.
-                && !matches!(self.follows, Follows::Docstring)
+                && !matches!(state.follows, Follows::Docstring)
                 // Do not trigger when the def/class follows an "indenting token" (if/while/etc...).
                 && prev_indent_length.is_some_and(|prev_indent_length| prev_indent_length >= line.indent_length)
                 // Allow groups of one-liners.
-                && !(matches!(self.follows, Follows::Def) && line.last_token != TokenKind::Colon)
+                && !(matches!(state.follows, Follows::Def) && line.last_token != TokenKind::Colon)
             {
                 // E306
                 let mut diagnostic =
                     Diagnostic::new(BlankLinesBeforeNestedDefinition, line.first_token_range);
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    stylist.line_ending().to_string(),
-                    locator.line_start(line.first_token_range.start()),
+                    self.stylist.line_ending().to_string(),
+                    self.locator.line_start(line.first_token_range.start()),
                 )));
 
                 diagnostics.push(diagnostic);
@@ -837,40 +841,55 @@ impl BlankLinesChecker {
 
         match line.kind {
             LogicalLineKind::Class => {
-                if matches!(self.class_status, Status::Outside) {
-                    self.class_status = Status::Inside(line.indent_length);
+                if matches!(state.class_status, Status::Outside) {
+                    state.class_status = Status::Inside(line.indent_length);
                 }
-                self.follows = Follows::Other;
+                state.follows = Follows::Other;
             }
             LogicalLineKind::Decorator => {
-                self.follows = Follows::Decorator;
+                state.follows = Follows::Decorator;
             }
             LogicalLineKind::Function => {
-                if matches!(self.fn_status, Status::Outside) {
-                    self.fn_status = Status::Inside(line.indent_length);
+                if matches!(state.fn_status, Status::Outside) {
+                    state.fn_status = Status::Inside(line.indent_length);
                 }
-                self.follows = Follows::Def;
+                state.follows = Follows::Def;
             }
             LogicalLineKind::Comment => {}
             LogicalLineKind::Other => {
-                self.follows = Follows::Other;
+                state.follows = Follows::Other;
             }
         }
 
         if line.is_docstring {
-            self.follows = Follows::Docstring;
+            state.follows = Follows::Docstring;
         }
 
         if !line.is_comment_only {
-            self.is_not_first_logical_line = true;
+            state.is_not_first_logical_line = true;
 
-            self.last_non_comment_line_end = line.logical_line_end;
+            state.last_non_comment_line_end = line.logical_line_end;
 
             if line.indent_length == 0 {
-                self.previous_unindented_line_kind = Some(line.kind);
+                state.previous_unindented_line_kind = Some(line.kind);
             }
         }
+
+        state
     }
+}
+
+#[derive(Clone, Debug, Default)]
+struct BlankLinesState {
+    follows: Follows,
+    fn_status: Status,
+    class_status: Status,
+    /// First line that is not a comment.
+    is_not_first_logical_line: bool,
+    /// Used for the fix in case a comment separates two non-comment logical lines to make the comment "stick"
+    /// to the second line instead of the first.
+    last_non_comment_line_end: TextSize,
+    previous_unindented_line_kind: Option<LogicalLineKind>,
 }
 
 #[derive(Copy, Clone, Debug)]
