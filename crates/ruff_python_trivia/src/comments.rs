@@ -53,12 +53,12 @@ impl SuppressionKind {
 
     /// Returns true if this comment is a `fmt: off` or `yapf: disable` own line suppression comment.
     pub fn is_suppression_on(slice: &str, position: CommentLinePosition) -> bool {
-        position.is_own_line() && matches!(Self::from_comment(slice), Some(Self::Off))
+        position.is_own_line() && matches!(Self::from_comment(slice), Some(Self::On))
     }
 
     /// Returns true if this comment is a `fmt: on` or `yapf: enable` own line suppression comment.
     pub fn is_suppression_off(slice: &str, position: CommentLinePosition) -> bool {
-        position.is_own_line() && matches!(Self::from_comment(slice), Some(Self::On))
+        position.is_own_line() && matches!(Self::from_comment(slice), Some(Self::Off))
     }
 }
 /// The position of a comment in the source text.
