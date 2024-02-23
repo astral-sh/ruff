@@ -30,6 +30,8 @@ E30_isort.py:22:5: E303 [*] Too many blank lines (3)
    |
 22 |     abcd.foo()
    |     ^^^^ E303
+23 | 
+24 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
    |
    = help: Remove extraneous blank line(s)
 
@@ -41,4 +43,4 @@ E30_isort.py:22:5: E303 [*] Too many blank lines (3)
 21    |-
 22 20 |     abcd.foo()
 23 21 | 
-24 22 |
+24 22 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
