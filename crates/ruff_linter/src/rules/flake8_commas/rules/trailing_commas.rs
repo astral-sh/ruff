@@ -7,115 +7,6 @@ use ruff_python_parser::Tok;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
-/// Simplified token type.
-#[derive(Copy, Clone, PartialEq, Eq)]
-enum TokenType {
-    Named,
-    String,
-    Newline,
-    NonLogicalNewline,
-    OpeningBracket,
-    ClosingBracket,
-    OpeningSquareBracket,
-    Colon,
-    Comma,
-    OpeningCurlyBracket,
-    Def,
-    For,
-    Lambda,
-    Irrelevant,
-}
-
-/// Simplified token specialized for the task.
-#[derive(Copy, Clone)]
-struct Token {
-    ty: TokenType,
-    range: TextRange,
-}
-
-impl Ranged for Token {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
-impl Token {
-    fn new(ty: TokenType, range: TextRange) -> Self {
-        Self { ty, range }
-    }
-
-    fn irrelevant() -> Token {
-        Token {
-            ty: TokenType::Irrelevant,
-            range: TextRange::default(),
-        }
-    }
-}
-
-impl From<(&Tok, TextRange)> for Token {
-    fn from((tok, range): (&Tok, TextRange)) -> Self {
-        let ty = match tok {
-            Tok::Name { .. } => TokenType::Named,
-            Tok::String { .. } => TokenType::String,
-            Tok::Newline => TokenType::Newline,
-            Tok::NonLogicalNewline => TokenType::NonLogicalNewline,
-            Tok::Lpar => TokenType::OpeningBracket,
-            Tok::Rpar => TokenType::ClosingBracket,
-            Tok::Lsqb => TokenType::OpeningSquareBracket,
-            Tok::Rsqb => TokenType::ClosingBracket,
-            Tok::Colon => TokenType::Colon,
-            Tok::Comma => TokenType::Comma,
-            Tok::Lbrace => TokenType::OpeningCurlyBracket,
-            Tok::Rbrace => TokenType::ClosingBracket,
-            Tok::Def => TokenType::Def,
-            Tok::For => TokenType::For,
-            Tok::Lambda => TokenType::Lambda,
-            // Import treated like a function.
-            Tok::Import => TokenType::Named,
-            _ => TokenType::Irrelevant,
-        };
-        #[allow(clippy::inconsistent_struct_constructor)]
-        Self { range, ty }
-    }
-}
-
-/// Comma context type - types of comma-delimited Python constructs.
-#[derive(Copy, Clone, PartialEq, Eq)]
-enum ContextType {
-    No,
-    /// Function definition parameter list, e.g. `def foo(a,b,c)`.
-    FunctionParameters,
-    /// Call argument-like item list, e.g. `f(1,2,3)`, `foo()(1,2,3)`.
-    CallArguments,
-    /// Tuple-like item list, e.g. `(1,2,3)`.
-    Tuple,
-    /// Subscript item list, e.g. `x[1,2,3]`, `foo()[1,2,3]`.
-    Subscript,
-    /// List-like item list, e.g. `[1,2,3]`.
-    List,
-    /// Dict-/set-like item list, e.g. `{1,2,3}`.
-    Dict,
-    /// Lambda parameter list, e.g. `lambda a, b`.
-    LambdaParameters,
-}
-
-/// Comma context - described a comma-delimited "situation".
-#[derive(Copy, Clone)]
-struct Context {
-    ty: ContextType,
-    num_commas: u32,
-}
-
-impl Context {
-    const fn new(ty: ContextType) -> Self {
-        Self { ty, num_commas: 0 }
-    }
-
-    fn inc(&mut self) {
-        self.num_commas += 1;
-    }
-}
-
 /// ## What it does
 /// Checks for the absence of trailing commas.
 ///
@@ -283,6 +174,9 @@ pub(crate) fn trailing_commas(
         // Update the comma context stack.
         let context = update_context(token, prev, prev_prev, &mut stack);
 
+        // Could we add a `Layout` to `Context` that is either `Flat` (no line breaks), `SingleLine`, `Multiline` (more than one line break or line break after a value)
+        // We could then simply check the layout to determine if a trailing comma is allowed or not.
+
         if let Some(diagnostic) = check_token(token, prev, prev_prev, context, locator) {
             diagnostics.push(diagnostic);
         }
@@ -312,21 +206,21 @@ fn check_token(
     context: Context,
     locator: &Locator,
 ) -> Option<Diagnostic> {
-    // Is it allowed to have a trailing comma before this token?
+    // Is it allowed to have a trailing comma before this closing bracket (`)`, `]`, or `}).
     let comma_allowed = token.ty == TokenType::ClosingBracket
         && match context.ty {
-            ContextType::No => false,
-            ContextType::FunctionParameters => true,
-            ContextType::CallArguments => true,
-            // `(1)` is not equivalent to `(1,)`.
-            ContextType::Tuple => context.num_commas != 0,
-            // `x[1]` is not equivalent to `x[1,]`.
-            ContextType::Subscript => context.num_commas != 0,
-            ContextType::List => true,
-            ContextType::Dict => true,
-            // Lambdas are required to be a single line, trailing comma never makes sense.
-            ContextType::LambdaParameters => false,
-        };
+        ContextType::No => false,
+        ContextType::FunctionParameters => true,
+        ContextType::CallArguments => true,
+        // `(1)` is not equivalent to `(1,)`.
+        ContextType::Tuple => context.num_commas != 0,
+        // `x[1]` is not equivalent to `x[1,]`.
+        ContextType::Subscript => context.num_commas != 0,
+        ContextType::List => true,
+        ContextType::Dict => true,
+        // Lambdas are required to be a single line, trailing comma never makes sense.
+        ContextType::LambdaParameters => false,
+    };
 
     // Is prev a prohibited trailing comma?
     let comma_prohibited = prev.ty == TokenType::Comma && {
@@ -334,13 +228,15 @@ fn check_token(
         let is_singleton_tuplish =
             matches!(context.ty, ContextType::Subscript | ContextType::Tuple)
                 && context.num_commas <= 1;
+
         // There was no non-logical newline, so prohibit (except in `(1,)` or `x[1,]`).
-        if comma_allowed && !is_singleton_tuplish {
-            true
-            // Lambdas not handled by comma_allowed so handle it specially.
-        } else {
-            context.ty == ContextType::LambdaParameters && token.ty == TokenType::Colon
-        }
+        let is_flat_and_not_singleton_tuplish = comma_allowed && !is_singleton_tuplish;
+
+        // Lambdas not handled by comma_allowed so handle it specially.
+        let is_lambda_parameters =
+            context.ty == ContextType::LambdaParameters && token.ty == TokenType::Colon;
+
+        is_flat_and_not_singleton_tuplish || is_lambda_parameters
     };
 
     if comma_prohibited {
@@ -428,4 +324,113 @@ fn update_context(
 
     stack.push(new_context);
     new_context
+}
+
+/// Simplified token type.
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum TokenType {
+    Named,
+    String,
+    Newline,
+    NonLogicalNewline,
+    OpeningBracket,
+    ClosingBracket,
+    OpeningSquareBracket,
+    Colon,
+    Comma,
+    OpeningCurlyBracket,
+    Def,
+    For,
+    Lambda,
+    Irrelevant,
+}
+
+/// Simplified token specialized for the task.
+#[derive(Copy, Clone)]
+struct Token {
+    ty: TokenType,
+    range: TextRange,
+}
+
+impl Ranged for Token {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+impl Token {
+    fn new(ty: TokenType, range: TextRange) -> Self {
+        Self { ty, range }
+    }
+
+    fn irrelevant() -> Token {
+        Token {
+            ty: TokenType::Irrelevant,
+            range: TextRange::default(),
+        }
+    }
+}
+
+impl From<(&Tok, TextRange)> for Token {
+    fn from((tok, range): (&Tok, TextRange)) -> Self {
+        let ty = match tok {
+            Tok::Name { .. } => TokenType::Named,
+            Tok::String { .. } => TokenType::String,
+            Tok::Newline => TokenType::Newline,
+            Tok::NonLogicalNewline => TokenType::NonLogicalNewline,
+            Tok::Lpar => TokenType::OpeningBracket,
+            Tok::Rpar => TokenType::ClosingBracket,
+            Tok::Lsqb => TokenType::OpeningSquareBracket,
+            Tok::Rsqb => TokenType::ClosingBracket,
+            Tok::Colon => TokenType::Colon,
+            Tok::Comma => TokenType::Comma,
+            Tok::Lbrace => TokenType::OpeningCurlyBracket,
+            Tok::Rbrace => TokenType::ClosingBracket,
+            Tok::Def => TokenType::Def,
+            Tok::For => TokenType::For,
+            Tok::Lambda => TokenType::Lambda,
+            // Import treated like a function.
+            Tok::Import => TokenType::Named,
+            _ => TokenType::Irrelevant,
+        };
+        #[allow(clippy::inconsistent_struct_constructor)]
+        Self { range, ty }
+    }
+}
+
+/// Comma context type - types of comma-delimited Python constructs.
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum ContextType {
+    No,
+    /// Function definition parameter list, e.g. `def foo(a,b,c)`.
+    FunctionParameters,
+    /// Call argument-like item list, e.g. `f(1,2,3)`, `foo()(1,2,3)`.
+    CallArguments,
+    /// Tuple-like item list, e.g. `(1,2,3)`.
+    Tuple,
+    /// Subscript item list, e.g. `x[1,2,3]`, `foo()[1,2,3]`.
+    Subscript,
+    /// List-like item list, e.g. `[1,2,3]`.
+    List,
+    /// Dict-/set-like item list, e.g. `{1,2,3}`.
+    Dict,
+    /// Lambda parameter list, e.g. `lambda a, b`.
+    LambdaParameters,
+}
+
+/// Comma context - described a comma-delimited "situation".
+#[derive(Copy, Clone)]
+struct Context {
+    ty: ContextType,
+    num_commas: u32,
+}
+
+impl Context {
+    const fn new(ty: ContextType) -> Self {
+        Self { ty, num_commas: 0 }
+    }
+
+    fn inc(&mut self) {
+        self.num_commas += 1;
+    }
 }
