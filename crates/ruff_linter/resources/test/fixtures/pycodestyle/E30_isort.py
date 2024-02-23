@@ -21,9 +21,10 @@ if __name__ == "__main__":
 
     abcd.foo()
 
-
 def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
 
+if TYPE_CHECKING:
+    from typing_extensions import TypeAlias
 
 def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any: ...
 

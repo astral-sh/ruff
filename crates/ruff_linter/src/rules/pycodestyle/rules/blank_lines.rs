@@ -669,7 +669,11 @@ impl<'a> BlankLinesChecker<'a> {
                 }
                 LogicalLineKind::Comment => {}
                 LogicalLineKind::Import => {
-                    state.follows = Follows::Import;
+                    state.follows = if logical_line.indent_length == 0 {
+                        Follows::Import
+                    } else {
+                        Follows::Other
+                    }
                 }
                 LogicalLineKind::Other => {
                     state.follows = Follows::Other;

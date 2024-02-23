@@ -24,4 +24,42 @@ E30_isort.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 6   |-
 7 4 | 
 8 5 | class MissingCommand(TypeError): ...  # noqa: N818
-9 6 |
+9 6 | 
+
+E30_isort.py:24:1: E302 [*] Expected 2 blank lines, found 1
+   |
+22 |     abcd.foo()
+23 | 
+24 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
+   | ^^^ E302
+25 | 
+26 | if TYPE_CHECKING:
+   |
+   = help: Add missing blank line(s)
+
+ℹ Safe fix
+21 21 | 
+22 22 |     abcd.foo()
+23 23 | 
+   24 |+
+24 25 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
+25 26 | 
+26 27 | if TYPE_CHECKING:
+
+E30_isort.py:29:1: E302 [*] Expected 2 blank lines, found 1
+   |
+27 |     from typing_extensions import TypeAlias
+28 | 
+29 | def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any: ...
+   | ^^^ E302
+   |
+   = help: Add missing blank line(s)
+
+ℹ Safe fix
+26 26 | if TYPE_CHECKING:
+27 27 |     from typing_extensions import TypeAlias
+28 28 | 
+   29 |+
+29 30 | def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any: ...
+30 31 | 
+31 32 |
