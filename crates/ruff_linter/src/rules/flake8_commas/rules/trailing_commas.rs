@@ -174,9 +174,6 @@ pub(crate) fn trailing_commas(
         // Update the comma context stack.
         let context = update_context(token, prev, prev_prev, &mut stack);
 
-        // Could we add a `Layout` to `Context` that is either `Flat` (no line breaks), `SingleLine`, `Multiline` (more than one line break or line break after a value)
-        // We could then simply check the layout to determine if a trailing comma is allowed or not.
-
         if let Some(diagnostic) = check_token(token, prev, prev_prev, context, locator) {
             diagnostics.push(diagnostic);
         }
@@ -209,18 +206,18 @@ fn check_token(
     // Is it allowed to have a trailing comma before this closing bracket (`)`, `]`, or `}).
     let comma_allowed = token.ty == TokenType::ClosingBracket
         && match context.ty {
-        ContextType::No => false,
-        ContextType::FunctionParameters => true,
-        ContextType::CallArguments => true,
-        // `(1)` is not equivalent to `(1,)`.
-        ContextType::Tuple => context.num_commas != 0,
-        // `x[1]` is not equivalent to `x[1,]`.
-        ContextType::Subscript => context.num_commas != 0,
-        ContextType::List => true,
-        ContextType::Dict => true,
-        // Lambdas are required to be a single line, trailing comma never makes sense.
-        ContextType::LambdaParameters => false,
-    };
+            ContextType::No => false,
+            ContextType::FunctionParameters => true,
+            ContextType::CallArguments => true,
+            // `(1)` is not equivalent to `(1,)`.
+            ContextType::Tuple => context.num_commas != 0,
+            // `x[1]` is not equivalent to `x[1,]`.
+            ContextType::Subscript => context.num_commas != 0,
+            ContextType::List => true,
+            ContextType::Dict => true,
+            // Lambdas are required to be a single line, trailing comma never makes sense.
+            ContextType::LambdaParameters => false,
+        };
 
     // Is prev a prohibited trailing comma?
     let comma_prohibited = prev.ty == TokenType::Comma && {
@@ -256,30 +253,35 @@ fn check_token(
         return None;
     }
 
+    let is_empty = matches!(
+        prev_prev.ty,
+        TokenType::Comma
+            | TokenType::OpeningBracket
+            | TokenType::OpeningSquareBracket
+            | TokenType::OpeningCurlyBracket
+    );
+
     // Comma is required if:
-    // - It is allowed,
+    // - positioned at a closing parentheses and it is allowed,
     // - Followed by a newline,
     // - Not already present,
     // - Not on an empty (), {}, [].
     let comma_required = prev.ty == TokenType::NonLogicalNewline
-        && !matches!(
-            prev_prev.ty,
-            TokenType::Comma
-                | TokenType::OpeningBracket
-                | TokenType::OpeningSquareBracket
-                | TokenType::OpeningCurlyBracket
-        );
+        && !is_empty
+        && (!context.is_singleline() || context.num_commas == 0);
+
     if comma_required {
-        let mut diagnostic =
-            Diagnostic::new(MissingTrailingComma, TextRange::empty(prev_prev.end()));
+        let range = prev_prev.range();
+
+        let mut diagnostic = Diagnostic::new(MissingTrailingComma, TextRange::empty(range.end()));
         // Create a replacement that includes the final bracket (or other token),
         // rather than just inserting a comma at the end. This prevents the UP034 fix
         // removing any brackets in the same linter pass - doing both at the same time could
         // lead to a syntax error.
-        let contents = locator.slice(prev_prev.range());
+        let contents = locator.slice(range);
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             format!("{contents},"),
-            prev_prev.range(),
+            range,
         )));
         Some(diagnostic)
     } else {
@@ -319,6 +321,21 @@ fn update_context(
             last.inc();
             return *last;
         }
+        TokenType::NonLogicalNewline => {
+            let last = stack.last_mut().expect("Stack to never be empty");
+            if matches!(
+                prev.ty,
+                TokenType::OpeningBracket
+                    | TokenType::OpeningSquareBracket
+                    | TokenType::OpeningCurlyBracket
+            ) {
+                last.layout = Layout::NewlineAfterOpenBracket;
+            } else {
+                last.add_newline();
+            }
+
+            return *last;
+        }
         _ => return stack.last().copied().expect("Stack to never be empty"),
     };
 
@@ -327,7 +344,7 @@ fn update_context(
 }
 
 /// Simplified token type.
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum TokenType {
     Named,
     String,
@@ -346,7 +363,7 @@ enum TokenType {
 }
 
 /// Simplified token specialized for the task.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 struct Token {
     ty: TokenType,
     range: TextRange,
@@ -399,7 +416,7 @@ impl From<(&Tok, TextRange)> for Token {
 }
 
 /// Comma context type - types of comma-delimited Python constructs.
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum ContextType {
     No,
     /// Function definition parameter list, e.g. `def foo(a,b,c)`.
@@ -419,18 +436,84 @@ enum ContextType {
 }
 
 /// Comma context - described a comma-delimited "situation".
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 struct Context {
     ty: ContextType,
     num_commas: u32,
+    layout: Layout,
 }
 
 impl Context {
     const fn new(ty: ContextType) -> Self {
-        Self { ty, num_commas: 0 }
+        Self {
+            ty,
+            num_commas: 0,
+            layout: Layout::Flat,
+        }
     }
 
     fn inc(&mut self) {
         self.num_commas += 1;
     }
+
+    fn add_newline(&mut self) {
+        self.layout = match self.layout {
+            // Note: Not necessarily correct yet
+            Layout::Flat => Layout::Multiline,
+            Layout::NewlineAfterOpenBracket => Layout::Singleline,
+            Layout::Singleline => Layout::Multiline,
+            Layout::Multiline => Layout::Multiline,
+        }
+    }
+
+    const fn is_singleline(self) -> bool {
+        matches!(self.layout, Layout::Singleline)
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+enum Layout {
+    /// The opening bracket, the content between, and the closing bracket are all "flat" on the same line.
+    ///
+    /// ```python
+    /// def test(a, b, c):
+    ///     ...
+    /// ```
+    Flat,
+
+    /// There's a newline after the opening bracket. But there are no other line breaks.
+    /// ```python
+    /// def test(
+    ///     a, b, c):
+    ///     ...
+    /// ```
+    NewlineAfterOpenBracket,
+
+    /// There's a line break after the opening bracket and before the closing bracket but the content is on a single line.
+    ///
+    /// ```python
+    /// def test(
+    ///     a, b, c
+    /// ):
+    ///     ...
+    /// ```
+    Singleline,
+
+    /// There's at least one line break that splits the parenthesized content over multiple lines.
+    ///
+    /// ```python
+    /// def test(
+    ///     a,
+    ///     b
+    /// ):
+    ///     ...
+    /// ```
+    /// But also
+    ///
+    /// ```python
+    /// def test(a,
+    ///         b):
+    ///     ...
+    /// ```
+    Multiline,
 }

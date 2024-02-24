@@ -791,14 +791,6 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
         for rule in [
             // The formatter might collapse implicit string concatenation on a single line.
             Rule::SingleLineImplicitStringConcatenation,
-            // Flags missing trailing commas when all arguments are on its own line:
-            // ```python
-            // def args(
-            //     aaaaaaaa, bbbbbbbbb, cccccccccc, ddddddddd, eeeeeeee, ffffff, gggggggggggg, hhhh
-            // ):
-            //     pass
-            // ```
-            Rule::MissingTrailingComma,
         ] {
             if setting.linter.rules.enabled(rule) {
                 incompatible_rules.insert(rule);

@@ -42,7 +42,7 @@ foo = (
 4,
 )
 
-foo = 3, 
+foo = 3,
 
 class A(object):
  foo = 3
@@ -654,3 +654,55 @@ f"""This is a test. {
     if True else
     "Don't add a trailing comma here ->"
 }"""
+
+
+def good_single(
+    a, bbbb, cccccccc, dddddddd, eeeeee
+):
+    ...
+
+def bad_single(
+    a, bbbb, cccccccc, dddddddd, eeeeee,
+):
+    ...
+
+def test(
+    a, b, c,
+):
+    ...
+
+def test(
+    a, b, c, d
+):
+    ...
+
+def single_line_argument_with_comma(
+    a=[bbbbbbbbbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccccccccccccccccc],
+):
+    pass
+
+# A trailing comma is required
+def single_line_argument(
+    a=[bbbbbbbbbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccccccccccccccccc]
+):
+    pass
+
+
+# The arguments and the inner list require a trailing comma
+def multiline_argument(
+    a=[
+        bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+        ccccccccccccccccccccccccccccccccccc
+    ]
+):
+    pass
+
+# The arguments need a trailing comma, but not the list values.
+def multiline_argument_flat_single_line_list(
+    a = [
+        1, 2
+    ]
+): pass
+
+
+

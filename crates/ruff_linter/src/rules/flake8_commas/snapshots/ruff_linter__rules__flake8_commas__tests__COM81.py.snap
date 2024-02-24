@@ -106,7 +106,7 @@ COM81.py:45:8: COM818 Trailing comma on bare tuple prohibited
    |
 43 | )
 44 | 
-45 | foo = 3, 
+45 | foo = 3,
    |        ^ COM818
 46 | 
 47 | class A(object):
@@ -959,23 +959,85 @@ COM81.py:644:46: COM819 [*] Trailing comma prohibited
 646 646 | raise Exception(
 647 647 |     "first", extra=f"Add trailing comma here ->"
 
-COM81.py:647:49: COM812 [*] Trailing comma missing
+COM81.py:686:75: COM812 [*] Trailing comma missing
     |
-646 | raise Exception(
-647 |     "first", extra=f"Add trailing comma here ->"
-    |                                                  COM812
-648 | )
+684 | # A trailing comma is required
+685 | def single_line_argument(
+686 |     a=[bbbbbbbbbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccccccccccccccccc]
+    |                                                                            COM812
+687 | ):
+688 |     pass
     |
     = help: Add trailing comma
 
 ℹ Safe fix
-644 644 | kwargs.pop("remove", f"this {trailing_comma}",)
-645 645 | 
-646 646 | raise Exception(
-647     |-    "first", extra=f"Add trailing comma here ->"
-    647 |+    "first", extra=f"Add trailing comma here ->",
-648 648 | )
-649 649 | 
-650 650 | assert False, f"<- This is not a trailing comma"
+683 683 | 
+684 684 | # A trailing comma is required
+685 685 | def single_line_argument(
+686     |-    a=[bbbbbbbbbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccccccccccccccccc]
+    686 |+    a=[bbbbbbbbbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccccccccccccccccc],
+687 687 | ):
+688 688 |     pass
+689 689 | 
 
+COM81.py:695:44: COM812 [*] Trailing comma missing
+    |
+693 |     a=[
+694 |         bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+695 |         ccccccccccccccccccccccccccccccccccc
+    |                                             COM812
+696 |     ]
+697 | ):
+    |
+    = help: Add trailing comma
 
+ℹ Safe fix
+692 692 | def multiline_argument(
+693 693 |     a=[
+694 694 |         bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+695     |-        ccccccccccccccccccccccccccccccccccc
+    695 |+        ccccccccccccccccccccccccccccccccccc,
+696 696 |     ]
+697 697 | ):
+698 698 |     pass
+
+COM81.py:696:6: COM812 [*] Trailing comma missing
+    |
+694 |         bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+695 |         ccccccccccccccccccccccccccccccccccc
+696 |     ]
+    |       COM812
+697 | ):
+698 |     pass
+    |
+    = help: Add trailing comma
+
+ℹ Safe fix
+693 693 |     a=[
+694 694 |         bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+695 695 |         ccccccccccccccccccccccccccccccccccc
+696     |-    ]
+    696 |+    ],
+697 697 | ):
+698 698 |     pass
+699 699 | 
+
+COM81.py:704:6: COM812 [*] Trailing comma missing
+    |
+702 |     a = [
+703 |         1, 2
+704 |     ]
+    |       COM812
+705 | ): pass
+    |
+    = help: Add trailing comma
+
+ℹ Safe fix
+701 701 | def multiline_argument_flat_single_line_list(
+702 702 |     a = [
+703 703 |         1, 2
+704     |-    ]
+    704 |+    ],
+705 705 | ): pass
+706 706 | 
+707 707 |
