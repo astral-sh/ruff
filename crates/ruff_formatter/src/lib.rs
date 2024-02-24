@@ -545,6 +545,10 @@ impl PrintedRange {
         &self.code
     }
 
+    pub fn into_code(self) -> String {
+        self.code
+    }
+
     /// The range the formatted code corresponds to in the source document.
     pub fn source_range(&self) -> TextRange {
         self.source_range
