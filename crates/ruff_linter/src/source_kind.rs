@@ -10,6 +10,8 @@ use ruff_diagnostics::SourceMap;
 use ruff_notebook::{Cell, Notebook, NotebookError};
 use ruff_python_ast::PySourceType;
 
+use colored::Colorize;
+
 use crate::fs;
 
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -97,13 +99,30 @@ impl SourceKind {
         match (self, other) {
             (SourceKind::Python(src), SourceKind::Python(dst)) => {
                 let text_diff = TextDiff::from_lines(src, dst);
-                let mut unified_diff = text_diff.unified_diff();
+                let unified_diff = text_diff.unified_diff();
 
-                if let Some(path) = path {
-                    unified_diff.header(&fs::relativize_path(path), &fs::relativize_path(path));
+                let relativized_path = if let Some(path) = path {
+                    fs::relativize_path(path)
+                } else {
+                    String::new()
+                };
+
+                // header
+                writeln!(writer, "+++ {}", relativized_path.green())?;
+                writeln!(writer, "--- {}", relativized_path.red())?;
+
+                // individual lines
+                for hunk in unified_diff.iter_hunks() {
+                    let hunk_str = hunk.to_string();
+                    for line in hunk_str.lines() {
+                        let colored_line = match line.chars().next() {
+                            Some('+') => line.green(),
+                            Some('-') => line.red(),
+                            _ => line.normal(),
+                        };
+                        writeln!(writer, "{colored_line}")?;
+                    }
                 }
-
-                unified_diff.to_writer(&mut *writer)?;
 
                 writer.write_all(b"\n")?;
                 writer.flush()?;
