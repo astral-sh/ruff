@@ -172,7 +172,7 @@ jobs:
   ruff:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: chartboost/ruff-action@v1
 ```
 
