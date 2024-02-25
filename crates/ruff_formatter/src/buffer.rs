@@ -218,7 +218,6 @@ impl<Context> DerefMut for VecBuffer<'_, Context> {
 impl<Context> Buffer for VecBuffer<'_, Context> {
     type Context = Context;
 
-    #[inline]
     fn write_element(&mut self, element: FormatElement) {
         self.elements.push(element);
     }
