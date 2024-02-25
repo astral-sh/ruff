@@ -135,6 +135,7 @@ fn is_identifier_start(c: char) -> bool {
 
 // Checks if the character c is a valid continuation character as described
 // in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
+#[inline]
 fn is_identifier_continuation(c: char) -> bool {
     // Arrange things such that ASCII codepoints never
     // result in the slower `is_xid_continue` getting called.
@@ -508,6 +509,7 @@ pub struct SimpleTokenizer<'a> {
 }
 
 impl<'a> SimpleTokenizer<'a> {
+    #[inline]
     pub fn new(source: &'a str, range: TextRange) -> Self {
         Self {
             offset: range.start(),
@@ -517,6 +519,7 @@ impl<'a> SimpleTokenizer<'a> {
         }
     }
 
+    #[inline]
     pub fn starts_at(offset: TextSize, source: &'a str) -> Self {
         let range = TextRange::new(offset, source.text_len());
         Self::new(source, range)
@@ -561,6 +564,33 @@ impl<'a> SimpleTokenizer<'a> {
 
     fn next_token_inner(&mut self, first: char) -> SimpleTokenKind {
         match first {
+            // Space, tab, or form feed. We ignore the true semantics of form feed, and treat it as
+            // whitespace.
+            ' ' | '\t' | '\x0C' => {
+                self.cursor.eat_while(|c| matches!(c, ' ' | '\t' | '\x0C'));
+                SimpleTokenKind::Whitespace
+            }
+
+            '\n' => SimpleTokenKind::Newline,
+
+            '\r' => {
+                self.cursor.eat_char('\n');
+                SimpleTokenKind::Newline
+            }
+
+            '#' => {
+                self.cursor.eat_while(|c| !matches!(c, '\n' | '\r'));
+                SimpleTokenKind::Comment
+            }
+
+            // Bracket tokens
+            '(' => SimpleTokenKind::LParen,
+            ')' => SimpleTokenKind::RParen,
+            '[' => SimpleTokenKind::LBracket,
+            ']' => SimpleTokenKind::RBracket,
+            '{' => SimpleTokenKind::LBrace,
+            '}' => SimpleTokenKind::RBrace,
+
             // Keywords and identifiers
             c if is_identifier_start(c) => {
                 self.cursor.eat_while(is_identifier_continuation);
@@ -605,25 +635,6 @@ impl<'a> SimpleTokenizer<'a> {
                 } else {
                     kind
                 }
-            }
-
-            // Space, tab, or form feed. We ignore the true semantics of form feed, and treat it as
-            // whitespace.
-            ' ' | '\t' | '\x0C' => {
-                self.cursor.eat_while(|c| matches!(c, ' ' | '\t' | '\x0C'));
-                SimpleTokenKind::Whitespace
-            }
-
-            '\n' => SimpleTokenKind::Newline,
-
-            '\r' => {
-                self.cursor.eat_char('\n');
-                SimpleTokenKind::Newline
-            }
-
-            '#' => {
-                self.cursor.eat_while(|c| !matches!(c, '\n' | '\r'));
-                SimpleTokenKind::Comment
             }
 
             '\\' => SimpleTokenKind::Continuation,
@@ -766,14 +777,6 @@ impl<'a> SimpleTokenizer<'a> {
                     SimpleTokenKind::Dot
                 }
             }
-
-            // Bracket tokens
-            '(' => SimpleTokenKind::LParen,
-            ')' => SimpleTokenKind::RParen,
-            '[' => SimpleTokenKind::LBracket,
-            ']' => SimpleTokenKind::RBracket,
-            '{' => SimpleTokenKind::LBrace,
-            '}' => SimpleTokenKind::RBrace,
 
             _ => {
                 self.bogus = true;
