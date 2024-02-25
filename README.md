@@ -3,10 +3,11 @@
 # Ruff
 
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![image](https://img.shields.io/pypi/v/ruff.svg)](https://pypi.python.org/pypi/ruff)
-[![image](https://img.shields.io/pypi/l/ruff.svg)](https://pypi.python.org/pypi/ruff)
-[![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
-[![Actions status](https://github.com/astral-sh/ruff/workflows/CI/badge.svg)](https://github.com/astral-sh/ruff/actions)
+[![PyPI Version](https://img.shields.io/pypi/v/ruff?logo=python&logoColor=D7FF64&color=261230&label=Version)](https://pypi.python.org/pypi/ruff)
+[![License](https://img.shields.io/pypi/l/ruff?logo=python&logoColor=D7FF64&color=261230&label=License)](https://pypi.python.org/pypi/ruff)
+[![Python Versions](https://img.shields.io/pypi/pyversions/ruff?logo=python&logoColor=D7FF64&color=261230&label=Python)](https://pypi.python.org/pypi/ruff)
+[![Actions Status](https://img.shields.io/github/actions/workflow/status/astral-sh/ruff/ci.yml?logo=github&logoColor=D7FF64&label=CI&color=261230)](https://github.com/astral-sh/ruff/actions)
+[![Astral Discord](https://img.shields.io/discord/1039017663004942429?logo=discord&logoColor=D7FF64&label=Astral%20Discord&color=261230)](https://discord.gg/astral-sh)
 
 [**Discord**](https://discord.com/invite/astral-sh) | [**Docs**](https://docs.astral.sh/ruff/) | [**Playground**](https://play.ruff.rs/)
 
