@@ -61,28 +61,18 @@ pub(crate) fn missing_fstring_syntax(
     locator: &Locator,
     semantic: &SemanticModel,
 ) {
-    match semantic.current_statement() {
-        ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
-            match value.as_ref() {
-                // We want to avoid statement expressions that are just a string literal.
-                // There's no reason to have standalone f-strings and this lets us avoid docstrings too.
-                ast::Expr::StringLiteral(_) | ast::Expr::FString(_) => return,
-                ast::Expr::Call(ast::ExprCall { func, .. }) => {
-                    if is_translation_string(func) {
-                        return;
-                    }
-                }
-                _ => {}
-            }
+    // we want to avoid statement expressions that are just a string literal.
+    // there's no reason to have standalone f-strings and this lets us avoid docstrings too
+    if let ast::Stmt::Expr(ast::StmtExpr { value, .. }) = semantic.current_statement() {
+        match value.as_ref() {
+            ast::Expr::StringLiteral(_) | ast::Expr::FString(_) => return,
+            _ => {}
         }
-        ast::Stmt::Assign(ast::StmtAssign { value, .. }) => {
-            if let ast::Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
-                if is_translation_string(func) {
-                    return;
-                }
-            }
-        }
-        _ => {}
+    }
+
+    // We also want to avoid expressions that are intended to be translated.
+    if semantic.current_expressions().any(is_gettext) {
+        return;
     }
 
     if should_be_fstring(literal, locator, semantic) {
@@ -92,18 +82,24 @@ pub(crate) fn missing_fstring_syntax(
     }
 }
 
-// It is a convention to use the `_()` alias for `gettext()`. We want to avoid
-// statement expressions and assignments related to aliases of the gettext API.
-// See https://docs.python.org/3/library/gettext.html for details. When one
-// uses `_() to mark a string for translation, the tools look for these markers
-// and replace the original string with its translated counterpart. If the
-// string contains variable placeholders or formatting, it can complicate the
-// translation process, lead to errors or incorrect translations.
-fn is_translation_string(func: &ast::Expr) -> bool {
-    match func {
-        ast::Expr::Name(ast::ExprName { id, .. }) => id == "_",
-        _ => false,
-    }
+/// Returns `true` if an expression appears to be a `gettext` call.
+///
+/// We want to avoid statement expressions and assignments related to aliases
+/// of the gettext API.
+///
+/// See <https://docs.python.org/3/library/gettext.html> for details. When one
+/// uses `_` to mark a string for translation, the tools look for these markers
+/// and replace the original string with its translated counterpart. If the
+/// string contains variable placeholders or formatting, it can complicate the
+/// translation process, lead to errors or incorrect translations.
+fn is_gettext(expr: &ast::Expr) -> bool {
+    let ast::Expr::Call(ast::ExprCall { func, .. }) = expr else {
+        return false;
+    };
+    let ast::Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
+        return false;
+    };
+    matches!(id.as_str(), "_" | "gettext" | "ngettext")
 }
 
 /// Returns `true` if `literal` is likely an f-string with a missing `f` prefix.

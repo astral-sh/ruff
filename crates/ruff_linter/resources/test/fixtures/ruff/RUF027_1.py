@@ -28,6 +28,7 @@ def negative_cases():
     partial = "partial sentence"
     a = _("formatting of {partial} in a translation string is bad practice")
     _("formatting of {partial} in a translation string is bad practice")
+    print(_("formatting of {partial} in a translation string is bad practice"))
     print(do_nothing("{a}".format(a=3)))
     print(do_nothing(alternative_formatter("{a}", a=5)))
     print(format(do_nothing("{a}"), a=5))
