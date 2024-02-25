@@ -61,19 +61,48 @@ pub(crate) fn missing_fstring_syntax(
     locator: &Locator,
     semantic: &SemanticModel,
 ) {
-    // we want to avoid statement expressions that are just a string literal.
-    // there's no reason to have standalone f-strings and this lets us avoid docstrings too
-    if let ast::Stmt::Expr(ast::StmtExpr { value, .. }) = semantic.current_statement() {
-        match value.as_ref() {
-            ast::Expr::StringLiteral(_) | ast::Expr::FString(_) => return,
-            _ => {}
+    match semantic.current_statement() {
+        ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
+            match value.as_ref() {
+                // We want to avoid statement expressions that are just a string literal.
+                // There's no reason to have standalone f-strings and this lets us avoid docstrings too.
+                ast::Expr::StringLiteral(_) | ast::Expr::FString(_) => return,
+                ast::Expr::Call(ast::ExprCall { func, .. }) => {
+                    if is_translation_string(func) {
+                        return;
+                    }
+                }
+                _ => {}
+            }
         }
+        ast::Stmt::Assign(ast::StmtAssign { value, .. }) => {
+            if let ast::Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
+                if is_translation_string(func) {
+                    return;
+                }
+            }
+        }
+        _ => {}
     }
 
     if should_be_fstring(literal, locator, semantic) {
         let diagnostic = Diagnostic::new(MissingFStringSyntax, literal.range())
             .with_fix(fix_fstring_syntax(literal.range()));
         diagnostics.push(diagnostic);
+    }
+}
+
+// It is a convention to use the `_()` alias for `gettext()`. We want to avoid
+// statement expressions and assignments related to aliases of the gettext API.
+// See https://docs.python.org/3/library/gettext.html for details. When one
+// uses `_() to mark a string for translation, the tools look for these markers
+// and replace the original string with its translated counterpart. If the
+// string contains variable placeholders or formatting, it can complicate the
+// translation process, lead to errors or incorrect translations.
+fn is_translation_string(func: &ast::Expr) -> bool {
+    match func {
+        ast::Expr::Name(ast::ExprName { id, .. }) => id == "_",
+        _ => false,
     }
 }
 
