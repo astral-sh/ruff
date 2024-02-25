@@ -7,7 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::context::FStringState;
 use crate::options::PythonVersion;
 use crate::prelude::*;
-use crate::preview::is_hex_codes_in_unicode_sequences_enabled;
+use crate::preview::{is_f_string_formatting_enabled, is_hex_codes_in_unicode_sequences_enabled};
 use crate::string::{QuoteChar, Quoting, StringPart, StringPrefix, StringQuotes};
 use crate::QuoteStyle;
 
@@ -18,6 +18,7 @@ pub(crate) struct StringNormalizer {
     f_string_state: FStringState,
     target_version: PythonVersion,
     normalize_hex: bool,
+    format_fstring: bool,
 }
 
 impl StringNormalizer {
@@ -29,6 +30,7 @@ impl StringNormalizer {
             f_string_state: context.f_string_state(),
             target_version: context.options().target_version(),
             normalize_hex: is_hex_codes_in_unicode_sequences_enabled(context),
+            format_fstring: is_f_string_formatting_enabled(context),
         }
     }
 
@@ -156,7 +158,13 @@ impl StringNormalizer {
 
         let quotes = self.choose_quotes(string, locator);
 
-        let normalized = normalize_string(raw_content, quotes, string.prefix(), self.normalize_hex);
+        let normalized = normalize_string(
+            raw_content,
+            quotes,
+            string.prefix(),
+            self.normalize_hex,
+            self.format_fstring,
+        );
 
         NormalizedString {
             prefix: string.prefix(),
@@ -394,6 +402,7 @@ pub(crate) fn normalize_string(
     quotes: StringQuotes,
     prefix: StringPrefix,
     normalize_hex: bool,
+    format_fstring: bool,
 ) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
@@ -409,7 +418,7 @@ pub(crate) fn normalize_string(
     let mut chars = input.char_indices().peekable();
 
     let is_raw = prefix.is_raw_string();
-    let is_fstring = prefix.is_fstring();
+    let is_fstring = !format_fstring && prefix.is_fstring();
     let mut formatted_value_nesting = 0u32;
 
     while let Some((index, c)) = chars.next() {
@@ -647,6 +656,7 @@ mod tests {
                 quote_char: QuoteChar::Double,
             },
             StringPrefix::BYTE,
+            true,
             true,
         );
 
