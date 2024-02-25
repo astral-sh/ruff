@@ -218,26 +218,32 @@ impl<Context> DerefMut for VecBuffer<'_, Context> {
 impl<Context> Buffer for VecBuffer<'_, Context> {
     type Context = Context;
 
+    #[inline]
     fn write_element(&mut self, element: FormatElement) {
         self.elements.push(element);
     }
 
+    #[inline]
     fn elements(&self) -> &[FormatElement] {
         self
     }
 
+    #[inline]
     fn state(&self) -> &FormatState<Self::Context> {
         self.state
     }
 
+    #[inline]
     fn state_mut(&mut self) -> &mut FormatState<Self::Context> {
         self.state
     }
 
+    #[inline]
     fn snapshot(&self) -> BufferSnapshot {
         BufferSnapshot::position(self.elements.len())
     }
 
+    #[inline]
     fn restore_snapshot(&mut self, snapshot: BufferSnapshot) {
         let position = snapshot.unwrap_position();
         assert!(
@@ -517,6 +523,7 @@ pub trait BufferExtensions: Buffer + Sized {
     }
 
     /// Writes a sequence of elements into this buffer.
+
     fn write_elements<I>(&mut self, elements: I)
     where
         I: IntoIterator<Item = FormatElement>,

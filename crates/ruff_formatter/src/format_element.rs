@@ -512,6 +512,7 @@ pub enum TextWidth {
 }
 
 impl TextWidth {
+    #[inline]
     pub fn from_text(text: &str, indent_width: IndentWidth) -> TextWidth {
         let mut width = 0u32;
 

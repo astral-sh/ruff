@@ -155,6 +155,7 @@ impl<F, Context> Format<Context> for Memoized<F, Context>
 where
     F: Format<Context>,
 {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         let result = self.memory.get_or_init(|| f.intern(&self.inner));
 

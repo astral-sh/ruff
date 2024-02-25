@@ -203,6 +203,7 @@ impl Line {
 }
 
 impl<Context> Format<Context> for Line {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::Line(self.mode));
         Ok(())
@@ -267,6 +268,7 @@ pub struct Token {
 }
 
 impl<Context> Format<Context> for Token {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::Token { text: self.text });
         Ok(())
@@ -324,6 +326,7 @@ pub const fn source_position(position: TextSize) -> SourcePosition {
 pub struct SourcePosition(TextSize);
 
 impl<Context> Format<Context> for SourcePosition {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         if let Some(FormatElement::SourcePosition(last_position)) = f.buffer.elements().last() {
             if *last_position == self.0 {
@@ -355,6 +358,7 @@ impl<Context> Format<Context> for Text<'_>
 where
     Context: FormatContext,
 {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::Text {
             text: self.text.to_string().into_boxed_str(),
@@ -385,6 +389,7 @@ impl<Context> Format<Context> for SourceTextSliceBuilder
 where
     Context: FormatContext,
 {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         let source_code = f.context().source_code();
         let slice = source_code.slice(self.range);
@@ -473,6 +478,7 @@ pub struct LineSuffix<'a, Context> {
 }
 
 impl<Context> Format<Context> for LineSuffix<'_, Context> {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::Tag(StartLineSuffix {
             reserved_width: self.reserved_width,
@@ -524,6 +530,7 @@ pub const fn line_suffix_boundary() -> LineSuffixBoundary {
 pub struct LineSuffixBoundary;
 
 impl<Context> Format<Context> for LineSuffixBoundary {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::LineSuffixBoundary);
 
@@ -611,6 +618,7 @@ pub struct FormatLabelled<'a, Context> {
 }
 
 impl<Context> Format<Context> for FormatLabelled<'_, Context> {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::Tag(StartLabelled(self.label_id)));
         Arguments::from(&self.content).fmt(f)?;
@@ -654,6 +662,7 @@ pub const fn space() -> Space {
 pub struct Space;
 
 impl<Context> Format<Context> for Space {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::Space);
 
@@ -712,6 +721,7 @@ pub struct Indent<'a, Context> {
 }
 
 impl<Context> Format<Context> for Indent<'_, Context> {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::Tag(StartIndent));
         Arguments::from(&self.content).fmt(f)?;
@@ -785,6 +795,7 @@ pub struct Dedent<'a, Context> {
 }
 
 impl<Context> Format<Context> for Dedent<'_, Context> {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::Tag(StartDedent(self.mode)));
         Arguments::from(&self.content).fmt(f)?;
@@ -974,6 +985,7 @@ pub struct Align<'a, Context> {
 }
 
 impl<Context> Format<Context> for Align<'_, Context> {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::Tag(StartAlign(tag::Align(self.count))));
         Arguments::from(&self.content).fmt(f)?;
@@ -1194,6 +1206,7 @@ enum IndentMode {
 }
 
 impl<Context> Format<Context> for BlockIndent<'_, Context> {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         let snapshot = f.snapshot();
 
@@ -1401,6 +1414,7 @@ pub struct Group<'a, Context> {
 }
 
 impl<Context> Group<'_, Context> {
+    #[inline]
     #[must_use]
     pub fn with_group_id(mut self, group_id: Option<GroupId>) -> Self {
         self.group_id = group_id;
@@ -1413,6 +1427,7 @@ impl<Context> Group<'_, Context> {
     /// This is useful for content rendered inside of a [`FormatElement::BestFitting`] that prints each variant
     /// in [`PrintMode::Flat`] to change some content to be printed in [`Expanded`](PrintMode::Expanded) regardless.
     /// See the documentation of the [`best_fitting`] macro for an example.
+    #[inline]
     #[must_use]
     pub fn should_expand(mut self, should_expand: bool) -> Self {
         self.should_expand = should_expand;
@@ -1421,6 +1436,7 @@ impl<Context> Group<'_, Context> {
 }
 
 impl<Context> Format<Context> for Group<'_, Context> {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         let mode = if self.should_expand {
             GroupMode::Expand
@@ -1564,6 +1580,7 @@ pub struct BestFitParenthesize<'a, Context> {
 impl<Context> BestFitParenthesize<'_, Context> {
     /// Optional ID that can be used in conditional content that supports [`Condition`] to gate content
     /// depending on whether the parentheses are rendered (flat: no parentheses, expanded: parentheses).
+    #[inline]
     #[must_use]
     pub fn with_group_id(mut self, group_id: Option<GroupId>) -> Self {
         self.group_id = group_id;
@@ -1572,6 +1589,7 @@ impl<Context> BestFitParenthesize<'_, Context> {
 }
 
 impl<Context> Format<Context> for BestFitParenthesize<'_, Context> {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::Tag(StartBestFitParenthesize {
             id: self.group_id,
@@ -1705,6 +1723,7 @@ pub struct ConditionalGroup<'content, Context> {
 }
 
 impl<Context> Format<Context> for ConditionalGroup<'_, Context> {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::Tag(StartConditionalGroup(
             tag::ConditionalGroup::new(self.condition),
@@ -1769,6 +1788,7 @@ pub const fn expand_parent() -> ExpandParent {
 pub struct ExpandParent;
 
 impl<Context> Format<Context> for ExpandParent {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::ExpandParent);
 
@@ -2010,6 +2030,7 @@ impl<Context> IfGroupBreaks<'_, Context> {
 }
 
 impl<Context> Format<Context> for IfGroupBreaks<'_, Context> {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::Tag(StartConditionalContent(
             Condition::new(self.mode).with_group_id(self.group_id),
@@ -2136,6 +2157,7 @@ pub struct IndentIfGroupBreaks<'a, Context> {
 }
 
 impl<Context> Format<Context> for IndentIfGroupBreaks<'_, Context> {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::Tag(StartIndentIfGroupBreaks(self.group_id)));
         Arguments::from(&self.content).fmt(f)?;
@@ -2229,6 +2251,7 @@ impl<Context> FitsExpanded<'_, Context> {
 }
 
 impl<Context> Format<Context> for FitsExpanded<'_, Context> {
+    #[inline]
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         f.write_element(FormatElement::Tag(StartFitsExpanded(
             tag::FitsExpanded::new().with_condition(self.condition),
@@ -2462,6 +2485,7 @@ where
     }
 
     /// Adds the contents of an iterator of entries to the join output.
+    #[inline]
     pub fn entries<F, I>(&mut self, entries: I) -> &mut Self
     where
         F: Format<Context>,
@@ -2475,6 +2499,7 @@ where
     }
 
     /// Finishes the output and returns any error encountered.
+    #[inline]
     pub fn finish(&mut self) -> FormatResult<()> {
         self.result
     }
@@ -2500,6 +2525,7 @@ impl<'a, 'buf, Context> FillBuilder<'a, 'buf, Context> {
     }
 
     /// Adds an iterator of entries to the fill output. Uses the passed `separator` to separate any two items.
+    #[inline]
     pub fn entries<F, I>(&mut self, separator: &dyn Format<Context>, entries: I) -> &mut Self
     where
         F: Format<Context>,
@@ -2537,6 +2563,7 @@ impl<'a, 'buf, Context> FillBuilder<'a, 'buf, Context> {
     }
 
     /// Finishes the output and returns any error encountered
+    #[inline]
     pub fn finish(&mut self) -> FormatResult<()> {
         if self.result.is_ok() {
             self.fmt.write_element(FormatElement::Tag(EndFill));

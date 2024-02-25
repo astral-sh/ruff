@@ -210,6 +210,7 @@ impl<Context> Buffer for Formatter<'_, Context> {
         self.buffer.write_element(element);
     }
 
+    #[inline]
     fn elements(&self) -> &[FormatElement] {
         self.buffer.elements()
     }
@@ -222,18 +223,22 @@ impl<Context> Buffer for Formatter<'_, Context> {
         Ok(())
     }
 
+    #[inline]
     fn state(&self) -> &FormatState<Self::Context> {
         self.buffer.state()
     }
 
+    #[inline]
     fn state_mut(&mut self) -> &mut FormatState<Self::Context> {
         self.buffer.state_mut()
     }
 
+    #[inline]
     fn snapshot(&self) -> BufferSnapshot {
         self.buffer.snapshot()
     }
 
+    #[inline]
     fn restore_snapshot(&mut self, snapshot: BufferSnapshot) {
         self.buffer.restore_snapshot(snapshot);
     }

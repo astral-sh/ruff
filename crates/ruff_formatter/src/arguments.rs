@@ -89,6 +89,7 @@ impl<Context> std::fmt::Debug for Arguments<'_, Context> {
 }
 
 impl<'fmt, Context> From<&'fmt Argument<'fmt, Context>> for Arguments<'fmt, Context> {
+    #[inline]
     fn from(argument: &'fmt Argument<'fmt, Context>) -> Self {
         Arguments::new(std::slice::from_ref(argument))
     }
