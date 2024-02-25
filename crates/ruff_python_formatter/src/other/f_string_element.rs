@@ -62,6 +62,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringLiteralElement<'_> {
             self.context.quotes(),
             self.context.prefix(),
             is_hex_codes_in_unicode_sequences_enabled(f.context()),
+            true,
         );
         match &normalized {
             Cow::Borrowed(_) => source_text_slice(self.element.range()).fmt(f),
