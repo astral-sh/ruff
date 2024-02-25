@@ -972,6 +972,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             ]) {
                 pyflakes::rules::repeated_keys(checker, dict);
             }
+            if checker.enabled(Rule::DataclassInsteadOfDict) {
+                pylint::rules::dataclass_instead_of_if(checker, dict);
+            }
             if checker.enabled(Rule::UnnecessarySpread) {
                 flake8_pie::rules::unnecessary_spread(checker, dict);
             }

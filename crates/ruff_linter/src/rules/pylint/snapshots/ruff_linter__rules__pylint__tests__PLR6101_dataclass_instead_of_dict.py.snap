@@ -1,0 +1,70 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+dataclass_instead_of_dict.py:10:13: PLR6101 Consider using dataclass or namedtuple instead of dict
+   |
+ 9 |   # Subdicts have at least 1 common key
+10 |   MAPPING_1 = {  # [consider-using-namedtuple-or-dataclass]
+   |  _____________^
+11 | |     "entry_1": {"key_1": 0, "key_2": 1, "key_diff_1": 2},
+12 | |     "entry_2": {"key_1": 0, "key_2": 1, "key_diff_2": 3},
+13 | | }
+   | |_^ PLR6101
+14 |   MAPPING_2 = {  # [consider-using-namedtuple-or-dataclass]
+15 |       "entry_1": {KEY_3: None, Foo.BAR: None},
+   |
+
+dataclass_instead_of_dict.py:14:13: PLR6101 Consider using dataclass or namedtuple instead of dict
+   |
+12 |       "entry_2": {"key_1": 0, "key_2": 1, "key_diff_2": 3},
+13 |   }
+14 |   MAPPING_2 = {  # [consider-using-namedtuple-or-dataclass]
+   |  _____________^
+15 | |     "entry_1": {KEY_3: None, Foo.BAR: None},
+16 | |     "entry_2": {KEY_3: None, Foo.BAR: None},
+17 | | }
+   | |_^ PLR6101
+18 |   
+19 |   # ints are not valid fieldnames for namedtuples
+   |
+
+dataclass_instead_of_dict.py:38:24: PLR6101 Consider using dataclass or namedtuple instead of dict
+   |
+36 |       }
+37 |   
+38 |       mapping_6: Final = {  # [consider-using-namedtuple-or-dataclass]
+   |  ________________________^
+39 | |         "entry_1": {"key_1": 0, "key_2": 1},
+40 | |         "entry_2": {"key_1": 0, "key_2": 1},
+41 | |     }
+   | |_____^ PLR6101
+   |
+
+dataclass_instead_of_dict.py:45:13: PLR6101 Consider using dataclass or namedtuple instead of dict
+   |
+44 |   # lists must have the same length
+45 |   MAPPING_7 = {  # [consider-using-namedtuple-or-dataclass]
+   |  _____________^
+46 | |     "entry_1": [1, "a", set()],
+47 | |     "entry_2": [2, "b", set()],
+48 | | }
+   | |_^ PLR6101
+49 |   MAPPING_8 = {
+50 |       "entry_1": [],
+   |
+
+dataclass_instead_of_dict.py:57:14: PLR6101 Consider using dataclass or namedtuple instead of dict
+   |
+55 |       "entry_2": [2, "b"],
+56 |   }
+57 |   MAPPING_10 = {  # [consider-using-namedtuple-or-dataclass]
+   |  ______________^
+58 | |     "entry_1": (1, "a"),
+59 | |     "entry_2": (2, "b"),
+60 | | }
+   | |_^ PLR6101
+61 |   
+62 |   # No entry can't contain only dicts
+   |
+
+
