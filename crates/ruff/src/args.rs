@@ -745,38 +745,34 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
     }
 }
 
+/// Enumeration of various ways in which a --config CLI flag
+/// could be invalid
 #[derive(Debug)]
-enum TomlParseFailureKind {
-    SyntaxError,
-    UnknownOption,
+enum InvalidConfigFlagReason {
+    InvalidToml(toml::de::Error),
+    /// It was valid TOML, but not a valid ruff config file.
+    /// E.g. the user tried to select a rule that doesn't exist,
+    /// or tried to enable a setting that doesn't exist
+    ValidTomlButInvalidRuffSchema(toml::de::Error),
+    /// It was a valid ruff config file, but the user tried to pass a
+    /// value for `extend` as part of the config override.
+    // `extend` is special, because it affects which config files we look at
+    /// in the first place. We currently only parse --config overrides *after*
+    /// we've combined them with all the arguments from the various config files
+    /// that we found, so trying to override `extend` as part of a --config
+    /// override is forbidden.
+    ExtendPassedViaConfigFlag,
 }
 
-impl std::fmt::Display for TomlParseFailureKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let display = match self {
-            Self::SyntaxError => "The supplied argument is not valid TOML",
-            Self::UnknownOption => {
+impl InvalidConfigFlagReason {
+    const fn description(&self) -> &'static str {
+        match self {
+            Self::InvalidToml(_) => "The supplied argument is not valid TOML",
+            Self::ValidTomlButInvalidRuffSchema(_) => {
                 "Could not parse the supplied argument as a `ruff.toml` configuration option"
             }
-        };
-        write!(f, "{display}")
-    }
-}
-
-#[derive(Debug)]
-struct TomlParseFailure {
-    kind: TomlParseFailureKind,
-    underlying_error: toml::de::Error,
-}
-
-impl std::fmt::Display for TomlParseFailure {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let TomlParseFailure {
-            kind,
-            underlying_error,
-        } = self;
-        let display = format!("{kind}:\n\n{underlying_error}");
-        write!(f, "{}", display.trim_end())
+            Self::ExtendPassedViaConfigFlag => "Cannot include `extend` in a --config flag value",
+        }
     }
 }
 
@@ -827,18 +823,19 @@ impl TypedValueParser for ConfigArgumentParser {
             .to_str()
             .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
 
-        let toml_parse_error = match toml::Table::from_str(value) {
-            Ok(table) => match table.try_into() {
-                Ok(option) => return Ok(SingleConfigArgument::SettingsOverride(Arc::new(option))),
-                Err(underlying_error) => TomlParseFailure {
-                    kind: TomlParseFailureKind::UnknownOption,
-                    underlying_error,
-                },
+        let config_parse_error = match toml::Table::from_str(value) {
+            Ok(table) => match table.try_into::<Options>() {
+                Ok(option) => {
+                    if option.extend.is_none() {
+                        return Ok(SingleConfigArgument::SettingsOverride(Arc::new(option)));
+                    }
+                    InvalidConfigFlagReason::ExtendPassedViaConfigFlag
+                }
+                Err(underlying_error) => {
+                    InvalidConfigFlagReason::ValidTomlButInvalidRuffSchema(underlying_error)
+                }
             },
-            Err(underlying_error) => TomlParseFailure {
-                kind: TomlParseFailureKind::SyntaxError,
-                underlying_error,
-            },
+            Err(underlying_error) => InvalidConfigFlagReason::InvalidToml(underlying_error),
         };
 
         let mut new_error = clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
@@ -852,6 +849,21 @@ impl TypedValueParser for ConfigArgumentParser {
             clap::error::ContextKind::InvalidValue,
             clap::error::ContextValue::String(value.to_string()),
         );
+
+        let underlying_error = match &config_parse_error {
+            InvalidConfigFlagReason::ExtendPassedViaConfigFlag => {
+                let tip = config_parse_error.description().into();
+                new_error.insert(
+                    clap::error::ContextKind::Suggested,
+                    clap::error::ContextValue::StyledStrs(vec![tip]),
+                );
+                return Err(new_error);
+            }
+            InvalidConfigFlagReason::InvalidToml(underlying_error)
+            | InvalidConfigFlagReason::ValidTomlButInvalidRuffSchema(underlying_error) => {
+                underlying_error
+            }
+        };
 
         // small hack so that multiline tips
         // have the same indent on the left-hand side:
@@ -881,12 +893,16 @@ The path `{value}` does not exist"
                 ));
             }
         } else if value.contains('=') {
-            tip.push_str(&format!("\n\n{toml_parse_error}"));
+            tip.push_str(&format!(
+                "\n\n{}:\n\n{underlying_error}",
+                config_parse_error.description()
+            ));
         }
+        let tip = tip.trim_end().to_owned().into();
 
         new_error.insert(
             clap::error::ContextKind::Suggested,
-            clap::error::ContextValue::StyledStrs(vec![tip.into()]),
+            clap::error::ContextValue::StyledStrs(vec![tip]),
         );
 
         Err(new_error)
