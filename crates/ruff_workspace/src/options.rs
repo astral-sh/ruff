@@ -378,7 +378,7 @@ pub struct Options {
     /// within the `line-length`, it isn't a hard upper bound, and formatted lines may
     /// exceed the `line-length`.
     ///
-    /// See [`pycodestyle.max-line-length`](#pycodestyle-max-line-length) to configure different lengths for `E501` and the formatter.
+    /// See [`pycodestyle.max-line-length`](#lint_pycodestyle_max-line-length) to configure different lengths for `E501` and the formatter.
     #[option(
         default = "88",
         value_type = "int",
