@@ -40,6 +40,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::UnusedPrivateTypedDict,
         Rule::UnusedStaticMethodArgument,
         Rule::UnusedVariable,
+        Rule::SingleDispatchMethod,
     ]) {
         return;
     }
@@ -388,6 +389,10 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
             if checker.enabled(Rule::TooManyLocals) {
                 pylint::rules::too_many_locals(checker, scope, &mut diagnostics);
+            }
+
+            if checker.enabled(Rule::SingleDispatchMethod) {
+                pylint::rules::single_dispatch_method(checker, scope, &mut diagnostics);
             }
         }
     }

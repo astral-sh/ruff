@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+E1519.py:9:5: PLE1519 singledispatch decorator should not be used with methods, use singledispatchmethod instead.
+   |
+ 8 | class Board:
+ 9 |     @singledispatch  # [singledispatch-method]
+   |     ^^^^^^^^^^^^^^^ PLE1519
+10 |     @classmethod
+11 |     def convert_position(cls, position):
+   |
+
+E1519.py:14:5: PLE1519 singledispatch decorator should not be used with methods, use singledispatchmethod instead.
+   |
+12 |         pass
+13 | 
+14 |     @singledispatch  # [singledispatch-method]
+   |     ^^^^^^^^^^^^^^^ PLE1519
+15 |     def move(self, position):
+16 |         pass
+   |
