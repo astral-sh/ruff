@@ -483,7 +483,8 @@ MatchStatement: ast::Stmt = {
                     ast::ExprTuple {
                         elts: vec![subject.into()],
                         ctx: ast::ExprContext::Load,
-                        range: (tuple_location..tuple_end_location).into()
+                        range: (tuple_location..tuple_end_location).into(),
+                        parenthesized: false
                     },
                 )),
                 cases,
@@ -506,7 +507,8 @@ MatchStatement: ast::Stmt = {
                     ast::ExprTuple {
                         elts,
                         ctx: ast::ExprContext::Load,
-                        range: (tuple_location..tuple_end_location).into()
+                        range: (tuple_location..tuple_end_location).into(),
+                        parenthesized: false
                     },
                 )),
                 cases,
@@ -1573,6 +1575,7 @@ SubscriptList: crate::parser::ParenthesizedExpr = {
             elts: vec![s1.into()],
             ctx: ast::ExprContext::Load,
             range: (location..end_location).into(),
+            parenthesized: false
         }.into()
     },
     <location:@L> <elts:TwoOrMoreSep<Subscript, ",">> ","? <end_location:@R> => {
@@ -1581,6 +1584,7 @@ SubscriptList: crate::parser::ParenthesizedExpr = {
             elts,
             ctx: ast::ExprContext::Load,
             range: (location..end_location).into(),
+            parenthesized: false
         }.into()
     }
 };
@@ -1726,7 +1730,12 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
             }
         } else {
             let elts = elts.into_iter().map(ast::Expr::from).collect();
-            ast::ExprTuple { elts, ctx: ast::ExprContext::Load, range: (location..end_location).into() }.into()
+            ast::ExprTuple {
+              elts,
+              ctx: ast::ExprContext::Load,
+              range: (location..end_location).into(),
+              parenthesized: true
+            }.into()
         }
     },
     <location:@L> "(" <left:(<OneOrMore<Test<"all">>> ",")?> <mid:NamedOrStarExpr> <right:("," <TestOrStarNamedExpr>)*> <trailing_comma:","?> ")" <end_location:@R> =>? {
@@ -1743,13 +1752,19 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
             })
         } else {
             let elts = left.into_iter().flatten().chain([mid]).chain(right).map(ast::Expr::from).collect();
-            Ok(ast::ExprTuple { elts, ctx: ast::ExprContext::Load, range: (location..end_location).into() }.into())
+            Ok(ast::ExprTuple {
+              elts,
+              ctx: ast::ExprContext::Load,
+              range: (location..end_location).into(),
+              parenthesized: true
+            }.into())
         }
     },
     <location:@L> "(" ")" <end_location:@R> => ast::ExprTuple {
         elts: Vec::new(),
         ctx: ast::ExprContext::Load,
         range: (location..end_location).into(),
+        parenthesized: true
     }.into(),
     <location:@L> "(" <e:YieldExpr> ")" <end_location:@R> => crate::parser::ParenthesizedExpr {
         expr: e.into(),
@@ -1759,6 +1774,7 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
         elt: Box::new(elt.into()),
         generators,
         range: (location..end_location).into(),
+        parenthesized: true
     }.into(),
     "(" <location:@L> "**" <e:Expression<"all">> ")" <end_location:@R> =>? {
         Err(LexicalError::new(
@@ -1852,7 +1868,12 @@ GenericList<Element>: crate::parser::ParenthesizedExpr = {
             }
         } else {
             let elts = elts.into_iter().map(ast::Expr::from).collect();
-            ast::ExprTuple { elts, ctx: ast::ExprContext::Load, range: (location..end_location).into() }.into()
+            ast::ExprTuple {
+              elts,
+              ctx: ast::ExprContext::Load,
+              range: (location..end_location).into(),
+              parenthesized: false
+            }.into()
         }
     }
 }
@@ -1904,7 +1925,8 @@ FunctionArgument: (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::E
                 ast::ExprGeneratorExp {
                     elt: Box::new(elt.into()),
                     generators,
-                    range: (location..end_location).into()
+                    range: (location..end_location).into(),
+                    parenthesized: false
                 }
             ),
             None => elt.into(),

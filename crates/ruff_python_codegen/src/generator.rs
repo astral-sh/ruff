@@ -970,6 +970,7 @@ impl<'a> Generator<'a> {
             Expr::GeneratorExp(ast::ExprGeneratorExp {
                 elt,
                 generators,
+                parenthesized: _,
                 range: _,
             }) => {
                 self.p("(");
@@ -1037,6 +1038,7 @@ impl<'a> Generator<'a> {
                         elt,
                         generators,
                         range: _,
+                        parenthesized: _,
                     })],
                     [],
                 ) = (arguments.args.as_ref(), arguments.keywords.as_ref())

@@ -1505,4 +1505,20 @@ u"foo" f"bar {baz} really" u"bar" "no"
         let parse_ast = parse_suite(r#"x = "\N{BACKSPACE}another cool trick""#).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
+
+    #[test]
+    fn test_tuple() {
+        let parse_ast = parse_suite(
+            r#"
+a,b
+(a,b)
+()
+(a,)
+((a,b))
+"#
+            .trim(),
+        )
+        .unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
 }
