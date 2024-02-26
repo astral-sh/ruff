@@ -1,6 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, identifier::Identifier, Expr, Stmt};
+use ruff_python_ast as ast;
+use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::{Expr, Stmt};
 
 /// ## What it does
 /// Checks for functions with a high cognitive complexity.
@@ -82,6 +84,12 @@ fn get_expt_cognitive_complexity(test: &Expr) -> usize {
             expt_cognitive_complexity += get_expt_cognitive_complexity(expr);
         }
     }
+    if test.is_unary_op_expr() {
+        let unary_op = test.as_unary_op_expr().unwrap();
+        if unary_op.op == ast::UnaryOp::Not {
+            expt_cognitive_complexity += 1;
+        }
+    }
     expt_cognitive_complexity
 }
 
@@ -139,20 +147,18 @@ fn get_cognitive_complexity_number(stmts: &[Stmt], nesting: usize) -> usize {
 }
 
 pub(crate) fn function_is_too_cognitive_complex(
-    stmt: &Stmt,
-    name: &str,
-    body: &[Stmt],
+    definition: &ast::StmtFunctionDef,
     max_cognitive_complexity: usize,
 ) -> Option<Diagnostic> {
-    let complexity = get_cognitive_complexity_number(body, 0);
+    let complexity = get_cognitive_complexity_number(&definition.body, 0);
     if complexity > max_cognitive_complexity {
         Some(Diagnostic::new(
             CognitiveComplexStructure {
-                name: name.to_string(),
+                name: definition.name.to_string(),
                 complexity,
                 max_cognitive_complexity,
             },
-            stmt.identifier(),
+            definition.identifier(),
         ))
     } else {
         None
@@ -276,6 +282,18 @@ def many_different_operators():
 "#;
         let stmts = parse_suite(source)?;
         assert_eq!(get_cognitive_complexity_number(&stmts, 0), 4);
+        Ok(())
+    }
+
+    #[test]
+    fn operators_and_not() -> Result<()> {
+        let source = r#"
+def nested_operators():
+    if a and not (b and c):
+        print("One point for if, one for each sequence of boolean operator (3)")
+"#;
+        let stmts = parse_suite(source)?;
+        assert_eq!(get_cognitive_complexity_number(&stmts, 0), 3);
         Ok(())
     }
 }

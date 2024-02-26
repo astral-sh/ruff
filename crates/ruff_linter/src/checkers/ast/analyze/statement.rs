@@ -248,9 +248,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::CognitiveComplexStructure) {
                 if let Some(diagnostic) =
                     flake8_cognitive_complexity::rules::function_is_too_cognitive_complex(
-                        stmt,
-                        name,
-                        body,
+                        function_def,
                         checker
                             .settings
                             .flake8_cognitive_complexity
