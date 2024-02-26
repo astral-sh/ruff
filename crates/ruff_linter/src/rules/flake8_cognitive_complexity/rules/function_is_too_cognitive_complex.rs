@@ -18,7 +18,7 @@ use ruff_python_ast::{self as ast, identifier::Identifier, Expr, Stmt};
 ///  > a method, it produces those fairer relative assessments not just at the method
 ///  > level, but also at the class and application levels.
 ///
-/// ref [{Cognitive Complexity} a new way of measuring understandability](file:///home/anderss/Downloads/Cognitive_Complexity_Sonar_Guide_2023%20(1).pdf).
+/// ref [{Cognitive Complexity} a new way of measuring understandability](https://www.sonarsource.com/docs/CognitiveComplexity.pdf).
 ///
 /// Functions with a high cognitive complexity are hard to understand and maintain.
 ///
