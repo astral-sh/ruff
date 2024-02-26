@@ -745,10 +745,10 @@ fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
     }
 }
 
-/// Enumeration of various errors that could occur
-/// when trying to parse a --config CLI flag value
+/// Enumeration of various ways in which a --config CLI flag
+/// could be invalid
 #[derive(Debug)]
-enum InvalidConfigFlagError {
+enum InvalidConfigFlagReason {
     InvalidToml(toml::de::Error),
     /// It was valid TOML, but not a valid ruff config file.
     /// E.g. the user tried to select a rule that doesn't exist,
@@ -764,7 +764,7 @@ enum InvalidConfigFlagError {
     ExtendPassedViaConfigFlag,
 }
 
-impl InvalidConfigFlagError {
+impl InvalidConfigFlagReason {
     const fn description(&self) -> &'static str {
         match self {
             Self::InvalidToml(_) => "The supplied argument is not valid TOML",
@@ -829,13 +829,13 @@ impl TypedValueParser for ConfigArgumentParser {
                     if option.extend.is_none() {
                         return Ok(SingleConfigArgument::SettingsOverride(Arc::new(option)));
                     }
-                    InvalidConfigFlagError::ExtendPassedViaConfigFlag
+                    InvalidConfigFlagReason::ExtendPassedViaConfigFlag
                 }
                 Err(underlying_error) => {
-                    InvalidConfigFlagError::ValidTomlButInvalidRuffSchema(underlying_error)
+                    InvalidConfigFlagReason::ValidTomlButInvalidRuffSchema(underlying_error)
                 }
             },
-            Err(underlying_error) => InvalidConfigFlagError::InvalidToml(underlying_error),
+            Err(underlying_error) => InvalidConfigFlagReason::InvalidToml(underlying_error),
         };
 
         let mut new_error = clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
@@ -851,7 +851,7 @@ impl TypedValueParser for ConfigArgumentParser {
         );
 
         let underlying_error = match &config_parse_error {
-            InvalidConfigFlagError::ExtendPassedViaConfigFlag => {
+            InvalidConfigFlagReason::ExtendPassedViaConfigFlag => {
                 let tip = config_parse_error.description().into();
                 new_error.insert(
                     clap::error::ContextKind::Suggested,
@@ -859,8 +859,8 @@ impl TypedValueParser for ConfigArgumentParser {
                 );
                 return Err(new_error);
             }
-            InvalidConfigFlagError::InvalidToml(underlying_error)
-            | InvalidConfigFlagError::ValidTomlButInvalidRuffSchema(underlying_error) => {
+            InvalidConfigFlagReason::InvalidToml(underlying_error)
+            | InvalidConfigFlagReason::ValidTomlButInvalidRuffSchema(underlying_error) => {
                 underlying_error
             }
         };
