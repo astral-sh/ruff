@@ -78,7 +78,7 @@ schemars = { version = "0.8.16" }
 seahash = { version ="4.1.0"}
 semver = { version = "1.0.22" }
 serde = { version = "1.0.196", features = ["derive"] }
-serde-wasm-bindgen = { version = "0.6.3" }
+serde-wasm-bindgen = { version = "0.6.4" }
 serde_json = { version = "1.0.113" }
 serde_test = { version = "1.0.152" }
 serde_with = { version = "3.6.0", default-features = false, features = ["macros"] }
