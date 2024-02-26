@@ -596,6 +596,24 @@ fn too_many_config_files() -> Result<()> {
 }
 
 #[test]
+fn extend_passed_via_config_argument() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", "extend = 'foo.toml'", "."]), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'extend = 'foo.toml'' for '--config <CONFIG_OPTION>'
+
+      tip: Cannot include `extend` in a --config flag value
+
+    For more information, try '--help'.
+    "###);
+}
+
+#[test]
 fn config_file_and_isolated() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_dot_toml = tempdir.path().join("ruff.toml");
