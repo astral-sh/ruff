@@ -14,7 +14,6 @@ use ruff_text_size::Ranged;
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{leading_comments, trailing_comments, LeadingDanglingTrailingComments};
 use crate::context::{NodeLevel, WithNodeLevel};
-use crate::expression::expr_generator_exp::is_generator_parenthesized;
 use crate::expression::parentheses::{
     is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
     OptionalParentheses, Parentheses, Parenthesize,
@@ -662,7 +661,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             }
 
             Expr::Tuple(ast::ExprTuple {
-                is_parenthesized: true,
+                parenthesized: true,
                 ..
             }) => {
                 self.any_parenthesized_expressions = true;
@@ -670,9 +669,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 return;
             }
 
-            Expr::GeneratorExp(generator)
-                if is_generator_parenthesized(generator, self.context.source()) =>
-            {
+            Expr::GeneratorExp(generator) if generator.parenthesized => {
                 self.any_parenthesized_expressions = true;
                 // The values are always parenthesized, don't visit.
                 return;
@@ -1038,11 +1035,7 @@ pub(crate) fn has_own_parentheses(
             Some(OwnParentheses::NonEmpty)
         }
 
-        Expr::GeneratorExp(generator)
-            if is_generator_parenthesized(generator, context.source()) =>
-        {
-            Some(OwnParentheses::NonEmpty)
-        }
+        Expr::GeneratorExp(generator) if generator.parenthesized => Some(OwnParentheses::NonEmpty),
 
         // These expressions must contain _some_ child or trivia token in order to be non-empty.
         Expr::List(ast::ExprList { elts, .. }) | Expr::Set(ast::ExprSet { elts, .. }) => {
@@ -1055,7 +1048,7 @@ pub(crate) fn has_own_parentheses(
 
         Expr::Tuple(
             tuple @ ast::ExprTuple {
-                is_parenthesized: true,
+                parenthesized: true,
                 ..
             },
         ) => {

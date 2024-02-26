@@ -59,5 +59,6 @@ GeneratorExp(
                 is_async: false,
             },
         ],
+        parenthesized: true,
     },
 )

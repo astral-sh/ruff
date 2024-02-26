@@ -1,8 +1,6 @@
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprGeneratorExp;
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::SourceComment;
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
@@ -42,6 +40,7 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
             range: _,
             elt,
             generators,
+            parenthesized: is_parenthesized,
         } = item;
 
         let joined = format_with(|f| {
@@ -55,7 +54,7 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
 
         if self.parentheses == GeneratorExpParentheses::Preserve
             && dangling.is_empty()
-            && !is_generator_parenthesized(item, f.context().source())
+            && !is_parenthesized
         {
             write!(
                 f,
@@ -100,38 +99,4 @@ impl NeedsParentheses for ExprGeneratorExp {
             OptionalParentheses::Never
         }
     }
-}
-
-/// Return `true` if a generator is parenthesized in the source code.
-pub(crate) fn is_generator_parenthesized(generator: &ExprGeneratorExp, source: &str) -> bool {
-    // Count the number of open parentheses between the start of the generator and the first element.
-    let open_parentheses_count = SimpleTokenizer::new(
-        source,
-        TextRange::new(generator.start(), generator.elt.start()),
-    )
-    .skip_trivia()
-    .filter(|token| token.kind() == SimpleTokenKind::LParen)
-    .count();
-    if open_parentheses_count == 0 {
-        return false;
-    }
-
-    // Count the number of parentheses between the end of the generator and its trailing comma.
-    let close_parentheses_count = SimpleTokenizer::new(
-        source,
-        TextRange::new(
-            generator.elt.end(),
-            generator
-                .generators
-                .first()
-                .map_or(generator.end(), Ranged::start),
-        ),
-    )
-    .skip_trivia()
-    .filter(|token| token.kind() == SimpleTokenKind::RParen)
-    .count();
-
-    // If the number of open parentheses is greater than the number of close parentheses, the
-    // generator is parenthesized.
-    open_parentheses_count > close_parentheses_count
 }

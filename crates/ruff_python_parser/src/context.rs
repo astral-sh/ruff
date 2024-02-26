@@ -6,13 +6,13 @@ pub(crate) fn set_context(expr: Expr, ctx: ExprContext) -> Expr {
         Expr::Tuple(ast::ExprTuple {
             elts,
             range,
-            is_parenthesized,
+            parenthesized: is_parenthesized,
             ctx: _,
         }) => ast::ExprTuple {
             elts: elts.into_iter().map(|elt| set_context(elt, ctx)).collect(),
             range,
             ctx,
-            is_parenthesized,
+            parenthesized: is_parenthesized,
         }
         .into(),
 

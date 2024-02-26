@@ -134,25 +134,23 @@ impl InferredMemberType {
 /// single-line tuple literals *can* be unparenthesized.
 /// We keep the original AST node around for the
 /// Tuple variant so that this can be queried later.
-#[derive(Debug)]
-pub(super) enum SequenceKind<'a> {
+#[derive(Copy, Clone, Debug)]
+pub(super) enum SequenceKind {
     List,
     Set,
-    Tuple(&'a ast::ExprTuple),
+    Tuple { parenthesized: bool },
 }
 
-impl SequenceKind<'_> {
+impl SequenceKind {
     // N.B. We only need the source code for the Tuple variant here,
     // but if you already have a `Locator` instance handy,
     // getting the source code is very cheap.
-    fn surrounding_brackets(&self) -> (&'static str, &'static str) {
+    fn surrounding_brackets(self) -> (&'static str, &'static str) {
         match self {
             Self::List => ("[", "]"),
             Self::Set => ("{", "}"),
-            Self::Tuple(ast::ExprTuple {
-                is_parenthesized, ..
-            }) => {
-                if *is_parenthesized {
+            Self::Tuple { parenthesized } => {
+                if parenthesized {
                     ("(", ")")
                 } else {
                     ("", "")
@@ -161,19 +159,19 @@ impl SequenceKind<'_> {
         }
     }
 
-    const fn opening_token_for_multiline_definition(&self) -> TokenKind {
+    const fn opening_token_for_multiline_definition(self) -> TokenKind {
         match self {
             Self::List => TokenKind::Lsqb,
             Self::Set => TokenKind::Lbrace,
-            Self::Tuple(_) => TokenKind::Lpar,
+            Self::Tuple { .. } => TokenKind::Lpar,
         }
     }
 
-    const fn closing_token_for_multiline_definition(&self) -> TokenKind {
+    const fn closing_token_for_multiline_definition(self) -> TokenKind {
         match self {
             Self::List => TokenKind::Rsqb,
             Self::Set => TokenKind::Rbrace,
-            Self::Tuple(_) => TokenKind::Rpar,
+            Self::Tuple { .. } => TokenKind::Rpar,
         }
     }
 }
@@ -219,7 +217,7 @@ impl<'a> SequenceElements<'a> {
 /// that can be inserted into the
 /// source code as a `range_replacement` autofix.
 pub(super) fn sort_single_line_elements_sequence(
-    kind: &SequenceKind,
+    kind: SequenceKind,
     elts: &[ast::Expr],
     elements: &[&str],
     locator: &Locator,
@@ -336,7 +334,7 @@ impl MultilineStringSequenceValue {
     /// Return `None` if the analysis fails for whatever reason.
     pub(super) fn from_source_range(
         range: TextRange,
-        kind: &SequenceKind,
+        kind: SequenceKind,
         locator: &Locator,
     ) -> Option<MultilineStringSequenceValue> {
         // Parse the multiline string sequence using the raw tokens.
@@ -488,7 +486,7 @@ impl Ranged for MultilineStringSequenceValue {
 /// in the original source code.
 fn collect_string_sequence_lines(
     range: TextRange,
-    kind: &SequenceKind,
+    kind: SequenceKind,
     locator: &Locator,
 ) -> Option<(Vec<StringSequenceLine>, bool)> {
     // These first two variables are used for keeping track of state

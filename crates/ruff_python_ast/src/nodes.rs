@@ -841,6 +841,7 @@ pub struct ExprGeneratorExp {
     pub range: TextRange,
     pub elt: Box<Expr>,
     pub generators: Vec<Comprehension>,
+    pub parenthesized: bool,
 }
 
 impl From<ExprGeneratorExp> for Expr {
@@ -1797,7 +1798,7 @@ pub struct ExprTuple {
     pub ctx: ExprContext,
 
     /// Whether the tuple is parenthesized in the source code.
-    pub is_parenthesized: bool,
+    pub parenthesized: bool,
 }
 
 impl From<ExprTuple> for Expr {
@@ -3882,7 +3883,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
         assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
         assert_eq!(std::mem::size_of::<ExprFString>(), 48);
-        assert_eq!(std::mem::size_of::<ExprGeneratorExp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprGeneratorExp>(), 48);
         assert_eq!(std::mem::size_of::<ExprIfExp>(), 32);
         assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
         assert_eq!(std::mem::size_of::<ExprLambda>(), 24);

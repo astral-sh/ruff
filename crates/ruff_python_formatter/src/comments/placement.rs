@@ -12,7 +12,6 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
-use crate::expression::expr_generator_exp::is_generator_parenthesized;
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
 use crate::other::parameters::{
     assign_argument_separator_comment_placement, find_parameter_separators,
@@ -316,12 +315,10 @@ fn handle_enclosed_comment<'a>(
         | AnyNodeRef::ExprListComp(_)
         | AnyNodeRef::ExprSetComp(_) => handle_bracketed_end_of_line_comment(comment, locator),
         AnyNodeRef::ExprTuple(ast::ExprTuple {
-            is_parenthesized: true,
+            parenthesized: true,
             ..
         }) => handle_bracketed_end_of_line_comment(comment, locator),
-        AnyNodeRef::ExprGeneratorExp(generator)
-            if is_generator_parenthesized(generator, locator.contents()) =>
-        {
+        AnyNodeRef::ExprGeneratorExp(generator) if generator.parenthesized => {
             handle_bracketed_end_of_line_comment(comment, locator)
         }
         _ => CommentPlacement::Default(comment),

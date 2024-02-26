@@ -484,7 +484,7 @@ MatchStatement: ast::Stmt = {
                         elts: vec![subject.into()],
                         ctx: ast::ExprContext::Load,
                         range: (tuple_location..tuple_end_location).into(),
-                        is_parenthesized: false
+                        parenthesized: false
                     },
                 )),
                 cases,
@@ -508,7 +508,7 @@ MatchStatement: ast::Stmt = {
                         elts,
                         ctx: ast::ExprContext::Load,
                         range: (tuple_location..tuple_end_location).into(),
-                        is_parenthesized: false
+                        parenthesized: false
                     },
                 )),
                 cases,
@@ -1575,7 +1575,7 @@ SubscriptList: crate::parser::ParenthesizedExpr = {
             elts: vec![s1.into()],
             ctx: ast::ExprContext::Load,
             range: (location..end_location).into(),
-            is_parenthesized: false
+            parenthesized: false
         }.into()
     },
     <location:@L> <elts:TwoOrMoreSep<Subscript, ",">> ","? <end_location:@R> => {
@@ -1584,7 +1584,7 @@ SubscriptList: crate::parser::ParenthesizedExpr = {
             elts,
             ctx: ast::ExprContext::Load,
             range: (location..end_location).into(),
-            is_parenthesized: false
+            parenthesized: false
         }.into()
     }
 };
@@ -1734,7 +1734,7 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
               elts,
               ctx: ast::ExprContext::Load,
               range: (location..end_location).into(),
-              is_parenthesized: true
+              parenthesized: true
             }.into()
         }
     },
@@ -1756,7 +1756,7 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
               elts,
               ctx: ast::ExprContext::Load,
               range: (location..end_location).into(),
-              is_parenthesized: true
+              parenthesized: true
             }.into())
         }
     },
@@ -1764,7 +1764,7 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
         elts: Vec::new(),
         ctx: ast::ExprContext::Load,
         range: (location..end_location).into(),
-        is_parenthesized: true
+        parenthesized: true
     }.into(),
     <location:@L> "(" <e:YieldExpr> ")" <end_location:@R> => crate::parser::ParenthesizedExpr {
         expr: e.into(),
@@ -1774,6 +1774,7 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
         elt: Box::new(elt.into()),
         generators,
         range: (location..end_location).into(),
+        parenthesized: true
     }.into(),
     "(" <location:@L> "**" <e:Expression<"all">> ")" <end_location:@R> =>? {
         Err(LexicalError::new(
@@ -1871,7 +1872,7 @@ GenericList<Element>: crate::parser::ParenthesizedExpr = {
               elts,
               ctx: ast::ExprContext::Load,
               range: (location..end_location).into(),
-              is_parenthesized: false
+              parenthesized: false
             }.into()
         }
     }
@@ -1924,7 +1925,8 @@ FunctionArgument: (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::E
                 ast::ExprGeneratorExp {
                     elt: Box::new(elt.into()),
                     generators,
-                    range: (location..end_location).into()
+                    range: (location..end_location).into(),
+                    parenthesized: false
                 }
             ),
             None => elt.into(),

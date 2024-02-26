@@ -111,7 +111,7 @@ expression: parse_ast
                                                             ),
                                                         ],
                                                         ctx: Load,
-                                                        is_parenthesized: false,
+                                                        parenthesized: false,
                                                     },
                                                 ),
                                                 debug_text: None,
@@ -502,7 +502,7 @@ expression: parse_ast
                                                             ),
                                                         ],
                                                         ctx: Load,
-                                                        is_parenthesized: false,
+                                                        parenthesized: false,
                                                     },
                                                 ),
                                                 debug_text: Some(

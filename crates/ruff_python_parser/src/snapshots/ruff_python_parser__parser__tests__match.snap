@@ -469,7 +469,7 @@ expression: parse_ast
                         ),
                     ],
                     ctx: Load,
-                    is_parenthesized: false,
+                    parenthesized: false,
                 },
             ),
             cases: [
@@ -522,7 +522,7 @@ expression: parse_ast
                         ),
                     ],
                     ctx: Load,
-                    is_parenthesized: false,
+                    parenthesized: false,
                 },
             ),
             cases: [
@@ -575,7 +575,7 @@ expression: parse_ast
                         ),
                     ],
                     ctx: Load,
-                    is_parenthesized: false,
+                    parenthesized: false,
                 },
             ),
             cases: [

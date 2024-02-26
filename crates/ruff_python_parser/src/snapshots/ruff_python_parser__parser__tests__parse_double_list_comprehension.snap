@@ -35,7 +35,7 @@ ListComp(
                             ),
                         ],
                         ctx: Store,
-                        is_parenthesized: false,
+                        parenthesized: false,
                     },
                 ),
                 iter: Name(

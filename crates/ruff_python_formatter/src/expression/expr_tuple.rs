@@ -116,7 +116,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             elts,
             ctx: _,
             range: _,
-            is_parenthesized,
+            parenthesized: is_parenthesized,
         } = item;
 
         let comments = f.context().comments().clone();

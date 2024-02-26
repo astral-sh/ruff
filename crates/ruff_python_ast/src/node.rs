@@ -2430,6 +2430,7 @@ impl AstNode for ast::ExprGeneratorExp {
             elt,
             generators,
             range: _,
+            parenthesized: _,
         } = self;
         visitor.visit_expr(elt);
         for comprehension in generators {
@@ -3256,7 +3257,7 @@ impl AstNode for ast::ExprTuple {
             elts,
             ctx: _,
             range: _,
-            is_parenthesized: _,
+            parenthesized: _,
         } = self;
 
         for expr in elts {

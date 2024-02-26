@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 7a000e58d9f27e971b204e2e53ef25a811c300174be0b0a1b9dfd89dddc441fb
+// sha3: d64ca7ff27121baee9d7a1b4d0f341932391a365fe75f115987b05bf2aaf538e
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -33939,7 +33939,7 @@ fn __action86<
                         elts: vec![subject.into()],
                         ctx: ast::ExprContext::Load,
                         range: (tuple_location..tuple_end_location).into(),
-                        is_parenthesized: false
+                        parenthesized: false
                     },
                 )),
                 cases,
@@ -33984,7 +33984,7 @@ fn __action87<
                         elts,
                         ctx: ast::ExprContext::Load,
                         range: (tuple_location..tuple_end_location).into(),
-                        is_parenthesized: false
+                        parenthesized: false
                     },
                 )),
                 cases,
@@ -36229,7 +36229,7 @@ fn __action208<
             elts: vec![s1.into()],
             ctx: ast::ExprContext::Load,
             range: (location..end_location).into(),
-            is_parenthesized: false
+            parenthesized: false
         }.into()
     }
 }
@@ -36252,7 +36252,7 @@ fn __action209<
             elts,
             ctx: ast::ExprContext::Load,
             range: (location..end_location).into(),
-            is_parenthesized: false
+            parenthesized: false
         }.into()
     }
 }
@@ -36800,7 +36800,8 @@ fn __action242<
                 ast::ExprGeneratorExp {
                     elt: Box::new(elt.into()),
                     generators,
-                    range: (location..end_location).into()
+                    range: (location..end_location).into(),
+                    parenthesized: false
                 }
             ),
             None => elt.into(),
@@ -37057,7 +37058,7 @@ fn __action259<
               elts,
               ctx: ast::ExprContext::Load,
               range: (location..end_location).into(),
-              is_parenthesized: false
+              parenthesized: false
             }.into()
         }
     }
@@ -37116,7 +37117,7 @@ fn __action262<
               elts,
               ctx: ast::ExprContext::Load,
               range: (location..end_location).into(),
-              is_parenthesized: false
+              parenthesized: false
             }.into()
         }
     }
@@ -41310,7 +41311,7 @@ fn __action553<
               elts,
               ctx: ast::ExprContext::Load,
               range: (location..end_location).into(),
-              is_parenthesized: true
+              parenthesized: true
             }.into()
         }
     }
@@ -41350,7 +41351,7 @@ fn __action554<
               elts,
               ctx: ast::ExprContext::Load,
               range: (location..end_location).into(),
-              is_parenthesized: true
+              parenthesized: true
             }.into())
         }
     }
@@ -41372,7 +41373,7 @@ fn __action555<
         elts: Vec::new(),
         ctx: ast::ExprContext::Load,
         range: (location..end_location).into(),
-        is_parenthesized: true
+        parenthesized: true
     }.into()
 }
 
@@ -41413,6 +41414,7 @@ fn __action557<
         elt: Box::new(elt.into()),
         generators,
         range: (location..end_location).into(),
+        parenthesized: true
     }.into()
 }
 
@@ -42054,7 +42056,7 @@ fn __action596<
               elts,
               ctx: ast::ExprContext::Load,
               range: (location..end_location).into(),
-              is_parenthesized: true
+              parenthesized: true
             }.into())
         }
     }
@@ -42076,7 +42078,7 @@ fn __action597<
         elts: Vec::new(),
         ctx: ast::ExprContext::Load,
         range: (location..end_location).into(),
-        is_parenthesized: true
+        parenthesized: true
     }.into()
 }
 
@@ -42117,6 +42119,7 @@ fn __action599<
         elt: Box::new(elt.into()),
         generators,
         range: (location..end_location).into(),
+        parenthesized: true
     }.into()
 }
 

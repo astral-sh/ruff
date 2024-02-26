@@ -382,6 +382,7 @@ fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
             range: TextRange::default(),
         }],
         range: TextRange::default(),
+        parenthesized: false,
     };
     let node1 = ast::ExprName {
         id: id.into(),

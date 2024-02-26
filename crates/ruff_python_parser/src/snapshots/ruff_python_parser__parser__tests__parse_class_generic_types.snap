@@ -143,7 +143,7 @@ expression: parse_suite(source).unwrap()
                                                 ),
                                             ],
                                             ctx: Load,
-                                            is_parenthesized: true,
+                                            parenthesized: true,
                                         },
                                     ),
                                 ),

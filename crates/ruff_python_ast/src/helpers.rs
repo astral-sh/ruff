@@ -183,6 +183,7 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
             elt,
             generators,
             range: _,
+            parenthesized: _,
         }) => {
             any_over_expr(elt, func)
                 || generators.iter().any(|generator| {
@@ -1423,7 +1424,7 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
             elts: vec![],
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            is_parenthesized: true,
+            parenthesized: true,
         }),
         [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts),
         [elt] => elt.clone(),
@@ -1458,7 +1459,7 @@ pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
                 elts: vec![],
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                is_parenthesized: true,
+                parenthesized: true,
             }),
             [Expr::Tuple(ast::ExprTuple { elts, .. })] => typing_union(elts, binding),
             [elt] => elt.clone(),

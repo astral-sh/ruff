@@ -141,7 +141,7 @@ fn tuple_diagnostic(checker: &mut Checker, tuple: &ast::ExprTuple, aliases: &[&E
                 elts: remaining,
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                is_parenthesized: true,
+                parenthesized: true,
             };
             format!("({})", checker.generator().expr(&node.into()))
         };

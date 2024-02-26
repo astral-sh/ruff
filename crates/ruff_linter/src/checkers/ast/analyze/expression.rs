@@ -134,7 +134,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             elts,
             ctx,
             range: _,
-            is_parenthesized: _,
+            parenthesized: _,
         })
         | Expr::List(ast::ExprList {
             elts,
@@ -1452,6 +1452,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 generators,
                 elt: _,
                 range: _,
+                parenthesized: _,
             },
         ) => {
             if checker.enabled(Rule::UnnecessaryListIndexLookup) {
