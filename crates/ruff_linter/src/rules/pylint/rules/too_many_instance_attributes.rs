@@ -43,6 +43,22 @@ fn collect_attributes<'a>(attributes: &mut HashSet<&'a str>, expr: &'a ExprAttri
     }
 }
 
+fn extract_assigned_attributes<'a>(attributes: &mut HashSet<&'a str>, target: &'a Expr) {
+    match target {
+        Expr::Attribute(expr) => {
+            collect_attributes(attributes, expr);
+        }
+        Expr::Tuple(tuple) => {
+            for expr in &tuple.elts {
+                if let Some(expr) = expr.as_attribute_expr() {
+                    collect_attributes(attributes, expr);
+                }
+            }
+        }
+        _ => (),
+    }
+}
+
 /// PLR0902
 pub(crate) fn too_many_instance_attributes(
     checker: &Checker,
@@ -51,26 +67,33 @@ pub(crate) fn too_many_instance_attributes(
 ) {
     let mut attributes = HashSet::new();
     for body in &class_def.body {
-        if let Stmt::FunctionDef(func_def) = body {
-            for stmt in &func_def.body {
-                if let Stmt::Assign(assign) = stmt {
-                    for target in &assign.targets {
-                        match target {
-                            Expr::Attribute(expr) => {
-                                collect_attributes(&mut attributes, expr);
+        match body {
+            // collect attributes defined in class methods
+            Stmt::FunctionDef(func_def) => {
+                for stmt in &func_def.body {
+                    match stmt {
+                        Stmt::Assign(assign) => {
+                            for target in &assign.targets {
+                                extract_assigned_attributes(&mut attributes, target);
                             }
-                            Expr::Tuple(tuple) => {
-                                for expr in &tuple.elts {
-                                    if let Some(expr) = expr.as_attribute_expr() {
-                                        collect_attributes(&mut attributes, expr);
-                                    }
-                                }
-                            }
-                            _ => (),
                         }
+                        Stmt::AnnAssign(assign) => {
+                            extract_assigned_attributes(&mut attributes, &assign.target);
+                        }
+                        _ => (),
                     }
                 }
             }
+            // collect attributes defined in class properties
+            Stmt::Assign(assign) => {
+                for target in &assign.targets {
+                    extract_assigned_attributes(&mut attributes, target);
+                }
+            }
+            Stmt::AnnAssign(assign) => {
+                extract_assigned_attributes(&mut attributes, &assign.target);
+            }
+            _ => (),
         }
     }
     let num_attributes = attributes.len();

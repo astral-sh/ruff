@@ -1,12 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-too_many_attributes.py:1:7: PLR0902 Too many instance attributes (10/7)
+too_many_attributes.py:1:7: PLR0902 Too many instance attributes (15/7)
   |
 1 | class Fruit:
   |       ^^^^^ PLR0902
-2 |     def __init__(self):
-3 |         # max of 7 attributes by default, can be configured
+2 |     # max of 7 attributes by default, can be configured
+3 |     self.attr0: int = 0
   |
 
 
