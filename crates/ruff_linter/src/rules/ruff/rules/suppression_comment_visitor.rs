@@ -5,10 +5,10 @@ use ruff_python_ast::{
     AnyNodeRef, Suite,
 };
 use ruff_python_trivia::{
-    indentation_at_offset, CommentLinePosition, SimpleTokenKind, SimpleTokenizer, SuppressionKind,
+    indentation_at_offset, CommentLinePosition, SimpleTokenizer, SuppressionKind,
 };
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct SuppressionComment {
@@ -124,16 +124,17 @@ where
                             break;
                         }
                     }
-                    let comment_indent = indentation_at_offset(range.start(), self.locator)
-                        .unwrap_or_default()
-                        .len();
-                    let node_indent = indentation_at_offset(node.start(), self.locator)
-                        .unwrap_or_default()
-                        .len();
+                    let comment_indent =
+                        AnyNodeRef::comment_indentation_after(node, range, self.locator);
+                    let node_indent = TextSize::of(
+                        indentation_at_offset(node.start(), self.locator).unwrap_or_default(),
+                    );
                     if node_indent >= comment_indent {
                         break;
                     }
                 } else {
+                    // If the end-of-line comment is not on the same line, we can assume that there's a node in between
+                    // the end of this node and this comment.
                     if self.locator.line_start(range.start())
                         != self.locator.line_start(node.start())
                     {
@@ -182,91 +183,22 @@ where
 
 #[derive(Clone, Debug)]
 pub(super) struct SuppressionCommentData<'src> {
-    /// If `enclosing` is `None`, this comment is top-level
+    /// The AST node that encloses the comment. If `enclosing` is `None`, this comment is a top-level statement.
     pub(super) enclosing: Option<AnyNodeRef<'src>>,
+    /// An AST node that comes directly before the comment. A child of `enclosing`.
     pub(super) preceding: Option<AnyNodeRef<'src>>,
+    /// An AST node that comes directly after the comment. A child of `enclosing`.
     pub(super) following: Option<AnyNodeRef<'src>>,
 
+    /// The line position of the comment - it can either be on its own line, or at the end of a line.
     pub(super) line_position: CommentLinePosition,
+    /// Whether this comment is `fmt: off`, `fmt: on`, or `fmt: skip` (or `yapf disable` / `yapf enable`)
     pub(super) kind: SuppressionKind,
+    /// The range of text that makes up the comment. This includes the `#` prefix.
     pub(super) range: TextRange,
 }
 
 pub(super) trait CaptureSuppressionComment<'src> {
     /// This is the entrypoint for the capturer to analyze the next comment.
     fn capture(&mut self, comment: SuppressionCommentData<'src>);
-}
-
-/// Determine the indentation level of an own-line comment, defined as the minimum indentation of
-/// all comments between the preceding node and the comment, including the comment itself. In
-/// other words, we don't allow successive comments to ident _further_ than any preceding comments.
-///
-/// For example, given:
-/// ```python
-/// if True:
-///     pass
-///     # comment
-/// ```
-///
-/// The indentation would be 4, as the comment is indented by 4 spaces.
-///
-/// Given:
-/// ```python
-/// if True:
-///     pass
-/// # comment
-/// else:
-///     pass
-/// ```
-///
-/// The indentation would be 0, as the comment is not indented at all.
-///
-/// Given:
-/// ```python
-/// if True:
-///     pass
-///     # comment
-///         # comment
-/// ```
-///
-/// Both comments would be marked as indented at 4 spaces, as the indentation of the first comment
-/// is used for the second comment.
-///
-/// This logic avoids pathological cases like:
-/// ```python
-/// try:
-///     if True:
-///         if True:
-///             pass
-///
-///         # a
-///             # b
-///         # c
-/// except Exception:
-///     pass
-/// ```
-///
-/// If we don't use the minimum indentation of any preceding comments, we would mark `# b` as
-/// indented to the same depth as `pass`, which could in turn lead to us treating it as a trailing
-/// comment of `pass`, despite there being a comment between them that "resets" the indentation.
-pub(super) fn own_line_comment_indentation(
-    preceding: AnyNodeRef,
-    comment_range: TextRange,
-    locator: &Locator,
-) -> TextSize {
-    let tokenizer = SimpleTokenizer::new(
-        locator.contents(),
-        TextRange::new(locator.full_line_end(preceding.end()), comment_range.end()),
-    );
-
-    tokenizer
-        .filter_map(|token| {
-            if token.kind() == SimpleTokenKind::Comment {
-                indentation_at_offset(token.start(), locator).map(TextLen::text_len)
-            } else {
-                None
-            }
-        })
-        .min()
-        .unwrap_or_default()
 }

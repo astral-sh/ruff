@@ -13,8 +13,8 @@ use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_comment;
 
 use super::suppression_comment_visitor::{
-    own_line_comment_indentation, CaptureSuppressionComment, SuppressionComment,
-    SuppressionCommentData, SuppressionCommentVisitor,
+    CaptureSuppressionComment, SuppressionComment, SuppressionCommentData,
+    SuppressionCommentVisitor,
 };
 
 /// ## What it does
@@ -127,17 +127,15 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
         // check if the comment is inside of an expression.
         if comment
             .enclosing
-            .map(AnyNodeRef::is_expression)
+            .map(|n| !AnyNodeRef::is_statement(n))
             .unwrap_or_default()
         {
-            return Err(IgnoredReason::InsideExpression);
+            return Err(IgnoredReason::InNonStatement);
         }
 
         // check if a skip comment is at the end of a line
         if comment.kind == SuppressionKind::Skip && !comment.line_position.is_end_of_line() {
-            if !comment.line_position.is_end_of_line() {
-                return Err(IgnoredReason::SkipHasToBeTrailing);
-            }
+            return Err(IgnoredReason::SkipHasToBeTrailing);
         }
 
         if comment.kind == SuppressionKind::Off || comment.kind == SuppressionKind::On {
@@ -155,9 +153,9 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
             ) = comment.enclosing
             {
                 if comment.line_position.is_own_line() && comment.range.start() < name.start() {
-                    if let Some(decorator) = decorator_list.last() {
-                        if decorator.start() > comment.range.end() {
-                            return Err(IgnoredReason::BetweenDecorators);
+                    if let Some(decorator) = decorator_list.first() {
+                        if decorator.end() < comment.range.start() {
+                            return Err(IgnoredReason::AfterDecorator);
                         }
                     }
                 }
@@ -168,10 +166,13 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
             if let (Some(enclosing), Some(preceding), Some(following)) =
                 (comment.enclosing, comment.preceding, comment.following)
             {
-                if is_first_statement_in_alternate_body(following, enclosing) {
+                if following.is_first_statement_in_alternate_body(enclosing) {
                     // check indentation
-                    let comment_indentation =
-                        own_line_comment_indentation(preceding, comment.range, self.locator);
+                    let comment_indentation = AnyNodeRef::comment_indentation_after(
+                        preceding,
+                        comment.range,
+                        self.locator,
+                    );
 
                     let preceding_indentation =
                         indentation_at_offset(preceding.start(), self.locator)
@@ -214,44 +215,10 @@ impl<'src, 'loc> CaptureSuppressionComment<'src> for UselessSuppressionComments<
     }
 }
 
-/// Returns `true` if `statement` is the first statement in an alternate `body` (e.g. the else of an if statement)
-fn is_first_statement_in_alternate_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bool {
-    match has_body {
-        AnyNodeRef::StmtFor(ast::StmtFor { orelse, .. })
-        | AnyNodeRef::StmtWhile(ast::StmtWhile { orelse, .. }) => {
-            are_same_optional(statement, orelse.first())
-        }
-
-        AnyNodeRef::StmtTry(ast::StmtTry {
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        }) => {
-            are_same_optional(statement, handlers.first())
-                || are_same_optional(statement, orelse.first())
-                || are_same_optional(statement, finalbody.first())
-        }
-
-        AnyNodeRef::StmtIf(ast::StmtIf {
-            elif_else_clauses, ..
-        }) => are_same_optional(statement, elif_else_clauses.first()),
-        _ => false,
-    }
-}
-
-/// Returns `true` if `right` is `Some` and `left` and `right` are referentially equal.
-fn are_same_optional<'a, T>(left: AnyNodeRef, right: Option<T>) -> bool
-where
-    T: Into<AnyNodeRef<'a>>,
-{
-    right.is_some_and(|right| left.ptr_eq(right.into()))
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum IgnoredReason {
-    InsideExpression,
-    BetweenDecorators,
+    InNonStatement,
+    AfterDecorator,
     SkipHasToBeTrailing,
     FmtOnCannotBeTrailing,
     FmtOffAboveBlock,
@@ -260,9 +227,12 @@ enum IgnoredReason {
 impl Display for IgnoredReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InsideExpression => write!(f, "it cannot be inside an expression"),
-            Self::BetweenDecorators => {
-                write!(f, "it cannot be between decorators")
+            Self::InNonStatement => write!(
+                f,
+                "it cannot be in an expression, pattern, argument list, or other non-statement"
+            ),
+            Self::AfterDecorator => {
+                write!(f, "it cannot be after a decorator")
             }
             Self::SkipHasToBeTrailing => {
                 write!(f, "it cannot be on its own line")
@@ -271,7 +241,7 @@ impl Display for IgnoredReason {
                 write!(f, "it cannot be at the end of a line")
             }
             Self::FmtOffAboveBlock => {
-                write!(f, "it cannot suppress formatting for an ambiguous region")
+                write!(f, "it cannot be directly above an alternate body")
             }
         }
     }

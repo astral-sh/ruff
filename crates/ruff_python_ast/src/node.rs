@@ -5,7 +5,9 @@ use crate::{
     PatternArguments, PatternKeyword, Stmt, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
     TypeParamTypeVarTuple, TypeParams, WithItem,
 };
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_trivia::{indentation_at_offset, SimpleTokenKind, SimpleTokenizer};
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ptr::NonNull;
 
 pub trait AstNode: Ranged {
@@ -6196,6 +6198,194 @@ impl<'a> AnyNodeRef<'a> {
 
         body.last().map(AnyNodeRef::from)
     }
+
+    /// Check if the given statement is the first statement after the colon of a branch, be it in if
+    /// statements, for statements, after each part of a try-except-else-finally or function/class
+    /// definitions.
+    ///
+    ///
+    /// ```python
+    /// if True:    <- has body
+    ///     a       <- first statement
+    ///     b
+    /// elif b:     <- has body
+    ///     c       <- first statement
+    ///     d
+    /// else:       <- has body
+    ///     e       <- first statement
+    ///     f
+    ///
+    /// class:      <- has body
+    ///     a: int  <- first statement
+    ///     b: int
+    ///
+    /// ```
+    ///
+    /// For nodes with multiple bodies, we check all bodies that don't have their own node. For
+    /// try-except-else-finally, each except branch has it's own node, so for the `StmtTry`, we check
+    /// the `try:`, `else:` and `finally:`, bodies, while `ExceptHandlerExceptHandler` has it's own
+    /// check. For for-else and while-else, we check both branches for the whole statement.
+    ///
+    /// ```python
+    /// try:        <- has body (a)
+    ///     6/8     <- first statement (a)
+    ///     1/0
+    /// except:     <- has body (b)
+    ///     a       <- first statement (b)
+    ///     b
+    /// else:
+    ///     c       <- first statement (a)
+    ///     d
+    /// finally:
+    ///     e       <- first statement (a)
+    ///     f
+    /// ```
+    pub fn is_first_statement_in_body(&self, body: AnyNodeRef) -> bool {
+        match body {
+            AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
+            | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
+                are_same_optional(*self, body.first()) || are_same_optional(*self, orelse.first())
+            }
+
+            AnyNodeRef::StmtTry(ast::StmtTry {
+                body,
+                orelse,
+                finalbody,
+                ..
+            }) => {
+                are_same_optional(*self, body.first())
+                    || are_same_optional(*self, orelse.first())
+                    || are_same_optional(*self, finalbody.first())
+            }
+
+            AnyNodeRef::StmtIf(ast::StmtIf { body, .. })
+            | AnyNodeRef::ElifElseClause(ast::ElifElseClause { body, .. })
+            | AnyNodeRef::StmtWith(ast::StmtWith { body, .. })
+            | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
+                body,
+                ..
+            })
+            | AnyNodeRef::MatchCase(MatchCase { body, .. })
+            | AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
+            | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. }) => {
+                are_same_optional(*self, body.first())
+            }
+
+            AnyNodeRef::StmtMatch(ast::StmtMatch { cases, .. }) => {
+                are_same_optional(*self, cases.first())
+            }
+
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if `statement` is the first statement in an alternate `body` (e.g. the else of an if statement)
+    pub fn is_first_statement_in_alternate_body(&self, body: AnyNodeRef) -> bool {
+        match body {
+            AnyNodeRef::StmtFor(ast::StmtFor { orelse, .. })
+            | AnyNodeRef::StmtWhile(ast::StmtWhile { orelse, .. }) => {
+                are_same_optional(*self, orelse.first())
+            }
+
+            AnyNodeRef::StmtTry(ast::StmtTry {
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            }) => {
+                are_same_optional(*self, handlers.first())
+                    || are_same_optional(*self, orelse.first())
+                    || are_same_optional(*self, finalbody.first())
+            }
+
+            AnyNodeRef::StmtIf(ast::StmtIf {
+                elif_else_clauses, ..
+            }) => are_same_optional(*self, elif_else_clauses.first()),
+            _ => false,
+        }
+    }
+
+    /// Determine the indentation level of an own-line comment, defined as the minimum indentation of
+    /// all comments between the preceding node and the comment, including the comment itself. In
+    /// other words, we don't allow successive comments to ident _further_ than any preceding comments.
+    ///
+    /// For example, given:
+    /// ```python
+    /// if True:
+    ///     pass
+    ///     # comment
+    /// ```
+    ///
+    /// The indentation would be 4, as the comment is indented by 4 spaces.
+    ///
+    /// Given:
+    /// ```python
+    /// if True:
+    ///     pass
+    /// # comment
+    /// else:
+    ///     pass
+    /// ```
+    ///
+    /// The indentation would be 0, as the comment is not indented at all.
+    ///
+    /// Given:
+    /// ```python
+    /// if True:
+    ///     pass
+    ///     # comment
+    ///         # comment
+    /// ```
+    ///
+    /// Both comments would be marked as indented at 4 spaces, as the indentation of the first comment
+    /// is used for the second comment.
+    ///
+    /// This logic avoids pathological cases like:
+    /// ```python
+    /// try:
+    ///     if True:
+    ///         if True:
+    ///             pass
+    ///
+    ///         # a
+    ///             # b
+    ///         # c
+    /// except Exception:
+    ///     pass
+    /// ```
+    ///
+    /// If we don't use the minimum indentation of any preceding comments, we would mark `# b` as
+    /// indented to the same depth as `pass`, which could in turn lead to us treating it as a trailing
+    /// comment of `pass`, despite there being a comment between them that "resets" the indentation.
+    pub fn comment_indentation_after(
+        preceding: Self,
+        comment_range: TextRange,
+        locator: &Locator,
+    ) -> TextSize {
+        let tokenizer = SimpleTokenizer::new(
+            locator.contents(),
+            TextRange::new(locator.full_line_end(preceding.end()), comment_range.end()),
+        );
+
+        tokenizer
+            .filter_map(|token| {
+                if token.kind() == SimpleTokenKind::Comment {
+                    indentation_at_offset(token.start(), locator).map(TextLen::text_len)
+                } else {
+                    None
+                }
+            })
+            .min()
+            .unwrap_or_default()
+    }
+}
+
+/// Returns `true` if `right` is `Some` and `left` and `right` are referentially equal.
+fn are_same_optional<'a, T>(left: AnyNodeRef, right: Option<T>) -> bool
+where
+    T: Into<AnyNodeRef<'a>>,
+{
+    right.is_some_and(|right| left.ptr_eq(right.into()))
 }
 
 impl<'a> From<&'a ast::ModModule> for AnyNodeRef<'a> {
