@@ -63,6 +63,7 @@ list(x).pop(0)
 # OK
 list(x).pop(1)
 
+
 def test():
     zip = list  # Overwrite the builtin zip
     list(zip(x, y))[0]

@@ -116,7 +116,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_simplify::rules::use_capital_environment_variables(checker, expr);
             }
             if checker.enabled(Rule::UnnecessaryIterableAllocationForFirstElement) {
-                ruff::rules::unnecessary_iterable_allocation_for_first_element(checker, subscript);
+                ruff::rules::unnecessary_iterable_allocation_for_first_element(checker, expr);
             }
             if checker.enabled(Rule::InvalidIndexType) {
                 ruff::rules::invalid_index_type(checker, subscript);
@@ -964,6 +964,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::DefaultFactoryKwarg) {
                 ruff::rules::default_factory_kwarg(checker, call);
+            }
+            if checker.enabled(Rule::UnnecessaryIterableAllocationForFirstElement) {
+                ruff::rules::unnecessary_iterable_allocation_for_first_element(checker, expr);
             }
         }
         Expr::Dict(dict) => {

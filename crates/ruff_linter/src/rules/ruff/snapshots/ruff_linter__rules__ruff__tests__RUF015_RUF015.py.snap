@@ -383,7 +383,7 @@ RUF015.py:57:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
    57 |+next(zip(x, y))
 58 58 | [*zip(x, y)][0]
 59 59 | 
-60 60 | 
+60 60 | # RUF015 (pop)
 
 RUF015.py:58:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
    |
@@ -391,6 +391,8 @@ RUF015.py:58:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
 57 | list(zip(x, y))[0]
 58 | [*zip(x, y)][0]
    | ^^^^^^^^^^^^^^^ RUF015
+59 | 
+60 | # RUF015 (pop)
    |
    = help: Replace with `next(zip(x, y))`
 
@@ -401,23 +403,41 @@ RUF015.py:58:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
 58    |-[*zip(x, y)][0]
    58 |+next(zip(x, y))
 59 59 | 
-60 60 | 
-61 61 | def test():
+60 60 | # RUF015 (pop)
+61 61 | list(x).pop(0)
 
-RUF015.py:63:5: RUF015 [*] Prefer `next(iter(zip(x, y)))` over single element slice
+RUF015.py:61:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
    |
-61 | def test():
-62 |     zip = list  # Overwrite the builtin zip
-63 |     list(zip(x, y))[0]
+60 | # RUF015 (pop)
+61 | list(x).pop(0)
+   | ^^^^^^^^^^^ RUF015
+62 | 
+63 | # OK
+   |
+   = help: Replace with `next(iter(x))`
+
+ℹ Unsafe fix
+58 58 | [*zip(x, y)][0]
+59 59 | 
+60 60 | # RUF015 (pop)
+61    |-list(x).pop(0)
+   61 |+next(iter(x))(0)
+62 62 | 
+63 63 | # OK
+64 64 | list(x).pop(1)
+
+RUF015.py:69:5: RUF015 [*] Prefer `next(iter(zip(x, y)))` over single element slice
+   |
+67 | def test():
+68 |     zip = list  # Overwrite the builtin zip
+69 |     list(zip(x, y))[0]
    |     ^^^^^^^^^^^^^^^^^^ RUF015
    |
    = help: Replace with `next(iter(zip(x, y)))`
 
 ℹ Unsafe fix
-60 60 | 
-61 61 | def test():
-62 62 |     zip = list  # Overwrite the builtin zip
-63    |-    list(zip(x, y))[0]
-   63 |+    next(iter(zip(x, y)))
-
-
+66 66 | 
+67 67 | def test():
+68 68 |     zip = list  # Overwrite the builtin zip
+69    |-    list(zip(x, y))[0]
+   69 |+    next(iter(zip(x, y)))
