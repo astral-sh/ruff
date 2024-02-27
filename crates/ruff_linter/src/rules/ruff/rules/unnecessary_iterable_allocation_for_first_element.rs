@@ -67,18 +67,37 @@ impl AlwaysFixableViolation for UnnecessaryIterableAllocationForFirstElement {
 /// RUF015
 pub(crate) fn unnecessary_iterable_allocation_for_first_element(
     checker: &mut Checker,
-    subscript: &ast::ExprSubscript,
+    expr: &ast::Expr,
 ) {
-    let ast::ExprSubscript {
-        value,
-        slice,
-        range,
-        ..
-    } = subscript;
-
-    if !is_head_slice(slice) {
-        return;
-    }
+    let (value, range) = match expr {
+        ast::Expr::Subscript(ast::ExprSubscript {
+            value,
+            slice,
+            range,
+            ..
+        }) => {
+            if !is_head_slice(slice) {
+                return;
+            }
+            (value, range)
+        }
+        ast::Expr::Call(ast::ExprCall {
+            func, arguments, ..
+        }) => {
+            let Some(arg) = arguments.args.first() else {
+                return;
+            };
+            if !is_head_slice(arg) {
+                return;
+            }
+            let ast::Expr::Attribute(ast::ExprAttribute { range, value, .. }) = func.as_ref()
+            else {
+                return;
+            };
+            (value, range)
+        }
+        _ => return,
+    };
 
     let Some(target) = match_iteration_target(value, checker.semantic()) else {
         return;
