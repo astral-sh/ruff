@@ -99,10 +99,15 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
             if !is_head_slice(arg) {
                 return;
             }
-            let ast::Expr::Attribute(ast::ExprAttribute { range, value, .. }) = func.as_ref()
+            let ast::Expr::Attribute(ast::ExprAttribute {
+                range, value, attr, ..
+            }) = func.as_ref()
             else {
                 return;
             };
+            if !matches!(attr.as_str(), "pop") {
+                return;
+            }
             (value, range)
         }
         _ => return,
