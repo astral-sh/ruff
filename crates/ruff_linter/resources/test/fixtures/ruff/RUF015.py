@@ -62,6 +62,8 @@ list(x).pop(0)
 
 # OK
 list(x).pop(1)
+list(x).remove(0)
+list(x).remove(1)
 
 
 def test():
