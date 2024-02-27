@@ -1,6 +1,6 @@
 #: E121
-print "E121", (
-  "dent")
+print("E121", (
+  "str"))
 
 #: E121
 result = {
@@ -9,8 +9,8 @@ result = {
 }
 
 #: E122
-print("In", (
-"dent"))
+print("E122", (
+"str"))
 
 #: E122:6:5 E122:7:5 E122:8:1
 print(dedent(
@@ -79,9 +79,9 @@ my_list = [
     ]
 
 #: E123
-print "Indent", (
+print("Indent", (
     "bad", "hanging", "close"
-    )
+    ))
 
 #: E123
 result = {
@@ -113,14 +113,14 @@ if True:
         )]
 
 #: E124 E128
-print ("E124", ("visual",
+print(("E124", ("visual",
                "indent_two"
-              ))
+              )))
 
 #: E124 E128
-print ("E124", ("visual",
+print(("E124", ("visual",
                "indent_five"
-))
+)))
 
 #: E124
 a = (123,
@@ -207,12 +207,12 @@ for foo in """
     print(foo)
 
 #: E126
-print "In", (
-            "dent")
+print("In", (
+            "dent"))
 
 #: E126
-print "In", (
-        "dent")
+print("In", (
+        "dent"))
 
 #: E126
 my_list = [
@@ -282,8 +282,8 @@ if (
     pass
 
 #: E127
-print ("abcd", ("over-",
-                  "over-indent"))
+print(("abcd", ("over-",
+                  "over-indent")))
 
 #: E127
 foo(1, 2, 3,
@@ -373,12 +373,12 @@ if line_removed:
                )
 
 #: E128
-print ("abcd", ("visual",
-    "hanging"))
+print(("abcd", ("visual",
+    "hanging")))
 
 #: E128
-print ("abcd", ("under-",
-              "under-indent"))
+print(("abcd", ("under-",
+              "under-indent")))
 
 #: E128
 # Arguments on first line forbidden when not using vertical alignment
@@ -428,11 +428,11 @@ if (a == 2
     return True
 
 #: E131
-print "hello", (
+print("hello", (
 
     "there",
      # "john",
-    "dude")
+    "dude"))
 
 #: E131
 troublesome_hash = {
