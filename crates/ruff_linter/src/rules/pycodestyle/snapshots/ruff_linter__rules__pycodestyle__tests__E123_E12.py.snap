@@ -13,9 +13,9 @@ E12.py:79:5: E123 Closing bracket not matching its corresponding opening bracket
 
 E12.py:84:5: E123 Closing bracket not matching its corresponding opening bracket's indentation.
    |
-82 | print "Indent", (
+82 | print("Indent", (
 83 |     "bad", "hanging", "close"
-84 |     )
+84 |     ))
    |     ^ E123
 85 | 
 86 | #: E123
@@ -69,5 +69,3 @@ E12.py:111:17: E123 Closing bracket not matching its corresponding opening brack
 112 |             dict(name=token.undefined)
 113 |         )]
     |
-
-

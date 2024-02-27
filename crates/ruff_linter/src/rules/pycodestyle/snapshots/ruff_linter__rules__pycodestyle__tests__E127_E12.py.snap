@@ -23,8 +23,8 @@ E12.py:177:17: E127 Continuation line over indented for visual indent.
 E12.py:286:19: E127 Continuation line over indented for visual indent.
     |
 284 | #: E127
-285 | print ("abcd", ("over-",
-286 |                   "over-indent"))
+285 | print(("abcd", ("over-",
+286 |                   "over-indent")))
     |                   ^^^^^^^^^^^^^ E127
 287 | 
 288 | #: E127
@@ -197,5 +197,3 @@ E12.py:361:11: E127 Continuation line over indented for visual indent.
     |           ^^^^ E127
 362 |         file_2.write(file_1.read())
     |
-
-

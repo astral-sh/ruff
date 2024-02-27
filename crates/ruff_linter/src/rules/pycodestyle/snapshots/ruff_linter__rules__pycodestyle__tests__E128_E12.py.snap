@@ -4,19 +4,19 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 E12.py:117:16: E128 Continuation line under indented for visual indent.
     |
 115 | #: E124 E128
-116 | print ("E124", ("visual",
+116 | print(("E124", ("visual",
 117 |                "indent_two"
     |                ^^^^^^^^^^^^ E128
-118 |               ))
+118 |               )))
     |
 
 E12.py:122:16: E128 Continuation line under indented for visual indent.
     |
 120 | #: E124 E128
-121 | print ("E124", ("visual",
+121 | print(("E124", ("visual",
 122 |                "indent_five"
     |                ^^^^^^^^^^^^^ E128
-123 | ))
+123 | )))
     |
 
 E12.py:169:9: E128 Continuation line under indented for visual indent.
@@ -70,8 +70,8 @@ E12.py:372:15: E128 Continuation line under indented for visual indent.
 E12.py:377:5: E128 Continuation line under indented for visual indent.
     |
 375 | #: E128
-376 | print ("abcd", ("visual",
-377 |     "hanging"))
+376 | print(("abcd", ("visual",
+377 |     "hanging")))
     |     ^^^^^^^^^ E128
 378 | 
 379 | #: E128
@@ -80,8 +80,8 @@ E12.py:377:5: E128 Continuation line under indented for visual indent.
 E12.py:381:15: E128 Continuation line under indented for visual indent.
     |
 379 | #: E128
-380 | print ("abcd", ("under-",
-381 |               "under-indent"))
+380 | print(("abcd", ("under-",
+381 |               "under-indent")))
     |               ^^^^^^^^^^^^^^ E128
 382 | 
 383 | #: E128
@@ -164,5 +164,3 @@ E12.py:417:18: E128 Continuation line under indented for visual indent.
 418 | 
 419 | #: E129 W503
     |
-
-

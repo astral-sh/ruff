@@ -4,9 +4,9 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 E12.py:13:1: E122 Continuation line missing indentation or outdented.
    |
 11 | #: E122
-12 | print("In", (
-13 | "dent"))
-   | ^^^^^^ E122
+12 | print("E122", (
+13 | "str"))
+   | ^^^^^ E122
 14 | 
 15 | #: E122:6:5 E122:7:5 E122:8:1
    |
@@ -115,5 +115,3 @@ E12.py:73:1: E122 Continuation line missing indentation or outdented.
 74 | 
 75 | #: E123
    |
-
-

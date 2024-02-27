@@ -3,9 +3,9 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
 E12.py:118:15: E124 Closing bracket not matching its corresponding opening bracket's visual indentation.
     |
-116 | print ("E124", ("visual",
+116 | print(("E124", ("visual",
 117 |                "indent_two"
-118 |               ))
+118 |               )))
     |               ^ E124
 119 | 
 120 | #: E124 E128
@@ -13,9 +13,9 @@ E12.py:118:15: E124 Closing bracket not matching its corresponding opening brack
 
 E12.py:123:1: E124 Closing bracket not matching its corresponding opening bracket's visual indentation.
     |
-121 | print ("E124", ("visual",
+121 | print(("E124", ("visual",
 122 |                "indent_five"
-123 | ))
+123 | )))
     | ^ E124
 124 | 
 125 | #: E124
@@ -110,5 +110,3 @@ E12.py:178:17: E124 Closing bracket not matching its corresponding opening brack
 179 | 
 180 | #: E125
     |
-
-

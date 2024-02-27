@@ -6,7 +6,7 @@ E12.py:434:6: E131 Continuation line unaligned for hanging indent.
 433 |     "there",
 434 |      # "john",
     |      ^^^^^^^^^ E131
-435 |     "dude")
+435 |     "dude"))
     |
 
 E12.py:441:9: E131 Continuation line unaligned for hanging indent.
@@ -17,5 +17,3 @@ E12.py:441:9: E131 Continuation line unaligned for hanging indent.
     |         ^^^^^^^^^^^^ E131
 442 | }
     |
-
-

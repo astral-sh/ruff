@@ -4,9 +4,9 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 E12.py:3:3: E121 Hanging indent under-indented.
   |
 1 | #: E121
-2 | print "E121", (
-3 |   "dent")
-  |   ^^^^^^ E121
+2 | print("E121", (
+3 |   "str"))
+  |   ^^^^^ E121
 4 | 
 5 | #: E121
   |
@@ -20,5 +20,3 @@ E12.py:7:4: E121 Hanging indent under-indented.
 8 |    'key2': 'value',
 9 | }
   |
-
-

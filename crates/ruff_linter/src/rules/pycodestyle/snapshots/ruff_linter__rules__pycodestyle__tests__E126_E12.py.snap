@@ -4,8 +4,8 @@ source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 E12.py:211:13: E126 Continuation line over indented for hanging indent.
     |
 209 | #: E126
-210 | print "In", (
-211 |             "dent")
+210 | print("In", (
+211 |             "dent"))
     |             ^^^^^^ E126
 212 | 
 213 | #: E126
@@ -14,8 +14,8 @@ E12.py:211:13: E126 Continuation line over indented for hanging indent.
 E12.py:215:9: E126 Continuation line over indented for hanging indent.
     |
 213 | #: E126
-214 | print "In", (
-215 |         "dent")
+214 | print("In", (
+215 |         "dent"))
     |         ^^^^^^ E126
 216 | 
 217 | #: E126
@@ -146,5 +146,3 @@ E12.py:280:13: E126 Continuation line over indented for hanging indent.
 281 |         or y == 4):
 282 |     pass
     |
-
-
