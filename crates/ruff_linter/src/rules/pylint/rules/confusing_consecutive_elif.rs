@@ -10,7 +10,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// It may not be ovious if the elif statement was willingly or mistakenly unindented.
-/// Extracting the indented if statement into a separate function might avoid confusion and prevent errors.
+/// Adding an explicit else, or extracting the indented if statement into a separate
+/// function might avoid confusion and prevent errors.
 ///
 /// ## Example
 /// ```python
@@ -26,6 +27,20 @@ use crate::checkers::ast::Checker;
 ///
 /// Use instead:
 /// ```python
+/// # Option 1: add explicit else
+/// if old_conf:
+///     if not new_conf:
+///         machine.disable()
+///     elif old_conf.value != new_conf.value:
+///         machine.disable()
+///         machine.enable(new_conf.value)
+///     else:
+///         pass
+/// elif new_conf:  # [confusing-consecutive-elif]
+///     machine.enable(new_conf.value)
+///
+///
+/// # Option 2: extract function
 /// def extracted(old_conf, new_conf, machine):
 ///     if not new_conf:
 ///         machine.disable()
