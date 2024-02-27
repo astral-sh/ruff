@@ -210,7 +210,7 @@ pub(crate) fn check_tokens(
         flake8_fixme::rules::todos(&mut diagnostics, &todo_comments);
     }
 
-    if settings.rules.enabled(Rule::MissingClassNewLine) {
+    if !source_type.is_stub() && settings.rules.enabled(Rule::MissingClassNewLine) {
         let mut blank_lines_checker = flake8_class_newline::rules::BlankLinesChecker::default();
         blank_lines_checker.check_lines(
             tokens,
