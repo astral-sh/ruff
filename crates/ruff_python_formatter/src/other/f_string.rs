@@ -59,16 +59,16 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
             return result;
         }
 
-        let quotes = normalizer.choose_quotes(&string, &locator);
+        let quote_selection = normalizer.choose_quotes(&string, &locator);
 
         let context = FStringContext::new(
             string.prefix(),
-            quotes,
+            quote_selection.quotes(),
             FStringLayout::from_f_string(self.value, &locator),
         );
 
         // Starting prefix and quote
-        write!(f, [string.prefix(), quotes])?;
+        write!(f, [string.prefix(), quote_selection.quotes()])?;
 
         f.join()
             .entries(
@@ -80,7 +80,7 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
             .finish()?;
 
         // Ending quote
-        quotes.fmt(f)
+        quote_selection.quotes().fmt(f)
     }
 }
 

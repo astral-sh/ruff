@@ -465,7 +465,7 @@
       ]
     },
     "line-length": {
-      "description": "The line length to use when enforcing long-lines violations (like `E501`) and at which `isort` and the formatter prefers to wrap lines.\n\nThe length is determined by the number of characters per line, except for lines containing East Asian characters or emojis. For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nThe value must be greater than `0` and less than or equal to `320`.\n\nNote: While the formatter will attempt to format lines such that they remain within the `line-length`, it isn't a hard upper bound, and formatted lines may exceed the `line-length`.\n\nSee [`pycodestyle.max-line-length`](#pycodestyle-max-line-length) to configure different lengths for `E501` and the formatter.",
+      "description": "The line length to use when enforcing long-lines violations (like `E501`) and at which `isort` and the formatter prefers to wrap lines.\n\nThe length is determined by the number of characters per line, except for lines containing East Asian characters or emojis. For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nThe value must be greater than `0` and less than or equal to `320`.\n\nNote: While the formatter will attempt to format lines such that they remain within the `line-length`, it isn't a hard upper bound, and formatted lines may exceed the `line-length`.\n\nSee [`pycodestyle.max-line-length`](#lint_pycodestyle_max-line-length) to configure different lengths for `E501` and the formatter.",
       "anyOf": [
         {
           "$ref": "#/definitions/LineLength"
@@ -953,7 +953,7 @@
           "minimum": 0.0
         },
         "notice-rgx": {
-          "description": "The regular expression used to match the copyright notice, compiled with the [`regex`](https://docs.rs/regex/latest/regex/) crate.\n\nDefaults to `(?i)Copyright\\s+(\\(C\\)\\s+)?\\d{4}(-\\d{4})*`, which matches the following: - `Copyright 2023` - `Copyright (C) 2023` - `Copyright 2021-2023` - `Copyright (C) 2021-2023`",
+          "description": "The regular expression used to match the copyright notice, compiled with the [`regex`](https://docs.rs/regex/latest/regex/) crate.\n\nDefaults to `(?i)Copyright\\s+((?:\\(C\\)|©)\\s+)?\\d{4}(-\\d{4})*`, which matches the following: - `Copyright 2023` - `Copyright (C) 2023` - `Copyright 2021-2023` - `Copyright (C) 2021-2023`",
           "type": [
             "string",
             "null"
@@ -3220,6 +3220,7 @@
         "PLE113",
         "PLE1132",
         "PLE114",
+        "PLE1141",
         "PLE1142",
         "PLE12",
         "PLE120",

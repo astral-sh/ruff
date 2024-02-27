@@ -374,7 +374,9 @@ where
                     || helpers::is_assignment_to_a_dunder(stmt)
                     || helpers::in_nested_block(self.semantic.current_statements())
                     || imports::is_matplotlib_activation(stmt, self.semantic())
-                    || imports::is_sys_path_modification(stmt, self.semantic()))
+                    || imports::is_sys_path_modification(stmt, self.semantic())
+                    || (self.settings.preview.is_enabled()
+                        && imports::is_os_environ_modification(stmt, self.semantic())))
                 {
                     self.semantic.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }
@@ -582,7 +584,8 @@ where
 
                 // Function annotations are always evaluated at runtime, unless future annotations
                 // are enabled.
-                let runtime_annotation = !self.semantic.future_annotations();
+                let annotation =
+                    AnnotationContext::from_function(function_def, &self.semantic, self.settings);
 
                 // The first parameter may be a single dispatch.
                 let mut singledispatch =
@@ -606,10 +609,18 @@ where
                     if let Some(expr) = &parameter_with_default.parameter.annotation {
                         if singledispatch {
                             self.visit_runtime_required_annotation(expr);
-                        } else if runtime_annotation {
-                            self.visit_runtime_evaluated_annotation(expr);
                         } else {
-                            self.visit_annotation(expr);
+                            match annotation {
+                                AnnotationContext::RuntimeRequired => {
+                                    self.visit_runtime_required_annotation(expr);
+                                }
+                                AnnotationContext::RuntimeEvaluated => {
+                                    self.visit_runtime_evaluated_annotation(expr);
+                                }
+                                AnnotationContext::TypingOnly => {
+                                    self.visit_annotation(expr);
+                                }
+                            }
                         };
                     }
                     if let Some(expr) = &parameter_with_default.default {
@@ -619,28 +630,46 @@ where
                 }
                 if let Some(arg) = &parameters.vararg {
                     if let Some(expr) = &arg.annotation {
-                        if runtime_annotation {
-                            self.visit_runtime_evaluated_annotation(expr);
-                        } else {
-                            self.visit_annotation(expr);
-                        };
+                        match annotation {
+                            AnnotationContext::RuntimeRequired => {
+                                self.visit_runtime_required_annotation(expr);
+                            }
+                            AnnotationContext::RuntimeEvaluated => {
+                                self.visit_runtime_evaluated_annotation(expr);
+                            }
+                            AnnotationContext::TypingOnly => {
+                                self.visit_annotation(expr);
+                            }
+                        }
                     }
                 }
                 if let Some(arg) = &parameters.kwarg {
                     if let Some(expr) = &arg.annotation {
-                        if runtime_annotation {
-                            self.visit_runtime_evaluated_annotation(expr);
-                        } else {
-                            self.visit_annotation(expr);
-                        };
+                        match annotation {
+                            AnnotationContext::RuntimeRequired => {
+                                self.visit_runtime_required_annotation(expr);
+                            }
+                            AnnotationContext::RuntimeEvaluated => {
+                                self.visit_runtime_evaluated_annotation(expr);
+                            }
+                            AnnotationContext::TypingOnly => {
+                                self.visit_annotation(expr);
+                            }
+                        }
                     }
                 }
                 for expr in returns {
-                    if runtime_annotation {
-                        self.visit_runtime_evaluated_annotation(expr);
-                    } else {
-                        self.visit_annotation(expr);
-                    };
+                    match annotation {
+                        AnnotationContext::RuntimeRequired => {
+                            self.visit_runtime_required_annotation(expr);
+                        }
+                        AnnotationContext::RuntimeEvaluated => {
+                            self.visit_runtime_evaluated_annotation(expr);
+                        }
+                        AnnotationContext::TypingOnly => {
+                            self.visit_annotation(expr);
+                        }
+                    }
                 }
 
                 let definition = docstrings::extraction::extract_definition(
@@ -978,6 +1007,7 @@ where
                 elt,
                 generators,
                 range: _,
+                parenthesized: _,
             }) => {
                 self.visit_generators(generators);
                 self.visit_expr(elt);
@@ -1298,6 +1328,7 @@ where
                                 elts,
                                 ctx,
                                 range: _,
+                                parenthesized: _,
                             }) = slice.as_ref()
                             {
                                 let mut iter = elts.iter();

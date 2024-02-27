@@ -378,7 +378,7 @@ pub struct Options {
     /// within the `line-length`, it isn't a hard upper bound, and formatted lines may
     /// exceed the `line-length`.
     ///
-    /// See [`pycodestyle.max-line-length`](#pycodestyle-max-line-length) to configure different lengths for `E501` and the formatter.
+    /// See [`pycodestyle.max-line-length`](#lint_pycodestyle_max-line-length) to configure different lengths for `E501` and the formatter.
     #[option(
         default = "88",
         value_type = "int",
@@ -1123,14 +1123,14 @@ pub struct Flake8CopyrightOptions {
     /// The regular expression used to match the copyright notice, compiled
     /// with the [`regex`](https://docs.rs/regex/latest/regex/) crate.
     ///
-    /// Defaults to `(?i)Copyright\s+(\(C\)\s+)?\d{4}(-\d{4})*`, which matches
+    /// Defaults to `(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}(-\d{4})*`, which matches
     /// the following:
     /// - `Copyright 2023`
     /// - `Copyright (C) 2023`
     /// - `Copyright 2021-2023`
     /// - `Copyright (C) 2021-2023`
     #[option(
-        default = r#"(?i)Copyright\s+(\(C\)\s+)?\d{4}([-,]\d{4})*"#,
+        default = r#"(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}([-,]\d{4})*"#,
         value_type = "str",
         example = r#"notice-rgx = "(?i)Copyright \\(C\\) \\d{4}""#
     )]

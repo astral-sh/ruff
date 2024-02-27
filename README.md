@@ -172,7 +172,7 @@ jobs:
   ruff:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: chartboost/ruff-action@v1
 ```
 
@@ -378,6 +378,7 @@ Ruff is released under the MIT license.
 
 Ruff is used by a number of major open-source projects and companies, including:
 
+- [Albumentations](https://github.com/albumentations-team/albumentations)
 - Amazon ([AWS SAM](https://github.com/aws/serverless-application-model))
 - Anthropic ([Python SDK](https://github.com/anthropics/anthropic-sdk-python))
 - [Apache Airflow](https://github.com/apache/airflow)

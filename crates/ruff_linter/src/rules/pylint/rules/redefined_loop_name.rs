@@ -305,6 +305,7 @@ fn assignment_targets_from_expr<'a>(
             ctx: ExprContext::Store,
             elts,
             range: _,
+            parenthesized: _,
         }) => Box::new(
             elts.iter()
                 .flat_map(|elt| assignment_targets_from_expr(elt, dummy_variable_rgx)),

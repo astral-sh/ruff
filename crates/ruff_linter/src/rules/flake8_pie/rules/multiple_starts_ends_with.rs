@@ -173,6 +173,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                     .collect(),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                parenthesized: true,
             });
             let node1 = Expr::Name(ast::ExprName {
                 id: arg_name.into(),

@@ -428,6 +428,7 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             elt,
             generators,
             range: _,
+            parenthesized: _,
         }) => {
             for comprehension in generators {
                 visitor.visit_comprehension(comprehension);
@@ -528,6 +529,7 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             elts,
             ctx,
             range: _,
+            parenthesized: _,
         }) => {
             for expr in elts {
                 visitor.visit_expr(expr);

@@ -127,6 +127,7 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
                                     range: TextRange::default(),
                                     elts: constraints.into_iter().cloned().collect(),
                                     ctx: ast::ExprContext::Load,
+                                    parenthesized: true,
                                 })))
                             }
                             None => None,

@@ -386,10 +386,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             },
         ) => {
             if checker.enabled(Rule::NoClassmethodDecorator) {
-                pylint::rules::no_classmethod_decorator(checker, class_def);
+                pylint::rules::no_classmethod_decorator(checker, stmt);
             }
             if checker.enabled(Rule::NoStaticmethodDecorator) {
-                pylint::rules::no_staticmethod_decorator(checker, class_def);
+                pylint::rules::no_staticmethod_decorator(checker, stmt);
             }
             if checker.enabled(Rule::DjangoNullableModelStringField) {
                 flake8_django::rules::nullable_model_string_field(checker, body);
@@ -1298,6 +1298,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::IterationOverSet) {
                 pylint::rules::iteration_over_set(checker, iter);
+            }
+            if checker.enabled(Rule::DictIterMissingItems) {
+                pylint::rules::dict_iter_missing_items(checker, target, iter);
             }
             if checker.enabled(Rule::ManualListComprehension) {
                 perflint::rules::manual_list_comprehension(checker, target, body);
