@@ -28,6 +28,16 @@ const ROOT_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../");
 struct Args {
     #[command(subcommand)]
     command: Command,
+    #[arg(
+        long,
+        action = clap::ArgAction::Append,
+        value_name = "CONFIG_OPTION",
+        value_parser = ruff::args::ConfigArgumentParser,
+        global = true,
+    )]
+    config: Vec<ruff::args::SingleConfigArgument>,
+    #[arg(long, help_heading = "Miscellaneous", global = true)]
+    isolated: bool,
 }
 
 #[derive(Subcommand)]
@@ -89,14 +99,19 @@ fn main() -> Result<ExitCode> {
         Command::PrintTokens(args) => print_tokens::main(&args)?,
         Command::RoundTrip(args) => round_trip::main(&args)?,
         Command::Repeat {
-            args,
+            args: subcommand_args,
             repeat,
             log_level_args,
         } => {
             let log_level = LogLevel::from(&log_level_args);
             set_up_logging(&log_level)?;
             for _ in 0..repeat {
-                check(args.clone(), log_level)?;
+                check(
+                    subcommand_args.clone(),
+                    log_level,
+                    args.config.clone(),
+                    args.isolated,
+                )?;
             }
         }
         Command::FormatDev(args) => {

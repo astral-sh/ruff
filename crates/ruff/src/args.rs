@@ -41,6 +41,32 @@ pub struct Args {
     pub command: Command,
     #[clap(flatten)]
     pub log_level_args: LogLevelArgs,
+    /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
+    /// or a TOML `<KEY> = <VALUE>` pair
+    /// (such as you might find in a `ruff.toml` configuration file)
+    /// overriding a specific configuration option.
+    /// Overrides of individual settings using this option always take precedence
+    /// over all configuration files, including configuration files that were also
+    /// specified using `--config`.
+    #[arg(
+        long,
+        action = clap::ArgAction::Append,
+        value_name = "CONFIG_OPTION",
+        value_parser = ConfigArgumentParser,
+        global = true,
+    )]
+    pub config: Vec<SingleConfigArgument>,
+    /// Ignore all configuration files.
+    //
+    // Note: We can't mark this as conflicting with `--config` here
+    // as `--config` can be used for specifying configuration overrides
+    // as well as configuration files.
+    // Specifying a configuration file conflicts with `--isolated`;
+    // specifying a configuration override does not.
+    // If a user specifies `ruff check --isolated --config=ruff.toml`,
+    // we emit an error later on, after the initial parsing by clap.
+    #[arg(long, help_heading = "Miscellaneous", global = true)]
+    pub isolated: bool,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -161,20 +187,6 @@ pub struct CheckCommand {
     preview: bool,
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
-    /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
-    /// or a TOML `<KEY> = <VALUE>` pair
-    /// (such as you might find in a `ruff.toml` configuration file)
-    /// overriding a specific configuration option.
-    /// Overrides of individual settings using this option always take precedence
-    /// over all configuration files, including configuration files that were also
-    /// specified using `--config`.
-    #[arg(
-        long,
-        action = clap::ArgAction::Append,
-        value_name = "CONFIG_OPTION",
-        value_parser = ConfigArgumentParser,
-    )]
-    pub config: Vec<SingleConfigArgument>,
     /// Comma-separated list of rule codes to enable (or ALL, to enable all rules).
     #[arg(
         long,
@@ -306,17 +318,6 @@ pub struct CheckCommand {
     /// Disable cache reads.
     #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
     pub no_cache: bool,
-    /// Ignore all configuration files.
-    //
-    // Note: We can't mark this as conflicting with `--config` here
-    // as `--config` can be used for specifying configuration overrides
-    // as well as configuration files.
-    // Specifying a configuration file conflicts with `--isolated`;
-    // specifying a configuration override does not.
-    // If a user specifies `ruff check --isolated --config=ruff.toml`,
-    // we emit an error later on, after the initial parsing by clap.
-    #[arg(long, help_heading = "Miscellaneous")]
-    pub isolated: bool,
     /// Path to the cache directory.
     #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]
     pub cache_dir: Option<PathBuf>,
@@ -408,20 +409,6 @@ pub struct FormatCommand {
     /// difference between the current file and how the formatted file would look like.
     #[arg(long)]
     pub diff: bool,
-    /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
-    /// or a TOML `<KEY> = <VALUE>` pair
-    /// (such as you might find in a `ruff.toml` configuration file)
-    /// overriding a specific configuration option.
-    /// Overrides of individual settings using this option always take precedence
-    /// over all configuration files, including configuration files that were also
-    /// specified using `--config`.
-    #[arg(
-        long,
-        action = clap::ArgAction::Append,
-        value_name = "CONFIG_OPTION",
-        value_parser = ConfigArgumentParser,
-    )]
-    pub config: Vec<SingleConfigArgument>,
 
     /// Disable cache reads.
     #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
@@ -462,17 +449,6 @@ pub struct FormatCommand {
     /// Set the line-length.
     #[arg(long, help_heading = "Format configuration")]
     pub line_length: Option<LineLength>,
-    /// Ignore all configuration files.
-    //
-    // Note: We can't mark this as conflicting with `--config` here
-    // as `--config` can be used for specifying configuration overrides
-    // as well as configuration files.
-    // Specifying a configuration file conflicts with `--isolated`;
-    // specifying a configuration override does not.
-    // If a user specifies `ruff check --isolated --config=ruff.toml`,
-    // we emit an error later on, after the initial parsing by clap.
-    #[arg(long, help_heading = "Miscellaneous")]
-    pub isolated: bool,
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
@@ -643,7 +619,11 @@ impl ConfigurationTransformer for ConfigArguments {
 impl CheckCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(self) -> anyhow::Result<(CheckArguments, ConfigArguments)> {
+    pub fn partition(
+        self,
+        config_flags: Vec<SingleConfigArgument>,
+        isolated: bool,
+    ) -> anyhow::Result<(CheckArguments, ConfigArguments)> {
         let check_arguments = CheckArguments {
             add_noqa: self.add_noqa,
             diff: self.diff,
@@ -652,7 +632,6 @@ impl CheckCommand {
             exit_zero: self.exit_zero,
             files: self.files,
             ignore_noqa: self.ignore_noqa,
-            isolated: self.isolated,
             no_cache: self.no_cache,
             output_file: self.output_file,
             show_files: self.show_files,
@@ -697,7 +676,8 @@ impl CheckCommand {
         };
 
         let config_args =
-            ConfigArguments::from_cli_arguments(self.config, cli_overrides, self.isolated)?;
+            ConfigArguments::from_cli_arguments(config_flags, cli_overrides, isolated)?;
+
         Ok((check_arguments, config_args))
     }
 }
@@ -705,12 +685,15 @@ impl CheckCommand {
 impl FormatCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(self) -> anyhow::Result<(FormatArguments, ConfigArguments)> {
+    pub fn partition(
+        self,
+        config_flags: Vec<SingleConfigArgument>,
+        isolated: bool,
+    ) -> anyhow::Result<(FormatArguments, ConfigArguments)> {
         let format_arguments = FormatArguments {
             check: self.check,
             diff: self.diff,
             files: self.files,
-            isolated: self.isolated,
             no_cache: self.no_cache,
             stdin_filename: self.stdin_filename,
             range: self.range,
@@ -731,7 +714,8 @@ impl FormatCommand {
         };
 
         let config_args =
-            ConfigArguments::from_cli_arguments(self.config, cli_overrides, self.isolated)?;
+            ConfigArguments::from_cli_arguments(config_flags, cli_overrides, isolated)?;
+
         Ok((format_arguments, config_args))
     }
 }
@@ -957,7 +941,6 @@ pub struct CheckArguments {
     pub exit_zero: bool,
     pub files: Vec<PathBuf>,
     pub ignore_noqa: bool,
-    pub isolated: bool,
     pub no_cache: bool,
     pub output_file: Option<PathBuf>,
     pub show_files: bool,
@@ -975,7 +958,6 @@ pub struct FormatArguments {
     pub no_cache: bool,
     pub diff: bool,
     pub files: Vec<PathBuf>,
-    pub isolated: bool,
     pub stdin_filename: Option<PathBuf>,
     pub range: Option<FormatRange>,
 }

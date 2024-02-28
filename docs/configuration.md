@@ -531,14 +531,26 @@ Commands:
   help     Print this message or the help of the given subcommand(s)
 
 Options:
-  -h, --help     Print help
-  -V, --version  Print version
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
+  -h, --help
+          Print help
+  -V, --version
+          Print version
 
 Log levels:
   -v, --verbose  Enable verbose logging
   -q, --quiet    Print diagnostics, but nothing else
   -s, --silent   Disable all logging (but still exit with status code "1" upon
                  detecting diagnostics)
+
+Miscellaneous:
+      --isolated  Ignore all configuration files
 
 For help with a specific command, see: `ruff help <command>`.
 ```
@@ -580,6 +592,13 @@ Options:
           Apply fixes to resolve lint violations, but don't report on leftover
           violations. Implies `--fix`. Use `--no-fix-only` to disable or
           `--unsafe-fixes` to include unsafe fixes
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
       --ignore-noqa
           Ignore any `# noqa` comments
       --output-format <OUTPUT_FORMAT>
@@ -596,13 +615,6 @@ Options:
       --preview
           Enable preview mode; checks will include unstable rules and fixes.
           Use `--no-preview` to disable
-      --config <CONFIG_OPTION>
-          Either a path to a TOML configuration file (`pyproject.toml` or
-          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
-          find in a `ruff.toml` configuration file) overriding a specific
-          configuration option. Overrides of individual settings using this
-          option always take precedence over all configuration files, including
-          configuration files that were also specified using `--config`
       --extension <EXTENSION>
           List of mappings from file extension to language (one of ["python",
           "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython
@@ -656,10 +668,10 @@ File selection:
           command-line. Use `--no-force-exclude` to disable
 
 Miscellaneous:
-  -n, --no-cache
-          Disable cache reads [env: RUFF_NO_CACHE=]
       --isolated
           Ignore all configuration files
+  -n, --no-cache
+          Disable cache reads [env: RUFF_NO_CACHE=]
       --cache-dir <CACHE_DIR>
           Path to the cache directory [env: RUFF_CACHE_DIR=]
       --stdin-filename <STDIN_FILENAME>
@@ -724,10 +736,10 @@ Miscellaneous:
           Disable cache reads [env: RUFF_NO_CACHE=]
       --cache-dir <CACHE_DIR>
           Path to the cache directory [env: RUFF_CACHE_DIR=]
-      --isolated
-          Ignore all configuration files
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
+      --isolated
+          Ignore all configuration files
 
 File selection:
       --respect-gitignore

@@ -29,7 +29,7 @@ mod panic;
 mod printer;
 pub mod resolve;
 mod stdin;
-mod version;
+pub mod version;
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
@@ -127,6 +127,8 @@ pub fn run(
     Args {
         command,
         log_level_args,
+        config,
+        isolated,
     }: Args,
 ) -> Result<ExitStatus> {
     {
@@ -198,31 +200,38 @@ pub fn run(
             shell.generate(&mut Args::command(), &mut stdout());
             Ok(ExitStatus::Success)
         }
-        Command::Check(args) => check(args, log_level),
-        Command::Format(args) => format(args, log_level),
+        Command::Check(args) => check(args, log_level, config, isolated),
+        Command::Format(args) => format(args, log_level, config, isolated),
     }
 }
 
-fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    let (cli, config_arguments) = args.partition()?;
+fn format(
+    args: FormatCommand,
+    log_level: LogLevel,
+    config_flags: Vec<args::SingleConfigArgument>,
+    isolated: bool,
+) -> Result<ExitStatus> {
+    let (cli, config_arguments) = args.partition(config_flags, isolated)?;
 
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
-        commands::format_stdin::format_stdin(&cli, &config_arguments)
+        commands::format_stdin::format_stdin(&cli, &config_arguments, isolated)
     } else {
-        commands::format::format(cli, &config_arguments, log_level)
+        commands::format::format(cli, &config_arguments, log_level, isolated)
     }
 }
 
-pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    let (cli, config_arguments) = args.partition()?;
+pub fn check(
+    args: CheckCommand,
+    log_level: LogLevel,
+    config_flags: Vec<args::SingleConfigArgument>,
+    isolated: bool,
+) -> Result<ExitStatus> {
+    let (cli, config_arguments) = args.partition(config_flags, isolated)?;
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let pyproject_config = resolve::resolve(
-        cli.isolated,
-        &config_arguments,
-        cli.stdin_filename.as_deref(),
-    )?;
+    let pyproject_config =
+        resolve::resolve(isolated, &config_arguments, cli.stdin_filename.as_deref())?;
 
     let mut writer: Box<dyn Write> = match cli.output_file {
         Some(path) if !cli.watch => {
@@ -383,7 +392,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
 
                     if matches!(change_kind, ChangeKind::Configuration) {
                         pyproject_config = resolve::resolve(
-                            cli.isolated,
+                            isolated,
                             &config_arguments,
                             cli.stdin_filename.as_deref(),
                         )?;

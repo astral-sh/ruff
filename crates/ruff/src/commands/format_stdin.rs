@@ -22,12 +22,9 @@ use crate::ExitStatus;
 pub(crate) fn format_stdin(
     cli: &FormatArguments,
     config_arguments: &ConfigArguments,
+    isolated: bool,
 ) -> Result<ExitStatus> {
-    let pyproject_config = resolve(
-        cli.isolated,
-        config_arguments,
-        cli.stdin_filename.as_deref(),
-    )?;
+    let pyproject_config = resolve(isolated, config_arguments, cli.stdin_filename.as_deref())?;
 
     let mut resolver = Resolver::new(&pyproject_config);
     warn_incompatible_formatter_settings(&resolver);
