@@ -44,7 +44,6 @@ file_resolver.exclude = [
 	"__pypackages__",
 	"_build",
 	"buck-out",
-	"build",
 	"dist",
 	"node_modules",
 	"site-packages",
@@ -366,4 +365,3 @@ formatter.docstring_code_format = disabled
 formatter.docstring_code_line_width = dynamic
 
 ----- stderr -----
-
