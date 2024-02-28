@@ -54,6 +54,7 @@ pub struct Args {
         value_name = "CONFIG_OPTION",
         value_parser = ConfigArgumentParser,
         global = true,
+        help_heading = "Global configuration options",
     )]
     pub config: Vec<SingleConfigArgument>,
     /// Ignore all configuration files.
@@ -65,7 +66,7 @@ pub struct Args {
     // specifying a configuration override does not.
     // If a user specifies `ruff check --isolated --config=ruff.toml`,
     // we emit an error later on, after the initial parsing by clap.
-    #[arg(long, help_heading = "Miscellaneous", global = true)]
+    #[arg(long, help_heading = "Global configuration options", global = true)]
     pub isolated: bool,
 }
 

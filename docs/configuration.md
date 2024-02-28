@@ -531,17 +531,8 @@ Commands:
   help     Print this message or the help of the given subcommand(s)
 
 Options:
-      --config <CONFIG_OPTION>
-          Either a path to a TOML configuration file (`pyproject.toml` or
-          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
-          find in a `ruff.toml` configuration file) overriding a specific
-          configuration option. Overrides of individual settings using this
-          option always take precedence over all configuration files, including
-          configuration files that were also specified using `--config`
-  -h, --help
-          Print help
-  -V, --version
-          Print version
+  -h, --help     Print help
+  -V, --version  Print version
 
 Log levels:
   -v, --verbose  Enable verbose logging
@@ -550,7 +541,15 @@ Log levels:
                  detecting diagnostics)
 
 Miscellaneous:
-      --isolated  Ignore all configuration files
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
+      --isolated
+          Ignore all configuration files
 
 For help with a specific command, see: `ruff help <command>`.
 ```
@@ -592,13 +591,6 @@ Options:
           Apply fixes to resolve lint violations, but don't report on leftover
           violations. Implies `--fix`. Use `--no-fix-only` to disable or
           `--unsafe-fixes` to include unsafe fixes
-      --config <CONFIG_OPTION>
-          Either a path to a TOML configuration file (`pyproject.toml` or
-          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
-          find in a `ruff.toml` configuration file) overriding a specific
-          configuration option. Overrides of individual settings using this
-          option always take precedence over all configuration files, including
-          configuration files that were also specified using `--config`
       --ignore-noqa
           Ignore any `# noqa` comments
       --output-format <OUTPUT_FORMAT>
@@ -668,6 +660,13 @@ File selection:
           command-line. Use `--no-force-exclude` to disable
 
 Miscellaneous:
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
       --isolated
           Ignore all configuration files
   -n, --no-cache
@@ -711,13 +710,6 @@ Options:
           Avoid writing any formatted files back; instead, exit with a non-zero
           status code and the difference between the current file and how the
           formatted file would look like
-      --config <CONFIG_OPTION>
-          Either a path to a TOML configuration file (`pyproject.toml` or
-          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
-          find in a `ruff.toml` configuration file) overriding a specific
-          configuration option. Overrides of individual settings using this
-          option always take precedence over all configuration files, including
-          configuration files that were also specified using `--config`
       --extension <EXTENSION>
           List of mappings from file extension to language (one of ["python",
           "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython
@@ -738,6 +730,13 @@ Miscellaneous:
           Path to the cache directory [env: RUFF_CACHE_DIR=]
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
       --isolated
           Ignore all configuration files
 
