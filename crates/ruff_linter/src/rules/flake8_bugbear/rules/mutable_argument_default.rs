@@ -153,9 +153,8 @@ fn move_initialization(
     let default_edit = Edit::range_replacement("None".to_string(), default.range());
 
     // If the function is a stub, this is the only necessary edit
-    println!("{:?}", function_def.body);
     if is_stub(&function_def.body) {
-        return Some(Fix::unsafe_edits(default_edit, []));
+        return Some(Fix::unsafe_edit(default_edit));
     }
     // Add an `if`, to set the argument to its original value if still `None`.
     let mut content = String::new();
