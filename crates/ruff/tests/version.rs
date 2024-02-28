@@ -8,7 +8,7 @@ use tempfile::TempDir;
 
 const BIN_NAME: &str = "ruff";
 const VERSION_FILTER: [(&str, &str); 1] = [(
-    r"\d+\.\d+\.\d+(\+\d+ \(\w{9} \d\d\d\d-\d\d-\d\d\))?",
+    r"\d+\.\d+\.\d+(\+\d+)?( \(\w{9} \d\d\d\d-\d\d-\d\d\))?",
     "[VERSION]",
 )];
 
