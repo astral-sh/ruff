@@ -68,11 +68,6 @@ pub(crate) fn version() -> VersionInfo {
     }
 }
 
-/// Used for testing the --version command
-pub fn version_string() -> String {
-    format!("{}", version())
-}
-
 #[cfg(test)]
 mod tests {
     use insta::{assert_display_snapshot, assert_json_snapshot};

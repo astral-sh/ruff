@@ -4,16 +4,17 @@ use std::process::Command;
 
 use anyhow::Result;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
-use regex::escape;
 use tempfile::TempDir;
 
-use ruff::version::version_string;
-
 const BIN_NAME: &str = "ruff";
+const VERSION_FILTER: [(&str, &str); 1] = [(
+    r"\d+\.\d+\.\d+(\+\d+ \(\w{9} \d\d\d\d-\d\d-\d\d\))?",
+    "[VERSION]",
+)];
 
 #[test]
 fn version_basics() {
-    insta::with_settings!({filters => vec![(escape(&version_string()).as_str(), "[VERSION]")]}, {
+    insta::with_settings!({filters => VERSION_FILTER.to_vec()}, {
         assert_cmd_snapshot!(
             Command::new(get_cargo_bin(BIN_NAME)).arg("version"), @r###"
         success: true
@@ -35,7 +36,7 @@ fn config_option_allowed_but_ignored() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_dot_toml = tempdir.path().join("ruff.toml");
     fs::File::create(&ruff_dot_toml)?;
-    insta::with_settings!({filters => vec![(escape(&version_string()).as_str(), "[VERSION]")]}, {
+    insta::with_settings!({filters => VERSION_FILTER.to_vec()}, {
         assert_cmd_snapshot!(
             Command::new(get_cargo_bin(BIN_NAME))
                 .arg("version")
@@ -55,7 +56,7 @@ fn config_option_allowed_but_ignored() -> Result<()> {
 }
 #[test]
 fn config_option_ignored_but_validated() {
-    insta::with_settings!({filters => vec![(escape(&version_string()).as_str(), "[VERSION]")]}, {
+    insta::with_settings!({filters => VERSION_FILTER.to_vec()}, {
         assert_cmd_snapshot!(
             Command::new(get_cargo_bin(BIN_NAME))
                 .arg("version")
@@ -89,7 +90,7 @@ fn config_option_ignored_but_validated() {
 /// `--isolated` is also a global option,
 #[test]
 fn isolated_option_allowed() {
-    insta::with_settings!({filters => vec![(escape(&version_string()).as_str(), "[VERSION]")]}, {
+    insta::with_settings!({filters => VERSION_FILTER.to_vec()}, {
         assert_cmd_snapshot!(
             Command::new(get_cargo_bin(BIN_NAME)).arg("version").arg("--isolated"), @r###"
         success: true

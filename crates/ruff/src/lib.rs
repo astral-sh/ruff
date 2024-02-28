@@ -29,7 +29,7 @@ mod panic;
 mod printer;
 pub mod resolve;
 mod stdin;
-pub mod version;
+mod version;
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
