@@ -40,7 +40,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as migrating from e.g. `list(...)[0]`
+/// This rule's fix is marked as unsafe, as migrating from (e.g.) `list(...)[0]`
 /// to `next(iter(...))` can change the behavior of your program in two ways:
 ///
 /// 1. First, all above mentioned constructs will eagerly evaluate the entire
@@ -76,39 +76,36 @@ impl AlwaysFixableViolation for UnnecessaryIterableAllocationForFirstElement {
 /// RUF015
 pub(crate) fn unnecessary_iterable_allocation_for_first_element(
     checker: &mut Checker,
-    expr: &ast::Expr,
+    expr: &Expr,
 ) {
-    let (value, range) = match expr {
-        ast::Expr::Subscript(ast::ExprSubscript {
-            value,
-            slice,
-            range,
-            ..
-        }) => {
-            if !is_head_slice(slice) {
+    let value = match expr {
+        // Ex) `list(x)[0]`
+        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            if !is_zero(slice) {
                 return;
             }
-            (value, range)
+            value
         }
-        ast::Expr::Call(ast::ExprCall {
+        // Ex) `list(x).pop(0)`
+        Expr::Call(ast::ExprCall {
             func, arguments, ..
         }) => {
-            let Some(arg) = arguments.args.first() else {
-                return;
-            };
-            if !is_head_slice(arg) {
+            if !arguments.keywords.is_empty() {
                 return;
             }
-            let ast::Expr::Attribute(ast::ExprAttribute {
-                range, value, attr, ..
-            }) = func.as_ref()
-            else {
+            let [arg] = arguments.args.as_ref() else {
+                return;
+            };
+            if !is_zero(arg) {
+                return;
+            }
+            let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
                 return;
             };
             if !matches!(attr.as_str(), "pop") {
                 return;
             }
-            (value, range)
+            value
         }
         _ => return,
     };
@@ -127,19 +124,19 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
         UnnecessaryIterableAllocationForFirstElement {
             iterable: SourceCodeSnippet::new(iterable.to_string()),
         },
-        *range,
+        expr.range(),
     );
 
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         format!("next({iterable})"),
-        *range,
+        expr.range(),
     )));
 
     checker.diagnostics.push(diagnostic);
 }
 
 /// Check that the slice [`Expr`] is a slice of the first element (e.g., `x[0]`).
-fn is_head_slice(expr: &Expr) -> bool {
+fn is_zero(expr: &Expr) -> bool {
     matches!(
         expr,
         Expr::NumberLiteral(ast::ExprNumberLiteral {

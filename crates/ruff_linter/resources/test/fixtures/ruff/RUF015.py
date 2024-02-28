@@ -59,6 +59,8 @@ list(zip(x, y))[0]
 
 # RUF015 (pop)
 list(x).pop(0)
+[i for i in x].pop(0)
+list(i for i in x).pop(0)
 
 # OK
 list(x).pop(1)
