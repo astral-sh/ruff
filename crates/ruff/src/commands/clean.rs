@@ -6,12 +6,13 @@ use colored::Colorize;
 use path_absolutize::path_dedot;
 use walkdir::WalkDir;
 
+use crate::args::GlobalConfigArgs;
 use ruff_cache::CACHE_DIR_NAME;
 use ruff_linter::fs;
 use ruff_linter::logging::LogLevel;
 
 /// Clear any caches in the current directory or any subdirectories.
-pub(crate) fn clean(level: LogLevel) -> Result<()> {
+pub(crate) fn clean(config: &GlobalConfigArgs) -> Result<()> {
     let mut stderr = BufWriter::new(io::stderr().lock());
     for entry in WalkDir::new(&*path_dedot::CWD)
         .into_iter()
@@ -20,7 +21,7 @@ pub(crate) fn clean(level: LogLevel) -> Result<()> {
     {
         let cache = entry.path().join(CACHE_DIR_NAME);
         if cache.is_dir() {
-            if level >= LogLevel::Default {
+            if config.log_level >= LogLevel::Default {
                 writeln!(
                     stderr,
                     "Removing cache at: {}",

@@ -7,6 +7,7 @@ use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
 use anyhow::Result;
+use args::GlobalConfigArgs;
 use clap::CommandFactory;
 use colored::Colorize;
 use log::warn;
@@ -123,14 +124,7 @@ fn resolve_help_output_format(output_format: HelpFormat, format: Option<HelpForm
     format.unwrap_or(output_format)
 }
 
-pub fn run(
-    Args {
-        command,
-        log_level_args,
-        config,
-        isolated,
-    }: Args,
-) -> Result<ExitStatus> {
+pub fn run(args: Args) -> Result<ExitStatus> {
     {
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
@@ -153,12 +147,13 @@ pub fn run(
         }));
     }
 
+    let (command, global_config_args) = args.partition();
+
     // Enabled ANSI colors on Windows 10.
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
-    let log_level = LogLevel::from(&log_level_args);
-    set_up_logging(&log_level)?;
+    set_up_logging(&global_config_args.log_level)?;
 
     match command {
         Command::Version { output_format } => {
@@ -193,25 +188,20 @@ pub fn run(
             Ok(ExitStatus::Success)
         }
         Command::Clean => {
-            commands::clean::clean(log_level)?;
+            commands::clean::clean(&global_config_args)?;
             Ok(ExitStatus::Success)
         }
         Command::GenerateShellCompletion { shell } => {
             shell.generate(&mut Args::command(), &mut stdout());
             Ok(ExitStatus::Success)
         }
-        Command::Check(args) => check(args, log_level, config, isolated),
-        Command::Format(args) => format(args, log_level, config, isolated),
+        Command::Check(args) => check(args, global_config_args),
+        Command::Format(args) => format(args, global_config_args),
     }
 }
 
-fn format(
-    args: FormatCommand,
-    log_level: LogLevel,
-    config_flags: Vec<args::SingleConfigArgument>,
-    isolated: bool,
-) -> Result<ExitStatus> {
-    let (cli, config_arguments) = args.partition(config_flags, isolated)?;
+fn format(args: FormatCommand, global_config_flags: GlobalConfigArgs) -> Result<ExitStatus> {
+    let (cli, config_arguments, isolated, log_level) = args.partition(global_config_flags)?;
 
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
         commands::format_stdin::format_stdin(&cli, &config_arguments, isolated)
@@ -220,13 +210,8 @@ fn format(
     }
 }
 
-pub fn check(
-    args: CheckCommand,
-    log_level: LogLevel,
-    config_flags: Vec<args::SingleConfigArgument>,
-    isolated: bool,
-) -> Result<ExitStatus> {
-    let (cli, config_arguments) = args.partition(config_flags, isolated)?;
+pub fn check(args: CheckCommand, global_config_flags: GlobalConfigArgs) -> Result<ExitStatus> {
+    let (cli, config_arguments, isolated, log_level) = args.partition(global_config_flags)?;
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.

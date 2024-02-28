@@ -28,6 +28,13 @@ use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
 use ruff_workspace::resolver::ConfigurationTransformer;
 
+#[derive(Debug, Default, Clone)]
+pub struct GlobalConfigArgs {
+    pub log_level: LogLevel,
+    pub config_flags: Vec<SingleConfigArgument>,
+    pub isolated: bool,
+}
+
 #[derive(Debug, Parser)]
 #[command(
     author,
@@ -38,9 +45,9 @@ use ruff_workspace::resolver::ConfigurationTransformer;
 #[command(version)]
 pub struct Args {
     #[command(subcommand)]
-    pub command: Command,
+    command: Command,
     #[clap(flatten)]
-    pub log_level_args: LogLevelArgs,
+    log_level_args: LogLevelArgs,
     /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
     /// or a TOML `<KEY> = <VALUE>` pair
     /// (such as you might find in a `ruff.toml` configuration file)
@@ -56,7 +63,7 @@ pub struct Args {
         global = true,
         help_heading = "Global configuration options",
     )]
-    pub config: Vec<SingleConfigArgument>,
+    config: Vec<SingleConfigArgument>,
     /// Ignore all configuration files.
     //
     // Note: We can't mark this as conflicting with `--config` here
@@ -67,7 +74,25 @@ pub struct Args {
     // If a user specifies `ruff check --isolated --config=ruff.toml`,
     // we emit an error later on, after the initial parsing by clap.
     #[arg(long, help_heading = "Global configuration options", global = true)]
-    pub isolated: bool,
+    isolated: bool,
+}
+
+impl Args {
+    #[must_use]
+    pub fn partition(self) -> (Command, GlobalConfigArgs) {
+        let Args {
+            command,
+            log_level_args,
+            config,
+            isolated,
+        } = self;
+        let global_config_args = GlobalConfigArgs {
+            log_level: LogLevel::from(&log_level_args),
+            config_flags: config,
+            isolated,
+        };
+        (command, global_config_args)
+    }
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -558,16 +583,15 @@ impl ConfigArguments {
     }
 
     fn from_cli_arguments(
-        config_options: Vec<SingleConfigArgument>,
+        global_config_flags: GlobalConfigArgs,
         per_flag_overrides: ExplicitConfigOverrides,
-        isolated: bool,
     ) -> anyhow::Result<Self> {
         let mut new = Self {
             per_flag_overrides,
             ..Self::default()
         };
 
-        for option in config_options {
+        for option in global_config_flags.config_flags {
             match option {
                 SingleConfigArgument::SettingsOverride(overridden_option) => {
                     let overridden_option = Arc::try_unwrap(overridden_option)
@@ -579,7 +603,7 @@ impl ConfigArguments {
                     )?);
                 }
                 SingleConfigArgument::FilePath(path) => {
-                    if isolated {
+                    if global_config_flags.isolated {
                         bail!(
                             "\
 The argument `--config={}` cannot be used with `--isolated`
@@ -622,9 +646,8 @@ impl CheckCommand {
     /// overrides.
     pub fn partition(
         self,
-        config_flags: Vec<SingleConfigArgument>,
-        isolated: bool,
-    ) -> anyhow::Result<(CheckArguments, ConfigArguments)> {
+        global_config_flags: GlobalConfigArgs,
+    ) -> anyhow::Result<(CheckArguments, ConfigArguments, bool, LogLevel)> {
         let check_arguments = CheckArguments {
             add_noqa: self.add_noqa,
             diff: self.diff,
@@ -676,10 +699,11 @@ impl CheckCommand {
             extension: self.extension,
         };
 
-        let config_args =
-            ConfigArguments::from_cli_arguments(config_flags, cli_overrides, isolated)?;
+        let isolated = global_config_flags.isolated;
+        let log_level = global_config_flags.log_level;
+        let config_args = ConfigArguments::from_cli_arguments(global_config_flags, cli_overrides)?;
 
-        Ok((check_arguments, config_args))
+        Ok((check_arguments, config_args, isolated, log_level))
     }
 }
 
@@ -688,9 +712,8 @@ impl FormatCommand {
     /// overrides.
     pub fn partition(
         self,
-        config_flags: Vec<SingleConfigArgument>,
-        isolated: bool,
-    ) -> anyhow::Result<(FormatArguments, ConfigArguments)> {
+        global_config_flags: GlobalConfigArgs,
+    ) -> anyhow::Result<(FormatArguments, ConfigArguments, bool, LogLevel)> {
         let format_arguments = FormatArguments {
             check: self.check,
             diff: self.diff,
@@ -714,10 +737,11 @@ impl FormatCommand {
             ..ExplicitConfigOverrides::default()
         };
 
-        let config_args =
-            ConfigArguments::from_cli_arguments(config_flags, cli_overrides, isolated)?;
+        let isolated = global_config_flags.isolated;
+        let log_level = global_config_flags.log_level;
+        let config_args = ConfigArguments::from_cli_arguments(global_config_flags, cli_overrides)?;
 
-        Ok((format_arguments, config_args))
+        Ok((format_arguments, config_args, isolated, log_level))
     }
 }
 

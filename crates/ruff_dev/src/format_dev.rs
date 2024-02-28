@@ -27,7 +27,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
-use ruff::args::{ConfigArguments, FormatArguments, FormatCommand, LogLevelArgs};
+use ruff::args::{ConfigArguments, FormatArguments, FormatCommand, GlobalConfigArgs, LogLevelArgs};
 use ruff::resolve::resolve;
 use ruff_formatter::{FormatError, LineWidth, PrintError};
 use ruff_linter::logging::LogLevel;
@@ -43,7 +43,7 @@ fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, ConfigArgumen
         .no_binary_name(true)
         .get_matches_from(dirs);
     let arguments: FormatCommand = FormatCommand::from_arg_matches(&args_matches)?;
-    let (cli, config_arguments) = arguments.partition(vec![], false)?;
+    let (cli, config_arguments, _, _) = arguments.partition(GlobalConfigArgs::default())?;
     Ok((cli, config_arguments))
 }
 

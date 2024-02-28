@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use ruff::check;
+use ruff::{args::GlobalConfigArgs, check};
 use ruff_linter::logging::{set_up_logging, LogLevel};
 use std::process::ExitCode;
 
@@ -34,10 +34,28 @@ struct Args {
         value_name = "CONFIG_OPTION",
         value_parser = ruff::args::ConfigArgumentParser,
         global = true,
+        help_heading = "Global configuration options"
     )]
     config: Vec<ruff::args::SingleConfigArgument>,
-    #[arg(long, help_heading = "Miscellaneous", global = true)]
+    #[arg(long, help_heading = "Global configuration options", global = true)]
     isolated: bool,
+}
+
+impl Args {
+    #[must_use]
+    fn partition(self) -> (Command, GlobalConfigArgs) {
+        let Args {
+            command,
+            config,
+            isolated,
+        } = self;
+        let global_config_args = GlobalConfigArgs {
+            log_level: LogLevel::default(),
+            config_flags: config,
+            isolated,
+        };
+        (command, global_config_args)
+    }
 }
 
 #[derive(Subcommand)]
@@ -67,8 +85,6 @@ enum Command {
     Repeat {
         #[clap(flatten)]
         args: ruff::args::CheckCommand,
-        #[clap(flatten)]
-        log_level_args: ruff::args::LogLevelArgs,
         /// Run this many times
         #[clap(long)]
         repeat: usize,
@@ -86,8 +102,9 @@ enum Command {
 
 fn main() -> Result<ExitCode> {
     let args = Args::parse();
+    let (command, global_config_args) = args.partition();
     #[allow(clippy::print_stdout)]
-    match args.command {
+    match command {
         Command::GenerateAll(args) => generate_all::main(&args)?,
         Command::GenerateJSONSchema(args) => generate_json_schema::main(&args)?,
         Command::GenerateRulesTable => println!("{}", generate_rules_table::generate()),
@@ -101,17 +118,10 @@ fn main() -> Result<ExitCode> {
         Command::Repeat {
             args: subcommand_args,
             repeat,
-            log_level_args,
         } => {
-            let log_level = LogLevel::from(&log_level_args);
-            set_up_logging(&log_level)?;
+            set_up_logging(&global_config_args.log_level)?;
             for _ in 0..repeat {
-                check(
-                    subcommand_args.clone(),
-                    log_level,
-                    args.config.clone(),
-                    args.isolated,
-                )?;
+                check(subcommand_args.clone(), global_config_args.clone())?;
             }
         }
         Command::FormatDev(args) => {
