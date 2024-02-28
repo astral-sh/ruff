@@ -3,8 +3,7 @@
 The Ruff formatter is an extremely fast Python code formatter designed as a drop-in replacement for
 [Black](https://pypi.org/project/black/), available as part of the `ruff` CLI via `ruff format`.
 
-The Ruff formatter is available as a [production-ready Beta](https://astral.sh/blog/the-ruff-formatter)
-as of Ruff v0.1.2.
+The Ruff formatter is available as of Ruff [v0.1.2](https://astral.sh/blog/the-ruff-formatter).
 
 ## `ruff format`
 
