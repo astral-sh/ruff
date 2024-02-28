@@ -45,6 +45,7 @@ The following preview styles are promoted to stable.
 - Parenthesize long type hints in assignments ([#9210](https://github.com/astral-sh/ruff/pull/9210))
 - Preserve indent for single mulitline-string call-expressions ([#9673](https://github.com/astral-sh/ruff/pull/9637))
 - Normalize hex escape and unicode escape sequences ([#9280](https://github.com/astral-sh/ruff/pull/9280))
+- Format module docstrings ([#9725](https://github.com/astral-sh/ruff/pull/9725))
 
 ### CLI
 

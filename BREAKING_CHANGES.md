@@ -3,7 +3,8 @@
 ## 0.3.0
 
 ### Ruff 2024.2 style
-The `format` command now uses the improved Ruff 2024.2 style. Expect changes in formatting when upgrading.
+The `format` command now formats your code according to the Ruff 2024.2 style guide.
+Read the [Changelog](./CHANGELOG.md#030) for an in detail list of changes.
 
 ### `isort`: Use one blank line after imports in typing stub files
 
