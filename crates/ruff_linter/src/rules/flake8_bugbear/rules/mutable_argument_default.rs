@@ -2,7 +2,7 @@ use ast::call_path::{from_qualified_name, CallPath};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
-use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault};
+use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Stmt};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
@@ -152,6 +152,11 @@ fn move_initialization(
     // Set the default argument value to `None`.
     let default_edit = Edit::range_replacement("None".to_string(), default.range());
 
+    // If the function is a stub, this is the only necessary edit
+    println!("{:?}", function_def.body);
+    if is_stub(&function_def.body) {
+        return Some(Fix::unsafe_edits(default_edit, []));
+    }
     // Add an `if`, to set the argument to its original value if still `None`.
     let mut content = String::new();
     content.push_str(&format!("if {} is None:", parameter.name.as_str()));
@@ -203,4 +208,22 @@ fn move_initialization(
 
     let initialization_edit = Edit::insertion(content, pos);
     Some(Fix::unsafe_edits(default_edit, [initialization_edit]))
+}
+
+// A function that only contains the pass keyword, the ... literal and/or a docstring is assumed to
+// be a stub for typing purposes and should not be modified.
+fn is_stub(body: &[Stmt]) -> bool {
+    for stmt in body {
+        match stmt {
+            Stmt::Pass(_) => continue,
+            Stmt::Expr(inner) => {
+                if inner.value.is_ellipsis_literal_expr() || inner.value.is_string_literal_expr() {
+                    continue;
+                }
+                return false;
+            }
+            _ => return false,
+        };
+    }
+    true
 }
