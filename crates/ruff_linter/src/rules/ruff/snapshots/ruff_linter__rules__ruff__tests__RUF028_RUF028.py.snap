@@ -164,7 +164,7 @@ RUF028.py:54:9: RUF028 [*] This suppression comment is invalid because it cannot
 54 |         # fmt: off
    |         ^^^^^^^^^^ RUF028
 55 |         cls,
-56 |     ) -> None:
+56 |     ) -> None: # noqa: test # fmt: skip
    |
    = help: Remove this comment
 
@@ -174,60 +174,41 @@ RUF028.py:54:9: RUF028 [*] This suppression comment is invalid because it cannot
 53 53 |     def cls_method_a(
 54    |-        # fmt: off
 55 54 |         cls,
-56 55 |     ) -> None:
-57 56 |         # noqa: test # fmt: skip
+56 55 |     ) -> None: # noqa: test # fmt: skip
+57 56 |         pass
 
-RUF028.py:57:9: RUF028 [*] This suppression comment is invalid because it cannot be on its own line
+RUF028.py:62:13: RUF028 [*] This suppression comment is invalid because it cannot be at the end of a line
    |
-55 |         cls,
-56 |     ) -> None:
-57 |         # noqa: test # fmt: skip
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^ RUF028
-58 |         pass
-   |
-   = help: Remove this comment
-
-ℹ Unsafe fix
-54 54 |         # fmt: off
-55 55 |         cls,
-56 56 |     ) -> None:
-57    |-        # noqa: test # fmt: skip
-58 57 |         pass
-59 58 | 
-60 59 | 
-
-RUF028.py:63:13: RUF028 [*] This suppression comment is invalid because it cannot be at the end of a line
-   |
-61 | def fmt_on_trailing():
-62 |     # fmt: off
-63 |     val = 5 # fmt: on
+60 | def fmt_on_trailing():
+61 |     # fmt: off
+62 |     val = 5 # fmt: on
    |             ^^^^^^^^^ RUF028
-64 |     pass # fmt: on
+63 |     pass # fmt: on
    |
    = help: Remove this comment
 
 ℹ Unsafe fix
-60 60 | 
-61 61 | def fmt_on_trailing():
-62 62 |     # fmt: off
-63    |-    val = 5 # fmt: on
-   63 |+    val = 5
-64 64 |     pass # fmt: on
+59 59 | 
+60 60 | def fmt_on_trailing():
+61 61 |     # fmt: off
+62    |-    val = 5 # fmt: on
+   62 |+    val = 5
+63 63 |     pass # fmt: on
 
-RUF028.py:64:10: RUF028 [*] This suppression comment is invalid because it cannot be at the end of a line
+RUF028.py:63:10: RUF028 [*] This suppression comment is invalid because it cannot be at the end of a line
    |
-62 |     # fmt: off
-63 |     val = 5 # fmt: on
-64 |     pass # fmt: on
+61 |     # fmt: off
+62 |     val = 5 # fmt: on
+63 |     pass # fmt: on
    |          ^^^^^^^^^ RUF028
    |
    = help: Remove this comment
 
 ℹ Unsafe fix
-61 61 | def fmt_on_trailing():
-62 62 |     # fmt: off
-63 63 |     val = 5 # fmt: on
-64    |-    pass # fmt: on
-   64 |+    pass
+60 60 | def fmt_on_trailing():
+61 61 |     # fmt: off
+62 62 |     val = 5 # fmt: on
+63    |-    pass # fmt: on
+   63 |+    pass
 
 

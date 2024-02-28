@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 
+use ast::helpers::comment_indentation_after;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, AnyNodeRef, Comprehension, Expr, ModModule, Parameters};
 use ruff_python_trivia::{
@@ -536,8 +537,7 @@ fn handle_own_line_comment_between_branches<'a>(
 
     // It depends on the indentation level of the comment if it is a leading comment for the
     // following branch or if it a trailing comment of the previous body's last statement.
-    let comment_indentation =
-        AnyNodeRef::comment_indentation_after(preceding, comment.range(), locator);
+    let comment_indentation = comment_indentation_after(preceding, comment.range(), locator);
 
     let preceding_indentation = indentation(locator, &preceding)
         .unwrap_or_default()
@@ -621,8 +621,7 @@ fn handle_own_line_comment_after_branch<'a>(
 
     // We only care about the length because indentations with mixed spaces and tabs are only valid if
     // the indent-level doesn't depend on the tab width (the indent level must be the same if the tab width is 1 or 8).
-    let comment_indentation =
-        AnyNodeRef::comment_indentation_after(preceding, comment.range(), locator);
+    let comment_indentation = comment_indentation_after(preceding, comment.range(), locator);
 
     // Keep the comment on the entire statement in case it's a trailing comment
     // ```python

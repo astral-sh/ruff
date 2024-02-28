@@ -3,7 +3,7 @@ use std::fmt::Display;
 use ast::{StmtClassDef, StmtFunctionDef};
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::{self as ast, helpers::comment_indentation_after, AnyNodeRef};
 use ruff_python_trivia::{indentation_at_offset, SuppressionKind};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange};
@@ -168,11 +168,8 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
             {
                 if following.is_first_statement_in_alternate_body(enclosing) {
                     // check indentation
-                    let comment_indentation = AnyNodeRef::comment_indentation_after(
-                        preceding,
-                        comment.range,
-                        self.locator,
-                    );
+                    let comment_indentation =
+                        comment_indentation_after(preceding, comment.range, self.locator);
 
                     let preceding_indentation =
                         indentation_at_offset(preceding.start(), self.locator)

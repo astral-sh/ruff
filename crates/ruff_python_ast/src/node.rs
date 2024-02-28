@@ -5,9 +5,7 @@ use crate::{
     PatternArguments, PatternKeyword, Stmt, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
     TypeParamTypeVarTuple, TypeParams, WithItem,
 };
-use ruff_python_trivia::{indentation_at_offset, SimpleTokenKind, SimpleTokenizer};
-use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 use std::ptr::NonNull;
 
 pub trait AstNode: Ranged {
@@ -6303,80 +6301,6 @@ impl<'a> AnyNodeRef<'a> {
             }) => are_same_optional(*self, elif_else_clauses.first()),
             _ => false,
         }
-    }
-
-    /// Determine the indentation level of an own-line comment, defined as the minimum indentation of
-    /// all comments between the preceding node and the comment, including the comment itself. In
-    /// other words, we don't allow successive comments to ident _further_ than any preceding comments.
-    ///
-    /// For example, given:
-    /// ```python
-    /// if True:
-    ///     pass
-    ///     # comment
-    /// ```
-    ///
-    /// The indentation would be 4, as the comment is indented by 4 spaces.
-    ///
-    /// Given:
-    /// ```python
-    /// if True:
-    ///     pass
-    /// # comment
-    /// else:
-    ///     pass
-    /// ```
-    ///
-    /// The indentation would be 0, as the comment is not indented at all.
-    ///
-    /// Given:
-    /// ```python
-    /// if True:
-    ///     pass
-    ///     # comment
-    ///         # comment
-    /// ```
-    ///
-    /// Both comments would be marked as indented at 4 spaces, as the indentation of the first comment
-    /// is used for the second comment.
-    ///
-    /// This logic avoids pathological cases like:
-    /// ```python
-    /// try:
-    ///     if True:
-    ///         if True:
-    ///             pass
-    ///
-    ///         # a
-    ///             # b
-    ///         # c
-    /// except Exception:
-    ///     pass
-    /// ```
-    ///
-    /// If we don't use the minimum indentation of any preceding comments, we would mark `# b` as
-    /// indented to the same depth as `pass`, which could in turn lead to us treating it as a trailing
-    /// comment of `pass`, despite there being a comment between them that "resets" the indentation.
-    pub fn comment_indentation_after(
-        preceding: Self,
-        comment_range: TextRange,
-        locator: &Locator,
-    ) -> TextSize {
-        let tokenizer = SimpleTokenizer::new(
-            locator.contents(),
-            TextRange::new(locator.full_line_end(preceding.end()), comment_range.end()),
-        );
-
-        tokenizer
-            .filter_map(|token| {
-                if token.kind() == SimpleTokenKind::Comment {
-                    indentation_at_offset(token.start(), locator).map(TextLen::text_len)
-                } else {
-                    None
-                }
-            })
-            .min()
-            .unwrap_or_default()
     }
 }
 

@@ -1,6 +1,7 @@
 use std::iter::Peekable;
 
 use ruff_python_ast::{
+    helpers::comment_indentation_after,
     visitor::preorder::{self, PreorderVisitor, TraversalSignal},
     AnyNodeRef, Suite,
 };
@@ -114,30 +115,42 @@ where
         while let Some(SuppressionComment { range, kind }) = self.comments.peek().copied() {
             let line_position = CommentLinePosition::for_range(range, self.locator.contents());
             if range.start() >= node_end {
+                let between = TextRange::new(node_end, range.start());
+                // Check if a non-trivial token exists between the end of this node and the start of the comment.
+                // If it doesn't, that means this comment could possibly be a trailing comment that comes after the
+                // end of this node.
+                // For example:
+                // ```
+                // def func(x):
+                //     pass # fmt: skip
+                // ```
+                // We want to make sure that `# fmt: skip` is associated with the `pass` statement,
+                // even though it comes after the end of that node.
+                if SimpleTokenizer::new(self.locator.contents(), between)
+                    .skip_trivia()
+                    .next()
+                    .is_some()
+                {
+                    break;
+                }
+                // If the comment is on its own line, it could still be a trailing comment if it has a greater
+                // level of indentation compared to this node. For example:
+                // ```
+                // def func(x):
+                //     # fmt: off
+                //     pass
+                //     # fmt: on
+                // def func2(y):
+                //     pass
+                // ```
+                // We want `# fmt: on` to be considered a trailing comment of `func(x)` instead of a leading comment
+                // on `func2(y)`.
                 if line_position.is_own_line() {
-                    if let Some(token) =
-                        SimpleTokenizer::starts_at(node_end, self.locator.contents())
-                            .skip_trivia()
-                            .next()
-                    {
-                        if token.end() <= range.end() {
-                            break;
-                        }
-                    }
-                    let comment_indent =
-                        AnyNodeRef::comment_indentation_after(node, range, self.locator);
+                    let comment_indent = comment_indentation_after(node, range, self.locator);
                     let node_indent = TextSize::of(
                         indentation_at_offset(node.start(), self.locator).unwrap_or_default(),
                     );
                     if node_indent >= comment_indent {
-                        break;
-                    }
-                } else {
-                    // If the end-of-line comment is not on the same line, we can assume that there's a node in between
-                    // the end of this node and this comment.
-                    if self.locator.line_start(range.start())
-                        != self.locator.line_start(node.start())
-                    {
                         break;
                     }
                 }

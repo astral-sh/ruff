@@ -53,8 +53,7 @@ class Test:
     def cls_method_a(
         # fmt: off
         cls,
-    ) -> None:
-        # noqa: test # fmt: skip
+    ) -> None: # noqa: test # fmt: skip
         pass
 
 
