@@ -7,13 +7,11 @@ use ruff_python_ast::{
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::comments::{
-    leading_alternate_branch_comments, trailing_comments, SourceComment, SuppressionKind,
-};
-use crate::prelude::*;
+use crate::comments::{leading_alternate_branch_comments, trailing_comments, SourceComment};
 use crate::preview::is_dummy_implementations_enabled;
 use crate::statement::suite::{contains_only_an_ellipsis, SuiteKind};
 use crate::verbatim::write_suppressed_clause_header;
+use crate::{has_skip_comment, prelude::*};
 
 /// The header of a compound statement clause.
 ///
@@ -354,7 +352,7 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatClauseHeader<'_, 'ast> {
             leading_alternate_branch_comments(leading_comments, last_node).fmt(f)?;
         }
 
-        if SuppressionKind::has_skip_comment(self.trailing_colon_comment, f.context().source()) {
+        if has_skip_comment(self.trailing_colon_comment, f.context().source()) {
             write_suppressed_clause_header(self.header, f)?;
         } else {
             // Write a source map entry for the colon for range formatting to support formatting the clause header without

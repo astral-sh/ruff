@@ -4,9 +4,9 @@ use std::path::Path;
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::{indentation_at_offset, CommentRanges, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::call_path::CallPath;
 use crate::parenthesize::parenthesized_range;
@@ -1482,6 +1482,80 @@ pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
         ctx: ExprContext::Load,
         range: TextRange::default(),
     })
+}
+
+/// Determine the indentation level of an own-line comment, defined as the minimum indentation of
+/// all comments between the preceding node and the comment, including the comment itself. In
+/// other words, we don't allow successive comments to ident _further_ than any preceding comments.
+///
+/// For example, given:
+/// ```python
+/// if True:
+///     pass
+///     # comment
+/// ```
+///
+/// The indentation would be 4, as the comment is indented by 4 spaces.
+///
+/// Given:
+/// ```python
+/// if True:
+///     pass
+/// # comment
+/// else:
+///     pass
+/// ```
+///
+/// The indentation would be 0, as the comment is not indented at all.
+///
+/// Given:
+/// ```python
+/// if True:
+///     pass
+///     # comment
+///         # comment
+/// ```
+///
+/// Both comments would be marked as indented at 4 spaces, as the indentation of the first comment
+/// is used for the second comment.
+///
+/// This logic avoids pathological cases like:
+/// ```python
+/// try:
+///     if True:
+///         if True:
+///             pass
+///
+///         # a
+///             # b
+///         # c
+/// except Exception:
+///     pass
+/// ```
+///
+/// If we don't use the minimum indentation of any preceding comments, we would mark `# b` as
+/// indented to the same depth as `pass`, which could in turn lead to us treating it as a trailing
+/// comment of `pass`, despite there being a comment between them that "resets" the indentation.
+pub fn comment_indentation_after(
+    preceding: AnyNodeRef,
+    comment_range: TextRange,
+    locator: &Locator,
+) -> TextSize {
+    let tokenizer = SimpleTokenizer::new(
+        locator.contents(),
+        TextRange::new(locator.full_line_end(preceding.end()), comment_range.end()),
+    );
+
+    tokenizer
+        .filter_map(|token| {
+            if token.kind() == SimpleTokenKind::Comment {
+                indentation_at_offset(token.start(), locator).map(TextLen::text_len)
+            } else {
+                None
+            }
+        })
+        .min()
+        .unwrap_or_default()
 }
 
 #[cfg(test)]
