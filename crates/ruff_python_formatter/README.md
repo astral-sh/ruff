@@ -23,7 +23,7 @@ For details, see [Black compatibility](#black-compatibility).
 
 ## Getting started
 
-The Ruff formatter is available since Ruff v0.1.2.
+The Ruff formatter is available as of Ruff v0.1.2.
 
 ### CLI
 
