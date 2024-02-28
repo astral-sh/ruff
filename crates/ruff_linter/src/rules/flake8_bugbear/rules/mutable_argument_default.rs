@@ -152,10 +152,11 @@ fn move_initialization(
     // Set the default argument value to `None`.
     let default_edit = Edit::range_replacement("None".to_string(), default.range());
 
-    // If the function is a stub, this is the only necessary edit
-    if is_stub(&function_def.body) {
+    // If the function is a stub, this is the only necessary edit.
+    if is_stub(function_def) {
         return Some(Fix::unsafe_edit(default_edit));
     }
+
     // Add an `if`, to set the argument to its original value if still `None`.
     let mut content = String::new();
     content.push_str(&format!("if {} is None:", parameter.name.as_str()));
@@ -209,20 +210,19 @@ fn move_initialization(
     Some(Fix::unsafe_edits(default_edit, [initialization_edit]))
 }
 
-// A function that only contains the pass keyword, the ... literal and/or a docstring is assumed to
-// be a stub for typing purposes and should not be modified.
-fn is_stub(body: &[Stmt]) -> bool {
-    for stmt in body {
-        match stmt {
-            Stmt::Pass(_) => continue,
-            Stmt::Expr(inner) => {
-                if inner.value.is_ellipsis_literal_expr() || inner.value.is_string_literal_expr() {
-                    continue;
-                }
-                return false;
-            }
-            _ => return false,
-        };
-    }
-    true
+/// Returns `true` if a function has an empty body, and is therefore a stub.
+///
+/// A function body is considered to be empty if it contains only `pass` statements, `...` literals,
+/// and docstrings.
+fn is_stub(function_def: &ast::StmtFunctionDef) -> bool {
+    function_def.body.iter().all(|stmt| match stmt {
+        Stmt::Pass(_) => true,
+        Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
+            matches!(
+                value.as_ref(),
+                Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
+            )
+        }
+        _ => false,
+    })
 }
