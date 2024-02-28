@@ -128,7 +128,6 @@ pub(crate) static EXCLUDE: &[FilePattern] = &[
     FilePattern::Builtin("__pypackages__"),
     FilePattern::Builtin("_build"),
     FilePattern::Builtin("buck-out"),
-    FilePattern::Builtin("build"),
     FilePattern::Builtin("dist"),
     FilePattern::Builtin("node_modules"),
     FilePattern::Builtin("site-packages"),
