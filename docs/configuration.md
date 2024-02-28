@@ -540,7 +540,7 @@ Log levels:
   -s, --silent   Disable all logging (but still exit with status code "1" upon
                  detecting diagnostics)
 
-Miscellaneous:
+Global configuration options:
       --config <CONFIG_OPTION>
           Either a path to a TOML configuration file (`pyproject.toml` or
           `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
@@ -660,15 +660,6 @@ File selection:
           command-line. Use `--no-force-exclude` to disable
 
 Miscellaneous:
-      --config <CONFIG_OPTION>
-          Either a path to a TOML configuration file (`pyproject.toml` or
-          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
-          find in a `ruff.toml` configuration file) overriding a specific
-          configuration option. Overrides of individual settings using this
-          option always take precedence over all configuration files, including
-          configuration files that were also specified using `--config`
-      --isolated
-          Ignore all configuration files
   -n, --no-cache
           Disable cache reads [env: RUFF_NO_CACHE=]
       --cache-dir <CACHE_DIR>
@@ -686,6 +677,17 @@ Log levels:
   -q, --quiet    Print diagnostics, but nothing else
   -s, --silent   Disable all logging (but still exit with status code "1" upon
                  detecting diagnostics)
+
+Global configuration options:
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
+      --isolated
+          Ignore all configuration files
 ```
 
 <!-- End auto-generated check help. -->
@@ -730,15 +732,6 @@ Miscellaneous:
           Path to the cache directory [env: RUFF_CACHE_DIR=]
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
-      --config <CONFIG_OPTION>
-          Either a path to a TOML configuration file (`pyproject.toml` or
-          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
-          find in a `ruff.toml` configuration file) overriding a specific
-          configuration option. Overrides of individual settings using this
-          option always take precedence over all configuration files, including
-          configuration files that were also specified using `--config`
-      --isolated
-          Ignore all configuration files
 
 File selection:
       --respect-gitignore
@@ -766,6 +759,17 @@ Log levels:
   -q, --quiet    Print diagnostics, but nothing else
   -s, --silent   Disable all logging (but still exit with status code "1" upon
                  detecting diagnostics)
+
+Global configuration options:
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
+      --isolated
+          Ignore all configuration files
 ```
 
 <!-- End auto-generated format help. -->
