@@ -1,0 +1,81 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF029.py:13:1: RUF029 Avoid non-transitive compound comparisons, which can be confusing
+   |
+11 | a is not b  # OK
+12 | a != b  # OK
+13 | a is b is not c  # RUF029
+   | ^^^^^^^^^^^^^^^ RUF029
+14 | a is not b is c  # RUF029
+15 | a is b == c  # RUF029
+   |
+
+RUF029.py:14:1: RUF029 Avoid non-transitive compound comparisons, which can be confusing
+   |
+12 | a != b  # OK
+13 | a is b is not c  # RUF029
+14 | a is not b is c  # RUF029
+   | ^^^^^^^^^^^^^^^ RUF029
+15 | a is b == c  # RUF029
+16 | a == b is c  # RUF029
+   |
+
+RUF029.py:15:1: RUF029 Avoid non-transitive compound comparisons, which can be confusing
+   |
+13 | a is b is not c  # RUF029
+14 | a is not b is c  # RUF029
+15 | a is b == c  # RUF029
+   | ^^^^^^^^^^^ RUF029
+16 | a == b is c  # RUF029
+17 | a is b < c  # RUF029
+   |
+
+RUF029.py:16:1: RUF029 Avoid non-transitive compound comparisons, which can be confusing
+   |
+14 | a is not b is c  # RUF029
+15 | a is b == c  # RUF029
+16 | a == b is c  # RUF029
+   | ^^^^^^^^^^^ RUF029
+17 | a is b < c  # RUF029
+18 | a < b is c  # RUF029
+   |
+
+RUF029.py:17:1: RUF029 Avoid non-transitive compound comparisons, which can be confusing
+   |
+15 | a is b == c  # RUF029
+16 | a == b is c  # RUF029
+17 | a is b < c  # RUF029
+   | ^^^^^^^^^^ RUF029
+18 | a < b is c  # RUF029
+19 | a > b < c  # RUF029
+   |
+
+RUF029.py:18:1: RUF029 Avoid non-transitive compound comparisons, which can be confusing
+   |
+16 | a == b is c  # RUF029
+17 | a is b < c  # RUF029
+18 | a < b is c  # RUF029
+   | ^^^^^^^^^^ RUF029
+19 | a > b < c  # RUF029
+20 | a < b > c  # RUF029
+   |
+
+RUF029.py:19:1: RUF029 Avoid non-transitive compound comparisons, which can be confusing
+   |
+17 | a is b < c  # RUF029
+18 | a < b is c  # RUF029
+19 | a > b < c  # RUF029
+   | ^^^^^^^^^ RUF029
+20 | a < b > c  # RUF029
+   |
+
+RUF029.py:20:1: RUF029 Avoid non-transitive compound comparisons, which can be confusing
+   |
+18 | a < b is c  # RUF029
+19 | a > b < c  # RUF029
+20 | a < b > c  # RUF029
+   | ^^^^^^^^^ RUF029
+   |
+
+
