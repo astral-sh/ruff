@@ -2096,6 +2096,16 @@ pub struct IsortOptions {
     )]
     pub section_order: Option<Vec<ImportSection>>,
 
+    /// Define a default section for any imports that don't fit into the specified `section-order`.
+    #[option(
+        default = r#"third-party"#,
+        value_type = "str",
+        example = r#"
+            default-section = "third-party"
+        "#
+    )]
+    pub default_section: Option<ImportSection>,
+
     /// Put all imports into the same section bucket.
     ///
     /// For example, rather than separating standard library and third-party imports, as in:
@@ -2223,6 +2233,9 @@ impl IsortOptions {
         if no_sections && self.section_order.is_some() {
             warn_user_once!("`section-order` is ignored when `no-sections` is set to `true`");
         }
+        if no_sections && self.default_section.is_some() {
+            warn_user_once!("`default-section` is ignored when `no-sections` is set to `true`");
+        }
         if no_sections && self.sections.is_some() {
             warn_user_once!("`sections` is ignored when `no-sections` is set to `true`");
         }
@@ -2238,6 +2251,10 @@ impl IsortOptions {
         let mut section_order: Vec<_> = self
             .section_order
             .unwrap_or_else(|| ImportType::iter().map(ImportSection::Known).collect());
+        let default_section = self
+            .default_section
+            .unwrap_or(ImportSection::Known(ImportType::ThirdParty));
+
         let known_first_party = self
             .known_first_party
             .map(|names| {
@@ -2341,24 +2358,13 @@ impl IsortOptions {
             }
         }
 
-        // Add all built-in sections to `section_order`, if not already present.
-        for section in ImportType::iter().map(ImportSection::Known) {
-            if !section_order.contains(&section) {
-                warn_user_once!(
-                    "`section-order` is missing built-in section: `{:?}`",
-                    section
-                );
-                section_order.push(section);
-            }
-        }
-
-        // Add all user-defined sections to `section-order`, if not already present.
-        for section_name in sections.keys() {
-            let section = ImportSection::UserDefined(section_name.clone());
-            if !section_order.contains(&section) {
-                warn_user_once!("`section-order` is missing section: `{:?}`", section);
-                section_order.push(section);
-            }
+        // Verify that `default_section` is in `section_order`.
+        if !section_order.contains(&default_section) {
+            warn_user_once!(
+                "`section-order` must contain `default-section`: {:?}",
+                default_section,
+            );
+            section_order.push(default_section.clone());
         }
 
         Ok(isort::settings::Settings {
@@ -2391,6 +2397,7 @@ impl IsortOptions {
             lines_between_types,
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),
             section_order,
+            default_section,
             no_sections,
             from_first,
             length_sort: self.length_sort.unwrap_or(false),

@@ -163,6 +163,8 @@ fn format_import_block(
         &settings.known_modules,
         target_version,
         settings.no_sections,
+        &settings.section_order,
+        &settings.default_section,
     );
 
     let mut output = String::new();
@@ -914,6 +916,38 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     no_sections: true,
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("default_section_user_defined.py"))]
+    fn default_section_can_map_to_user_defined_section(path: &Path) -> Result<()> {
+        let snapshot = format!("default_section_user_defined_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(
+                        vec![],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::from_iter([("django".to_string(), vec![pattern("django")])]),
+                    ),
+                    section_order: vec![
+                        ImportSection::Known(ImportType::Future),
+                        ImportSection::UserDefined("django".to_string()),
+                        ImportSection::Known(ImportType::FirstParty),
+                        ImportSection::Known(ImportType::LocalFolder),
+                    ],
+                    force_sort_within_sections: true,
+                    default_section: ImportSection::UserDefined("django".to_string()),
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],

@@ -1474,6 +1474,17 @@
             "type": "string"
           }
         },
+        "default-section": {
+          "description": "Define a default section for any imports that don't fit into the specified `section-order`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ImportSection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "detect-same-package": {
           "description": "Whether to automatically mark imports from within the same package as first-party. For example, when `detect-same-package = true`, then when analyzing files within the `foo` package, any imports from within the `foo` package will be considered first-party.\n\nThis heuristic is often unnecessary when `src` is configured to detect all first-party sources; however, if `src` is _not_ configured, this heuristic can be useful to detect first-party imports from _within_ (but not _across_) first-party packages.",
           "type": [

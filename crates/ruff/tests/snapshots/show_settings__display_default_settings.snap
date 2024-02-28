@@ -312,6 +312,7 @@ linter.isort.section_order = [
 	known { type = first_party },
 	known { type = local_folder },
 ]
+linter.isort.default_section = known { type = third_party }
 linter.isort.no_sections = false
 linter.isort.from_first = false
 linter.isort.length_sort = false
