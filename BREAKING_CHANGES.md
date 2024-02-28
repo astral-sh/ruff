@@ -1,5 +1,50 @@
 # Breaking Changes
 
+## 0.3.0
+
+### Ruff 2024.2 style
+The `format` command now uses the improved Ruff 2024.2 style. Expect changes in formatting when upgrading.
+
+### `isort`: Use one blank line after imports in typing stub files
+
+Previously, Ruff used one or two blank lines (or the number configured by `isort.lines-after-imports`) in typing stub files (`.pyi`).
+Using more than one blank line isn't in accordance with the [typing style guide](https://typing.readthedocs.io/en/latest/source/stubs.html#style-guide) and incompatible with ruff's formatter.
+As of this release, `isort` now always uses one blank line after imports in typing stub files.
+
+### Remove `build` from the default exclusion list
+
+Ruff maintains a list of default exclusions, which now consists of the following patterns:
+
+- `.bzr`
+- `.direnv`
+- `.eggs`
+- `.git`
+- `.git-rewrite`
+- `.hg`
+- `.ipynb_checkpoints`
+- `.mypy_cache`
+- `.nox`
+- `.pants.d`
+- `.pyenv`
+- `.pytest_cache`
+- `.pytype`
+- `.ruff_cache`
+- `.svn`
+- `.tox`
+- `.venv`
+- `.vscode`
+- `__pypackages__`
+- `_build`
+- `buck-out`
+- `dist`
+- `node_modules`
+- `site-packages`
+- `venv`
+
+Previously, the `build` directory was excluded by default. However, the `build` directory tends to be a not un-popular directory
+name and excluding it by default caused confusion. Ruff now no longer excludes `build` by default except if it is excluded in your `.gitignore`.
+If necessary, you can exclude `build` by adding it to `extend-exclude` in your `pyproject.toml` file.
+
 ## 0.1.9
 
 ### `site-packages` is now excluded by default ([#5513](https://github.com/astral-sh/ruff/pull/5513))
