@@ -1,12 +1,12 @@
 use ruff_formatter::write;
 use ruff_python_ast::StmtTypeAlias;
 
-use crate::comments::{SourceComment, SuppressionKind};
-use crate::prelude::*;
+use crate::comments::SourceComment;
 use crate::preview::is_prefer_splitting_right_hand_side_of_assignments_enabled;
 use crate::statement::stmt_assign::{
     AnyAssignmentOperator, AnyBeforeOperator, FormatStatementsLastExpression,
 };
+use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
 pub struct FormatStmtTypeAlias;
@@ -52,6 +52,6 @@ impl FormatNodeRule<StmtTypeAlias> for FormatStmtTypeAlias {
         trailing_comments: &[SourceComment],
         context: &PyFormatContext,
     ) -> bool {
-        SuppressionKind::has_skip_comment(trailing_comments, context.source())
+        has_skip_comment(trailing_comments, context.source())
     }
 }

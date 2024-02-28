@@ -5,7 +5,7 @@ use ruff_python_ast::{
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{
-    trailing_comments, Comments, LeadingDanglingTrailingComments, SourceComment, SuppressionKind,
+    trailing_comments, Comments, LeadingDanglingTrailingComments, SourceComment,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{
@@ -16,12 +16,12 @@ use crate::expression::{
     can_omit_optional_parentheses, has_own_parentheses, has_parentheses,
     maybe_parenthesize_expression,
 };
-use crate::prelude::*;
 use crate::preview::{
     is_parenthesize_long_type_hints_enabled,
     is_prefer_splitting_right_hand_side_of_assignments_enabled,
 };
 use crate::statement::trailing_semicolon;
+use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
 pub struct FormatStmtAssign;
@@ -110,7 +110,7 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
         trailing_comments: &[SourceComment],
         context: &PyFormatContext,
     ) -> bool {
-        SuppressionKind::has_skip_comment(trailing_comments, context.source())
+        has_skip_comment(trailing_comments, context.source())
     }
 }
 
