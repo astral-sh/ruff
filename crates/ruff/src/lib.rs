@@ -203,8 +203,8 @@ pub fn run(
     }
 }
 
-fn format(args: FormatCommand, global_config_args: GlobalConfigArgs) -> Result<ExitStatus> {
-    let (cli, config_arguments) = args.partition(global_config_args)?;
+fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
+    let (cli, config_arguments) = args.partition(global_options)?;
 
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
         commands::format_stdin::format_stdin(&cli, &config_arguments)
@@ -213,8 +213,8 @@ fn format(args: FormatCommand, global_config_args: GlobalConfigArgs) -> Result<E
     }
 }
 
-pub fn check(args: CheckCommand, global_config_args: GlobalConfigArgs) -> Result<ExitStatus> {
-    let (cli, config_arguments) = args.partition(global_config_args)?;
+pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
+    let (cli, config_arguments) = args.partition(global_options)?;
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.

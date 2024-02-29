@@ -593,14 +593,14 @@ impl ConfigArguments {
     }
 
     fn from_cli_arguments(
-        global_config_args: GlobalConfigArgs,
+        global_options: GlobalConfigArgs,
         per_flag_overrides: ExplicitConfigOverrides,
     ) -> anyhow::Result<Self> {
-        let (log_level, config_arguments, isolated) = global_config_args.partition();
+        let (log_level, config_options, isolated) = global_options.partition();
         let mut config_file: Option<PathBuf> = None;
         let mut overrides = Configuration::default();
 
-        for option in config_arguments {
+        for option in config_options {
             match option {
                 SingleConfigArgument::SettingsOverride(overridden_option) => {
                     let overridden_option = Arc::try_unwrap(overridden_option)
@@ -661,7 +661,7 @@ impl CheckCommand {
     /// overrides.
     pub fn partition(
         self,
-        global_config_args: GlobalConfigArgs,
+        global_options: GlobalConfigArgs,
     ) -> anyhow::Result<(CheckArguments, ConfigArguments)> {
         let check_arguments = CheckArguments {
             add_noqa: self.add_noqa,
@@ -714,7 +714,7 @@ impl CheckCommand {
             extension: self.extension,
         };
 
-        let config_args = ConfigArguments::from_cli_arguments(global_config_args, cli_overrides)?;
+        let config_args = ConfigArguments::from_cli_arguments(global_options, cli_overrides)?;
         Ok((check_arguments, config_args))
     }
 }
@@ -724,7 +724,7 @@ impl FormatCommand {
     /// overrides.
     pub fn partition(
         self,
-        global_config_args: GlobalConfigArgs,
+        global_options: GlobalConfigArgs,
     ) -> anyhow::Result<(FormatArguments, ConfigArguments)> {
         let format_arguments = FormatArguments {
             check: self.check,
@@ -749,7 +749,7 @@ impl FormatCommand {
             ..ExplicitConfigOverrides::default()
         };
 
-        let config_args = ConfigArguments::from_cli_arguments(global_config_args, cli_overrides)?;
+        let config_args = ConfigArguments::from_cli_arguments(global_options, cli_overrides)?;
 
         Ok((format_arguments, config_args))
     }

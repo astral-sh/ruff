@@ -52,8 +52,8 @@ impl Args {
             config,
             isolated,
         } = self;
-        let global_config_args = GlobalConfigArgs::new(LogLevelArgs::default(), config, isolated);
-        (command, global_config_args)
+        let global_options = GlobalConfigArgs::new(LogLevelArgs::default(), config, isolated);
+        (command, global_options)
     }
 }
 
@@ -101,7 +101,7 @@ enum Command {
 
 fn main() -> Result<ExitCode> {
     let args = Args::parse();
-    let (command, global_config_args) = args.partition();
+    let (command, global_options) = args.partition();
     #[allow(clippy::print_stdout)]
     match command {
         Command::GenerateAll(args) => generate_all::main(&args)?,
@@ -118,9 +118,9 @@ fn main() -> Result<ExitCode> {
             args: subcommand_args,
             repeat,
         } => {
-            set_up_logging(global_config_args.log_level())?;
+            set_up_logging(global_options.log_level())?;
             for _ in 0..repeat {
-                check(subcommand_args.clone(), global_config_args.clone())?;
+                check(subcommand_args.clone(), global_options.clone())?;
             }
         }
         Command::FormatDev(args) => {
