@@ -6,7 +6,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
-/// Python exception hierarchy: https://docs.python.org/3/library/exceptions.html#exception-hierarchy
+/// - [Python exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
 const PY_BUILTIN_EXCEPTIONS: [&str; 21] = [
     "SystemExit",
     "Exception",
