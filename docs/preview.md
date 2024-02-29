@@ -5,7 +5,7 @@ changes are a net-benefit before enabling them for everyone.
 
 Preview mode enables a collection of new lint rules, fixes, formatter style and other changes that are considered experimental or unstable.
 
-Simply enabling preview mode does not imply that all the new preview features/changes will be turned on. Some, like the rules that are in preview, need to be turned on explicitly (see the [rules section](#using-rules-that-are-in-preview). Others, like the formatter style or default values (for example `output-format`) will be turned on by simply enabling the preview mode.
+Simply enabling preview mode does not imply that all the new preview features/changes will be turned on. Some, like the rules that are in preview, need to be turned on explicitly (see the [rules section](#using-rules-that-are-in-preview). Others, like the formatter style or default values changes will be turned on by simply enabling the preview mode.
 
 ## Enabling preview mode
 
