@@ -235,7 +235,6 @@ pub fn check_path(
                 Rule::StableTestRuleDisplayOnlyFix => {
                     test_rules::StableTestRuleDisplayOnlyFix::diagnostic(locator, indexer)
                 }
-                Rule::NurseryTestRule => test_rules::NurseryTestRule::diagnostic(locator, indexer),
                 Rule::PreviewTestRule => test_rules::PreviewTestRule::diagnostic(locator, indexer),
                 Rule::DeprecatedTestRule => {
                     test_rules::DeprecatedTestRule::diagnostic(locator, indexer)
