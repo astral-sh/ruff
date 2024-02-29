@@ -210,7 +210,7 @@ on both `first()` and `second()`:
 
 #### Parenthesizing long nested-expressions
 
-Black's 2024 style introduced parenthesizing long conditional expressions and type annotations in function parameters.
+Black 24 and newer parenthesizes long conditional expressions and type annotations in function parameters:
 
 ```python
 # Black
@@ -258,13 +258,11 @@ def foo(
   pass
 ```
 
-We agree, that Ruff's existing formatting (and Black's 2023 formatting) is difficult to read and needs improvement.
-However, we aren't convinced that parenthesizing the nested expressions is the best way of doing it when considering expression formatting holistically.
-That's why we decided to defer the implementation of this new style and instead explore alternative formatting styles that improve nested expressions formatting that avoids unnecessary parentheses. See [psf/Black#4123 ](https://github.com/psf/black/issues/4123) for an in-depth explanation of our concerns and an outline of possible alternatives.
+We agree that Ruff's formatting (that matches Black's 23) is hard to read and needs improvement. But we aren't convinced that parenthesizing long nested expressions is the best solution, especially when considering expression formatting holistically. That's why we want to defer the decision until we've explored alternative nested expression formatting styles. See [psf/Black#4123](https://github.com/psf/black/issues/4123) for an in-depth explanation of our concerns and an outline of possible alternatives.
 
 #### Call expressions with a single multiline string argument
 
-Unlike Black, Ruff preserves the indentation around a single multiline string argument in a call expression.
+Unlike Black, Ruff preserves the indentation of a single multiline-string argument in a call expression:
 
 ```python
 # Input
@@ -310,13 +308,11 @@ dedent(""""
 """)
 ```
 
-Black intended to ship a similar style change as part of 2024 but, unlike Ruff, Black would always remove the indent.
-It turned out, that this change is very disruptive, even though it improves formatting in many cases.
-We believe that the new heuristic of preserving the indent is a good compromise and allowed us to ship this style change.
+Black intended to ship a similar style change as part of the 2024 style that always removes the indent. It turned out that this change was too disruptive to justify the cases where it improved formatting. Ruff introduced the new heuristic of preserving the indent, and we believe it's a good compromise that improves formatting but isn't disruptive.
 
 #### Blank lines at the start of a block
 
-Black 2024 allows blank lines at the start of a block where Ruff always removes them.
+Black 24 and newer allow blank lines at the start of a block, where Ruff always removes them:
 
 ```python
 # Black
@@ -329,13 +325,11 @@ if x:
   a = 123
 ```
 
-We may consider adopting Black's formatting at a later point but we're concerned that allowing blank lines at the start of a block
-leads to [unintentional blank lines when refactoring or moving code](https://github.com/astral-sh/ruff/issues/8893#issuecomment-1867259744).
-This difference is tracked in [#9745](https://github.com/astral-sh/ruff/issues/9745).
+We consider adopting Black's formatting at a later point with an improved heuristic because we're concerned that allowing blank lines at the start of a block leads [to unintentional blank lines when refactoring or moving code](https://github.com/astral-sh/ruff/issues/8893#issuecomment-1867259744). The style change is tracked in [#9745](https://github.com/astral-sh/ruff/issues/9745).
 
-#### Hex codes and unicode sequences
+#### Hex codes and Unicode sequences
 
-Ruff normalizes hex codes and unicode sequences in strings ([#9280](https://github.com/astral-sh/ruff/pull/9280)). Black intended to ship this change as part of the 2024 style but accidentally didn't.
+Ruff normalizes hex codes and Unicode sequences in strings ([#9280](https://github.com/astral-sh/ruff/pull/9280)). Black intended to ship this change as part of the 2024 style but accidentally didn't.
 
 ```python
 # Black
@@ -353,7 +347,7 @@ d = "\N{CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I}"
 
 #### Module docstrings
 
-Ruff formats module docstrings the same as class or function docstrings whereas Black does not.
+Ruff formats module docstrings similar to class or function docstrings, whereas Black does not.
 
 ```python
 # Input
