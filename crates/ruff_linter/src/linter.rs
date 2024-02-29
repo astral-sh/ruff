@@ -244,9 +244,6 @@ pub fn check_path(
                 Rule::StableTestRuleDisplayOnlyFix => {
                     test_rules::StableTestRuleDisplayOnlyFix::diagnostic(locator, comment_ranges)
                 }
-                Rule::NurseryTestRule => {
-                    test_rules::NurseryTestRule::diagnostic(locator, comment_ranges)
-                }
                 Rule::PreviewTestRule => {
                     test_rules::PreviewTestRule::diagnostic(locator, comment_ranges)
                 }
