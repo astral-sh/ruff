@@ -28,6 +28,8 @@ use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
 use ruff_workspace::resolver::ConfigurationTransformer;
 
+/// All configuration options that can be passed "globally",
+/// i.e., can be passed to all subcommands
 #[derive(Debug, Default, Clone)]
 pub struct GlobalConfigArgs {
     pub log_level: LogLevel,
@@ -587,13 +589,13 @@ impl ConfigArguments {
     }
 
     fn from_cli_arguments(
-        global_config_flags: GlobalConfigArgs,
+        global_config_args: GlobalConfigArgs,
         per_flag_overrides: ExplicitConfigOverrides,
     ) -> anyhow::Result<Self> {
         let mut config_file: Option<PathBuf> = None;
         let mut overrides = Configuration::default();
 
-        for option in global_config_flags.config_flags {
+        for option in global_config_args.config_flags {
             match option {
                 SingleConfigArgument::SettingsOverride(overridden_option) => {
                     let overridden_option = Arc::try_unwrap(overridden_option)
@@ -605,7 +607,7 @@ impl ConfigArguments {
                     )?);
                 }
                 SingleConfigArgument::FilePath(path) => {
-                    if global_config_flags.isolated {
+                    if global_config_args.isolated {
                         bail!(
                             "\
 The argument `--config={}` cannot be used with `--isolated`
@@ -633,8 +635,8 @@ You cannot specify more than one configuration file on the command line.
             }
         }
         Ok(Self {
-            isolated: global_config_flags.isolated,
-            log_level: global_config_flags.log_level,
+            isolated: global_config_args.isolated,
+            log_level: global_config_args.log_level,
             config_file,
             overrides,
             per_flag_overrides,
@@ -654,7 +656,7 @@ impl CheckCommand {
     /// overrides.
     pub fn partition(
         self,
-        global_config_flags: GlobalConfigArgs,
+        global_config_args: GlobalConfigArgs,
     ) -> anyhow::Result<(CheckArguments, ConfigArguments)> {
         let check_arguments = CheckArguments {
             add_noqa: self.add_noqa,
@@ -707,7 +709,7 @@ impl CheckCommand {
             extension: self.extension,
         };
 
-        let config_args = ConfigArguments::from_cli_arguments(global_config_flags, cli_overrides)?;
+        let config_args = ConfigArguments::from_cli_arguments(global_config_args, cli_overrides)?;
         Ok((check_arguments, config_args))
     }
 }
@@ -717,7 +719,7 @@ impl FormatCommand {
     /// overrides.
     pub fn partition(
         self,
-        global_config_flags: GlobalConfigArgs,
+        global_config_args: GlobalConfigArgs,
     ) -> anyhow::Result<(FormatArguments, ConfigArguments)> {
         let format_arguments = FormatArguments {
             check: self.check,
@@ -742,7 +744,7 @@ impl FormatCommand {
             ..ExplicitConfigOverrides::default()
         };
 
-        let config_args = ConfigArguments::from_cli_arguments(global_config_flags, cli_overrides)?;
+        let config_args = ConfigArguments::from_cli_arguments(global_config_args, cli_overrides)?;
 
         Ok((format_arguments, config_args))
     }
