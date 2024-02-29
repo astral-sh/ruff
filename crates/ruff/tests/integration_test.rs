@@ -927,7 +927,7 @@ fn preview_enabled_prefix() {
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     -:1:1: RUF911 Hey this is a preview test rule.
     -:1:1: RUF950 Hey this is a test rule that was redirected from another.
-    Found 7 errors.
+    Found 6 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
@@ -949,9 +949,9 @@ fn preview_enabled_all() {
     -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    -:1:1: RUF911 Hey this is a preview test rule
+    -:1:1: RUF911 Hey this is a preview test rule.
     -:1:1: RUF950 Hey this is a test rule that was redirected from another.
-    Found 9 errors.
+    Found 8 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
@@ -1090,7 +1090,7 @@ fn preview_enabled_group_ignore() {
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     -:1:1: RUF911 Hey this is a preview test rule.
     -:1:1: RUF950 Hey this is a test rule that was redirected from another.
-    Found 7 errors.
+    Found 6 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
