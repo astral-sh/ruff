@@ -27,6 +27,13 @@ Preview mode can be configured separately for linting and formatting (requires R
     preview = true
     ```
 
+=== "CLI"
+
+    ```console
+    ruff check . --preview
+    ```
+
+
 To enable preview style formatting without enabling any preview lint rules:
 
 === "pyproject.toml"
@@ -43,11 +50,17 @@ To enable preview style formatting without enabling any preview lint rules:
     preview = true
     ```
 
+=== "CLI"
+
+    ```console
+    ruff format . --preview
+    ```
+
 ## Using rules that are in preview
 
 If a rule is marked as preview, it can only be selected if preview mode is enabled. For example, consider a
 hypothetical rule, `HYP001`. If `HYP001` were in preview, it would _not_ be enabled by adding following to your
-config file:
+config file or only using the `--select` flag on the CLI:
 
 === "pyproject.toml"
 
@@ -62,6 +75,13 @@ config file:
     [lint]
     extend-select = ["HYP001"]
     ```
+
+=== "CLI"
+
+    ```console
+    ruff check . --select HYP001
+    ```
+
 
 It also would _not_ be enabled by selecting the `HYP` category, like so:
 
@@ -79,6 +99,13 @@ It also would _not_ be enabled by selecting the `HYP` category, like so:
     extend-select = ["HYP"]
     ```
 
+=== "CLI"
+
+    ```console
+    ruff check . --select HYP
+    ```
+
+
 Similarly, it would _not_ be enabled via the `ALL` selector:
 
 === "pyproject.toml"
@@ -95,7 +122,13 @@ Similarly, it would _not_ be enabled via the `ALL` selector:
     select = ["ALL"]
     ```
 
-However, it would be enabled in any of the above cases if you enabled preview in your configuration file:
+=== "CLI"
+
+    ```console
+    ruff check . --select ALL
+    ```
+
+However, it would be enabled in any of the above cases if you enabled preview in your configuration file or provided the `--preview` CLI flag:
 
 === "pyproject.toml"
 
@@ -113,7 +146,11 @@ However, it would be enabled in any of the above cases if you enabled preview in
     preview = true
     ```
 
-Or, if you provided the `--preview` CLI flag.
+=== "CLI"
+
+    ```console
+    ruff check . --select HYP --preview
+    ```
 
 To see which rules are currently in preview, visit the [rules reference](rules.md).
 
