@@ -46,6 +46,11 @@ Previously, the `build` directory was included in this list. However, the `build
 name, and excluding it by default caused confusion. Ruff now no longer excludes `build` except if it is excluded by a `.gitignore` file
 or because it is listed in `extend-exclude`.
 
+### `--format` is no longer a valid `rule` or `linter` command option
+
+Previously, `ruff rule` and `ruff linter` accepted the `--format <FORMAT>` option as an alias for `--output-format`. Ruff no longer
+supports this alias. Please use `ruff rule --output-format <FORMAT>` and `ruff linter --output-format <FORMAT>` instead.
+
 ## 0.1.9
 
 ### `site-packages` is now excluded by default ([#5513](https://github.com/astral-sh/ruff/pull/5513))
