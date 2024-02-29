@@ -3,6 +3,7 @@
 ## 0.3.0
 
 ### Ruff 2024.2 style
+
 The `format` command now formats your code according to the Ruff 2024.2 style guide.
 Read the [Changelog](./CHANGELOG.md#030) for an in detail list of changes.
 

@@ -2,40 +2,30 @@
 
 ## 0.3.0
 
-This release introduces the new Ruff formatter 2024 stable style and adds a new lint rule to
+This release introduces the new Ruff formatter 2024.2 style and adds a new lint rule to
 detect invalid formatter suppression comments.
 
 ### Preview features
 
-- \[`pycodestyle`\] Allow `os.environ` modifications between
-    imports (`E402`) ([#10066](https://github.com/astral-sh/ruff/pull/10066))
-- \[`pycodestyle`\] Don't warn about single whitespace before
-    comma in tuple (`E203`) ([#10094](https://github.com/astral-sh/ruff/pull/10094))
+- \[`pycodestyle`\] Allow `os.environ` modifications between imports (`E402`) ([#10066](https://github.com/astral-sh/ruff/pull/10066))
+- \[`pycodestyle`\] Don't warn about single whitespace before comma in tuple (`E203`) ([#10094](https://github.com/astral-sh/ruff/pull/10094))
 - \[`flake8-bandit`\] Remove suspicious-lxml-import (`S410`) ([#10154](https://github.com/astral-sh/ruff/pull/10154))
 
 ### Rule changes
 
 - \[`isort`\]: Use one blank line after imports in typing stub files. ([#9971](https://github.com/astral-sh/ruff/pull/9971))
-- \[`pylint`\] New
-    Rule `dict-iter-missing-items` (`PLE1141`) ([#9845](https://github.com/astral-sh/ruff/pull/9845))
-- \[`pylint`\] Ignore `sys.version`
-    and `sys.platform` (`PLR1714`) ([#10054](https://github.com/astral-sh/ruff/pull/10054))
-- \[`ruff`\] Expand rule for `list(iterable).pop(0)`
-    idiom (`RUF015`) ([#10148](https://github.com/astral-sh/ruff/pull/10148))
-- \[`flake8-boolean-trap`\] Allow boolean positionals
-    in `__post_init__` ([#10027](https://github.com/astral-sh/ruff/pull/10027))
-- \[`flake8-copyright`\] Allow © in copyright
-    notices ([#10065](https://github.com/astral-sh/ruff/pull/10065))
-- \[`pyupgrade`\] Detect literals with unary operators (
-    `UP018`) ([#10060](https://github.com/astral-sh/ruff/pull/10060))
-- \[`eradicate`\] Detect commented out `case`
-    statements (`ERA001`) ([#10055](https://github.com/astral-sh/ruff/pull/10055))
-- \[`eradicate`\] detect single-line code for try:, except:,
-    etc. (`ERA001`) ([#10057](https://github.com/astral-sh/ruff/pull/10057))
+- \[`pylint`\] New Rule `dict-iter-missing-items` (`PLE1141`) ([#9845](https://github.com/astral-sh/ruff/pull/9845))
+- \[`pylint`\] Ignore `sys.version` and `sys.platform` (`PLR1714`) ([#10054](https://github.com/astral-sh/ruff/pull/10054))
+- \[`ruff`\] Expand rule for `list(iterable).pop(0)` idiom (`RUF015`) ([#10148](https://github.com/astral-sh/ruff/pull/10148))
+- \[`flake8-boolean-trap`\] Allow boolean positionals in `__post_init__` ([#10027](https://github.com/astral-sh/ruff/pull/10027))
+- \[`flake8-copyright`\] Allow © in copyright notices ([#10065](https://github.com/astral-sh/ruff/pull/10065))
+- \[`pyupgrade`\] Detect literals with unary operators (`UP018`) ([#10060](https://github.com/astral-sh/ruff/pull/10060))
+- \[`eradicate`\] Detect commented out `case` statements (`ERA001`) ([#10055](https://github.com/astral-sh/ruff/pull/10055))
+- \[`eradicate`\] detect single-line code for `try:`, `except:`, etc. (`ERA001`) ([#10057](https://github.com/astral-sh/ruff/pull/10057))
 
 ### Formatter
 
-The following preview styles are promoted to stable.
+This release introduces the new Ruff 2024.2 style, stabilizing the following changes:
 
 - Prefer splitting the assignment's value over the target or type annotation ([#8943](https://github.com/astral-sh/ruff/pull/8943))
 - Remove blank lines before class docstrings ([#9154](https://github.com/astral-sh/ruff/pull/9154))
@@ -44,42 +34,34 @@ The following preview styles are promoted to stable.
 - Reduce vertical spacing for classes and functions with a dummy (`...`) body ([#7440](https://github.com/astral-sh/ruff/issues/7440), [#9240](https://github.com/astral-sh/ruff/pull/9240))
 - Add a blank line after the module docstring ([#8283](https://github.com/astral-sh/ruff/pull/8283))
 - Parenthesize long type hints in assignments ([#9210](https://github.com/astral-sh/ruff/pull/9210))
-- Preserve indent for single mulitline-string call-expressions ([#9673](https://github.com/astral-sh/ruff/pull/9637))
+- Preserve indent for single multiline-string call-expressions ([#9673](https://github.com/astral-sh/ruff/pull/9637))
 - Normalize hex escape and unicode escape sequences ([#9280](https://github.com/astral-sh/ruff/pull/9280))
 - Format module docstrings ([#9725](https://github.com/astral-sh/ruff/pull/9725))
 
 ### CLI
 
-- Explicitly disallow `extend` as part of a `--config`
-    flag ([#10135](https://github.com/astral-sh/ruff/pull/10135))
+- Explicitly disallow `extend` as part of a `--config` flag ([#10135](https://github.com/astral-sh/ruff/pull/10135))
 - Remove `build` from the default exclusion list ([#10093](https://github.com/astral-sh/ruff/pull/10093))
+- Deprecate `ruff <path>`, `ruff --explain`, `ruff --clean`, and `ruff --generate-shell-completion` in favor of `ruff check <path>`, `ruff rule`, `ruff clean`, and `ruff generate-shell-completion` ([#10169](https://github.com/astral-sh/ruff/pull/10169))
 
 ### Bug fixes
 
-- \[`pycodestyle`\] Mark fixes overlapping with a multiline string as
-    unsafe (`W293`) ([#10049](https://github.com/astral-sh/ruff/pull/10049))
-- \[`flake8-type-checking`\] Respect runtime-required decorators for function
-    signatures ([#10091](https://github.com/astral-sh/ruff/pull/10091))
+- \[`pycodestyle`\] Mark fixes overlapping with a multiline string as unsafe (`W293`) ([#10049](https://github.com/astral-sh/ruff/pull/10049))
+- \[`flake8-type-checking`\] Respect runtime-required decorators for function signatures ([#10091](https://github.com/astral-sh/ruff/pull/10091))
 - Set PowerPC page size to 64KB ([#10080](https://github.com/astral-sh/ruff/pull/10080))
-- \[`ruff`\] Avoid f-string false positives in `gettext`
-    calls (`RUF027`) ([#10118](https://github.com/astral-sh/ruff/pull/10118))
-- \[`pylint`\] Delete entire statement, including
-    semicolons (`PLR0203`) ([#10074](https://github.com/astral-sh/ruff/pull/10074))
+- \[`ruff`\] Avoid f-string false positives in `gettext` calls (`RUF027`) ([#10118](https://github.com/astral-sh/ruff/pull/10118))
+- \[`pylint`\] Delete entire statement, including semicolons (`PLR0203`) ([#10074](https://github.com/astral-sh/ruff/pull/10074))
 - \[`flake8-bugbear`\] Avoid adding default initializers to stubs (`B006`) ([#10152](https://github.com/astral-sh/ruff/pull/10152))
 
 ### Performance
 
-- Add cold attribute to less likely printer queue branches in the
-    formatter ([#10121](https://github.com/astral-sh/ruff/pull/10121))
-- Skip unnecessary string normalization in the
-    formatter ([#10116](https://github.com/astral-sh/ruff/pull/10116))
+- Add cold attribute to less likely printer queue branches in the formatter ([#10121](https://github.com/astral-sh/ruff/pull/10121))
+- Skip unnecessary string normalization in the formatter ([#10116](https://github.com/astral-sh/ruff/pull/10116))
 
 ### Documentation
 
-- Remove "Beta" Label from formatter
-    documentation ([#10144](https://github.com/astral-sh/ruff/pull/10144))
-- `line-length` option: fix link
-    to `pycodestyle.max-line-length` ([#10136](https://github.com/astral-sh/ruff/pull/10136))
+- Remove "Beta" Label from formatter documentation ([#10144](https://github.com/astral-sh/ruff/pull/10144))
+- `line-length` option: fix link to `pycodestyle.max-line-length` ([#10136](https://github.com/astral-sh/ruff/pull/10136))
 
 ## 0.2.2
 
