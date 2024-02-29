@@ -2,7 +2,6 @@ use ruff_formatter::write;
 use ruff_python_ast::StmtTypeAlias;
 
 use crate::comments::SourceComment;
-use crate::preview::is_prefer_splitting_right_hand_side_of_assignments_enabled;
 use crate::statement::stmt_assign::{
     AnyAssignmentOperator, AnyBeforeOperator, FormatStatementsLastExpression,
 };
@@ -23,17 +22,13 @@ impl FormatNodeRule<StmtTypeAlias> for FormatStmtTypeAlias {
         write!(f, [token("type"), space(), name.as_ref().format()])?;
 
         if let Some(type_params) = type_params {
-            if is_prefer_splitting_right_hand_side_of_assignments_enabled(f.context()) {
-                return FormatStatementsLastExpression::RightToLeft {
-                    before_operator: AnyBeforeOperator::TypeParams(type_params),
-                    operator: AnyAssignmentOperator::Assign,
-                    value,
-                    statement: item.into(),
-                }
-                .fmt(f);
-            };
-
-            write!(f, [type_params.format()])?;
+            return FormatStatementsLastExpression::RightToLeft {
+                before_operator: AnyBeforeOperator::TypeParams(type_params),
+                operator: AnyAssignmentOperator::Assign,
+                value,
+                statement: item.into(),
+            }
+            .fmt(f);
         }
 
         write!(

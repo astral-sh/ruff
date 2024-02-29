@@ -3,7 +3,6 @@ use ruff_python_ast::StmtAugAssign;
 
 use crate::comments::SourceComment;
 use crate::expression::parentheses::is_expression_parenthesized;
-use crate::preview::is_prefer_splitting_right_hand_side_of_assignments_enabled;
 use crate::statement::stmt_assign::{
     has_target_own_parentheses, AnyAssignmentOperator, AnyBeforeOperator,
     FormatStatementsLastExpression,
@@ -24,8 +23,7 @@ impl FormatNodeRule<StmtAugAssign> for FormatStmtAugAssign {
             range: _,
         } = item;
 
-        if is_prefer_splitting_right_hand_side_of_assignments_enabled(f.context())
-            && has_target_own_parentheses(target, f.context())
+        if has_target_own_parentheses(target, f.context())
             && !is_expression_parenthesized(
                 target.into(),
                 f.context().comments().ranges(),

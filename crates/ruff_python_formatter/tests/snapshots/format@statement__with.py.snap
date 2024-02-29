@@ -629,8 +629,9 @@ with (
     pass
 
 with (
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b,
+    (
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    ) as b,
     c as d,
 ):
     pass
@@ -665,25 +666,6 @@ with Child(aaaaaaaaa, bbbbbbbbbbbbbbb, cccccc), Document(
     aaaaa, bbbbbbbbbb, ddddddddddddd
 ):
     pass
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -295,8 +295,9 @@
-     pass
- 
- with (
--    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b,
-+    (
-+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-+    ) as b,
-     c as d,
- ):
-     pass
 ```
 
 

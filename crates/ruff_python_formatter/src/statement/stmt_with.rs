@@ -12,7 +12,6 @@ use crate::expression::parentheses::{
 };
 use crate::other::commas;
 use crate::prelude::*;
-use crate::preview::is_wrap_multiple_context_managers_in_parens_enabled;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::{PyFormatOptions, PythonVersion};
 
@@ -152,8 +151,7 @@ fn should_parenthesize(
         return Ok(ParenthesizeWith::IfExpands);
     }
 
-    let can_parenthesize = (is_wrap_multiple_context_managers_in_parens_enabled(context)
-        && options.target_version() >= PythonVersion::Py39)
+    let can_parenthesize = options.target_version() >= PythonVersion::Py39
         || are_with_items_parenthesized(with, context)?;
 
     if !can_parenthesize {
@@ -176,9 +174,7 @@ fn should_parenthesize(
                 // Preserve the parentheses around the context expression instead of parenthesizing the entire
                 // with items.
                 ParenthesizeWith::UnlessCommented
-            } else if is_wrap_multiple_context_managers_in_parens_enabled(context)
-                && can_omit_optional_parentheses(&single.context_expr, context)
-            {
+            } else if can_omit_optional_parentheses(&single.context_expr, context) {
                 ParenthesizeWith::Optional
             } else {
                 ParenthesizeWith::IfExpands

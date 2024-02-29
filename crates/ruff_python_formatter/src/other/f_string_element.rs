@@ -9,7 +9,6 @@ use ruff_text_size::Ranged;
 use crate::comments::{dangling_open_parenthesis_comments, trailing_comments};
 use crate::context::{FStringState, NodeLevel, WithFStringState, WithNodeLevel};
 use crate::prelude::*;
-use crate::preview::is_hex_codes_in_unicode_sequences_enabled;
 use crate::string::normalize_string;
 use crate::verbatim::verbatim_text;
 
@@ -62,7 +61,6 @@ impl Format<PyFormatContext<'_>> for FormatFStringLiteralElement<'_> {
             0,
             self.context.quotes(),
             self.context.prefix(),
-            is_hex_codes_in_unicode_sequences_enabled(f.context()),
             true,
         );
         match &normalized {
