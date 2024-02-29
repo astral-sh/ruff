@@ -209,7 +209,7 @@ impl RuleSelector {
             // Always include stable rules
             rule.is_stable()
             // Enabling preview includes all preview rules unless explicit selection is turned on
-            || ((rule.is_preview() && preview_enabled && (self.is_exact() || !preview_require_explicit))
+            || (rule.is_preview() && preview_enabled && (self.is_exact() || !preview_require_explicit))
             // Deprecated rules are excluded in preview mode unless explicitly selected
             || (rule.is_deprecated() && (!preview_enabled || self.is_exact()))
             // Removed rules are included if explicitly selected but will error downstream
