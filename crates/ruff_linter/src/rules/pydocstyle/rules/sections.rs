@@ -1665,15 +1665,15 @@ fn common_section(
                 .take_while(|line| line.trim().is_empty())
                 .count();
             if num_blank_lines < 2 {
-                let del_len = context.following_lines().next_back().map_or(0, |line| {
-                    if line.trim().is_empty() {
-                        u32::try_from(line.len()).unwrap()
-                    } else {
-                        0
-                    }
-                });
-                let del_start = context.end() - TextSize::new(del_len);
+                let del_len = if num_blank_lines == 1 {
+                    // SAFETY: Guaranteed to not be None, because `num_blank_lines`is 1.
+                    context.following_lines().next_back().unwrap().text_len()
+                } else {
+                    TextSize::new(0)
+                };
+                let del_start = context.end() - del_len;
                 let deletion = Edit::deletion(del_start, context.end());
+
                 let insertion = [Edit::insertion(
                     format!(
                         "{}{}",
