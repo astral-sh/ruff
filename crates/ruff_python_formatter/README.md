@@ -262,7 +262,6 @@ We agree, that Ruff's existing formatting (and Black's 2023 formatting) is diffi
 However, we aren't convinced that parenthesizing the nested expressions is the best way of doing it when considering expression formatting holistically.
 That's why we decided to defer the implementation of this new style and instead explore alternative formatting styles that improve nested expressions formatting that avoids unnecessary parentheses. See [psf/Black#4123 ](https://github.com/psf/black/issues/4123) for an in-depth explanation of our concerns and an outline of possible alternatives.
 
-
 #### Call expressions with a single multiline string argument
 
 Unlike Black, Ruff preserves the indentation around a single multiline string argument in a call expression.
@@ -333,8 +332,6 @@ if x:
 We may consider adopting Black's formatting at a later point but we're concerned that allowing blank lines at the start of a block
 leads to [unintentional blank lines when refactoring or moving code](https://github.com/astral-sh/ruff/issues/8893#issuecomment-1867259744).
 This difference is tracked in [#9745](https://github.com/astral-sh/ruff/issues/9745).
-
-
 
 #### Hex codes and unicode sequences
 
