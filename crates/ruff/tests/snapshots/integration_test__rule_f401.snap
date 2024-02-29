@@ -3,7 +3,7 @@ source: crates/ruff/tests/integration_test.rs
 info:
   program: ruff
   args:
-    - "--explain"
+    - rule
     - F401
 ---
 success: true
@@ -68,4 +68,3 @@ else:
 - [Typing documentation: interface conventions](https://typing.readthedocs.io/en/latest/source/libraries.html#library-interface-public-and-private-symbols)
 
 ----- stderr -----
-
