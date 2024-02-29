@@ -124,7 +124,12 @@ fn resolve_help_output_format(output_format: HelpFormat, format: Option<HelpForm
     format.unwrap_or(output_format)
 }
 
-pub fn run(args: Args) -> Result<ExitStatus> {
+pub fn run(
+    Args {
+        command,
+        global_options,
+    }: Args,
+) -> Result<ExitStatus> {
     {
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
@@ -147,13 +152,11 @@ pub fn run(args: Args) -> Result<ExitStatus> {
         }));
     }
 
-    let (command, global_config_args) = args.partition();
-
     // Enabled ANSI colors on Windows 10.
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
-    set_up_logging(global_config_args.log_level())?;
+    set_up_logging(global_options.log_level())?;
 
     match command {
         Command::Version { output_format } => {
@@ -188,15 +191,15 @@ pub fn run(args: Args) -> Result<ExitStatus> {
             Ok(ExitStatus::Success)
         }
         Command::Clean => {
-            commands::clean::clean(global_config_args.log_level())?;
+            commands::clean::clean(global_options.log_level())?;
             Ok(ExitStatus::Success)
         }
         Command::GenerateShellCompletion { shell } => {
             shell.generate(&mut Args::command(), &mut stdout());
             Ok(ExitStatus::Success)
         }
-        Command::Check(args) => check(args, global_config_args),
-        Command::Format(args) => format(args, global_config_args),
+        Command::Check(args) => check(args, global_options),
+        Command::Format(args) => format(args, global_options),
     }
 }
 

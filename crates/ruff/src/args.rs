@@ -79,6 +79,11 @@ impl GlobalConfigArgs {
     pub fn log_level(&self) -> LogLevel {
         LogLevel::from(&self.log_level_args)
     }
+
+    #[must_use]
+    fn partition(self) -> (LogLevel, Vec<SingleConfigArgument>, bool) {
+        (self.log_level(), self.config, self.isolated)
+    }
 }
 
 #[derive(Debug, Parser)]
@@ -91,16 +96,9 @@ impl GlobalConfigArgs {
 #[command(version)]
 pub struct Args {
     #[command(subcommand)]
-    command: Command,
+    pub(crate) command: Command,
     #[clap(flatten)]
-    global_options: GlobalConfigArgs,
-}
-
-impl Args {
-    #[must_use]
-    pub fn partition(self) -> (Command, GlobalConfigArgs) {
-        (self.command, self.global_options)
-    }
+    pub(crate) global_options: GlobalConfigArgs,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -598,11 +596,11 @@ impl ConfigArguments {
         global_config_args: GlobalConfigArgs,
         per_flag_overrides: ExplicitConfigOverrides,
     ) -> anyhow::Result<Self> {
-        let log_level = global_config_args.log_level();
+        let (log_level, config_arguments, isolated) = global_config_args.partition();
         let mut config_file: Option<PathBuf> = None;
         let mut overrides = Configuration::default();
 
-        for option in global_config_args.config {
+        for option in config_arguments {
             match option {
                 SingleConfigArgument::SettingsOverride(overridden_option) => {
                     let overridden_option = Arc::try_unwrap(overridden_option)
@@ -614,7 +612,7 @@ impl ConfigArguments {
                     )?);
                 }
                 SingleConfigArgument::FilePath(path) => {
-                    if global_config_args.isolated {
+                    if isolated {
                         bail!(
                             "\
 The argument `--config={}` cannot be used with `--isolated`
@@ -642,7 +640,7 @@ You cannot specify more than one configuration file on the command line.
             }
         }
         Ok(Self {
-            isolated: global_config_args.isolated,
+            isolated,
             log_level,
             config_file,
             overrides,
