@@ -1671,17 +1671,16 @@ fn common_section(
                 } else {
                     TextSize::new(0)
                 };
-                let del_start = context.end() - del_len;
-                let deletion = Edit::deletion(del_start, context.end());
 
-                let insertion = [Edit::insertion(
+                let edit = Edit::replacement(
                     format!(
                         "{}{}",
                         line_end.repeat(2 - num_blank_lines),
                         docstring.indentation
                     ),
+                    context.end() - del_len,
                     context.end(),
-                )];
+                );
 
                 let mut diagnostic = Diagnostic::new(
                     BlankLineAfterLastSection {
@@ -1689,7 +1688,7 @@ fn common_section(
                     },
                     docstring.range(),
                 );
-                diagnostic.set_fix(Fix::safe_edits(deletion, insertion));
+                diagnostic.set_fix(Fix::safe_edit(edit));
                 checker.diagnostics.push(diagnostic);
             }
         }
