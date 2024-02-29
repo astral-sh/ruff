@@ -4,14 +4,13 @@
 
 ### Ruff 2024.2 style
 
-The `format` command now formats your code according to the Ruff 2024.2 style guide.
-Read the [Changelog](./CHANGELOG.md#030) for an in detail list of changes.
+The formatter now formats code according to the Ruff 2024.2 style guide. Read the [changelog](./CHANGELOG.md#030) for a detailed list of stabilized style changes.
 
 ### `isort`: Use one blank line after imports in typing stub files
 
-Previously, Ruff used one or two blank lines (or the number configured by `isort.lines-after-imports`) in typing stub files (`.pyi`).
-Using more than one blank line isn't in accordance with the [typing style guide](https://typing.readthedocs.io/en/latest/source/stubs.html#style-guide) and incompatible with ruff's formatter.
-As of this release, `isort` now always uses one blank line after imports in typing stub files.
+Previously, Ruff used one or two blank lines (or the number configured by `isort.lines-after-imports`) after imports in typing stub files (`.pyi`).
+The [typing style guide](https://typing.readthedocs.io/en/latest/source/stubs.html#style-guide) recommends using at most 1 blank line in stub files for grouping.
+As of this release, `isort` now always uses one blank line after imports in typing stub files, the same as the formatter.
 
 ### Remove `build` from the default exclusion list
 
@@ -44,8 +43,8 @@ Ruff maintains a list of default exclusions, which now consists of the following
 - `venv`
 
 Previously, the `build` directory was excluded by default. However, the `build` directory tends to be a not un-popular directory
-name and excluding it by default caused confusion. Ruff now no longer excludes `build` by default except if it is excluded in your `.gitignore`.
-If necessary, you can exclude `build` by adding it to `extend-exclude` in your `pyproject.toml` file.
+name and excluding it by default caused confusion. Ruff now no longer excludes `build` except if it is excluded by a `.gitignore` file
+or because it is listed in`extend-exclude`.
 
 ## 0.1.9
 
