@@ -62,6 +62,51 @@ pub(crate) fn delete_stmt(
     }
 }
 
+/// Generate a [`Edit`] to delete a comment (for example: a `noqa` directive).
+pub(crate) fn delete_comment(range: TextRange, locator: &Locator) -> Edit {
+    let line_range = locator.line_range(range.start());
+
+    // Compute the leading space.
+    let prefix = locator.slice(TextRange::new(line_range.start(), range.start()));
+    let leading_space_len = prefix.text_len() - prefix.trim_whitespace_end().text_len();
+
+    // Compute the trailing space.
+    let suffix = locator.slice(TextRange::new(range.end(), line_range.end()));
+    let trailing_space_len = suffix.text_len() - suffix.trim_whitespace_start().text_len();
+
+    // Ex) `# noqa`
+    if line_range
+        == TextRange::new(
+            range.start() - leading_space_len,
+            range.end() + trailing_space_len,
+        )
+    {
+        let full_line_end = locator.full_line_end(line_range.end());
+        Edit::deletion(line_range.start(), full_line_end)
+    }
+    // Ex) `x = 1  # noqa`
+    else if range.end() + trailing_space_len == line_range.end() {
+        Edit::deletion(range.start() - leading_space_len, line_range.end())
+    }
+    // Ex) `x = 1  # noqa  # type: ignore`
+    else if locator
+        .slice(TextRange::new(
+            range.end() + trailing_space_len,
+            line_range.end(),
+        ))
+        .starts_with('#')
+    {
+        Edit::deletion(range.start(), range.end() + trailing_space_len)
+    }
+    // Ex) `x = 1  # noqa here`
+    else {
+        Edit::deletion(
+            range.start() + "# ".text_len(),
+            range.end() + trailing_space_len,
+        )
+    }
+}
+
 /// Generate a `Fix` to remove the specified imports from an `import` statement.
 pub(crate) fn remove_unused_imports<'a>(
     member_names: impl Iterator<Item = &'a str>,

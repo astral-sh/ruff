@@ -264,8 +264,7 @@ class Test(  # trailing class comment
     pass
 
 
-class Test((Aaaa)):
-    ...
+class Test((Aaaa)): ...
 
 
 class Test(
@@ -330,7 +329,6 @@ class Test:
 
 
 class Test:
-
     """Docstring"""
 
 
@@ -347,14 +345,12 @@ class Test:
 
 
 class Test:
-
     """Docstring"""
 
     x = 1
 
 
 class Test:
-
     """Docstring"""
 
     # comment
@@ -395,20 +391,17 @@ class C(
 
 @dataclass
 # Copied from transformers.models.clip.modeling_clip.CLIPOutput with CLIP->AltCLIP
-class AltCLIPOutput(ModelOutput):
-    ...
+class AltCLIPOutput(ModelOutput): ...
 
 
 @dataclass
-class AltCLIPOutput:  # Copied from transformers.models.clip.modeling_clip.CLIPOutput with CLIP->AltCLIP
-    ...
+class AltCLIPOutput: ...  # Copied from transformers.models.clip.modeling_clip.CLIPOutput with CLIP->AltCLIP
 
 
 @dataclass
 class AltCLIPOutput(
     # Copied from transformers.models.clip.modeling_clip.CLIPOutput with CLIP->AltCLIP
-):
-    ...
+): ...
 
 
 class TestTypeParams[
@@ -496,70 +489,6 @@ class QuerySet(AltersData):
 
     as_manager.queryset_only = True
     as_manager = classmethod(as_manager)
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -28,8 +28,7 @@
-     pass
- 
- 
--class Test((Aaaa)):
--    ...
-+class Test((Aaaa)): ...
- 
- 
- class Test(
-@@ -94,7 +93,6 @@
- 
- 
- class Test:
--
-     """Docstring"""
- 
- 
-@@ -111,14 +109,12 @@
- 
- 
- class Test:
--
-     """Docstring"""
- 
-     x = 1
- 
- 
- class Test:
--
-     """Docstring"""
- 
-     # comment
-@@ -159,20 +155,17 @@
- 
- @dataclass
- # Copied from transformers.models.clip.modeling_clip.CLIPOutput with CLIP->AltCLIP
--class AltCLIPOutput(ModelOutput):
--    ...
-+class AltCLIPOutput(ModelOutput): ...
- 
- 
- @dataclass
--class AltCLIPOutput:  # Copied from transformers.models.clip.modeling_clip.CLIPOutput with CLIP->AltCLIP
--    ...
-+class AltCLIPOutput: ...  # Copied from transformers.models.clip.modeling_clip.CLIPOutput with CLIP->AltCLIP
- 
- 
- @dataclass
- class AltCLIPOutput(
-     # Copied from transformers.models.clip.modeling_clip.CLIPOutput with CLIP->AltCLIP
--):
--    ...
-+): ...
- 
- 
- class TestTypeParams[
 ```
 
 

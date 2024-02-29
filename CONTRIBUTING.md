@@ -316,7 +316,7 @@ To preview any changes to the documentation locally:
     ```
 
 The documentation should then be available locally at
-[http://127.0.0.1:8000/docs/](http://127.0.0.1:8000/docs/).
+[http://127.0.0.1:8000/ruff/](http://127.0.0.1:8000/ruff/).
 
 ## Release Process
 
