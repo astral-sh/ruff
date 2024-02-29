@@ -30,24 +30,8 @@ use ruff_workspace::resolver::ConfigurationTransformer;
 
 /// All configuration options that can be passed "globally",
 /// i.e., can be passed to all subcommands
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, clap::Args)]
 pub struct GlobalConfigArgs {
-    pub log_level: LogLevel,
-    pub config_flags: Vec<SingleConfigArgument>,
-    pub isolated: bool,
-}
-
-#[derive(Debug, Parser)]
-#[command(
-    author,
-    name = "ruff",
-    about = "Ruff: An extremely fast Python linter.",
-    after_help = "For help with a specific command, see: `ruff help <command>`."
-)]
-#[command(version)]
-pub struct Args {
-    #[command(subcommand)]
-    command: Command,
     #[clap(flatten)]
     log_level_args: LogLevelArgs,
     /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
@@ -65,7 +49,7 @@ pub struct Args {
         global = true,
         help_heading = "Global options",
     )]
-    config: Vec<SingleConfigArgument>,
+    pub config: Vec<SingleConfigArgument>,
     /// Ignore all configuration files.
     //
     // Note: We can't mark this as conflicting with `--config` here
@@ -76,24 +60,46 @@ pub struct Args {
     // If a user specifies `ruff check --isolated --config=ruff.toml`,
     // we emit an error later on, after the initial parsing by clap.
     #[arg(long, help_heading = "Global options", global = true)]
-    isolated: bool,
+    pub isolated: bool,
+}
+
+impl GlobalConfigArgs {
+    pub fn new(
+        log_level_args: LogLevelArgs,
+        config_flags: Vec<SingleConfigArgument>,
+        isolated: bool,
+    ) -> Self {
+        Self {
+            log_level_args,
+            config: config_flags,
+            isolated,
+        }
+    }
+
+    pub fn log_level(&self) -> LogLevel {
+        LogLevel::from(&self.log_level_args)
+    }
+}
+
+#[derive(Debug, Parser)]
+#[command(
+    author,
+    name = "ruff",
+    about = "Ruff: An extremely fast Python linter.",
+    after_help = "For help with a specific command, see: `ruff help <command>`."
+)]
+#[command(version)]
+pub struct Args {
+    #[command(subcommand)]
+    command: Command,
+    #[clap(flatten)]
+    global_options: GlobalConfigArgs,
 }
 
 impl Args {
     #[must_use]
     pub fn partition(self) -> (Command, GlobalConfigArgs) {
-        let Args {
-            command,
-            log_level_args,
-            config,
-            isolated,
-        } = self;
-        let global_config_args = GlobalConfigArgs {
-            log_level: LogLevel::from(&log_level_args),
-            config_flags: config,
-            isolated,
-        };
-        (command, global_config_args)
+        (self.command, self.global_options)
     }
 }
 
@@ -517,7 +523,7 @@ pub enum HelpFormat {
 }
 
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug, clap::Args)]
+#[derive(Debug, Default, Clone, clap::Args)]
 pub struct LogLevelArgs {
     /// Enable verbose logging.
     #[arg(
@@ -592,10 +598,11 @@ impl ConfigArguments {
         global_config_args: GlobalConfigArgs,
         per_flag_overrides: ExplicitConfigOverrides,
     ) -> anyhow::Result<Self> {
+        let log_level = global_config_args.log_level();
         let mut config_file: Option<PathBuf> = None;
         let mut overrides = Configuration::default();
 
-        for option in global_config_args.config_flags {
+        for option in global_config_args.config {
             match option {
                 SingleConfigArgument::SettingsOverride(overridden_option) => {
                     let overridden_option = Arc::try_unwrap(overridden_option)
@@ -636,7 +643,7 @@ You cannot specify more than one configuration file on the command line.
         }
         Ok(Self {
             isolated: global_config_args.isolated,
-            log_level: global_config_args.log_level,
+            log_level,
             config_file,
             overrides,
             per_flag_overrides,

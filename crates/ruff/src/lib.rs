@@ -153,7 +153,7 @@ pub fn run(args: Args) -> Result<ExitStatus> {
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
-    set_up_logging(global_config_args.log_level)?;
+    set_up_logging(global_config_args.log_level())?;
 
     match command {
         Command::Version { output_format } => {
@@ -188,7 +188,7 @@ pub fn run(args: Args) -> Result<ExitStatus> {
             Ok(ExitStatus::Success)
         }
         Command::Clean => {
-            commands::clean::clean(global_config_args.log_level)?;
+            commands::clean::clean(global_config_args.log_level())?;
             Ok(ExitStatus::Success)
         }
         Command::GenerateShellCompletion { shell } => {

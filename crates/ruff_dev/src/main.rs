@@ -4,8 +4,11 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use ruff::{args::GlobalConfigArgs, check};
-use ruff_linter::logging::{set_up_logging, LogLevel};
+use ruff::{
+    args::{GlobalConfigArgs, LogLevelArgs},
+    check,
+};
+use ruff_linter::logging::set_up_logging;
 use std::process::ExitCode;
 
 mod format_dev;
@@ -49,11 +52,7 @@ impl Args {
             config,
             isolated,
         } = self;
-        let global_config_args = GlobalConfigArgs {
-            log_level: LogLevel::default(),
-            config_flags: config,
-            isolated,
-        };
+        let global_config_args = GlobalConfigArgs::new(LogLevelArgs::default(), config, isolated);
         (command, global_config_args)
     }
 }
@@ -119,7 +118,7 @@ fn main() -> Result<ExitCode> {
             args: subcommand_args,
             repeat,
         } => {
-            set_up_logging(global_config_args.log_level)?;
+            set_up_logging(global_config_args.log_level())?;
             for _ in 0..repeat {
                 check(subcommand_args.clone(), global_config_args.clone())?;
             }
