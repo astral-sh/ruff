@@ -6,13 +6,13 @@
 
 The formatter now formats code according to the Ruff 2024.2 style guide. Read the [changelog](./CHANGELOG.md#030) for a detailed list of stabilized style changes.
 
-### `isort`: Use one blank line after imports in typing stub files
+### `isort`: Use one blank line after imports in typing stub files ([#9971](https://github.com/astral-sh/ruff/pull/9971))
 
 Previously, Ruff used one or two blank lines (or the number configured by `isort.lines-after-imports`) after imports in typing stub files (`.pyi` files).
 The [typing style guide for stubs](https://typing.readthedocs.io/en/latest/source/stubs.html#style-guide) recommends using at most 1 blank line for grouping.
 As of this release, `isort` now always uses one blank line after imports in stub files, the same as the formatter.
 
-### Remove `build` from the default exclusion list
+### `build` is no longer excluded by default ([#10093](https://github.com/astral-sh/ruff/pull/10093))
 
 Ruff maintains a list of directories and files that are excluded by default. This list now consists of the following patterns:
 

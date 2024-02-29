@@ -13,7 +13,7 @@ detect invalid formatter suppression comments.
 
 ### Rule changes
 
-- \[`isort`\]: Use one blank line after imports in typing stub files. ([#9971](https://github.com/astral-sh/ruff/pull/9971))
+- \[`isort`\]: Use one blank line after imports in typing stub files ([#9971](https://github.com/astral-sh/ruff/pull/9971))
 - \[`pylint`\] New Rule `dict-iter-missing-items` (`PLE1141`) ([#9845](https://github.com/astral-sh/ruff/pull/9845))
 - \[`pylint`\] Ignore `sys.version` and `sys.platform` (`PLR1714`) ([#10054](https://github.com/astral-sh/ruff/pull/10054))
 - \[`ruff`\] Expand rule for `list(iterable).pop(0)` idiom (`RUF015`) ([#10148](https://github.com/astral-sh/ruff/pull/10148))
@@ -48,7 +48,7 @@ This release introduces the Ruff 2024.2 style, stabilizing the following changes
 
 - \[`pycodestyle`\] Mark fixes overlapping with a multiline string as unsafe (`W293`) ([#10049](https://github.com/astral-sh/ruff/pull/10049))
 - \[`flake8-type-checking`\] Respect runtime-required decorators for function signatures ([#10091](https://github.com/astral-sh/ruff/pull/10091))
-- Set PowerPC page size to 64KB ([#10080](https://github.com/astral-sh/ruff/pull/10080))
+- Fix `ruff` crashing on PowerPC systems because of too small page size ([#10080](https://github.com/astral-sh/ruff/pull/10080))
 - \[`ruff`\] Avoid f-string false positives in `gettext` calls (`RUF027`) ([#10118](https://github.com/astral-sh/ruff/pull/10118))
 - \[`pylint`\] Delete entire statement, including semicolons (`PLR0203`) ([#10074](https://github.com/astral-sh/ruff/pull/10074))
 - \[`flake8-bugbear`\] Avoid adding default initializers to stubs (`B006`) ([#10152](https://github.com/astral-sh/ruff/pull/10152))
