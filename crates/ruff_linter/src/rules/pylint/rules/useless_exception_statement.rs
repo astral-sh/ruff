@@ -6,27 +6,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
-/// ## What it does
-/// Checks for a missing `raise` statement for an exception. It's unnecessary to
-/// use an exception without raising it. This rule checks for the absence of a
-/// `raise` statement for an exception.
-///
-/// ## Why is this bad?
-/// It's unnecessary to use an exception without raising it. This can lead to
-/// confusion and unexpected behavior. It's better to raise the exception to
-/// indicate that an error has occurred.
-///
-/// ## Example
-/// ```python
-/// Exception("exception should be raised")
-/// ```
-///
-/// Use instead:
-/// ```python
-/// raise Exception("exception should be raised")
-/// ```
-
-// Python exception hierarchy: https://docs.python.org/3/library/exceptions.html#exception-hierarchy
+/// Python exception hierarchy: https://docs.python.org/3/library/exceptions.html#exception-hierarchy
 const PY_BUILTIN_EXCEPTIONS: [&str; 21] = [
     "SystemExit",
     "Exception",
@@ -51,6 +31,25 @@ const PY_BUILTIN_EXCEPTIONS: [&str; 21] = [
     "ValueError",
 ];
 
+/// ## What it does
+/// Checks for a missing `raise` statement for an exception. It's unnecessary to
+/// use an exception without raising it. This rule checks for the absence of a
+/// `raise` statement for an exception.
+///
+/// ## Why is this bad?
+/// It's unnecessary to use an exception without raising it. This can lead to
+/// confusion and unexpected behavior. It's better to raise the exception to
+/// indicate that an error has occurred.
+///
+/// ## Example
+/// ```python
+/// Exception("exception should be raised")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// raise Exception("exception should be raised")
+/// ```
 #[violation]
 pub struct UselessExceptionStatement;
 
