@@ -119,7 +119,7 @@ fn main() -> Result<ExitCode> {
             args: subcommand_args,
             repeat,
         } => {
-            set_up_logging(&global_config_args.log_level)?;
+            set_up_logging(global_config_args.log_level)?;
             for _ in 0..repeat {
                 check(subcommand_args.clone(), global_config_args.clone())?;
             }

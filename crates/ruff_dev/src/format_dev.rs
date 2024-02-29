@@ -43,7 +43,7 @@ fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, ConfigArgumen
         .no_binary_name(true)
         .get_matches_from(dirs);
     let arguments: FormatCommand = FormatCommand::from_arg_matches(&args_matches)?;
-    let (cli, config_arguments, _, _) = arguments.partition(GlobalConfigArgs::default())?;
+    let (cli, config_arguments) = arguments.partition(GlobalConfigArgs::default())?;
     Ok((cli, config_arguments))
 }
 
@@ -51,9 +51,8 @@ fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, ConfigArgumen
 fn find_pyproject_config(
     cli: &FormatArguments,
     config_arguments: &ConfigArguments,
-    isolated: bool,
 ) -> anyhow::Result<PyprojectConfig> {
-    let mut pyproject_config = resolve(isolated, config_arguments, cli.stdin_filename.as_deref())?;
+    let mut pyproject_config = resolve(config_arguments, cli.stdin_filename.as_deref())?;
     // We don't want to format pyproject.toml
     pyproject_config.settings.file_resolver.include = FilePatternSet::try_from_iter([
         FilePattern::Builtin("*.py"),
@@ -460,7 +459,7 @@ fn format_dev_project(
     // Find files to check (or in this case, format twice). Adapted from ruff
     // First argument is ignored
     let (cli, overrides) = parse_cli(files)?;
-    let pyproject_config = find_pyproject_config(&cli, &overrides, false)?;
+    let pyproject_config = find_pyproject_config(&cli, &overrides)?;
     let (paths, resolver) = ruff_check_paths(&pyproject_config, &cli, &overrides)?;
 
     if paths.is_empty() {

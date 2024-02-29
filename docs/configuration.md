@@ -540,7 +540,7 @@ Log levels:
   -s, --silent   Disable all logging (but still exit with status code "1" upon
                  detecting diagnostics)
 
-Global configuration options:
+Global options:
       --config <CONFIG_OPTION>
           Either a path to a TOML configuration file (`pyproject.toml` or
           `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
@@ -678,7 +678,7 @@ Log levels:
   -s, --silent   Disable all logging (but still exit with status code "1" upon
                  detecting diagnostics)
 
-Global configuration options:
+Global options:
       --config <CONFIG_OPTION>
           Either a path to a TOML configuration file (`pyproject.toml` or
           `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
@@ -760,7 +760,7 @@ Log levels:
   -s, --silent   Disable all logging (but still exit with status code "1" upon
                  detecting diagnostics)
 
-Global configuration options:
+Global options:
       --config <CONFIG_OPTION>
           Either a path to a TOML configuration file (`pyproject.toml` or
           `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
