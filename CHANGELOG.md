@@ -8,7 +8,7 @@ detect invalid formatter suppression comments.
 ### Preview features
 
 - \[`pycodestyle`\] Allow `os.environ` modifications between imports (`E402`) ([#10066](https://github.com/astral-sh/ruff/pull/10066))
-- \[`pycodestyle`\] Don't warn about single whitespace before comma in tuple (`E203`) ([#10094](https://github.com/astral-sh/ruff/pull/10094))
+- \[`pycodestyle`\] Don't warn about a single whitespace character before a comma in a tuple (`E203`) ([#10094](https://github.com/astral-sh/ruff/pull/10094))
 - \[`flake8-bandit`\] Remove suspicious-lxml-import (`S410`) ([#10154](https://github.com/astral-sh/ruff/pull/10154))
 
 ### Rule changes
@@ -21,11 +21,11 @@ detect invalid formatter suppression comments.
 - \[`flake8-copyright`\] Allow © in copyright notices ([#10065](https://github.com/astral-sh/ruff/pull/10065))
 - \[`pyupgrade`\] Detect literals with unary operators (`UP018`) ([#10060](https://github.com/astral-sh/ruff/pull/10060))
 - \[`eradicate`\] Detect commented out `case` statements (`ERA001`) ([#10055](https://github.com/astral-sh/ruff/pull/10055))
-- \[`eradicate`\] detect single-line code for `try:`, `except:`, etc. (`ERA001`) ([#10057](https://github.com/astral-sh/ruff/pull/10057))
+- \[`eradicate`\] Detect single-line code for `try:`, `except:`, etc. (`ERA001`) ([#10057](https://github.com/astral-sh/ruff/pull/10057))
 
 ### Formatter
 
-This release introduces the new Ruff 2024.2 style, stabilizing the following changes:
+This release introduces the Ruff 2024.2 style, stabilizing the following changes:
 
 - Prefer splitting the assignment's value over the target or type annotation ([#8943](https://github.com/astral-sh/ruff/pull/8943))
 - Remove blank lines before class docstrings ([#9154](https://github.com/astral-sh/ruff/pull/9154))

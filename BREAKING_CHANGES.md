@@ -8,13 +8,13 @@ The formatter now formats code according to the Ruff 2024.2 style guide. Read th
 
 ### `isort`: Use one blank line after imports in typing stub files
 
-Previously, Ruff used one or two blank lines (or the number configured by `isort.lines-after-imports`) after imports in typing stub files (`.pyi`).
-The [typing style guide](https://typing.readthedocs.io/en/latest/source/stubs.html#style-guide) recommends using at most 1 blank line in stub files for grouping.
-As of this release, `isort` now always uses one blank line after imports in typing stub files, the same as the formatter.
+Previously, Ruff used one or two blank lines (or the number configured by `isort.lines-after-imports`) after imports in typing stub files (`.pyi` files).
+The [typing style guide for stubs](https://typing.readthedocs.io/en/latest/source/stubs.html#style-guide) recommends using at most 1 blank line for grouping.
+As of this release, `isort` now always uses one blank line after imports in stub files, the same as the formatter.
 
 ### Remove `build` from the default exclusion list
 
-Ruff maintains a list of default exclusions, which now consists of the following patterns:
+Ruff maintains a list of directories and files that are excluded by default. This list now consists of the following patterns:
 
 - `.bzr`
 - `.direnv`
@@ -42,9 +42,9 @@ Ruff maintains a list of default exclusions, which now consists of the following
 - `site-packages`
 - `venv`
 
-Previously, the `build` directory was excluded by default. However, the `build` directory tends to be a not un-popular directory
-name and excluding it by default caused confusion. Ruff now no longer excludes `build` except if it is excluded by a `.gitignore` file
-or because it is listed in`extend-exclude`.
+Previously, the `build` directory was included in this list. However, the `build` directory tends to be a not-unpopular directory
+name, and excluding it by default caused confusion. Ruff now no longer excludes `build` except if it is excluded by a `.gitignore` file
+or because it is listed in `extend-exclude`.
 
 ## 0.1.9
 

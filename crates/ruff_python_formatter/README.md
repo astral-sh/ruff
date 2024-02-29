@@ -308,11 +308,11 @@ dedent(""""
 """)
 ```
 
-Black intended to ship a similar style change as part of the 2024 style that always removes the indent. It turned out that this change was too disruptive to justify the cases where it improved formatting. Ruff introduced the new heuristic of preserving the indent, and we believe it's a good compromise that improves formatting but isn't disruptive.
+Black intended to ship a similar style change as part of the 2024 style that always removes the indent. It turned out that this change was too disruptive to justify the cases where it improved formatting. Ruff introduced the new heuristic of preserving the indent. We believe it's a good compromise that improves formatting but minimizes disruption for users.
 
 #### Blank lines at the start of a block
 
-Black 24 and newer allow blank lines at the start of a block, where Ruff always removes them:
+Black 24 and newer allows blank lines at the start of a block, where Ruff always removes them:
 
 ```python
 # Black
@@ -325,7 +325,7 @@ if x:
   a = 123
 ```
 
-We consider adopting Black's formatting at a later point with an improved heuristic because we're concerned that allowing blank lines at the start of a block leads [to unintentional blank lines when refactoring or moving code](https://github.com/astral-sh/ruff/issues/8893#issuecomment-1867259744). The style change is tracked in [#9745](https://github.com/astral-sh/ruff/issues/9745).
+Currently, we are concerned that allowing blank lines at the start of a block leads [to unintentional blank lines when refactoring or moving code](https://github.com/astral-sh/ruff/issues/8893#issuecomment-1867259744). However, we will consider adotping Black's formatting at a later point with an improved heuristic. The style change is tracked in [#9745](https://github.com/astral-sh/ruff/issues/9745).
 
 #### Hex codes and Unicode sequences
 
