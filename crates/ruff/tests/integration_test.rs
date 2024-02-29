@@ -71,6 +71,7 @@ impl<'a> RuffCheck<'a> {
     /// Generate a [`Command`] for the `ruff check` command.
     fn build(self) -> Command {
         let mut cmd = ruff_cmd();
+        cmd.arg("check");
         if let Some(output_format) = self.output_format {
             cmd.args(["--output-format", output_format]);
         }
@@ -805,13 +806,13 @@ fn full_output_format() {
 }
 
 #[test]
-fn explain_status_codes_f401() {
-    assert_cmd_snapshot!(ruff_cmd().args(["--explain", "F401"]));
+fn rule_f401() {
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "F401"]));
 }
 
 #[test]
-fn explain_status_codes_ruf404() {
-    assert_cmd_snapshot!(ruff_cmd().args(["--explain", "RUF404"]), @r###"
+fn rule_invalid_rule_name() {
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404"]), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1348,7 +1349,7 @@ fn unreadable_pyproject_toml() -> Result<()> {
 
     // Don't `--isolated` since the configuration discovery is where the error happens
     let args = Args::parse_from(["", "check", "--no-cache", tempdir.path().to_str().unwrap()]);
-    let err = run(args).err().context("Unexpected success")?;
+    let err = run(args, None).err().context("Unexpected success")?;
     assert_eq!(
         err.chain()
             .map(std::string::ToString::to_string)

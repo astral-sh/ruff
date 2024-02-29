@@ -27,26 +27,42 @@ pub fn main() -> ExitCode {
     let mut args =
         argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX).unwrap();
 
-    // Clap doesn't support default subcommands but we want to run `check` by
-    // default for convenience and backwards-compatibility, so we just
-    // preprocess the arguments accordingly before passing them to Clap.
-    if let Some(arg) = args.get(1) {
-        if arg
-            .to_str()
-            .is_some_and(|arg| !Command::has_subcommand(rewrite_legacy_subcommand(arg)))
+    // We can't use `warn_user` here because logging isn't set up at this point
+    // and we also don't know if the user runs ruff with quiet.
+    // Keep the message and pass it to `run` that is responsible for emitting the warning.
+    let deprecated_alias_warning = match args.get(1).and_then(|arg| arg.to_str()) {
+        // Deprecated aliases that are handled by clap
+        Some("--explain") => {
+            Some("`ruff --explain <RULE>` is deprecated. Use `ruff rule <RULE>` instead.")
+        }
+        Some("--clean") => {
+            Some("`ruff --clean` is deprecated. Use `ruff clean` instead.")
+        }
+        Some("--generate-shell-completion") => {
+            Some("`ruff --generate-shell-completion <SHELL>` is deprecated. Use `ruff generate-shell-completion <SHELL>` instead.")
+        }
+        // Deprecated `ruff` alias to `ruff check`
+        // Clap doesn't support default subcommands but we want to run `check` by
+        // default for convenience and backwards-compatibility, so we just
+        // preprocess the arguments accordingly before passing them to Clap.
+        Some(arg) if !Command::has_subcommand(arg)
             && arg != "-h"
             && arg != "--help"
             && arg != "-V"
             && arg != "--version"
-            && arg != "help"
-        {
-            args.insert(1, "check".into());
-        }
-    }
+            && arg != "help" => {
+
+            {
+                args.insert(1, "check".into());
+                Some("`ruff <path>` is deprecated. Use `ruff check <path>` instead.")
+            }
+        },
+        _ => None
+    };
 
     let args = Args::parse_from(args);
 
-    match run(args) {
+    match run(args, deprecated_alias_warning) {
         Ok(code) => code.into(),
         Err(err) => {
             #[allow(clippy::print_stderr)]
@@ -63,14 +79,5 @@ pub fn main() -> ExitCode {
             }
             ExitStatus::Error.into()
         }
-    }
-}
-
-fn rewrite_legacy_subcommand(cmd: &str) -> &str {
-    match cmd {
-        "--explain" => "rule",
-        "--clean" => "clean",
-        "--generate-shell-completion" => "generate-shell-completion",
-        cmd => cmd,
     }
 }

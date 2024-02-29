@@ -12,7 +12,7 @@ use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 use tempfile::TempDir;
 
 const BIN_NAME: &str = "ruff";
-const STDIN_BASE_OPTIONS: &[&str] = &["--no-cache", "--output-format", "concise"];
+const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
 
 fn tempdir_filter(tempdir: &TempDir) -> String {
     format!(r"{}\\?/?", escape(tempdir.path().to_str().unwrap()))
@@ -246,7 +246,6 @@ OTHER = "OTHER"
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .arg("check")
         .args(STDIN_BASE_OPTIONS)
         .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
         // Explicitly pass test.py, should be linted regardless of it being excluded by lint.exclude
@@ -293,7 +292,6 @@ inline-quotes = "single"
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .arg("check")
         .args(STDIN_BASE_OPTIONS)
         .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
         .args(["--stdin-filename", "generated.py"])
@@ -386,7 +384,6 @@ inline-quotes = "single"
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .arg("check")
         .args(STDIN_BASE_OPTIONS)
         .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
         .args(["--stdin-filename", "generated.py"])
@@ -435,7 +432,6 @@ inline-quotes = "single"
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .arg("check")
         .args(STDIN_BASE_OPTIONS)
         .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
         .args(["--stdin-filename", "generated.py"])
@@ -495,7 +491,6 @@ ignore = ["D203", "D212"]
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(sub_dir)
-        .arg("check")
         .args(STDIN_BASE_OPTIONS)
         , @r###"
     success: true
@@ -921,7 +916,6 @@ include = ["*.ipy"]
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .arg("check")
         .args(STDIN_BASE_OPTIONS)
         .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
         .args(["--extension", "ipy:ipynb"])

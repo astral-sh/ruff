@@ -128,6 +128,7 @@ pub fn run(
         command,
         log_level_args,
     }: Args,
+    deprecated_alias_warning: Option<&'static str>,
 ) -> Result<ExitStatus> {
     {
         let default_panic_hook = std::panic::take_hook();
@@ -157,6 +158,10 @@ pub fn run(
 
     let log_level = LogLevel::from(&log_level_args);
     set_up_logging(&log_level)?;
+
+    if let Some(deprecated_alias_warning) = deprecated_alias_warning {
+        warn_user!("{}", deprecated_alias_warning);
+    }
 
     match command {
         Command::Version { output_format } => {
