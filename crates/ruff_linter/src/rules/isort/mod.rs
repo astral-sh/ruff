@@ -928,7 +928,10 @@ mod tests {
 
     #[test_case(Path::new("default_section_user_defined.py"))]
     fn default_section_can_map_to_user_defined_section(path: &Path) -> Result<()> {
-        let snapshot = format!("default_section_user_defined_{}", path.to_string_lossy());
+        let snapshot = format!(
+            "default_section_can_map_to_user_defined_section_{}",
+            path.to_string_lossy()
+        );
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
@@ -948,6 +951,30 @@ mod tests {
                     ],
                     force_sort_within_sections: true,
                     default_section: ImportSection::UserDefined("django".to_string()),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("no_standard_library.py"))]
+    fn no_standard_library(path: &Path) -> Result<()> {
+        let snapshot = format!("no_standard_library_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    section_order: vec![
+                        ImportSection::Known(ImportType::Future),
+                        ImportSection::Known(ImportType::ThirdParty),
+                        ImportSection::Known(ImportType::FirstParty),
+                        ImportSection::Known(ImportType::LocalFolder),
+                    ],
+                    force_sort_within_sections: true,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
