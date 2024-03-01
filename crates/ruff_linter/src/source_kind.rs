@@ -1,9 +1,10 @@
+use std::fmt::Formatter;
 use std::io;
 use std::io::Write;
 use std::path::Path;
 
 use anyhow::Result;
-use similar::TextDiff;
+use similar::{ChangeTag, TextDiff};
 use thiserror::Error;
 
 use ruff_diagnostics::SourceMap;
@@ -89,50 +90,53 @@ impl SourceKind {
         }
     }
 
-    /// Write a diff of the transformed source file to `stdout`.
-    pub fn diff(
-        &self,
-        other: &Self,
-        path: Option<&Path>,
-        writer: &mut dyn Write,
-    ) -> io::Result<()> {
+    /// Returns a diff between the original and modified source code.
+    ///
+    /// Returns `None` if `self` and `other` are not of the same kind.
+    pub fn diff<'a>(
+        &'a self,
+        other: &'a Self,
+        path: Option<&'a Path>,
+    ) -> Option<SourceKindDiff<'a>> {
         match (self, other) {
-            (SourceKind::Python(src), SourceKind::Python(dst)) => {
-                let text_diff = TextDiff::from_lines(src, dst);
-                let unified_diff = text_diff.unified_diff();
+            (SourceKind::Python(src), SourceKind::Python(dst)) => Some(SourceKindDiff {
+                kind: DiffKind::Python(src, dst),
+                path,
+            }),
+            (SourceKind::IpyNotebook(src), SourceKind::IpyNotebook(dst)) => Some(SourceKindDiff {
+                kind: DiffKind::IpyNotebook(src, dst),
+                path,
+            }),
+            _ => None,
+        }
+    }
+}
 
-                let relativized_path = if let Some(path) = path {
-                    fs::relativize_path(path)
-                } else {
-                    String::new()
-                };
+#[derive(Clone, Debug)]
+pub struct SourceKindDiff<'a> {
+    kind: DiffKind<'a>,
+    path: Option<&'a Path>,
+}
 
-                // header
-                writeln!(writer, "+++ {}", relativized_path.green())?;
-                writeln!(writer, "--- {}", relativized_path.red())?;
+impl std::fmt::Display for SourceKindDiff<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self.kind {
+            DiffKind::Python(original, modified) => {
+                let mut diff = CodeDiff::new(original, modified);
 
-                // individual lines
-                for hunk in unified_diff.iter_hunks() {
-                    let hunk_str = hunk.to_string();
-                    for line in hunk_str.lines() {
-                        let colored_line = match line.chars().next() {
-                            Some('+') => line.green(),
-                            Some('-') => line.red(),
-                            _ => line.normal(),
-                        };
-                        writeln!(writer, "{colored_line}")?;
-                    }
+                let relative_path = self.path.map(fs::relativize_path);
+
+                if let Some(relative_path) = &relative_path {
+                    diff.header(relative_path, relative_path);
                 }
 
-                writer.write_all(b"\n")?;
-                writer.flush()?;
-
-                Ok(())
+                writeln!(f, "{diff}")?;
             }
-            (SourceKind::IpyNotebook(src), SourceKind::IpyNotebook(dst)) => {
+            DiffKind::IpyNotebook(original, modified) => {
                 // Cell indices are 1-based.
-                for ((idx, src_cell), dst_cell) in
-                    (1u32..).zip(src.cells().iter()).zip(dst.cells().iter())
+                for ((idx, src_cell), dst_cell) in (1u32..)
+                    .zip(original.cells().iter())
+                    .zip(modified.cells().iter())
                 {
                     let (Cell::Code(src_cell), Cell::Code(dst_cell)) = (src_cell, dst_cell) else {
                         continue;
@@ -141,8 +145,18 @@ impl SourceKind {
                     let src_source_code = src_cell.source.to_string();
                     let dst_source_code = dst_cell.source.to_string();
 
-                    let text_diff = TextDiff::from_lines(&src_source_code, &dst_source_code);
-                    let mut unified_diff = text_diff.unified_diff();
+                    let header = self.path.map_or_else(
+                        || (format!("cell {idx}"), format!("cell {idx}")),
+                        |path| {
+                            (
+                                format!("{}:cell {}", &fs::relativize_path(path), idx),
+                                format!("{}:cell {}", &fs::relativize_path(path), idx),
+                            )
+                        },
+                    );
+
+                    let mut diff = CodeDiff::new(&src_source_code, &dst_source_code);
+                    diff.header(&header.0, &header.1);
 
                     // Jupyter notebook cells don't necessarily have a newline
                     // at the end. For example,
@@ -159,27 +173,85 @@ impl SourceKind {
                     // print("hello")
                     //
                     // ```
-                    unified_diff.missing_newline_hint(false);
+                    diff.missing_newline_hint(false);
 
-                    if let Some(path) = path {
-                        unified_diff.header(
-                            &format!("{}:cell {}", &fs::relativize_path(path), idx),
-                            &format!("{}:cell {}", &fs::relativize_path(path), idx),
-                        );
-                    } else {
-                        unified_diff.header(&format!("cell {idx}"), &format!("cell {idx}"));
-                    };
-
-                    unified_diff.to_writer(&mut *writer)?;
+                    write!(f, "{diff}")?;
                 }
 
-                writer.write_all(b"\n")?;
-                writer.flush()?;
-
-                Ok(())
+                writeln!(f)?;
             }
-            _ => panic!("cannot diff Python source code with Jupyter notebook source code"),
         }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum DiffKind<'a> {
+    Python(&'a str, &'a str),
+    IpyNotebook(&'a Notebook, &'a Notebook),
+}
+
+struct CodeDiff<'a> {
+    diff: TextDiff<'a, 'a, 'a, str>,
+    header: Option<(&'a str, &'a str)>,
+    missing_newline_hint: bool,
+}
+
+impl<'a> CodeDiff<'a> {
+    fn new(original: &'a str, modified: &'a str) -> Self {
+        let diff = TextDiff::from_lines(original, modified);
+        Self {
+            diff,
+            header: None,
+            missing_newline_hint: true,
+        }
+    }
+
+    fn header(&mut self, original: &'a str, modified: &'a str) {
+        self.header = Some((original, modified));
+    }
+
+    fn missing_newline_hint(&mut self, missing_newline_hint: bool) {
+        self.missing_newline_hint = missing_newline_hint;
+    }
+}
+
+impl std::fmt::Display for CodeDiff<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some((original, modified)) = self.header {
+            writeln!(f, "--- {}", original.red())?;
+            writeln!(f, "+++ {}", modified.green())?;
+        }
+
+        let mut unified = self.diff.unified_diff();
+        unified.missing_newline_hint(self.missing_newline_hint);
+
+        // Individual hunks (section of changes)
+        for hunk in unified.iter_hunks() {
+            writeln!(f, "{}", hunk.header())?;
+
+            // individual lines
+            for change in hunk.iter_changes() {
+                match change.tag() {
+                    ChangeTag::Equal => write!(f, " {}", change.value())?,
+                    ChangeTag::Delete => write!(f, "{}{}", "-".red(), change.value())?,
+                    ChangeTag::Insert => write!(f, "{}{}", "+".green(), change.value())?,
+                }
+
+                if !self.diff.newline_terminated() {
+                    writeln!(f)?;
+                } else if change.missing_newline() {
+                    if self.missing_newline_hint {
+                        writeln!(f, "{}", "\n\\ No newline at end of file".red())?;
+                    } else {
+                        writeln!(f)?;
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
