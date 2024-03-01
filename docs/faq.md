@@ -261,8 +261,8 @@ from numpy import tan, uint8, uint16, uint32, uint64
 Like isort, Ruff's import sorting is compatible with Black.
 
 Ruff does not yet support all of isort's configuration options, though it does support many of
-them. You can find the supported settings in the [API reference](settings.md#isort).
-For example, you can set [`known-first-party`](settings.md#isort-known-first-party)
+them. You can find the supported settings in the [API reference](settings.md#lintisort).
+For example, you can set [`known-first-party`](settings.md#lint_isort_known-first-party)
 like so:
 
 === "pyproject.toml"
