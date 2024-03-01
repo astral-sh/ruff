@@ -426,7 +426,7 @@ Found 3 errors.
 
 ## Does Ruff support NumPy- or Google-style docstrings?
 
-Yes! To enforce a docstring convention, add a [`convention`](settings.md#pydocstyle-convention)
+Yes! To enforce a docstring convention, add a [`convention`](settings.md#lint_pydocstyle_convention)
 setting following to your configuration file:
 
 === "pyproject.toml"
@@ -447,7 +447,7 @@ For example, if you're coming from flake8-docstrings, and your originating confi
 `--docstring-convention=numpy`, you'd instead set `convention = "numpy"` in your `pyproject.toml`,
 as above.
 
-Alongside [`convention`](settings.md#pydocstyle-convention), you'll want to
+Alongside [`convention`](settings.md#lint_pydocstyle_convention), you'll want to
 explicitly enable the `D` rule code prefix, since the `D` rules are not enabled by default:
 
 === "pyproject.toml"
@@ -470,7 +470,7 @@ explicitly enable the `D` rule code prefix, since the `D` rules are not enabled 
     convention = "google"
     ```
 
-Enabling a [`convention`](settings.md#pydocstyle-convention) will disable any rules that are not
+Enabling a [`convention`](settings.md#lint_pydocstyle_convention) will disable any rules that are not
 included in the specified convention. As such, the intended workflow is to enable a convention and
 then selectively enable or disable any additional rules on top of it:
 
@@ -556,7 +556,7 @@ The Google convention includes all `D` errors apart from:
 [`D409`](rules/section-underline-matches-section-length.md), and
 [`D413`](rules/no-blank-line-after-section.md).
 
-By default, no [`convention`](settings.md#pydocstyle-convention) is set, and so the enabled rules
+By default, no [`convention`](settings.md#lint_pydocstyle_convention) is set, and so the enabled rules
 are determined by the [`select`](settings.md#select) setting alone.
 
 ## What is "preview"?
