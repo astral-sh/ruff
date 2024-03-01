@@ -1,164 +1,157 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-useless_exception_statement.py:10:5: PLW0133 [*] Missing `raise` statement for exception; add `raise` statement to exception
-   |
- 9 | def test():
-10 |     AssertionError("This is an assertion error")  # PLW0133
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133
-11 | 
-12 | # Test case 2: Useless exception statement in try-except block
-   |
-   = help: Add `raise` statement to exception
+useless_exception_statement.py:7:5: PLW0133 [*] Missing `raise` statement for exception; add `raise` statement to exception
+  |
+6 | def func():
+7 |     AssertionError("This is an assertion error")  # PLW0133
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133
+  |
+  = help: Add `raise` statement to exception
 
 ℹ Safe fix
-7  7  | 
-8  8  | 
-9  9  | def test():
-10    |-    AssertionError("This is an assertion error")  # PLW0133
-   10 |+    raise AssertionError("This is an assertion error")  # PLW0133
-11 11 | 
-12 12 | # Test case 2: Useless exception statement in try-except block
-13 13 | 
+4 4 | 
+5 5 | 
+6 6 | def func():
+7   |-    AssertionError("This is an assertion error")  # PLW0133
+  7 |+    raise AssertionError("This is an assertion error")  # PLW0133
+8 8 | 
+9 9 | 
+10 10 | # Test case 2: Useless exception statement in try-except block
 
-useless_exception_statement.py:16:9: PLW0133 [*] Missing `raise` statement for exception; add `raise` statement to exception
+useless_exception_statement.py:13:9: PLW0133 [*] Missing `raise` statement for exception; add `raise` statement to exception
    |
-14 | def test():
-15 |     try:
-16 |         Exception("This is an exception") # PLW0133
+11 | def func():
+12 |     try:
+13 |         Exception("This is an exception")  # PLW0133
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133
-17 |     except Exception as e:
-18 |         pass  # PL
+14 |     except Exception as err:
+15 |         pass
    |
    = help: Add `raise` statement to exception
 
 ℹ Safe fix
-13 13 | 
-14 14 | def test():
-15 15 |     try:
-16    |-        Exception("This is an exception") # PLW0133
-   16 |+        raise Exception("This is an exception") # PLW0133
-17 17 |     except Exception as e:
-18 18 |         pass  # PL
-19 19 | 
+10 10 | # Test case 2: Useless exception statement in try-except block
+11 11 | def func():
+12 12 |     try:
+13    |-        Exception("This is an exception")  # PLW0133
+   13 |+        raise Exception("This is an exception")  # PLW0133
+14 14 |     except Exception as err:
+15 15 |         pass
+16 16 | 
 
-useless_exception_statement.py:24:9: PLW0133 [*] Missing `raise` statement for exception; add `raise` statement to exception
+useless_exception_statement.py:21:9: PLW0133 [*] Missing `raise` statement for exception; add `raise` statement to exception
    |
-22 | def test():
-23 |     if True:
-24 |         RuntimeError("This is an exception")  # PLW0133
+19 | def func():
+20 |     if True:
+21 |         RuntimeError("This is an exception")  # PLW0133
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133
-25 | 
-26 | # Test case 4: Useless exception statement in class
    |
    = help: Add `raise` statement to exception
 
 ℹ Safe fix
-21 21 | 
-22 22 | def test():
-23 23 |     if True:
-24    |-        RuntimeError("This is an exception")  # PLW0133
-   24 |+        raise RuntimeError("This is an exception")  # PLW0133
-25 25 | 
-26 26 | # Test case 4: Useless exception statement in class
-27 27 | 
+18 18 | # Test case 3: Useless exception statement in if statement
+19 19 | def func():
+20 20 |     if True:
+21    |-        RuntimeError("This is an exception")  # PLW0133
+   21 |+        raise RuntimeError("This is an exception")  # PLW0133
+22 22 | 
+23 23 | 
+24 24 | # Test case 4: Useless exception statement in class
 
-useless_exception_statement.py:31:13: PLW0133 [*] Missing `raise` statement for exception; add `raise` statement to exception
+useless_exception_statement.py:28:13: PLW0133 [*] Missing `raise` statement for exception; add `raise` statement to exception
    |
-29 |     class Test:
-30 |         def __init__(self):
-31 |             TypeError("This is an exception") # PLW0133
+26 |     class Class:
+27 |         def __init__(self):
+28 |             TypeError("This is an exception")  # PLW0133
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133
-32 | 
-33 | # Test case 5: Useless exception statement in function
    |
    = help: Add `raise` statement to exception
 
 ℹ Safe fix
-28 28 | def test():
-29 29 |     class Test:
-30 30 |         def __init__(self):
-31    |-            TypeError("This is an exception") # PLW0133
-   31 |+            raise TypeError("This is an exception") # PLW0133
-32 32 | 
-33 33 | # Test case 5: Useless exception statement in function
-34 34 | 
+25 25 | def func():
+26 26 |     class Class:
+27 27 |         def __init__(self):
+28    |-            TypeError("This is an exception")  # PLW0133
+   28 |+            raise TypeError("This is an exception")  # PLW0133
+29 29 | 
+30 30 | 
+31 31 | # Test case 5: Useless exception statement in function
 
-useless_exception_statement.py:37:9: PLW0133 [*] Missing `raise` statement for exception; add `raise` statement to exception
+useless_exception_statement.py:34:9: PLW0133 [*] Missing `raise` statement for exception; add `raise` statement to exception
    |
-35 | def test():
-36 |     def f():
-37 |         IndexError("This is an exception") # PLW0133
+32 | def func():
+33 |     def inner():
+34 |         IndexError("This is an exception")  # PLW0133
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133
-38 |     f()
+35 | 
+36 |     inner()
    |
    = help: Add `raise` statement to exception
 
 ℹ Safe fix
-34 34 | 
-35 35 | def test():
-36 36 |     def f():
-37    |-        IndexError("This is an exception") # PLW0133
-   37 |+        raise IndexError("This is an exception") # PLW0133
-38 38 |     f()
-39 39 | 
-40 40 | # Test case 6: Useless exception statement in while loop
+31 31 | # Test case 5: Useless exception statement in function
+32 32 | def func():
+33 33 |     def inner():
+34    |-        IndexError("This is an exception")  # PLW0133
+   34 |+        raise IndexError("This is an exception")  # PLW0133
+35 35 | 
+36 36 |     inner()
+37 37 | 
 
-useless_exception_statement.py:44:9: PLW0133 [*] Missing `raise` statement for exception; add `raise` statement to exception
+useless_exception_statement.py:42:9: PLW0133 [*] Missing `raise` statement for exception; add `raise` statement to exception
    |
-42 | def test():
-43 |     while True:
-44 |         KeyError("This is an exception") # PLW0133
+40 | def func():
+41 |     while True:
+42 |         KeyError("This is an exception")  # PLW0133
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133
-45 | 
-46 | # Test case 7: Useless exception statement in abstract class
    |
    = help: Add `raise` statement to exception
 
 ℹ Safe fix
-41 41 |     
-42 42 | def test():
-43 43 |     while True:
-44    |-        KeyError("This is an exception") # PLW0133
-   44 |+        raise KeyError("This is an exception") # PLW0133
-45 45 | 
-46 46 | # Test case 7: Useless exception statement in abstract class
-47 47 |         
+39 39 | # Test case 6: Useless exception statement in while loop
+40 40 | def func():
+41 41 |     while True:
+42    |-        KeyError("This is an exception")  # PLW0133
+   42 |+        raise KeyError("This is an exception")  # PLW0133
+43 43 | 
+44 44 | 
+45 45 | # Test case 7: Useless exception statement in abstract class
 
-useless_exception_statement.py:52:13: PLW0133 [*] Missing `raise` statement for exception; add `raise` statement to exception
+useless_exception_statement.py:50:13: PLW0133 [*] Missing `raise` statement for exception; add `raise` statement to exception
    |
-50 |         @abstractmethod
-51 |         def test(self):
-52 |             NotImplementedError("This is an exception") # PLW0133
+48 |         @abstractmethod
+49 |         def method(self):
+50 |             NotImplementedError("This is an exception")  # PLW0133
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133
    |
    = help: Add `raise` statement to exception
 
 ℹ Safe fix
-49 49 |     class Test(ABC):
-50 50 |         @abstractmethod
-51 51 |         def test(self):
-52    |-            NotImplementedError("This is an exception") # PLW0133
-   52 |+            raise NotImplementedError("This is an exception") # PLW0133
-53 53 | 
-54 54 | 
-55 55 | # Test case 8: Useless exception statement inside context manager
+47 47 |     class Class(ABC):
+48 48 |         @abstractmethod
+49 49 |         def method(self):
+50    |-            NotImplementedError("This is an exception")  # PLW0133
+   50 |+            raise NotImplementedError("This is an exception")  # PLW0133
+51 51 | 
+52 52 | 
+53 53 | # Test case 8: Useless exception statement inside context manager
 
-useless_exception_statement.py:59:9: PLW0133 [*] Missing `raise` statement for exception; add `raise` statement to exception
+useless_exception_statement.py:56:9: PLW0133 [*] Missing `raise` statement for exception; add `raise` statement to exception
    |
-57 | def test():
-58 |     with suppress(AttributeError):
-59 |         AttributeError("This is an exception") # PLW0133
+54 | def func():
+55 |     with suppress(AttributeError):
+56 |         AttributeError("This is an exception")  # PLW0133
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133
    |
    = help: Add `raise` statement to exception
 
 ℹ Safe fix
-56 56 |             
-57 57 | def test():
-58 58 |     with suppress(AttributeError):
-59    |-        AttributeError("This is an exception") # PLW0133
-   59 |+        raise AttributeError("This is an exception") # PLW0133
-60 60 | 
-61 61 | 
-62 62 | # Non-violation test cases: PLW0133
+53 53 | # Test case 8: Useless exception statement inside context manager
+54 54 | def func():
+55 55 |     with suppress(AttributeError):
+56    |-        AttributeError("This is an exception")  # PLW0133
+   56 |+        raise AttributeError("This is an exception")  # PLW0133
+57 57 | 
+58 58 | 
+59 59 | # Non-violation test cases: PLW0133
