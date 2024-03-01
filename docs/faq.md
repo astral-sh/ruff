@@ -557,7 +557,7 @@ The Google convention includes all `D` errors apart from:
 [`D413`](rules/no-blank-line-after-section.md).
 
 By default, no [`convention`](settings.md#lint_pydocstyle_convention) is set, and so the enabled rules
-are determined by the [`select`](settings.md#select) setting alone.
+are determined by the [`select`](settings.md#lint_select) setting alone.
 
 ## What is "preview"?
 
