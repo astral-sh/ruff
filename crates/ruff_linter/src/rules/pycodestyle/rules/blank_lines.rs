@@ -660,8 +660,8 @@ impl BlankLinesChecker {
                 // Only applies to methods.
                 && matches!(line.kind,  LogicalLineKind::Function | LogicalLineKind::Decorator)
                 // Allow groups of one-liners.
-                && !(matches!(state.follows, Follows::Def) && !matches!(line.last_token, TokenKind::Colon))
-                && matches!(state.class_status, Status::Inside(_))
+                && !(matches!(self.follows, Follows::Def) && !matches!(line.last_token, TokenKind::Colon))
+                && matches!(self.class_status, Status::Inside(_))
                 // The class/parent method's docstring can directly precede the def.
                 // Allow following a decorator (if there is an error it will be triggered on the first decorator).
                 && !matches!(self.follows, Follows::Docstring | Follows::Decorator)
