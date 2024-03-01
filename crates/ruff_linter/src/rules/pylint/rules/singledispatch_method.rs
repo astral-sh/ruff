@@ -21,6 +21,7 @@ use crate::importer::ImportRequest;
 /// ```python
 /// from functools import singledispatch
 ///
+///
 /// class Class:
 ///     @singledispatch
 ///     def method(self, arg):
@@ -30,6 +31,7 @@ use crate::importer::ImportRequest;
 /// Use instead:
 /// ```python
 /// from functools import singledispatchmethod
+///
 ///
 /// class Class:
 ///     @singledispatchmethod
