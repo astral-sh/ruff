@@ -206,7 +206,7 @@ d={'a':1,
  # fmt: off
  from third_party import (X,
                           Y, Z)
-@@ -63,15 +64,15 @@
+@@ -59,15 +60,15 @@
  
  something = {
      # fmt: off
@@ -225,7 +225,7 @@ d={'a':1,
          # fmt: on
          goes + here,
          andhere,
-@@ -122,8 +123,10 @@
+@@ -118,8 +119,10 @@
      """
      # fmt: off
  
@@ -237,7 +237,7 @@ d={'a':1,
      # fmt: on
      pass
  
-@@ -138,7 +141,7 @@
+@@ -134,7 +137,7 @@
      now . considers . multiple . fmt . directives . within . one . prefix
      # fmt: on
      # fmt: off
@@ -246,7 +246,7 @@ d={'a':1,
      # fmt: on
  
  
-@@ -178,14 +181,18 @@
+@@ -174,14 +177,18 @@
          $
          """,
          # fmt: off
@@ -328,12 +328,8 @@ def spaces_types(
     g: int = 1 if False else 2,
     h: str = "",
     i: str = r"",
-):
-    ...
-
-
-def spaces2(result=_core.Value(None)):
-    ...
+): ...
+def spaces2(result=_core.Value(None)): ...
 
 
 something = {
@@ -562,12 +558,8 @@ def spaces_types(
     g: int = 1 if False else 2,
     h: str = "",
     i: str = r"",
-):
-    ...
-
-
-def spaces2(result=_core.Value(None)):
-    ...
+): ...
+def spaces2(result=_core.Value(None)): ...
 
 
 something = {
@@ -731,5 +723,3 @@ l=[1,2,3]
 d={'a':1,
    'b':2}
 ```
-
-

@@ -656,7 +656,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "407") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousXmlExpatImport),
         (Flake8Bandit, "408") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousXmlMinidomImport),
         (Flake8Bandit, "409") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousXmlPulldomImport),
-        (Flake8Bandit, "410") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousLxmlImport),
+        (Flake8Bandit, "410") => (RuleGroup::Removed, rules::flake8_bandit::rules::SuspiciousLxmlImport),
         (Flake8Bandit, "411") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousXmlrpcImport),
         (Flake8Bandit, "412") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousHttpoxyImport),
         (Flake8Bandit, "413") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousPycryptoImport),
@@ -946,6 +946,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "025") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryDictComprehensionForIterable),
         (Ruff, "026") => (RuleGroup::Preview, rules::ruff::rules::DefaultFactoryKwarg),
         (Ruff, "027") => (RuleGroup::Preview, rules::ruff::rules::MissingFStringSyntax),
+        (Ruff, "028") => (RuleGroup::Preview, rules::ruff::rules::InvalidFormatterSuppressionComment),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
         #[cfg(feature = "test-rules")]

@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::context::FStringState;
 use crate::options::PythonVersion;
 use crate::prelude::*;
-use crate::preview::{is_f_string_formatting_enabled, is_hex_codes_in_unicode_sequences_enabled};
+use crate::preview::is_f_string_formatting_enabled;
 use crate::string::{QuoteChar, Quoting, StringPart, StringPrefix, StringQuotes};
 use crate::QuoteStyle;
 
@@ -18,7 +18,6 @@ pub(crate) struct StringNormalizer {
     parent_docstring_quote_char: Option<QuoteChar>,
     f_string_state: FStringState,
     target_version: PythonVersion,
-    normalize_hex: bool,
     format_fstring: bool,
 }
 
@@ -30,7 +29,6 @@ impl StringNormalizer {
             parent_docstring_quote_char: context.docstring(),
             f_string_state: context.f_string_state(),
             target_version: context.options().target_version(),
-            normalize_hex: is_hex_codes_in_unicode_sequences_enabled(context),
             format_fstring: is_f_string_formatting_enabled(context),
         }
     }
@@ -195,7 +193,6 @@ impl StringNormalizer {
                 first_quote_or_escape_offset,
                 quote_selection.quotes,
                 string.prefix(),
-                self.normalize_hex,
                 // TODO: Remove the `b'{'` in `choose_quotes` when promoting the
                 // `format_fstring` preview style
                 self.format_fstring,
@@ -454,7 +451,6 @@ pub(crate) fn normalize_string(
     start_offset: usize,
     quotes: StringQuotes,
     prefix: StringPrefix,
-    normalize_hex: bool,
     format_fstring: bool,
 ) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
@@ -506,7 +502,7 @@ pub(crate) fn normalize_string(
                     if next == '\\' {
                         // Skip over escaped backslashes
                         chars.next();
-                    } else if normalize_hex {
+                    } else {
                         // Length of the `\` plus the length of the escape sequence character (`u` | `U` | `x`)
                         let escape_start_len = '\\'.len_utf8() + next.len_utf8();
                         if let Some(normalised) = UnicodeEscape::new(next, !prefix.is_byte())
@@ -737,7 +733,6 @@ mod tests {
                 quote_char: QuoteChar::Double,
             },
             StringPrefix::BYTE,
-            true,
             true,
         );
 
