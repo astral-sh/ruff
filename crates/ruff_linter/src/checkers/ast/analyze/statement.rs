@@ -1609,7 +1609,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 refurb::rules::delete_full_slice(checker, delete);
             }
         }
-        Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
+        Stmt::Expr(expr @ ast::StmtExpr { value, range: _ }) => {
             if checker.enabled(Rule::UselessComparison) {
                 flake8_bugbear::rules::useless_comparison(checker, value);
             }
@@ -1633,7 +1633,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 refurb::rules::repeated_append(checker, stmt);
             }
             if checker.enabled(Rule::UselessExceptionStatement) {
-                pylint::rules::useless_exception_statement(checker, value);
+                pylint::rules::useless_exception_statement(checker, expr);
             }
         }
         _ => {}

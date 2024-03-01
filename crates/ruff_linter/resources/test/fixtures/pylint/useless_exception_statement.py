@@ -56,6 +56,16 @@ def func():
         AttributeError("This is an exception")  # PLW0133
 
 
+# Test case 9: Useless exception statement in parentheses
+def func():
+    (RuntimeError("This is an exception"))  # PLW0133
+
+
+# Test case 10: Useless exception statement in continuation
+def func():
+    x = 1; (RuntimeError("This is an exception")); y = 2  # PLW0133
+
+
 # Non-violation test cases: PLW0133
 
 

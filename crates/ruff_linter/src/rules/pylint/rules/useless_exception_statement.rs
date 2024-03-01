@@ -1,55 +1,32 @@
-use ast::{ExprCall, StmtRaise};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
-/// - [Python exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
-const PY_BUILTIN_EXCEPTIONS: [&str; 21] = [
-    "SystemExit",
-    "Exception",
-    "ArithmeticError",
-    "AssertionError",
-    "AttributeError",
-    "BufferError",
-    "EOFError",
-    "ImportError",
-    "LookupError",
-    "IndexError",
-    "KeyError",
-    "MemoryError",
-    "NameError",
-    "ReferenceError",
-    "RuntimeError",
-    "NotImplementedError",
-    "StopIteration",
-    "SyntaxError",
-    "SystemError",
-    "TypeError",
-    "ValueError",
-];
-
 /// ## What it does
-/// Checks for a missing `raise` statement for an exception. It's unnecessary to
-/// use an exception without raising it. This rule checks for the absence of a
-/// `raise` statement for an exception.
+/// Checks for an exception that is not raised.
 ///
 /// ## Why is this bad?
-/// It's unnecessary to use an exception without raising it. This can lead to
-/// confusion and unexpected behavior. It's better to raise the exception to
-/// indicate that an error has occurred.
+/// It's unnecessary to create an exception without raising it. For example,
+/// `ValueError("...")` on its own will have no effect (unlike
+/// `raise ValueError("...")`) and is likely a mistake.
 ///
 /// ## Example
 /// ```python
-/// Exception("exception should be raised")
+/// ValueError("...")
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// raise Exception("exception should be raised")
+/// raise ValueError("...")
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as converting a useless exception
+/// statement to a `raise` statement will change the program's behavior.
 #[violation]
 pub struct UselessExceptionStatement;
 
@@ -58,52 +35,61 @@ impl Violation for UselessExceptionStatement {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing `raise` statement for exception; add `raise` statement to exception")
+        format!("Missing `raise` statement on exception")
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Add `raise` statement to exception"))
+        Some(format!("Add `raise` keyword"))
     }
 }
 
 /// PLW0133
-pub(crate) fn useless_exception_statement(checker: &mut Checker, expr: &Expr) {
-    let Expr::Call(ExprCall { func, .. }) = expr else {
+pub(crate) fn useless_exception_statement(checker: &mut Checker, expr: &ast::StmtExpr) {
+    let Expr::Call(ast::ExprCall { func, .. }) = expr.value.as_ref() else {
         return;
     };
 
-    if !is_builtin_exception(checker, func) {
-        return;
+    if is_builtin_exception(func, checker.semantic()) {
+        let mut diagnostic = Diagnostic::new(UselessExceptionStatement, expr.range());
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+            "raise ".to_string(),
+            expr.start(),
+        )));
+        checker.diagnostics.push(diagnostic);
     }
-
-    let mut diagnostic = Diagnostic::new(UselessExceptionStatement {}, expr.range());
-
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        checker
-            .generator()
-            .stmt(&fix_useless_exception_statement(expr)),
-        expr.range(),
-    )));
-    checker.diagnostics.push(diagnostic);
 }
 
-fn is_builtin_exception(checker: &mut Checker, exc: &Expr) -> bool {
-    return checker
-        .semantic()
-        .resolve_call_path(exc)
-        .is_some_and(|call_path| {
-            PY_BUILTIN_EXCEPTIONS.contains(call_path.as_slice().get(1).unwrap_or(&""))
-        });
-}
-
-/// Generate a [`Fix`] to replace useless builtin exception `raise exception`.
+/// Returns `true` if the given expression is a builtin exception.
 ///
-/// For example:
-/// - Given `ValueError("incorrect value")`, generate `raise ValueError("incorrect value")`.
-fn fix_useless_exception_statement(expr: &Expr) -> Stmt {
-    Stmt::Raise(StmtRaise {
-        range: TextRange::default(),
-        exc: Some(Box::new(expr.clone())),
-        cause: None,
-    })
+/// See: <https://docs.python.org/3/library/exceptions.html#exception-hierarchy>
+fn is_builtin_exception(expr: &Expr, semantic: &SemanticModel) -> bool {
+    return semantic.resolve_call_path(expr).is_some_and(|call_path| {
+        matches!(
+            call_path.as_slice(),
+            [
+                "",
+                "SystemExit"
+                    | "Exception"
+                    | "ArithmeticError"
+                    | "AssertionError"
+                    | "AttributeError"
+                    | "BufferError"
+                    | "EOFError"
+                    | "ImportError"
+                    | "LookupError"
+                    | "IndexError"
+                    | "KeyError"
+                    | "MemoryError"
+                    | "NameError"
+                    | "ReferenceError"
+                    | "RuntimeError"
+                    | "NotImplementedError"
+                    | "StopIteration"
+                    | "SyntaxError"
+                    | "SystemError"
+                    | "TypeError"
+                    | "ValueError"
+            ]
+        )
+    });
 }
