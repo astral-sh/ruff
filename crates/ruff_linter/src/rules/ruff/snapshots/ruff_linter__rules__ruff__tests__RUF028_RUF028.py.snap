@@ -194,6 +194,8 @@ RUF028.py:62:13: RUF028 [*] This suppression comment is invalid because it canno
 62    |-    val = 5 # fmt: on
    62 |+    val = 5
 63 63 |     pass # fmt: on
+64 64 | 
+65 65 | 
 
 RUF028.py:63:10: RUF028 [*] This suppression comment is invalid because it cannot be at the end of a line
    |
@@ -210,5 +212,6 @@ RUF028.py:63:10: RUF028 [*] This suppression comment is invalid because it canno
 62 62 |     val = 5 # fmt: on
 63    |-    pass # fmt: on
    63 |+    pass
-
-
+64 64 | 
+65 65 | 
+66 66 | # all of these should be fine
