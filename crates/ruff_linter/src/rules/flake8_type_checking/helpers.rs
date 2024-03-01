@@ -143,6 +143,7 @@ pub(crate) fn is_dataclass_meta_annotation(annotation: &Expr, semantic: &Semanti
 /// ```python
 /// from functools import singledispatch
 ///
+///
 /// @singledispatch
 /// def fun(arg, verbose=False):
 ///     ...
@@ -166,6 +167,7 @@ pub(crate) fn is_singledispatch_interface(
 /// For example:
 /// ```python
 /// from functools import singledispatch
+///
 ///
 /// @singledispatch
 /// def fun(arg, verbose=False):
