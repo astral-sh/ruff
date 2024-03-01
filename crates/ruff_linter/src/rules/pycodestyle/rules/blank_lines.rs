@@ -659,8 +659,8 @@ impl<'a> BlankLinesChecker<'a> {
             // a = 10
             // ```
             // The `a` statement doesn't follow the `import` statement but the `if` statement.
-            if let Some(prev_indent_lenth) = prev_indent_length {
-                if prev_indent_lenth > logical_line.indent_length {
+            if let Some(prev_indent_length) = prev_indent_length {
+                if prev_indent_length > logical_line.indent_length {
                     state.follows = Follows::Other;
                 }
             }
