@@ -18,14 +18,13 @@ use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
 
 use crate::checkers::logical_lines::expand_indent;
-use crate::codes::Rule;
 use crate::line_width::IndentWidth;
 use ruff_python_trivia::PythonWhitespace;
 
 /// Number of blank lines around top level classes and functions.
 const BLANK_LINES_TOP_LEVEL: u32 = 2;
 /// Number of blank lines around methods and nested classes and functions.
-const BLANK_LINES_METHOD_LEVEL: u32 = 1;
+const BLANK_LINES_NESTED_LEVEL: u32 = 1;
 
 /// ## What it does
 /// Checks for missing blank lines between methods of a class.
@@ -61,7 +60,7 @@ pub struct BlankLineBetweenMethods;
 impl AlwaysFixableViolation for BlankLineBetweenMethods {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Expected {BLANK_LINES_METHOD_LEVEL:?} blank line, found 0")
+        format!("Expected {BLANK_LINES_NESTED_LEVEL:?} blank line, found 0")
     }
 
     fn fix_title(&self) -> String {
@@ -74,6 +73,10 @@ impl AlwaysFixableViolation for BlankLineBetweenMethods {
 ///
 /// ## Why is this bad?
 /// PEP 8 recommends exactly two blank lines between top level functions and classes.
+///
+/// Note: The rule respects the [`lint.isort.lines-after-imports`] setting when determining
+/// the required number of blank lines between top-level `import` statements and function or class definitions
+/// for compatibility with isort.
 ///
 /// ## Example
 /// ```python
@@ -99,16 +102,18 @@ impl AlwaysFixableViolation for BlankLineBetweenMethods {
 #[violation]
 pub struct BlankLinesTopLevel {
     actual_blank_lines: u32,
+    expected_blank_lines: u32,
 }
 
 impl AlwaysFixableViolation for BlankLinesTopLevel {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BlankLinesTopLevel {
-            actual_blank_lines: nb_blank_lines,
+            actual_blank_lines,
+            expected_blank_lines,
         } = self;
 
-        format!("Expected {BLANK_LINES_TOP_LEVEL:?} blank lines, found {nb_blank_lines}")
+        format!("Expected {expected_blank_lines:?} blank lines, found {actual_blank_lines}")
     }
 
     fn fix_title(&self) -> String {
@@ -145,21 +150,27 @@ impl AlwaysFixableViolation for BlankLinesTopLevel {
 ///     pass
 /// ```
 ///
+/// Note: The rule respects the following `isort` settings when determining the maximum number of blank lines allowed between two statements:
+/// * [`lint.isort.lines-after-imports`]: For top-level statements directly following an import statement.
+/// * [`lint.isort.lines-between-types`]: For `import` statements directly following an `from..import` statement or vice versa.
+///
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E303.html)
 #[violation]
 pub struct TooManyBlankLines {
     actual_blank_lines: u32,
+    max_blank_lines: u32,
 }
 
 impl AlwaysFixableViolation for TooManyBlankLines {
     #[derive_message_formats]
     fn message(&self) -> String {
         let TooManyBlankLines {
-            actual_blank_lines: nb_blank_lines,
+            actual_blank_lines,
+            max_blank_lines,
         } = self;
-        format!("Too many blank lines ({nb_blank_lines})")
+        format!("Too many blank lines ({actual_blank_lines} > {max_blank_lines})")
     }
 
     fn fix_title(&self) -> String {
@@ -416,7 +427,8 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     {
                         LogicalLineKind::Function
                     }
-                    TokenKind::Import | TokenKind::From => LogicalLineKind::Import,
+                    TokenKind::Import => LogicalLineKind::Import,
+                    TokenKind::From => LogicalLineKind::FromImport,
                     _ => LogicalLineKind::Other,
                 };
 
@@ -563,12 +575,13 @@ enum Follows {
     Decorator,
     Def,
     Import,
+    FromImport,
     Docstring,
 }
 
 impl Follows {
-    const fn is_import(self) -> bool {
-        matches!(self, Follows::Import)
+    const fn is_any_import(self) -> bool {
+        matches!(self, Follows::Import | Follows::FromImport)
     }
 }
 
@@ -616,7 +629,8 @@ pub(crate) struct BlankLinesChecker<'a> {
     stylist: &'a Stylist<'a>,
     locator: &'a Locator<'a>,
     indent_width: IndentWidth,
-    isort_enabled: bool,
+    lines_after_imports: isize,
+    lines_between_types: usize,
 }
 
 impl<'a> BlankLinesChecker<'a> {
@@ -629,7 +643,8 @@ impl<'a> BlankLinesChecker<'a> {
             stylist,
             locator,
             indent_width: settings.tab_size,
-            isort_enabled: settings.rules.enabled(Rule::UnsortedImports),
+            lines_after_imports: settings.isort.lines_after_imports,
+            lines_between_types: settings.isort.lines_between_types,
         }
     }
 
@@ -640,14 +655,23 @@ impl<'a> BlankLinesChecker<'a> {
         let line_preprocessor = LinePreprocessor::new(tokens, self.locator, self.indent_width);
 
         for logical_line in line_preprocessor {
+            // Reset `follows` after a dedent:
+            // ```python
+            // if True:
+            //      import test
+            // a = 10
+            // ```
+            // The `a` statement doesn't follow the `import` statement but the `if` statement.
+            if let Some(prev_indent_lenth) = prev_indent_length {
+                if prev_indent_lenth > logical_line.indent_length {
+                    state.follows = Follows::Other;
+                }
+            }
+
             state.class_status.update(&logical_line);
             state.fn_status.update(&logical_line);
 
-            // Leave checking of empty lines after imports to isort if it is enabled.
-            // This is to avoid conflicts where isort e.g. requires one empty line but blank lines
-            // requires two empty lines.
-            if !state.follows.is_import() || !self.isort_enabled || logical_line.indent_length != 0
-            {
+            if state.is_not_first_logical_line {
                 self.check_line(&logical_line, &state, prev_indent_length, diagnostics);
             }
 
@@ -669,11 +693,10 @@ impl<'a> BlankLinesChecker<'a> {
                 }
                 LogicalLineKind::Comment => {}
                 LogicalLineKind::Import => {
-                    state.follows = if logical_line.indent_length == 0 {
-                        Follows::Import
-                    } else {
-                        Follows::Other
-                    }
+                    state.follows = Follows::Import;
+                }
+                LogicalLineKind::FromImport => {
+                    state.follows = Follows::FromImport;
                 }
                 LogicalLineKind::Other => {
                     state.follows = Follows::Other;
@@ -708,9 +731,7 @@ impl<'a> BlankLinesChecker<'a> {
         prev_indent_length: Option<usize>,
         diagnostics: &mut Vec<Diagnostic>,
     ) {
-        // Don't expect blank lines before the first non comment line.
-        if state.is_not_first_logical_line {
-            if line.preceding_blank_lines == 0
+        if line.preceding_blank_lines == 0
                 // Only applies to methods.
                 && matches!(line.kind,  LogicalLineKind::Function | LogicalLineKind::Decorator)
                 // Allow groups of one-liners.
@@ -721,19 +742,33 @@ impl<'a> BlankLinesChecker<'a> {
                 && !matches!(state.follows, Follows::Docstring | Follows::Decorator)
                 // Do not trigger when the def follows an if/while/etc...
                 && prev_indent_length.is_some_and(|prev_indent_length| prev_indent_length >= line.indent_length)
-            {
-                // E301
-                let mut diagnostic =
-                    Diagnostic::new(BlankLineBetweenMethods, line.first_token_range);
-                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    self.stylist.line_ending().to_string(),
-                    self.locator.line_start(state.last_non_comment_line_end),
-                )));
+        {
+            // E301
+            let mut diagnostic = Diagnostic::new(BlankLineBetweenMethods, line.first_token_range);
+            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                self.stylist.line_ending().to_string(),
+                self.locator.line_start(state.last_non_comment_line_end),
+            )));
 
-                diagnostics.push(diagnostic);
+            diagnostics.push(diagnostic);
+        }
+
+        let expected_blank_lines_before_definition = if line.indent_length == 0 {
+            // Mimic the isort rules for the number of blank lines before classes and functions
+            if state.follows.is_any_import() {
+                // Fallback to the default if the value is too large for an u32 or if it is negative.
+                // A negative value means that isort should determine the blank lines automatically
+                // Defaulting to 2 is correct because the variable is only used when testing the
+                // blank lines before a class or function definition.
+                u32::try_from(self.lines_after_imports).unwrap_or(BLANK_LINES_TOP_LEVEL)
+            } else {
+                BLANK_LINES_TOP_LEVEL
             }
+        } else {
+            BLANK_LINES_NESTED_LEVEL
+        };
 
-            if line.preceding_blank_lines < BLANK_LINES_TOP_LEVEL
+        if line.preceding_blank_lines < expected_blank_lines_before_definition
                 // Allow following a decorator (if there is an error it will be triggered on the first decorator).
                 && !matches!(state.follows, Follows::Decorator)
                 // Allow groups of one-liners.
@@ -741,142 +776,162 @@ impl<'a> BlankLinesChecker<'a> {
                 // Only trigger on non-indented classes and functions (for example functions within an if are ignored)
                 && line.indent_length == 0
                 // Only apply to functions or classes.
-                && line.kind.is_top_level()
-            {
-                // E302
-                let mut diagnostic = Diagnostic::new(
-                    BlankLinesTopLevel {
-                        actual_blank_lines: line.preceding_blank_lines.count(),
-                    },
-                    line.first_token_range,
-                );
+                && line.kind.is_class_function_or_decorator()
+        {
+            // E302
+            let mut diagnostic = Diagnostic::new(
+                BlankLinesTopLevel {
+                    actual_blank_lines: line.preceding_blank_lines.count(),
+                    expected_blank_lines: expected_blank_lines_before_definition,
+                },
+                line.first_token_range,
+            );
 
-                if let Some(blank_lines_range) = line.blank_lines.range() {
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        self.stylist
-                            .line_ending()
-                            .repeat(BLANK_LINES_TOP_LEVEL as usize),
-                        blank_lines_range,
-                    )));
-                } else {
-                    diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                        self.stylist
-                            .line_ending()
-                            .repeat(BLANK_LINES_TOP_LEVEL as usize),
-                        self.locator.line_start(state.last_non_comment_line_end),
-                    )));
-                }
-
-                diagnostics.push(diagnostic);
+            if let Some(blank_lines_range) = line.blank_lines.range() {
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    self.stylist
+                        .line_ending()
+                        .repeat(expected_blank_lines_before_definition as usize),
+                    blank_lines_range,
+                )));
+            } else {
+                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                    self.stylist
+                        .line_ending()
+                        .repeat(expected_blank_lines_before_definition as usize),
+                    self.locator.line_start(state.last_non_comment_line_end),
+                )));
             }
 
-            let expected_blank_lines = if line.indent_length > 0 {
-                BLANK_LINES_METHOD_LEVEL
+            diagnostics.push(diagnostic);
+        }
+
+        let max_lines_level = if line.indent_length == 0 {
+            BLANK_LINES_TOP_LEVEL
+        } else {
+            BLANK_LINES_NESTED_LEVEL
+        };
+
+        // If between `import` and `from..import` or the other way round,
+        // allow up to `lines_between_types` newlines for isort compatibility.
+        // We let `isort` remove extra blank lines when the imports belong
+        // to different sections.
+        let max_blank_lines = if matches!(
+            (line.kind, state.follows),
+            (LogicalLineKind::Import, Follows::FromImport)
+                | (LogicalLineKind::FromImport, Follows::Import)
+        ) {
+            if self.lines_between_types == 0 {
+                max_lines_level
             } else {
-                BLANK_LINES_TOP_LEVEL
+                u32::try_from(self.lines_between_types).unwrap_or(u32::MAX)
+            }
+        } else {
+            expected_blank_lines_before_definition
+        };
+
+        if line.blank_lines > max_blank_lines {
+            // E303
+            let mut diagnostic = Diagnostic::new(
+                TooManyBlankLines {
+                    actual_blank_lines: line.blank_lines.count(),
+                    max_blank_lines,
+                },
+                line.first_token_range,
+            );
+
+            if let Some(blank_lines_range) = line.blank_lines.range() {
+                if max_blank_lines == 0 {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(blank_lines_range)));
+                } else {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        self.stylist.line_ending().repeat(max_blank_lines as usize),
+                        blank_lines_range,
+                    )));
+                }
+            }
+
+            diagnostics.push(diagnostic);
+        }
+
+        if matches!(state.follows, Follows::Decorator)
+            && !line.is_comment_only
+            && line.preceding_blank_lines > 0
+        {
+            // E304
+            let mut diagnostic = Diagnostic::new(
+                BlankLineAfterDecorator {
+                    actual_blank_lines: line.preceding_blank_lines.count(),
+                },
+                line.first_token_range,
+            );
+
+            // Get all the lines between the last decorator line (included) and the current line (included).
+            // Then remove all blank lines.
+            let trivia_range = TextRange::new(
+                state.last_non_comment_line_end,
+                self.locator.line_start(line.first_token_range.start()),
+            );
+            let trivia_text = self.locator.slice(trivia_range);
+            let mut trivia_without_blank_lines = trivia_text
+                .universal_newlines()
+                .filter_map(|line| (!line.trim_whitespace().is_empty()).then_some(line.as_str()))
+                .join(&self.stylist.line_ending());
+
+            let fix = if trivia_without_blank_lines.is_empty() {
+                Fix::safe_edit(Edit::range_deletion(trivia_range))
+            } else {
+                trivia_without_blank_lines.push_str(&self.stylist.line_ending());
+                Fix::safe_edit(Edit::range_replacement(
+                    trivia_without_blank_lines,
+                    trivia_range,
+                ))
             };
 
-            if line.blank_lines > expected_blank_lines {
-                // E303
-                let mut diagnostic = Diagnostic::new(
-                    TooManyBlankLines {
-                        actual_blank_lines: line.blank_lines.count(),
-                    },
-                    line.first_token_range,
-                );
+            diagnostic.set_fix(fix);
 
-                if let Some(blank_lines_range) = line.blank_lines.range() {
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        self.stylist
-                            .line_ending()
-                            .repeat(expected_blank_lines as usize),
-                        blank_lines_range,
-                    )));
-                }
+            diagnostics.push(diagnostic);
+        }
 
-                diagnostics.push(diagnostic);
-            }
+        if line.preceding_blank_lines < BLANK_LINES_TOP_LEVEL
+            && state
+                .previous_unindented_line_kind
+                .is_some_and(LogicalLineKind::is_class_function_or_decorator)
+            && line.indent_length == 0
+            && !line.is_comment_only
+            && !line.kind.is_class_function_or_decorator()
+        {
+            // E305
+            let mut diagnostic = Diagnostic::new(
+                BlankLinesAfterFunctionOrClass {
+                    actual_blank_lines: line.preceding_blank_lines.count(),
+                },
+                line.first_token_range,
+            );
 
-            if matches!(state.follows, Follows::Decorator)
-                && !line.is_comment_only
-                && line.preceding_blank_lines > 0
-            {
-                // E304
-                let mut diagnostic = Diagnostic::new(
-                    BlankLineAfterDecorator {
-                        actual_blank_lines: line.preceding_blank_lines.count(),
-                    },
-                    line.first_token_range,
-                );
-
-                // Get all the lines between the last decorator line (included) and the current line (included).
-                // Then remove all blank lines.
-                let trivia_range = TextRange::new(
-                    state.last_non_comment_line_end,
+            if let Some(blank_lines_range) = line.blank_lines.range() {
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    self.stylist
+                        .line_ending()
+                        .repeat(BLANK_LINES_TOP_LEVEL as usize),
+                    blank_lines_range,
+                )));
+            } else {
+                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                    self.stylist
+                        .line_ending()
+                        .repeat(BLANK_LINES_TOP_LEVEL as usize),
                     self.locator.line_start(line.first_token_range.start()),
-                );
-                let trivia_text = self.locator.slice(trivia_range);
-                let mut trivia_without_blank_lines = trivia_text
-                    .universal_newlines()
-                    .filter_map(|line| {
-                        (!line.trim_whitespace().is_empty()).then_some(line.as_str())
-                    })
-                    .join(&self.stylist.line_ending());
-
-                let fix = if trivia_without_blank_lines.is_empty() {
-                    Fix::safe_edit(Edit::range_deletion(trivia_range))
-                } else {
-                    trivia_without_blank_lines.push_str(&self.stylist.line_ending());
-                    Fix::safe_edit(Edit::range_replacement(
-                        trivia_without_blank_lines,
-                        trivia_range,
-                    ))
-                };
-
-                diagnostic.set_fix(fix);
-
-                diagnostics.push(diagnostic);
+                )));
             }
 
-            if line.preceding_blank_lines < BLANK_LINES_TOP_LEVEL
-                && state
-                    .previous_unindented_line_kind
-                    .is_some_and(LogicalLineKind::is_top_level)
-                && line.indent_length == 0
-                && !line.is_comment_only
-                && !line.kind.is_top_level()
-            {
-                // E305
-                let mut diagnostic = Diagnostic::new(
-                    BlankLinesAfterFunctionOrClass {
-                        actual_blank_lines: line.preceding_blank_lines.count(),
-                    },
-                    line.first_token_range,
-                );
+            diagnostics.push(diagnostic);
+        }
 
-                if let Some(blank_lines_range) = line.blank_lines.range() {
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        self.stylist
-                            .line_ending()
-                            .repeat(BLANK_LINES_TOP_LEVEL as usize),
-                        blank_lines_range,
-                    )));
-                } else {
-                    diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                        self.stylist
-                            .line_ending()
-                            .repeat(BLANK_LINES_TOP_LEVEL as usize),
-                        self.locator.line_start(line.first_token_range.start()),
-                    )));
-                }
-
-                diagnostics.push(diagnostic);
-            }
-
-            if line.preceding_blank_lines == 0
+        if line.preceding_blank_lines == 0
                 // Only apply to nested functions.
                 && matches!(state.fn_status, Status::Inside(_))
-                && line.kind.is_top_level()
+                && line.kind.is_class_function_or_decorator()
                 // Allow following a decorator (if there is an error it will be triggered on the first decorator).
                 && !matches!(state.follows, Follows::Decorator)
                 // The class's docstring can directly precede the first function.
@@ -885,18 +940,17 @@ impl<'a> BlankLinesChecker<'a> {
                 && prev_indent_length.is_some_and(|prev_indent_length| prev_indent_length >= line.indent_length)
                 // Allow groups of one-liners.
                 && !(matches!(state.follows, Follows::Def) && line.last_token != TokenKind::Colon)
-            {
-                // E306
-                let mut diagnostic =
-                    Diagnostic::new(BlankLinesBeforeNestedDefinition, line.first_token_range);
+        {
+            // E306
+            let mut diagnostic =
+                Diagnostic::new(BlankLinesBeforeNestedDefinition, line.first_token_range);
 
-                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    self.stylist.line_ending().to_string(),
-                    self.locator.line_start(line.first_token_range.start()),
-                )));
+            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                self.stylist.line_ending().to_string(),
+                self.locator.line_start(line.first_token_range.start()),
+            )));
 
-                diagnostics.push(diagnostic);
-            }
+            diagnostics.push(diagnostic);
         }
     }
 }
@@ -926,12 +980,14 @@ enum LogicalLineKind {
     Comment,
     /// An import statement
     Import,
+    /// A from.. import statement
+    FromImport,
     /// Any other statement or clause header
     Other,
 }
 
 impl LogicalLineKind {
-    fn is_top_level(self) -> bool {
+    fn is_class_function_or_decorator(self) -> bool {
         matches!(
             self,
             LogicalLineKind::Class | LogicalLineKind::Function | LogicalLineKind::Decorator

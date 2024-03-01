@@ -164,20 +164,58 @@ mod tests {
         Ok(())
     }
 
-    /// Tests the compatibility of the blank line rules and isort.
-    #[test_case(Rule::BlankLinesTopLevel)]
-    #[test_case(Rule::TooManyBlankLines)]
-    fn blank_lines_isort(rule_code: Rule) -> Result<()> {
-        let snapshot = format!("blank_lines_{}_isort", rule_code.noqa_code());
+    /// Tests the compatibility of the blank line top level rule and isort.
+    #[test_case(-1, 0)]
+    #[test_case(1, 1)]
+    #[test_case(0, 0)]
+    #[test_case(4, 4)]
+    fn blank_lines_top_level_isort_compatibility(
+        lines_after_imports: isize,
+        lines_between_types: usize,
+    ) -> Result<()> {
+        let snapshot = format!(
+            "blank_lines_top_level_isort_compatibility-lines-after({lines_after_imports})-between({lines_between_types})"
+        );
         let diagnostics = test_path(
             Path::new("pycodestyle").join("E30_isort.py"),
             &settings::LinterSettings {
                 isort: isort::settings::Settings {
-                    lines_after_imports: 1,
-                    lines_between_types: 1,
+                    lines_after_imports,
+                    lines_between_types,
                     ..isort::settings::Settings::default()
                 },
-                ..settings::LinterSettings::for_rules([rule_code, Rule::UnsortedImports])
+                ..settings::LinterSettings::for_rules([
+                    Rule::BlankLinesTopLevel,
+                    Rule::UnsortedImports,
+                ])
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    /// Tests the compatibility of the blank line too many lines and isort.
+    #[test_case(-1, 0)]
+    #[test_case(1, 1)]
+    #[test_case(0, 0)]
+    #[test_case(4, 4)]
+    fn too_many_blank_lines_isort_compatibility(
+        lines_after_imports: isize,
+        lines_between_types: usize,
+    ) -> Result<()> {
+        let snapshot = format!("too_many_blank_lines_isort_compatibility-lines-after({lines_after_imports})-between({lines_between_types})");
+        let diagnostics = test_path(
+            Path::new("pycodestyle").join("E30_isort.py"),
+            &settings::LinterSettings {
+                isort: isort::settings::Settings {
+                    lines_after_imports,
+                    lines_between_types,
+                    ..isort::settings::Settings::default()
+                },
+                ..settings::LinterSettings::for_rules([
+                    Rule::TooManyBlankLines,
+                    Rule::UnsortedImports,
+                ])
             },
         )?;
         assert_messages!(snapshot, diagnostics);
