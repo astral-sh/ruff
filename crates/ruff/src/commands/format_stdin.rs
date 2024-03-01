@@ -122,9 +122,13 @@ fn format_source_code(
             }
             FormatMode::Check => {}
             FormatMode::Diff => {
-                source_kind
-                    .diff(formatted, path, &mut stdout().lock())
-                    .map_err(|err| FormatCommandError::Diff(path.map(Path::to_path_buf), err))?;
+                use std::io::Write;
+                write!(
+                    &mut stdout().lock(),
+                    "{}",
+                    source_kind.diff(formatted, path).unwrap()
+                )
+                .map_err(|err| FormatCommandError::Diff(path.map(Path::to_path_buf), err))?;
             }
         },
         FormattedSource::Unchanged => {
