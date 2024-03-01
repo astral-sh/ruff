@@ -18,15 +18,28 @@ if __name__ == "__main__":
     import abcd
 
 
-
     abcd.foo()
 
 def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
 
 if TYPE_CHECKING:
+    import os
+
+
+
     from typing_extensions import TypeAlias
 
-def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any: ...
+
+    abcd.foo()
+
+def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any:
+    ...
+
+if TYPE_CHECKING:
+    from typing_extensions import TypeAlias
+
+def __call__2(self, name: str, *args: Any, **kwargs: Any) -> Any:
+    ...
 
 
 def _exit(self) -> None: ...
