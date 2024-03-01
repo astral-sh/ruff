@@ -160,17 +160,14 @@ impl AlwaysFixableViolation for BlankLinesTopLevel {
 #[violation]
 pub struct TooManyBlankLines {
     actual_blank_lines: u32,
-    max_blank_lines: u32,
 }
 
 impl AlwaysFixableViolation for TooManyBlankLines {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyBlankLines {
-            actual_blank_lines,
-            max_blank_lines,
-        } = self;
-        format!("Too many blank lines ({actual_blank_lines} > {max_blank_lines})")
+        let TooManyBlankLines { actual_blank_lines } = self;
+
+        format!("Too many blank lines ({actual_blank_lines})")
     }
 
     fn fix_title(&self) -> String {
@@ -835,7 +832,6 @@ impl<'a> BlankLinesChecker<'a> {
             let mut diagnostic = Diagnostic::new(
                 TooManyBlankLines {
                     actual_blank_lines: line.blank_lines.count(),
-                    max_blank_lines,
                 },
                 line.first_token_range,
             );

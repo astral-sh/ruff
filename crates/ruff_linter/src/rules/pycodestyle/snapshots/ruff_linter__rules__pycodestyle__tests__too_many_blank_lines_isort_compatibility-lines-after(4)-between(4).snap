@@ -29,7 +29,7 @@ E30_isort.py:1:1: I001 [*] Import block is un-sorted or un-formatted
 9  12 | 
 10 13 | 
 
-E30_isort.py:21:5: E303 [*] Too many blank lines (2 > 1)
+E30_isort.py:21:5: E303 [*] Too many blank lines (2)
    |
 21 |     abcd.foo()
    |     ^^^^ E303
@@ -72,7 +72,7 @@ E30_isort.py:26:1: I001 [*] Import block is un-sorted or un-formatted
 31 29 | 
 32 30 | 
 
-E30_isort.py:33:5: E303 [*] Too many blank lines (2 > 1)
+E30_isort.py:33:5: E303 [*] Too many blank lines (2)
    |
 33 |     abcd.foo()
    |     ^^^^ E303
