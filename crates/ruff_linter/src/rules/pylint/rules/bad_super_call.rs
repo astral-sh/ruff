@@ -8,14 +8,14 @@ use crate::checkers::ast::Checker;
 
 /// ### What it does
 /// Checks to see another argument other than the current class is given as the first argument of the super builtin
-/// 
+///
 /// ### Why is this bad?
 /// In Python 2.7, `super()` has to be called with its own class and `self`
 /// as arguments `(super(Cat, self))`, which can lead to a mix up of parent and child class in the code.
 ///
 /// In Python 3 the recommended way is to call `super()` without arguments
 /// (see also [`super-with-arguments`](https://pylint.readthedocs.io/en/latest/user_guide/messages/refactor/super-with-arguments.html)).
-/// 
+///
 /// ## Problematic code
 /// ```python
 /// class Animal:
@@ -31,7 +31,7 @@ use crate::checkers::ast::Checker;
 ///         super(Tree, self).__init__()  # [bad-super-call]
 ///         super(Animal, self).__init__()
 /// ```
-/// 
+///
 /// ## Correct code
 /// ```python
 /// class Animal:
@@ -46,7 +46,7 @@ use crate::checkers::ast::Checker;
 ///     def __init__(self):
 ///         super(Animal, self).__init__()
 /// ```
-/// 
+///
 /// ## References
 /// - [Python documentation: `class super`](https://docs.python.org/3/library/functions.html#super)
 #[violation]
@@ -71,14 +71,12 @@ fn is_bad_super_call<'a>(first_arg: &'a Expr, current_class_name: &str) -> Optio
 
 fn check_expr(expr: &Expr, truths: &str) -> Option<Diagnostic> {
     if let Expr::Call(ExprCall {
-        range: call_range, func, arguments, ..
+        range: call_range,
+        func,
+        arguments,
     }) = expr
     {
-        if let Expr::Name(ExprName {
-            id,
-            ..
-        }) = func.as_ref()
-        {
+        if let Expr::Name(ExprName { id, .. }) = func.as_ref() {
             if id == "super" {
                 if let Some(first) = arguments.args.first() {
                     if let Some(id) = is_bad_super_call(first, truths) {
@@ -120,7 +118,10 @@ fn traverse_body(body: &[Stmt], current_class_name: &str) -> Vec<Diagnostic> {
 pub(crate) fn bad_super_call(
     checker: &mut Checker,
     StmtClassDef {
-        name, arguments, body, ..
+        name,
+        arguments,
+        body,
+        ..
     }: &StmtClassDef,
 ) {
     if arguments.is_some() {
