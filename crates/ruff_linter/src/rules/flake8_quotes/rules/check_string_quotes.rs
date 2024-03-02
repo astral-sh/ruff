@@ -2,7 +2,7 @@ use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 use ruff_text_size::{TextRange, TextSize};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::Locator;
 
@@ -44,7 +44,9 @@ pub struct BadQuotesInlineString {
     preferred_quote: Quote,
 }
 
-impl AlwaysFixableViolation for BadQuotesInlineString {
+impl Violation for BadQuotesInlineString {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let BadQuotesInlineString { preferred_quote } = self;
@@ -54,11 +56,11 @@ impl AlwaysFixableViolation for BadQuotesInlineString {
         }
     }
 
-    fn fix_title(&self) -> String {
+    fn fix_title(&self) -> Option<String> {
         let BadQuotesInlineString { preferred_quote } = self;
         match preferred_quote {
-            Quote::Double => "Replace single quotes with double quotes".to_string(),
-            Quote::Single => "Replace double quotes with single quotes".to_string(),
+            Quote::Double => Some("Replace single quotes with double quotes".to_string()),
+            Quote::Single => Some("Replace double quotes with single quotes".to_string()),
         }
     }
 }
@@ -155,7 +157,9 @@ pub struct BadQuotesDocstring {
     preferred_quote: Quote,
 }
 
-impl AlwaysFixableViolation for BadQuotesDocstring {
+impl Violation for BadQuotesDocstring {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let BadQuotesDocstring { preferred_quote } = self;
@@ -165,11 +169,11 @@ impl AlwaysFixableViolation for BadQuotesDocstring {
         }
     }
 
-    fn fix_title(&self) -> String {
+    fn fix_title(&self) -> Option<String> {
         let BadQuotesDocstring { preferred_quote } = self;
         match preferred_quote {
-            Quote::Double => "Replace single quotes docstring with double quotes".to_string(),
-            Quote::Single => "Replace double quotes docstring with single quotes".to_string(),
+            Quote::Double => Some("Replace single quotes docstring with double quotes".to_string()),
+            Quote::Single => Some("Replace double quotes docstring with single quotes".to_string()),
         }
     }
 }
@@ -203,6 +207,12 @@ struct Trivia<'a> {
     is_multiline: bool,
 }
 
+impl Trivia<'_> {
+    fn has_empty_text(&self) -> bool {
+        self.raw_text == "\"\"" || self.raw_text == "''"
+    }
+}
+
 impl<'a> From<&'a str> for Trivia<'a> {
     fn from(value: &'a str) -> Self {
         // Remove any prefixes (e.g., remove `u` from `u"foo"`).
@@ -231,12 +241,35 @@ impl<'a> From<&'a str> for Trivia<'a> {
     }
 }
 
+fn text_ends_at_quote(locator: &Locator, range: TextRange, settings: &LinterSettings) -> bool {
+    let trivia_of_next_char: Trivia = locator
+        .slice(TextRange::new(
+            range.end(),
+            TextSize::new(range.end().to_u32() + 1),
+        ))
+        .into();
+    trivia_of_next_char
+        .raw_text
+        .contains(good_docstring(settings.flake8_quotes.docstring_quotes))
+}
+
 /// Q002
 fn docstring(locator: &Locator, range: TextRange, settings: &LinterSettings) -> Option<Diagnostic> {
     let quotes_settings = &settings.flake8_quotes;
 
     let text = locator.slice(range);
     let trivia: Trivia = text.into();
+    if trivia.has_empty_text() && text_ends_at_quote(locator, range, settings) {
+        // Cannot fix. Fix would result in an one-sided multi-line docstring,
+        // which would introduce an error.
+        let diagnostic = Diagnostic::new(
+            BadQuotesDocstring {
+                preferred_quote: quotes_settings.multiline_quotes,
+            },
+            range,
+        );
+        return Some(diagnostic);
+    }
 
     if trivia
         .raw_text
@@ -344,6 +377,18 @@ fn strings(
             // If we're not using the preferred type, only allow use to avoid escapes.
             && !relax_quote
         {
+            if trivia.has_empty_text() && text_ends_at_quote(locator, *range, settings) {
+                // Cannot fix. Fix would result in an one-sided multi-line docstring,
+                // which would introduce an error.
+                let diagnostic = Diagnostic::new(
+                    BadQuotesInlineString {
+                        preferred_quote: quotes_settings.inline_quotes,
+                    },
+                    *range,
+                );
+                diagnostics.push(diagnostic);
+                continue;
+            }
             let mut diagnostic = Diagnostic::new(
                 BadQuotesInlineString {
                     preferred_quote: quotes_settings.inline_quotes,
