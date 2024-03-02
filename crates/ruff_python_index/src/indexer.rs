@@ -37,7 +37,7 @@ impl Indexer {
         let mut continuation_lines = Vec::new();
         // Token, end
         let mut prev_end = TextSize::default();
-        let mut prev_token: Option<&Tok> = None;
+        let mut prev_token = &Tok::EndOfFile;
         let mut line_start = TextSize::default();
 
         for (tok, range) in tokens.iter().flatten() {
@@ -53,7 +53,7 @@ impl Indexer {
                 }
 
                 // Newlines after a newline never form a continuation.
-                if !matches!(prev_token, Some(Tok::Newline | Tok::NonLogicalNewline)) {
+                if !matches!(prev_token, Tok::Newline | Tok::NonLogicalNewline) {
                     continuation_lines.push(line_start);
                 }
 
@@ -80,7 +80,7 @@ impl Indexer {
                 _ => {}
             }
 
-            prev_token = Some(tok);
+            prev_token = tok;
             prev_end = range.end();
         }
 
