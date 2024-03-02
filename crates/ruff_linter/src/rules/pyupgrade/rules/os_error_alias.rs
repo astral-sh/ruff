@@ -58,7 +58,7 @@ impl AlwaysFixableViolation for OSErrorAlias {
 fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic.resolve_call_path(expr).is_some_and(|call_path| {
         matches!(
-            call_path.as_slice(),
+            call_path.segments(),
             ["", "EnvironmentError" | "IOError" | "WindowsError"]
                 | ["mmap" | "select" | "socket" | "os", "error"]
         )
@@ -69,7 +69,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
 fn is_os_error(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_call_path(expr)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "OSError"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["", "OSError"]))
 }
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].

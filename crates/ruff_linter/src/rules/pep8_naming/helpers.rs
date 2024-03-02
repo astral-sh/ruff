@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::call_path::collect_call_path;
+use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use ruff_python_semantic::SemanticModel;
@@ -32,7 +32,7 @@ pub(super) fn is_named_tuple_assignment(stmt: &Stmt, semantic: &SemanticModel) -
         return false;
     };
     semantic.resolve_call_path(func).is_some_and(|call_path| {
-        matches!(call_path.as_slice(), ["collections", "namedtuple"])
+        matches!(call_path.segments(), ["collections", "namedtuple"])
             || semantic.match_typing_call_path(&call_path, "NamedTuple")
     })
 }
@@ -118,8 +118,8 @@ pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &Semanti
         }
 
         // Match against, e.g., `apps.get_model("zerver", "Attachment")`.
-        if let Some(call_path) = collect_call_path(func.as_ref()) {
-            if matches!(call_path.as_slice(), [.., "get_model"]) {
+        if let Some(call_path) = CallPath::from_expr(func.as_ref()) {
+            if matches!(call_path.segments(), [.., "get_model"]) {
                 if let Some(argument) =
                     arguments.find_argument("model_name", arguments.args.len().saturating_sub(1))
                 {
@@ -137,7 +137,7 @@ pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &Semanti
         // Match against, e.g., `import_string("zerver.models.Attachment")`.
         if let Some(call_path) = semantic.resolve_call_path(func.as_ref()) {
             if matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 ["django", "utils", "module_loading", "import_string"]
             ) {
                 if let Some(argument) = arguments.find_argument("dotted_path", 0) {

@@ -62,7 +62,7 @@ pub(crate) fn jinja2_autoescape_false(checker: &mut Checker, call: &ast::ExprCal
     if checker
         .semantic()
         .resolve_call_path(&call.func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["jinja2", "Environment"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["jinja2", "Environment"]))
     {
         if let Some(keyword) = call.arguments.find_keyword("autoescape") {
             match &keyword.value {

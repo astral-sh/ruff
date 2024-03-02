@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::collect_call_path;
+use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Parameters};
@@ -107,10 +107,10 @@ fn check_patch_call(call: &ast::ExprCall, index: usize) -> Option<Diagnostic> {
 
 /// PT008
 pub(crate) fn patch_with_lambda(call: &ast::ExprCall) -> Option<Diagnostic> {
-    let call_path = collect_call_path(&call.func)?;
+    let call_path = CallPath::from_expr(&call.func)?;
 
     if matches!(
-        call_path.as_slice(),
+        call_path.segments(),
         [
             "mocker"
                 | "class_mocker"
@@ -123,7 +123,7 @@ pub(crate) fn patch_with_lambda(call: &ast::ExprCall) -> Option<Diagnostic> {
     ) {
         check_patch_call(call, 1)
     } else if matches!(
-        call_path.as_slice(),
+        call_path.segments(),
         [
             "mocker"
                 | "class_mocker"

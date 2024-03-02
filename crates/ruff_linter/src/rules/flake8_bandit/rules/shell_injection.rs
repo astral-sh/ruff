@@ -420,7 +420,7 @@ enum CallKind {
 fn get_call_kind(func: &Expr, semantic: &SemanticModel) -> Option<CallKind> {
     semantic
         .resolve_call_path(func)
-        .and_then(|call_path| match call_path.as_slice() {
+        .and_then(|call_path| match call_path.segments() {
             &[module, submodule] => match module {
                 "os" => match submodule {
                     "execl" | "execle" | "execlp" | "execlpe" | "execv" | "execve" | "execvp"

@@ -78,7 +78,7 @@ pub(crate) fn default_factory_kwarg(checker: &mut Checker, call: &ast::ExprCall)
     if !checker
         .semantic()
         .resolve_call_path(call.func.as_ref())
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["collections", "defaultdict"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["collections", "defaultdict"]))
     {
         return;
     }

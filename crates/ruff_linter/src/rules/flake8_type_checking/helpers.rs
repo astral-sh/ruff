@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::call_path::from_qualified_name;
+use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::{self as ast, Decorator, Expr};
 use ruff_python_codegen::{Generator, Stylist};
@@ -80,7 +80,7 @@ fn runtime_required_base_class(
     analyze::class::any_call_path(class_def, semantic, &|call_path| {
         base_classes
             .iter()
-            .any(|base_class| from_qualified_name(base_class) == call_path)
+            .any(|base_class| CallPath::from_qualified_name(base_class) == call_path)
     })
 }
 
@@ -99,7 +99,7 @@ fn runtime_required_decorators(
             .is_some_and(|call_path| {
                 decorators
                     .iter()
-                    .any(|base_class| from_qualified_name(base_class) == call_path)
+                    .any(|base_class| CallPath::from_qualified_name(base_class) == call_path)
             })
     })
 }
@@ -121,14 +121,14 @@ pub(crate) fn is_dataclass_meta_annotation(annotation: &Expr, semantic: &Semanti
             semantic
                 .resolve_call_path(map_callable(&decorator.expression))
                 .is_some_and(|call_path| {
-                    matches!(call_path.as_slice(), ["dataclasses", "dataclass"])
+                    matches!(call_path.segments(), ["dataclasses", "dataclass"])
                 })
         }) {
             // Determine whether the annotation is `typing.ClassVar` or `dataclasses.InitVar`.
             return semantic
                 .resolve_call_path(map_subscript(annotation))
                 .is_some_and(|call_path| {
-                    matches!(call_path.as_slice(), ["dataclasses", "InitVar"])
+                    matches!(call_path.segments(), ["dataclasses", "InitVar"])
                         || semantic.match_typing_call_path(&call_path, "ClassVar")
                 });
         }
@@ -156,7 +156,7 @@ pub(crate) fn is_singledispatch_interface(
         semantic
             .resolve_call_path(&decorator.expression)
             .is_some_and(|call_path| {
-                matches!(call_path.as_slice(), ["functools", "singledispatch"])
+                matches!(call_path.segments(), ["functools", "singledispatch"])
             })
     })
 }

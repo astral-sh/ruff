@@ -101,7 +101,7 @@ pub(crate) fn print_call(checker: &mut Checker, call: &ast::ExprCall) {
         let call_path = checker.semantic().resolve_call_path(&call.func);
         if call_path
             .as_ref()
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "print"]))
+            .is_some_and(|call_path| matches!(call_path.segments(), ["", "print"]))
         {
             // If the print call has a `file=` argument (that isn't `None`, `"sys.stdout"`,
             // or `"sys.stderr"`), don't trigger T201.
@@ -110,8 +110,8 @@ pub(crate) fn print_call(checker: &mut Checker, call: &ast::ExprCall) {
                     if checker.semantic().resolve_call_path(&keyword.value).map_or(
                         true,
                         |call_path| {
-                            call_path.as_slice() != ["sys", "stdout"]
-                                && call_path.as_slice() != ["sys", "stderr"]
+                            call_path.segments() != ["sys", "stdout"]
+                                && call_path.segments() != ["sys", "stderr"]
                         },
                     ) {
                         return;
@@ -121,7 +121,7 @@ pub(crate) fn print_call(checker: &mut Checker, call: &ast::ExprCall) {
             Diagnostic::new(Print, call.func.range())
         } else if call_path
             .as_ref()
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["pprint", "pprint"]))
+            .is_some_and(|call_path| matches!(call_path.segments(), ["pprint", "pprint"]))
         {
             Diagnostic::new(PPrint, call.func.range())
         } else {

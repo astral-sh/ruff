@@ -128,7 +128,7 @@ pub(crate) fn bad_generator_return_type(
         let Some(call_path) = semantic.resolve_call_path(map_subscript(returns)) else {
             return;
         };
-        match (name, call_path.as_slice()) {
+        match (name, call_path.segments()) {
             ("__iter__", ["typing", "Generator"]) => {
                 (Method::Iter, Module::Typing, Generator::Generator)
             }

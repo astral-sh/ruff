@@ -468,7 +468,7 @@ pub(crate) fn f_strings(
                 .resolve_call_path(call.func.as_ref())
                 .map_or(false, |call_path| {
                     matches!(
-                        call_path.as_slice(),
+                        call_path.segments(),
                         ["django", "utils", "translation", "gettext" | "gettext_lazy"]
                     )
                 })

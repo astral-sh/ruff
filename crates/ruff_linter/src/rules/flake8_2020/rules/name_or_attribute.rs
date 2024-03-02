@@ -54,7 +54,7 @@ pub(crate) fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
     if checker
         .semantic()
         .resolve_call_path(expr)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["six", "PY3"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["six", "PY3"]))
     {
         checker
             .diagnostics

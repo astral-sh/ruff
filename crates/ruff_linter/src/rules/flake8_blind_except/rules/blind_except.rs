@@ -141,7 +141,7 @@ pub(crate) fn blind_except(
                         if checker
                             .semantic()
                             .resolve_call_path(func.as_ref())
-                            .is_some_and(|call_path| match call_path.as_slice() {
+                            .is_some_and(|call_path| match call_path.segments() {
                                 ["logging", "exception"] => true,
                                 ["logging", "error"] => {
                                     if let Some(keyword) = arguments.find_keyword("exc_info") {

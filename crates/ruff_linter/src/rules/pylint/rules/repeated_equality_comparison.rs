@@ -203,7 +203,7 @@ fn is_allowed_value(bool_op: BoolOp, value: &Expr, semantic: &SemanticModel) -> 
     // respected by type checkers when enforced via equality.
     if any_over_expr(value, &|expr| {
         semantic.resolve_call_path(expr).is_some_and(|call_path| {
-            matches!(call_path.as_slice(), ["sys", "version_info" | "platform"])
+            matches!(call_path.segments(), ["sys", "version_info" | "platform"])
         })
     }) {
         return false;

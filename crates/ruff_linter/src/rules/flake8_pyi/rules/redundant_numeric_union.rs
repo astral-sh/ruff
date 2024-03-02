@@ -94,7 +94,7 @@ fn check_annotation(checker: &mut Checker, annotation: &Expr) {
             return;
         };
 
-        match call_path.as_slice() {
+        match call_path.segments() {
             ["" | "builtins", "int"] => has_int = true,
             ["" | "builtins", "float"] => has_float = true,
             ["" | "builtins", "complex"] => has_complex = true,

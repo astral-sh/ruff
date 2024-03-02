@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::call_path::format_call_path;
+use ruff_python_ast::call_path::format_call_path_segments;
 use ruff_python_ast::Stmt;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -560,7 +560,9 @@ pub trait Imported<'a> {
 
     /// Returns the fully-qualified name of the imported symbol.
     fn qualified_name(&self) -> String {
-        format_call_path(self.call_path())
+        let mut output = String::new();
+        format_call_path_segments(self.call_path(), &mut output).unwrap();
+        output
     }
 }
 
@@ -601,7 +603,7 @@ impl<'a> Imported<'a> for SubmoduleImport<'a> {
 impl<'a> Imported<'a> for FromImport<'a> {
     /// For example, given `from foo import bar`, returns `["foo", "bar"]`.
     fn call_path(&self) -> &[&str] {
-        self.call_path.as_ref()
+        &self.call_path
     }
 
     /// For example, given `from foo import bar`, returns `["foo"]`.

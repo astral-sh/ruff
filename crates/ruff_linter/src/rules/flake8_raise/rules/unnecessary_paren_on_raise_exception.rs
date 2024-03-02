@@ -100,7 +100,7 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
             if checker
                 .semantic()
                 .resolve_call_path(func)
-                .is_some_and(|call_path| matches!(call_path.as_slice(), ["ctypes", "WinError"]))
+                .is_some_and(|call_path| matches!(call_path.segments(), ["ctypes", "WinError"]))
             {
                 return;
             }

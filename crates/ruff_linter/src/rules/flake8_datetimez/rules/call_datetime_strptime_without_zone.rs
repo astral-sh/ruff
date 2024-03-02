@@ -73,7 +73,7 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &mut Checker, call: &
         .semantic()
         .resolve_call_path(&call.func)
         .is_some_and(|call_path| {
-            matches!(call_path.as_slice(), ["datetime", "datetime", "strptime"])
+            matches!(call_path.segments(), ["datetime", "datetime", "strptime"])
         })
     {
         return;

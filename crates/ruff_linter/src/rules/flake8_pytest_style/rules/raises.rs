@@ -1,6 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::format_call_path;
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{self as ast, Expr, Stmt, WithItem};
 use ruff_python_semantic::SemanticModel;
@@ -155,7 +154,7 @@ impl Violation for PytestRaisesWithoutException {
 fn is_pytest_raises(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_call_path(func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["pytest", "raises"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["pytest", "raises"]))
 }
 
 const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
@@ -231,7 +230,7 @@ fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
         .semantic()
         .resolve_call_path(exception)
         .and_then(|call_path| {
-            let call_path = format_call_path(&call_path);
+            let call_path = call_path.to_string();
             checker
                 .settings
                 .flake8_pytest_style

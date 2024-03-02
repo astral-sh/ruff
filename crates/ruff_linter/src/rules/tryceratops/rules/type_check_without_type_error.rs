@@ -81,7 +81,7 @@ fn check_type_check_call(checker: &mut Checker, call: &Expr) -> bool {
         .resolve_call_path(call)
         .is_some_and(|call_path| {
             matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 ["", "isinstance" | "issubclass" | "callable"]
             )
         })
@@ -106,7 +106,7 @@ fn is_builtin_exception(checker: &mut Checker, exc: &Expr) -> bool {
         .resolve_call_path(exc)
         .is_some_and(|call_path| {
             matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 [
                     "",
                     "ArithmeticError"

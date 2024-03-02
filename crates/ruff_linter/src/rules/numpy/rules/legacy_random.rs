@@ -70,7 +70,7 @@ pub(crate) fn legacy_random(checker: &mut Checker, expr: &Expr) {
         .and_then(|call_path| {
             // seeding state
             if matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 [
                     "numpy",
                     "random",
@@ -130,7 +130,7 @@ pub(crate) fn legacy_random(checker: &mut Checker, expr: &Expr) {
                     "zipf"
                 ]
             ) {
-                Some(call_path[2])
+                Some(call_path.segments()[2])
             } else {
                 None
             }

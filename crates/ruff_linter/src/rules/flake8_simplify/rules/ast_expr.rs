@@ -152,7 +152,7 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
         .resolve_call_path(func)
         .is_some_and(|call_path| {
             matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 ["os", "environ", "get"] | ["os", "getenv"]
             )
         })

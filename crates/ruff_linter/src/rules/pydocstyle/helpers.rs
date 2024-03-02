@@ -1,6 +1,6 @@
+use ruff_python_ast::call_path::CallPath;
 use std::collections::BTreeSet;
 
-use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_source_file::UniversalNewlines;
@@ -57,7 +57,7 @@ pub(crate) fn should_ignore_definition(
             .is_some_and(|call_path| {
                 ignore_decorators
                     .iter()
-                    .any(|decorator| from_qualified_name(decorator) == call_path)
+                    .any(|decorator| CallPath::from_qualified_name(decorator) == call_path)
             })
     })
 }

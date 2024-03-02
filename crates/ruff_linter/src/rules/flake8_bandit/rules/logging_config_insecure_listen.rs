@@ -43,7 +43,7 @@ pub(crate) fn logging_config_insecure_listen(checker: &mut Checker, call: &ast::
     if checker
         .semantic()
         .resolve_call_path(&call.func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "config", "listen"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["logging", "config", "listen"]))
     {
         if call.arguments.find_keyword("verify").is_some() {
             return;

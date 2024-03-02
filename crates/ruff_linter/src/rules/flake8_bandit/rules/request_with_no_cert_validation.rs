@@ -50,7 +50,7 @@ pub(crate) fn request_with_no_cert_validation(checker: &mut Checker, call: &ast:
     if let Some(target) = checker
         .semantic()
         .resolve_call_path(&call.func)
-        .and_then(|call_path| match call_path.as_slice() {
+        .and_then(|call_path| match call_path.segments() {
             ["requests", "get" | "options" | "head" | "post" | "put" | "patch" | "delete"] => {
                 Some("requests")
             }

@@ -61,7 +61,7 @@ pub(crate) fn regex_flag_alias(checker: &mut Checker, expr: &Expr) {
         checker
             .semantic()
             .resolve_call_path(expr)
-            .and_then(|call_path| match call_path.as_slice() {
+            .and_then(|call_path| match call_path.segments() {
                 ["re", "A"] => Some(RegexFlag::Ascii),
                 ["re", "I"] => Some(RegexFlag::IgnoreCase),
                 ["re", "L"] => Some(RegexFlag::Locale),

@@ -309,7 +309,7 @@ fn is_object_or_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
         .as_ref()
         .is_some_and(|call_path| {
             matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 ["" | "builtins", "object"] | ["_typeshed", "Unused"]
             )
         })
@@ -320,7 +320,7 @@ fn is_base_exception(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_call_path(expr)
         .as_ref()
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["" | "builtins", "BaseException"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["" | "builtins", "BaseException"]))
 }
 
 /// Return `true` if the [`Expr`] is the `types.TracebackType` type.
@@ -328,7 +328,7 @@ fn is_traceback_type(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_call_path(expr)
         .as_ref()
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["types", "TracebackType"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["types", "TracebackType"]))
 }
 
 /// Return `true` if the [`Expr`] is, e.g., `Type[BaseException]`.
@@ -341,7 +341,7 @@ fn is_base_exception_type(expr: &Expr, semantic: &SemanticModel) -> bool {
         || semantic
             .resolve_call_path(value)
             .as_ref()
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["" | "builtins", "type"]))
+            .is_some_and(|call_path| matches!(call_path.segments(), ["" | "builtins", "type"]))
     {
         is_base_exception(slice, semantic)
     } else {

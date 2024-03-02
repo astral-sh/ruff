@@ -55,7 +55,7 @@ pub(crate) fn request_without_timeout(checker: &mut Checker, call: &ast::ExprCal
         .resolve_call_path(&call.func)
         .is_some_and(|call_path| {
             matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 [
                     "requests",
                     "get" | "options" | "head" | "post" | "put" | "patch" | "delete"

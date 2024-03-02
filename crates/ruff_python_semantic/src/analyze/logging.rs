@@ -1,4 +1,4 @@
-use ruff_python_ast::call_path::{collect_call_path, from_qualified_name};
+use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
 
@@ -29,7 +29,7 @@ pub fn is_logger_candidate(
     // logger object, the `logging` module itself, or `flask.current_app.logger`.
     if let Some(call_path) = semantic.resolve_call_path(value) {
         if matches!(
-            call_path.as_slice(),
+            call_path.segments(),
             ["logging"] | ["flask", "current_app", "logger"]
         ) {
             return true;
@@ -37,7 +37,7 @@ pub fn is_logger_candidate(
 
         if logger_objects
             .iter()
-            .any(|logger| from_qualified_name(logger) == call_path)
+            .any(|logger| CallPath::from_qualified_name(logger) == call_path)
         {
             return true;
         }
@@ -47,8 +47,8 @@ pub fn is_logger_candidate(
 
     // Otherwise, if the symbol was defined in the current module, match against some common
     // logger names.
-    if let Some(call_path) = collect_call_path(value) {
-        if let Some(tail) = call_path.last() {
+    if let Some(call_path) = CallPath::from_expr(value) {
+        if let Some(tail) = call_path.segments().last() {
             if tail.starts_with("log")
                 || tail.ends_with("logger")
                 || tail.ends_with("logging")
@@ -79,7 +79,7 @@ pub fn exc_info<'a>(arguments: &'a Arguments, semantic: &SemanticModel) -> Optio
         .value
         .as_call_expr()
         .and_then(|call| semantic.resolve_call_path(&call.func))
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["sys", "exc_info"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["sys", "exc_info"]))
     {
         return Some(exc_info);
     }

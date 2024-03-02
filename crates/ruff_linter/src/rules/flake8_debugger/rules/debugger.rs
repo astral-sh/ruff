@@ -2,7 +2,7 @@ use ruff_python_ast::{Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::{format_call_path, from_unqualified_name, CallPath};
+use ruff_python_ast::call_path::{CallPath, CallPathBuilder};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -53,7 +53,7 @@ pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
         .resolve_call_path(func)
         .and_then(|call_path| {
             if is_debugger_call(&call_path) {
-                Some(DebuggerUsingType::Call(format_call_path(&call_path)))
+                Some(DebuggerUsingType::Call(call_path.to_string()))
             } else {
                 None
             }
@@ -68,19 +68,20 @@ pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
 /// Checks for the presence of a debugger import.
 pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<Diagnostic> {
     if let Some(module) = module {
-        let mut call_path: CallPath = from_unqualified_name(module);
-        call_path.push(name);
+        let mut builder = CallPathBuilder::from_path(CallPath::from_unqualified_name(module));
+        builder.push(name);
+        let call_path = builder.build();
 
         if is_debugger_call(&call_path) {
             return Some(Diagnostic::new(
                 Debugger {
-                    using_type: DebuggerUsingType::Import(format_call_path(&call_path)),
+                    using_type: DebuggerUsingType::Import(call_path.to_string()),
                 },
                 stmt.range(),
             ));
         }
     } else {
-        let call_path: CallPath = from_unqualified_name(name);
+        let call_path: CallPath = CallPath::from_unqualified_name(name);
 
         if is_debugger_import(&call_path) {
             return Some(Diagnostic::new(
@@ -96,7 +97,7 @@ pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> 
 
 fn is_debugger_call(call_path: &CallPath) -> bool {
     matches!(
-        call_path.as_slice(),
+        call_path.segments(),
         ["pdb" | "pudb" | "ipdb", "set_trace"]
             | ["ipdb", "sset_trace"]
             | ["IPython", "terminal", "embed", "InteractiveShellEmbed"]
@@ -120,7 +121,7 @@ fn is_debugger_import(call_path: &CallPath) -> bool {
     // As a special-case, we omit `builtins` to allow `import builtins`, which is far more general
     // than (e.g.) `import celery.contrib.rdb`.
     matches!(
-        call_path.as_slice(),
+        call_path.segments(),
         ["pdb" | "pudb" | "ipdb" | "debugpy" | "ptvsd"]
             | ["IPython", "terminal", "embed"]
             | ["IPython", "frontend", "terminal", "embed",]

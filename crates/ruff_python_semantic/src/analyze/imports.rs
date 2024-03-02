@@ -20,7 +20,7 @@ pub fn is_sys_path_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
         .resolve_call_path(func.as_ref())
         .is_some_and(|call_path| {
             matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 [
                     "sys",
                     "path",
@@ -50,7 +50,7 @@ pub fn is_os_environ_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool
                 .resolve_call_path(func.as_ref())
                 .is_some_and(|call_path| {
                     matches!(
-                        call_path.as_slice(),
+                        call_path.segments(),
                         ["os", "putenv" | "unsetenv"]
                             | [
                                 "os",
@@ -64,19 +64,19 @@ pub fn is_os_environ_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool
         Stmt::Delete(ast::StmtDelete { targets, .. }) => targets.iter().any(|target| {
             semantic
                 .resolve_call_path(map_subscript(target))
-                .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "environ"]))
+                .is_some_and(|call_path| matches!(call_path.segments(), ["os", "environ"]))
         }),
         Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.iter().any(|target| {
             semantic
                 .resolve_call_path(map_subscript(target))
-                .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "environ"]))
+                .is_some_and(|call_path| matches!(call_path.segments(), ["os", "environ"]))
         }),
         Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => semantic
             .resolve_call_path(map_subscript(target))
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "environ"])),
+            .is_some_and(|call_path| matches!(call_path.segments(), ["os", "environ"])),
         Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => semantic
             .resolve_call_path(map_subscript(target))
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "environ"])),
+            .is_some_and(|call_path| matches!(call_path.segments(), ["os", "environ"])),
         _ => false,
     }
 }
@@ -96,5 +96,5 @@ pub fn is_matplotlib_activation(stmt: &Stmt, semantic: &SemanticModel) -> bool {
     };
     semantic
         .resolve_call_path(func.as_ref())
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["matplotlib", "use"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["matplotlib", "use"]))
 }

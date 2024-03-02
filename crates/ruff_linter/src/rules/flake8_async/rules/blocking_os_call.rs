@@ -62,7 +62,7 @@ pub(crate) fn blocking_os_call(checker: &mut Checker, call: &ExprCall) {
 
 fn is_unsafe_os_method(call_path: &CallPath) -> bool {
     matches!(
-        call_path.as_slice(),
+        call_path.segments(),
         [
             "os",
             "popen"

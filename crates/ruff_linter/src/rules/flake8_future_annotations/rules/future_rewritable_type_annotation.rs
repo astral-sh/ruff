@@ -2,7 +2,6 @@ use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::format_call_path;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -82,7 +81,7 @@ pub(crate) fn future_rewritable_type_annotation(checker: &mut Checker, expr: &Ex
     let name = checker
         .semantic()
         .resolve_call_path(expr)
-        .map(|binding| format_call_path(&binding));
+        .map(|binding| binding.to_string());
 
     if let Some(name) = name {
         checker.diagnostics.push(Diagnostic::new(

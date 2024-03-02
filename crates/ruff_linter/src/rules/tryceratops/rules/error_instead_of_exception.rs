@@ -92,7 +92,7 @@ pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Exce
                                     .semantic()
                                     .resolve_call_path(expr.func.as_ref())
                                     .is_some_and(|call_path| {
-                                        matches!(call_path.as_slice(), ["logging", "error"])
+                                        matches!(call_path.segments(), ["logging", "error"])
                                     })
                                 {
                                     Applicability::Safe
@@ -119,7 +119,7 @@ pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Exce
                                         .semantic()
                                         .resolve_call_path(expr.func.as_ref())
                                         .is_some_and(|call_path| {
-                                            matches!(call_path.as_slice(), ["logging", "error"])
+                                            matches!(call_path.segments(), ["logging", "error"])
                                         })
                                     {
                                         Applicability::Safe

@@ -26,7 +26,7 @@ pub(super) fn is_dataclass_field(func: &Expr, semantic: &SemanticModel) -> bool 
 
     semantic
         .resolve_call_path(func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["dataclasses", "field"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["dataclasses", "field"]))
 }
 
 /// Returns `true` if the given [`Expr`] is a `typing.ClassVar` annotation.
@@ -60,7 +60,7 @@ pub(super) fn is_dataclass(class_def: &ast::StmtClassDef, semantic: &SemanticMod
     class_def.decorator_list.iter().any(|decorator| {
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["dataclasses", "dataclass"]))
+            .is_some_and(|call_path| matches!(call_path.segments(), ["dataclasses", "dataclass"]))
     })
 }
 
@@ -74,7 +74,7 @@ pub(super) fn has_default_copy_semantics(
 ) -> bool {
     analyze::class::any_call_path(class_def, semantic, &|call_path| {
         matches!(
-            call_path.as_slice(),
+            call_path.segments(),
             ["pydantic", "BaseModel" | "BaseSettings" | "BaseConfig"]
                 | ["pydantic_settings", "BaseSettings"]
                 | ["msgspec", "Struct"]

@@ -48,7 +48,7 @@ pub(crate) fn mako_templates(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
         .resolve_call_path(&call.func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["mako", "template", "Template"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["mako", "template", "Template"]))
     {
         checker
             .diagnostics

@@ -64,7 +64,7 @@ pub(crate) fn deprecated_function(checker: &mut Checker, expr: &Expr) {
         checker
             .semantic()
             .resolve_call_path(expr)
-            .and_then(|call_path| match call_path.as_slice() {
+            .and_then(|call_path| match call_path.segments() {
                 ["numpy", "round_"] => Some(("round_", "round")),
                 ["numpy", "product"] => Some(("product", "prod")),
                 ["numpy", "cumproduct"] => Some(("cumproduct", "cumprod")),

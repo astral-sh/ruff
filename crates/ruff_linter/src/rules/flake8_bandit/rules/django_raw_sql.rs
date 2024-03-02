@@ -45,7 +45,7 @@ pub(crate) fn django_raw_sql(checker: &mut Checker, call: &ast::ExprCall) {
         .resolve_call_path(&call.func)
         .is_some_and(|call_path| {
             matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 ["django", "db", "models", "expressions", "RawSQL"]
             )
         })

@@ -64,7 +64,7 @@ pub(crate) fn call_datetime_now_without_tzinfo(checker: &mut Checker, call: &ast
     if !checker
         .semantic()
         .resolve_call_path(&call.func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["datetime", "datetime", "now"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["datetime", "datetime", "now"]))
     {
         return;
     }

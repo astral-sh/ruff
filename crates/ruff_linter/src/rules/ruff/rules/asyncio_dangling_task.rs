@@ -74,7 +74,7 @@ pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Op
     if let Some(method) =
         semantic
             .resolve_call_path(func)
-            .and_then(|call_path| match call_path.as_slice() {
+            .and_then(|call_path| match call_path.segments() {
                 ["asyncio", "create_task"] => Some(Method::CreateTask),
                 ["asyncio", "ensure_future"] => Some(Method::EnsureFuture),
                 _ => None,
@@ -95,7 +95,7 @@ pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Op
             if let Expr::Name(name) = value.as_ref() {
                 if typing::resolve_assignment(value, semantic).is_some_and(|call_path| {
                     matches!(
-                        call_path.as_slice(),
+                        call_path.segments(),
                         [
                             "asyncio",
                             "get_event_loop" | "get_running_loop" | "new_event_loop"

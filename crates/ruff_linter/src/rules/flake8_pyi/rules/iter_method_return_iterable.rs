@@ -92,12 +92,12 @@ pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &De
         .is_some_and(|call_path| {
             if is_async {
                 matches!(
-                    call_path.as_slice(),
+                    call_path.segments(),
                     ["typing", "AsyncIterable"] | ["collections", "abc", "AsyncIterable"]
                 )
             } else {
                 matches!(
-                    call_path.as_slice(),
+                    call_path.segments(),
                     ["typing", "Iterable"] | ["collections", "abc", "Iterable"]
                 )
             }
