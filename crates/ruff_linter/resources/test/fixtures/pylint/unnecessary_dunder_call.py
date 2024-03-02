@@ -45,6 +45,40 @@ x = -a.__add__(3)  # PLC2801
 x = (-a).__add__(3)  # PLC2801
 x = -(-a).__add__(3)  # PLC2801
 
+# Calls
+print(a.__call__())  # PLC2801 (no fix, intentional)
+
+# Lambda expressions
+blah = lambda: a.__add__(1)  # PLC2801
+
+# If expressions
+print(a.__add__(1) if a > 0 else a.__sub__(1))  # PLC2801
+
+# Dict/Set/List/Tuple
+print({"a": a.__add__(1)})  # PLC2801
+print({a.__add__(1)})  # PLC2801
+print([a.__add__(1)])  # PLC2801
+print((a.__add__(1),))  # PLC2801
+
+# Comprehension variants
+print({i: i.__add__(1) for i in range(5)})  # PLC2801
+print({i.__add__(1) for i in range(5)})  # PLC2801
+print([i.__add__(1) for i in range(5)])  # PLC2801
+print((i.__add__(1) for i in range(5)))  # PLC2801
+
+# Generators
+gen = (i.__add__(1) for i in range(5))  # PLC2801
+print(next(gen))
+
+# Subscripts
+print({"a": a.__add__(1)}["a"])  # PLC2801
+
+# Starred
+print(*[a.__add__(1)])  # PLC2801
+
+# Slices
+print([a.__add__(1), a.__sub__(1)][0:1])  # PLC2801
+
 
 class Thing:
     def __init__(self, stuff: Any) -> None:
