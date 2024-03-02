@@ -69,9 +69,9 @@ fn is_bad_super_call<'a>(first_arg: &'a Expr, current_class_name: &str) -> Optio
     (id != current_class_name).then_some(id)
 }
 
-fn check_expr(expr: &Expr, truths: &str) -> Option<Diagnostic> {
+fn check_expr(expr: &Expr, current_class_name: &str) -> Option<Diagnostic> {
     if let Expr::Call(ExprCall {
-        range: call_range,
+        range,
         func,
         arguments,
     }) = expr
@@ -79,23 +79,20 @@ fn check_expr(expr: &Expr, truths: &str) -> Option<Diagnostic> {
         if let Expr::Name(ExprName { id, .. }) = func.as_ref() {
             if id == "super" {
                 if let Some(first) = arguments.args.first() {
-                    if let Some(id) = is_bad_super_call(first, truths) {
-                        return Some(Diagnostic::new(
+                    return is_bad_super_call(first, current_class_name).map(|id| {
+                        Diagnostic::new(
                             BadSuperCall {
                                 bad_super_arg: id.to_owned(),
                             },
-                            call_range.to_owned(),
-                        ));
-                    }
+                            range.to_owned(),
+                        )
+                    });
                 }
             }
         }
-        return check_expr(func, truths);
-    } else if let Expr::Attribute(ExprAttribute {
-        range: _, value, ..
-    }) = expr
-    {
-        return check_expr(value, truths);
+        return check_expr(func, current_class_name);
+    } else if let Expr::Attribute(ExprAttribute { value, .. }) = expr {
+        return check_expr(value, current_class_name);
     }
     None
 }
