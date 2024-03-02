@@ -521,6 +521,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::MetaClassABCMeta) {
                 refurb::rules::metaclass_abcmeta(checker, class_def);
             }
+            if checker.enabled(Rule::BadSuperCall) {
+                pylint::rules::bad_super_call(checker, class_def);
+            }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
             if checker.enabled(Rule::MultipleImportsOnOneLine) {

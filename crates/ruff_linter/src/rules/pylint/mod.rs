@@ -30,6 +30,7 @@ mod tests {
     )]
     #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"))]
     #[test_case(Rule::BadStringFormatType, Path::new("bad_string_format_type.py"))]
+    #[test_case(Rule::BadSuperCall, Path::new("bad_super_call.py"))]
     #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"))]
     #[test_case(Rule::BinaryOpException, Path::new("binary_op_exception.py"))]
     #[test_case(Rule::CollapsibleElseIf, Path::new("collapsible_else_if.py"))]

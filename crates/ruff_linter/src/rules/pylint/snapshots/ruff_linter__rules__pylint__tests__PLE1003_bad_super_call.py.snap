@@ -1,0 +1,67 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+bad_super_call.py:18:9: PLE1003 Bad first argument 'Tree' given to super()
+   |
+16 |     """CatA"""
+17 |     def __init__(self):
+18 |         super(Tree, self).__init__()  # [bad-super-call]
+   |         ^^^^^^^^^^^^^^^^^ PLE1003
+19 |         super(Animal, self).__init__()
+   |
+
+bad_super_call.py:19:9: PLE1003 Bad first argument 'Animal' given to super()
+   |
+17 |     def __init__(self):
+18 |         super(Tree, self).__init__()  # [bad-super-call]
+19 |         super(Animal, self).__init__()
+   |         ^^^^^^^^^^^^^^^^^^^ PLE1003
+   |
+
+bad_super_call.py:25:9: PLE1003 Bad first argument 'Animal' given to super()
+   |
+23 |     """CatB"""
+24 |     def __init__(self):
+25 |         super(Animal, self).__init__() # OK
+   |         ^^^^^^^^^^^^^^^^^^^ PLE1003
+   |
+
+bad_super_call.py:32:9: PLE1003 Bad first argument 'Tree' given to super()
+   |
+30 |     def some_other_func(self):
+31 |         """Some other func"""
+32 |         super(Tree, self).__init__()
+   |         ^^^^^^^^^^^^^^^^^ PLE1003
+   |
+
+bad_super_call.py:39:13: PLE1003 Bad first argument 'Tree' given to super()
+   |
+37 |     def __init__(self):
+38 |         def some_nested_func(self):
+39 |             super(Tree, self).__init__()
+   |             ^^^^^^^^^^^^^^^^^ PLE1003
+   |
+
+bad_super_call.py:45:9: PLE1003 Bad first argument 'Tree' given to super()
+   |
+43 |     """CatE"""
+44 |     def __init__(self):
+45 |         super(Tree, self).__init__()
+   |         ^^^^^^^^^^^^^^^^^ PLE1003
+46 |         super(Bug, self).__init__()
+   |
+
+bad_super_call.py:46:9: PLE1003 Bad first argument 'Bug' given to super()
+   |
+44 |     def __init__(self):
+45 |         super(Tree, self).__init__()
+46 |         super(Bug, self).__init__()
+   |         ^^^^^^^^^^^^^^^^ PLE1003
+   |
+
+bad_super_call.py:55:13: PLE1003 Bad first argument 'Tree' given to super()
+   |
+54 |         def thing():
+55 |             super(Tree, self).__init__()
+   |             ^^^^^^^^^^^^^^^^^ PLE1003
+   |
