@@ -141,7 +141,6 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..LinterSettings::for_rules(vec![
-                    Rule::BadQuotesInlineString,
                     Rule::BadQuotesMultilineString,
                     Rule::BadQuotesDocstring,
                     Rule::AvoidableEscapedQuote,
@@ -177,7 +176,6 @@ mod tests {
                     avoid_escape: true,
                 },
                 ..LinterSettings::for_rules(vec![
-                    Rule::BadQuotesInlineString,
                     Rule::BadQuotesMultilineString,
                     Rule::BadQuotesDocstring,
                     Rule::AvoidableEscapedQuote,
