@@ -905,6 +905,14 @@ impl TokenKind {
             Tok::StartExpression => TokenKind::StartExpression,
         }
     }
+
+    pub const fn is_comment(self) -> bool {
+        matches!(self, TokenKind::Comment)
+    }
+
+    pub const fn is_non_logical_newline(self) -> bool {
+        matches!(self, TokenKind::NonLogicalNewline)
+    }
 }
 
 impl From<&Tok> for TokenKind {

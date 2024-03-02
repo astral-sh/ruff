@@ -1,7 +1,6 @@
 use itertools::Itertools;
 use std::cmp::Ordering;
 use std::num::NonZeroU32;
-use std::slice::Iter;
 
 use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::Diagnostic;
@@ -9,15 +8,14 @@ use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::lexer::LexicalError;
-use ruff_python_parser::Tok;
+
 use ruff_python_parser::TokenKind;
 use ruff_source_file::{Locator, UniversalNewlines};
-use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::logical_lines::expand_indent;
+use crate::checkers::tokens::SpannedKind;
 use crate::line_width::IndentWidth;
 use ruff_python_trivia::PythonWhitespace;
 
@@ -337,7 +335,7 @@ struct LogicalLineInfo {
 /// Iterator that processes tokens until a full logical line (or comment line) is "built".
 /// It then returns characteristics of that logical line (see `LogicalLineInfo`).
 struct LinePreprocessor<'a> {
-    tokens: Iter<'a, Result<(Tok, TextRange), LexicalError>>,
+    tokens: std::slice::Iter<'a, SpannedKind>,
     locator: &'a Locator<'a>,
     indent_width: IndentWidth,
     /// The start position of the next logical line.
@@ -349,7 +347,7 @@ struct LinePreprocessor<'a> {
 
 impl<'a> LinePreprocessor<'a> {
     fn new(
-        tokens: &'a [LexResult],
+        tokens: &'a [SpannedKind],
         locator: &'a Locator,
         indent_width: IndentWidth,
     ) -> LinePreprocessor<'a> {
@@ -375,65 +373,64 @@ impl<'a> Iterator for LinePreprocessor<'a> {
         let mut last_token: TokenKind = TokenKind::EndOfFile;
         let mut parens = 0u32;
 
-        while let Some(result) = self.tokens.next() {
-            let Ok((token, range)) = result else {
-                continue;
-            };
-
-            if matches!(token, Tok::Indent | Tok::Dedent) {
+        while let Some(spanned) = self.tokens.next() {
+            if matches!(spanned.kind(), TokenKind::Indent | TokenKind::Dedent) {
                 continue;
             }
 
-            let token_kind = TokenKind::from_token(token);
-
-            let (logical_line_kind, first_token_range) = if let Some(first_token_range) =
-                first_logical_line_token
-            {
-                first_token_range
-            }
-            // At the start of the line...
-            else {
-                // An empty line
-                if token_kind == TokenKind::NonLogicalNewline {
-                    blank_lines.add(*range);
-
-                    self.line_start = range.end();
-
-                    continue;
+            let (logical_line_kind, first_token_range) =
+                if let Some(first_token_range) = first_logical_line_token {
+                    first_token_range
                 }
+                // At the start of the line...
+                else {
+                    // An empty line
+                    if spanned.kind().is_non_logical_newline() {
+                        blank_lines.add(spanned.range());
 
-                is_docstring = token_kind == TokenKind::String;
+                        self.line_start = spanned.end();
 
-                let logical_line_kind = match token_kind {
-                    TokenKind::Class => LogicalLineKind::Class,
-                    TokenKind::Comment => LogicalLineKind::Comment,
-                    TokenKind::At => LogicalLineKind::Decorator,
-                    TokenKind::Def => LogicalLineKind::Function,
-                    // Lookahead to distinguish `async def` from `async with`.
-                    TokenKind::Async
-                        if matches!(self.tokens.as_slice().first(), Some(Ok((Tok::Def, _)))) =>
-                    {
-                        LogicalLineKind::Function
+                        continue;
                     }
-                    _ => LogicalLineKind::Other,
+
+                    is_docstring = spanned.kind() == TokenKind::String;
+
+                    let logical_line_kind = match spanned.kind() {
+                        TokenKind::Class => LogicalLineKind::Class,
+                        TokenKind::Comment => LogicalLineKind::Comment,
+                        TokenKind::At => LogicalLineKind::Decorator,
+                        TokenKind::Def => LogicalLineKind::Function,
+                        // Lookahead to distinguish `async def` from `async with`.
+                        TokenKind::Async
+                            if matches!(
+                                self.tokens.as_slice().first(),
+                                Some(SpannedKind {
+                                    kind: TokenKind::Def,
+                                    ..
+                                })
+                            ) =>
+                        {
+                            LogicalLineKind::Function
+                        }
+                        _ => LogicalLineKind::Other,
+                    };
+
+                    first_logical_line_token = Some((logical_line_kind, spanned.range()));
+
+                    (logical_line_kind, spanned.range())
                 };
 
-                first_logical_line_token = Some((logical_line_kind, *range));
-
-                (logical_line_kind, *range)
-            };
-
-            if !token_kind.is_trivia() {
+            if !spanned.kind().is_trivia() {
                 line_is_comment_only = false;
             }
 
             // A docstring line is composed only of the docstring (TokenKind::String) and trivia tokens.
             // (If a comment follows a docstring, we still count the line as a docstring)
-            if token_kind != TokenKind::String && !token_kind.is_trivia() {
+            if spanned.kind() != TokenKind::String && !spanned.kind().is_trivia() {
                 is_docstring = false;
             }
 
-            match token_kind {
+            match spanned.kind() {
                 TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
                     parens = parens.saturating_add(1);
                 }
@@ -453,7 +450,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         kind: logical_line_kind,
                         first_token_range,
                         last_token,
-                        logical_line_end: range.end(),
+                        logical_line_end: spanned.end(),
                         is_comment_only: line_is_comment_only,
                         is_docstring,
                         indent_length,
@@ -467,14 +464,14 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     }
 
                     // Set the start for the next logical line.
-                    self.line_start = range.end();
+                    self.line_start = spanned.end();
 
                     return Some(logical_line);
                 }
                 _ => {}
             }
 
-            last_token = token_kind;
+            last_token = spanned.kind();
         }
 
         None
@@ -619,7 +616,7 @@ impl BlankLinesChecker {
     /// E301, E302, E303, E304, E305, E306
     pub(crate) fn check_lines(
         &mut self,
-        tokens: &[LexResult],
+        tokens: &[SpannedKind],
         locator: &Locator,
         stylist: &Stylist,
         indent_width: IndentWidth,

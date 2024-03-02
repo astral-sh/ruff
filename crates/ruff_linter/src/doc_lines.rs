@@ -4,27 +4,27 @@
 use std::iter::FusedIterator;
 
 use ruff_python_ast::{self as ast, Stmt, Suite};
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
+use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextSize};
 
+use crate::checkers::tokens::SpannedKind;
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_source_file::{Locator, UniversalNewlineIterator};
 
 /// Extract doc lines (standalone comments) from a token sequence.
-pub(crate) fn doc_lines_from_tokens(lxr: &[LexResult]) -> DocLines {
+pub(crate) fn doc_lines_from_tokens(lxr: &[SpannedKind]) -> DocLines {
     DocLines::new(lxr)
 }
 
 pub(crate) struct DocLines<'a> {
-    inner: std::iter::Flatten<core::slice::Iter<'a, LexResult>>,
+    inner: std::slice::Iter<'a, SpannedKind>,
     prev: TextSize,
 }
 
 impl<'a> DocLines<'a> {
-    fn new(lxr: &'a [LexResult]) -> Self {
+    fn new(lxr: &'a [SpannedKind]) -> Self {
         Self {
-            inner: lxr.iter().flatten(),
+            inner: lxr.iter(),
             prev: TextSize::default(),
         }
     }
@@ -36,18 +36,18 @@ impl Iterator for DocLines<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         let mut at_start_of_line = true;
         loop {
-            let (tok, range) = self.inner.next()?;
+            let spanned = self.inner.next()?;
 
-            match tok {
-                Tok::Comment(..) => {
+            match spanned.kind() {
+                TokenKind::Comment => {
                     if at_start_of_line {
-                        break Some(range.start());
+                        break Some(spanned.start());
                     }
                 }
-                Tok::Newline | Tok::NonLogicalNewline => {
+                TokenKind::Newline | TokenKind::NonLogicalNewline => {
                     at_start_of_line = true;
                 }
-                Tok::Indent | Tok::Dedent => {
+                TokenKind::Indent | TokenKind::Dedent => {
                     // ignore
                 }
                 _ => {
@@ -55,7 +55,7 @@ impl Iterator for DocLines<'_> {
                 }
             }
 
-            self.prev = range.end();
+            self.prev = spanned.end();
         }
     }
 }

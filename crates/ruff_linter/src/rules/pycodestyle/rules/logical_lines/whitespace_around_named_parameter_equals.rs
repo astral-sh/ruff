@@ -4,7 +4,8 @@ use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
-use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine, LogicalLineToken};
+use crate::checkers::tokens::SpannedKind;
+use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 
 /// ## What it does
 /// Checks for missing whitespace around the equals sign in an unannotated
@@ -84,7 +85,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundParameterEquals {
     }
 }
 
-fn is_in_def(tokens: &[LogicalLineToken]) -> bool {
+fn is_in_def(tokens: &[SpannedKind]) -> bool {
     for token in tokens {
         match token.kind() {
             TokenKind::Async | TokenKind::Indent | TokenKind::Dedent => continue,

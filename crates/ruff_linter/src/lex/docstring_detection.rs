@@ -4,7 +4,7 @@
 //!
 //! TODO(charlie): Consolidate with the existing AST-based docstring extraction.
 
-use ruff_python_parser::Tok;
+use ruff_python_parser::TokenKind;
 
 #[derive(Default, Copy, Clone)]
 enum State {
@@ -31,15 +31,15 @@ pub(crate) struct StateMachine {
 }
 
 impl StateMachine {
-    pub(crate) fn consume(&mut self, tok: &Tok) -> bool {
+    pub(crate) fn consume(&mut self, tok: TokenKind) -> bool {
         match tok {
-            Tok::NonLogicalNewline
-            | Tok::Newline
-            | Tok::Indent
-            | Tok::Dedent
-            | Tok::Comment(..) => false,
+            TokenKind::NonLogicalNewline
+            | TokenKind::Newline
+            | TokenKind::Indent
+            | TokenKind::Dedent
+            | TokenKind::Comment => false,
 
-            Tok::String { .. } => {
+            TokenKind::String => {
                 if matches!(
                     self.state,
                     State::ExpectModuleDocstring
@@ -52,21 +52,21 @@ impl StateMachine {
                     false
                 }
             }
-            Tok::Class => {
+            TokenKind::Class => {
                 self.state = State::ExpectClassColon;
                 self.bracket_count = 0;
 
                 false
             }
 
-            Tok::Def => {
+            TokenKind::Def => {
                 self.state = State::ExpectFunctionColon;
                 self.bracket_count = 0;
 
                 false
             }
 
-            Tok::Colon => {
+            TokenKind::Colon => {
                 if self.bracket_count == 0 {
                     if matches!(self.state, State::ExpectClassColon) {
                         self.state = State::ExpectClassDocstring;
@@ -78,7 +78,7 @@ impl StateMachine {
                 false
             }
 
-            Tok::Lpar | Tok::Lbrace | Tok::Lsqb => {
+            TokenKind::Lpar | TokenKind::Lbrace | TokenKind::Lsqb => {
                 self.bracket_count = self.bracket_count.saturating_add(1);
                 if matches!(
                     self.state,
@@ -91,7 +91,7 @@ impl StateMachine {
                 false
             }
 
-            Tok::Rpar | Tok::Rbrace | Tok::Rsqb => {
+            TokenKind::Rpar | TokenKind::Rbrace | TokenKind::Rsqb => {
                 self.bracket_count = self.bracket_count.saturating_sub(1);
                 if matches!(
                     self.state,

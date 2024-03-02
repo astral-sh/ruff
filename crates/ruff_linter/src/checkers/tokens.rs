@@ -1,5 +1,6 @@
 //! Lint rules based on token traversal.
 
+use std::cell::OnceCell;
 use std::path::Path;
 
 use ruff_notebook::CellOffsets;
@@ -9,7 +10,9 @@ use ruff_python_parser::lexer::LexResult;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_index::Indexer;
+use ruff_python_parser::{Tok, TokenKind};
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::directives::TodoComment;
 use crate::registry::{AsRule, Rule};
@@ -22,7 +25,7 @@ use crate::settings::LinterSettings;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn check_tokens(
-    tokens: &[LexResult],
+    tokens: &Tokens,
     path: &Path,
     locator: &Locator,
     indexer: &Indexer,
@@ -43,7 +46,7 @@ pub(crate) fn check_tokens(
     ]) {
         let mut blank_lines_checker = BlankLinesChecker::default();
         blank_lines_checker.check_lines(
-            tokens,
+            tokens.kinds(),
             locator,
             stylist,
             settings.tab_size,
@@ -86,7 +89,7 @@ pub(crate) fn check_tokens(
     }
 
     if settings.rules.enabled(Rule::InvalidEscapeSequence) {
-        for (tok, range) in tokens.iter().flatten() {
+        for (tok, range) in tokens.ok_results() {
             pycodestyle::rules::invalid_escape_sequence(
                 &mut diagnostics,
                 locator,
@@ -108,8 +111,13 @@ pub(crate) fn check_tokens(
         Rule::InvalidCharacterNul,
         Rule::InvalidCharacterZeroWidthSpace,
     ]) {
-        for (tok, range) in tokens.iter().flatten() {
-            pylint::rules::invalid_string_characters(&mut diagnostics, tok, *range, locator);
+        for spanned in tokens.kinds() {
+            pylint::rules::invalid_string_characters(
+                &mut diagnostics,
+                spanned.kind(),
+                spanned.range(),
+                locator,
+            );
         }
     }
 
@@ -120,7 +128,7 @@ pub(crate) fn check_tokens(
     ]) {
         pycodestyle::rules::compound_statements(
             &mut diagnostics,
-            tokens,
+            tokens.kinds(),
             locator,
             indexer,
             source_type,
@@ -129,11 +137,20 @@ pub(crate) fn check_tokens(
     }
 
     if settings.rules.enabled(Rule::AvoidableEscapedQuote) && settings.flake8_quotes.avoid_escape {
-        flake8_quotes::rules::avoidable_escaped_quote(&mut diagnostics, tokens, locator, settings);
+        flake8_quotes::rules::avoidable_escaped_quote(
+            &mut diagnostics,
+            tokens.lex_results(),
+            locator,
+            settings,
+        );
     }
 
     if settings.rules.enabled(Rule::UnnecessaryEscapedQuote) {
-        flake8_quotes::rules::unnecessary_escaped_quote(&mut diagnostics, tokens, locator);
+        flake8_quotes::rules::unnecessary_escaped_quote(
+            &mut diagnostics,
+            tokens.lex_results(),
+            locator,
+        );
     }
 
     if settings.rules.any_enabled(&[
@@ -141,7 +158,12 @@ pub(crate) fn check_tokens(
         Rule::BadQuotesMultilineString,
         Rule::BadQuotesDocstring,
     ]) {
-        flake8_quotes::rules::check_string_quotes(&mut diagnostics, tokens, locator, settings);
+        flake8_quotes::rules::check_string_quotes(
+            &mut diagnostics,
+            tokens.kinds(),
+            locator,
+            settings,
+        );
     }
 
     if settings.rules.any_enabled(&[
@@ -150,7 +172,7 @@ pub(crate) fn check_tokens(
     ]) {
         flake8_implicit_str_concat::rules::implicit(
             &mut diagnostics,
-            tokens,
+            tokens.kinds(),
             settings,
             locator,
             indexer,
@@ -162,11 +184,11 @@ pub(crate) fn check_tokens(
         Rule::TrailingCommaOnBareTuple,
         Rule::ProhibitedTrailingComma,
     ]) {
-        flake8_commas::rules::trailing_commas(&mut diagnostics, tokens, locator, indexer);
+        flake8_commas::rules::trailing_commas(&mut diagnostics, tokens.kinds(), locator, indexer);
     }
 
     if settings.rules.enabled(Rule::ExtraneousParentheses) {
-        pyupgrade::rules::extraneous_parentheses(&mut diagnostics, tokens, locator);
+        pyupgrade::rules::extraneous_parentheses(&mut diagnostics, tokens.kinds(), locator);
     }
 
     if source_type.is_stub() && settings.rules.enabled(Rule::TypeCommentInStub) {
@@ -212,4 +234,79 @@ pub(crate) fn check_tokens(
     diagnostics.retain(|diagnostic| settings.rules.enabled(diagnostic.kind.rule()));
 
     diagnostics
+}
+
+pub(crate) struct Tokens<'a> {
+    lex_results: &'a [LexResult],
+    kinds: OnceCell<Vec<SpannedKind>>,
+}
+
+impl<'a> Tokens<'a> {
+    pub(crate) fn new(tokens: &'a [LexResult]) -> Self {
+        Self {
+            lex_results: tokens,
+            kinds: OnceCell::new(),
+        }
+    }
+
+    pub(crate) fn kinds(&self) -> &[SpannedKind] {
+        self.kinds.get_or_init(|| {
+            let mut kinds = Vec::with_capacity(self.lex_results.len());
+            kinds.extend(
+                self.lex_results
+                    .iter()
+                    .flatten()
+                    .map(|(tok, range)| SpannedKind::from((tok, range))),
+            );
+            kinds
+        })
+    }
+
+    pub(crate) fn lex_results(&self) -> &'a [LexResult] {
+        self.lex_results
+    }
+
+    pub(crate) fn ok_results(&self) -> std::iter::Flatten<std::slice::Iter<'a, LexResult>> {
+        self.lex_results.iter().flatten()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SpannedKind {
+    pub(crate) kind: TokenKind,
+    pub(crate) range: TextRange,
+}
+
+impl SpannedKind {
+    #[inline]
+    pub(crate) const fn kind(&self) -> TokenKind {
+        self.kind
+    }
+}
+
+impl Ranged for SpannedKind {
+    #[inline]
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+impl From<(&Tok, &TextRange)> for SpannedKind {
+    #[inline]
+    fn from((tok, range): (&Tok, &TextRange)) -> Self {
+        Self {
+            kind: TokenKind::from_token(tok),
+            range: *range,
+        }
+    }
+}
+
+impl From<(Tok, TextRange)> for SpannedKind {
+    #[inline]
+    fn from((tok, range): (Tok, TextRange)) -> Self {
+        Self {
+            kind: TokenKind::from_token(&tok),
+            range,
+        }
+    }
 }

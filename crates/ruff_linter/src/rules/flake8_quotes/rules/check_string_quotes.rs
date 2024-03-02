@@ -1,7 +1,7 @@
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_parser::TokenKind;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::checkers::tokens::SpannedKind;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::Locator;
@@ -381,18 +381,18 @@ struct FStringRangeBuilder {
 }
 
 impl FStringRangeBuilder {
-    fn visit_token(&mut self, token: &Tok, range: TextRange) {
-        match token {
-            Tok::FStringStart => {
+    fn visit_token(&mut self, spanned: &SpannedKind) {
+        match spanned.kind() {
+            TokenKind::FStringStart => {
                 if self.nesting == 0 {
-                    self.start_location = range.start();
+                    self.start_location = spanned.start();
                 }
                 self.nesting += 1;
             }
-            Tok::FStringEnd => {
+            TokenKind::FStringEnd => {
                 self.nesting = self.nesting.saturating_sub(1);
                 if self.nesting == 0 {
-                    self.end_location = range.end();
+                    self.end_location = spanned.end();
                 }
             }
             _ => {}
@@ -423,7 +423,7 @@ impl FStringRangeBuilder {
 /// Generate `flake8-quote` diagnostics from a token stream.
 pub(crate) fn check_string_quotes(
     diagnostics: &mut Vec<Diagnostic>,
-    lxr: &[LexResult],
+    lxr: &[SpannedKind],
     locator: &Locator,
     settings: &LinterSettings,
 ) {
@@ -432,13 +432,13 @@ pub(crate) fn check_string_quotes(
     let mut sequence = vec![];
     let mut state_machine = StateMachine::default();
     let mut fstring_range_builder = FStringRangeBuilder::default();
-    for &(ref tok, range) in lxr.iter().flatten() {
-        fstring_range_builder.visit_token(tok, range);
+    for spanned in lxr {
+        fstring_range_builder.visit_token(spanned);
         if fstring_range_builder.in_fstring() {
             continue;
         }
 
-        let is_docstring = state_machine.consume(tok);
+        let is_docstring = state_machine.consume(spanned.kind());
 
         // If this is a docstring, consume the existing sequence, then consume the
         // docstring, then move on.
@@ -447,21 +447,21 @@ pub(crate) fn check_string_quotes(
                 diagnostics.extend(strings(locator, &sequence, settings));
                 sequence.clear();
             }
-            if let Some(diagnostic) = docstring(locator, range, settings) {
+            if let Some(diagnostic) = docstring(locator, spanned.range(), settings) {
                 diagnostics.push(diagnostic);
             }
         } else {
-            match tok {
-                Tok::String { .. } => {
+            match spanned.kind() {
+                TokenKind::String => {
                     // If this is a string, add it to the sequence.
-                    sequence.push(range);
+                    sequence.push(spanned.range());
                 }
-                Tok::FStringEnd => {
+                TokenKind::FStringEnd => {
                     // If this is the end of an f-string, add the entire f-string
                     // range to the sequence.
                     sequence.push(fstring_range_builder.finish());
                 }
-                Tok::Comment(..) | Tok::NonLogicalNewline => continue,
+                TokenKind::Comment | TokenKind::NonLogicalNewline => continue,
                 _ => {
                     // Otherwise, consume the sequence.
                     if !sequence.is_empty() {

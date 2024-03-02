@@ -1,9 +1,9 @@
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_parser::TokenKind;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::checkers::tokens::SpannedKind;
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -100,7 +100,7 @@ impl AlwaysFixableViolation for UselessSemicolon {
 /// E701, E702, E703
 pub(crate) fn compound_statements(
     diagnostics: &mut Vec<Diagnostic>,
-    lxr: &[LexResult],
+    lxr: &[SpannedKind],
     locator: &Locator,
     indexer: &Indexer,
     source_type: PySourceType,
@@ -135,38 +135,38 @@ pub(crate) fn compound_statements(
     let mut indent = 0u32;
 
     // Keep the token iterator to perform lookaheads.
-    let mut tokens = lxr.iter().flatten();
+    let mut tokens = lxr.iter();
 
-    while let Some(&(ref tok, range)) = tokens.next() {
-        match tok {
-            Tok::Lpar => {
+    while let Some(spanned) = tokens.next() {
+        match spanned.kind() {
+            TokenKind::Lpar => {
                 par_count = par_count.saturating_add(1);
             }
-            Tok::Rpar => {
+            TokenKind::Rpar => {
                 par_count = par_count.saturating_sub(1);
             }
-            Tok::Lsqb => {
+            TokenKind::Lsqb => {
                 sqb_count = sqb_count.saturating_add(1);
             }
-            Tok::Rsqb => {
+            TokenKind::Rsqb => {
                 sqb_count = sqb_count.saturating_sub(1);
             }
-            Tok::Lbrace => {
+            TokenKind::Lbrace => {
                 brace_count = brace_count.saturating_add(1);
             }
-            Tok::Rbrace => {
+            TokenKind::Rbrace => {
                 brace_count = brace_count.saturating_sub(1);
             }
-            Tok::Ellipsis => {
+            TokenKind::Ellipsis => {
                 if allow_ellipsis {
                     allow_ellipsis = false;
                     continue;
                 }
             }
-            Tok::Indent => {
+            TokenKind::Indent => {
                 indent = indent.saturating_add(1);
             }
-            Tok::Dedent => {
+            TokenKind::Dedent => {
                 indent = indent.saturating_sub(1);
             }
             _ => {}
@@ -176,13 +176,13 @@ pub(crate) fn compound_statements(
             continue;
         }
 
-        match tok {
-            Tok::Newline => {
+        match spanned.kind() {
+            TokenKind::Newline => {
                 if let Some((start, end)) = semi {
                     if !(source_type.is_ipynb()
                         && indent == 0
                         && cell_offsets
-                            .and_then(|cell_offsets| cell_offsets.containing_range(range.start()))
+                            .and_then(|cell_offsets| cell_offsets.containing_range(spanned.start()))
                             .is_some_and(|cell_range| {
                                 !has_non_trivia_tokens_till(tokens.clone(), cell_range.end())
                             }))
@@ -215,7 +215,7 @@ pub(crate) fn compound_statements(
                 while_ = None;
                 with = None;
             }
-            Tok::Colon => {
+            TokenKind::Colon => {
                 if case.is_some()
                     || class.is_some()
                     || elif.is_some()
@@ -229,17 +229,20 @@ pub(crate) fn compound_statements(
                     || while_.is_some()
                     || with.is_some()
                 {
-                    colon = Some((range.start(), range.end()));
+                    colon = Some((spanned.start(), spanned.end()));
 
                     // Allow `class C: ...`-style definitions.
                     allow_ellipsis = true;
                 }
             }
-            Tok::Semi => {
-                semi = Some((range.start(), range.end()));
+            TokenKind::Semi => {
+                semi = Some((spanned.start(), spanned.end()));
                 allow_ellipsis = false;
             }
-            Tok::Comment(..) | Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline => {}
+            TokenKind::Comment
+            | TokenKind::Indent
+            | TokenKind::Dedent
+            | TokenKind::NonLogicalNewline => {}
             _ => {
                 if let Some((start, end)) = semi {
                     diagnostics.push(Diagnostic::new(
@@ -277,8 +280,8 @@ pub(crate) fn compound_statements(
             }
         }
 
-        match tok {
-            Tok::Lambda => {
+        match spanned.kind() {
+            TokenKind::Lambda => {
                 // Reset.
                 colon = None;
                 case = None;
@@ -294,41 +297,41 @@ pub(crate) fn compound_statements(
                 while_ = None;
                 with = None;
             }
-            Tok::Case => {
-                case = Some((range.start(), range.end()));
+            TokenKind::Case => {
+                case = Some((spanned.start(), spanned.end()));
             }
-            Tok::If => {
-                if_ = Some((range.start(), range.end()));
+            TokenKind::If => {
+                if_ = Some((spanned.start(), spanned.end()));
             }
-            Tok::While => {
-                while_ = Some((range.start(), range.end()));
+            TokenKind::While => {
+                while_ = Some((spanned.start(), spanned.end()));
             }
-            Tok::For => {
-                for_ = Some((range.start(), range.end()));
+            TokenKind::For => {
+                for_ = Some((spanned.start(), spanned.end()));
             }
-            Tok::Try => {
-                try_ = Some((range.start(), range.end()));
+            TokenKind::Try => {
+                try_ = Some((spanned.start(), spanned.end()));
             }
-            Tok::Except => {
-                except = Some((range.start(), range.end()));
+            TokenKind::Except => {
+                except = Some((spanned.start(), spanned.end()));
             }
-            Tok::Finally => {
-                finally = Some((range.start(), range.end()));
+            TokenKind::Finally => {
+                finally = Some((spanned.start(), spanned.end()));
             }
-            Tok::Elif => {
-                elif = Some((range.start(), range.end()));
+            TokenKind::Elif => {
+                elif = Some((spanned.start(), spanned.end()));
             }
-            Tok::Else => {
-                else_ = Some((range.start(), range.end()));
+            TokenKind::Else => {
+                else_ = Some((spanned.start(), spanned.end()));
             }
-            Tok::Class => {
-                class = Some((range.start(), range.end()));
+            TokenKind::Class => {
+                class = Some((spanned.start(), spanned.end()));
             }
-            Tok::With => {
-                with = Some((range.start(), range.end()));
+            TokenKind::With => {
+                with = Some((spanned.start(), spanned.end()));
             }
-            Tok::Match => {
-                match_ = Some((range.start(), range.end()));
+            TokenKind::Match => {
+                match_ = Some((spanned.start(), spanned.end()));
             }
             _ => {}
         };
@@ -338,16 +341,19 @@ pub(crate) fn compound_statements(
 /// Returns `true` if there are any non-trivia tokens from the given token
 /// iterator till the given end offset.
 fn has_non_trivia_tokens_till<'a>(
-    tokens: impl Iterator<Item = &'a (Tok, TextRange)>,
+    tokens: impl Iterator<Item = &'a SpannedKind>,
     cell_end: TextSize,
 ) -> bool {
-    for &(ref tok, tok_range) in tokens {
-        if tok_range.start() >= cell_end {
+    for spanned in tokens {
+        if spanned.start() >= cell_end {
             return false;
         }
         if !matches!(
-            tok,
-            Tok::Newline | Tok::Comment(_) | Tok::EndOfFile | Tok::NonLogicalNewline
+            spanned.kind(),
+            TokenKind::Newline
+                | TokenKind::Comment
+                | TokenKind::EndOfFile
+                | TokenKind::NonLogicalNewline
         ) {
             return true;
         }

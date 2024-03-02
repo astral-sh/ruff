@@ -24,7 +24,7 @@ use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
 use crate::checkers::noqa::check_noqa;
 use crate::checkers::physical_lines::check_physical_lines;
-use crate::checkers::tokens::check_tokens;
+use crate::checkers::tokens::{check_tokens, Tokens};
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{fix_file, FixResult};
@@ -83,8 +83,10 @@ pub fn check_path(
     noqa: flags::Noqa,
     source_kind: &SourceKind,
     source_type: PySourceType,
-    tokens: TokenSource,
+    token_source: TokenSource,
 ) -> LinterResult<(Vec<Diagnostic>, Option<ImportMap>)> {
+    let tokens = Tokens::new(&token_source);
+
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
     let mut imports = None;
@@ -95,7 +97,7 @@ pub fn check_path(
     let use_doc_lines = settings.rules.enabled(Rule::DocLineTooLong);
     let mut doc_lines = vec![];
     if use_doc_lines {
-        doc_lines.extend(doc_lines_from_tokens(&tokens));
+        doc_lines.extend(doc_lines_from_tokens(tokens.kinds()));
     }
 
     // Run the token-based rules.
@@ -132,7 +134,10 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
         diagnostics.extend(crate::checkers::logical_lines::check_logical_lines(
-            &tokens, locator, stylist, settings,
+            tokens.kinds(),
+            locator,
+            stylist,
+            settings,
         ));
     }
 
@@ -148,7 +153,7 @@ pub fn check_path(
             .any(|rule_code| rule_code.lint_source().is_imports());
     if use_ast || use_imports || use_doc_lines {
         // Parse, if the AST wasn't pre-provided provided.
-        match tokens.into_ast_source(source_kind, source_type) {
+        match token_source.into_ast_source(source_kind, source_type) {
             Ok(python_ast) => {
                 let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
                 let notebook_index = source_kind.as_ipy_notebook().map(Notebook::index);

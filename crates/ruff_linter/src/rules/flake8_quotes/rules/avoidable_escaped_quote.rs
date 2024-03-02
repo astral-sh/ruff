@@ -2,7 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
+use ruff_python_parser::{Tok, TokenKind};
 use ruff_source_file::Locator;
 use ruff_text_size::TextRange;
 
@@ -136,7 +136,7 @@ pub(crate) fn avoidable_escaped_quote(
     let mut state_machine = StateMachine::default();
 
     for &(ref tok, tok_range) in lxr.iter().flatten() {
-        let is_docstring = state_machine.consume(tok);
+        let is_docstring = state_machine.consume(TokenKind::from_token(tok));
         if is_docstring {
             continue;
         }
@@ -306,7 +306,7 @@ pub(crate) fn unnecessary_escaped_quote(
     let mut state_machine = StateMachine::default();
 
     for &(ref tok, tok_range) in lxr.iter().flatten() {
-        let is_docstring = state_machine.consume(tok);
+        let is_docstring = state_machine.consume(TokenKind::from_token(tok));
         if is_docstring {
             continue;
         }

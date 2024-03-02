@@ -13,9 +13,9 @@ use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
 use bitflags::bitflags;
-use ruff_python_parser::lexer::LexResult;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::checkers::tokens::SpannedKind;
 use ruff_python_parser::TokenKind;
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::Locator;
@@ -52,23 +52,22 @@ bitflags! {
 
 #[derive(Clone)]
 pub(crate) struct LogicalLines<'a> {
-    tokens: Vec<LogicalLineToken>,
+    tokens: &'a [SpannedKind],
     lines: Vec<Line>,
     locator: &'a Locator<'a>,
 }
 
 impl<'a> LogicalLines<'a> {
-    pub(crate) fn from_tokens(tokens: &'a [LexResult], locator: &'a Locator<'a>) -> Self {
+    pub(crate) fn from_tokens(tokens: &'a [SpannedKind], locator: &'a Locator<'a>) -> Self {
         assert!(u32::try_from(tokens.len()).is_ok());
 
-        let mut builder = LogicalLinesBuilder::with_capacity(tokens.len());
+        let mut builder = LogicalLinesBuilder::new(tokens, locator);
         let mut parens = 0u32;
 
-        for (token, range) in tokens.iter().flatten() {
-            let token_kind = TokenKind::from_token(token);
-            builder.push_token(token_kind, *range);
+        for spanned in tokens {
+            builder.push_token(spanned.kind());
 
-            match token_kind {
+            match spanned.kind() {
                 TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
                     parens = parens.saturating_add(1);
                 }
@@ -82,7 +81,7 @@ impl<'a> LogicalLines<'a> {
             }
         }
 
-        builder.finish(locator)
+        builder.finish()
     }
 }
 
@@ -162,7 +161,7 @@ impl<'a> LogicalLine<'a> {
         }
     }
 
-    pub(crate) fn tokens_trimmed(&self) -> &'a [LogicalLineToken] {
+    pub(crate) fn tokens_trimmed(&self) -> &'a [SpannedKind] {
         let tokens = self.tokens();
 
         let start = tokens
@@ -200,7 +199,7 @@ impl<'a> LogicalLine<'a> {
 
     /// Returns the text after `token`
     #[inline]
-    pub(crate) fn text_after(&self, token: &'a LogicalLineToken) -> &str {
+    pub(crate) fn text_after(&self, token: &'a SpannedKind) -> &str {
         // SAFETY: The line must have at least one token or `token` would not belong to this line.
         let last_token = self.tokens().last().unwrap();
         self.lines
@@ -210,7 +209,7 @@ impl<'a> LogicalLine<'a> {
 
     /// Returns the text before `token`
     #[inline]
-    pub(crate) fn text_before(&self, token: &'a LogicalLineToken) -> &str {
+    pub(crate) fn text_before(&self, token: &'a SpannedKind) -> &str {
         // SAFETY: The line must have at least one token or `token` would not belong to this line.
         let first_token = self.tokens().first().unwrap();
         self.lines
@@ -219,24 +218,21 @@ impl<'a> LogicalLine<'a> {
     }
 
     /// Returns the whitespace *after* the `token` with the byte length
-    pub(crate) fn trailing_whitespace(
-        &self,
-        token: &'a LogicalLineToken,
-    ) -> (Whitespace, TextSize) {
+    pub(crate) fn trailing_whitespace(&self, token: &'a SpannedKind) -> (Whitespace, TextSize) {
         Whitespace::leading(self.text_after(token))
     }
 
     /// Returns the whitespace and whitespace byte-length *before* the `token`
-    pub(crate) fn leading_whitespace(&self, token: &'a LogicalLineToken) -> (Whitespace, TextSize) {
+    pub(crate) fn leading_whitespace(&self, token: &'a SpannedKind) -> (Whitespace, TextSize) {
         Whitespace::trailing(self.text_before(token))
     }
 
     /// Returns all tokens of the line, including comments and trailing new lines.
-    pub(crate) fn tokens(&self) -> &'a [LogicalLineToken] {
+    pub(crate) fn tokens(&self) -> &'a [SpannedKind] {
         &self.lines.tokens[self.line.tokens_start as usize..self.line.tokens_end as usize]
     }
 
-    pub(crate) fn first_token(&self) -> Option<&'a LogicalLineToken> {
+    pub(crate) fn first_token(&self) -> Option<&'a SpannedKind> {
         self.tokens().first()
     }
 
@@ -296,28 +292,6 @@ impl DoubleEndedIterator for LogicalLinesIter<'_> {
 impl ExactSizeIterator for LogicalLinesIter<'_> {}
 
 impl FusedIterator for LogicalLinesIter<'_> {}
-
-/// A token of a [`LogicalLine`]
-#[derive(Clone, Debug)]
-pub(crate) struct LogicalLineToken {
-    kind: TokenKind,
-    range: TextRange,
-}
-
-impl LogicalLineToken {
-    /// Returns the token's kind
-    #[inline]
-    pub(crate) const fn kind(&self) -> TokenKind {
-        self.kind
-    }
-}
-
-impl Ranged for LogicalLineToken {
-    /// Returns a tuple with the token's `(start, end)` locations
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub(crate) enum Whitespace {
@@ -400,36 +374,39 @@ impl Whitespace {
 struct CurrentLine {
     flags: TokenFlags,
     tokens_start: u32,
+    token_end: u32,
 }
 
 /// Builder for [`LogicalLines`]
-#[derive(Debug, Default)]
-struct LogicalLinesBuilder {
-    tokens: Vec<LogicalLineToken>,
+struct LogicalLinesBuilder<'a> {
+    tokens: &'a [SpannedKind],
+    locator: &'a Locator<'a>,
     lines: Vec<Line>,
     current_line: CurrentLine,
 }
 
-impl LogicalLinesBuilder {
-    fn with_capacity(tokens: usize) -> Self {
+impl<'a> LogicalLinesBuilder<'a> {
+    fn new(tokens: &'a [SpannedKind], locator: &'a Locator<'a>) -> Self {
         Self {
-            tokens: Vec::with_capacity(tokens),
-            ..Self::default()
+            tokens,
+            locator,
+            lines: Vec::new(),
+            current_line: CurrentLine::default(),
         }
     }
 
     // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each tokens is at least one character long
     #[allow(clippy::cast_possible_truncation)]
-    fn push_token(&mut self, kind: TokenKind, range: TextRange) {
+    fn push_token(&mut self, token_kind: TokenKind) {
         let line = &mut self.current_line;
 
-        if matches!(kind, TokenKind::Comment) {
+        if token_kind.is_comment() {
             line.flags.insert(TokenFlags::COMMENT);
-        } else if kind.is_operator() {
+        } else if token_kind.is_operator() {
             line.flags.insert(TokenFlags::OPERATOR);
 
             if matches!(
-                kind,
+                token_kind,
                 TokenKind::Lpar
                     | TokenKind::Lsqb
                     | TokenKind::Lbrace
@@ -441,14 +418,17 @@ impl LogicalLinesBuilder {
             }
         }
 
-        if matches!(kind, TokenKind::Comma | TokenKind::Semi | TokenKind::Colon) {
+        if matches!(
+            token_kind,
+            TokenKind::Comma | TokenKind::Semi | TokenKind::Colon
+        ) {
             line.flags.insert(TokenFlags::PUNCTUATION);
-        } else if kind.is_keyword() {
+        } else if token_kind.is_keyword() {
             line.flags.insert(TokenFlags::KEYWORD);
         }
 
         if !matches!(
-            kind,
+            token_kind,
             TokenKind::Comment
                 | TokenKind::Newline
                 | TokenKind::NonLogicalNewline
@@ -458,39 +438,40 @@ impl LogicalLinesBuilder {
             line.flags.insert(TokenFlags::NON_TRIVIA);
         }
 
-        self.tokens.push(LogicalLineToken { kind, range });
+        self.current_line.token_end += 1;
     }
 
     // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each tokens is at least one character long
     #[allow(clippy::cast_possible_truncation)]
     fn finish_line(&mut self) {
-        let end = self.tokens.len() as u32;
-        if self.current_line.tokens_start < end {
-            let is_empty = self.tokens[self.current_line.tokens_start as usize..end as usize]
+        if self.current_line.tokens_start < self.current_line.token_end {
+            let is_empty = self.tokens
+                [self.current_line.tokens_start as usize..self.current_line.token_end as usize]
                 .iter()
                 .all(|token| token.kind.is_newline());
             if !is_empty {
                 self.lines.push(Line {
                     flags: self.current_line.flags,
                     tokens_start: self.current_line.tokens_start,
-                    tokens_end: end,
+                    tokens_end: self.current_line.token_end,
                 });
             }
 
             self.current_line = CurrentLine {
                 flags: TokenFlags::default(),
-                tokens_start: end,
+                tokens_start: self.current_line.token_end,
+                token_end: self.current_line.token_end,
             }
         }
     }
 
-    fn finish<'a>(mut self, locator: &'a Locator<'a>) -> LogicalLines<'a> {
+    fn finish(mut self) -> LogicalLines<'a> {
         self.finish_line();
 
         LogicalLines {
             tokens: self.tokens,
             lines: self.lines,
-            locator,
+            locator: self.locator,
         }
     }
 }
@@ -504,9 +485,9 @@ struct Line {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_parser::lexer::LexResult;
     use ruff_python_parser::{lexer, Mode};
 
+    use crate::checkers::tokens::SpannedKind;
     use ruff_source_file::Locator;
 
     use super::LogicalLines;
@@ -590,7 +571,10 @@ if False:
     }
 
     fn assert_logical_lines(contents: &str, expected: &[&str]) {
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let lxr: Vec<SpannedKind> = lexer::lex(contents, Mode::Module)
+            .flatten()
+            .map(|(tok, range)| SpannedKind::from((tok, range)))
+            .collect();
         let locator = Locator::new(contents);
         let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
             .into_iter()
