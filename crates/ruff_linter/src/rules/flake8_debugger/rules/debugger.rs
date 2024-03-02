@@ -109,6 +109,8 @@ fn is_debugger_call(call_path: &CallPath) -> bool {
             ]
             | ["celery", "contrib", "rdb", "set_trace"]
             | ["builtins" | "", "breakpoint"]
+            | ["debugpy", "breakpoint" | "listen" | "wait_for_client"]
+            | ["ptvsd", "break_into_debugger" | "wait_for_attach"]
     )
 }
 
@@ -119,7 +121,7 @@ fn is_debugger_import(call_path: &CallPath) -> bool {
     // than (e.g.) `import celery.contrib.rdb`.
     matches!(
         call_path.as_slice(),
-        ["pdb" | "pudb" | "ipdb"]
+        ["pdb" | "pudb" | "ipdb" | "debugpy" | "ptvsd"]
             | ["IPython", "terminal", "embed"]
             | ["IPython", "frontend", "terminal", "embed",]
             | ["celery", "contrib", "rdb"]
