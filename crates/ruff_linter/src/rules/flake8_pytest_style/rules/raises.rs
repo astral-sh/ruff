@@ -153,7 +153,7 @@ impl Violation for PytestRaisesWithoutException {
 
 fn is_pytest_raises(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_call_path(func)
+        .resolve_qualified_name(func)
         .is_some_and(|call_path| matches!(call_path.segments(), ["pytest", "raises"]))
 }
 
@@ -228,7 +228,7 @@ pub(crate) fn complex_raises(
 fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
     if let Some(call_path) = checker
         .semantic()
-        .resolve_call_path(exception)
+        .resolve_qualified_name(exception)
         .and_then(|call_path| {
             let call_path = call_path.to_string();
             checker

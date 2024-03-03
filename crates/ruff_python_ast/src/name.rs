@@ -5,49 +5,44 @@ use crate::{nodes, Expr};
 
 /// A representation of a qualified name, like `typing.List`.
 #[derive(Debug, Clone, Eq, Hash)]
-pub struct CallPath<'a> {
+pub struct QualifiedName<'a> {
     segments: SmallVec<[&'a str; 8]>,
 }
 
-impl<'a> CallPath<'a> {
-    pub fn from_expr(expr: &'a Expr) -> Option<Self> {
-        let segments = collect_call_path(expr)?;
-        Some(Self { segments })
-    }
-
-    /// Create a [`CallPath`] from an unqualified name.
+impl<'a> QualifiedName<'a> {
+    /// Create a [`QualifiedName`] from a dotted name.
     ///
     /// ```rust
     /// # use smallvec::smallvec;
-    /// # use ruff_python_ast::call_path::CallPath;
+    /// # use ruff_python_ast::name::QualifiedName;
     ///
-    /// assert_eq!(CallPath::from_unqualified_name("typing.List").segments(), ["typing", "List"]);
-    /// assert_eq!(CallPath::from_unqualified_name("list").segments(), ["list"]);
+    /// assert_eq!(QualifiedName::from_dotted_name("typing.List").segments(), ["typing", "List"]);
+    /// assert_eq!(QualifiedName::from_dotted_name("list").segments(), ["", "list"]);
     /// ```
     #[inline]
-    pub fn from_unqualified_name(name: &'a str) -> Self {
-        name.split('.').collect()
-    }
-
-    /// Create a [`CallPath`] from a fully-qualified name.
-    ///
-    /// ```rust
-    /// # use smallvec::smallvec;
-    /// # use ruff_python_ast::call_path::CallPath;
-    ///
-    /// assert_eq!(CallPath::from_qualified_name("typing.List").segments(), ["typing", "List"]);
-    /// assert_eq!(CallPath::from_qualified_name("list").segments(), ["", "list"]);
-    /// ```
-    #[inline]
-    pub fn from_qualified_name(name: &'a str) -> Self {
+    pub fn from_dotted_name(name: &'a str) -> Self {
         if let Some(dot) = name.find('.') {
             let mut segments = SmallVec::new();
             segments.push(&name[..dot]);
             segments.extend(name[dot + 1..].split('.'));
             Self { segments }
         } else {
-            // Special-case: for builtins, return `["", "int"]` instead of `["int"]`.
-            Self::from_slice(&["", name])
+            Self::builtin(name)
+        }
+    }
+
+    /// Creates a name that's guaranteed not be a built in
+    #[inline]
+    pub fn imported(name: &'a str) -> Self {
+        name.split('.').collect()
+    }
+
+    /// Creates a qualified name for a built in
+    #[inline]
+    pub fn builtin(name: &'a str) -> Self {
+        debug_assert!(!name.contains('.'));
+        Self {
+            segments: ["", name].into_iter().collect(),
         }
     }
 
@@ -58,7 +53,7 @@ impl<'a> CallPath<'a> {
         }
     }
 
-    pub fn starts_with(&self, other: &CallPath) -> bool {
+    pub fn starts_with(&self, other: &QualifiedName) -> bool {
         self.segments().starts_with(other.segments())
     }
 
@@ -73,7 +68,7 @@ impl<'a> CallPath<'a> {
     }
 }
 
-impl<'a> FromIterator<&'a str> for CallPath<'a> {
+impl<'a> FromIterator<&'a str> for QualifiedName<'a> {
     fn from_iter<I: IntoIterator<Item = &'a str>>(iter: I) -> Self {
         Self {
             segments: iter.into_iter().collect(),
@@ -81,30 +76,26 @@ impl<'a> FromIterator<&'a str> for CallPath<'a> {
     }
 }
 
-impl<'a, 'b> PartialEq<CallPath<'b>> for CallPath<'a> {
+impl<'a, 'b> PartialEq<QualifiedName<'b>> for QualifiedName<'a> {
     #[inline]
-    fn eq(&self, other: &CallPath<'b>) -> bool {
+    fn eq(&self, other: &QualifiedName<'b>) -> bool {
         self.segments == other.segments
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct CallPathBuilder<'a> {
+#[derive(Debug, Clone)]
+pub struct QualifiedNameBuilder<'a> {
     segments: SmallVec<[&'a str; 8]>,
 }
 
-impl<'a> CallPathBuilder<'a> {
+impl<'a> QualifiedNameBuilder<'a> {
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             segments: SmallVec::with_capacity(capacity),
         }
     }
 
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn from_path(call_path: CallPath<'a>) -> Self {
+    pub fn from_qualified_name(call_path: QualifiedName<'a>) -> Self {
         Self {
             segments: call_path.segments,
         }
@@ -133,15 +124,126 @@ impl<'a> CallPathBuilder<'a> {
         self.segments.extend_from_slice(segments);
     }
 
-    pub fn build(self) -> CallPath<'a> {
-        CallPath {
+    pub fn build(self) -> QualifiedName<'a> {
+        QualifiedName {
             segments: self.segments,
         }
     }
 }
 
-/// Convert an `Expr` to its [`CallPath`] segments (like `["typing", "List"]`).
-fn collect_call_path(expr: &Expr) -> Option<SmallVec<[&str; 8]>> {
+impl Display for QualifiedName<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        format_call_path_segments(self.segments(), f)
+    }
+}
+
+/// Convert an `Expr` to its call path (like `List`, or `typing.List`).
+pub fn compose_call_path(expr: &Expr) -> Option<String> {
+    UnqualifiedName::from_expr(expr).map(|call_path| call_path.to_string())
+}
+
+pub fn format_call_path_segments(segments: &[&str], w: &mut dyn Write) -> std::fmt::Result {
+    if segments.first().is_some_and(|first| first.is_empty()) {
+        // If the first segment is empty, the `CallPath` is that of a builtin.
+        // Ex) `["", "bool"]` -> `"bool"`
+        let mut first = true;
+
+        for segment in segments.iter().skip(1) {
+            if !first {
+                w.write_char('.')?;
+            }
+
+            w.write_str(segment)?;
+            first = false;
+        }
+    } else if segments.first().is_some_and(|first| matches!(*first, ".")) {
+        // If the call path is dot-prefixed, it's an unresolved relative import.
+        // Ex) `[".foo", "bar"]` -> `".foo.bar"`
+
+        let mut iter = segments.iter();
+        for segment in iter.by_ref() {
+            if *segment == "." {
+                w.write_char('.')?;
+            } else {
+                w.write_str(segment)?;
+                break;
+            }
+        }
+        for segment in iter {
+            w.write_char('.')?;
+            w.write_str(segment)?;
+        }
+    } else {
+        let mut first = true;
+        for segment in segments {
+            if !first {
+                w.write_char('.')?;
+            }
+
+            w.write_str(segment)?;
+            first = false;
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, Clone, Eq, Hash)]
+pub struct UnqualifiedName<'a> {
+    segments: SmallVec<[&'a str; 8]>,
+}
+
+impl<'a> UnqualifiedName<'a> {
+    /// Create a [`UnqualifiedName`] from a dotted name.
+    ///
+    /// ```rust
+    /// # use smallvec::smallvec;
+    /// # use ruff_python_ast::name::{UnqualifiedName};
+    ///
+    /// assert_eq!(UnqualifiedName::from_dotted("typing.List").segments(), ["typing", "List"]);
+    /// assert_eq!(UnqualifiedName::from_dotted("list").segments(), ["list"]);
+    /// ```
+    pub fn from_dotted(name: &'a str) -> Self {
+        Self {
+            segments: name.split('.').collect(),
+        }
+    }
+
+    pub fn from_expr(expr: &'a Expr) -> Option<Self> {
+        let segments = collect_segments(expr)?;
+        Some(Self { segments })
+    }
+
+    pub fn segments(&self) -> &[&'a str] {
+        &self.segments
+    }
+}
+
+impl<'a, 'b> PartialEq<UnqualifiedName<'b>> for UnqualifiedName<'a> {
+    #[inline]
+    fn eq(&self, other: &UnqualifiedName<'b>) -> bool {
+        self.segments == other.segments
+    }
+}
+
+impl Display for UnqualifiedName<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut first = true;
+        for segment in &self.segments {
+            if !first {
+                f.write_char('.')?;
+            }
+
+            f.write_str(segment)?;
+            first = false;
+        }
+
+        Ok(())
+    }
+}
+
+/// Convert an `Expr` to its [`QualifiedName`] segments (like `["typing", "List"]`).
+fn collect_segments(expr: &Expr) -> Option<SmallVec<[&str; 8]>> {
     // Unroll the loop up to eight times, to match the maximum number of expected attributes.
     // In practice, unrolling appears to give about a 4x speed-up on this hot path.
     let attr1 = match expr {
@@ -255,7 +357,7 @@ fn collect_call_path(expr: &Expr) -> Option<SmallVec<[&str; 8]>> {
         _ => return None,
     };
 
-    collect_call_path(&attr8.value).map(|mut segments| {
+    collect_segments(&attr8.value).map(|mut segments| {
         segments.extend([
             attr8.attr.as_str(),
             attr7.attr.as_str(),
@@ -268,61 +370,4 @@ fn collect_call_path(expr: &Expr) -> Option<SmallVec<[&str; 8]>> {
         ]);
         segments
     })
-}
-
-impl Display for CallPath<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        format_call_path_segments(self.segments(), f)
-    }
-}
-
-/// Convert an `Expr` to its call path (like `List`, or `typing.List`).
-pub fn compose_call_path(expr: &Expr) -> Option<String> {
-    CallPath::from_expr(expr).map(|call_path| call_path.to_string())
-}
-
-pub fn format_call_path_segments(segments: &[&str], w: &mut dyn Write) -> std::fmt::Result {
-    if segments.first().is_some_and(|first| first.is_empty()) {
-        // If the first segment is empty, the `CallPath` is that of a builtin.
-        // Ex) `["", "bool"]` -> `"bool"`
-        let mut first = true;
-
-        for segment in segments.iter().skip(1) {
-            if !first {
-                w.write_char('.')?;
-            }
-
-            w.write_str(segment)?;
-            first = false;
-        }
-    } else if segments.first().is_some_and(|first| matches!(*first, ".")) {
-        // If the call path is dot-prefixed, it's an unresolved relative import.
-        // Ex) `[".foo", "bar"]` -> `".foo.bar"`
-
-        let mut iter = segments.iter();
-        for segment in iter.by_ref() {
-            if *segment == "." {
-                w.write_char('.')?;
-            } else {
-                w.write_str(segment)?;
-                break;
-            }
-        }
-        for segment in iter {
-            w.write_char('.')?;
-            w.write_str(segment)?;
-        }
-    } else {
-        let mut first = true;
-        for segment in segments {
-            if !first {
-                w.write_char('.')?;
-            }
-
-            w.write_str(segment)?;
-            first = false;
-        }
-    }
-
-    Ok(())
 }

@@ -195,17 +195,19 @@ pub(crate) fn unused_private_type_var(
         };
 
         let semantic = checker.semantic();
-        let Some(type_var_like_kind) = semantic.resolve_call_path(func).and_then(|call_path| {
-            if semantic.match_typing_call_path(&call_path, "TypeVar") {
-                Some("TypeVar")
-            } else if semantic.match_typing_call_path(&call_path, "ParamSpec") {
-                Some("ParamSpec")
-            } else if semantic.match_typing_call_path(&call_path, "TypeVarTuple") {
-                Some("TypeVarTuple")
-            } else {
-                None
-            }
-        }) else {
+        let Some(type_var_like_kind) =
+            semantic.resolve_qualified_name(func).and_then(|call_path| {
+                if semantic.match_typing_call_path(&call_path, "TypeVar") {
+                    Some("TypeVar")
+                } else if semantic.match_typing_call_path(&call_path, "ParamSpec") {
+                    Some("ParamSpec")
+                } else if semantic.match_typing_call_path(&call_path, "TypeVarTuple") {
+                    Some("TypeVarTuple")
+                } else {
+                    None
+                }
+            })
+        else {
             continue;
         };
 

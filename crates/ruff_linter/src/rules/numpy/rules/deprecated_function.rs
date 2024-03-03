@@ -63,7 +63,7 @@ pub(crate) fn deprecated_function(checker: &mut Checker, expr: &Expr) {
     if let Some((existing, replacement)) =
         checker
             .semantic()
-            .resolve_call_path(expr)
+            .resolve_qualified_name(expr)
             .and_then(|call_path| match call_path.segments() {
                 ["numpy", "round_"] => Some(("round_", "round")),
                 ["numpy", "product"] => Some(("product", "prod")),

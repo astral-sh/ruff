@@ -69,7 +69,7 @@ pub(crate) fn no_slots_in_str_subclass(checker: &mut Checker, stmt: &Stmt, class
 fn is_str_subclass(bases: &[Expr], semantic: &SemanticModel) -> bool {
     let mut is_str_subclass = false;
     for base in bases {
-        if let Some(call_path) = semantic.resolve_call_path(base) {
+        if let Some(call_path) = semantic.resolve_qualified_name(base) {
             match call_path.segments() {
                 ["" | "builtins", "str"] => {
                     is_str_subclass = true;

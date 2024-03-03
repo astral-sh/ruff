@@ -56,7 +56,7 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
 
     if let Some(type_name) = checker
         .semantic()
-        .resolve_call_path(expr)
+        .resolve_qualified_name(expr)
         .and_then(|call_path| {
             if matches!(
                 call_path.segments(),

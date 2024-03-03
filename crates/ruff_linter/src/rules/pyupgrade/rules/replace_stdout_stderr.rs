@@ -60,7 +60,7 @@ pub(crate) fn replace_stdout_stderr(checker: &mut Checker, call: &ast::ExprCall)
 
     if checker
         .semantic()
-        .resolve_call_path(&call.func)
+        .resolve_qualified_name(&call.func)
         .is_some_and(|call_path| matches!(call_path.segments(), ["subprocess", "run"]))
     {
         // Find `stdout` and `stderr` kwargs.
@@ -74,11 +74,11 @@ pub(crate) fn replace_stdout_stderr(checker: &mut Checker, call: &ast::ExprCall)
         // Verify that they're both set to `subprocess.PIPE`.
         if !checker
             .semantic()
-            .resolve_call_path(&stdout.value)
+            .resolve_qualified_name(&stdout.value)
             .is_some_and(|call_path| matches!(call_path.segments(), ["subprocess", "PIPE"]))
             || !checker
                 .semantic()
-                .resolve_call_path(&stderr.value)
+                .resolve_qualified_name(&stderr.value)
                 .is_some_and(|call_path| matches!(call_path.segments(), ["subprocess", "PIPE"]))
         {
             return;

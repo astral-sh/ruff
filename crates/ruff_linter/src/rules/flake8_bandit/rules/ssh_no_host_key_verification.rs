@@ -60,7 +60,7 @@ pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCal
     // Detect either, e.g., `paramiko.client.AutoAddPolicy` or `paramiko.client.AutoAddPolicy()`.
     if !checker
         .semantic()
-        .resolve_call_path(map_callable(policy_argument))
+        .resolve_qualified_name(map_callable(policy_argument))
         .is_some_and(|call_path| {
             matches!(
                 call_path.segments(),

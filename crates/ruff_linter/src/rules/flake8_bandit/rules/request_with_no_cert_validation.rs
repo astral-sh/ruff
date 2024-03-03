@@ -49,7 +49,7 @@ impl Violation for RequestWithNoCertValidation {
 pub(crate) fn request_with_no_cert_validation(checker: &mut Checker, call: &ast::ExprCall) {
     if let Some(target) = checker
         .semantic()
-        .resolve_call_path(&call.func)
+        .resolve_qualified_name(&call.func)
         .and_then(|call_path| match call_path.segments() {
             ["requests", "get" | "options" | "head" | "post" | "put" | "patch" | "delete"] => {
                 Some("requests")

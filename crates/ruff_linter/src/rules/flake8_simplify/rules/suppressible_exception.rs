@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::helpers;
+use ruff_python_ast::name::compose_call_path;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};

@@ -465,7 +465,7 @@ pub(crate) fn f_strings(
         expr.as_call_expr().is_some_and(|call| {
             checker
                 .semantic()
-                .resolve_call_path(call.func.as_ref())
+                .resolve_qualified_name(call.func.as_ref())
                 .map_or(false, |call_path| {
                     matches!(
                         call_path.segments(),

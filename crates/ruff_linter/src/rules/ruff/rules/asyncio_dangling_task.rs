@@ -73,7 +73,7 @@ pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Op
     // Ex) `asyncio.create_task(...)`
     if let Some(method) =
         semantic
-            .resolve_call_path(func)
+            .resolve_qualified_name(func)
             .and_then(|call_path| match call_path.segments() {
                 ["asyncio", "create_task"] => Some(Method::CreateTask),
                 ["asyncio", "ensure_future"] => Some(Method::EnsureFuture),

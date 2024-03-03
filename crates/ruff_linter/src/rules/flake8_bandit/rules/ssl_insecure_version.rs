@@ -51,7 +51,7 @@ impl Violation for SslInsecureVersion {
 pub(crate) fn ssl_insecure_version(checker: &mut Checker, call: &ExprCall) {
     let Some(keyword) = checker
         .semantic()
-        .resolve_call_path(call.func.as_ref())
+        .resolve_qualified_name(call.func.as_ref())
         .and_then(|call_path| match call_path.segments() {
             ["ssl", "wrap_socket"] => Some("ssl_version"),
             ["OpenSSL", "SSL", "Context"] => Some("method"),

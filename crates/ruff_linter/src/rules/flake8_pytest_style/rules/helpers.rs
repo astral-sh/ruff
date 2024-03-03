@@ -1,7 +1,6 @@
-use ruff_python_ast::call_path::CallPath;
-use ruff_python_ast::{self as ast, Decorator, Expr, Keyword};
-
 use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::name::UnqualifiedName;
+use ruff_python_ast::{self as ast, Decorator, Expr, Keyword};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::PythonWhitespace;
 
@@ -9,7 +8,8 @@ pub(super) fn get_mark_decorators(
     decorators: &[Decorator],
 ) -> impl Iterator<Item = (&Decorator, &str)> {
     decorators.iter().filter_map(|decorator| {
-        let Some(call_path) = CallPath::from_expr(map_callable(&decorator.expression)) else {
+        let Some(call_path) = UnqualifiedName::from_expr(map_callable(&decorator.expression))
+        else {
             return None;
         };
         let ["pytest", "mark", marker] = call_path.segments() else {
@@ -21,25 +21,25 @@ pub(super) fn get_mark_decorators(
 
 pub(super) fn is_pytest_fail(call: &Expr, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_call_path(call)
+        .resolve_qualified_name(call)
         .is_some_and(|call_path| matches!(call_path.segments(), ["pytest", "fail"]))
 }
 
 pub(super) fn is_pytest_fixture(decorator: &Decorator, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_call_path(map_callable(&decorator.expression))
+        .resolve_qualified_name(map_callable(&decorator.expression))
         .is_some_and(|call_path| matches!(call_path.segments(), ["pytest", "fixture"]))
 }
 
 pub(super) fn is_pytest_yield_fixture(decorator: &Decorator, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_call_path(map_callable(&decorator.expression))
+        .resolve_qualified_name(map_callable(&decorator.expression))
         .is_some_and(|call_path| matches!(call_path.segments(), ["pytest", "yield_fixture"]))
 }
 
 pub(super) fn is_pytest_parametrize(decorator: &Decorator, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_call_path(map_callable(&decorator.expression))
+        .resolve_qualified_name(map_callable(&decorator.expression))
         .is_some_and(|call_path| matches!(call_path.segments(), ["pytest", "mark", "parametrize"]))
 }
 

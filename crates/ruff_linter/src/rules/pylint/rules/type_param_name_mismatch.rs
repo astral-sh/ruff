@@ -89,7 +89,7 @@ pub(crate) fn type_param_name_mismatch(checker: &mut Checker, value: &Expr, targ
 
     let Some(kind) = checker
         .semantic()
-        .resolve_call_path(func)
+        .resolve_qualified_name(func)
         .and_then(|call_path| {
             if checker
                 .semantic()

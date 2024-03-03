@@ -25,7 +25,7 @@ pub(super) fn is_dataclass_field(func: &Expr, semantic: &SemanticModel) -> bool 
     }
 
     semantic
-        .resolve_call_path(func)
+        .resolve_qualified_name(func)
         .is_some_and(|call_path| matches!(call_path.segments(), ["dataclasses", "field"]))
 }
 
@@ -59,7 +59,7 @@ pub(super) fn is_dataclass(class_def: &ast::StmtClassDef, semantic: &SemanticMod
 
     class_def.decorator_list.iter().any(|decorator| {
         semantic
-            .resolve_call_path(map_callable(&decorator.expression))
+            .resolve_qualified_name(map_callable(&decorator.expression))
             .is_some_and(|call_path| matches!(call_path.segments(), ["dataclasses", "dataclass"]))
     })
 }

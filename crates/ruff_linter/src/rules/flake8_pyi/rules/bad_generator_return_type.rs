@@ -125,7 +125,7 @@ pub(crate) fn bad_generator_return_type(
     // Determine the module from which the existing annotation is imported (e.g., `typing` or
     // `collections.abc`)
     let (method, module, member) = {
-        let Some(call_path) = semantic.resolve_call_path(map_subscript(returns)) else {
+        let Some(call_path) = semantic.resolve_qualified_name(map_subscript(returns)) else {
             return;
         };
         match (name, call_path.segments()) {

@@ -61,7 +61,7 @@ pub(crate) fn non_leading_receiver_decorator(checker: &mut Checker, decorator_li
         let is_receiver = decorator.expression.as_call_expr().is_some_and(|call| {
             checker
                 .semantic()
-                .resolve_call_path(&call.func)
+                .resolve_qualified_name(&call.func)
                 .is_some_and(|call_path| {
                     matches!(call_path.segments(), ["django", "dispatch", "receiver"])
                 })

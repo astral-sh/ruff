@@ -59,7 +59,7 @@ pub(crate) fn call_datetime_without_tzinfo(checker: &mut Checker, call: &ast::Ex
 
     if !checker
         .semantic()
-        .resolve_call_path(&call.func)
+        .resolve_qualified_name(&call.func)
         .is_some_and(|call_path| matches!(call_path.segments(), ["datetime", "datetime"]))
     {
         return;

@@ -1,12 +1,12 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
-use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::CallPath;
+use ruff_python_ast::name::UnqualifiedName;
+use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
@@ -118,12 +118,12 @@ fn duplicate_handler_exceptions<'a>(
     checker: &mut Checker,
     expr: &'a Expr,
     elts: &'a [Expr],
-) -> FxHashMap<CallPath<'a>, &'a Expr> {
-    let mut seen: FxHashMap<CallPath, &Expr> = FxHashMap::default();
-    let mut duplicates: FxHashSet<CallPath> = FxHashSet::default();
+) -> FxHashMap<UnqualifiedName<'a>, &'a Expr> {
+    let mut seen: FxHashMap<UnqualifiedName, &Expr> = FxHashMap::default();
+    let mut duplicates: FxHashSet<UnqualifiedName> = FxHashSet::default();
     let mut unique_elts: Vec<&Expr> = Vec::default();
     for type_ in elts {
-        if let Some(call_path) = CallPath::from_expr(type_) {
+        if let Some(call_path) = UnqualifiedName::from_expr(type_) {
             if seen.contains_key(&call_path) {
                 duplicates.insert(call_path);
             } else {
@@ -171,8 +171,8 @@ fn duplicate_handler_exceptions<'a>(
 
 /// B025
 pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHandler]) {
-    let mut seen: FxHashSet<CallPath> = FxHashSet::default();
-    let mut duplicates: FxHashMap<CallPath, Vec<&Expr>> = FxHashMap::default();
+    let mut seen: FxHashSet<UnqualifiedName> = FxHashSet::default();
+    let mut duplicates: FxHashMap<UnqualifiedName, Vec<&Expr>> = FxHashMap::default();
     for handler in handlers {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
             type_: Some(type_),
@@ -183,7 +183,7 @@ pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHand
         };
         match type_.as_ref() {
             Expr::Attribute(_) | Expr::Name(_) => {
-                if let Some(call_path) = CallPath::from_expr(type_) {
+                if let Some(call_path) = UnqualifiedName::from_expr(type_) {
                     if seen.contains(&call_path) {
                         duplicates.entry(call_path).or_default().push(type_);
                     } else {

@@ -3,7 +3,7 @@ use anyhow::Result;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_ast::call_path::CallPath;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::Expr;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -72,7 +72,7 @@ impl AlwaysFixableViolation for UnspecifiedEncoding {
 pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) {
     let Some((function_name, mode)) = checker
         .semantic()
-        .resolve_call_path(&call.func)
+        .resolve_qualified_name(&call.func)
         .filter(|call_path| is_violation(call, call_path))
         .map(|call_path| (call_path.to_string(), Mode::from(&call_path)))
     else {
@@ -145,7 +145,7 @@ fn is_binary_mode(expr: &Expr) -> Option<bool> {
 }
 
 /// Returns `true` if the given call lacks an explicit `encoding`.
-fn is_violation(call: &ast::ExprCall, call_path: &CallPath) -> bool {
+fn is_violation(call: &ast::ExprCall, qualified_name: &QualifiedName) -> bool {
     // If we have something like `*args`, which might contain the encoding argument, abort.
     if call.arguments.args.iter().any(Expr::is_starred_expr) {
         return false;
@@ -159,7 +159,7 @@ fn is_violation(call: &ast::ExprCall, call_path: &CallPath) -> bool {
     {
         return false;
     }
-    match call_path.segments() {
+    match qualified_name.segments() {
         ["" | "codecs" | "_io", "open"] => {
             if let Some(mode_arg) = call.arguments.find_argument("mode", 1) {
                 if is_binary_mode(mode_arg).unwrap_or(true) {
@@ -171,7 +171,7 @@ fn is_violation(call: &ast::ExprCall, call_path: &CallPath) -> bool {
             call.arguments.find_argument("encoding", 3).is_none()
         }
         ["tempfile", "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"] => {
-            let mode_pos = usize::from(call_path.segments()[1] == "SpooledTemporaryFile");
+            let mode_pos = usize::from(qualified_name.segments()[1] == "SpooledTemporaryFile");
             if let Some(mode_arg) = call.arguments.find_argument("mode", mode_pos) {
                 if is_binary_mode(mode_arg).unwrap_or(true) {
                     // binary mode or unknown mode is no violation
@@ -198,8 +198,8 @@ enum Mode {
     Unsupported,
 }
 
-impl From<&CallPath<'_>> for Mode {
-    fn from(value: &CallPath<'_>) -> Self {
+impl From<&QualifiedName<'_>> for Mode {
+    fn from(value: &QualifiedName<'_>) -> Self {
         match value.segments() {
             ["" | "codecs" | "_io", "open"] => Mode::Supported,
             ["tempfile", "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"] => {

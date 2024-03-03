@@ -74,7 +74,7 @@ pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, string: StringLike)
     {
         if checker
             .semantic()
-            .resolve_call_path(func)
+            .resolve_qualified_name(func)
             .is_some_and(|call_path| matches!(call_path.segments(), ["tempfile", ..]))
         {
             return;

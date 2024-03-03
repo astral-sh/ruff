@@ -62,13 +62,13 @@ impl Violation for UnsafeYAMLLoad {
 pub(crate) fn unsafe_yaml_load(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
-        .resolve_call_path(&call.func)
+        .resolve_qualified_name(&call.func)
         .is_some_and(|call_path| matches!(call_path.segments(), ["yaml", "load"]))
     {
         if let Some(loader_arg) = call.arguments.find_argument("Loader", 1) {
             if !checker
                 .semantic()
-                .resolve_call_path(loader_arg)
+                .resolve_qualified_name(loader_arg)
                 .is_some_and(|call_path| {
                     matches!(
                         call_path.segments(),

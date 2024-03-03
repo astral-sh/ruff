@@ -231,12 +231,14 @@ fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool
 
 /// Returns `true` if the given expression resolves to a metaclass.
 fn is_metaclass_base(base: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(base).is_some_and(|call_path| {
-        matches!(
-            call_path.segments(),
-            ["" | "builtins", "type"] | ["abc", "ABCMeta"] | ["enum", "EnumMeta" | "EnumType"]
-        )
-    })
+    semantic
+        .resolve_qualified_name(base)
+        .is_some_and(|call_path| {
+            matches!(
+                call_path.segments(),
+                ["" | "builtins", "type"] | ["abc", "ABCMeta"] | ["enum", "EnumMeta" | "EnumType"]
+            )
+        })
 }
 
 /// Returns `true` if the method is an in-place binary operator.
@@ -279,7 +281,7 @@ fn is_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool 
     };
     bases.iter().any(|expr| {
         semantic
-            .resolve_call_path(map_subscript(expr))
+            .resolve_qualified_name(map_subscript(expr))
             .is_some_and(|call_path| {
                 matches!(
                     call_path.segments(),
@@ -292,7 +294,7 @@ fn is_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool 
 /// Return `true` if the given expression resolves to `collections.abc.Iterable`.
 fn is_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_call_path(map_subscript(expr))
+        .resolve_qualified_name(map_subscript(expr))
         .is_some_and(|call_path| {
             matches!(
                 call_path.segments(),
@@ -309,7 +311,7 @@ fn is_async_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) ->
     };
     bases.iter().any(|expr| {
         semantic
-            .resolve_call_path(map_subscript(expr))
+            .resolve_qualified_name(map_subscript(expr))
             .is_some_and(|call_path| {
                 matches!(
                     call_path.segments(),
@@ -322,7 +324,7 @@ fn is_async_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) ->
 /// Return `true` if the given expression resolves to `collections.abc.AsyncIterable`.
 fn is_async_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_call_path(map_subscript(expr))
+        .resolve_qualified_name(map_subscript(expr))
         .is_some_and(|call_path| {
             matches!(
                 call_path.segments(),

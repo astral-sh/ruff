@@ -80,7 +80,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
             let unwrapped = subscript.unwrap();
             if checker
                 .semantic()
-                .resolve_call_path(unwrapped.value.as_ref())
+                .resolve_qualified_name(unwrapped.value.as_ref())
                 .is_some_and(|call_path| matches!(call_path.segments(), ["" | "builtins", "type"]))
             {
                 type_exprs.push(unwrapped.slice.as_ref());

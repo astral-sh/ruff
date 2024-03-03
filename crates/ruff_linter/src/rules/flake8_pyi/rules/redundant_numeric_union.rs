@@ -90,7 +90,7 @@ fn check_annotation(checker: &mut Checker, annotation: &Expr) {
     let mut has_int = false;
 
     let mut func = |expr: &Expr, _parent: &Expr| {
-        let Some(call_path) = checker.semantic().resolve_call_path(expr) else {
+        let Some(call_path) = checker.semantic().resolve_qualified_name(expr) else {
             return;
         };
 

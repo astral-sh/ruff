@@ -101,7 +101,7 @@ fn extract_cryptographic_key(
     checker: &mut Checker,
     call: &ExprCall,
 ) -> Option<(CryptographicKey, TextRange)> {
-    let call_path = checker.semantic().resolve_call_path(&call.func)?;
+    let call_path = checker.semantic().resolve_qualified_name(&call.func)?;
     match call_path.segments() {
         ["cryptography", "hazmat", "primitives", "asymmetric", function, "generate_private_key"] => {
             match *function {
@@ -116,7 +116,7 @@ fn extract_cryptographic_key(
                 "ec" => {
                     let argument = call.arguments.find_argument("curve", 0)?;
                     let ExprAttribute { attr, value, .. } = argument.as_attribute_expr()?;
-                    let call_path = checker.semantic().resolve_call_path(value)?;
+                    let call_path = checker.semantic().resolve_qualified_name(value)?;
                     if matches!(
                         call_path.segments(),
                         ["cryptography", "hazmat", "primitives", "asymmetric", "ec"]

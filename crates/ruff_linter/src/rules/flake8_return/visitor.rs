@@ -198,7 +198,7 @@ fn has_conditional_body(with: &ast::StmtWith, semantic: &SemanticModel) -> bool 
         else {
             return false;
         };
-        if let Some(call_path) = semantic.resolve_call_path(func) {
+        if let Some(call_path) = semantic.resolve_qualified_name(func) {
             if call_path.segments() == ["contextlib", "suppress"] {
                 return true;
             }

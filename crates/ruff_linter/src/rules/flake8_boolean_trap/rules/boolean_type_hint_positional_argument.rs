@@ -1,9 +1,8 @@
-use ruff_python_ast::{self as ast, Decorator, Expr, ParameterWithDefault, Parameters};
-
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::CallPath;
+use ruff_python_ast::name::UnqualifiedName;
+use ruff_python_ast::{self as ast, Decorator, Expr, ParameterWithDefault, Parameters};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -136,7 +135,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
 
         // Allow Boolean type hints in setters.
         if decorator_list.iter().any(|decorator| {
-            CallPath::from_expr(&decorator.expression)
+            UnqualifiedName::from_expr(&decorator.expression)
                 .is_some_and(|call_path| call_path.segments() == [name, "setter"])
         }) {
             return;
@@ -196,7 +195,7 @@ fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel)
                 return false;
             }
 
-            let call_path = semantic.resolve_call_path(value);
+            let call_path = semantic.resolve_qualified_name(value);
             if call_path
                 .as_ref()
                 .is_some_and(|call_path| semantic.match_typing_call_path(call_path, "Union"))

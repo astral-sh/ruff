@@ -66,7 +66,7 @@ pub(crate) fn non_slot_assignment(checker: &mut Checker, class_def: &ast::StmtCl
     if !class_def.bases().iter().all(|base| {
         checker
             .semantic()
-            .resolve_call_path(base)
+            .resolve_qualified_name(base)
             .is_some_and(|call_path| matches!(call_path.segments(), ["", "object"]))
     }) {
         return;

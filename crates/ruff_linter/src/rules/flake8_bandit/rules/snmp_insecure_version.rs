@@ -44,7 +44,7 @@ impl Violation for SnmpInsecureVersion {
 pub(crate) fn snmp_insecure_version(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
-        .resolve_call_path(&call.func)
+        .resolve_qualified_name(&call.func)
         .is_some_and(|call_path| {
             matches!(call_path.segments(), ["pysnmp", "hlapi", "CommunityData"])
         })

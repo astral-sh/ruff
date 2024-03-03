@@ -40,7 +40,7 @@ impl Violation for NoExplicitStacklevel {
 pub(crate) fn no_explicit_stacklevel(checker: &mut Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
-        .resolve_call_path(&call.func)
+        .resolve_qualified_name(&call.func)
         .is_some_and(|call_path| matches!(call_path.segments(), ["warnings", "warn"]))
     {
         return;

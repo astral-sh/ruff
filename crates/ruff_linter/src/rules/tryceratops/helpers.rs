@@ -35,7 +35,9 @@ impl<'a, 'b> Visitor<'b> for LoggerCandidateVisitor<'a, 'b> {
                     }
                 }
                 Expr::Name(_) => {
-                    if let Some(call_path) = self.semantic.resolve_call_path(call.func.as_ref()) {
+                    if let Some(call_path) =
+                        self.semantic.resolve_qualified_name(call.func.as_ref())
+                    {
                         if let ["logging", attribute] = call_path.segments() {
                             if let Some(logging_level) = LoggingLevel::from_attribute(attribute) {
                                 {

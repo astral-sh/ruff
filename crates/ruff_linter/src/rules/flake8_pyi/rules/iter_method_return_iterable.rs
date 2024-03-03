@@ -88,7 +88,7 @@ pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &De
 
     if checker
         .semantic()
-        .resolve_call_path(map_subscript(annotation))
+        .resolve_qualified_name(map_subscript(annotation))
         .is_some_and(|call_path| {
             if is_async {
                 matches!(

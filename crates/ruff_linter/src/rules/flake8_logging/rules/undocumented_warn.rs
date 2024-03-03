@@ -55,7 +55,7 @@ pub(crate) fn undocumented_warn(checker: &mut Checker, expr: &Expr) {
 
     if checker
         .semantic()
-        .resolve_call_path(expr)
+        .resolve_qualified_name(expr)
         .is_some_and(|call_path| matches!(call_path.segments(), ["logging", "WARN"]))
     {
         let mut diagnostic = Diagnostic::new(UndocumentedWarn, expr.range());

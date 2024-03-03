@@ -193,7 +193,7 @@ enum NeverLike {
 
 impl NeverLike {
     fn from_expr(expr: &Expr, semantic: &ruff_python_semantic::SemanticModel) -> Option<Self> {
-        let call_path = semantic.resolve_call_path(expr)?;
+        let call_path = semantic.resolve_qualified_name(expr)?;
         if semantic.match_typing_call_path(&call_path, "NoReturn") {
             Some(NeverLike::NoReturn)
         } else if semantic.match_typing_call_path(&call_path, "Never") {

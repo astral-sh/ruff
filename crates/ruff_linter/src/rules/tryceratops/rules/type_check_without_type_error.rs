@@ -75,7 +75,7 @@ fn has_control_flow(stmt: &Stmt) -> bool {
 fn check_type_check_call(checker: &mut Checker, call: &Expr) -> bool {
     checker
         .semantic()
-        .resolve_call_path(call)
+        .resolve_qualified_name(call)
         .is_some_and(|call_path| {
             matches!(
                 call_path.segments(),
@@ -100,7 +100,7 @@ fn check_type_check_test(checker: &mut Checker, test: &Expr) -> bool {
 fn is_builtin_exception(checker: &mut Checker, exc: &Expr) -> bool {
     return checker
         .semantic()
-        .resolve_call_path(exc)
+        .resolve_qualified_name(exc)
         .is_some_and(|call_path| {
             matches!(
                 call_path.segments(),

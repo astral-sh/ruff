@@ -103,7 +103,7 @@ pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr) {
     if is_const_true(covariant) && is_const_true(contravariant) {
         let Some(kind) = checker
             .semantic()
-            .resolve_call_path(func)
+            .resolve_qualified_name(func)
             .and_then(|call_path| {
                 if checker
                     .semantic()

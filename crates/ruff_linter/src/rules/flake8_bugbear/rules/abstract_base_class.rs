@@ -109,11 +109,11 @@ fn is_abc_class(bases: &[Expr], keywords: &[Keyword], semantic: &SemanticModel) 
     keywords.iter().any(|keyword| {
         keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass")
             && semantic
-                .resolve_call_path(&keyword.value)
+                .resolve_qualified_name(&keyword.value)
                 .is_some_and(|call_path| matches!(call_path.segments(), ["abc", "ABCMeta"]))
     }) || bases.iter().any(|base| {
         semantic
-            .resolve_call_path(base)
+            .resolve_qualified_name(base)
             .is_some_and(|call_path| matches!(call_path.segments(), ["abc", "ABC"]))
     })
 }

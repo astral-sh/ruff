@@ -21,11 +21,13 @@ pub(super) fn is_model_form(class_def: &ast::StmtClassDef, semantic: &SemanticMo
 
 /// Return `true` if the expression is constructor for a Django model field.
 pub(super) fn is_model_field(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(expr).is_some_and(|call_path| {
-        call_path
-            .segments()
-            .starts_with(&["django", "db", "models"])
-    })
+    semantic
+        .resolve_qualified_name(expr)
+        .is_some_and(|call_path| {
+            call_path
+                .segments()
+                .starts_with(&["django", "db", "models"])
+        })
 }
 
 /// Return the name of the field type, if the expression is constructor for a Django model field.
@@ -33,7 +35,7 @@ pub(super) fn get_model_field_name<'a>(
     expr: &'a Expr,
     semantic: &'a SemanticModel,
 ) -> Option<&'a str> {
-    semantic.resolve_call_path(expr).and_then(|call_path| {
+    semantic.resolve_qualified_name(expr).and_then(|call_path| {
         let call_path = call_path.segments();
         if !call_path.starts_with(&["django", "db", "models"]) {
             return None;

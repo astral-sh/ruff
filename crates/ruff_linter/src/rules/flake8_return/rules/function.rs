@@ -400,16 +400,19 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
 fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
     // First, look for known functions that never return from the standard library and popular
     // libraries.
-    if semantic.resolve_call_path(func).is_some_and(|call_path| {
-        matches!(
-            call_path.segments(),
-            ["" | "builtins" | "sys" | "_thread" | "pytest", "exit"]
-                | ["" | "builtins", "quit"]
-                | ["os" | "posix", "_exit" | "abort"]
-                | ["_winapi", "ExitProcess"]
-                | ["pytest", "fail" | "skip" | "xfail"]
-        ) || semantic.match_typing_call_path(&call_path, "assert_never")
-    }) {
+    if semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|call_path| {
+            matches!(
+                call_path.segments(),
+                ["" | "builtins" | "sys" | "_thread" | "pytest", "exit"]
+                    | ["" | "builtins", "quit"]
+                    | ["os" | "posix", "_exit" | "abort"]
+                    | ["_winapi", "ExitProcess"]
+                    | ["pytest", "fail" | "skip" | "xfail"]
+            ) || semantic.match_typing_call_path(&call_path, "assert_never")
+        })
+    {
         return true;
     }
 
@@ -430,7 +433,7 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    let Some(call_path) = semantic.resolve_call_path(returns) else {
+    let Some(call_path) = semantic.resolve_qualified_name(returns) else {
         return false;
     };
 

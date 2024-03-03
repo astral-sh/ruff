@@ -52,7 +52,7 @@ impl Violation for RequestWithoutTimeout {
 pub(crate) fn request_without_timeout(checker: &mut Checker, call: &ast::ExprCall) {
     if checker
         .semantic()
-        .resolve_call_path(&call.func)
+        .resolve_qualified_name(&call.func)
         .is_some_and(|call_path| {
             matches!(
                 call_path.segments(),

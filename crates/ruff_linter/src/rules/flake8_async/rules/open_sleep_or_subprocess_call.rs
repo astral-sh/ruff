@@ -58,24 +58,26 @@ pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, call: &ast::E
 /// Returns `true` if the expression resolves to a blocking call, like `time.sleep` or
 /// `subprocess.run`.
 fn is_open_sleep_or_subprocess_call(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(func).is_some_and(|call_path| {
-        matches!(
-            call_path.segments(),
-            ["", "open"]
-                | ["time", "sleep"]
-                | [
-                    "subprocess",
-                    "run"
-                        | "Popen"
-                        | "call"
-                        | "check_call"
-                        | "check_output"
-                        | "getoutput"
-                        | "getstatusoutput"
-                ]
-                | ["os", "wait" | "wait3" | "wait4" | "waitid" | "waitpid"]
-        )
-    })
+    semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|call_path| {
+            matches!(
+                call_path.segments(),
+                ["", "open"]
+                    | ["time", "sleep"]
+                    | [
+                        "subprocess",
+                        "run"
+                            | "Popen"
+                            | "call"
+                            | "check_call"
+                            | "check_output"
+                            | "getoutput"
+                            | "getstatusoutput"
+                    ]
+                    | ["os", "wait" | "wait3" | "wait4" | "waitid" | "waitpid"]
+            )
+        })
 }
 
 /// Returns `true` if an expression resolves to a call to `pathlib.Path.open`.
@@ -94,7 +96,7 @@ fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -> bool {
     // Path("foo").open()
     // ```
     if let Expr::Call(call) = value.as_ref() {
-        let Some(call_path) = semantic.resolve_call_path(call.func.as_ref()) else {
+        let Some(call_path) = semantic.resolve_qualified_name(call.func.as_ref()) else {
             return false;
         };
         if call_path.segments() == ["pathlib", "Path"] {
@@ -123,6 +125,6 @@ fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -> bool {
     };
 
     semantic
-        .resolve_call_path(call.func.as_ref())
+        .resolve_qualified_name(call.func.as_ref())
         .is_some_and(|call_path| call_path.segments() == ["pathlib", "Path"])
 }

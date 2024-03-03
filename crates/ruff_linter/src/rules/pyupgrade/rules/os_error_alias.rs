@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::compose_call_path;
+use ruff_python_ast::name::compose_call_path;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -56,19 +56,21 @@ impl AlwaysFixableViolation for OSErrorAlias {
 
 /// Return `true` if an [`Expr`] is an alias of `OSError`.
 fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(expr).is_some_and(|call_path| {
-        matches!(
-            call_path.segments(),
-            ["", "EnvironmentError" | "IOError" | "WindowsError"]
-                | ["mmap" | "select" | "socket" | "os", "error"]
-        )
-    })
+    semantic
+        .resolve_qualified_name(expr)
+        .is_some_and(|call_path| {
+            matches!(
+                call_path.segments(),
+                ["", "EnvironmentError" | "IOError" | "WindowsError"]
+                    | ["mmap" | "select" | "socket" | "os", "error"]
+            )
+        })
 }
 
 /// Return `true` if an [`Expr`] is `OSError`.
 fn is_os_error(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_call_path(expr)
+        .resolve_qualified_name(expr)
         .is_some_and(|call_path| matches!(call_path.segments(), ["", "OSError"]))
 }
 

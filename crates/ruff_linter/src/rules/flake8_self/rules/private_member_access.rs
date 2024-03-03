@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::CallPath;
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{BindingKind, ScopeKind};
 use ruff_text_size::Ranged;
@@ -141,7 +141,7 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
         }
 
         // Allow some documented private methods, like `os._exit()`.
-        if let Some(call_path) = checker.semantic().resolve_call_path(expr) {
+        if let Some(call_path) = checker.semantic().resolve_qualified_name(expr) {
             if matches!(call_path.segments(), ["os", "_exit"]) {
                 return;
             }
@@ -149,14 +149,14 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
 
         if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
             // Ignore `super()` calls.
-            if let Some(call_path) = CallPath::from_expr(func) {
+            if let Some(call_path) = UnqualifiedName::from_expr(func) {
                 if matches!(call_path.segments(), ["super"]) {
                     return;
                 }
             }
         }
 
-        if let Some(call_path) = CallPath::from_expr(value) {
+        if let Some(call_path) = UnqualifiedName::from_expr(value) {
             // Ignore `self` and `cls` accesses.
             if matches!(call_path.segments(), ["self" | "cls" | "mcs"]) {
                 return;

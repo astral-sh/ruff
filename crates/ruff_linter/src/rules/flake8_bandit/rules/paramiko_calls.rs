@@ -39,7 +39,7 @@ impl Violation for ParamikoCall {
 pub(crate) fn paramiko_call(checker: &mut Checker, func: &Expr) {
     if checker
         .semantic()
-        .resolve_call_path(func)
+        .resolve_qualified_name(func)
         .is_some_and(|call_path| matches!(call_path.segments(), ["paramiko", "exec_command"]))
     {
         checker

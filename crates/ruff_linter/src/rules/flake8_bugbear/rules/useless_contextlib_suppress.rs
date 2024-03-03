@@ -59,7 +59,7 @@ pub(crate) fn useless_contextlib_suppress(
     if args.is_empty()
         && checker
             .semantic()
-            .resolve_call_path(func)
+            .resolve_qualified_name(func)
             .is_some_and(|call_path| matches!(call_path.segments(), ["contextlib", "suppress"]))
     {
         checker

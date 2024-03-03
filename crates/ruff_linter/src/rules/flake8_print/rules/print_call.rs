@@ -98,7 +98,7 @@ impl Violation for PPrint {
 /// T201, T203
 pub(crate) fn print_call(checker: &mut Checker, call: &ast::ExprCall) {
     let mut diagnostic = {
-        let call_path = checker.semantic().resolve_call_path(&call.func);
+        let call_path = checker.semantic().resolve_qualified_name(&call.func);
         if call_path
             .as_ref()
             .is_some_and(|call_path| matches!(call_path.segments(), ["", "print"]))
@@ -107,13 +107,14 @@ pub(crate) fn print_call(checker: &mut Checker, call: &ast::ExprCall) {
             // or `"sys.stderr"`), don't trigger T201.
             if let Some(keyword) = call.arguments.find_keyword("file") {
                 if !keyword.value.is_none_literal_expr() {
-                    if checker.semantic().resolve_call_path(&keyword.value).map_or(
-                        true,
-                        |call_path| {
+                    if checker
+                        .semantic()
+                        .resolve_qualified_name(&keyword.value)
+                        .map_or(true, |call_path| {
                             call_path.segments() != ["sys", "stdout"]
                                 && call_path.segments() != ["sys", "stderr"]
-                        },
-                    ) {
+                        })
+                    {
                         return;
                     }
                 }

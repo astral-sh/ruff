@@ -1,7 +1,7 @@
 //! Analysis rules for the `typing` module.
 
-use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::helpers::{any_over_expr, is_const_false, map_subscript};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Int, Operator, ParameterWithDefault, Parameters, Stmt};
 use ruff_python_stdlib::typing::{
     as_pep_585_generic, has_pep_585_generic, is_immutable_generic_type,
@@ -42,7 +42,7 @@ pub fn match_annotated_subscript<'a>(
     typing_modules: impl Iterator<Item = &'a str>,
     extend_generics: &[String],
 ) -> Option<SubscriptKind> {
-    semantic.resolve_call_path(expr).and_then(|call_path| {
+    semantic.resolve_qualified_name(expr).and_then(|call_path| {
         if is_standard_library_literal(call_path.segments()) {
             return Some(SubscriptKind::Literal);
         }
@@ -50,7 +50,7 @@ pub fn match_annotated_subscript<'a>(
         if is_standard_library_generic(call_path.segments())
             || extend_generics
                 .iter()
-                .map(|target| CallPath::from_qualified_name(target))
+                .map(|target| QualifiedName::from_dotted_name(target))
                 .any(|target| call_path == target)
         {
             return Some(SubscriptKind::Generic);
@@ -61,7 +61,7 @@ pub fn match_annotated_subscript<'a>(
         }
 
         for module in typing_modules {
-            let module_call_path: CallPath = CallPath::from_unqualified_name(module);
+            let module_call_path = QualifiedName::imported(module);
             if call_path.starts_with(&module_call_path) {
                 if let Some(member) = call_path.segments().last() {
                     if is_literal_member(member) {
@@ -103,7 +103,7 @@ impl std::fmt::Display for ModuleMember {
 pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<ModuleMember> {
     semantic
         .seen_module(Modules::TYPING | Modules::TYPING_EXTENSIONS)
-        .then(|| semantic.resolve_call_path(expr))
+        .then(|| semantic.resolve_qualified_name(expr))
         .flatten()
         .and_then(|call_path| {
             let [module, member] = call_path.segments() else {
@@ -121,12 +121,14 @@ pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<Module
 
 /// Return whether a given expression uses a PEP 585 standard library generic.
 pub fn is_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic.resolve_call_path(expr).is_some_and(|call_path| {
-        let [module, name] = call_path.segments() else {
-            return false;
-        };
-        has_pep_585_generic(module, name)
-    })
+    semantic
+        .resolve_qualified_name(expr)
+        .is_some_and(|call_path| {
+            let [module, name] = call_path.segments() else {
+                return false;
+            };
+            has_pep_585_generic(module, name)
+        })
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -195,7 +197,7 @@ pub fn to_pep604_operator(
     }
 
     semantic
-        .resolve_call_path(value)
+        .resolve_qualified_name(value)
         .as_ref()
         .and_then(|call_path| {
             if semantic.match_typing_call_path(call_path, "Optional") {
@@ -213,20 +215,23 @@ pub fn to_pep604_operator(
 pub fn is_immutable_annotation(
     expr: &Expr,
     semantic: &SemanticModel,
-    extend_immutable_calls: &[CallPath],
+    extend_immutable_calls: &[QualifiedName],
 ) -> bool {
     match expr {
         Expr::Name(_) | Expr::Attribute(_) => {
-            semantic.resolve_call_path(expr).is_some_and(|call_path| {
-                is_immutable_non_generic_type(call_path.segments())
-                    || is_immutable_generic_type(call_path.segments())
-                    || extend_immutable_calls
-                        .iter()
-                        .any(|target| call_path == *target)
-            })
+            semantic
+                .resolve_qualified_name(expr)
+                .is_some_and(|call_path| {
+                    is_immutable_non_generic_type(call_path.segments())
+                        || is_immutable_generic_type(call_path.segments())
+                        || extend_immutable_calls
+                            .iter()
+                            .any(|target| call_path == *target)
+                })
         }
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-            semantic.resolve_call_path(value).is_some_and(|call_path| {
+        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => semantic
+            .resolve_qualified_name(value)
+            .is_some_and(|call_path| {
                 if is_immutable_generic_type(call_path.segments()) {
                     true
                 } else if matches!(call_path.segments(), ["typing", "Union"]) {
@@ -250,8 +255,7 @@ pub fn is_immutable_annotation(
                 } else {
                     false
                 }
-            })
-        }
+            }),
         Expr::BinOp(ast::ExprBinOp {
             left,
             op: Operator::BitOr,
@@ -270,22 +274,24 @@ pub fn is_immutable_annotation(
 pub fn is_immutable_func(
     func: &Expr,
     semantic: &SemanticModel,
-    extend_immutable_calls: &[CallPath],
+    extend_immutable_calls: &[QualifiedName],
 ) -> bool {
-    semantic.resolve_call_path(func).is_some_and(|call_path| {
-        is_immutable_return_type(call_path.segments())
-            || extend_immutable_calls
-                .iter()
-                .any(|target| call_path == *target)
-    })
+    semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|call_path| {
+            is_immutable_return_type(call_path.segments())
+                || extend_immutable_calls
+                    .iter()
+                    .any(|target| call_path == *target)
+        })
 }
 
 /// Return `true` if `func` is a function that returns a mutable value.
 pub fn is_mutable_func(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_call_path(func)
+        .resolve_qualified_name(func)
         .as_ref()
-        .map(CallPath::segments)
+        .map(QualifiedName::segments)
         .is_some_and(is_mutable_return_type)
 }
 
@@ -336,9 +342,11 @@ pub fn is_sys_version_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> boo
     let ast::StmtIf { test, .. } = stmt;
 
     any_over_expr(test, &|expr| {
-        semantic.resolve_call_path(expr).is_some_and(|call_path| {
-            matches!(call_path.segments(), ["sys", "version_info" | "platform"])
-        })
+        semantic
+            .resolve_qualified_name(expr)
+            .is_some_and(|call_path| {
+                matches!(call_path.segments(), ["sys", "version_info" | "platform"])
+            })
     })
 }
 
@@ -608,7 +616,7 @@ pub struct IoBaseChecker;
 impl TypeChecker for IoBaseChecker {
     fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
         semantic
-            .resolve_call_path(annotation)
+            .resolve_qualified_name(annotation)
             .is_some_and(|call_path| {
                 if semantic.match_typing_call_path(&call_path, "IO") {
                     return true;
@@ -652,22 +660,24 @@ impl TypeChecker for IoBaseChecker {
         if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
             if attr.as_str() == "open" {
                 if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
-                    return semantic.resolve_call_path(func).is_some_and(|call_path| {
-                        matches!(
-                            call_path.segments(),
-                            [
-                                "pathlib",
-                                "Path" | "PurePath" | "PurePosixPath" | "PureWindowsPath"
-                            ]
-                        )
-                    });
+                    return semantic
+                        .resolve_qualified_name(func)
+                        .is_some_and(|call_path| {
+                            matches!(
+                                call_path.segments(),
+                                [
+                                    "pathlib",
+                                    "Path" | "PurePath" | "PurePosixPath" | "PureWindowsPath"
+                                ]
+                            )
+                        });
                 }
             }
         }
 
         // Ex) `open("file.txt")`
         semantic
-            .resolve_call_path(func.as_ref())
+            .resolve_qualified_name(func.as_ref())
             .is_some_and(|call_path| {
                 matches!(
                     call_path.segments(),
@@ -736,7 +746,7 @@ fn find_parameter<'a>(
         .find(|arg| arg.parameter.name.range() == binding.range())
 }
 
-/// Return the [`CallPath`] of the value to which the given [`Expr`] is assigned, if any.
+/// Return the [`QualifiedName`] of the value to which the given [`Expr`] is assigned, if any.
 ///
 /// For example, given:
 /// ```python
@@ -750,20 +760,20 @@ fn find_parameter<'a>(
 pub fn resolve_assignment<'a>(
     expr: &'a Expr,
     semantic: &'a SemanticModel<'a>,
-) -> Option<CallPath<'a>> {
+) -> Option<QualifiedName<'a>> {
     let name = expr.as_name_expr()?;
     let binding_id = semantic.resolve_name(name)?;
     let statement = semantic.binding(binding_id).statement(semantic)?;
     match statement {
         Stmt::Assign(ast::StmtAssign { value, .. }) => {
             let ast::ExprCall { func, .. } = value.as_call_expr()?;
-            semantic.resolve_call_path(func)
+            semantic.resolve_qualified_name(func)
         }
         Stmt::AnnAssign(ast::StmtAnnAssign {
             value: Some(value), ..
         }) => {
             let ast::ExprCall { func, .. } = value.as_call_expr()?;
-            semantic.resolve_call_path(func)
+            semantic.resolve_qualified_name(func)
         }
         _ => None,
     }

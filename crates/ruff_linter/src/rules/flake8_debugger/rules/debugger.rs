@@ -2,7 +2,7 @@ use ruff_python_ast::{Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::{CallPath, CallPathBuilder};
+use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -48,16 +48,17 @@ impl Violation for Debugger {
 
 /// Checks for the presence of a debugger call.
 pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
-    if let Some(using_type) = checker
-        .semantic()
-        .resolve_call_path(func)
-        .and_then(|call_path| {
-            if is_debugger_call(&call_path) {
-                Some(DebuggerUsingType::Call(call_path.to_string()))
-            } else {
-                None
-            }
-        })
+    if let Some(using_type) =
+        checker
+            .semantic()
+            .resolve_qualified_name(func)
+            .and_then(|call_path| {
+                if is_debugger_call(&call_path) {
+                    Some(DebuggerUsingType::Call(call_path.to_string()))
+                } else {
+                    None
+                }
+            })
     {
         checker
             .diagnostics
@@ -68,7 +69,8 @@ pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
 /// Checks for the presence of a debugger import.
 pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<Diagnostic> {
     if let Some(module) = module {
-        let mut builder = CallPathBuilder::from_path(CallPath::from_unqualified_name(module));
+        let mut builder =
+            QualifiedNameBuilder::from_qualified_name(QualifiedName::imported(module));
         builder.push(name);
         let call_path = builder.build();
 
@@ -81,7 +83,7 @@ pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> 
             ));
         }
     } else {
-        let call_path: CallPath = CallPath::from_unqualified_name(name);
+        let call_path = QualifiedName::imported(name);
 
         if is_debugger_import(&call_path) {
             return Some(Diagnostic::new(
@@ -95,7 +97,7 @@ pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> 
     None
 }
 
-fn is_debugger_call(call_path: &CallPath) -> bool {
+fn is_debugger_call(call_path: &QualifiedName) -> bool {
     matches!(
         call_path.segments(),
         ["pdb" | "pudb" | "ipdb", "set_trace"]
@@ -115,7 +117,7 @@ fn is_debugger_call(call_path: &CallPath) -> bool {
     )
 }
 
-fn is_debugger_import(call_path: &CallPath) -> bool {
+fn is_debugger_import(call_path: &QualifiedName) -> bool {
     // Constructed by taking every pattern in `is_debugger_call`, removing the last element in
     // each pattern, and de-duplicating the values.
     // As a special-case, we omit `builtins` to allow `import builtins`, which is far more general

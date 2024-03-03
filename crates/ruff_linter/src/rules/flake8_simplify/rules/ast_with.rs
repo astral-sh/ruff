@@ -99,7 +99,7 @@ fn explicit_with_items(checker: &mut Checker, with_items: &[WithItem]) -> bool {
     };
     checker
         .semantic()
-        .resolve_call_path(&expr_call.func)
+        .resolve_qualified_name(&expr_call.func)
         .is_some_and(|call_path| {
             matches!(
                 call_path.segments(),

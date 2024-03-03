@@ -53,7 +53,7 @@ impl Violation for DatetimeTimezoneUTC {
 pub(crate) fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
     if checker
         .semantic()
-        .resolve_call_path(expr)
+        .resolve_qualified_name(expr)
         .is_some_and(|call_path| matches!(call_path.segments(), ["datetime", "timezone", "utc"]))
     {
         let mut diagnostic = Diagnostic::new(DatetimeTimezoneUTC, expr.range());

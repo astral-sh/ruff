@@ -7,7 +7,7 @@ use ruff_python_trivia::{indentation_at_offset, CommentRanges, SimpleTokenKind, 
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::call_path::{CallPath, CallPathBuilder};
+use crate::name::{QualifiedName, QualifiedNameBuilder};
 use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::StatementVisitor;
 use crate::visitor::Visitor;
@@ -800,8 +800,8 @@ pub fn collect_import_from_member<'a>(
     level: Option<u32>,
     module: Option<&'a str>,
     member: &'a str,
-) -> CallPath<'a> {
-    let mut call_path_builder = CallPathBuilder::with_capacity(
+) -> QualifiedName<'a> {
+    let mut call_path_builder = QualifiedNameBuilder::with_capacity(
         level.unwrap_or_default() as usize
             + module
                 .map(|module| module.split('.').count())
@@ -838,9 +838,9 @@ pub fn from_relative_import<'a>(
     import: &[&'a str],
     // The remaining segments to the call path (e.g., given `bar.baz`, `["baz"]`).
     tail: &[&'a str],
-) -> Option<CallPath<'a>> {
+) -> Option<QualifiedName<'a>> {
     let mut call_path_builder =
-        CallPathBuilder::with_capacity(module.len() + import.len() + tail.len());
+        QualifiedNameBuilder::with_capacity(module.len() + import.len() + tail.len());
 
     // Start with the module path.
     call_path_builder.extend(module.iter().map(String::as_str));

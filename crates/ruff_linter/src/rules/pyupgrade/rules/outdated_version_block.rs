@@ -97,7 +97,7 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
         // Detect `sys.version_info`, along with slices (like `sys.version_info[:2]`).
         if !checker
             .semantic()
-            .resolve_call_path(map_subscript(left))
+            .resolve_qualified_name(map_subscript(left))
             .is_some_and(|call_path| matches!(call_path.segments(), ["sys", "version_info"]))
         {
             continue;

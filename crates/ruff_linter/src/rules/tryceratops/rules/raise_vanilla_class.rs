@@ -65,7 +65,7 @@ impl Violation for RaiseVanillaClass {
 pub(crate) fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
     if checker
         .semantic()
-        .resolve_call_path(if let Expr::Call(ast::ExprCall { func, .. }) = expr {
+        .resolve_qualified_name(if let Expr::Call(ast::ExprCall { func, .. }) = expr {
             func
         } else {
             expr
