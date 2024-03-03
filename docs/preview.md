@@ -60,8 +60,7 @@ To enable preview style formatting without enabling any preview lint rules:
 ## Using rules that are in preview
 
 If a rule is marked as preview, it can only be selected if preview mode is enabled. For example, consider a
-hypothetical rule, `HYP001`. If `HYP001` were in preview, it would _not_ be enabled by adding following to your
-config file or only using the `--select` flag on the CLI:
+hypothetical rule, `HYP001`. If `HYP001` were in preview, it would _not_ be enabled by adding it to the selected rule set.
 
 === "pyproject.toml"
 
