@@ -132,29 +132,28 @@ impl Violation for InvalidFirstArgumentNameForClassMethod {
     }
 }
 
-/// An AST node that can contain arguments.
 #[derive(Debug, Copy, Clone)]
-enum Argumentable {
+enum ApplicableFunctionType {
     Method,
     ClassMethod,
 }
 
-impl Argumentable {
-    fn check_for(self, argument_name: String) -> DiagnosticKind {
+impl ApplicableFunctionType {
+    fn diagnostic_kind(self, argument_name: String) -> DiagnosticKind {
         match self {
             Self::Method => InvalidFirstArgumentNameForMethod { argument_name }.into(),
             Self::ClassMethod => InvalidFirstArgumentNameForClassMethod { argument_name }.into(),
         }
     }
 
-    const fn valid_argument_name(self) -> &'static str {
+    const fn valid_first_argument_name(self) -> &'static str {
         match self {
             Self::Method => "self",
             Self::ClassMethod => "cls",
         }
     }
 
-    const fn rule_code(self) -> Rule {
+    const fn rule(self) -> Rule {
         match self {
             Self::Method => Rule::InvalidFirstArgumentNameForMethod,
             Self::ClassMethod => Rule::InvalidFirstArgumentNameForClassMethod,
@@ -182,7 +181,7 @@ pub(crate) fn invalid_first_argument_name(
         return;
     };
 
-    let argumentable = match function_type::classify(
+    let function_type = match function_type::classify(
         name,
         decorator_list,
         parent,
@@ -193,10 +192,12 @@ pub(crate) fn invalid_first_argument_name(
         function_type::FunctionType::Function | function_type::FunctionType::StaticMethod => {
             return;
         }
-        function_type::FunctionType::Method => Argumentable::Method,
-        function_type::FunctionType::ClassMethod => Argumentable::ClassMethod,
+        function_type::FunctionType::Method => ApplicableFunctionType::Method,
+        function_type::FunctionType::ClassMethod => ApplicableFunctionType::ClassMethod,
     };
-    if !checker.enabled(argumentable.rule_code()) {
+    if !checker.enabled(function_type.rule())
+        || checker.settings.pep8_naming.ignore_names.matches(name)
+    {
         return;
     }
 
@@ -211,15 +212,12 @@ pub(crate) fn invalid_first_argument_name(
         return;
     };
 
-    if &first_parameter.name == argumentable.valid_argument_name() {
-        return;
-    }
-    if checker.settings.pep8_naming.ignore_names.matches(name) {
+    if &first_parameter.name == function_type.valid_first_argument_name() {
         return;
     }
 
     let mut diagnostic = Diagnostic::new(
-        argumentable.check_for(first_parameter.name.to_string()),
+        function_type.diagnostic_kind(first_parameter.name.to_string()),
         first_parameter.range(),
     );
     diagnostic.try_set_optional_fix(|| {
@@ -228,7 +226,7 @@ pub(crate) fn invalid_first_argument_name(
             first_parameter,
             parameters,
             checker.semantic(),
-            argumentable,
+            function_type,
         ))
     });
     diagnostics.push(diagnostic);
@@ -239,7 +237,7 @@ fn try_fix(
     first_parameter: &ast::Parameter,
     parameters: &ast::Parameters,
     semantic: &SemanticModel<'_>,
-    argumentable: Argumentable,
+    function_type: ApplicableFunctionType,
 ) -> Option<Fix> {
     // Don't fix if another parameter has the valid name.
     if let Some(_) = parameters
@@ -251,7 +249,7 @@ fn try_fix(
         .map(|parameter_with_default| &parameter_with_default.parameter)
         .chain(parameters.vararg.as_deref().into_iter())
         .chain(parameters.kwarg.as_deref().into_iter())
-        .find(|p| &p.name == argumentable.valid_argument_name())
+        .find(|p| &p.name == function_type.valid_first_argument_name())
     {
         return None;
     }
@@ -260,13 +258,12 @@ fn try_fix(
         .get_all(&first_parameter.name)
         .map(|id| semantic.binding(id))
         .find(|b| b.kind.is_argument())?;
-    let replacement = argumentable.valid_argument_name();
-    let fix = Fix::unsafe_edits(
+    let replacement = function_type.valid_first_argument_name();
+    Some(Fix::unsafe_edits(
         Edit::range_replacement(replacement.to_string(), binding.range()),
         binding
             .references()
             .map(|rid| semantic.reference(rid))
             .map(|reference| Edit::range_replacement(replacement.to_string(), reference.range())),
-    );
-    Some(fix)
+    ))
 }
