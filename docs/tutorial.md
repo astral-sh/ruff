@@ -38,7 +38,7 @@ def sum_even_numbers(numbers: Iterable[int]) -> int:
 We can run the Ruff linter over our project via `ruff check`:
 
 ```shell
-❯ ruff check .
+❯ ruff check
 numbers/numbers.py:3:8: F401 [*] `os` imported but unused
 Found 1 error.
 [*] 1 fixable with the `--fix` option.
@@ -135,7 +135,7 @@ To configure Ruff, let's create a configuration file in our project's root direc
 Running Ruff again, we see that it now enforces a maximum line width, with a limit of 79:
 
 ```shell
-❯ ruff check .
+❯ ruff check
 numbers/numbers.py:5:80: E501 Line too long (90 > 79)
 Found 1 error.
 ```
@@ -217,7 +217,7 @@ If we run Ruff again, we'll see that it now enforces the pyupgrade rules. In par
 the use of the deprecated `typing.Iterable` instead of `collections.abc.Iterable`:
 
 ```shell
-❯ ruff check .
+❯ ruff check
 numbers/numbers.py:1:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
 Found 1 error.
 [*] 1 fixable with the `--fix` option.
@@ -260,7 +260,7 @@ all functions have docstrings:
 If we run Ruff again, we'll see that it now enforces the pydocstyle rules:
 
 ```shell
-❯ ruff check .
+❯ ruff check
 numbers/__init__.py:1:1: D104 Missing docstring in public package
 numbers/numbers.py:1:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
 numbers/numbers.py:1:1: D100 Missing docstring in public module
@@ -285,7 +285,7 @@ def sum_even_numbers(numbers: Iterable[int]) -> int:
 Running `ruff check` again, we'll see that it no longer flags the `Iterable` import:
 
 ```shell
-❯ ruff check .
+❯ ruff check
 numbers/__init__.py:1:1: D104 Missing docstring in public package
 numbers/numbers.py:1:1: D100 Missing docstring in public module
 Found 3 errors.

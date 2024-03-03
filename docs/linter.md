@@ -11,9 +11,9 @@ and more.
 directories, and lints all discovered Python files, optionally fixing any fixable errors:
 
 ```shell
-ruff check .          # Lint all files in the current directory.
-ruff check . --fix    # Lint all files in the current directory, and fix any fixable errors.
-ruff check . --watch  # Lint all files in the current directory, and re-lint on change.
+ruff check          # Lint all files in the current directory.
+ruff check --fix    # Lint all files in the current directory, and fix any fixable errors.
+ruff check --watch  # Lint all files in the current directory, and re-lint on change.
 ```
 
 For the full list of supported options, run `ruff check --help`.
@@ -150,7 +150,7 @@ imports, reformat docstrings, rewrite type annotations to use newer Python synta
 To enable fixes, pass the `--fix` flag to `ruff check`:
 
 ```shell
-ruff check . --fix
+ruff check --fix
 ```
 
 By default, Ruff will fix all violations for which safe fixes are available; to determine
@@ -197,10 +197,10 @@ Ruff only enables safe fixes by default. Unsafe fixes can be enabled by settings
 
 ```shell
 # Show unsafe fixes
-ruff check . --unsafe-fixes
+ruff check --unsafe-fixes
 
 # Apply unsafe fixes
-ruff check . --fix --unsafe-fixes
+ruff check --fix --unsafe-fixes
 ```
 
 By default, Ruff will display a hint when unsafe fixes are available but not enabled. The suggestion can be silenced
