@@ -31,7 +31,7 @@ Preview mode can be configured separately for linting and formatting (requires R
 === "CLI"
 
     ```console
-    ruff check . --preview
+    ruff check --preview
     ```
 
 
@@ -54,7 +54,7 @@ To enable preview style formatting without enabling any preview lint rules:
 === "CLI"
 
     ```console
-    ruff format . --preview
+    ruff format --preview
     ```
 
 ## Using rules that are in preview
@@ -79,7 +79,7 @@ hypothetical rule, `HYP001`. If `HYP001` were in preview, it would _not_ be enab
 === "CLI"
 
     ```console
-    ruff check . --extend-select HYP001
+    ruff check --extend-select HYP001
     ```
 
 
@@ -102,7 +102,7 @@ It also would _not_ be enabled by selecting the `HYP` category, like so:
 === "CLI"
 
     ```console
-    ruff check . --extend-select HYP
+    ruff check --extend-select HYP
     ```
 
 
@@ -125,7 +125,7 @@ Similarly, it would _not_ be enabled via the `ALL` selector:
 === "CLI"
 
     ```console
-    ruff check . --select ALL
+    ruff check --select ALL
     ```
 
 However, it would be enabled in any of the above cases if you enabled preview mode:
@@ -149,7 +149,7 @@ However, it would be enabled in any of the above cases if you enabled preview mo
 === "CLI"
 
     ```console
-    ruff check . --extend-select HYP --preview
+    ruff check --extend-select HYP --preview
     ```
 
 To see which rules are currently in preview, visit the [rules reference](rules.md).
