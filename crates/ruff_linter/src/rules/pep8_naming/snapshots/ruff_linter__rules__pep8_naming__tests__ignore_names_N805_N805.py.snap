@@ -43,5 +43,3 @@ N805.py:58:18: N805 First argument of a method should be named `self`
    |                  ^^^^ N805
 59 |         pass
    |
-
-

@@ -22,7 +22,7 @@ N805.py:64:29: N805 First argument of a method should be named `self`
    |
 62 |         pass
 63 | 
-64 |     def bad_method_pos_only(this, blah, /, self, something: str):
+64 |     def bad_method_pos_only(this, blah, /, something: str):
    |                             ^^^^ N805
 65 |         pass
    |
@@ -52,4 +52,64 @@ N805.py:94:19: N805 First argument of a method should be named `self`
 95 |         pass
    |
 
+N805.py:98:26: N805 First argument of a method should be named `self`
+   |
+97 | class SelfInArgsClass:
+98 |     def self_as_argument(this, self):
+   |                          ^^^^ N805
+99 |         pass
+   |
 
+N805.py:101:35: N805 First argument of a method should be named `self`
+    |
+ 99 |         pass
+100 | 
+101 |     def self_as_pos_only_argument(this, self, /):
+    |                                   ^^^^ N805
+102 |         pass
+    |
+
+N805.py:104:34: N805 First argument of a method should be named `self`
+    |
+102 |         pass
+103 | 
+104 |     def self_as_kw_only_argument(this, *, self):
+    |                                  ^^^^ N805
+105 |         pass
+    |
+
+N805.py:107:24: N805 First argument of a method should be named `self`
+    |
+105 |         pass
+106 | 
+107 |     def self_as_varags(this, *self):
+    |                        ^^^^ N805
+108 |         pass
+    |
+
+N805.py:110:24: N805 First argument of a method should be named `self`
+    |
+108 |         pass
+109 | 
+110 |     def self_as_kwargs(this, **self):
+    |                        ^^^^ N805
+111 |         pass
+    |
+
+N805.py:114:20: N805 First argument of a method should be named `self`
+    |
+113 | class RenamingInMethodBodyClass:
+114 |     def bad_method(this):
+    |                    ^^^^ N805
+115 |         this = this
+116 |         this
+    |
+
+N805.py:118:20: N805 First argument of a method should be named `self`
+    |
+116 |         this
+117 | 
+118 |     def bad_method(this):
+    |                    ^^^^ N805
+119 |         self = this
+    |

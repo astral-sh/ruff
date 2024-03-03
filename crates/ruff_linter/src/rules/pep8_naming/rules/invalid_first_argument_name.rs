@@ -67,8 +67,7 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 
     fn fix_title(&self) -> Option<String> {
         let Self { argument_name } = self;
-        Some(format!("Rename `{argument_name}` to `self`"));
-        None
+        Some(format!("Rename `{argument_name}` to `self`"))
     }
 }
 
@@ -130,8 +129,7 @@ impl Violation for InvalidFirstArgumentNameForClassMethod {
 
     fn fix_title(&self) -> Option<String> {
         let Self { argument_name } = self;
-        Some(format!("Rename `{argument_name}` to `cls`"));
-        None
+        Some(format!("Rename `{argument_name}` to `cls`"))
     }
 }
 

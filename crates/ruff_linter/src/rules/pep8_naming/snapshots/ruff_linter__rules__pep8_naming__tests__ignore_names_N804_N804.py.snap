@@ -25,5 +25,3 @@ N804.py:21:18: N804 First argument of a class method should be named `cls`
    |                  ^^^^ N804
 22 |         pass
    |
-
-
