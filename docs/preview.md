@@ -128,7 +128,7 @@ Similarly, it would _not_ be enabled via the `ALL` selector:
     ruff check . --select ALL
     ```
 
-However, it would be enabled in any of the above cases if you enabled preview in your configuration file or provided the `--preview` CLI flag:
+However, it would be enabled in any of the above cases if you enabled preview mode:
 
 === "pyproject.toml"
 
