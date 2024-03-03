@@ -6,7 +6,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::options_base::{OptionsMetadata, Visit};
 use ruff_formatter::IndentStyle;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
@@ -25,12 +24,13 @@ use ruff_linter::rules::{
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, PythonVersion, SerializationFormat, Version,
+    IdentifierPattern, PythonVersion, RequiredVersion, SerializationFormat,
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 
+use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
@@ -135,17 +135,22 @@ pub struct Options {
     )]
     pub show_fixes: Option<bool>,
 
-    /// Require a specific version of Ruff to be running (useful for unifying
-    /// results across many environments, e.g., with a `pyproject.toml`
-    /// file).
+    /// Enforce a requirement on the version of Ruff, to enforce at runtime.
+    /// If the version of Ruff does not meet the requirement, Ruff will exit
+    /// with an error.
+    ///
+    /// Useful for unifying results across many environments, e.g., with a
+    /// `pyproject.toml` file.
+    ///
+    /// Accepts a PEP 440 specifier, like `==0.3.1` or `>=0.3.1`.
     #[option(
         default = "null",
         value_type = "str",
         example = r#"
-            required-version = "0.0.193"
+            required-version = ">=0.0.193"
         "#
     )]
-    pub required_version: Option<Version>,
+    pub required_version: Option<RequiredVersion>,
 
     /// Whether to enable preview mode. When preview mode is enabled, Ruff will
     /// use unstable rules, fixes, and formatting.
