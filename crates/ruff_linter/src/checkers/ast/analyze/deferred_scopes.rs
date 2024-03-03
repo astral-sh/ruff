@@ -7,8 +7,8 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix;
 use crate::rules::{
-    flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments, pyflakes, pylint,
-    ruff,
+    flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments, pep8_naming,
+    pyflakes, pylint, ruff,
 };
 
 /// Run lint rules over all deferred scopes in the [`SemanticModel`].
@@ -18,6 +18,8 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
         Rule::ImportShadowedByLoopVar,
+        Rule::InvalidFirstArgumentNameForMethod,
+        Rule::InvalidFirstArgumentNameForClassMethod,
         Rule::NoSelfUse,
         Rule::RedefinedArgumentFromLocal,
         Rule::RedefinedWhileUnused,
@@ -393,6 +395,12 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
             if checker.enabled(Rule::SingledispatchMethod) {
                 pylint::rules::singledispatch_method(checker, scope, &mut diagnostics);
+            }
+            if checker.any_enabled(&[
+                Rule::InvalidFirstArgumentNameForClassMethod,
+                Rule::InvalidFirstArgumentNameForMethod,
+            ]) {
+                pep8_naming::rules::invalid_first_argument_name(checker, scope, &mut diagnostics)
             }
         }
     }
