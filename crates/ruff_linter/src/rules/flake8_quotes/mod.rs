@@ -24,6 +24,7 @@ mod tests {
     #[test_case(Path::new("doubles_multiline_string.py"))]
     #[test_case(Path::new("doubles_noqa.py"))]
     #[test_case(Path::new("doubles_wrapped.py"))]
+    #[test_case(Path::new("doubles_would_be_triple_quotes.py"))]
     fn require_singles(path: &Path) -> Result<()> {
         let snapshot = format!("require_singles_over_{}", path.to_string_lossy());
         let diagnostics = test_path(
@@ -93,6 +94,7 @@ mod tests {
     #[test_case(Path::new("singles_multiline_string.py"))]
     #[test_case(Path::new("singles_noqa.py"))]
     #[test_case(Path::new("singles_wrapped.py"))]
+    #[test_case(Path::new("singles_would_be_triple_quotes.py"))]
     fn require_doubles(path: &Path) -> Result<()> {
         let snapshot = format!("require_doubles_over_{}", path.to_string_lossy());
         let diagnostics = test_path(
