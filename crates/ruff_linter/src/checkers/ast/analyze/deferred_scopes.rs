@@ -400,7 +400,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                 Rule::InvalidFirstArgumentNameForClassMethod,
                 Rule::InvalidFirstArgumentNameForMethod,
             ]) {
-                pep8_naming::rules::invalid_first_argument_name(checker, scope, &mut diagnostics)
+                pep8_naming::rules::invalid_first_argument_name(checker, scope, &mut diagnostics);
             }
         }
     }

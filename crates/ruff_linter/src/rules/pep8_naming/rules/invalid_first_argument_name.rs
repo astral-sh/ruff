@@ -240,16 +240,16 @@ fn try_fix(
     function_type: ApplicableFunctionType,
 ) -> Option<Fix> {
     // Don't fix if another parameter has the valid name.
-    if let Some(_) = parameters
+    if parameters
         .posonlyargs
         .iter()
         .chain(&parameters.args)
         .chain(&parameters.kwonlyargs)
         .skip(1)
         .map(|parameter_with_default| &parameter_with_default.parameter)
-        .chain(parameters.vararg.as_deref().into_iter())
-        .chain(parameters.kwarg.as_deref().into_iter())
-        .find(|p| &p.name == function_type.valid_first_argument_name())
+        .chain(parameters.vararg.as_deref())
+        .chain(parameters.kwarg.as_deref())
+        .any(|p| &p.name == function_type.valid_first_argument_name())
     {
         return None;
     }
