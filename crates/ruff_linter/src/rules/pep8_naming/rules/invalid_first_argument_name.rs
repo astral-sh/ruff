@@ -1,8 +1,8 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
 
-use ruff_diagnostics::DiagnosticKind;
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Violation};
+use ruff_diagnostics::{DiagnosticKind, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{Scope, ScopeKind};
@@ -57,9 +57,18 @@ pub struct InvalidFirstArgumentNameForMethod {
 }
 
 impl Violation for InvalidFirstArgumentNameForMethod {
+    const FIX_AVAILABILITY: ruff_diagnostics::FixAvailability =
+        ruff_diagnostics::FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("First argument of a method should be named `self`")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let Self { argument_name } = self;
+        Some(format!("Rename `{argument_name}` to `self`"));
+        None
     }
 }
 
@@ -111,9 +120,18 @@ pub struct InvalidFirstArgumentNameForClassMethod {
 }
 
 impl Violation for InvalidFirstArgumentNameForClassMethod {
+    const FIX_AVAILABILITY: ruff_diagnostics::FixAvailability =
+        ruff_diagnostics::FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("First argument of a class method should be named `cls`")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let Self { argument_name } = self;
+        Some(format!("Rename `{argument_name}` to `cls`"));
+        None
     }
 }
 
@@ -156,6 +174,7 @@ pub(crate) fn invalid_first_argument_name(
     let ScopeKind::Function(ast::StmtFunctionDef {
         name,
         parameters,
+        // body,
         decorator_list,
         ..
     }) = &scope.kind
@@ -199,8 +218,30 @@ pub(crate) fn invalid_first_argument_name(
     if checker.settings.pep8_naming.ignore_names.matches(name) {
         return;
     }
-    diagnostics.push(Diagnostic::new(
+
+    let fix = if let Some(bid) = scope.get(&parameter.name) {
+        let binding = checker.semantic().binding(bid);
+        let replacement = argumentable.valid_argument_name();
+        let fix = Fix::unsafe_edits(
+            Edit::range_replacement(replacement.to_string(), binding.range()),
+            binding
+                .references()
+                .map(|rid| checker.semantic().reference(rid))
+                .map(|reference| {
+                    Edit::range_replacement(replacement.to_string(), reference.range())
+                }),
+        );
+        Some(fix)
+    } else {
+        None
+    };
+
+    let mut diagnostic = Diagnostic::new(
         argumentable.check_for(parameter.name.to_string()),
         parameter.range(),
-    ))
+    );
+    if let Some(fix) = fix {
+        diagnostic.set_fix(fix);
+    }
+    diagnostics.push(diagnostic);
 }
