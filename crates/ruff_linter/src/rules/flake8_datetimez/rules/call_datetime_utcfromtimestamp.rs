@@ -73,7 +73,7 @@ pub(crate) fn call_datetime_utcfromtimestamp(
         .resolve_call_path(func)
         .is_some_and(|call_path| {
             matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 ["datetime", "datetime", "utcfromtimestamp"]
             )
         })

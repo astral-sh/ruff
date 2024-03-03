@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::{compose_call_path, from_qualified_name, CallPath};
+use ruff_python_ast::call_path::{compose_call_path, CallPath};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::analyze::typing::{
@@ -128,7 +128,7 @@ pub(crate) fn function_call_in_argument_default(checker: &mut Checker, parameter
         .flake8_bugbear
         .extend_immutable_calls
         .iter()
-        .map(|target| from_qualified_name(target))
+        .map(|target| CallPath::from_qualified_name(target))
         .collect();
 
     let mut visitor = ArgumentDefaultVisitor::new(checker.semantic(), &extend_immutable_calls);

@@ -2,9 +2,8 @@ use std::path::Path;
 
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
-use smallvec::smallvec;
 
-use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
+use ruff_python_ast::call_path::{CallPath, CallPathBuilder};
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::{self as ast, Expr, Operator, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -181,16 +180,18 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the call path is a reference to `typing.${target}`.
     pub fn match_typing_call_path(&self, call_path: &CallPath, target: &str) -> bool {
         if matches!(
-            call_path.as_slice(),
+            call_path.segments(),
             ["typing" | "_typeshed" | "typing_extensions", member] if *member == target
         ) {
             return true;
         }
 
         if self.typing_modules.iter().any(|module| {
-            let mut module: CallPath = from_unqualified_name(module);
-            module.push(target);
-            *call_path == module
+            let module = CallPath::from_unqualified_name(module);
+            let mut builder = CallPathBuilder::from_path(module);
+            builder.push(target);
+            let target_path = builder.build();
+            call_path == &target_path
         }) {
             return true;
         }
@@ -567,10 +568,10 @@ impl<'a> SemanticModel<'a> {
     /// associated with `Class`, then the `BindingKind::FunctionDefinition` associated with
     /// `Class.method`.
     pub fn lookup_attribute(&'a self, value: &'a Expr) -> Option<BindingId> {
-        let call_path = collect_call_path(value)?;
+        let call_path = CallPath::from_expr(value)?;
 
         // Find the symbol in the current scope.
-        let (symbol, attribute) = call_path.split_first()?;
+        let (symbol, attribute) = call_path.segments().split_first()?;
         let mut binding_id = self.lookup_symbol(symbol)?;
 
         // Recursively resolve class attributes, e.g., `foo.bar.baz` in.
@@ -677,25 +678,22 @@ impl<'a> SemanticModel<'a> {
 
         match &binding.kind {
             BindingKind::Import(Import { call_path }) => {
-                let value_path = collect_call_path(value)?;
-                let (_, tail) = value_path.split_first()?;
+                let value_path = CallPath::from_expr(value)?;
+                let (_, tail) = value_path.segments().split_first()?;
                 let resolved: CallPath = call_path.iter().chain(tail.iter()).copied().collect();
                 Some(resolved)
             }
             BindingKind::SubmoduleImport(SubmoduleImport { call_path }) => {
-                let value_path = collect_call_path(value)?;
-                let (_, tail) = value_path.split_first()?;
-                let resolved: CallPath = call_path
-                    .iter()
-                    .take(1)
-                    .chain(tail.iter())
-                    .copied()
-                    .collect();
-                Some(resolved)
+                let value_path = CallPath::from_expr(value)?;
+                let (_, tail) = value_path.segments().split_first()?;
+                let mut builder = CallPathBuilder::with_capacity(1 + tail.len());
+                builder.extend(call_path.iter().copied().take(1));
+                builder.extend(tail.iter().copied());
+                Some(builder.build())
             }
             BindingKind::FromImport(FromImport { call_path }) => {
-                let value_path = collect_call_path(value)?;
-                let (_, tail) = value_path.split_first()?;
+                let value_path = CallPath::from_expr(value)?;
+                let (_, tail) = value_path.segments().split_first()?;
 
                 let resolved: CallPath =
                     if call_path.first().map_or(false, |segment| *segment == ".") {
@@ -708,24 +706,24 @@ impl<'a> SemanticModel<'a> {
             BindingKind::Builtin => {
                 if value.is_name_expr() {
                     // Ex) `dict`
-                    Some(smallvec!["", head.id.as_str()])
+                    Some(CallPath::from_slice(&["", head.id.as_str()]))
                 } else {
                     // Ex) `dict.__dict__`
-                    let value_path = collect_call_path(value)?;
+                    let value_path = CallPath::from_expr(value)?;
                     Some(
                         std::iter::once("")
-                            .chain(value_path.iter().copied())
+                            .chain(value_path.segments().iter().copied())
                             .collect(),
                     )
                 }
             }
             BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {
-                let value_path = collect_call_path(value)?;
+                let value_path = CallPath::from_expr(value)?;
                 let resolved: CallPath = self
                     .module_path?
                     .iter()
                     .map(String::as_str)
-                    .chain(value_path)
+                    .chain(value_path.segments().iter().copied())
                     .collect();
                 Some(resolved)
             }

@@ -66,7 +66,7 @@ pub(crate) fn call_date_fromtimestamp(checker: &mut Checker, func: &Expr, locati
         .semantic()
         .resolve_call_path(func)
         .is_some_and(|call_path| {
-            matches!(call_path.as_slice(), ["datetime", "date", "fromtimestamp"])
+            matches!(call_path.segments(), ["datetime", "date", "fromtimestamp"])
         })
     {
         checker

@@ -314,7 +314,7 @@ pub(crate) fn reuse_of_groupby_generator(
     if !checker
         .semantic()
         .resolve_call_path(func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["itertools", "groupby"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["itertools", "groupby"]))
     {
         return;
     }

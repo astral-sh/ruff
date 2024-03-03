@@ -24,12 +24,12 @@ pub(super) fn is_untyped_exception(type_: Option<&Expr>, semantic: &SemanticMode
         if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &type_ {
             elts.iter().any(|type_| {
                 semantic.resolve_call_path(type_).is_some_and(|call_path| {
-                    matches!(call_path.as_slice(), ["", "Exception" | "BaseException"])
+                    matches!(call_path.segments(), ["", "Exception" | "BaseException"])
                 })
             })
         } else {
             semantic.resolve_call_path(type_).is_some_and(|call_path| {
-                matches!(call_path.as_slice(), ["", "Exception" | "BaseException"])
+                matches!(call_path.segments(), ["", "Exception" | "BaseException"])
             })
         }
     })

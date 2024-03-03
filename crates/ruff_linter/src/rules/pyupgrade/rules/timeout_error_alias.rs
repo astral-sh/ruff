@@ -62,7 +62,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion
     semantic.resolve_call_path(expr).is_some_and(|call_path| {
         if target_version >= PythonVersion::Py311 {
             matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 ["socket", "timeout"] | ["asyncio", "TimeoutError"]
             )
         } else {
@@ -74,7 +74,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion
                 target_version >= PythonVersion::Py310,
                 "lint should only be used for Python 3.10+",
             );
-            matches!(call_path.as_slice(), ["socket", "timeout"])
+            matches!(call_path.segments(), ["socket", "timeout"])
         }
     })
 }
@@ -83,7 +83,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion
 fn is_timeout_error(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_call_path(expr)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "TimeoutError"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["", "TimeoutError"]))
 }
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].

@@ -41,7 +41,7 @@ pub(crate) fn no_explicit_stacklevel(checker: &mut Checker, call: &ast::ExprCall
     if !checker
         .semantic()
         .resolve_call_path(&call.func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["warnings", "warn"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["warnings", "warn"]))
     {
         return;
     }

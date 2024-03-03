@@ -65,7 +65,7 @@ pub(crate) fn hashlib_insecure_hash_functions(checker: &mut Checker, call: &ast:
         checker
             .semantic()
             .resolve_call_path(&call.func)
-            .and_then(|call_path| match call_path.as_slice() {
+            .and_then(|call_path| match call_path.segments() {
                 ["hashlib", "new"] => Some(HashlibCall::New),
                 ["hashlib", "md4"] => Some(HashlibCall::WeakHash("md4")),
                 ["hashlib", "md5"] => Some(HashlibCall::WeakHash("md5")),

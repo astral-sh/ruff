@@ -101,7 +101,7 @@ pub(crate) fn bit_count(checker: &mut Checker, call: &ExprCall) {
     if !checker
         .semantic()
         .resolve_call_path(func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["" | "builtins", "bin"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["" | "builtins", "bin"]))
     {
         return;
     }

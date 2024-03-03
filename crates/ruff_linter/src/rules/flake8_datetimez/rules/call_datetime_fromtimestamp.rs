@@ -70,7 +70,7 @@ pub(crate) fn call_datetime_fromtimestamp(checker: &mut Checker, call: &ast::Exp
         .resolve_call_path(&call.func)
         .is_some_and(|call_path| {
             matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 ["datetime", "datetime", "fromtimestamp"]
             )
         })

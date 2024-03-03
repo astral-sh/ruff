@@ -98,7 +98,7 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
         if !checker
             .semantic()
             .resolve_call_path(map_subscript(left))
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["sys", "version_info"]))
+            .is_some_and(|call_path| matches!(call_path.segments(), ["sys", "version_info"]))
         {
             continue;
         }

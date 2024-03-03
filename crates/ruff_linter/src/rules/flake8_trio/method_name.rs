@@ -71,7 +71,7 @@ impl MethodName {
 
 impl MethodName {
     pub(super) fn try_from(call_path: &CallPath<'_>) -> Option<Self> {
-        match call_path.as_slice() {
+        match call_path.segments() {
             ["trio", "CancelScope"] => Some(Self::CancelScope),
             ["trio", "aclose_forcefully"] => Some(Self::AcloseForcefully),
             ["trio", "fail_after"] => Some(Self::FailAfter),

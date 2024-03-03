@@ -73,7 +73,7 @@ pub(crate) fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
     if checker
         .semantic()
         .resolve_call_path(func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "NotImplementedError"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["", "NotImplementedError"]))
     {
         return;
     }

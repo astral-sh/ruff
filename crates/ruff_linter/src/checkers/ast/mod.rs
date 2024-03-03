@@ -755,7 +755,7 @@ where
                 let mut handled_exceptions = Exceptions::empty();
                 for type_ in extract_handled_exceptions(handlers) {
                     if let Some(call_path) = self.semantic.resolve_call_path(type_) {
-                        match call_path.as_slice() {
+                        match call_path.segments() {
                             ["", "NameError"] => {
                                 handled_exceptions |= Exceptions::NAME_ERROR;
                             }
@@ -1086,7 +1086,7 @@ where
                     {
                         Some(typing::Callable::TypedDict)
                     } else if matches!(
-                        call_path.as_slice(),
+                        call_path.segments(),
                         [
                             "mypy_extensions",
                             "Arg"
@@ -1098,7 +1098,7 @@ where
                         ]
                     ) {
                         Some(typing::Callable::MypyExtension)
-                    } else if matches!(call_path.as_slice(), ["", "bool"]) {
+                    } else if matches!(call_path.segments(), ["", "bool"]) {
                         Some(typing::Callable::Bool)
                     } else {
                         None

@@ -63,7 +63,7 @@ pub(crate) fn exception_without_exc_info(checker: &mut Checker, call: &ExprCall)
             if !checker
                 .semantic()
                 .resolve_call_path(call.func.as_ref())
-                .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "exception"]))
+                .is_some_and(|call_path| matches!(call_path.segments(), ["logging", "exception"]))
             {
                 return;
             }

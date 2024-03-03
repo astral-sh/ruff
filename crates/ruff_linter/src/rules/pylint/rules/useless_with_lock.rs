@@ -68,7 +68,7 @@ pub(crate) fn useless_with_lock(checker: &mut Checker, with: &ast::StmtWith) {
             .resolve_call_path(call.func.as_ref())
             .is_some_and(|call_path| {
                 matches!(
-                    call_path.as_slice(),
+                    call_path.segments(),
                     [
                         "threading",
                         "Lock" | "RLock" | "Condition" | "Semaphore" | "BoundedSemaphore"

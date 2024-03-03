@@ -98,7 +98,7 @@ pub(crate) fn singledispatch_method(
             .semantic()
             .resolve_call_path(&decorator.expression)
             .is_some_and(|call_path| {
-                matches!(call_path.as_slice(), ["functools", "singledispatch"])
+                matches!(call_path.segments(), ["functools", "singledispatch"])
             })
         {
             let mut diagnostic = Diagnostic::new(SingledispatchMethod, decorator.range());

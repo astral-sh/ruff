@@ -160,7 +160,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
     let maybe_replacement = checker
         .semantic()
         .resolve_call_path(expr)
-        .and_then(|call_path| match call_path.as_slice() {
+        .and_then(|call_path| match call_path.segments() {
             // NumPy's main namespace np.* members removed in 2.0
             ["numpy", "add_docstring"] => Some(Replacement {
                 existing: "add_docstring",

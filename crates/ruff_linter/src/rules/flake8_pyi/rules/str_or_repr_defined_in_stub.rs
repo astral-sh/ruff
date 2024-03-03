@@ -82,7 +82,7 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         .semantic()
         .resolve_call_path(returns)
         .map_or(true, |call_path| {
-            !matches!(call_path.as_slice(), ["" | "builtins", "str"])
+            !matches!(call_path.segments(), ["" | "builtins", "str"])
         })
     {
         return;

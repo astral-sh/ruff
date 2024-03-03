@@ -3,7 +3,7 @@ use ruff_python_ast::{self as ast, Decorator, Expr, ParameterWithDefault, Parame
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::collect_call_path;
+use ruff_python_ast::call_path::CallPath;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -136,8 +136,8 @@ pub(crate) fn boolean_type_hint_positional_argument(
 
         // Allow Boolean type hints in setters.
         if decorator_list.iter().any(|decorator| {
-            collect_call_path(&decorator.expression)
-                .is_some_and(|call_path| call_path.as_slice() == [name, "setter"])
+            CallPath::from_expr(&decorator.expression)
+                .is_some_and(|call_path| call_path.segments() == [name, "setter"])
         }) {
             return;
         }

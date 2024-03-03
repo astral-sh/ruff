@@ -102,7 +102,7 @@ fn extract_cryptographic_key(
     call: &ExprCall,
 ) -> Option<(CryptographicKey, TextRange)> {
     let call_path = checker.semantic().resolve_call_path(&call.func)?;
-    match call_path.as_slice() {
+    match call_path.segments() {
         ["cryptography", "hazmat", "primitives", "asymmetric", function, "generate_private_key"] => {
             match *function {
                 "dsa" => {
@@ -118,7 +118,7 @@ fn extract_cryptographic_key(
                     let ExprAttribute { attr, value, .. } = argument.as_attribute_expr()?;
                     let call_path = checker.semantic().resolve_call_path(value)?;
                     if matches!(
-                        call_path.as_slice(),
+                        call_path.segments(),
                         ["cryptography", "hazmat", "primitives", "asymmetric", "ec"]
                     ) {
                         Some((

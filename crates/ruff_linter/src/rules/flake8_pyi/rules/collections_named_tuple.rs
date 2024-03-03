@@ -58,7 +58,7 @@ pub(crate) fn collections_named_tuple(checker: &mut Checker, expr: &Expr) {
     if checker
         .semantic()
         .resolve_call_path(expr)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["collections", "namedtuple"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["collections", "namedtuple"]))
     {
         checker
             .diagnostics

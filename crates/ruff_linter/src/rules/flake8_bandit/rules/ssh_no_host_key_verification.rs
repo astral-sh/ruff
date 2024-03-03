@@ -63,7 +63,7 @@ pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCal
         .resolve_call_path(map_callable(policy_argument))
         .is_some_and(|call_path| {
             matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 ["paramiko", "client", "AutoAddPolicy" | "WarningPolicy"]
                     | ["paramiko", "AutoAddPolicy" | "WarningPolicy"]
             )
@@ -74,7 +74,7 @@ pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCal
 
     if typing::resolve_assignment(value, checker.semantic()).is_some_and(|call_path| {
         matches!(
-            call_path.as_slice(),
+            call_path.segments(),
             ["paramiko", "client", "SSHClient"] | ["paramiko", "SSHClient"]
         )
     }) {

@@ -87,7 +87,7 @@ fn is_warnings_dot_deprecated(expr: Option<&ast::Expr>, semantic: &SemanticModel
         .resolve_call_path(&call.func)
         .is_some_and(|call_path| {
             matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 ["warnings" | "typing_extensions", "deprecated"]
             )
         })

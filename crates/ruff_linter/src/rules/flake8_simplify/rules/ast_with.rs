@@ -102,7 +102,7 @@ fn explicit_with_items(checker: &mut Checker, with_items: &[WithItem]) -> bool {
         .resolve_call_path(&expr_call.func)
         .is_some_and(|call_path| {
             matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 ["asyncio", "timeout" | "timeout_at"]
                     | ["anyio", "CancelScope" | "fail_after" | "move_on_after"]
                     | [

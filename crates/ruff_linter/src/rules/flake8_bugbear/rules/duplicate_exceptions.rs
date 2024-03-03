@@ -6,7 +6,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path;
 use ruff_python_ast::call_path::CallPath;
 
 use crate::checkers::ast::Checker;
@@ -124,7 +123,7 @@ fn duplicate_handler_exceptions<'a>(
     let mut duplicates: FxHashSet<CallPath> = FxHashSet::default();
     let mut unique_elts: Vec<&Expr> = Vec::default();
     for type_ in elts {
-        if let Some(call_path) = call_path::collect_call_path(type_) {
+        if let Some(call_path) = CallPath::from_expr(type_) {
             if seen.contains_key(&call_path) {
                 duplicates.insert(call_path);
             } else {
@@ -141,7 +140,7 @@ fn duplicate_handler_exceptions<'a>(
                 DuplicateHandlerException {
                     names: duplicates
                         .into_iter()
-                        .map(|call_path| call_path.join("."))
+                        .map(|call_path| call_path.segments().join("."))
                         .sorted()
                         .collect::<Vec<String>>(),
                 },
@@ -184,7 +183,7 @@ pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHand
         };
         match type_.as_ref() {
             Expr::Attribute(_) | Expr::Name(_) => {
-                if let Some(call_path) = call_path::collect_call_path(type_) {
+                if let Some(call_path) = CallPath::from_expr(type_) {
                     if seen.contains(&call_path) {
                         duplicates.entry(call_path).or_default().push(type_);
                     } else {
@@ -210,7 +209,7 @@ pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHand
             for expr in exprs {
                 checker.diagnostics.push(Diagnostic::new(
                     DuplicateTryBlockException {
-                        name: name.join("."),
+                        name: name.segments().join("."),
                     },
                     expr.range(),
                 ));

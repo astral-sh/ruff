@@ -47,7 +47,7 @@ pub(crate) fn snmp_weak_cryptography(checker: &mut Checker, call: &ast::ExprCall
             .semantic()
             .resolve_call_path(&call.func)
             .is_some_and(|call_path| {
-                matches!(call_path.as_slice(), ["pysnmp", "hlapi", "UsmUserData"])
+                matches!(call_path.segments(), ["pysnmp", "hlapi", "UsmUserData"])
             })
         {
             checker

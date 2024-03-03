@@ -111,7 +111,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
             if checker
                 .semantic()
                 .resolve_call_path(func)
-                .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "dict"]))
+                .is_some_and(|call_path| matches!(call_path.segments(), ["", "dict"]))
             {
                 for keyword in keywords.iter() {
                     if let Some(attr) = &keyword.arg {
@@ -168,7 +168,7 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
             let Some(call_path) = checker.semantic().resolve_call_path(call.func.as_ref()) else {
                 return;
             };
-            let ["logging", attribute] = call_path.as_slice() else {
+            let ["logging", attribute] = call_path.segments() else {
                 return;
             };
             let Some(call_type) = LoggingCallType::from_attribute(attribute) else {

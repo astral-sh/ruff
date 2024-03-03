@@ -402,7 +402,7 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
     // libraries.
     if semantic.resolve_call_path(func).is_some_and(|call_path| {
         matches!(
-            call_path.as_slice(),
+            call_path.segments(),
             ["" | "builtins" | "sys" | "_thread" | "pytest", "exit"]
                 | ["" | "builtins", "quit"]
                 | ["os" | "posix", "_exit" | "abort"]

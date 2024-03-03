@@ -64,7 +64,7 @@ fn match_async_exit_stack(semantic: &SemanticModel) -> bool {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
                     if semantic.resolve_call_path(func).is_some_and(|call_path| {
-                        matches!(call_path.as_slice(), ["contextlib", "AsyncExitStack"])
+                        matches!(call_path.segments(), ["contextlib", "AsyncExitStack"])
                     }) {
                         return true;
                     }
@@ -95,7 +95,7 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
                     if semantic.resolve_call_path(func).is_some_and(|call_path| {
-                        matches!(call_path.as_slice(), ["contextlib", "ExitStack"])
+                        matches!(call_path.segments(), ["contextlib", "ExitStack"])
                     }) {
                         return true;
                     }
@@ -115,7 +115,7 @@ fn is_open(checker: &mut Checker, func: &Expr) -> bool {
                 Expr::Call(ast::ExprCall { func, .. }) => checker
                     .semantic()
                     .resolve_call_path(func)
-                    .is_some_and(|call_path| matches!(call_path.as_slice(), ["pathlib", "Path"])),
+                    .is_some_and(|call_path| matches!(call_path.segments(), ["pathlib", "Path"])),
                 _ => false,
             }
         }

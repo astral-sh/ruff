@@ -20,7 +20,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
         checker
             .semantic()
             .resolve_call_path(&call.func)
-            .and_then(|call_path| match call_path.as_slice() {
+            .and_then(|call_path| match call_path.segments() {
                 // PTH100
                 ["os", "path", "abspath"] => Some(OsPathAbspath.into()),
                 // PTH101

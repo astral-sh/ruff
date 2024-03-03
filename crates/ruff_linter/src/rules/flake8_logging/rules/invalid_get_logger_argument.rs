@@ -78,7 +78,7 @@ pub(crate) fn invalid_get_logger_argument(checker: &mut Checker, call: &ast::Exp
     if !checker
         .semantic()
         .resolve_call_path(call.func.as_ref())
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "getLogger"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["logging", "getLogger"]))
     {
         return;
     }

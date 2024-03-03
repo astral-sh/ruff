@@ -63,7 +63,7 @@ pub(crate) fn non_leading_receiver_decorator(checker: &mut Checker, decorator_li
                 .semantic()
                 .resolve_call_path(&call.func)
                 .is_some_and(|call_path| {
-                    matches!(call_path.as_slice(), ["django", "dispatch", "receiver"])
+                    matches!(call_path.segments(), ["django", "dispatch", "receiver"])
                 })
         });
         if i > 0 && is_receiver && !seen_receiver {

@@ -199,7 +199,7 @@ fn has_conditional_body(with: &ast::StmtWith, semantic: &SemanticModel) -> bool 
             return false;
         };
         if let Some(call_path) = semantic.resolve_call_path(func) {
-            if call_path.as_slice() == ["contextlib", "suppress"] {
+            if call_path.segments() == ["contextlib", "suppress"] {
                 return true;
             }
         }

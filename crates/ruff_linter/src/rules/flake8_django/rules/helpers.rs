@@ -5,7 +5,7 @@ use ruff_python_semantic::{analyze, SemanticModel};
 /// Return `true` if a Python class appears to be a Django model, based on its base classes.
 pub(super) fn is_model(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
     analyze::class::any_call_path(class_def, semantic, &|call_path| {
-        matches!(call_path.as_slice(), ["django", "db", "models", "Model"])
+        matches!(call_path.segments(), ["django", "db", "models", "Model"])
     })
 }
 
@@ -13,7 +13,7 @@ pub(super) fn is_model(class_def: &ast::StmtClassDef, semantic: &SemanticModel) 
 pub(super) fn is_model_form(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
     analyze::class::any_call_path(class_def, semantic, &|call_path| {
         matches!(
-            call_path.as_slice(),
+            call_path.segments(),
             ["django", "forms", "ModelForm"] | ["django", "forms", "models", "ModelForm"]
         )
     })
@@ -23,7 +23,7 @@ pub(super) fn is_model_form(class_def: &ast::StmtClassDef, semantic: &SemanticMo
 pub(super) fn is_model_field(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic.resolve_call_path(expr).is_some_and(|call_path| {
         call_path
-            .as_slice()
+            .segments()
             .starts_with(&["django", "db", "models"])
     })
 }
@@ -34,7 +34,7 @@ pub(super) fn get_model_field_name<'a>(
     semantic: &'a SemanticModel,
 ) -> Option<&'a str> {
     semantic.resolve_call_path(expr).and_then(|call_path| {
-        let call_path = call_path.as_slice();
+        let call_path = call_path.segments();
         if !call_path.starts_with(&["django", "db", "models"]) {
             return None;
         }

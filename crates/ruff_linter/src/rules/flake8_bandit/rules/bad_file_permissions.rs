@@ -67,7 +67,7 @@ pub(crate) fn bad_file_permissions(checker: &mut Checker, call: &ast::ExprCall) 
     if checker
         .semantic()
         .resolve_call_path(&call.func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["os", "chmod"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["os", "chmod"]))
     {
         if let Some(mode_arg) = call.arguments.find_argument("mode", 1) {
             match parse_mask(mode_arg, checker.semantic()) {
@@ -102,7 +102,7 @@ const WRITE_WORLD: u16 = 0o2;
 const EXECUTE_GROUP: u16 = 0o10;
 
 fn py_stat(call_path: &CallPath) -> Option<u16> {
-    match call_path.as_slice() {
+    match call_path.segments() {
         ["stat", "ST_MODE"] => Some(0o0),
         ["stat", "S_IFDOOR"] => Some(0o0),
         ["stat", "S_IFPORT"] => Some(0o0),

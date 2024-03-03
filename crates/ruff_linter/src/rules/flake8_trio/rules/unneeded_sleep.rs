@@ -64,7 +64,7 @@ pub(crate) fn unneeded_sleep(checker: &mut Checker, while_stmt: &ast::StmtWhile)
     if checker
         .semantic()
         .resolve_call_path(func.as_ref())
-        .is_some_and(|path| matches!(path.as_slice(), ["trio", "sleep" | "sleep_until"]))
+        .is_some_and(|path| matches!(path.segments(), ["trio", "sleep" | "sleep_until"]))
     {
         checker
             .diagnostics

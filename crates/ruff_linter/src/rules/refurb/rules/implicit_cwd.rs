@@ -77,7 +77,7 @@ pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
     if !checker
         .semantic()
         .resolve_call_path(func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["pathlib", "Path"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["pathlib", "Path"]))
     {
         return;
     }

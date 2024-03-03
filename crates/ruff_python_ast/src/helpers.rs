@@ -2,13 +2,12 @@ use std::borrow::Cow;
 use std::path::Path;
 
 use rustc_hash::FxHashMap;
-use smallvec::SmallVec;
 
 use ruff_python_trivia::{indentation_at_offset, CommentRanges, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::call_path::CallPath;
+use crate::call_path::{CallPath, CallPathBuilder};
 use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::StatementVisitor;
 use crate::visitor::Visitor;
@@ -793,16 +792,16 @@ pub fn to_module_path(package: &Path, path: &Path) -> Option<Vec<String>> {
 /// ```rust
 /// # use ruff_python_ast::helpers::collect_import_from_member;
 ///
-/// assert_eq!(collect_import_from_member(None, None, "bar").as_slice(), ["bar"]);
-/// assert_eq!(collect_import_from_member(Some(1), None, "bar").as_slice(), [".", "bar"]);
-/// assert_eq!(collect_import_from_member(Some(1), Some("foo"), "bar").as_slice(), [".", "foo", "bar"]);
+/// assert_eq!(collect_import_from_member(None, None, "bar").segments(), ["bar"]);
+/// assert_eq!(collect_import_from_member(Some(1), None, "bar").segments(), [".", "bar"]);
+/// assert_eq!(collect_import_from_member(Some(1), Some("foo"), "bar").segments(), [".", "foo", "bar"]);
 /// ```
 pub fn collect_import_from_member<'a>(
     level: Option<u32>,
     module: Option<&'a str>,
     member: &'a str,
 ) -> CallPath<'a> {
-    let mut call_path: CallPath = SmallVec::with_capacity(
+    let mut call_path_builder = CallPathBuilder::with_capacity(
         level.unwrap_or_default() as usize
             + module
                 .map(|module| module.split('.').count())
@@ -814,20 +813,20 @@ pub fn collect_import_from_member<'a>(
     if let Some(level) = level {
         if level > 0 {
             for _ in 0..level {
-                call_path.push(".");
+                call_path_builder.push(".");
             }
         }
     }
 
     // Add the remaining segments.
     if let Some(module) = module {
-        call_path.extend(module.split('.'));
+        call_path_builder.extend(module.split('.'));
     }
 
     // Add the member.
-    call_path.push(member);
+    call_path_builder.push(member);
 
-    call_path
+    call_path_builder.build()
 }
 
 /// Format the call path for a relative import, or `None` if the relative import extends beyond
@@ -840,27 +839,28 @@ pub fn from_relative_import<'a>(
     // The remaining segments to the call path (e.g., given `bar.baz`, `["baz"]`).
     tail: &[&'a str],
 ) -> Option<CallPath<'a>> {
-    let mut call_path: CallPath = SmallVec::with_capacity(module.len() + import.len() + tail.len());
+    let mut call_path_builder =
+        CallPathBuilder::with_capacity(module.len() + import.len() + tail.len());
 
     // Start with the module path.
-    call_path.extend(module.iter().map(String::as_str));
+    call_path_builder.extend(module.iter().map(String::as_str));
 
     // Remove segments based on the number of dots.
     for segment in import {
         if *segment == "." {
-            if call_path.is_empty() {
+            if call_path_builder.is_empty() {
                 return None;
             }
-            call_path.pop();
+            call_path_builder.pop();
         } else {
-            call_path.push(segment);
+            call_path_builder.push(segment);
         }
     }
 
     // Add the remaining segments.
-    call_path.extend_from_slice(tail);
+    call_path_builder.extend_from_slice(tail);
 
-    Some(call_path)
+    Some(call_path_builder.build())
 }
 
 /// Given an imported module (based on its relative import level and module name), return the

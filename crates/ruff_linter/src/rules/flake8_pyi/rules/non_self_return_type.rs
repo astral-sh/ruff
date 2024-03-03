@@ -233,7 +233,7 @@ fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool
 fn is_metaclass_base(base: &Expr, semantic: &SemanticModel) -> bool {
     semantic.resolve_call_path(base).is_some_and(|call_path| {
         matches!(
-            call_path.as_slice(),
+            call_path.segments(),
             ["" | "builtins", "type"] | ["abc", "ABCMeta"] | ["enum", "EnumMeta" | "EnumType"]
         )
     })
@@ -282,7 +282,7 @@ fn is_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool 
             .resolve_call_path(map_subscript(expr))
             .is_some_and(|call_path| {
                 matches!(
-                    call_path.as_slice(),
+                    call_path.segments(),
                     ["typing", "Iterator"] | ["collections", "abc", "Iterator"]
                 )
             })
@@ -295,7 +295,7 @@ fn is_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
         .resolve_call_path(map_subscript(expr))
         .is_some_and(|call_path| {
             matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 ["typing", "Iterable" | "Iterator"]
                     | ["collections", "abc", "Iterable" | "Iterator"]
             )
@@ -312,7 +312,7 @@ fn is_async_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) ->
             .resolve_call_path(map_subscript(expr))
             .is_some_and(|call_path| {
                 matches!(
-                    call_path.as_slice(),
+                    call_path.segments(),
                     ["typing", "AsyncIterator"] | ["collections", "abc", "AsyncIterator"]
                 )
             })
@@ -325,7 +325,7 @@ fn is_async_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
         .resolve_call_path(map_subscript(expr))
         .is_some_and(|call_path| {
             matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 ["typing", "AsyncIterable" | "AsyncIterator"]
                     | ["collections", "abc", "AsyncIterable" | "AsyncIterator"]
             )

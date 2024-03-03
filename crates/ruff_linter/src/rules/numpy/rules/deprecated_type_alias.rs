@@ -59,13 +59,13 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
         .resolve_call_path(expr)
         .and_then(|call_path| {
             if matches!(
-                call_path.as_slice(),
+                call_path.segments(),
                 [
                     "numpy",
                     "bool" | "int" | "float" | "complex" | "object" | "str" | "long" | "unicode"
                 ]
             ) {
-                Some(call_path[1])
+                Some(call_path.segments()[1])
             } else {
                 None
             }

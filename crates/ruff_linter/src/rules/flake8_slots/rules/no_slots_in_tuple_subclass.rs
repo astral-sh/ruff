@@ -60,7 +60,7 @@ pub(crate) fn no_slots_in_tuple_subclass(checker: &mut Checker, stmt: &Stmt, cla
             .semantic()
             .resolve_call_path(map_subscript(base))
             .is_some_and(|call_path| {
-                matches!(call_path.as_slice(), ["" | "builtins", "tuple"])
+                matches!(call_path.segments(), ["" | "builtins", "tuple"])
                     || checker
                         .semantic()
                         .match_typing_call_path(&call_path, "Tuple")

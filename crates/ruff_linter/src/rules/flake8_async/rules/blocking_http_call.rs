@@ -43,7 +43,7 @@ impl Violation for BlockingHttpCallInAsyncFunction {
 
 fn is_blocking_http_call(call_path: &CallPath) -> bool {
     matches!(
-        call_path.as_slice(),
+        call_path.segments(),
         ["urllib", "request", "urlopen"]
             | [
                 "httpx" | "requests",

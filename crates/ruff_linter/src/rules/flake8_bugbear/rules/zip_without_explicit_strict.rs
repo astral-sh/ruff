@@ -100,7 +100,7 @@ fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
     };
 
     semantic.resolve_call_path(func).is_some_and(|call_path| {
-        match call_path.as_slice() {
+        match call_path.segments() {
             ["itertools", "cycle" | "count"] => true,
             ["itertools", "repeat"] => {
                 // Ex) `itertools.repeat(1)`

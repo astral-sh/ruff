@@ -116,7 +116,7 @@ pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &
                     .semantic()
                     .resolve_call_path(expr)
                     .is_some_and(|call_path| {
-                        matches!(call_path.as_slice(), ["", "Exception" | "BaseException"])
+                        matches!(call_path.segments(), ["", "Exception" | "BaseException"])
                     })
             })
         {

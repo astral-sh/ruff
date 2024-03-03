@@ -12,7 +12,7 @@ use ruff_source_file::Locator;
 /// A known type is either a builtin type, any object from the standard library,
 /// or a type from the `typing_extensions` module.
 fn is_known_type(call_path: &CallPath, minor_version: u8) -> bool {
-    match call_path.as_slice() {
+    match call_path.segments() {
         ["" | "typing_extensions", ..] => true,
         [module, ..] => is_known_standard_library(minor_version, module),
         _ => false,
@@ -122,10 +122,10 @@ impl<'a> TypingTarget<'a> {
                 |call_path| {
                     if semantic.match_typing_call_path(&call_path, "Any") {
                         Some(TypingTarget::Any)
-                    } else if matches!(call_path.as_slice(), ["" | "builtins", "object"]) {
+                    } else if matches!(call_path.segments(), ["" | "builtins", "object"]) {
                         Some(TypingTarget::Object)
                     } else if semantic.match_typing_call_path(&call_path, "Hashable")
-                        || matches!(call_path.as_slice(), ["collections", "abc", "Hashable"])
+                        || matches!(call_path.segments(), ["collections", "abc", "Hashable"])
                     {
                         Some(TypingTarget::Hashable)
                     } else if !is_known_type(&call_path, minor_version) {

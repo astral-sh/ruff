@@ -68,7 +68,7 @@ pub(crate) fn subprocess_run_without_check(checker: &mut Checker, call: &ast::Ex
     if checker
         .semantic()
         .resolve_call_path(&call.func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["subprocess", "run"]))
+        .is_some_and(|call_path| matches!(call_path.segments(), ["subprocess", "run"]))
     {
         if call.arguments.find_keyword("check").is_none() {
             let mut diagnostic = Diagnostic::new(SubprocessRunWithoutCheck, call.func.range());

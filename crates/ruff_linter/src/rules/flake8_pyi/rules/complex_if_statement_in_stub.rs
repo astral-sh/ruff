@@ -69,7 +69,7 @@ pub(crate) fn complex_if_statement_in_stub(checker: &mut Checker, test: &Expr) {
         .semantic()
         .resolve_call_path(left)
         .is_some_and(|call_path| {
-            matches!(call_path.as_slice(), ["sys", "version_info" | "platform"])
+            matches!(call_path.segments(), ["sys", "version_info" | "platform"])
         })
     {
         return;

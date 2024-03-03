@@ -3,7 +3,7 @@ use std::fmt;
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::collect_call_path;
+use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -649,8 +649,8 @@ where
                 }
             }
             Expr::Call(ast::ExprCall { func, .. }) => {
-                if collect_call_path(func).is_some_and(|call_path| {
-                    matches!(call_path.as_slice(), ["request", "addfinalizer"])
+                if CallPath::from_expr(func).is_some_and(|call_path| {
+                    matches!(call_path.segments(), ["request", "addfinalizer"])
                 }) {
                     self.addfinalizer_call = Some(expr);
                 };

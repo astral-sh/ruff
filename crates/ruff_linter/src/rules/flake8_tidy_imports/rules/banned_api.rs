@@ -2,7 +2,7 @@ use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::from_qualified_name;
+use ruff_python_ast::call_path::CallPath;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -67,9 +67,9 @@ pub(crate) fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
             .semantic()
             .resolve_call_path(expr)
             .and_then(|call_path| {
-                banned_api
-                    .iter()
-                    .find(|(banned_path, ..)| call_path == from_qualified_name(banned_path))
+                banned_api.iter().find(|(banned_path, ..)| {
+                    call_path == CallPath::from_qualified_name(banned_path)
+                })
             })
     {
         checker.diagnostics.push(Diagnostic::new(

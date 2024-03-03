@@ -70,7 +70,7 @@ fn is_str_subclass(bases: &[Expr], semantic: &SemanticModel) -> bool {
     let mut is_str_subclass = false;
     for base in bases {
         if let Some(call_path) = semantic.resolve_call_path(base) {
-            match call_path.as_slice() {
+            match call_path.segments() {
                 ["" | "builtins", "str"] => {
                     is_str_subclass = true;
                 }

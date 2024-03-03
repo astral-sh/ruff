@@ -249,12 +249,12 @@ impl AlwaysFixableViolation for TypeAliasWithoutAnnotation {
 }
 
 fn is_allowed_negated_math_attribute(call_path: &CallPath) -> bool {
-    matches!(call_path.as_slice(), ["math", "inf" | "e" | "pi" | "tau"])
+    matches!(call_path.segments(), ["math", "inf" | "e" | "pi" | "tau"])
 }
 
 fn is_allowed_math_attribute(call_path: &CallPath) -> bool {
     matches!(
-        call_path.as_slice(),
+        call_path.segments(),
         ["math", "inf" | "nan" | "e" | "pi" | "tau"]
             | [
                 "sys",
@@ -437,7 +437,7 @@ fn is_type_var_like_call(expr: &Expr, semantic: &SemanticModel) -> bool {
     };
     semantic.resolve_call_path(func).is_some_and(|call_path| {
         matches!(
-            call_path.as_slice(),
+            call_path.segments(),
             [
                 "typing" | "typing_extensions",
                 "TypeVar" | "TypeVarTuple" | "NewType" | "ParamSpec"
@@ -483,7 +483,7 @@ fn is_enum(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
                 .resolve_call_path(map_subscript(expr))
                 .is_some_and(|call_path| {
                     matches!(
-                        call_path.as_slice(),
+                        call_path.segments(),
                         [
                             "enum",
                             "Enum" | "Flag" | "IntEnum" | "IntFlag" | "StrEnum" | "ReprEnum"

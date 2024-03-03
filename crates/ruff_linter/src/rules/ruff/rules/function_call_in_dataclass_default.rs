@@ -3,7 +3,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
-use ruff_python_ast::call_path::{from_qualified_name, CallPath};
+use ruff_python_ast::call_path::CallPath;
 use ruff_python_semantic::analyze::typing::is_immutable_func;
 use ruff_text_size::Ranged;
 
@@ -85,7 +85,7 @@ pub(crate) fn function_call_in_dataclass_default(
         .flake8_bugbear
         .extend_immutable_calls
         .iter()
-        .map(|target| from_qualified_name(target))
+        .map(|target| CallPath::from_qualified_name(target))
         .collect();
 
     for statement in &class_def.body {
