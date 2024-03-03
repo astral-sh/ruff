@@ -18,7 +18,7 @@ use crate::rules::{
 use crate::settings::types::PythonVersion;
 
 /// Run lint rules over a [`Stmt`] syntax node.
-pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
+pub(crate) fn statement<'a>(stmt: &'a Stmt, checker: &mut Checker<'a>) {
     match stmt {
         Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
             if checker.enabled(Rule::GlobalAtModuleLevel) {

@@ -62,9 +62,12 @@ impl<'a> QualifiedName<'a> {
         &self.segments
     }
 
-    #[inline]
-    pub fn into_boxed_slice(self) -> Box<[&'a str]> {
-        self.segments.into_boxed_slice()
+    pub fn module_name(&self) -> Option<&'a str> {
+        match self.segments.as_slice() {
+            ["", ..] => None,
+            [module, ..] => Some(module),
+            [] => unreachable!(),
+        }
     }
 }
 

@@ -75,7 +75,7 @@ impl Violation for RepeatedAppend {
 }
 
 /// FURB113
-pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn repeated_append<'a, 'b>(checker: &'b mut Checker<'a>, stmt: &'a Stmt) {
     let Some(appends) = match_consecutive_appends(stmt, checker.semantic()) else {
         return;
     };
@@ -171,9 +171,9 @@ impl Ranged for AppendGroup<'_> {
 }
 
 /// Match consecutive calls to `append` on list variables starting from the given statement.
-fn match_consecutive_appends<'a>(
+fn match_consecutive_appends<'a, 'b>(
     stmt: &'a Stmt,
-    semantic: &'a SemanticModel,
+    semantic: &'b SemanticModel<'a>,
 ) -> Option<Vec<Append<'a>>> {
     // Match the current statement, to see if it's an append.
     let append = match_append(semantic, stmt)?;
@@ -267,7 +267,7 @@ fn get_or_add<'a, 'b>(
 }
 
 /// Matches that the given statement is a call to `append` on a list variable.
-fn match_append<'a>(semantic: &'a SemanticModel, stmt: &'a Stmt) -> Option<Append<'a>> {
+fn match_append<'a>(semantic: &'a SemanticModel<'a>, stmt: &'a Stmt) -> Option<Append<'a>> {
     let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
         return None;
     };
