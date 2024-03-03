@@ -56,11 +56,8 @@ struct LambdaBodyVisitor<'a> {
     uses_args: bool,
 }
 
-impl<'a, 'b> Visitor<'b> for LambdaBodyVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_expr(&mut self, expr: &'b Expr) {
+impl<'a> Visitor<'a> for LambdaBodyVisitor<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
                 if self.parameters.includes(id) {

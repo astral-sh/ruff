@@ -223,10 +223,7 @@ impl<'a> ExceptionHandlerVisitor<'a> {
     }
 }
 
-impl<'a, 'b> Visitor<'b> for ExceptionHandlerVisitor<'a>
-where
-    'b: 'a,
-{
+impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Assert(_) => {

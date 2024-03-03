@@ -903,10 +903,7 @@ pub struct NameFinder<'a> {
     pub names: FxHashMap<&'a str, &'a ast::ExprName>,
 }
 
-impl<'a, 'b> Visitor<'b> for NameFinder<'a>
-where
-    'b: 'a,
-{
+impl<'a> Visitor<'a> for NameFinder<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         if let Expr::Name(name) = expr {
             self.names.insert(&name.id, name);
@@ -922,10 +919,7 @@ pub struct StoredNameFinder<'a> {
     pub names: FxHashMap<&'a str, &'a ast::ExprName>,
 }
 
-impl<'a, 'b> Visitor<'b> for StoredNameFinder<'a>
-where
-    'b: 'a,
-{
+impl<'a> Visitor<'a> for StoredNameFinder<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         if let Expr::Name(name) = expr {
             if name.ctx.is_store() {
@@ -943,11 +937,8 @@ pub struct ReturnStatementVisitor<'a> {
     pub is_generator: bool,
 }
 
-impl<'a, 'b> Visitor<'b> for ReturnStatementVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> Visitor<'a> for ReturnStatementVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
@@ -957,7 +948,7 @@ where
         }
     }
 
-    fn visit_expr(&mut self, expr: &'b Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr) {
         if let Expr::Yield(_) | Expr::YieldFrom(_) = expr {
             self.is_generator = true;
         } else {
@@ -972,11 +963,8 @@ pub struct RaiseStatementVisitor<'a> {
     pub raises: Vec<(TextRange, Option<&'a Expr>, Option<&'a Expr>)>,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for RaiseStatementVisitor<'b>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Raise(ast::StmtRaise {
                 exc,
