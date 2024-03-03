@@ -10,7 +10,7 @@ Once installed, you can run Ruff from the command line:
 
 ```shell
 ruff check   # Lint all files in the current directory.
-ruff format .  # Format all files in the current directory.
+ruff format  # Format all files in the current directory.
 ```
 
 For **macOS Homebrew** and **Linuxbrew** users, Ruff is also available as [`ruff`](https://formulae.brew.sh/formula/ruff)

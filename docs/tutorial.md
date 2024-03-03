@@ -74,7 +74,7 @@ def sum_even_numbers(numbers: Iterable[int]) -> int:
 Now that our project is passing `ruff check`, we can run the Ruff formatter via `ruff format`:
 
 ```shell
-❯ ruff format .
+❯ ruff format
 1 file reformatted
 ```
 
