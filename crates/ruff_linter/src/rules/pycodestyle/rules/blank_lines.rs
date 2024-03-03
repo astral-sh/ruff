@@ -729,16 +729,16 @@ impl<'a> BlankLinesChecker<'a> {
         diagnostics: &mut Vec<Diagnostic>,
     ) {
         if line.preceding_blank_lines == 0
-                // Only applies to methods.
-                && matches!(line.kind,  LogicalLineKind::Function | LogicalLineKind::Decorator)
-                // Allow groups of one-liners.
-                && !(matches!(state.follows, Follows::Def) && !matches!(line.last_token, TokenKind::Colon))
-                && matches!(state.class_status, Status::Inside(_))
-                // The class/parent method's docstring can directly precede the def.
-                // Allow following a decorator (if there is an error it will be triggered on the first decorator).
-                && !matches!(state.follows, Follows::Docstring | Follows::Decorator)
-                // Do not trigger when the def follows an if/while/etc...
-                && prev_indent_length.is_some_and(|prev_indent_length| prev_indent_length >= line.indent_length)
+            // Only applies to methods.
+            && matches!(line.kind,  LogicalLineKind::Function | LogicalLineKind::Decorator)
+            // Allow groups of one-liners.
+            && !(matches!(state.follows, Follows::Def) && !matches!(line.last_token, TokenKind::Colon))
+            && matches!(state.class_status, Status::Inside(_))
+            // The class/parent method's docstring can directly precede the def.
+            // Allow following a decorator (if there is an error it will be triggered on the first decorator).
+            && !matches!(state.follows, Follows::Docstring | Follows::Decorator)
+            // Do not trigger when the def follows an if/while/etc...
+            && prev_indent_length.is_some_and(|prev_indent_length| prev_indent_length >= line.indent_length)
         {
             // E301
             let mut diagnostic = Diagnostic::new(BlankLineBetweenMethods, line.first_token_range);
@@ -766,14 +766,14 @@ impl<'a> BlankLinesChecker<'a> {
         };
 
         if line.preceding_blank_lines < expected_blank_lines_before_definition
-                // Allow following a decorator (if there is an error it will be triggered on the first decorator).
-                && !matches!(state.follows, Follows::Decorator)
-                // Allow groups of one-liners.
-                && !(matches!(state.follows, Follows::Def) && !matches!(line.last_token, TokenKind::Colon))
-                // Only trigger on non-indented classes and functions (for example functions within an if are ignored)
-                && line.indent_length == 0
-                // Only apply to functions or classes.
-                && line.kind.is_class_function_or_decorator()
+            // Allow following a decorator (if there is an error it will be triggered on the first decorator).
+            && !matches!(state.follows, Follows::Decorator)
+            // Allow groups of one-liners.
+            && !(matches!(state.follows, Follows::Def) && !matches!(line.last_token, TokenKind::Colon))
+            // Only trigger on non-indented classes and functions (for example functions within an if are ignored)
+            && line.indent_length == 0
+            // Only apply to functions or classes.
+            && line.kind.is_class_function_or_decorator()
         {
             // E302
             let mut diagnostic = Diagnostic::new(
@@ -925,17 +925,17 @@ impl<'a> BlankLinesChecker<'a> {
         }
 
         if line.preceding_blank_lines == 0
-                // Only apply to nested functions.
-                && matches!(state.fn_status, Status::Inside(_))
-                && line.kind.is_class_function_or_decorator()
-                // Allow following a decorator (if there is an error it will be triggered on the first decorator).
-                && !matches!(state.follows, Follows::Decorator)
-                // The class's docstring can directly precede the first function.
-                && !matches!(state.follows, Follows::Docstring)
-                // Do not trigger when the def/class follows an "indenting token" (if/while/etc...).
-                && prev_indent_length.is_some_and(|prev_indent_length| prev_indent_length >= line.indent_length)
-                // Allow groups of one-liners.
-                && !(matches!(state.follows, Follows::Def) && line.last_token != TokenKind::Colon)
+            // Only apply to nested functions.
+            && matches!(state.fn_status, Status::Inside(_))
+            && line.kind.is_class_function_or_decorator()
+            // Allow following a decorator (if there is an error it will be triggered on the first decorator).
+            && !matches!(state.follows, Follows::Decorator)
+            // The class's docstring can directly precede the first function.
+            && !matches!(state.follows, Follows::Docstring)
+            // Do not trigger when the def/class follows an "indenting token" (if/while/etc...).
+            && prev_indent_length.is_some_and(|prev_indent_length| prev_indent_length >= line.indent_length)
+            // Allow groups of one-liners.
+            && !(matches!(state.follows, Follows::Def) && line.last_token != TokenKind::Colon)
         {
             // E306
             let mut diagnostic =
