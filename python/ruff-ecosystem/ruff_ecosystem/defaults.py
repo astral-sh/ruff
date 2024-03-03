@@ -110,7 +110,8 @@ DEFAULT_TARGETS = [
             "include": ["*.ipynb"],
             # TODO(charlie): Re-enable after fixing typo.
             "exclude": [
-                "examples/dalle/Image_generations_edits_and_variations_with_DALL-E.ipynb"
+                "examples/dalle/Image_generations_edits_and_variations_with_DALL-E.ipynb",
+                "examples/How_to_handle_rate_limits.ipynb",
             ],
         },
     ),
