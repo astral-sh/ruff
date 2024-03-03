@@ -933,3 +933,42 @@ include = ["*.ipy"]
 
     Ok(())
 }
+
+#[test]
+fn file_noqa_external() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+external = ["AAA"]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+# flake8: noqa: AAA101, BBB102
+import os
+"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:3:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Invalid rule code provided to `# ruff: noqa` at -:2: BBB102
+    "###);
+    });
+
+    Ok(())
+}
