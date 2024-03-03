@@ -1,11 +1,10 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
 
-use ruff_diagnostics::{Diagnostic, Edit, Violation};
-use ruff_diagnostics::{DiagnosticKind, Fix};
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::function_type;
-use ruff_python_semantic::{Scope, ScopeKind};
+use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -148,7 +147,7 @@ impl Argumentable {
         }
     }
 
-    fn valid_argument_name(self) -> &'static str {
+    const fn valid_argument_name(self) -> &'static str {
         match self {
             Self::Method => "self",
             Self::ClassMethod => "cls",
@@ -172,7 +171,6 @@ pub(crate) fn invalid_first_argument_name(
     let ScopeKind::Function(ast::StmtFunctionDef {
         name,
         parameters,
-        // body,
         decorator_list,
         ..
     }) = &scope.kind
@@ -202,7 +200,10 @@ pub(crate) fn invalid_first_argument_name(
         return;
     }
 
-    let Some(ParameterWithDefault { parameter, .. }) = parameters
+    let Some(ParameterWithDefault {
+        parameter: first_parameter,
+        ..
+    }) = parameters
         .posonlyargs
         .first()
         .or_else(|| parameters.args.first())
@@ -210,36 +211,62 @@ pub(crate) fn invalid_first_argument_name(
         return;
     };
 
-    if &parameter.name == argumentable.valid_argument_name() {
+    if &first_parameter.name == argumentable.valid_argument_name() {
         return;
     }
     if checker.settings.pep8_naming.ignore_names.matches(name) {
         return;
     }
 
-    let fix = if let Some(bid) = scope.get(&parameter.name) {
-        let binding = checker.semantic().binding(bid);
-        let replacement = argumentable.valid_argument_name();
-        let fix = Fix::unsafe_edits(
-            Edit::range_replacement(replacement.to_string(), binding.range()),
-            binding
-                .references()
-                .map(|rid| checker.semantic().reference(rid))
-                .map(|reference| {
-                    Edit::range_replacement(replacement.to_string(), reference.range())
-                }),
-        );
-        Some(fix)
-    } else {
-        None
-    };
-
     let mut diagnostic = Diagnostic::new(
-        argumentable.check_for(parameter.name.to_string()),
-        parameter.range(),
+        argumentable.check_for(first_parameter.name.to_string()),
+        first_parameter.range(),
     );
-    if let Some(fix) = fix {
-        diagnostic.set_fix(fix);
-    }
+    diagnostic.try_set_optional_fix(|| {
+        Ok(try_fix(
+            scope,
+            first_parameter,
+            parameters,
+            checker.semantic(),
+            argumentable,
+        ))
+    });
     diagnostics.push(diagnostic);
+}
+
+fn try_fix(
+    scope: &Scope<'_>,
+    first_parameter: &ast::Parameter,
+    parameters: &ast::Parameters,
+    semantic: &SemanticModel<'_>,
+    argumentable: Argumentable,
+) -> Option<Fix> {
+    // Don't fix if another parameter has the valid name.
+    if let Some(_) = parameters
+        .posonlyargs
+        .iter()
+        .chain(&parameters.args)
+        .chain(&parameters.kwonlyargs)
+        .skip(1)
+        .map(|parameter_with_default| &parameter_with_default.parameter)
+        .chain(parameters.vararg.as_deref().into_iter())
+        .chain(parameters.kwarg.as_deref().into_iter())
+        .find(|p| &p.name == argumentable.valid_argument_name())
+    {
+        return None;
+    }
+
+    let binding = scope
+        .get_all(&first_parameter.name)
+        .map(|id| semantic.binding(id))
+        .find(|b| b.kind.is_argument())?;
+    let replacement = argumentable.valid_argument_name();
+    let fix = Fix::unsafe_edits(
+        Edit::range_replacement(replacement.to_string(), binding.range()),
+        binding
+            .references()
+            .map(|rid| semantic.reference(rid))
+            .map(|reference| Edit::range_replacement(replacement.to_string(), reference.range())),
+    );
+    Some(fix)
 }
