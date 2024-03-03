@@ -407,6 +407,7 @@ pub fn add_noqa_to_path(
         &diagnostics.0,
         &locator,
         indexer.comment_ranges(),
+        &settings.external,
         &directives.noqa_line_for,
         stylist.line_ending(),
     )
