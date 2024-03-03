@@ -320,11 +320,8 @@ impl<'a> Checker<'a> {
     }
 }
 
-impl<'a, 'b> Visitor<'b> for Checker<'a>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> Visitor<'a> for Checker<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
 
@@ -922,14 +919,14 @@ where
         self.last_stmt_end = stmt.end();
     }
 
-    fn visit_annotation(&mut self, expr: &'b Expr) {
+    fn visit_annotation(&mut self, expr: &'a Expr) {
         let flags_snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::TYPING_ONLY_ANNOTATION;
         self.visit_type_definition(expr);
         self.semantic.flags = flags_snapshot;
     }
 
-    fn visit_expr(&mut self, expr: &'b Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr) {
         // Step 0: Pre-processing
         if !self.semantic.in_typing_literal()
             && !self.semantic.in_deferred_type_definition()
@@ -1403,7 +1400,7 @@ where
         self.semantic.pop_node();
     }
 
-    fn visit_except_handler(&mut self, except_handler: &'b ExceptHandler) {
+    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
         let flags_snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
 
@@ -1453,7 +1450,7 @@ where
         self.semantic.flags = flags_snapshot;
     }
 
-    fn visit_parameters(&mut self, parameters: &'b Parameters) {
+    fn visit_parameters(&mut self, parameters: &'a Parameters) {
         // Step 1: Binding.
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
@@ -1477,7 +1474,7 @@ where
         analyze::parameters(parameters, self);
     }
 
-    fn visit_parameter(&mut self, parameter: &'b Parameter) {
+    fn visit_parameter(&mut self, parameter: &'a Parameter) {
         // Step 1: Binding.
         // Bind, but intentionally avoid walking the annotation, as we handle it
         // upstream.
@@ -1492,7 +1489,7 @@ where
         analyze::parameter(parameter, self);
     }
 
-    fn visit_pattern(&mut self, pattern: &'b Pattern) {
+    fn visit_pattern(&mut self, pattern: &'a Pattern) {
         // Step 1: Binding
         if let Pattern::MatchAs(ast::PatternMatchAs {
             name: Some(name), ..
@@ -1517,7 +1514,7 @@ where
         walk_pattern(self, pattern);
     }
 
-    fn visit_body(&mut self, body: &'b [Stmt]) {
+    fn visit_body(&mut self, body: &'a [Stmt]) {
         // Step 4: Analysis
         analyze::suite(body, self);
 
@@ -1527,7 +1524,7 @@ where
         }
     }
 
-    fn visit_match_case(&mut self, match_case: &'b MatchCase) {
+    fn visit_match_case(&mut self, match_case: &'a MatchCase) {
         self.visit_pattern(&match_case.pattern);
         if let Some(expr) = &match_case.guard {
             self.visit_boolean_test(expr);
@@ -1538,7 +1535,7 @@ where
         self.semantic.pop_branch();
     }
 
-    fn visit_type_param(&mut self, type_param: &'b ast::TypeParam) {
+    fn visit_type_param(&mut self, type_param: &'a ast::TypeParam) {
         // Step 1: Binding
         match type_param {
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, range, .. })
@@ -1563,7 +1560,7 @@ where
         }
     }
 
-    fn visit_f_string_element(&mut self, f_string_element: &'b ast::FStringElement) {
+    fn visit_f_string_element(&mut self, f_string_element: &'a ast::FStringElement) {
         // Step 2: Traversal
         walk_f_string_element(self, f_string_element);
 

@@ -102,10 +102,7 @@ impl<'a> GroupNameFinder<'a> {
     }
 }
 
-impl<'a, 'b> Visitor<'b> for GroupNameFinder<'a>
-where
-    'b: 'a,
-{
+impl<'a> Visitor<'a> for GroupNameFinder<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         if self.overridden {
             return;
