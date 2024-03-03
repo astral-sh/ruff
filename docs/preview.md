@@ -80,7 +80,7 @@ config file or only using the `--select` flag on the CLI:
 === "CLI"
 
     ```console
-    ruff check . --select HYP001
+    ruff check . --extend-select HYP001
     ```
 
 
@@ -103,7 +103,7 @@ It also would _not_ be enabled by selecting the `HYP` category, like so:
 === "CLI"
 
     ```console
-    ruff check . --select HYP
+    ruff check . --extend-select HYP
     ```
 
 
@@ -150,7 +150,7 @@ However, it would be enabled in any of the above cases if you enabled preview in
 === "CLI"
 
     ```console
-    ruff check . --select HYP --preview
+    ruff check . --extend-select HYP --preview
     ```
 
 To see which rules are currently in preview, visit the [rules reference](rules.md).
