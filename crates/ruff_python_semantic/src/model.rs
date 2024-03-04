@@ -25,6 +25,9 @@ use crate::reference::{
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 use crate::Imported;
 
+// pub trait Captures<U> {}
+// impl<T: ?Sized, U> Captures<U> for T {}
+
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
     typing_modules: &'a [String],
@@ -692,8 +695,12 @@ impl<'a> SemanticModel<'a> {
             BindingKind::Import(Import { qualified_name }) => {
                 let unqualified_name = UnqualifiedName::from_expr(value)?;
                 let (_, tail) = unqualified_name.segments().split_first()?;
-                let resolved: QualifiedName =
-                    qualified_name.iter().chain(tail.iter()).copied().collect();
+                let resolved: QualifiedName = qualified_name
+                    .segments()
+                    .iter()
+                    .chain(tail.iter())
+                    .copied()
+                    .collect();
                 Some(resolved)
             }
             BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
@@ -702,6 +709,7 @@ impl<'a> SemanticModel<'a> {
 
                 Some(
                     qualified_name
+                        .segments()
                         .iter()
                         .take(1)
                         .chain(tail.iter())
@@ -714,12 +722,18 @@ impl<'a> SemanticModel<'a> {
                 let (_, tail) = value_name.segments().split_first()?;
 
                 let resolved: QualifiedName = if qualified_name
+                    .segments()
                     .first()
                     .map_or(false, |segment| *segment == ".")
                 {
-                    from_relative_import(self.module_path?, qualified_name, tail)?
+                    from_relative_import(self.module_path?, qualified_name.segments(), tail)?
                 } else {
-                    qualified_name.iter().chain(tail.iter()).copied().collect()
+                    qualified_name
+                        .segments()
+                        .iter()
+                        .chain(tail.iter())
+                        .copied()
+                        .collect()
                 };
                 Some(resolved)
             }
@@ -780,7 +794,7 @@ impl<'a> SemanticModel<'a> {
                         // `import sys`         -> `sys.exit`
                         // `import sys as sys2` -> `sys2.exit`
                         BindingKind::Import(Import { qualified_name }) => {
-                            if qualified_name.as_ref() == module_path.as_slice() {
+                            if qualified_name.segments() == module_path.as_slice() {
                                 if let Some(source) = binding.source {
                                     // Verify that `sys` isn't bound in an inner scope.
                                     if self
@@ -803,7 +817,7 @@ impl<'a> SemanticModel<'a> {
                         // `from os.path import join as join2` -> `join2`
                         BindingKind::FromImport(FromImport { qualified_name }) => {
                             if let Some((target_member, target_module)) =
-                                qualified_name.split_last()
+                                qualified_name.segments().split_last()
                             {
                                 if target_module == module_path.as_slice()
                                     && target_member == &member
@@ -831,7 +845,7 @@ impl<'a> SemanticModel<'a> {
                         // Ex) Given `module="os.path"` and `object="join"`:
                         // `import os.path ` -> `os.path.join`
                         BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
-                            if qualified_name.starts_with(&module_path) {
+                            if qualified_name.segments().starts_with(&module_path) {
                                 if let Some(source) = binding.source {
                                     // Verify that `os` isn't bound in an inner scope.
                                     if self
@@ -959,6 +973,7 @@ impl<'a> SemanticModel<'a> {
     /// Returns an [`Iterator`] over the current statement hierarchy represented as [`NodeId`],
     /// from the current [`NodeId`] through to any parents.
     pub fn current_statement_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
+        // ) -> impl Iterator<Item = NodeId> + Captures<(&'a (), &'_ ())> {
         self.node_id
             .iter()
             .flat_map(|id| self.nodes.ancestor_ids(*id))
@@ -1555,6 +1570,7 @@ impl<'a> SemanticModel<'a> {
         scope_id: ScopeId,
         binding_id: BindingId,
     ) -> impl Iterator<Item = ShadowedBinding> + '_ {
+        // ) -> impl Iterator<Item = ShadowedBinding> + Captures<(&'a (), &'_ ())> {
         let mut first = true;
         let mut binding_id = binding_id;
         std::iter::from_fn(move || {
