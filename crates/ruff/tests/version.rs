@@ -1,4 +1,4 @@
-//! Tests the --version command
+//! Tests for the --version command
 use std::fs;
 use std::process::Command;
 

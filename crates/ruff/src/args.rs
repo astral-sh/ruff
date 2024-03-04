@@ -730,7 +730,6 @@ impl FormatCommand {
         };
 
         let config_args = ConfigArguments::from_cli_arguments(global_options, cli_overrides)?;
-
         Ok((format_arguments, config_args))
     }
 }
