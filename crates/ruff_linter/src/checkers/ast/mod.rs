@@ -418,11 +418,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.semantic.add_module(module);
 
                     if alias.asname.is_none() && alias.name.contains('.') {
-                        let call_path: Box<[&str]> = alias.name.split('.').collect();
+                        let qualified_name: Box<[&str]> = alias.name.split('.').collect();
                         self.add_binding(
                             module,
                             alias.identifier(),
-                            BindingKind::SubmoduleImport(SubmoduleImport { call_path }),
+                            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }),
                             BindingFlags::EXTERNAL,
                         );
                     } else {
@@ -439,11 +439,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
 
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let call_path: Box<[&str]> = alias.name.split('.').collect();
+                        let qualified_name: Box<[&str]> = alias.name.split('.').collect();
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::Import(Import { call_path }),
+                            BindingKind::Import(Import { qualified_name }),
                             flags,
                         );
                     }
@@ -503,12 +503,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         // Attempt to resolve any relative imports; but if we don't know the current
                         // module path, or the relative import extends beyond the package root,
                         // fallback to a literal representation (e.g., `[".", "foo"]`).
-                        let call_path = collect_import_from_member(level, module, &alias.name)
+                        let qualified_name = collect_import_from_member(level, module, &alias.name)
                             .into_boxed_slice();
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::FromImport(FromImport { call_path }),
+                            BindingKind::FromImport(FromImport { qualified_name }),
                             flags,
                         );
                     }
@@ -751,8 +751,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }) => {
                 let mut handled_exceptions = Exceptions::empty();
                 for type_ in extract_handled_exceptions(handlers) {
-                    if let Some(call_path) = self.semantic.resolve_call_path(type_) {
-                        match call_path.segments() {
+                    if let Some(qualified_name) = self.semantic.resolve_qualified_name(type_) {
+                        match qualified_name.segments() {
                             ["", "NameError"] => {
                                 handled_exceptions |= Exceptions::NAME_ERROR;
                             }
@@ -1065,42 +1065,54 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }) => {
                 self.visit_expr(func);
 
-                let callable = self.semantic.resolve_call_path(func).and_then(|call_path| {
-                    if self.semantic.match_typing_call_path(&call_path, "cast") {
-                        Some(typing::Callable::Cast)
-                    } else if self.semantic.match_typing_call_path(&call_path, "NewType") {
-                        Some(typing::Callable::NewType)
-                    } else if self.semantic.match_typing_call_path(&call_path, "TypeVar") {
-                        Some(typing::Callable::TypeVar)
-                    } else if self
-                        .semantic
-                        .match_typing_call_path(&call_path, "NamedTuple")
-                    {
-                        Some(typing::Callable::NamedTuple)
-                    } else if self
-                        .semantic
-                        .match_typing_call_path(&call_path, "TypedDict")
-                    {
-                        Some(typing::Callable::TypedDict)
-                    } else if matches!(
-                        call_path.segments(),
-                        [
-                            "mypy_extensions",
-                            "Arg"
-                                | "DefaultArg"
-                                | "NamedArg"
-                                | "DefaultNamedArg"
-                                | "VarArg"
-                                | "KwArg"
-                        ]
-                    ) {
-                        Some(typing::Callable::MypyExtension)
-                    } else if matches!(call_path.segments(), ["", "bool"]) {
-                        Some(typing::Callable::Bool)
-                    } else {
-                        None
-                    }
-                });
+                let callable =
+                    self.semantic
+                        .resolve_qualified_name(func)
+                        .and_then(|qualified_name| {
+                            if self
+                                .semantic
+                                .match_typing_qualified_name(&qualified_name, "cast")
+                            {
+                                Some(typing::Callable::Cast)
+                            } else if self
+                                .semantic
+                                .match_typing_qualified_name(&qualified_name, "NewType")
+                            {
+                                Some(typing::Callable::NewType)
+                            } else if self
+                                .semantic
+                                .match_typing_qualified_name(&qualified_name, "TypeVar")
+                            {
+                                Some(typing::Callable::TypeVar)
+                            } else if self
+                                .semantic
+                                .match_typing_qualified_name(&qualified_name, "NamedTuple")
+                            {
+                                Some(typing::Callable::NamedTuple)
+                            } else if self
+                                .semantic
+                                .match_typing_qualified_name(&qualified_name, "TypedDict")
+                            {
+                                Some(typing::Callable::TypedDict)
+                            } else if matches!(
+                                qualified_name.segments(),
+                                [
+                                    "mypy_extensions",
+                                    "Arg"
+                                        | "DefaultArg"
+                                        | "NamedArg"
+                                        | "DefaultNamedArg"
+                                        | "VarArg"
+                                        | "KwArg"
+                                ]
+                            ) {
+                                Some(typing::Callable::MypyExtension)
+                            } else if matches!(qualified_name.segments(), ["", "bool"]) {
+                                Some(typing::Callable::Bool)
+                            } else {
+                                None
+                            }
+                        });
                 match callable {
                     Some(typing::Callable::Bool) => {
                         let mut args = arguments.args.iter();

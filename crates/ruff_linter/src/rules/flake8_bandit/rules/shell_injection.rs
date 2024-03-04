@@ -419,8 +419,8 @@ enum CallKind {
 /// Return the [`CallKind`] of the given function call.
 fn get_call_kind(func: &Expr, semantic: &SemanticModel) -> Option<CallKind> {
     semantic
-        .resolve_call_path(func)
-        .and_then(|call_path| match call_path.segments() {
+        .resolve_qualified_name(func)
+        .and_then(|qualified_name| match qualified_name.segments() {
             &[module, submodule] => match module {
                 "os" => match submodule {
                     "execl" | "execle" | "execlp" | "execlpe" | "execv" | "execve" | "execvp"

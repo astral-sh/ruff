@@ -101,24 +101,25 @@ pub(crate) fn type_bivariance(checker: &mut Checker, value: &Expr) {
     };
 
     if is_const_true(covariant) && is_const_true(contravariant) {
-        let Some(kind) = checker
-            .semantic()
-            .resolve_call_path(func)
-            .and_then(|call_path| {
-                if checker
-                    .semantic()
-                    .match_typing_call_path(&call_path, "ParamSpec")
-                {
-                    Some(VarKind::ParamSpec)
-                } else if checker
-                    .semantic()
-                    .match_typing_call_path(&call_path, "TypeVar")
-                {
-                    Some(VarKind::TypeVar)
-                } else {
-                    None
-                }
-            })
+        let Some(kind) =
+            checker
+                .semantic()
+                .resolve_qualified_name(func)
+                .and_then(|qualified_name| {
+                    if checker
+                        .semantic()
+                        .match_typing_qualified_name(&qualified_name, "ParamSpec")
+                    {
+                        Some(VarKind::ParamSpec)
+                    } else if checker
+                        .semantic()
+                        .match_typing_qualified_name(&qualified_name, "TypeVar")
+                    {
+                        Some(VarKind::TypeVar)
+                    } else {
+                        None
+                    }
+                })
         else {
             return;
         };

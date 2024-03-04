@@ -202,9 +202,14 @@ fn is_allowed_value(bool_op: BoolOp, value: &Expr, semantic: &SemanticModel) -> 
     // Ignore `sys.version_info` and `sys.platform` comparisons, which are only
     // respected by type checkers when enforced via equality.
     if any_over_expr(value, &|expr| {
-        semantic.resolve_call_path(expr).is_some_and(|call_path| {
-            matches!(call_path.segments(), ["sys", "version_info" | "platform"])
-        })
+        semantic
+            .resolve_qualified_name(expr)
+            .is_some_and(|qualified_name| {
+                matches!(
+                    qualified_name.segments(),
+                    ["sys", "version_info" | "platform"]
+                )
+            })
     }) {
         return false;
     }

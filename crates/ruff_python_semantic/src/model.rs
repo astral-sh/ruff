@@ -3,8 +3,8 @@ use std::path::Path;
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 
-use ruff_python_ast::call_path::{CallPath, CallPathBuilder};
 use ruff_python_ast::helpers::from_relative_import;
+use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder, UnqualifiedName};
 use ruff_python_ast::{self as ast, Expr, Operator, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -173,25 +173,31 @@ impl<'a> SemanticModel<'a> {
     pub fn match_typing_expr(&self, expr: &Expr, target: &str) -> bool {
         self.seen_typing()
             && self
-                .resolve_call_path(expr)
-                .is_some_and(|call_path| self.match_typing_call_path(&call_path, target))
+                .resolve_qualified_name(expr)
+                .is_some_and(|qualified_name| {
+                    self.match_typing_qualified_name(&qualified_name, target)
+                })
     }
 
     /// Return `true` if the call path is a reference to `typing.${target}`.
-    pub fn match_typing_call_path(&self, call_path: &CallPath, target: &str) -> bool {
+    pub fn match_typing_qualified_name(
+        &self,
+        qualified_name: &QualifiedName,
+        target: &str,
+    ) -> bool {
         if matches!(
-            call_path.segments(),
+            qualified_name.segments(),
             ["typing" | "_typeshed" | "typing_extensions", member] if *member == target
         ) {
             return true;
         }
 
         if self.typing_modules.iter().any(|module| {
-            let module = CallPath::from_unqualified_name(module);
-            let mut builder = CallPathBuilder::from_path(module);
+            let module = QualifiedName::from_dotted_name(module);
+            let mut builder = QualifiedNameBuilder::from_qualified_name(module);
             builder.push(target);
             let target_path = builder.build();
-            call_path == &target_path
+            qualified_name == &target_path
         }) {
             return true;
         }
@@ -568,10 +574,10 @@ impl<'a> SemanticModel<'a> {
     /// associated with `Class`, then the `BindingKind::FunctionDefinition` associated with
     /// `Class.method`.
     pub fn lookup_attribute(&self, value: &Expr) -> Option<BindingId> {
-        let call_path = CallPath::from_expr(value)?;
+        let unqualified_name = UnqualifiedName::from_expr(value)?;
 
         // Find the symbol in the current scope.
-        let (symbol, attribute) = call_path.segments().split_first()?;
+        let (symbol, attribute) = unqualified_name.segments().split_first()?;
         let mut binding_id = self.lookup_symbol(symbol)?;
 
         // Recursively resolve class attributes, e.g., `foo.bar.baz` in.
@@ -659,10 +665,10 @@ impl<'a> SemanticModel<'a> {
     /// ```
     ///
     /// ...then `resolve_call_path(${python_version})` will resolve to `sys.version_info`.
-    pub fn resolve_call_path<'name, 'expr: 'name>(
+    pub fn resolve_qualified_name<'name, 'expr: 'name>(
         &self,
         value: &'expr Expr,
-    ) -> Option<CallPath<'name>>
+    ) -> Option<QualifiedName<'name>>
     where
         'a: 'name,
     {
@@ -683,53 +689,61 @@ impl<'a> SemanticModel<'a> {
             .map(|id| self.binding(id))?;
 
         match &binding.kind {
-            BindingKind::Import(Import { call_path }) => {
-                let value_path = CallPath::from_expr(value)?;
-                let (_, tail) = value_path.segments().split_first()?;
-                let resolved: CallPath = call_path.iter().chain(tail.iter()).copied().collect();
+            BindingKind::Import(Import { qualified_name }) => {
+                let unqualified_name = UnqualifiedName::from_expr(value)?;
+                let (_, tail) = unqualified_name.segments().split_first()?;
+                let resolved: QualifiedName =
+                    qualified_name.iter().chain(tail.iter()).copied().collect();
                 Some(resolved)
             }
-            BindingKind::SubmoduleImport(SubmoduleImport { call_path }) => {
-                let value_path = CallPath::from_expr(value)?;
-                let (_, tail) = value_path.segments().split_first()?;
-                let mut builder = CallPathBuilder::with_capacity(1 + tail.len());
-                builder.extend(call_path.iter().copied().take(1));
-                builder.extend(tail.iter().copied());
-                Some(builder.build())
-            }
-            BindingKind::FromImport(FromImport { call_path }) => {
-                let value_path = CallPath::from_expr(value)?;
-                let (_, tail) = value_path.segments().split_first()?;
+            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
+                let value_name = UnqualifiedName::from_expr(value)?;
+                let (_, tail) = value_name.segments().split_first()?;
 
-                let resolved: CallPath =
-                    if call_path.first().map_or(false, |segment| *segment == ".") {
-                        from_relative_import(self.module_path?, call_path, tail)?
-                    } else {
-                        call_path.iter().chain(tail.iter()).copied().collect()
-                    };
+                Some(
+                    qualified_name
+                        .iter()
+                        .take(1)
+                        .chain(tail.iter())
+                        .copied()
+                        .collect(),
+                )
+            }
+            BindingKind::FromImport(FromImport { qualified_name }) => {
+                let value_name = UnqualifiedName::from_expr(value)?;
+                let (_, tail) = value_name.segments().split_first()?;
+
+                let resolved: QualifiedName = if qualified_name
+                    .first()
+                    .map_or(false, |segment| *segment == ".")
+                {
+                    from_relative_import(self.module_path?, qualified_name, tail)?
+                } else {
+                    qualified_name.iter().chain(tail.iter()).copied().collect()
+                };
                 Some(resolved)
             }
             BindingKind::Builtin => {
                 if value.is_name_expr() {
                     // Ex) `dict`
-                    Some(CallPath::from_slice(&["", head.id.as_str()]))
+                    Some(QualifiedName::from_slice(&["", head.id.as_str()]))
                 } else {
                     // Ex) `dict.__dict__`
-                    let value_path = CallPath::from_expr(value)?;
+                    let value_name = UnqualifiedName::from_expr(value)?;
                     Some(
                         std::iter::once("")
-                            .chain(value_path.segments().iter().copied())
+                            .chain(value_name.segments().iter().copied())
                             .collect(),
                     )
                 }
             }
             BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {
-                let value_path = CallPath::from_expr(value)?;
-                let resolved: CallPath = self
+                let value_name = UnqualifiedName::from_expr(value)?;
+                let resolved: QualifiedName = self
                     .module_path?
                     .iter()
                     .map(String::as_str)
-                    .chain(value_path.segments().iter().copied())
+                    .chain(value_name.segments().iter().copied())
                     .collect();
                 Some(resolved)
             }
@@ -765,8 +779,8 @@ impl<'a> SemanticModel<'a> {
                         // Ex) Given `module="sys"` and `object="exit"`:
                         // `import sys`         -> `sys.exit`
                         // `import sys as sys2` -> `sys2.exit`
-                        BindingKind::Import(Import { call_path }) => {
-                            if call_path.as_ref() == module_path.as_slice() {
+                        BindingKind::Import(Import { qualified_name }) => {
+                            if qualified_name.as_ref() == module_path.as_slice() {
                                 if let Some(source) = binding.source {
                                     // Verify that `sys` isn't bound in an inner scope.
                                     if self
@@ -787,8 +801,10 @@ impl<'a> SemanticModel<'a> {
                         // Ex) Given `module="os.path"` and `object="join"`:
                         // `from os.path import join`          -> `join`
                         // `from os.path import join as join2` -> `join2`
-                        BindingKind::FromImport(FromImport { call_path }) => {
-                            if let Some((target_member, target_module)) = call_path.split_last() {
+                        BindingKind::FromImport(FromImport { qualified_name }) => {
+                            if let Some((target_member, target_module)) =
+                                qualified_name.split_last()
+                            {
                                 if target_module == module_path.as_slice()
                                     && target_member == &member
                                 {
@@ -814,8 +830,8 @@ impl<'a> SemanticModel<'a> {
                         // `import os.path ` -> `os.name`
                         // Ex) Given `module="os.path"` and `object="join"`:
                         // `import os.path ` -> `os.path.join`
-                        BindingKind::SubmoduleImport(SubmoduleImport { call_path }) => {
-                            if call_path.starts_with(&module_path) {
+                        BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
+                            if qualified_name.starts_with(&module_path) {
                                 if let Some(source) = binding.source {
                                     // Verify that `os` isn't bound in an inner scope.
                                     if self

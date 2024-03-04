@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::call_path::format_call_path_segments;
+use ruff_python_ast::name::format_qualified_name_segments;
 use ruff_python_ast::Stmt;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -125,38 +125,38 @@ impl<'a> Binding<'a> {
             // import foo.baz
             // ```
             BindingKind::Import(Import {
-                call_path: redefinition,
+                qualified_name: redefinition,
             }) => {
                 if let BindingKind::SubmoduleImport(SubmoduleImport {
-                    call_path: definition,
+                    qualified_name: definition,
                 }) = &existing.kind
                 {
                     return redefinition == definition;
                 }
             }
             BindingKind::FromImport(FromImport {
-                call_path: redefinition,
+                qualified_name: redefinition,
             }) => {
                 if let BindingKind::SubmoduleImport(SubmoduleImport {
-                    call_path: definition,
+                    qualified_name: definition,
                 }) = &existing.kind
                 {
                     return redefinition == definition;
                 }
             }
             BindingKind::SubmoduleImport(SubmoduleImport {
-                call_path: redefinition,
+                qualified_name: redefinition,
             }) => match &existing.kind {
                 BindingKind::Import(Import {
-                    call_path: definition,
+                    qualified_name: definition,
                 })
                 | BindingKind::SubmoduleImport(SubmoduleImport {
-                    call_path: definition,
+                    qualified_name: definition,
                 }) => {
                     return redefinition == definition;
                 }
                 BindingKind::FromImport(FromImport {
-                    call_path: definition,
+                    qualified_name: definition,
                 }) => {
                     return redefinition == definition;
                 }
@@ -362,7 +362,7 @@ pub struct Import<'a> {
     /// The full name of the module being imported.
     /// Ex) Given `import foo`, `qualified_name` would be "foo".
     /// Ex) Given `import foo as bar`, `qualified_name` would be "foo".
-    pub call_path: Box<[&'a str]>,
+    pub qualified_name: Box<[&'a str]>,
 }
 
 /// A binding for a member imported from a module, keyed on the name to which the member is bound.
@@ -373,7 +373,7 @@ pub struct FromImport<'a> {
     /// The full name of the member being imported.
     /// Ex) Given `from foo import bar`, `qualified_name` would be "foo.bar".
     /// Ex) Given `from foo import bar as baz`, `qualified_name` would be "foo.bar".
-    pub call_path: Box<[&'a str]>,
+    pub qualified_name: Box<[&'a str]>,
 }
 
 /// A binding for a submodule imported from a module, keyed on the name of the parent module.
@@ -382,7 +382,7 @@ pub struct FromImport<'a> {
 pub struct SubmoduleImport<'a> {
     /// The full name of the submodule being imported.
     /// Ex) Given `import foo.bar`, `qualified_name` would be "foo.bar".
-    pub call_path: Box<[&'a str]>,
+    pub qualified_name: Box<[&'a str]>,
 }
 
 #[derive(Debug, Clone, is_macro::Is)]
@@ -561,7 +561,7 @@ pub trait Imported<'a> {
     /// Returns the fully-qualified name of the imported symbol.
     fn qualified_name(&self) -> String {
         let mut output = String::new();
-        format_call_path_segments(self.call_path(), &mut output).unwrap();
+        format_qualified_name_segments(self.call_path(), &mut output).unwrap();
         output
     }
 }
@@ -569,12 +569,12 @@ pub trait Imported<'a> {
 impl<'a> Imported<'a> for Import<'a> {
     /// For example, given `import foo`, returns `["foo"]`.
     fn call_path(&self) -> &[&'a str] {
-        self.call_path.as_ref()
+        self.qualified_name.as_ref()
     }
 
     /// For example, given `import foo`, returns `["foo"]`.
     fn module_name(&self) -> &[&'a str] {
-        &self.call_path[..1]
+        &self.qualified_name[..1]
     }
 
     /// For example, given `import foo`, returns `"foo"`.
@@ -586,12 +586,12 @@ impl<'a> Imported<'a> for Import<'a> {
 impl<'a> Imported<'a> for SubmoduleImport<'a> {
     /// For example, given `import foo.bar`, returns `["foo", "bar"]`.
     fn call_path(&self) -> &[&'a str] {
-        self.call_path.as_ref()
+        self.qualified_name.as_ref()
     }
 
     /// For example, given `import foo.bar`, returns `["foo"]`.
     fn module_name(&self) -> &[&'a str] {
-        &self.call_path[..1]
+        &self.qualified_name[..1]
     }
 
     /// For example, given `import foo.bar`, returns `"foo.bar"`.
@@ -603,17 +603,17 @@ impl<'a> Imported<'a> for SubmoduleImport<'a> {
 impl<'a> Imported<'a> for FromImport<'a> {
     /// For example, given `from foo import bar`, returns `["foo", "bar"]`.
     fn call_path(&self) -> &[&'a str] {
-        &self.call_path
+        &self.qualified_name
     }
 
     /// For example, given `from foo import bar`, returns `["foo"]`.
     fn module_name(&self) -> &[&'a str] {
-        &self.call_path[..self.call_path.len() - 1]
+        &self.qualified_name[..self.qualified_name.len() - 1]
     }
 
     /// For example, given `from foo import bar`, returns `"bar"`.
     fn member_name(&self) -> Cow<'a, str> {
-        Cow::Borrowed(self.call_path[self.call_path.len() - 1])
+        Cow::Borrowed(self.qualified_name[self.qualified_name.len() - 1])
     }
 }
 

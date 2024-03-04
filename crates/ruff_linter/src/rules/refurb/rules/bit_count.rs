@@ -100,8 +100,8 @@ pub(crate) fn bit_count(checker: &mut Checker, call: &ExprCall) {
     // Ensure that we're performing a `bin(...)`.
     if !checker
         .semantic()
-        .resolve_call_path(func)
-        .is_some_and(|call_path| matches!(call_path.segments(), ["" | "builtins", "bin"]))
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["" | "builtins", "bin"]))
     {
         return;
     }

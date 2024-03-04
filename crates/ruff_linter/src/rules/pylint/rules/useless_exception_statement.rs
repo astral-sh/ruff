@@ -63,33 +63,35 @@ pub(crate) fn useless_exception_statement(checker: &mut Checker, expr: &ast::Stm
 ///
 /// See: <https://docs.python.org/3/library/exceptions.html#exception-hierarchy>
 fn is_builtin_exception(expr: &Expr, semantic: &SemanticModel) -> bool {
-    return semantic.resolve_call_path(expr).is_some_and(|call_path| {
-        matches!(
-            call_path.segments(),
-            [
-                "",
-                "SystemExit"
-                    | "Exception"
-                    | "ArithmeticError"
-                    | "AssertionError"
-                    | "AttributeError"
-                    | "BufferError"
-                    | "EOFError"
-                    | "ImportError"
-                    | "LookupError"
-                    | "IndexError"
-                    | "KeyError"
-                    | "MemoryError"
-                    | "NameError"
-                    | "ReferenceError"
-                    | "RuntimeError"
-                    | "NotImplementedError"
-                    | "StopIteration"
-                    | "SyntaxError"
-                    | "SystemError"
-                    | "TypeError"
-                    | "ValueError"
-            ]
-        )
-    });
+    return semantic
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                [
+                    "",
+                    "SystemExit"
+                        | "Exception"
+                        | "ArithmeticError"
+                        | "AssertionError"
+                        | "AttributeError"
+                        | "BufferError"
+                        | "EOFError"
+                        | "ImportError"
+                        | "LookupError"
+                        | "IndexError"
+                        | "KeyError"
+                        | "MemoryError"
+                        | "NameError"
+                        | "ReferenceError"
+                        | "RuntimeError"
+                        | "NotImplementedError"
+                        | "StopIteration"
+                        | "SyntaxError"
+                        | "SystemError"
+                        | "TypeError"
+                        | "ValueError"
+                ]
+            )
+        });
 }

@@ -61,18 +61,17 @@ impl Violation for HashlibInsecureHashFunction {
 
 /// S324
 pub(crate) fn hashlib_insecure_hash_functions(checker: &mut Checker, call: &ast::ExprCall) {
-    if let Some(hashlib_call) =
-        checker
-            .semantic()
-            .resolve_call_path(&call.func)
-            .and_then(|call_path| match call_path.segments() {
-                ["hashlib", "new"] => Some(HashlibCall::New),
-                ["hashlib", "md4"] => Some(HashlibCall::WeakHash("md4")),
-                ["hashlib", "md5"] => Some(HashlibCall::WeakHash("md5")),
-                ["hashlib", "sha"] => Some(HashlibCall::WeakHash("sha")),
-                ["hashlib", "sha1"] => Some(HashlibCall::WeakHash("sha1")),
-                _ => None,
-            })
+    if let Some(hashlib_call) = checker
+        .semantic()
+        .resolve_qualified_name(&call.func)
+        .and_then(|qualified_name| match qualified_name.segments() {
+            ["hashlib", "new"] => Some(HashlibCall::New),
+            ["hashlib", "md4"] => Some(HashlibCall::WeakHash("md4")),
+            ["hashlib", "md5"] => Some(HashlibCall::WeakHash("md5")),
+            ["hashlib", "sha"] => Some(HashlibCall::WeakHash("sha")),
+            ["hashlib", "sha1"] => Some(HashlibCall::WeakHash("sha1")),
+            _ => None,
+        })
     {
         if !is_used_for_security(&call.arguments) {
             return;
