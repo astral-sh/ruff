@@ -1126,3 +1126,47 @@ import os
 
     Ok(())
 }
+
+/// Expand environment variables in `--config` paths provided via the CLI.
+#[test]
+fn config_expand() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        ruff_toml,
+        r#"
+[lint]
+select = ["F"]
+ignore = ["F841"]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg("${NAME}.toml")
+        .env("NAME", "ruff")
+        .arg("-")
+        .current_dir(tempdir.path())
+        .pass_stdin(r#"
+import os
+
+def func():
+    x = 1
+"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:2:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    });
+
+    Ok(())
+}

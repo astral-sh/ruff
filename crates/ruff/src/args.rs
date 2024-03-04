@@ -812,14 +812,17 @@ impl TypedValueParser for ConfigArgumentParser {
         arg: Option<&clap::Arg>,
         value: &std::ffi::OsStr,
     ) -> Result<Self::Value, clap::Error> {
-        let path_to_config_file = PathBuf::from(value);
-        if path_to_config_file.exists() {
-            return Ok(SingleConfigArgument::FilePath(path_to_config_file));
-        }
-
         let value = value
             .to_str()
             .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
+
+        if let Ok(path_to_config_file) =
+            shellexpand::full(value).map(|config| PathBuf::from(config.as_ref()))
+        {
+            if path_to_config_file.is_file() {
+                return Ok(SingleConfigArgument::FilePath(path_to_config_file));
+            }
+        }
 
         let config_parse_error = match toml::Table::from_str(value) {
             Ok(table) => match table.try_into::<Options>() {
