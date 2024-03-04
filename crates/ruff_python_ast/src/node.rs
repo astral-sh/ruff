@@ -55,17 +55,17 @@ pub enum AnyNode {
     StmtContinue(ast::StmtContinue),
     StmtIpyEscapeCommand(ast::StmtIpyEscapeCommand),
     ExprBoolOp(ast::ExprBoolOp),
-    ExprNamedExpr(ast::ExprNamedExpr),
+    ExprNamed(ast::ExprNamed),
     ExprBinOp(ast::ExprBinOp),
     ExprUnaryOp(ast::ExprUnaryOp),
     ExprLambda(ast::ExprLambda),
-    ExprIfExp(ast::ExprIfExp),
+    ExprIf(ast::ExprIf),
     ExprDict(ast::ExprDict),
     ExprSet(ast::ExprSet),
     ExprListComp(ast::ExprListComp),
     ExprSetComp(ast::ExprSetComp),
     ExprDictComp(ast::ExprDictComp),
-    ExprGeneratorExp(ast::ExprGeneratorExp),
+    ExprGenerator(ast::ExprGenerator),
     ExprAwait(ast::ExprAwait),
     ExprYield(ast::ExprYield),
     ExprYieldFrom(ast::ExprYieldFrom),
@@ -152,17 +152,17 @@ impl AnyNode {
             AnyNode::ModModule(_)
             | AnyNode::ModExpression(_)
             | AnyNode::ExprBoolOp(_)
-            | AnyNode::ExprNamedExpr(_)
+            | AnyNode::ExprNamed(_)
             | AnyNode::ExprBinOp(_)
             | AnyNode::ExprUnaryOp(_)
             | AnyNode::ExprLambda(_)
-            | AnyNode::ExprIfExp(_)
+            | AnyNode::ExprIf(_)
             | AnyNode::ExprDict(_)
             | AnyNode::ExprSet(_)
             | AnyNode::ExprListComp(_)
             | AnyNode::ExprSetComp(_)
             | AnyNode::ExprDictComp(_)
-            | AnyNode::ExprGeneratorExp(_)
+            | AnyNode::ExprGenerator(_)
             | AnyNode::ExprAwait(_)
             | AnyNode::ExprYield(_)
             | AnyNode::ExprYieldFrom(_)
@@ -221,17 +221,17 @@ impl AnyNode {
     pub fn expression(self) -> Option<Expr> {
         match self {
             AnyNode::ExprBoolOp(node) => Some(Expr::BoolOp(node)),
-            AnyNode::ExprNamedExpr(node) => Some(Expr::NamedExpr(node)),
+            AnyNode::ExprNamed(node) => Some(Expr::Named(node)),
             AnyNode::ExprBinOp(node) => Some(Expr::BinOp(node)),
             AnyNode::ExprUnaryOp(node) => Some(Expr::UnaryOp(node)),
             AnyNode::ExprLambda(node) => Some(Expr::Lambda(node)),
-            AnyNode::ExprIfExp(node) => Some(Expr::IfExp(node)),
+            AnyNode::ExprIf(node) => Some(Expr::If(node)),
             AnyNode::ExprDict(node) => Some(Expr::Dict(node)),
             AnyNode::ExprSet(node) => Some(Expr::Set(node)),
             AnyNode::ExprListComp(node) => Some(Expr::ListComp(node)),
             AnyNode::ExprSetComp(node) => Some(Expr::SetComp(node)),
             AnyNode::ExprDictComp(node) => Some(Expr::DictComp(node)),
-            AnyNode::ExprGeneratorExp(node) => Some(Expr::GeneratorExp(node)),
+            AnyNode::ExprGenerator(node) => Some(Expr::Generator(node)),
             AnyNode::ExprAwait(node) => Some(Expr::Await(node)),
             AnyNode::ExprYield(node) => Some(Expr::Yield(node)),
             AnyNode::ExprYieldFrom(node) => Some(Expr::YieldFrom(node)),
@@ -346,17 +346,17 @@ impl AnyNode {
             | AnyNode::StmtContinue(_)
             | AnyNode::StmtIpyEscapeCommand(_)
             | AnyNode::ExprBoolOp(_)
-            | AnyNode::ExprNamedExpr(_)
+            | AnyNode::ExprNamed(_)
             | AnyNode::ExprBinOp(_)
             | AnyNode::ExprUnaryOp(_)
             | AnyNode::ExprLambda(_)
-            | AnyNode::ExprIfExp(_)
+            | AnyNode::ExprIf(_)
             | AnyNode::ExprDict(_)
             | AnyNode::ExprSet(_)
             | AnyNode::ExprListComp(_)
             | AnyNode::ExprSetComp(_)
             | AnyNode::ExprDictComp(_)
-            | AnyNode::ExprGeneratorExp(_)
+            | AnyNode::ExprGenerator(_)
             | AnyNode::ExprAwait(_)
             | AnyNode::ExprYield(_)
             | AnyNode::ExprYieldFrom(_)
@@ -451,17 +451,17 @@ impl AnyNode {
             | AnyNode::StmtContinue(_)
             | AnyNode::StmtIpyEscapeCommand(_)
             | AnyNode::ExprBoolOp(_)
-            | AnyNode::ExprNamedExpr(_)
+            | AnyNode::ExprNamed(_)
             | AnyNode::ExprBinOp(_)
             | AnyNode::ExprUnaryOp(_)
             | AnyNode::ExprLambda(_)
-            | AnyNode::ExprIfExp(_)
+            | AnyNode::ExprIf(_)
             | AnyNode::ExprDict(_)
             | AnyNode::ExprSet(_)
             | AnyNode::ExprListComp(_)
             | AnyNode::ExprSetComp(_)
             | AnyNode::ExprDictComp(_)
-            | AnyNode::ExprGeneratorExp(_)
+            | AnyNode::ExprGenerator(_)
             | AnyNode::ExprAwait(_)
             | AnyNode::ExprYield(_)
             | AnyNode::ExprYieldFrom(_)
@@ -541,17 +541,17 @@ impl AnyNode {
             | AnyNode::StmtContinue(_)
             | AnyNode::StmtIpyEscapeCommand(_)
             | AnyNode::ExprBoolOp(_)
-            | AnyNode::ExprNamedExpr(_)
+            | AnyNode::ExprNamed(_)
             | AnyNode::ExprBinOp(_)
             | AnyNode::ExprUnaryOp(_)
             | AnyNode::ExprLambda(_)
-            | AnyNode::ExprIfExp(_)
+            | AnyNode::ExprIf(_)
             | AnyNode::ExprDict(_)
             | AnyNode::ExprSet(_)
             | AnyNode::ExprListComp(_)
             | AnyNode::ExprSetComp(_)
             | AnyNode::ExprDictComp(_)
-            | AnyNode::ExprGeneratorExp(_)
+            | AnyNode::ExprGenerator(_)
             | AnyNode::ExprAwait(_)
             | AnyNode::ExprYield(_)
             | AnyNode::ExprYieldFrom(_)
@@ -656,17 +656,17 @@ impl AnyNode {
             Self::StmtContinue(node) => AnyNodeRef::StmtContinue(node),
             Self::StmtIpyEscapeCommand(node) => AnyNodeRef::StmtIpyEscapeCommand(node),
             Self::ExprBoolOp(node) => AnyNodeRef::ExprBoolOp(node),
-            Self::ExprNamedExpr(node) => AnyNodeRef::ExprNamedExpr(node),
+            Self::ExprNamed(node) => AnyNodeRef::ExprNamed(node),
             Self::ExprBinOp(node) => AnyNodeRef::ExprBinOp(node),
             Self::ExprUnaryOp(node) => AnyNodeRef::ExprUnaryOp(node),
             Self::ExprLambda(node) => AnyNodeRef::ExprLambda(node),
-            Self::ExprIfExp(node) => AnyNodeRef::ExprIfExp(node),
+            Self::ExprIf(node) => AnyNodeRef::ExprIf(node),
             Self::ExprDict(node) => AnyNodeRef::ExprDict(node),
             Self::ExprSet(node) => AnyNodeRef::ExprSet(node),
             Self::ExprListComp(node) => AnyNodeRef::ExprListComp(node),
             Self::ExprSetComp(node) => AnyNodeRef::ExprSetComp(node),
             Self::ExprDictComp(node) => AnyNodeRef::ExprDictComp(node),
-            Self::ExprGeneratorExp(node) => AnyNodeRef::ExprGeneratorExp(node),
+            Self::ExprGenerator(node) => AnyNodeRef::ExprGenerator(node),
             Self::ExprAwait(node) => AnyNodeRef::ExprAwait(node),
             Self::ExprYield(node) => AnyNodeRef::ExprYield(node),
             Self::ExprYieldFrom(node) => AnyNodeRef::ExprYieldFrom(node),
@@ -1959,12 +1959,12 @@ impl AstNode for ast::ExprBoolOp {
         }
     }
 }
-impl AstNode for ast::ExprNamedExpr {
+impl AstNode for ast::ExprNamed {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::ExprNamedExpr(node) = kind {
+        if let AnyNode::ExprNamed(node) = kind {
             Some(node)
         } else {
             None
@@ -1972,7 +1972,7 @@ impl AstNode for ast::ExprNamedExpr {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprNamedExpr(node) = kind {
+        if let AnyNodeRef::ExprNamed(node) = kind {
             Some(node)
         } else {
             None
@@ -1991,7 +1991,7 @@ impl AstNode for ast::ExprNamedExpr {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::ExprNamedExpr {
+        let ast::ExprNamed {
             target,
             value,
             range: _,
@@ -2129,12 +2129,12 @@ impl AstNode for ast::ExprLambda {
         visitor.visit_expr(body);
     }
 }
-impl AstNode for ast::ExprIfExp {
+impl AstNode for ast::ExprIf {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::ExprIfExp(node) = kind {
+        if let AnyNode::ExprIf(node) = kind {
             Some(node)
         } else {
             None
@@ -2142,7 +2142,7 @@ impl AstNode for ast::ExprIfExp {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprIfExp(node) = kind {
+        if let AnyNodeRef::ExprIf(node) = kind {
             Some(node)
         } else {
             None
@@ -2161,7 +2161,7 @@ impl AstNode for ast::ExprIfExp {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::ExprIfExp {
+        let ast::ExprIf {
             test,
             body,
             orelse,
@@ -2394,12 +2394,12 @@ impl AstNode for ast::ExprDictComp {
         }
     }
 }
-impl AstNode for ast::ExprGeneratorExp {
+impl AstNode for ast::ExprGenerator {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::ExprGeneratorExp(node) = kind {
+        if let AnyNode::ExprGenerator(node) = kind {
             Some(node)
         } else {
             None
@@ -2407,7 +2407,7 @@ impl AstNode for ast::ExprGeneratorExp {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprGeneratorExp(node) = kind {
+        if let AnyNodeRef::ExprGenerator(node) = kind {
             Some(node)
         } else {
             None
@@ -2426,7 +2426,7 @@ impl AstNode for ast::ExprGeneratorExp {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::ExprGeneratorExp {
+        let ast::ExprGenerator {
             elt,
             generators,
             range: _,
@@ -4542,17 +4542,17 @@ impl From<Expr> for AnyNode {
     fn from(expr: Expr) -> Self {
         match expr {
             Expr::BoolOp(node) => AnyNode::ExprBoolOp(node),
-            Expr::NamedExpr(node) => AnyNode::ExprNamedExpr(node),
+            Expr::Named(node) => AnyNode::ExprNamed(node),
             Expr::BinOp(node) => AnyNode::ExprBinOp(node),
             Expr::UnaryOp(node) => AnyNode::ExprUnaryOp(node),
             Expr::Lambda(node) => AnyNode::ExprLambda(node),
-            Expr::IfExp(node) => AnyNode::ExprIfExp(node),
+            Expr::If(node) => AnyNode::ExprIf(node),
             Expr::Dict(node) => AnyNode::ExprDict(node),
             Expr::Set(node) => AnyNode::ExprSet(node),
             Expr::ListComp(node) => AnyNode::ExprListComp(node),
             Expr::SetComp(node) => AnyNode::ExprSetComp(node),
             Expr::DictComp(node) => AnyNode::ExprDictComp(node),
-            Expr::GeneratorExp(node) => AnyNode::ExprGeneratorExp(node),
+            Expr::Generator(node) => AnyNode::ExprGenerator(node),
             Expr::Await(node) => AnyNode::ExprAwait(node),
             Expr::Yield(node) => AnyNode::ExprYield(node),
             Expr::YieldFrom(node) => AnyNode::ExprYieldFrom(node),
@@ -4792,9 +4792,9 @@ impl From<ast::ExprBoolOp> for AnyNode {
     }
 }
 
-impl From<ast::ExprNamedExpr> for AnyNode {
-    fn from(node: ast::ExprNamedExpr) -> Self {
-        AnyNode::ExprNamedExpr(node)
+impl From<ast::ExprNamed> for AnyNode {
+    fn from(node: ast::ExprNamed) -> Self {
+        AnyNode::ExprNamed(node)
     }
 }
 
@@ -4816,9 +4816,9 @@ impl From<ast::ExprLambda> for AnyNode {
     }
 }
 
-impl From<ast::ExprIfExp> for AnyNode {
-    fn from(node: ast::ExprIfExp) -> Self {
-        AnyNode::ExprIfExp(node)
+impl From<ast::ExprIf> for AnyNode {
+    fn from(node: ast::ExprIf) -> Self {
+        AnyNode::ExprIf(node)
     }
 }
 
@@ -4852,9 +4852,9 @@ impl From<ast::ExprDictComp> for AnyNode {
     }
 }
 
-impl From<ast::ExprGeneratorExp> for AnyNode {
-    fn from(node: ast::ExprGeneratorExp) -> Self {
-        AnyNode::ExprGeneratorExp(node)
+impl From<ast::ExprGenerator> for AnyNode {
+    fn from(node: ast::ExprGenerator) -> Self {
+        AnyNode::ExprGenerator(node)
     }
 }
 
@@ -5184,17 +5184,17 @@ impl Ranged for AnyNode {
             AnyNode::StmtContinue(node) => node.range(),
             AnyNode::StmtIpyEscapeCommand(node) => node.range(),
             AnyNode::ExprBoolOp(node) => node.range(),
-            AnyNode::ExprNamedExpr(node) => node.range(),
+            AnyNode::ExprNamed(node) => node.range(),
             AnyNode::ExprBinOp(node) => node.range(),
             AnyNode::ExprUnaryOp(node) => node.range(),
             AnyNode::ExprLambda(node) => node.range(),
-            AnyNode::ExprIfExp(node) => node.range(),
+            AnyNode::ExprIf(node) => node.range(),
             AnyNode::ExprDict(node) => node.range(),
             AnyNode::ExprSet(node) => node.range(),
             AnyNode::ExprListComp(node) => node.range(),
             AnyNode::ExprSetComp(node) => node.range(),
             AnyNode::ExprDictComp(node) => node.range(),
-            AnyNode::ExprGeneratorExp(node) => node.range(),
+            AnyNode::ExprGenerator(node) => node.range(),
             AnyNode::ExprAwait(node) => node.range(),
             AnyNode::ExprYield(node) => node.range(),
             AnyNode::ExprYieldFrom(node) => node.range(),
@@ -5281,17 +5281,17 @@ pub enum AnyNodeRef<'a> {
     StmtContinue(&'a ast::StmtContinue),
     StmtIpyEscapeCommand(&'a ast::StmtIpyEscapeCommand),
     ExprBoolOp(&'a ast::ExprBoolOp),
-    ExprNamedExpr(&'a ast::ExprNamedExpr),
+    ExprNamed(&'a ast::ExprNamed),
     ExprBinOp(&'a ast::ExprBinOp),
     ExprUnaryOp(&'a ast::ExprUnaryOp),
     ExprLambda(&'a ast::ExprLambda),
-    ExprIfExp(&'a ast::ExprIfExp),
+    ExprIf(&'a ast::ExprIf),
     ExprDict(&'a ast::ExprDict),
     ExprSet(&'a ast::ExprSet),
     ExprListComp(&'a ast::ExprListComp),
     ExprSetComp(&'a ast::ExprSetComp),
     ExprDictComp(&'a ast::ExprDictComp),
-    ExprGeneratorExp(&'a ast::ExprGeneratorExp),
+    ExprGenerator(&'a ast::ExprGenerator),
     ExprAwait(&'a ast::ExprAwait),
     ExprYield(&'a ast::ExprYield),
     ExprYieldFrom(&'a ast::ExprYieldFrom),
@@ -5377,17 +5377,17 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::StmtContinue(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtIpyEscapeCommand(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprBoolOp(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::ExprNamedExpr(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprNamed(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprBinOp(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprUnaryOp(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprLambda(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::ExprIfExp(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprIf(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprDict(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprSet(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprListComp(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprSetComp(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprDictComp(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::ExprGeneratorExp(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprGenerator(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprAwait(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprYield(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprYieldFrom(node) => NonNull::from(*node).cast(),
@@ -5479,17 +5479,17 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::StmtContinue(_) => NodeKind::StmtContinue,
             AnyNodeRef::StmtIpyEscapeCommand(_) => NodeKind::StmtIpyEscapeCommand,
             AnyNodeRef::ExprBoolOp(_) => NodeKind::ExprBoolOp,
-            AnyNodeRef::ExprNamedExpr(_) => NodeKind::ExprNamedExpr,
+            AnyNodeRef::ExprNamed(_) => NodeKind::ExprNamed,
             AnyNodeRef::ExprBinOp(_) => NodeKind::ExprBinOp,
             AnyNodeRef::ExprUnaryOp(_) => NodeKind::ExprUnaryOp,
             AnyNodeRef::ExprLambda(_) => NodeKind::ExprLambda,
-            AnyNodeRef::ExprIfExp(_) => NodeKind::ExprIfExp,
+            AnyNodeRef::ExprIf(_) => NodeKind::ExprIf,
             AnyNodeRef::ExprDict(_) => NodeKind::ExprDict,
             AnyNodeRef::ExprSet(_) => NodeKind::ExprSet,
             AnyNodeRef::ExprListComp(_) => NodeKind::ExprListComp,
             AnyNodeRef::ExprSetComp(_) => NodeKind::ExprSetComp,
             AnyNodeRef::ExprDictComp(_) => NodeKind::ExprDictComp,
-            AnyNodeRef::ExprGeneratorExp(_) => NodeKind::ExprGeneratorExp,
+            AnyNodeRef::ExprGenerator(_) => NodeKind::ExprGenerator,
             AnyNodeRef::ExprAwait(_) => NodeKind::ExprAwait,
             AnyNodeRef::ExprYield(_) => NodeKind::ExprYield,
             AnyNodeRef::ExprYieldFrom(_) => NodeKind::ExprYieldFrom,
@@ -5576,17 +5576,17 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModExpression(_)
             | AnyNodeRef::ExprBoolOp(_)
-            | AnyNodeRef::ExprNamedExpr(_)
+            | AnyNodeRef::ExprNamed(_)
             | AnyNodeRef::ExprBinOp(_)
             | AnyNodeRef::ExprUnaryOp(_)
             | AnyNodeRef::ExprLambda(_)
-            | AnyNodeRef::ExprIfExp(_)
+            | AnyNodeRef::ExprIf(_)
             | AnyNodeRef::ExprDict(_)
             | AnyNodeRef::ExprSet(_)
             | AnyNodeRef::ExprListComp(_)
             | AnyNodeRef::ExprSetComp(_)
             | AnyNodeRef::ExprDictComp(_)
-            | AnyNodeRef::ExprGeneratorExp(_)
+            | AnyNodeRef::ExprGenerator(_)
             | AnyNodeRef::ExprAwait(_)
             | AnyNodeRef::ExprYield(_)
             | AnyNodeRef::ExprYieldFrom(_)
@@ -5645,17 +5645,17 @@ impl<'a> AnyNodeRef<'a> {
     pub const fn is_expression(self) -> bool {
         match self {
             AnyNodeRef::ExprBoolOp(_)
-            | AnyNodeRef::ExprNamedExpr(_)
+            | AnyNodeRef::ExprNamed(_)
             | AnyNodeRef::ExprBinOp(_)
             | AnyNodeRef::ExprUnaryOp(_)
             | AnyNodeRef::ExprLambda(_)
-            | AnyNodeRef::ExprIfExp(_)
+            | AnyNodeRef::ExprIf(_)
             | AnyNodeRef::ExprDict(_)
             | AnyNodeRef::ExprSet(_)
             | AnyNodeRef::ExprListComp(_)
             | AnyNodeRef::ExprSetComp(_)
             | AnyNodeRef::ExprDictComp(_)
-            | AnyNodeRef::ExprGeneratorExp(_)
+            | AnyNodeRef::ExprGenerator(_)
             | AnyNodeRef::ExprAwait(_)
             | AnyNodeRef::ExprYield(_)
             | AnyNodeRef::ExprYieldFrom(_)
@@ -5769,17 +5769,17 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::StmtContinue(_)
             | AnyNodeRef::StmtIpyEscapeCommand(_)
             | AnyNodeRef::ExprBoolOp(_)
-            | AnyNodeRef::ExprNamedExpr(_)
+            | AnyNodeRef::ExprNamed(_)
             | AnyNodeRef::ExprBinOp(_)
             | AnyNodeRef::ExprUnaryOp(_)
             | AnyNodeRef::ExprLambda(_)
-            | AnyNodeRef::ExprIfExp(_)
+            | AnyNodeRef::ExprIf(_)
             | AnyNodeRef::ExprDict(_)
             | AnyNodeRef::ExprSet(_)
             | AnyNodeRef::ExprListComp(_)
             | AnyNodeRef::ExprSetComp(_)
             | AnyNodeRef::ExprDictComp(_)
-            | AnyNodeRef::ExprGeneratorExp(_)
+            | AnyNodeRef::ExprGenerator(_)
             | AnyNodeRef::ExprAwait(_)
             | AnyNodeRef::ExprYield(_)
             | AnyNodeRef::ExprYieldFrom(_)
@@ -5874,17 +5874,17 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::StmtContinue(_)
             | AnyNodeRef::StmtIpyEscapeCommand(_)
             | AnyNodeRef::ExprBoolOp(_)
-            | AnyNodeRef::ExprNamedExpr(_)
+            | AnyNodeRef::ExprNamed(_)
             | AnyNodeRef::ExprBinOp(_)
             | AnyNodeRef::ExprUnaryOp(_)
             | AnyNodeRef::ExprLambda(_)
-            | AnyNodeRef::ExprIfExp(_)
+            | AnyNodeRef::ExprIf(_)
             | AnyNodeRef::ExprDict(_)
             | AnyNodeRef::ExprSet(_)
             | AnyNodeRef::ExprListComp(_)
             | AnyNodeRef::ExprSetComp(_)
             | AnyNodeRef::ExprDictComp(_)
-            | AnyNodeRef::ExprGeneratorExp(_)
+            | AnyNodeRef::ExprGenerator(_)
             | AnyNodeRef::ExprAwait(_)
             | AnyNodeRef::ExprYield(_)
             | AnyNodeRef::ExprYieldFrom(_)
@@ -5964,17 +5964,17 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::StmtContinue(_)
             | AnyNodeRef::StmtIpyEscapeCommand(_)
             | AnyNodeRef::ExprBoolOp(_)
-            | AnyNodeRef::ExprNamedExpr(_)
+            | AnyNodeRef::ExprNamed(_)
             | AnyNodeRef::ExprBinOp(_)
             | AnyNodeRef::ExprUnaryOp(_)
             | AnyNodeRef::ExprLambda(_)
-            | AnyNodeRef::ExprIfExp(_)
+            | AnyNodeRef::ExprIf(_)
             | AnyNodeRef::ExprDict(_)
             | AnyNodeRef::ExprSet(_)
             | AnyNodeRef::ExprListComp(_)
             | AnyNodeRef::ExprSetComp(_)
             | AnyNodeRef::ExprDictComp(_)
-            | AnyNodeRef::ExprGeneratorExp(_)
+            | AnyNodeRef::ExprGenerator(_)
             | AnyNodeRef::ExprAwait(_)
             | AnyNodeRef::ExprYield(_)
             | AnyNodeRef::ExprYieldFrom(_)
@@ -6073,17 +6073,17 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::StmtContinue(node) => node.visit_preorder(visitor),
             AnyNodeRef::StmtIpyEscapeCommand(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprBoolOp(node) => node.visit_preorder(visitor),
-            AnyNodeRef::ExprNamedExpr(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprNamed(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprBinOp(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprUnaryOp(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprLambda(node) => node.visit_preorder(visitor),
-            AnyNodeRef::ExprIfExp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprIf(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprDict(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprSet(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprListComp(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprSetComp(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprDictComp(node) => node.visit_preorder(visitor),
-            AnyNodeRef::ExprGeneratorExp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprGenerator(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprAwait(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprYield(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprYieldFrom(node) => node.visit_preorder(visitor),
@@ -6488,9 +6488,9 @@ impl<'a> From<&'a ast::ExprBoolOp> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ExprNamedExpr> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::ExprNamedExpr) -> Self {
-        AnyNodeRef::ExprNamedExpr(node)
+impl<'a> From<&'a ast::ExprNamed> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::ExprNamed) -> Self {
+        AnyNodeRef::ExprNamed(node)
     }
 }
 
@@ -6512,9 +6512,9 @@ impl<'a> From<&'a ast::ExprLambda> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ExprIfExp> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::ExprIfExp) -> Self {
-        AnyNodeRef::ExprIfExp(node)
+impl<'a> From<&'a ast::ExprIf> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::ExprIf) -> Self {
+        AnyNodeRef::ExprIf(node)
     }
 }
 
@@ -6548,9 +6548,9 @@ impl<'a> From<&'a ast::ExprDictComp> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ExprGeneratorExp> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::ExprGeneratorExp) -> Self {
-        AnyNodeRef::ExprGeneratorExp(node)
+impl<'a> From<&'a ast::ExprGenerator> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::ExprGenerator) -> Self {
+        AnyNodeRef::ExprGenerator(node)
     }
 }
 
@@ -6841,17 +6841,17 @@ impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
     fn from(expr: &'a Expr) -> Self {
         match expr {
             Expr::BoolOp(node) => AnyNodeRef::ExprBoolOp(node),
-            Expr::NamedExpr(node) => AnyNodeRef::ExprNamedExpr(node),
+            Expr::Named(node) => AnyNodeRef::ExprNamed(node),
             Expr::BinOp(node) => AnyNodeRef::ExprBinOp(node),
             Expr::UnaryOp(node) => AnyNodeRef::ExprUnaryOp(node),
             Expr::Lambda(node) => AnyNodeRef::ExprLambda(node),
-            Expr::IfExp(node) => AnyNodeRef::ExprIfExp(node),
+            Expr::If(node) => AnyNodeRef::ExprIf(node),
             Expr::Dict(node) => AnyNodeRef::ExprDict(node),
             Expr::Set(node) => AnyNodeRef::ExprSet(node),
             Expr::ListComp(node) => AnyNodeRef::ExprListComp(node),
             Expr::SetComp(node) => AnyNodeRef::ExprSetComp(node),
             Expr::DictComp(node) => AnyNodeRef::ExprDictComp(node),
-            Expr::GeneratorExp(node) => AnyNodeRef::ExprGeneratorExp(node),
+            Expr::Generator(node) => AnyNodeRef::ExprGenerator(node),
             Expr::Await(node) => AnyNodeRef::ExprAwait(node),
             Expr::Yield(node) => AnyNodeRef::ExprYield(node),
             Expr::YieldFrom(node) => AnyNodeRef::ExprYieldFrom(node),
@@ -7006,17 +7006,17 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::StmtContinue(node) => node.range(),
             AnyNodeRef::StmtIpyEscapeCommand(node) => node.range(),
             AnyNodeRef::ExprBoolOp(node) => node.range(),
-            AnyNodeRef::ExprNamedExpr(node) => node.range(),
+            AnyNodeRef::ExprNamed(node) => node.range(),
             AnyNodeRef::ExprBinOp(node) => node.range(),
             AnyNodeRef::ExprUnaryOp(node) => node.range(),
             AnyNodeRef::ExprLambda(node) => node.range(),
-            AnyNodeRef::ExprIfExp(node) => node.range(),
+            AnyNodeRef::ExprIf(node) => node.range(),
             AnyNodeRef::ExprDict(node) => node.range(),
             AnyNodeRef::ExprSet(node) => node.range(),
             AnyNodeRef::ExprListComp(node) => node.range(),
             AnyNodeRef::ExprSetComp(node) => node.range(),
             AnyNodeRef::ExprDictComp(node) => node.range(),
-            AnyNodeRef::ExprGeneratorExp(node) => node.range(),
+            AnyNodeRef::ExprGenerator(node) => node.range(),
             AnyNodeRef::ExprAwait(node) => node.range(),
             AnyNodeRef::ExprYield(node) => node.range(),
             AnyNodeRef::ExprYieldFrom(node) => node.range(),
@@ -7105,17 +7105,17 @@ pub enum NodeKind {
     StmtBreak,
     StmtContinue,
     ExprBoolOp,
-    ExprNamedExpr,
+    ExprNamed,
     ExprBinOp,
     ExprUnaryOp,
     ExprLambda,
-    ExprIfExp,
+    ExprIf,
     ExprDict,
     ExprSet,
     ExprListComp,
     ExprSetComp,
     ExprDictComp,
-    ExprGeneratorExp,
+    ExprGenerator,
     ExprAwait,
     ExprYield,
     ExprYieldFrom,

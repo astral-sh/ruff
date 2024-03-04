@@ -2,8 +2,8 @@
 source: crates/ruff_python_parser/src/parser.rs
 expression: parse_ast
 ---
-NamedExpr(
-    ExprNamedExpr {
+Named(
+    ExprNamed {
         range: 1..15,
         target: Name(
             ExprName {

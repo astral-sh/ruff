@@ -146,9 +146,9 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
             Expr::BinOp(_)
             | Expr::UnaryOp(_)
             | Expr::BoolOp(_)
-            | Expr::NamedExpr(_)
+            | Expr::Named(_)
             | Expr::Compare(_)
-            | Expr::IfExp(_)
+            | Expr::If(_)
             | Expr::Lambda(_)
             | Expr::Await(_)
             | Expr::Yield(_)
@@ -166,7 +166,7 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
         // E.g., `{x, y}` should be parenthesized in `f"{(x, y)}"`.
         (
             _,
-            Expr::GeneratorExp(_)
+            Expr::Generator(_)
             | Expr::Dict(_)
             | Expr::Set(_)
             | Expr::SetComp(_)
@@ -175,7 +175,7 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
         (_, Expr::Subscript(ast::ExprSubscript { value, .. })) => {
             matches!(
                 value.as_ref(),
-                Expr::GeneratorExp(_)
+                Expr::Generator(_)
                     | Expr::Dict(_)
                     | Expr::Set(_)
                     | Expr::SetComp(_)
@@ -185,7 +185,7 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
         (_, Expr::Attribute(ast::ExprAttribute { value, .. })) => {
             matches!(
                 value.as_ref(),
-                Expr::GeneratorExp(_)
+                Expr::Generator(_)
                     | Expr::Dict(_)
                     | Expr::Set(_)
                     | Expr::SetComp(_)
@@ -195,7 +195,7 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
         (_, Expr::Call(ast::ExprCall { func, .. })) => {
             matches!(
                 func.as_ref(),
-                Expr::GeneratorExp(_)
+                Expr::Generator(_)
                     | Expr::Dict(_)
                     | Expr::Set(_)
                     | Expr::SetComp(_)

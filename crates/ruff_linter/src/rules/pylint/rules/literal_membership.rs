@@ -76,7 +76,7 @@ pub(crate) fn literal_membership(checker: &mut Checker, compare: &ast::ExprCompa
             | Expr::ListComp(_)
             | Expr::SetComp(_)
             | Expr::DictComp(_)
-            | Expr::GeneratorExp(_)
+            | Expr::Generator(_)
             | Expr::Await(_)
             | Expr::Yield(_)
             | Expr::YieldFrom(_) => true,

@@ -1846,8 +1846,8 @@ expression: parse_ast
                         },
                     ),
                     guard: Some(
-                        NamedExpr(
-                            ExprNamedExpr {
+                        Named(
+                            ExprNamed {
                                 range: 1472..1482,
                                 target: Name(
                                     ExprName {
@@ -3620,8 +3620,8 @@ expression: parse_ast
                 ExprTuple {
                     range: 2789..2796,
                     elts: [
-                        NamedExpr(
-                            ExprNamedExpr {
+                        Named(
+                            ExprNamed {
                                 range: 2789..2795,
                                 target: Name(
                                     ExprName {

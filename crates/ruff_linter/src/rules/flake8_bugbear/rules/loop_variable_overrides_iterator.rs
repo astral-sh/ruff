@@ -88,7 +88,7 @@ impl<'a> Visitor<'a> for NameFinder<'a> {
             Expr::ListComp(ast::ExprListComp { generators, .. })
             | Expr::DictComp(ast::ExprDictComp { generators, .. })
             | Expr::SetComp(ast::ExprSetComp { generators, .. })
-            | Expr::GeneratorExp(ast::ExprGeneratorExp { generators, .. }) => {
+            | Expr::Generator(ast::ExprGenerator { generators, .. }) => {
                 for comp in generators {
                     self.visit_expr(&comp.iter);
                 }

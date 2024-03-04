@@ -169,13 +169,13 @@ fn is_allowed_value(expr: &Expr) -> bool {
         Expr::BoolOp(_)
         | Expr::BinOp(_)
         | Expr::UnaryOp(_)
-        | Expr::IfExp(_)
+        | Expr::If(_)
         | Expr::Dict(_)
         | Expr::Set(_)
         | Expr::ListComp(_)
         | Expr::SetComp(_)
         | Expr::DictComp(_)
-        | Expr::GeneratorExp(_)
+        | Expr::Generator(_)
         | Expr::Compare(_)
         | Expr::Call(_)
         | Expr::FString(_)
@@ -191,7 +191,7 @@ fn is_allowed_value(expr: &Expr) -> bool {
         | Expr::List(_) => true,
         Expr::Tuple(tuple) => tuple.elts.iter().all(is_allowed_value),
         // Maybe require parentheses.
-        Expr::NamedExpr(_) => false,
+        Expr::Named(_) => false,
         // Invalid in binary expressions.
         Expr::Await(_)
         | Expr::Lambda(_)

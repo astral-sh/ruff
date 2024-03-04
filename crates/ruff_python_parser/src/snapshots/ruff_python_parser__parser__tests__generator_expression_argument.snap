@@ -32,8 +32,8 @@ Call(
         arguments: Arguments {
             range: 8..141,
             args: [
-                GeneratorExp(
-                    ExprGeneratorExp {
+                Generator(
+                    ExprGenerator {
                         range: 14..139,
                         elt: Name(
                             ExprName {
@@ -56,8 +56,8 @@ Call(
                                     ExprTuple {
                                         range: 33..139,
                                         elts: [
-                                            IfExp(
-                                                ExprIfExp {
+                                            If(
+                                                ExprIf {
                                                     range: 43..80,
                                                     test: Name(
                                                         ExprName {
@@ -100,8 +100,8 @@ Call(
                                                     ),
                                                 },
                                             ),
-                                            IfExp(
-                                                ExprIfExp {
+                                            If(
+                                                ExprIf {
                                                     range: 90..132,
                                                     test: Name(
                                                         ExprName {
