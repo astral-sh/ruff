@@ -527,7 +527,7 @@ impl<'a> FormatResults<'a> {
             })
             .sorted_unstable_by_key(|(path, _, _)| *path)
         {
-            unformatted.diff(formatted, Some(path), f)?;
+            write!(f, "{}", unformatted.diff(formatted, Some(path)).unwrap())?;
         }
 
         Ok(())

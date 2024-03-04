@@ -70,10 +70,10 @@ pub(crate) fn call_datetime_utcfromtimestamp(
 
     if !checker
         .semantic()
-        .resolve_call_path(func)
-        .is_some_and(|call_path| {
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.as_slice(),
+                qualified_name.segments(),
                 ["datetime", "datetime", "utcfromtimestamp"]
             )
         })

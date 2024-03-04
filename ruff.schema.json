@@ -623,10 +623,10 @@
       ]
     },
     "required-version": {
-      "description": "Require a specific version of Ruff to be running (useful for unifying results across many environments, e.g., with a `pyproject.toml` file).",
+      "description": "Enforce a requirement on the version of Ruff, to enforce at runtime. If the version of Ruff does not meet the requirement, Ruff will exit with an error.\n\nUseful for unifying results across many environments, e.g., with a `pyproject.toml` file.\n\nAccepts a PEP 440 specifier, like `==0.3.1` or `>=0.3.1`.",
       "anyOf": [
         {
-          "$ref": "#/definitions/Version"
+          "$ref": "#/definitions/RequiredVersion"
         },
         {
           "type": "null"
@@ -1473,6 +1473,17 @@
           "items": {
             "type": "string"
           }
+        },
+        "default-section": {
+          "description": "Define a default section for any imports that don't fit into the specified `section-order`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ImportSection"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "detect-same-package": {
           "description": "Whether to automatically mark imports from within the same package as first-party. For example, when `detect-same-package = true`, then when analyzing files within the `foo` package, any imports from within the `foo` package will be considered first-party.\n\nThis heuristic is often unnecessary when `src` is configured to detect all first-party sources; however, if `src` is _not_ configured, this heuristic can be useful to detect first-party imports from _within_ (but not _across_) first-party packages.",
@@ -2579,6 +2590,9 @@
         }
       ]
     },
+    "RequiredVersion": {
+      "type": "string"
+    },
     "RuleSelector": {
       "type": "string",
       "enum": [
@@ -3231,6 +3245,8 @@
         "PLE15",
         "PLE150",
         "PLE1507",
+        "PLE151",
+        "PLE1519",
         "PLE17",
         "PLE170",
         "PLE1700",
@@ -3312,6 +3328,7 @@
         "PLW0129",
         "PLW013",
         "PLW0131",
+        "PLW0133",
         "PLW02",
         "PLW024",
         "PLW0245",
@@ -3856,9 +3873,6 @@
           ]
         }
       ]
-    },
-    "Version": {
-      "type": "string"
     }
   }
 }

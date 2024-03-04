@@ -304,6 +304,8 @@ pub(crate) fn typing_only_runtime_import(
                 &checker.settings.isort.known_modules,
                 checker.settings.target_version,
                 checker.settings.isort.no_sections,
+                &checker.settings.isort.section_order,
+                &checker.settings.isort.default_section,
             ) {
                 ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
                     ImportType::FirstParty

@@ -6,7 +6,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::options_base::{OptionsMetadata, Visit};
 use ruff_formatter::IndentStyle;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
@@ -25,12 +24,13 @@ use ruff_linter::rules::{
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, PythonVersion, SerializationFormat, Version,
+    IdentifierPattern, PythonVersion, RequiredVersion, SerializationFormat,
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 
+use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
@@ -135,17 +135,22 @@ pub struct Options {
     )]
     pub show_fixes: Option<bool>,
 
-    /// Require a specific version of Ruff to be running (useful for unifying
-    /// results across many environments, e.g., with a `pyproject.toml`
-    /// file).
+    /// Enforce a requirement on the version of Ruff, to enforce at runtime.
+    /// If the version of Ruff does not meet the requirement, Ruff will exit
+    /// with an error.
+    ///
+    /// Useful for unifying results across many environments, e.g., with a
+    /// `pyproject.toml` file.
+    ///
+    /// Accepts a PEP 440 specifier, like `==0.3.1` or `>=0.3.1`.
     #[option(
         default = "null",
         value_type = "str",
         example = r#"
-            required-version = "0.0.193"
+            required-version = ">=0.0.193"
         "#
     )]
-    pub required_version: Option<Version>,
+    pub required_version: Option<RequiredVersion>,
 
     /// Whether to enable preview mode. When preview mode is enabled, Ruff will
     /// use unstable rules, fixes, and formatting.
@@ -2099,6 +2104,16 @@ pub struct IsortOptions {
     )]
     pub section_order: Option<Vec<ImportSection>>,
 
+    /// Define a default section for any imports that don't fit into the specified `section-order`.
+    #[option(
+        default = r#"third-party"#,
+        value_type = "str",
+        example = r#"
+            default-section = "third-party"
+        "#
+    )]
+    pub default_section: Option<ImportSection>,
+
     /// Put all imports into the same section bucket.
     ///
     /// For example, rather than separating standard library and third-party imports, as in:
@@ -2226,6 +2241,9 @@ impl IsortOptions {
         if no_sections && self.section_order.is_some() {
             warn_user_once!("`section-order` is ignored when `no-sections` is set to `true`");
         }
+        if no_sections && self.default_section.is_some() {
+            warn_user_once!("`default-section` is ignored when `no-sections` is set to `true`");
+        }
         if no_sections && self.sections.is_some() {
             warn_user_once!("`sections` is ignored when `no-sections` is set to `true`");
         }
@@ -2241,6 +2259,10 @@ impl IsortOptions {
         let mut section_order: Vec<_> = self
             .section_order
             .unwrap_or_else(|| ImportType::iter().map(ImportSection::Known).collect());
+        let default_section = self
+            .default_section
+            .unwrap_or(ImportSection::Known(ImportType::ThirdParty));
+
         let known_first_party = self
             .known_first_party
             .map(|names| {
@@ -2344,24 +2366,13 @@ impl IsortOptions {
             }
         }
 
-        // Add all built-in sections to `section_order`, if not already present.
-        for section in ImportType::iter().map(ImportSection::Known) {
-            if !section_order.contains(&section) {
-                warn_user_once!(
-                    "`section-order` is missing built-in section: `{:?}`",
-                    section
-                );
-                section_order.push(section);
-            }
-        }
-
-        // Add all user-defined sections to `section-order`, if not already present.
-        for section_name in sections.keys() {
-            let section = ImportSection::UserDefined(section_name.clone());
-            if !section_order.contains(&section) {
-                warn_user_once!("`section-order` is missing section: `{:?}`", section);
-                section_order.push(section);
-            }
+        // Verify that `default_section` is in `section_order`.
+        if !section_order.contains(&default_section) {
+            warn_user_once!(
+                "`section-order` must contain `default-section`: {:?}",
+                default_section,
+            );
+            section_order.push(default_section.clone());
         }
 
         Ok(isort::settings::Settings {
@@ -2394,6 +2405,7 @@ impl IsortOptions {
             lines_between_types,
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),
             section_order,
+            default_section,
             no_sections,
             from_first,
             length_sort: self.length_sort.unwrap_or(false),

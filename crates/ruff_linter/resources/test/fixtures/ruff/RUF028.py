@@ -61,3 +61,29 @@ def fmt_on_trailing():
     # fmt: off
     val = 5 # fmt: on
     pass # fmt: on
+
+
+# all of these should be fine
+def match_case_and_elif():
+    string = "hello"
+    match string:
+        case ("C"
+            | "CX"
+            | "R"
+            | "RX"
+            | "S"
+            | "SP"
+            | "WAP"
+            | "XX"
+            | "Y"
+            | "YY"
+            | "YZ"
+            | "Z"
+            | "ZZ"
+        ):  # fmt: skip
+            pass
+        case _: # fmt: skip
+            if string != "Hello":
+                pass
+            elif string == "Hello": # fmt: skip
+                pass

@@ -105,30 +105,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
-            if checker.enabled(Rule::InvalidFirstArgumentNameForClassMethod) {
-                if let Some(diagnostic) =
-                    pep8_naming::rules::invalid_first_argument_name_for_class_method(
-                        checker,
-                        checker.semantic.current_scope(),
-                        name,
-                        decorator_list,
-                        parameters,
-                    )
-                {
-                    checker.diagnostics.push(diagnostic);
-                }
-            }
-            if checker.enabled(Rule::InvalidFirstArgumentNameForMethod) {
-                if let Some(diagnostic) = pep8_naming::rules::invalid_first_argument_name_for_method(
-                    checker,
-                    checker.semantic.current_scope(),
-                    name,
-                    decorator_list,
-                    parameters,
-                ) {
-                    checker.diagnostics.push(diagnostic);
-                }
-            }
             if checker.source_type.is_stub() {
                 if checker.enabled(Rule::PassStatementStubBody) {
                     flake8_pyi::rules::pass_statement_stub_body(checker, body);
@@ -1609,7 +1585,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 refurb::rules::delete_full_slice(checker, delete);
             }
         }
-        Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
+        Stmt::Expr(expr @ ast::StmtExpr { value, range: _ }) => {
             if checker.enabled(Rule::UselessComparison) {
                 flake8_bugbear::rules::useless_comparison(checker, value);
             }
@@ -1631,6 +1607,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::RepeatedAppend) {
                 refurb::rules::repeated_append(checker, stmt);
+            }
+            if checker.enabled(Rule::UselessExceptionStatement) {
+                pylint::rules::useless_exception_statement(checker, expr);
             }
         }
         _ => {}

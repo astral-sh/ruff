@@ -102,10 +102,7 @@ impl<'a> GroupNameFinder<'a> {
     }
 }
 
-impl<'a, 'b> Visitor<'b> for GroupNameFinder<'a>
-where
-    'b: 'a,
-{
+impl<'a> Visitor<'a> for GroupNameFinder<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         if self.overridden {
             return;
@@ -313,8 +310,8 @@ pub(crate) fn reuse_of_groupby_generator(
     // Check if the function call is `itertools.groupby`
     if !checker
         .semantic()
-        .resolve_call_path(func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["itertools", "groupby"]))
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["itertools", "groupby"]))
     {
         return;
     }

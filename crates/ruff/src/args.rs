@@ -121,10 +121,6 @@ pub enum Command {
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
         output_format: HelpFormat,
-
-        /// Output format (Deprecated: Use `--output-format` instead).
-        #[arg(long, value_enum, conflicts_with = "output_format", hide = true)]
-        format: Option<HelpFormat>,
     },
     /// List or describe the available configuration options.
     Config { option: Option<String> },
@@ -133,10 +129,6 @@ pub enum Command {
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
         output_format: HelpFormat,
-
-        /// Output format (Deprecated: Use `--output-format` instead).
-        #[arg(long, value_enum, conflicts_with = "output_format", hide = true)]
-        format: Option<HelpFormat>,
     },
     /// Clear any caches in the current directory and any subdirectories.
     #[clap(alias = "--clean")]

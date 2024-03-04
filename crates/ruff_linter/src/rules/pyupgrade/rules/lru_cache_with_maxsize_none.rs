@@ -76,8 +76,10 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
             && keywords.len() == 1
             && checker
                 .semantic()
-                .resolve_call_path(func)
-                .is_some_and(|call_path| matches!(call_path.as_slice(), ["functools", "lru_cache"]))
+                .resolve_qualified_name(func)
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["functools", "lru_cache"])
+                })
         {
             let Keyword {
                 arg,

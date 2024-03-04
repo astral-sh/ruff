@@ -1,28 +1,28 @@
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast as ast;
-use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::helpers::map_subscript;
+use ruff_python_ast::name::QualifiedName;
 
 use crate::{BindingId, SemanticModel};
 
-/// Return `true` if any base class matches a [`CallPath`] predicate.
-pub fn any_call_path(
+/// Return `true` if any base class matches a [`QualifiedName`] predicate.
+pub fn any_qualified_name(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
-    func: &dyn Fn(CallPath) -> bool,
+    func: &dyn Fn(QualifiedName) -> bool,
 ) -> bool {
     fn inner(
         class_def: &ast::StmtClassDef,
         semantic: &SemanticModel,
-        func: &dyn Fn(CallPath) -> bool,
+        func: &dyn Fn(QualifiedName) -> bool,
         seen: &mut FxHashSet<BindingId>,
     ) -> bool {
         class_def.bases().iter().any(|expr| {
             // If the base class itself matches the pattern, then this does too.
             // Ex) `class Foo(BaseModel): ...`
             if semantic
-                .resolve_call_path(map_subscript(expr))
+                .resolve_qualified_name(map_subscript(expr))
                 .is_some_and(func)
             {
                 return true;
