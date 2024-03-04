@@ -110,7 +110,7 @@ impl<'a> Binding<'a> {
 
     /// Return `true` if this binding "redefines" the given binding, as per Pyflake's definition of
     /// redefinition.
-    pub fn redefines(&self, existing: &'a Binding) -> bool {
+    pub fn redefines(&self, existing: &Binding) -> bool {
         match &self.kind {
             // Submodule imports are only considered redefinitions if they import the same
             // submodule. For example, this is a redefinition:
@@ -184,12 +184,12 @@ impl<'a> Binding<'a> {
     }
 
     /// Returns the name of the binding (e.g., `x` in `x = 1`).
-    pub fn name<'b>(&self, locator: &'b Locator) -> &'b str {
+    pub fn name<'b>(&self, locator: &Locator<'b>) -> &'b str {
         locator.slice(self.range)
     }
 
     /// Returns the statement in which the binding was defined.
-    pub fn statement<'b>(&self, semantic: &'b SemanticModel) -> Option<&'b Stmt> {
+    pub fn statement<'b>(&self, semantic: &SemanticModel<'b>) -> Option<&'b Stmt> {
         self.source
             .map(|statement_id| semantic.statement(statement_id))
     }
@@ -205,7 +205,7 @@ impl<'a> Binding<'a> {
         })
     }
 
-    pub fn as_any_import(&'a self) -> Option<AnyImport<'a>> {
+    pub fn as_any_import(&self) -> Option<AnyImport<'_, 'a>> {
         match &self.kind {
             BindingKind::Import(import) => Some(AnyImport::Import(import)),
             BindingKind::SubmoduleImport(import) => Some(AnyImport::SubmoduleImport(import)),
@@ -549,10 +549,10 @@ bitflags! {
 /// A trait for imported symbols.
 pub trait Imported<'a> {
     /// Returns the call path to the imported symbol.
-    fn call_path(&self) -> &[&str];
+    fn call_path(&self) -> &[&'a str];
 
     /// Returns the module name of the imported symbol.
-    fn module_name(&self) -> &[&str];
+    fn module_name(&self) -> &[&'a str];
 
     /// Returns the member name of the imported symbol. For a straight import, this is equivalent
     /// to the qualified name; for a `from` import, this is the name of the imported symbol.
@@ -568,12 +568,12 @@ pub trait Imported<'a> {
 
 impl<'a> Imported<'a> for Import<'a> {
     /// For example, given `import foo`, returns `["foo"]`.
-    fn call_path(&self) -> &[&str] {
+    fn call_path(&self) -> &[&'a str] {
         self.call_path.as_ref()
     }
 
     /// For example, given `import foo`, returns `["foo"]`.
-    fn module_name(&self) -> &[&str] {
+    fn module_name(&self) -> &[&'a str] {
         &self.call_path[..1]
     }
 
@@ -585,12 +585,12 @@ impl<'a> Imported<'a> for Import<'a> {
 
 impl<'a> Imported<'a> for SubmoduleImport<'a> {
     /// For example, given `import foo.bar`, returns `["foo", "bar"]`.
-    fn call_path(&self) -> &[&str] {
+    fn call_path(&self) -> &[&'a str] {
         self.call_path.as_ref()
     }
 
     /// For example, given `import foo.bar`, returns `["foo"]`.
-    fn module_name(&self) -> &[&str] {
+    fn module_name(&self) -> &[&'a str] {
         &self.call_path[..1]
     }
 
@@ -602,12 +602,12 @@ impl<'a> Imported<'a> for SubmoduleImport<'a> {
 
 impl<'a> Imported<'a> for FromImport<'a> {
     /// For example, given `from foo import bar`, returns `["foo", "bar"]`.
-    fn call_path(&self) -> &[&str] {
+    fn call_path(&self) -> &[&'a str] {
         &self.call_path
     }
 
     /// For example, given `from foo import bar`, returns `["foo"]`.
-    fn module_name(&self) -> &[&str] {
+    fn module_name(&self) -> &[&'a str] {
         &self.call_path[..self.call_path.len() - 1]
     }
 
@@ -619,14 +619,14 @@ impl<'a> Imported<'a> for FromImport<'a> {
 
 /// A wrapper around an import [`BindingKind`] that can be any of the three types of imports.
 #[derive(Debug, Clone, is_macro::Is)]
-pub enum AnyImport<'a> {
-    Import(&'a Import<'a>),
-    SubmoduleImport(&'a SubmoduleImport<'a>),
-    FromImport(&'a FromImport<'a>),
+pub enum AnyImport<'a, 'ast> {
+    Import(&'a Import<'ast>),
+    SubmoduleImport(&'a SubmoduleImport<'ast>),
+    FromImport(&'a FromImport<'ast>),
 }
 
-impl<'a> Imported<'a> for AnyImport<'a> {
-    fn call_path(&self) -> &[&str] {
+impl<'a, 'ast> Imported<'ast> for AnyImport<'a, 'ast> {
+    fn call_path(&self) -> &[&'ast str] {
         match self {
             Self::Import(import) => import.call_path(),
             Self::SubmoduleImport(import) => import.call_path(),
@@ -634,7 +634,7 @@ impl<'a> Imported<'a> for AnyImport<'a> {
         }
     }
 
-    fn module_name(&self) -> &[&str] {
+    fn module_name(&self) -> &[&'ast str] {
         match self {
             Self::Import(import) => import.module_name(),
             Self::SubmoduleImport(import) => import.module_name(),
@@ -642,7 +642,7 @@ impl<'a> Imported<'a> for AnyImport<'a> {
         }
     }
 
-    fn member_name(&self) -> Cow<'a, str> {
+    fn member_name(&self) -> Cow<'ast, str> {
         match self {
             Self::Import(import) => import.member_name(),
             Self::SubmoduleImport(import) => import.member_name(),
