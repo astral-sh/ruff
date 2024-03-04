@@ -124,11 +124,13 @@ N804.py:70:20: N804 [*] First argument of a class method should be named `cls`
 69 69 | class RenamingInMethodBodyClass(ABCMeta):
 70    |-    def bad_method(this):
 71    |-        this = this
+72    |-        this
    70 |+    def bad_method(cls):
-   71 |+        this = cls
-72 72 |         this
+   71 |+        cls = cls
+   72 |+        cls
 73 73 | 
 74 74 |     def bad_method(this):
+75 75 |         self = this
 
 N804.py:74:20: N804 [*] First argument of a class method should be named `cls`
    |

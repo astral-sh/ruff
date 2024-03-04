@@ -1,14 +1,16 @@
+use anyhow::Result;
+
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
-
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix, Violation};
-use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+use crate::renamer::Renamer;
 
 /// ## What it does
 /// Checks for instance methods that use a name other than `self` for their
@@ -221,13 +223,13 @@ pub(crate) fn invalid_first_argument_name(
         first_parameter.range(),
     );
     diagnostic.try_set_optional_fix(|| {
-        Ok(try_fix(
+        try_fix(
             scope,
             first_parameter,
             parameters,
             checker.semantic(),
             function_type,
-        ))
+        )
     });
     diagnostics.push(diagnostic);
 }
@@ -238,7 +240,7 @@ fn try_fix(
     parameters: &ast::Parameters,
     semantic: &SemanticModel<'_>,
     function_type: ApplicableFunctionType,
-) -> Option<Fix> {
+) -> Result<Option<Fix>> {
     // Don't fix if another parameter has the valid name.
     if parameters
         .posonlyargs
@@ -251,19 +253,14 @@ fn try_fix(
         .chain(parameters.kwarg.as_deref())
         .any(|p| &p.name == function_type.valid_first_argument_name())
     {
-        return None;
+        return Ok(None);
     }
 
-    let binding = scope
-        .get_all(&first_parameter.name)
-        .map(|id| semantic.binding(id))
-        .find(|b| b.kind.is_argument())?;
-    let replacement = function_type.valid_first_argument_name();
-    Some(Fix::unsafe_edits(
-        Edit::range_replacement(replacement.to_string(), binding.range()),
-        binding
-            .references()
-            .map(|rid| semantic.reference(rid))
-            .map(|reference| Edit::range_replacement(replacement.to_string(), reference.range())),
-    ))
+    let (edit, rest) = Renamer::rename(
+        &first_parameter.name,
+        function_type.valid_first_argument_name(),
+        scope,
+        semantic,
+    )?;
+    Ok(Some(Fix::unsafe_edits(edit, rest)))
 }

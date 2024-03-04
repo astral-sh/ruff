@@ -221,11 +221,13 @@ N805.py:114:20: N805 [*] First argument of a method should be named `self`
 113 113 | class RenamingInMethodBodyClass:
 114     |-    def bad_method(this):
 115     |-        this = this
+116     |-        this
     114 |+    def bad_method(self):
-    115 |+        this = self
-116 116 |         this
+    115 |+        self = self
+    116 |+        self
 117 117 | 
 118 118 |     def bad_method(this):
+119 119 |         self = this
 
 N805.py:118:20: N805 [*] First argument of a method should be named `self`
     |
