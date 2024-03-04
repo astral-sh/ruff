@@ -522,7 +522,7 @@ fn nonexistent_config_file() {
            option
 
     It looks like you were trying to pass a path to a configuration file.
-    The path `foo.toml` does not exist
+    The path `foo.toml` does not point to a configuration file
 
     For more information, try '--help'.
     "###);
@@ -1123,6 +1123,46 @@ import os
     ----- stderr -----
     "###);
     });
+
+    Ok(())
+}
+
+/// Expand environment variables in `--config` paths provided via the CLI.
+#[test]
+fn config_expand() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        ruff_toml,
+        r#"
+[lint]
+select = ["F"]
+ignore = ["F841"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg("${NAME}.toml")
+        .env("NAME", "ruff")
+        .arg("-")
+        .current_dir(tempdir.path())
+        .pass_stdin(r#"
+import os
+
+def func():
+    x = 1
+"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:2:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
 
     Ok(())
 }
