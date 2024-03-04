@@ -812,12 +812,19 @@ impl TypedValueParser for ConfigArgumentParser {
         arg: Option<&clap::Arg>,
         value: &std::ffi::OsStr,
     ) -> Result<Self::Value, clap::Error> {
-        let value = value
-            .to_str()
-            .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
+        // Convert to UTF-8.
+        let Some(value) = value.to_str() else {
+            // But respect non-UTF-8 paths.
+            let path_to_config_file = PathBuf::from(value);
+            if path_to_config_file.is_file() {
+                return Ok(SingleConfigArgument::FilePath(path_to_config_file));
+            }
+            return Err(clap::Error::new(clap::error::ErrorKind::InvalidUtf8));
+        };
 
+        // Expand environment variables and tildes.
         if let Ok(path_to_config_file) =
-            shellexpand::full(value).map(|config| PathBuf::from(config.as_ref()))
+            shellexpand::full(value).map(|config| PathBuf::from(&*config))
         {
             if path_to_config_file.is_file() {
                 return Ok(SingleConfigArgument::FilePath(path_to_config_file));
@@ -890,7 +897,7 @@ A `--config` flag must either be a path to a `.toml` configuration file
                     "
 
 It looks like you were trying to pass a path to a configuration file.
-The path `{value}` does not exist"
+The path `{value}` does not point to a configuration file"
                 ));
             }
         } else if value.contains('=') {

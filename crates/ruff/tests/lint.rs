@@ -522,7 +522,7 @@ fn nonexistent_config_file() {
            option
 
     It looks like you were trying to pass a path to a configuration file.
-    The path `foo.toml` does not exist
+    The path `foo.toml` does not point to a configuration file
 
     For more information, try '--help'.
     "###);
@@ -1141,9 +1141,6 @@ ignore = ["F841"]
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
-    }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .arg("--config")
@@ -1166,7 +1163,6 @@ def func():
 
     ----- stderr -----
     "###);
-    });
 
     Ok(())
 }
