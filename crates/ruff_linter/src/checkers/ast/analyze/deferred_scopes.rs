@@ -396,6 +396,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
             if checker.enabled(Rule::SingledispatchMethod) {
                 pylint::rules::singledispatch_method(checker, scope, &mut diagnostics);
             }
+
             if checker.any_enabled(&[
                 Rule::InvalidFirstArgumentNameForClassMethod,
                 Rule::InvalidFirstArgumentNameForMethod,

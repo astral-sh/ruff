@@ -45,6 +45,10 @@ use crate::renamer::Renamer;
 ///         ...
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as renaming a method parameter
+/// can change the behavior of the program.
+///
 /// ## Options
 /// - `lint.pep8-naming.classmethod-decorators`
 /// - `lint.pep8-naming.staticmethod-decorators`
@@ -107,6 +111,10 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 ///         ...
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as renaming a method parameter
+/// can change the behavior of the program.
+///
 /// ## Options
 /// - `lint.pep8-naming.classmethod-decorators`
 /// - `lint.pep8-naming.staticmethod-decorators`
@@ -135,12 +143,14 @@ impl Violation for InvalidFirstArgumentNameForClassMethod {
 }
 
 #[derive(Debug, Copy, Clone)]
-enum ApplicableFunctionType {
+enum FunctionType {
+    /// The function is an instance method.
     Method,
+    /// The function is a class method.
     ClassMethod,
 }
 
-impl ApplicableFunctionType {
+impl FunctionType {
     fn diagnostic_kind(self, argument_name: String) -> DiagnosticKind {
         match self {
             Self::Method => InvalidFirstArgumentNameForMethod { argument_name }.into(),
@@ -194,8 +204,8 @@ pub(crate) fn invalid_first_argument_name(
         function_type::FunctionType::Function | function_type::FunctionType::StaticMethod => {
             return;
         }
-        function_type::FunctionType::Method => ApplicableFunctionType::Method,
-        function_type::FunctionType::ClassMethod => ApplicableFunctionType::ClassMethod,
+        function_type::FunctionType::Method => FunctionType::Method,
+        function_type::FunctionType::ClassMethod => FunctionType::ClassMethod,
     };
     if !checker.enabled(function_type.rule())
         || checker.settings.pep8_naming.ignore_names.matches(name)
@@ -204,7 +214,7 @@ pub(crate) fn invalid_first_argument_name(
     }
 
     let Some(ParameterWithDefault {
-        parameter: first_parameter,
+        parameter: self_or_cls,
         ..
     }) = parameters
         .posonlyargs
@@ -214,18 +224,18 @@ pub(crate) fn invalid_first_argument_name(
         return;
     };
 
-    if &first_parameter.name == function_type.valid_first_argument_name() {
+    if &self_or_cls.name == function_type.valid_first_argument_name() {
         return;
     }
 
     let mut diagnostic = Diagnostic::new(
-        function_type.diagnostic_kind(first_parameter.name.to_string()),
-        first_parameter.range(),
+        function_type.diagnostic_kind(self_or_cls.name.to_string()),
+        self_or_cls.range(),
     );
     diagnostic.try_set_optional_fix(|| {
-        try_fix(
+        rename_parameter(
             scope,
-            first_parameter,
+            self_or_cls,
             parameters,
             checker.semantic(),
             function_type,
@@ -234,12 +244,13 @@ pub(crate) fn invalid_first_argument_name(
     diagnostics.push(diagnostic);
 }
 
-fn try_fix(
+/// Rename the first parameter to `self` or `cls`, if no other parameter has the target name.
+fn rename_parameter(
     scope: &Scope<'_>,
-    first_parameter: &ast::Parameter,
+    self_or_cls: &ast::Parameter,
     parameters: &ast::Parameters,
     semantic: &SemanticModel<'_>,
-    function_type: ApplicableFunctionType,
+    function_type: FunctionType,
 ) -> Result<Option<Fix>> {
     // Don't fix if another parameter has the valid name.
     if parameters
@@ -251,13 +262,13 @@ fn try_fix(
         .map(|parameter_with_default| &parameter_with_default.parameter)
         .chain(parameters.vararg.as_deref())
         .chain(parameters.kwarg.as_deref())
-        .any(|p| &p.name == function_type.valid_first_argument_name())
+        .any(|parameter| &parameter.name == function_type.valid_first_argument_name())
     {
         return Ok(None);
     }
 
     let (edit, rest) = Renamer::rename(
-        &first_parameter.name,
+        &self_or_cls.name,
         function_type.valid_first_argument_name(),
         scope,
         semantic,
