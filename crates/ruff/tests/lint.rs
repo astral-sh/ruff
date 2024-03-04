@@ -849,7 +849,7 @@ fn deprecated_config_option_overridden_via_cli() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:7: N801 Class name `lowercase` should use CapWords convention 
+    -:1:7: N801 Class name `lowercase` should use CapWords convention
     Found 1 error.
 
     ----- stderr -----
@@ -967,6 +967,160 @@ import os
 
     ----- stderr -----
     warning: Invalid rule code provided to `# ruff: noqa` at -:2: BBB102
+    "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn required_version_exact_mismatch() -> Result<()> {
+    let version = env!("CARGO_PKG_VERSION");
+
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+required-version = "0.1.0"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (version, "[VERSION]")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+import os
+"#), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Required version `==0.1.0` does not match the running version `[VERSION]`
+    "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn required_version_exact_match() -> Result<()> {
+    let version = env!("CARGO_PKG_VERSION");
+
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        format!(
+            r#"
+required-version = "{version}"
+"#
+        ),
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (version, "[VERSION]")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+import os
+"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:2:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn required_version_bound_mismatch() -> Result<()> {
+    let version = env!("CARGO_PKG_VERSION");
+
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        format!(
+            r#"
+required-version = ">{version}"
+"#
+        ),
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (version, "[VERSION]")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+import os
+"#), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Required version `>[VERSION]` does not match the running version `[VERSION]`
+    "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn required_version_bound_match() -> Result<()> {
+    let version = env!("CARGO_PKG_VERSION");
+
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+required-version = ">=0.1.0"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (version, "[VERSION]")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+import os
+"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:2:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
     "###);
     });
 
