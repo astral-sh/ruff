@@ -52,8 +52,23 @@ class CatF(Animal):
         super().__init__()
 
         def thing():
+            """Something"""
             super(Tree, self).__init__()
 
 
 def hello():  # just to make sure it doesn't trigger on an ordinary function
     super(Tree, self).__init__()
+
+
+class CatG:
+    """CatG"""
+    a = super()
+
+
+class CatH:
+    """CatH"""
+    def __init__(self):
+        class CatI:
+            """CatI"""
+            super(Tree, self).__init__()
+

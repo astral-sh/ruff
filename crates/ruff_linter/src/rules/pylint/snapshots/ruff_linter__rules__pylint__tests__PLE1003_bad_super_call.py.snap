@@ -59,9 +59,10 @@ bad_super_call.py:46:9: PLE1003 Bad first argument 'Bug' given to super()
    |         ^^^^^^^^^^^^^^^^ PLE1003
    |
 
-bad_super_call.py:55:13: PLE1003 Bad first argument 'Tree' given to super()
+bad_super_call.py:56:13: PLE1003 Bad first argument 'Tree' given to super()
    |
 54 |         def thing():
-55 |             super(Tree, self).__init__()
+55 |             """Something"""
+56 |             super(Tree, self).__init__()
    |             ^^^^^^^^^^^^^^^^^ PLE1003
    |

@@ -7,7 +7,7 @@ use ruff_python_ast::{
 use crate::checkers::ast::Checker;
 
 /// ### What it does
-/// Checks to see another argument other than the current class is given as the first argument of the super builtin
+/// Checks to see another argument other than the current class is given as the first argument of the super builtin.
 ///
 /// ### Why is this bad?
 /// In Python 2.7, `super()` has to be called with its own class and `self`
@@ -62,7 +62,7 @@ impl Violation for BadSuperCall {
     }
 }
 
-fn is_bad_super_call<'a>(first_arg: &'a Expr, current_class_name: &str) -> Option<&'a str> {
+fn check_for_bad_super_call<'a>(first_arg: &'a Expr, current_class_name: &str) -> Option<&'a str> {
     let Expr::Name(ExprName { id, .. }) = first_arg else {
         return None;
     };
@@ -76,10 +76,10 @@ fn check_expr(expr: &Expr, current_class_name: &str) -> Option<Diagnostic> {
             func,
             arguments,
         }) => {
-            if let Expr::Name(ExprName { id, .. }) = func.as_ref() {
-                if id == "super" {
+            if let Expr::Name(ExprName { id, ctx, .. }) = &**func {
+                if id == "super" && ctx.is_load() {
                     if let Some(first) = arguments.args.first() {
-                        return is_bad_super_call(first, current_class_name).map(|id| {
+                        return check_for_bad_super_call(first, current_class_name).map(|id| {
                             Diagnostic::new(
                                 BadSuperCall {
                                     bad_super_arg: id.to_owned(),
