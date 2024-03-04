@@ -131,7 +131,7 @@ pub struct SemanticModel<'a> {
 }
 
 impl<'a> SemanticModel<'a> {
-    pub fn new(typing_modules: &'a [String], path: &'a Path, module: Module<'a>) -> Self {
+    pub fn new(typing_modules: &'a [String], path: &Path, module: Module<'a>) -> Self {
         Self {
             typing_modules,
             module_path: module.path(),
@@ -159,7 +159,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Return the [`Binding`] for the given [`BindingId`].
     #[inline]
-    pub fn binding(&self, id: BindingId) -> &Binding {
+    pub fn binding(&self, id: BindingId) -> &Binding<'a> {
         &self.bindings[id]
     }
 
@@ -200,7 +200,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return an iterator over the set of `typing` modules allowed in the semantic model.
-    pub fn typing_modules(&self) -> impl Iterator<Item = &str> {
+    pub fn typing_modules(&self) -> impl Iterator<Item = &'a str> {
         ["typing", "_typeshed", "typing_extensions"]
             .iter()
             .copied()
@@ -567,7 +567,7 @@ impl<'a> SemanticModel<'a> {
     /// For example, given `["Class", "method"`], resolve the `BindingKind::ClassDefinition`
     /// associated with `Class`, then the `BindingKind::FunctionDefinition` associated with
     /// `Class.method`.
-    pub fn lookup_attribute(&'a self, value: &'a Expr) -> Option<BindingId> {
+    pub fn lookup_attribute(&self, value: &Expr) -> Option<BindingId> {
         let call_path = CallPath::from_expr(value)?;
 
         // Find the symbol in the current scope.
@@ -659,7 +659,13 @@ impl<'a> SemanticModel<'a> {
     /// ```
     ///
     /// ...then `resolve_call_path(${python_version})` will resolve to `sys.version_info`.
-    pub fn resolve_call_path(&'a self, value: &'a Expr) -> Option<CallPath<'a>> {
+    pub fn resolve_call_path<'name, 'expr: 'name>(
+        &self,
+        value: &'expr Expr,
+    ) -> Option<CallPath<'name>>
+    where
+        'a: 'name,
+    {
         /// Return the [`ast::ExprName`] at the head of the expression, if any.
         const fn match_head(value: &Expr) -> Option<&ast::ExprName> {
             match value {
@@ -974,7 +980,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Returns an iterator over all scopes, starting from the current [`Scope`].
-    pub fn current_scopes(&self) -> impl Iterator<Item = &Scope> {
+    pub fn current_scopes(&self) -> impl Iterator<Item = &Scope<'a>> {
         self.scopes.ancestors(self.scope_id)
     }
 
@@ -1154,7 +1160,7 @@ impl<'a> SemanticModel<'a> {
     /// Return the [`TextRange`] at which a name is declared as global in the current [`Scope`].
     pub fn global(&self, name: &str) -> Option<TextRange> {
         let global_id = self.scopes[self.scope_id].globals_id()?;
-        self.globals[global_id].get(name).copied()
+        self.globals[global_id].get(name)
     }
 
     /// Given a `name` that has been declared `nonlocal`, return the [`ScopeId`] and [`BindingId`]
@@ -1998,7 +2004,7 @@ impl ImportedName {
         self.context
     }
 
-    pub fn statement<'a>(&self, semantic: &'a SemanticModel) -> &'a Stmt {
+    pub fn statement<'a>(&self, semantic: &SemanticModel<'a>) -> &'a Stmt {
         semantic.statement(self.source)
     }
 }
