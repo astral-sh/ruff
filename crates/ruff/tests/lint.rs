@@ -849,7 +849,7 @@ fn deprecated_config_option_overridden_via_cli() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:7: N801 Class name `lowercase` should use CapWords convention 
+    -:1:7: N801 Class name `lowercase` should use CapWords convention
     Found 1 error.
 
     ----- stderr -----
