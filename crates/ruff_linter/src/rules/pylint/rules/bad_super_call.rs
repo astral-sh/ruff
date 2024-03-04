@@ -70,31 +70,31 @@ fn is_bad_super_call<'a>(first_arg: &'a Expr, current_class_name: &str) -> Optio
 }
 
 fn check_expr(expr: &Expr, current_class_name: &str) -> Option<Diagnostic> {
-    if let Expr::Call(ExprCall {
-        range,
-        func,
-        arguments,
-    }) = expr
-    {
-        if let Expr::Name(ExprName { id, .. }) = func.as_ref() {
-            if id == "super" {
-                if let Some(first) = arguments.args.first() {
-                    return is_bad_super_call(first, current_class_name).map(|id| {
-                        Diagnostic::new(
-                            BadSuperCall {
-                                bad_super_arg: id.to_owned(),
-                            },
-                            range.to_owned(),
-                        )
-                    });
+    match expr {
+        Expr::Call(ExprCall {
+            range,
+            func,
+            arguments,
+        }) => {
+            if let Expr::Name(ExprName { id, .. }) = func.as_ref() {
+                if id == "super" {
+                    if let Some(first) = arguments.args.first() {
+                        return is_bad_super_call(first, current_class_name).map(|id| {
+                            Diagnostic::new(
+                                BadSuperCall {
+                                    bad_super_arg: id.to_owned(),
+                                },
+                                range.to_owned(),
+                            )
+                        });
+                    }
                 }
             }
+            check_expr(func, current_class_name)
         }
-        return check_expr(func, current_class_name);
-    } else if let Expr::Attribute(ExprAttribute { value, .. }) = expr {
-        return check_expr(value, current_class_name);
+        Expr::Attribute(ExprAttribute { value, .. }) => check_expr(value, current_class_name),
+        _ => None,
     }
-    None
 }
 
 fn traverse_body(body: &[Stmt], current_class_name: &str) -> Vec<Diagnostic> {
