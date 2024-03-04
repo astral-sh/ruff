@@ -50,7 +50,9 @@ pub(super) fn test_expression(expr: &Expr, semantic: &SemanticModel) -> Resoluti
                         | BindingKind::ComprehensionVar
                         | BindingKind::Global
                         | BindingKind::Nonlocal(_) => Resolution::RelevantLocal,
-                        BindingKind::Import(import) if matches!(import.call_path(), ["pandas"]) => {
+                        BindingKind::Import(import)
+                            if matches!(import.qualified_name().segments(), ["pandas"]) =>
+                        {
                             Resolution::PandasModule
                         }
                         _ => Resolution::IrrelevantBinding,

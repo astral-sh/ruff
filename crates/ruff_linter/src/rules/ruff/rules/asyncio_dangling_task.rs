@@ -65,10 +65,7 @@ impl Violation for AsyncioDanglingTask {
 }
 
 /// RUF006
-pub(crate) fn asyncio_dangling_task<'a>(
-    expr: &'a Expr,
-    semantic: &SemanticModel<'a>,
-) -> Option<Diagnostic> {
+pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Option<Diagnostic> {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return None;
     };

@@ -4,7 +4,7 @@ use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 
 use ruff_python_ast::helpers::from_relative_import;
-use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder, UnqualifiedName};
+use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::{self as ast, Expr, Operator, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -24,9 +24,6 @@ use crate::reference::{
 };
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 use crate::Imported;
-
-pub trait Captures<U> {}
-impl<T: ?Sized, U> Captures<U> for T {}
 
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
@@ -197,10 +194,7 @@ impl<'a> SemanticModel<'a> {
 
         if self.typing_modules.iter().any(|module| {
             let module = QualifiedName::from_dotted_name(module);
-            let mut builder = QualifiedNameBuilder::from_qualified_name(module);
-            builder.push(target);
-            let target_path = builder.build();
-            qualified_name == &target_path
+            qualified_name == &module.append_member(target)
         }) {
             return true;
         }
@@ -620,8 +614,8 @@ impl<'a> SemanticModel<'a> {
         }
 
         // Grab, e.g., `pyarrow` from `import pyarrow as pa`.
-        let call_path = import.call_path();
-        let segment = call_path.last()?;
+        let call_path = import.qualified_name();
+        let segment = call_path.segments().last()?;
         if *segment == symbol {
             return None;
         }
@@ -740,7 +734,7 @@ impl<'a> SemanticModel<'a> {
             BindingKind::Builtin => {
                 if value.is_name_expr() {
                     // Ex) `dict`
-                    Some(QualifiedName::from_slice(&["", head.id.as_str()]))
+                    Some(QualifiedName::builtin(head.id.as_str()))
                 } else {
                     // Ex) `dict.__dict__`
                     let value_name = UnqualifiedName::from_expr(value)?;
@@ -972,9 +966,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Returns an [`Iterator`] over the current statement hierarchy represented as [`NodeId`],
     /// from the current [`NodeId`] through to any parents.
-    pub fn current_statement_ids(
-        &self,
-    ) -> impl Iterator<Item = NodeId> + Captures<(&'a (), &'_ ())> {
+    pub fn current_statement_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
         self.node_id
             .iter()
             .flat_map(|id| self.nodes.ancestor_ids(*id))
@@ -1570,7 +1562,7 @@ impl<'a> SemanticModel<'a> {
         &self,
         scope_id: ScopeId,
         binding_id: BindingId,
-    ) -> impl Iterator<Item = ShadowedBinding> + Captures<(&'a (), &'_ ())> {
+    ) -> impl Iterator<Item = ShadowedBinding> + '_ {
         let mut first = true;
         let mut binding_id = binding_id;
         std::iter::from_fn(move || {

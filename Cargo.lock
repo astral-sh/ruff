@@ -2221,7 +2221,6 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash",
  "serde",
- "smallvec",
 ]
 
 [[package]]
@@ -2338,7 +2337,6 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
- "smallvec",
 ]
 
 [[package]]

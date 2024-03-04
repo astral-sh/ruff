@@ -1,13 +1,12 @@
-use smallvec::SmallVec;
-use std::fmt::{Display, Formatter, Write};
+use std::fmt::{Debug, Display, Formatter, Write};
+use std::hash::{Hash, Hasher};
+use std::ops::Deref;
 
 use crate::{nodes, Expr};
 
 /// A representation of a qualified name, like `typing.List`.
-#[derive(Debug, Clone, Eq, Hash)]
-pub struct QualifiedName<'a> {
-    segments: SmallVec<[&'a str; 8]>,
-}
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct QualifiedName<'a>(SegmentsInner<'a>);
 
 impl<'a> QualifiedName<'a> {
     /// Create a [`QualifiedName`] from a dotted name.
@@ -22,10 +21,10 @@ impl<'a> QualifiedName<'a> {
     #[inline]
     pub fn from_dotted_name(name: &'a str) -> Self {
         if let Some(dot) = name.find('.') {
-            let mut segments = SmallVec::new();
-            segments.push(&name[..dot]);
-            segments.extend(name[dot + 1..].split('.'));
-            Self { segments }
+            let mut builder = QualifiedNameBuilder::default();
+            builder.push(&name[..dot]);
+            builder.extend(name[dot + 1..].split('.'));
+            builder.build()
         } else {
             Self::builtin(name)
         }
@@ -33,7 +32,7 @@ impl<'a> QualifiedName<'a> {
 
     /// Creates a name that's guaranteed not be a built in
     #[inline]
-    pub fn imported(name: &'a str) -> Self {
+    pub fn user_defined(name: &'a str) -> Self {
         name.split('.').collect()
     }
 
@@ -41,66 +40,99 @@ impl<'a> QualifiedName<'a> {
     #[inline]
     pub fn builtin(name: &'a str) -> Self {
         debug_assert!(!name.contains('.'));
-        Self {
-            segments: ["", name].into_iter().collect(),
-        }
-    }
-
-    #[inline]
-    pub fn from_slice(segments: &[&'a str]) -> Self {
-        Self {
-            segments: segments.into(),
-        }
-    }
-
-    pub fn starts_with(&self, other: &QualifiedName) -> bool {
-        self.segments().starts_with(other.segments())
+        Self(SegmentsInner::Small(SegmentsSmall::from_slice(&["", name])))
     }
 
     #[inline]
     pub fn segments(&self) -> &[&'a str] {
-        &self.segments
+        self.0.as_slice()
     }
 
-    pub fn module_name(&self) -> Option<&'a str> {
-        match self.segments.as_slice() {
-            ["", ..] => None,
-            [module, ..] => Some(module),
-            [] => unreachable!(),
+    pub fn is_builtin(&self) -> bool {
+        matches!(self.segments(), ["", ..])
+    }
+
+    pub fn is_user_defined(&self) -> bool {
+        !self.is_builtin()
+    }
+
+    pub fn starts_with(&self, other: &QualifiedName<'_>) -> bool {
+        self.segments().starts_with(other.segments())
+    }
+
+    /// Appends a member to the qualified name.
+    #[must_use]
+    pub fn append_member(self, member: &'a str) -> Self {
+        let mut inner = self.0;
+        inner.push(member);
+        Self(inner)
+    }
+}
+
+impl Display for QualifiedName<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let segments = self.segments();
+        if segments.first().is_some_and(|first| first.is_empty()) {
+            // If the first segment is empty, the `CallPath` is that of a builtin.
+            // Ex) `["", "bool"]` -> `"bool"`
+            let mut first = true;
+
+            for segment in segments.iter().skip(1) {
+                if !first {
+                    f.write_char('.')?;
+                }
+
+                f.write_str(segment)?;
+                first = false;
+            }
+        } else if segments.first().is_some_and(|first| matches!(*first, ".")) {
+            // If the call path is dot-prefixed, it's an unresolved relative import.
+            // Ex) `[".foo", "bar"]` -> `".foo.bar"`
+
+            let mut iter = segments.iter();
+            for segment in iter.by_ref() {
+                if *segment == "." {
+                    f.write_char('.')?;
+                } else {
+                    f.write_str(segment)?;
+                    break;
+                }
+            }
+            for segment in iter {
+                f.write_char('.')?;
+                f.write_str(segment)?;
+            }
+        } else {
+            let mut first = true;
+            for segment in segments {
+                if !first {
+                    f.write_char('.')?;
+                }
+
+                f.write_str(segment)?;
+                first = false;
+            }
         }
+
+        Ok(())
     }
 }
 
 impl<'a> FromIterator<&'a str> for QualifiedName<'a> {
-    fn from_iter<I: IntoIterator<Item = &'a str>>(iter: I) -> Self {
-        Self {
-            segments: iter.into_iter().collect(),
-        }
+    fn from_iter<T: IntoIterator<Item = &'a str>>(iter: T) -> Self {
+        Self(SegmentsInner::from_iter(iter))
     }
 }
 
-impl<'a, 'b> PartialEq<QualifiedName<'b>> for QualifiedName<'a> {
-    #[inline]
-    fn eq(&self, other: &QualifiedName<'b>) -> bool {
-        self.segments == other.segments
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct QualifiedNameBuilder<'a> {
-    segments: SmallVec<[&'a str; 8]>,
+    segments: SegmentsInner<'a>,
 }
 
 impl<'a> QualifiedNameBuilder<'a> {
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            segments: SmallVec::with_capacity(capacity),
-        }
-    }
-
-    pub fn from_qualified_name(qualified_name: QualifiedName<'a>) -> Self {
-        Self {
-            segments: qualified_name.segments,
+            segments: SegmentsInner::with_capacity(capacity),
         }
     }
 
@@ -114,6 +146,7 @@ impl<'a> QualifiedNameBuilder<'a> {
         self.segments.push(segment);
     }
 
+    #[inline]
     pub fn pop(&mut self) {
         self.segments.pop();
     }
@@ -123,96 +156,34 @@ impl<'a> QualifiedNameBuilder<'a> {
         self.segments.extend(segments);
     }
 
+    #[inline]
     pub fn extend_from_slice(&mut self, segments: &[&'a str]) {
         self.segments.extend_from_slice(segments);
     }
 
     pub fn build(self) -> QualifiedName<'a> {
-        QualifiedName {
-            segments: self.segments,
-        }
+        QualifiedName(self.segments)
     }
 }
 
-impl Display for QualifiedName<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        format_qualified_name_segments(self.segments(), f)
-    }
-}
-
-pub fn format_qualified_name_segments(segments: &[&str], w: &mut dyn Write) -> std::fmt::Result {
-    if segments.first().is_some_and(|first| first.is_empty()) {
-        // If the first segment is empty, the `CallPath` is that of a builtin.
-        // Ex) `["", "bool"]` -> `"bool"`
-        let mut first = true;
-
-        for segment in segments.iter().skip(1) {
-            if !first {
-                w.write_char('.')?;
-            }
-
-            w.write_str(segment)?;
-            first = false;
-        }
-    } else if segments.first().is_some_and(|first| matches!(*first, ".")) {
-        // If the call path is dot-prefixed, it's an unresolved relative import.
-        // Ex) `[".foo", "bar"]` -> `".foo.bar"`
-
-        let mut iter = segments.iter();
-        for segment in iter.by_ref() {
-            if *segment == "." {
-                w.write_char('.')?;
-            } else {
-                w.write_str(segment)?;
-                break;
-            }
-        }
-        for segment in iter {
-            w.write_char('.')?;
-            w.write_str(segment)?;
-        }
-    } else {
-        let mut first = true;
-        for segment in segments {
-            if !first {
-                w.write_char('.')?;
-            }
-
-            w.write_str(segment)?;
-            first = false;
-        }
-    }
-
-    Ok(())
-}
-
-#[derive(Debug, Clone, Eq, Hash)]
-pub struct UnqualifiedName<'a> {
-    segments: SmallVec<[&'a str; 8]>,
-}
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct UnqualifiedName<'a>(SegmentsInner<'a>);
 
 impl<'a> UnqualifiedName<'a> {
     pub fn from_expr(expr: &'a Expr) -> Option<Self> {
         let segments = collect_segments(expr)?;
-        Some(Self { segments })
+        Some(Self(segments))
     }
 
     pub fn segments(&self) -> &[&'a str] {
-        &self.segments
-    }
-}
-
-impl<'a, 'b> PartialEq<UnqualifiedName<'b>> for UnqualifiedName<'a> {
-    #[inline]
-    fn eq(&self, other: &UnqualifiedName<'b>) -> bool {
-        self.segments == other.segments
+        self.0.as_slice()
     }
 }
 
 impl Display for UnqualifiedName<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut first = true;
-        for segment in &self.segments {
+        for segment in self.segments() {
             if !first {
                 f.write_char('.')?;
             }
@@ -228,21 +199,248 @@ impl Display for UnqualifiedName<'_> {
 impl<'a> FromIterator<&'a str> for UnqualifiedName<'a> {
     #[inline]
     fn from_iter<T: IntoIterator<Item = &'a str>>(iter: T) -> Self {
-        Self {
-            segments: iter.into_iter().collect(),
+        Self(iter.into_iter().collect())
+    }
+}
+
+#[derive(Clone)]
+enum SegmentsInner<'a> {
+    Small(SegmentsSmall<'a>),
+    Vec(SegmentsVec<'a>),
+}
+
+impl<'a> SegmentsInner<'a> {
+    fn new() -> Self {
+        Self::Small(SegmentsSmall::default())
+    }
+
+    fn with_capacity(capacity: usize) -> Self {
+        if capacity <= SMALL_LEN {
+            Self::new()
+        } else {
+            Self::Vec(SegmentsVec {
+                segments: Vec::with_capacity(capacity),
+            })
+        }
+    }
+
+    fn as_slice(&self) -> &[&'a str] {
+        match self {
+            Self::Small(name) => name.as_slice(),
+            Self::Vec(name) => name.as_slice(),
+        }
+    }
+
+    fn push(&mut self, name: &'a str) {
+        match self {
+            SegmentsInner::Small(small) => {
+                if small.len < small.segments.len() {
+                    small.segments[small.len] = name;
+                    small.len += 1;
+                } else {
+                    *self = SegmentsInner::Vec(SegmentsVec {
+                        segments: Vec::from(small.segments),
+                    });
+                }
+            }
+            SegmentsInner::Vec(dynamic) => {
+                dynamic.segments.push(name);
+            }
+        }
+    }
+
+    fn pop(&mut self) -> Option<&'a str> {
+        match self {
+            SegmentsInner::Small(small) => {
+                if small.len == 0 {
+                    None
+                } else {
+                    small.len -= 1;
+                    Some(small.segments[small.len])
+                }
+            }
+            SegmentsInner::Vec(heap) => heap.segments.pop(),
+        }
+    }
+
+    #[inline]
+    fn from_slice(slice: &[&'a str]) -> Self {
+        if slice.len() <= SMALL_LEN {
+            SegmentsInner::Small(SegmentsSmall::from_slice(slice))
+        } else {
+            SegmentsInner::Vec(SegmentsVec {
+                segments: slice.to_vec(),
+            })
+        }
+    }
+
+    #[inline]
+    fn extend_from_slice(&mut self, slice: &[&'a str]) {
+        match self {
+            SegmentsInner::Small(small) => {
+                let capacity = small.segments.len() - small.len;
+
+                if slice.len() <= capacity {
+                    let new_len = small.len + slice.len();
+                    small.segments[small.len..new_len].copy_from_slice(slice);
+                    small.len = new_len;
+                } else {
+                    let mut segments = small.as_slice().to_vec();
+                    segments.extend_from_slice(slice);
+                    *self = SegmentsInner::Vec(SegmentsVec { segments });
+                }
+            }
+            SegmentsInner::Vec(heap) => heap.segments.extend_from_slice(slice),
         }
     }
 }
 
+impl Default for SegmentsInner<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Debug for SegmentsInner<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(self.as_slice()).finish()
+    }
+}
+
+impl<'a> Deref for SegmentsInner<'a> {
+    type Target = [&'a str];
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl<'a, 'b> PartialEq<SegmentsInner<'b>> for SegmentsInner<'a> {
+    fn eq(&self, other: &SegmentsInner<'b>) -> bool {
+        self.as_slice() == other.as_slice()
+    }
+}
+
+impl Eq for SegmentsInner<'_> {}
+
+impl Hash for SegmentsInner<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_slice().hash(state);
+    }
+}
+
+impl<'a> FromIterator<&'a str> for SegmentsInner<'a> {
+    #[inline]
+    fn from_iter<T: IntoIterator<Item = &'a str>>(iter: T) -> Self {
+        let mut segments = SegmentsInner::default();
+        segments.extend(iter);
+        segments
+    }
+}
+
+impl<'a> From<[&'a str; 8]> for SegmentsInner<'a> {
+    #[inline]
+    fn from(segments: [&'a str; 8]) -> Self {
+        SegmentsInner::Small(SegmentsSmall {
+            segments,
+            len: segments.len(),
+        })
+    }
+}
+
+impl<'a> From<Vec<&'a str>> for SegmentsInner<'a> {
+    #[inline]
+    fn from(segments: Vec<&'a str>) -> Self {
+        SegmentsInner::Vec(SegmentsVec { segments })
+    }
+}
+
+impl<'a> Extend<&'a str> for SegmentsInner<'a> {
+    #[inline]
+    fn extend<T: IntoIterator<Item = &'a str>>(&mut self, iter: T) {
+        match self {
+            SegmentsInner::Small(small) => {
+                let iter = iter.into_iter();
+                let (lower, upper) = iter.size_hint();
+
+                let capacity = SMALL_LEN - small.len;
+
+                if upper.unwrap_or(lower) <= capacity {
+                    for name in iter {
+                        self.push(name);
+                    }
+                } else {
+                    let mut segments = small.as_slice().to_vec();
+                    segments.extend(iter);
+                    *self = SegmentsInner::Vec(SegmentsVec { segments });
+                }
+            }
+            SegmentsInner::Vec(heap) => {
+                heap.segments.extend(iter);
+            }
+        }
+    }
+}
+
+const SMALL_LEN: usize = 8;
+
+#[derive(Debug, Clone, Default)]
+struct SegmentsSmall<'a> {
+    segments: [&'a str; SMALL_LEN],
+    len: usize,
+}
+
+impl<'a> SegmentsSmall<'a> {
+    fn from_slice(slice: &[&'a str]) -> Self {
+        assert!(slice.len() <= SMALL_LEN);
+
+        let mut segments: [&'a str; SMALL_LEN] = Default::default();
+        segments[..slice.len()].copy_from_slice(slice);
+        SegmentsSmall {
+            segments,
+            len: slice.len(),
+        }
+    }
+
+    fn as_slice(&self) -> &[&'a str] {
+        &self.segments[..self.len]
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+struct SegmentsVec<'a> {
+    segments: Vec<&'a str>,
+}
+
+impl<'a> SegmentsVec<'a> {
+    fn as_slice(&self) -> &[&'a str] {
+        &self.segments
+    }
+}
+
 /// Convert an `Expr` to its [`QualifiedName`] segments (like `["typing", "List"]`).
-fn collect_segments(expr: &Expr) -> Option<SmallVec<[&str; 8]>> {
+fn collect_segments(expr: &Expr) -> Option<SegmentsInner> {
+    // Records the value names before the attribute names (depth first)
+    fn record_attributes<'a>(expr: &'a Expr, segments: &mut Vec<&'a str>) {
+        match expr {
+            Expr::Attribute(attr) => {
+                // Depth first traversal
+                record_attributes(&attr.value, segments);
+                segments.push(attr.attr.as_str());
+            }
+            Expr::Name(nodes::ExprName { id, .. }) => {
+                segments.push(id.as_str());
+            }
+            _ => {}
+        }
+    }
+
     // Unroll the loop up to eight times, to match the maximum number of expected attributes.
     // In practice, unrolling appears to give about a 4x speed-up on this hot path.
     let attr1 = match expr {
         Expr::Attribute(attr1) => attr1,
         // Ex) `foo`
         Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(SmallVec::from_slice(&[id.as_str()]))
+            return Some(SegmentsInner::from_slice(&[id.as_str()]))
         }
         _ => return None,
     };
@@ -251,7 +449,10 @@ fn collect_segments(expr: &Expr) -> Option<SmallVec<[&str; 8]>> {
         Expr::Attribute(attr2) => attr2,
         // Ex) `foo.bar`
         Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(SmallVec::from_slice(&[id.as_str(), attr1.attr.as_str()]))
+            return Some(SegmentsInner::from_slice(&[
+                id.as_str(),
+                attr1.attr.as_str(),
+            ]))
         }
         _ => return None,
     };
@@ -260,7 +461,7 @@ fn collect_segments(expr: &Expr) -> Option<SmallVec<[&str; 8]>> {
         Expr::Attribute(attr3) => attr3,
         // Ex) `foo.bar.baz`
         Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(SmallVec::from_slice(&[
+            return Some(SegmentsInner::from_slice(&[
                 id.as_str(),
                 attr2.attr.as_str(),
                 attr1.attr.as_str(),
@@ -273,7 +474,7 @@ fn collect_segments(expr: &Expr) -> Option<SmallVec<[&str; 8]>> {
         Expr::Attribute(attr4) => attr4,
         // Ex) `foo.bar.baz.bop`
         Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(SmallVec::from_slice(&[
+            return Some(SegmentsInner::from_slice(&[
                 id.as_str(),
                 attr3.attr.as_str(),
                 attr2.attr.as_str(),
@@ -287,7 +488,7 @@ fn collect_segments(expr: &Expr) -> Option<SmallVec<[&str; 8]>> {
         Expr::Attribute(attr5) => attr5,
         // Ex) `foo.bar.baz.bop.bap`
         Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(SmallVec::from_slice(&[
+            return Some(SegmentsInner::from_slice(&[
                 id.as_str(),
                 attr4.attr.as_str(),
                 attr3.attr.as_str(),
@@ -302,7 +503,7 @@ fn collect_segments(expr: &Expr) -> Option<SmallVec<[&str; 8]>> {
         Expr::Attribute(attr6) => attr6,
         // Ex) `foo.bar.baz.bop.bap.bab`
         Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(SmallVec::from_slice(&[
+            return Some(SegmentsInner::from_slice(&[
                 id.as_str(),
                 attr5.attr.as_str(),
                 attr4.attr.as_str(),
@@ -318,7 +519,7 @@ fn collect_segments(expr: &Expr) -> Option<SmallVec<[&str; 8]>> {
         Expr::Attribute(attr7) => attr7,
         // Ex) `foo.bar.baz.bop.bap.bab.bob`
         Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(SmallVec::from_slice(&[
+            return Some(SegmentsInner::from_slice(&[
                 id.as_str(),
                 attr6.attr.as_str(),
                 attr5.attr.as_str(),
@@ -335,7 +536,7 @@ fn collect_segments(expr: &Expr) -> Option<SmallVec<[&str; 8]>> {
         Expr::Attribute(attr8) => attr8,
         // Ex) `foo.bar.baz.bop.bap.bab.bob.bib`
         Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(SmallVec::from([
+            return Some(SegmentsInner::from([
                 id.as_str(),
                 attr7.attr.as_str(),
                 attr6.attr.as_str(),
@@ -349,17 +550,21 @@ fn collect_segments(expr: &Expr) -> Option<SmallVec<[&str; 8]>> {
         _ => return None,
     };
 
-    collect_segments(&attr8.value).map(|mut segments| {
-        segments.extend([
-            attr8.attr.as_str(),
-            attr7.attr.as_str(),
-            attr6.attr.as_str(),
-            attr5.attr.as_str(),
-            attr4.attr.as_str(),
-            attr3.attr.as_str(),
-            attr2.attr.as_str(),
-            attr1.attr.as_str(),
-        ]);
-        segments
-    })
+    let mut segments = Vec::with_capacity(SMALL_LEN * 2);
+
+    record_attributes(&attr8.value, &mut segments);
+
+    // Append the attributes we visited before calling into the recursion.
+    segments.extend_from_slice(&[
+        attr8.attr.as_str(),
+        attr7.attr.as_str(),
+        attr6.attr.as_str(),
+        attr5.attr.as_str(),
+        attr4.attr.as_str(),
+        attr3.attr.as_str(),
+        attr2.attr.as_str(),
+        attr1.attr.as_str(),
+    ]);
+
+    Some(SegmentsInner::from(segments))
 }

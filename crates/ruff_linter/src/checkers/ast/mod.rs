@@ -419,11 +419,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.semantic.add_module(module);
 
                     if alias.asname.is_none() && alias.name.contains('.') {
-                        let qualified_name = QualifiedName::imported(&alias.name);
+                        let qualified_name = QualifiedName::user_defined(&alias.name);
                         self.add_binding(
                             module,
                             alias.identifier(),
-                            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }),
+                            BindingKind::SubmoduleImport(SubmoduleImport {
+                                qualified_name: Box::new(qualified_name),
+                            }),
                             BindingFlags::EXTERNAL,
                         );
                     } else {
@@ -440,11 +442,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
 
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let qualified_name = QualifiedName::imported(&alias.name);
+                        let qualified_name = QualifiedName::user_defined(&alias.name);
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::Import(Import { qualified_name }),
+                            BindingKind::Import(Import {
+                                qualified_name: Box::new(qualified_name),
+                            }),
                             flags,
                         );
                     }
@@ -508,7 +512,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::FromImport(FromImport { qualified_name }),
+                            BindingKind::FromImport(FromImport {
+                                qualified_name: Box::new(qualified_name),
+                            }),
                             flags,
                         );
                     }

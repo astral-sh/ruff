@@ -63,7 +63,7 @@ pub fn match_annotated_subscript<'a>(
             }
 
             for module in typing_modules {
-                let module_qualified_name = QualifiedName::imported(module);
+                let module_qualified_name = QualifiedName::user_defined(module);
                 if qualified_name.starts_with(&module_qualified_name) {
                     if let Some(member) = qualified_name.segments().last() {
                         if is_literal_member(member) {
@@ -764,7 +764,7 @@ fn find_parameter<'a>(
 /// This function will return `["asyncio", "get_running_loop"]` for the `loop` binding.
 pub fn resolve_assignment<'a>(
     expr: &'a Expr,
-    semantic: &SemanticModel<'a>,
+    semantic: &'a SemanticModel<'a>,
 ) -> Option<QualifiedName<'a>> {
     let name = expr.as_name_expr()?;
     let binding_id = semantic.resolve_name(name)?;
@@ -794,7 +794,7 @@ pub fn resolve_assignment<'a>(
 ///
 /// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
 /// `StringLiteral` with value `"str"` when called with `bla`.
-pub fn find_assigned_value<'a>(symbol: &str, semantic: &SemanticModel<'a>) -> Option<&'a Expr> {
+pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) -> Option<&'a Expr> {
     let binding_id = semantic.lookup_symbol(symbol)?;
     let binding = semantic.binding(binding_id);
     find_binding_value(binding, semantic)
@@ -811,7 +811,7 @@ pub fn find_assigned_value<'a>(symbol: &str, semantic: &SemanticModel<'a>) -> Op
 /// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
 /// `StringLiteral` with value `"str"` when called with `bla`.
 #[allow(clippy::single_match)]
-pub fn find_binding_value<'a>(binding: &Binding, semantic: &SemanticModel<'a>) -> Option<&'a Expr> {
+pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) -> Option<&'a Expr> {
     match binding.kind {
         // Ex) `x := 1`
         BindingKind::NamedExprAssignment => {

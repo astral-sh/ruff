@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::name::{format_qualified_name_segments, QualifiedName};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::Stmt;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -362,7 +362,7 @@ pub struct Import<'a> {
     /// The full name of the module being imported.
     /// Ex) Given `import foo`, `qualified_name` would be "foo".
     /// Ex) Given `import foo as bar`, `qualified_name` would be "foo".
-    pub qualified_name: QualifiedName<'a>,
+    pub qualified_name: Box<QualifiedName<'a>>,
 }
 
 /// A binding for a member imported from a module, keyed on the name to which the member is bound.
@@ -373,7 +373,7 @@ pub struct FromImport<'a> {
     /// The full name of the member being imported.
     /// Ex) Given `from foo import bar`, `qualified_name` would be "foo.bar".
     /// Ex) Given `from foo import bar as baz`, `qualified_name` would be "foo.bar".
-    pub qualified_name: QualifiedName<'a>,
+    pub qualified_name: Box<QualifiedName<'a>>,
 }
 
 /// A binding for a submodule imported from a module, keyed on the name of the parent module.
@@ -382,7 +382,7 @@ pub struct FromImport<'a> {
 pub struct SubmoduleImport<'a> {
     /// The full name of the submodule being imported.
     /// Ex) Given `import foo.bar`, `qualified_name` would be "foo.bar".
-    pub qualified_name: QualifiedName<'a>,
+    pub qualified_name: Box<QualifiedName<'a>>,
 }
 
 #[derive(Debug, Clone, is_macro::Is)]
@@ -549,7 +549,7 @@ bitflags! {
 /// A trait for imported symbols.
 pub trait Imported<'a> {
     /// Returns the call path to the imported symbol.
-    fn call_path(&self) -> &[&'a str];
+    fn qualified_name(&self) -> &QualifiedName<'a>;
 
     /// Returns the module name of the imported symbol.
     fn module_name(&self) -> &[&'a str];
@@ -557,19 +557,12 @@ pub trait Imported<'a> {
     /// Returns the member name of the imported symbol. For a straight import, this is equivalent
     /// to the qualified name; for a `from` import, this is the name of the imported symbol.
     fn member_name(&self) -> Cow<'a, str>;
-
-    /// Returns the fully-qualified name of the imported symbol.
-    fn qualified_name(&self) -> String {
-        let mut output = String::new();
-        format_qualified_name_segments(self.call_path(), &mut output).unwrap();
-        output
-    }
 }
 
 impl<'a> Imported<'a> for Import<'a> {
     /// For example, given `import foo`, returns `["foo"]`.
-    fn call_path(&self) -> &[&'a str] {
-        self.qualified_name.segments()
+    fn qualified_name(&self) -> &QualifiedName<'a> {
+        &self.qualified_name
     }
 
     /// For example, given `import foo`, returns `["foo"]`.
@@ -579,14 +572,14 @@ impl<'a> Imported<'a> for Import<'a> {
 
     /// For example, given `import foo`, returns `"foo"`.
     fn member_name(&self) -> Cow<'a, str> {
-        Cow::Owned(self.qualified_name())
+        Cow::Owned(self.qualified_name().to_string())
     }
 }
 
 impl<'a> Imported<'a> for SubmoduleImport<'a> {
     /// For example, given `import foo.bar`, returns `["foo", "bar"]`.
-    fn call_path(&self) -> &[&'a str] {
-        self.qualified_name.segments()
+    fn qualified_name(&self) -> &QualifiedName<'a> {
+        &self.qualified_name
     }
 
     /// For example, given `import foo.bar`, returns `["foo"]`.
@@ -596,14 +589,14 @@ impl<'a> Imported<'a> for SubmoduleImport<'a> {
 
     /// For example, given `import foo.bar`, returns `"foo.bar"`.
     fn member_name(&self) -> Cow<'a, str> {
-        Cow::Owned(self.qualified_name())
+        Cow::Owned(self.qualified_name().to_string())
     }
 }
 
 impl<'a> Imported<'a> for FromImport<'a> {
     /// For example, given `from foo import bar`, returns `["foo", "bar"]`.
-    fn call_path(&self) -> &[&'a str] {
-        self.qualified_name.segments()
+    fn qualified_name(&self) -> &QualifiedName<'a> {
+        &self.qualified_name
     }
 
     /// For example, given `from foo import bar`, returns `["foo"]`.
@@ -626,11 +619,11 @@ pub enum AnyImport<'a, 'ast> {
 }
 
 impl<'a, 'ast> Imported<'ast> for AnyImport<'a, 'ast> {
-    fn call_path(&self) -> &[&'ast str] {
+    fn qualified_name(&self) -> &QualifiedName<'ast> {
         match self {
-            Self::Import(import) => import.call_path(),
-            Self::SubmoduleImport(import) => import.call_path(),
-            Self::FromImport(import) => import.call_path(),
+            Self::Import(import) => import.qualified_name(),
+            Self::SubmoduleImport(import) => import.qualified_name(),
+            Self::FromImport(import) => import.qualified_name(),
         }
     }
 

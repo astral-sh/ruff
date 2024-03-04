@@ -4,6 +4,7 @@ use itertools::Itertools;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::{FromImport, Import, Imported, ResolvedReference, Scope};
 use ruff_text_size::Ranged;
 
@@ -113,7 +114,8 @@ pub(crate) fn import_private_name(
         // Ignore public imports; require at least one private name.
         // Ex) `from foo import bar`
         let Some((index, private_name)) = import_info
-            .call_path
+            .qualified_name
+            .segments()
             .iter()
             .find_position(|name| name.starts_with('_'))
         else {
@@ -132,7 +134,7 @@ pub(crate) fn import_private_name(
 
         let name = (*private_name).to_string();
         let module = if index > 0 {
-            Some(import_info.call_path[..index].join("."))
+            Some(import_info.qualified_name.segments()[..index].join("."))
         } else {
             None
         };
@@ -152,21 +154,22 @@ fn is_typing(reference: &ResolvedReference) -> bool {
         || reference.in_runtime_evaluated_annotation()
 }
 
+#[allow(clippy::struct_field_names)]
 struct ImportInfo<'a> {
     module_name: &'a [&'a str],
     member_name: Cow<'a, str>,
-    call_path: &'a [&'a str],
+    qualified_name: &'a QualifiedName<'a>,
 }
 
 impl<'a> From<&'a FromImport<'_>> for ImportInfo<'a> {
     fn from(import: &'a FromImport) -> Self {
         let module_name = import.module_name();
         let member_name = import.member_name();
-        let call_path = import.call_path();
+        let qualified_name = import.qualified_name();
         Self {
             module_name,
             member_name,
-            call_path,
+            qualified_name,
         }
     }
 }
@@ -175,11 +178,11 @@ impl<'a> From<&'a Import<'_>> for ImportInfo<'a> {
     fn from(import: &'a Import) -> Self {
         let module_name = import.module_name();
         let member_name = import.member_name();
-        let call_path = import.call_path();
+        let qualified_name = import.qualified_name();
         Self {
             module_name,
             member_name,
-            call_path,
+            qualified_name,
         }
     }
 }
