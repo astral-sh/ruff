@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::name::compose_call_path;
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
@@ -61,10 +61,10 @@ impl AlwaysFixableViolation for TimeoutErrorAlias {
 fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion) -> bool {
     semantic
         .resolve_qualified_name(expr)
-        .is_some_and(|call_path| {
+        .is_some_and(|qualified_name| {
             if target_version >= PythonVersion::Py311 {
                 matches!(
-                    call_path.segments(),
+                    qualified_name.segments(),
                     ["socket", "timeout"] | ["asyncio", "TimeoutError"]
                 )
             } else {
@@ -76,7 +76,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion
                     target_version >= PythonVersion::Py310,
                     "lint should only be used for Python 3.10+",
                 );
-                matches!(call_path.segments(), ["socket", "timeout"])
+                matches!(qualified_name.segments(), ["socket", "timeout"])
             }
         })
 }
@@ -85,14 +85,14 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion
 fn is_timeout_error(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
-        .is_some_and(|call_path| matches!(call_path.segments(), ["", "TimeoutError"]))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "TimeoutError"]))
 }
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
 fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
     let mut diagnostic = Diagnostic::new(
         TimeoutErrorAlias {
-            name: compose_call_path(target),
+            name: UnqualifiedName::from_expr(target).map(|name| name.to_string()),
         },
         target.range(),
     );

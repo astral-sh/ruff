@@ -66,9 +66,9 @@ pub(crate) fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
         checker
             .semantic()
             .resolve_qualified_name(expr)
-            .and_then(|call_path| {
+            .and_then(|qualified_name| {
                 banned_api.iter().find(|(banned_path, ..)| {
-                    call_path == QualifiedName::from_dotted_name(banned_path)
+                    qualified_name == QualifiedName::from_dotted_name(banned_path)
                 })
             })
     {

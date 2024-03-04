@@ -64,7 +64,7 @@ pub(crate) fn metaclass_abcmeta(checker: &mut Checker, class_def: &StmtClassDef)
     if !checker
         .semantic()
         .resolve_qualified_name(&keyword.value)
-        .is_some_and(|call_path| matches!(call_path.segments(), ["abc", "ABCMeta"]))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["abc", "ABCMeta"]))
     {
         return;
     }

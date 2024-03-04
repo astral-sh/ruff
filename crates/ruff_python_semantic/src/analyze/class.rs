@@ -7,7 +7,7 @@ use ruff_python_ast::name::QualifiedName;
 use crate::{BindingId, SemanticModel};
 
 /// Return `true` if any base class matches a [`QualifiedName`] predicate.
-pub fn any_call_path(
+pub fn any_qualified_name(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
     func: &dyn Fn(QualifiedName) -> bool,

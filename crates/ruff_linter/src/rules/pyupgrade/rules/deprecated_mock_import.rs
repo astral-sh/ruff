@@ -256,7 +256,7 @@ pub(crate) fn deprecated_mock_attribute(checker: &mut Checker, attribute: &ast::
     }
 
     if UnqualifiedName::from_expr(&attribute.value)
-        .is_some_and(|call_path| matches!(call_path.segments(), ["mock", "mock"]))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["mock", "mock"]))
     {
         let mut diagnostic = Diagnostic::new(
             DeprecatedMockImport {

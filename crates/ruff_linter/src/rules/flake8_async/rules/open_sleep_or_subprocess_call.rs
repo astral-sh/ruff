@@ -60,9 +60,9 @@ pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, call: &ast::E
 fn is_open_sleep_or_subprocess_call(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
-        .is_some_and(|call_path| {
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.segments(),
+                qualified_name.segments(),
                 ["", "open"]
                     | ["time", "sleep"]
                     | [
@@ -96,10 +96,10 @@ fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -> bool {
     // Path("foo").open()
     // ```
     if let Expr::Call(call) = value.as_ref() {
-        let Some(call_path) = semantic.resolve_qualified_name(call.func.as_ref()) else {
+        let Some(qualified_name) = semantic.resolve_qualified_name(call.func.as_ref()) else {
             return false;
         };
-        if call_path.segments() == ["pathlib", "Path"] {
+        if qualified_name.segments() == ["pathlib", "Path"] {
             return true;
         }
     }
@@ -126,5 +126,5 @@ fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -> bool {
 
     semantic
         .resolve_qualified_name(call.func.as_ref())
-        .is_some_and(|call_path| call_path.segments() == ["pathlib", "Path"])
+        .is_some_and(|qualified_name| qualified_name.segments() == ["pathlib", "Path"])
 }

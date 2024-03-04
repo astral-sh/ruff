@@ -18,9 +18,9 @@ pub fn is_sys_path_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
     };
     semantic
         .resolve_qualified_name(func.as_ref())
-        .is_some_and(|call_path| {
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.segments(),
+                qualified_name.segments(),
                 [
                     "sys",
                     "path",
@@ -48,9 +48,9 @@ pub fn is_os_environ_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool
         Stmt::Expr(ast::StmtExpr { value, .. }) => match value.as_ref() {
             Expr::Call(ast::ExprCall { func, .. }) => semantic
                 .resolve_qualified_name(func.as_ref())
-                .is_some_and(|call_path| {
+                .is_some_and(|qualified_name| {
                     matches!(
-                        call_path.segments(),
+                        qualified_name.segments(),
                         ["os", "putenv" | "unsetenv"]
                             | [
                                 "os",
@@ -64,19 +64,23 @@ pub fn is_os_environ_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool
         Stmt::Delete(ast::StmtDelete { targets, .. }) => targets.iter().any(|target| {
             semantic
                 .resolve_qualified_name(map_subscript(target))
-                .is_some_and(|call_path| matches!(call_path.segments(), ["os", "environ"]))
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["os", "environ"])
+                })
         }),
         Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.iter().any(|target| {
             semantic
                 .resolve_qualified_name(map_subscript(target))
-                .is_some_and(|call_path| matches!(call_path.segments(), ["os", "environ"]))
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["os", "environ"])
+                })
         }),
         Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => semantic
             .resolve_qualified_name(map_subscript(target))
-            .is_some_and(|call_path| matches!(call_path.segments(), ["os", "environ"])),
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["os", "environ"])),
         Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => semantic
             .resolve_qualified_name(map_subscript(target))
-            .is_some_and(|call_path| matches!(call_path.segments(), ["os", "environ"])),
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["os", "environ"])),
         _ => false,
     }
 }
@@ -96,5 +100,5 @@ pub fn is_matplotlib_activation(stmt: &Stmt, semantic: &SemanticModel) -> bool {
     };
     semantic
         .resolve_qualified_name(func.as_ref())
-        .is_some_and(|call_path| matches!(call_path.segments(), ["matplotlib", "use"]))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["matplotlib", "use"]))
 }

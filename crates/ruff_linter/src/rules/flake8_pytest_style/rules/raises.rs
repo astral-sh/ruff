@@ -154,7 +154,7 @@ impl Violation for PytestRaisesWithoutException {
 fn is_pytest_raises(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
-        .is_some_and(|call_path| matches!(call_path.segments(), ["pytest", "raises"]))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "raises"]))
 }
 
 const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
@@ -226,11 +226,11 @@ pub(crate) fn complex_raises(
 
 /// PT011
 fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
-    if let Some(call_path) = checker
+    if let Some(qualified_name) = checker
         .semantic()
         .resolve_qualified_name(exception)
-        .and_then(|call_path| {
-            let call_path = call_path.to_string();
+        .and_then(|qualified_name| {
+            let qualified_name = qualified_name.to_string();
             checker
                 .settings
                 .flake8_pytest_style
@@ -242,13 +242,13 @@ fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
                         .flake8_pytest_style
                         .raises_extend_require_match_for,
                 )
-                .any(|pattern| pattern.matches(&call_path))
-                .then_some(call_path)
+                .any(|pattern| pattern.matches(&qualified_name))
+                .then_some(qualified_name)
         })
     {
         checker.diagnostics.push(Diagnostic::new(
             PytestRaisesTooBroad {
-                exception: call_path,
+                exception: qualified_name,
             },
             exception.range(),
         ));

@@ -1071,27 +1071,27 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         .and_then(|qualified_name| {
                             if self
                                 .semantic
-                                .match_typing_call_path(&qualified_name, "cast")
+                                .match_typing_qualified_name(&qualified_name, "cast")
                             {
                                 Some(typing::Callable::Cast)
                             } else if self
                                 .semantic
-                                .match_typing_call_path(&qualified_name, "NewType")
+                                .match_typing_qualified_name(&qualified_name, "NewType")
                             {
                                 Some(typing::Callable::NewType)
                             } else if self
                                 .semantic
-                                .match_typing_call_path(&qualified_name, "TypeVar")
+                                .match_typing_qualified_name(&qualified_name, "TypeVar")
                             {
                                 Some(typing::Callable::TypeVar)
                             } else if self
                                 .semantic
-                                .match_typing_call_path(&qualified_name, "NamedTuple")
+                                .match_typing_qualified_name(&qualified_name, "NamedTuple")
                             {
                                 Some(typing::Callable::NamedTuple)
                             } else if self
                                 .semantic
-                                .match_typing_call_path(&qualified_name, "TypedDict")
+                                .match_typing_qualified_name(&qualified_name, "TypedDict")
                             {
                                 Some(typing::Callable::TypedDict)
                             } else if matches!(

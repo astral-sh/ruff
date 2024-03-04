@@ -36,8 +36,8 @@ pub fn classify(
             // The class itself extends a known metaclass, so all methods are class methods.
             semantic
                 .resolve_qualified_name(map_callable(expr))
-                .is_some_and( |call_path| {
-                    matches!(call_path.segments(), ["", "type"] | ["abc", "ABCMeta"])
+                .is_some_and( |qualified_name| {
+                    matches!(qualified_name.segments(), ["", "type"] | ["abc", "ABCMeta"])
                 })
         })
         || decorator_list.iter().any(|decorator| is_class_method(decorator, semantic, classmethod_decorators))
@@ -60,13 +60,13 @@ fn is_static_method(
     // The decorator is an import, so should match against a qualified path.
     if semantic
         .resolve_qualified_name(decorator)
-        .is_some_and(|call_path| {
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.segments(),
+                qualified_name.segments(),
                 ["", "staticmethod"] | ["abc", "abstractstaticmethod"]
             ) || staticmethod_decorators
                 .iter()
-                .any(|decorator| call_path == QualifiedName::from_dotted_name(decorator))
+                .any(|decorator| qualified_name == QualifiedName::from_dotted_name(decorator))
         })
     {
         return true;
@@ -75,8 +75,8 @@ fn is_static_method(
     // We do not have a resolvable call path, most likely from a decorator like
     // `@someproperty.setter`. Instead, match on the last element.
     if !staticmethod_decorators.is_empty() {
-        if UnqualifiedName::from_expr(decorator).is_some_and(|call_path| {
-            call_path.segments().last().is_some_and(|tail| {
+        if UnqualifiedName::from_expr(decorator).is_some_and(|name| {
+            name.segments().last().is_some_and(|tail| {
                 staticmethod_decorators
                     .iter()
                     .any(|decorator| tail == decorator)
@@ -100,13 +100,13 @@ fn is_class_method(
     // The decorator is an import, so should match against a qualified path.
     if semantic
         .resolve_qualified_name(decorator)
-        .is_some_and(|call_path| {
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.segments(),
+                qualified_name.segments(),
                 ["", "classmethod"] | ["abc", "abstractclassmethod"]
             ) || classmethod_decorators
                 .iter()
-                .any(|decorator| call_path == QualifiedName::from_dotted_name(decorator))
+                .any(|decorator| qualified_name == QualifiedName::from_dotted_name(decorator))
         })
     {
         return true;
@@ -115,8 +115,8 @@ fn is_class_method(
     // We do not have a resolvable call path, most likely from a decorator like
     // `@someproperty.setter`. Instead, match on the last element.
     if !classmethod_decorators.is_empty() {
-        if UnqualifiedName::from_expr(decorator).is_some_and(|call_path| {
-            call_path.segments().last().is_some_and(|tail| {
+        if UnqualifiedName::from_expr(decorator).is_some_and(|name| {
+            name.segments().last().is_some_and(|tail| {
                 classmethod_decorators
                     .iter()
                     .any(|decorator| tail == decorator)

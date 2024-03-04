@@ -73,8 +73,8 @@ pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) 
     let Some((function_name, mode)) = checker
         .semantic()
         .resolve_qualified_name(&call.func)
-        .filter(|call_path| is_violation(call, call_path))
-        .map(|call_path| (call_path.to_string(), Mode::from(&call_path)))
+        .filter(|qualified_name| is_violation(call, qualified_name))
+        .map(|qualified_name| (qualified_name.to_string(), Mode::from(&qualified_name)))
     else {
         return;
     };

@@ -81,7 +81,9 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
             if checker
                 .semantic()
                 .resolve_qualified_name(unwrapped.value.as_ref())
-                .is_some_and(|call_path| matches!(call_path.segments(), ["" | "builtins", "type"]))
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["" | "builtins", "type"])
+                })
             {
                 type_exprs.push(unwrapped.slice.as_ref());
             } else {

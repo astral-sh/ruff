@@ -83,19 +83,20 @@ impl<'a> TypingTarget<'a> {
                     // If we can't resolve the call path, it must be defined
                     // in the same file and could be a type alias.
                     Some(TypingTarget::Unknown),
-                    |call_path| {
-                        if semantic.match_typing_call_path(&call_path, "Optional") {
+                    |qualified_name| {
+                        if semantic.match_typing_qualified_name(&qualified_name, "Optional") {
                             Some(TypingTarget::Optional(slice.as_ref()))
-                        } else if semantic.match_typing_call_path(&call_path, "Literal") {
+                        } else if semantic.match_typing_qualified_name(&qualified_name, "Literal") {
                             Some(TypingTarget::Literal(slice.as_ref()))
-                        } else if semantic.match_typing_call_path(&call_path, "Union") {
+                        } else if semantic.match_typing_qualified_name(&qualified_name, "Union") {
                             Some(TypingTarget::Union(slice.as_ref()))
-                        } else if semantic.match_typing_call_path(&call_path, "Annotated") {
+                        } else if semantic.match_typing_qualified_name(&qualified_name, "Annotated")
+                        {
                             resolve_slice_value(slice.as_ref())
                                 .next()
                                 .map(TypingTarget::Annotated)
                         } else {
-                            if is_known_type(&call_path, minor_version) {
+                            if is_known_type(&qualified_name, minor_version) {
                                 Some(TypingTarget::Known)
                             } else {
                                 Some(TypingTarget::Unknown)
@@ -119,16 +120,19 @@ impl<'a> TypingTarget<'a> {
                 // If we can't resolve the call path, it must be defined in the
                 // same file, so we assume it's `Any` as it could be a type alias.
                 Some(TypingTarget::Unknown),
-                |call_path| {
-                    if semantic.match_typing_call_path(&call_path, "Any") {
+                |qualified_name| {
+                    if semantic.match_typing_qualified_name(&qualified_name, "Any") {
                         Some(TypingTarget::Any)
-                    } else if matches!(call_path.segments(), ["" | "builtins", "object"]) {
+                    } else if matches!(qualified_name.segments(), ["" | "builtins", "object"]) {
                         Some(TypingTarget::Object)
-                    } else if semantic.match_typing_call_path(&call_path, "Hashable")
-                        || matches!(call_path.segments(), ["collections", "abc", "Hashable"])
+                    } else if semantic.match_typing_qualified_name(&qualified_name, "Hashable")
+                        || matches!(
+                            qualified_name.segments(),
+                            ["collections", "abc", "Hashable"]
+                        )
                     {
                         Some(TypingTarget::Hashable)
-                    } else if !is_known_type(&call_path, minor_version) {
+                    } else if !is_known_type(&qualified_name, minor_version) {
                         // If it's not a known type, we assume it's `Any`.
                         Some(TypingTarget::Unknown)
                     } else {

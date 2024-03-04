@@ -25,15 +25,21 @@ pub(super) fn is_untyped_exception(type_: Option<&Expr>, semantic: &SemanticMode
             elts.iter().any(|type_| {
                 semantic
                     .resolve_qualified_name(type_)
-                    .is_some_and(|call_path| {
-                        matches!(call_path.segments(), ["", "Exception" | "BaseException"])
+                    .is_some_and(|qualified_name| {
+                        matches!(
+                            qualified_name.segments(),
+                            ["", "Exception" | "BaseException"]
+                        )
                     })
             })
         } else {
             semantic
                 .resolve_qualified_name(type_)
-                .is_some_and(|call_path| {
-                    matches!(call_path.segments(), ["", "Exception" | "BaseException"])
+                .is_some_and(|qualified_name| {
+                    matches!(
+                        qualified_name.segments(),
+                        ["", "Exception" | "BaseException"]
+                    )
                 })
         }
     })

@@ -70,7 +70,7 @@ pub(crate) fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
         } else {
             expr
         })
-        .is_some_and(|call_path| matches!(call_path.segments(), ["", "Exception"]))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "Exception"]))
     {
         checker
             .diagnostics

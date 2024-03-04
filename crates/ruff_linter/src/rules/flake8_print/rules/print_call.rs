@@ -98,10 +98,10 @@ impl Violation for PPrint {
 /// T201, T203
 pub(crate) fn print_call(checker: &mut Checker, call: &ast::ExprCall) {
     let mut diagnostic = {
-        let call_path = checker.semantic().resolve_qualified_name(&call.func);
-        if call_path
+        let qualified_name = checker.semantic().resolve_qualified_name(&call.func);
+        if qualified_name
             .as_ref()
-            .is_some_and(|call_path| matches!(call_path.segments(), ["", "print"]))
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "print"]))
         {
             // If the print call has a `file=` argument (that isn't `None`, `"sys.stdout"`,
             // or `"sys.stderr"`), don't trigger T201.
@@ -110,9 +110,9 @@ pub(crate) fn print_call(checker: &mut Checker, call: &ast::ExprCall) {
                     if checker
                         .semantic()
                         .resolve_qualified_name(&keyword.value)
-                        .map_or(true, |call_path| {
-                            call_path.segments() != ["sys", "stdout"]
-                                && call_path.segments() != ["sys", "stderr"]
+                        .map_or(true, |qualified_name| {
+                            qualified_name.segments() != ["sys", "stdout"]
+                                && qualified_name.segments() != ["sys", "stderr"]
                         })
                     {
                         return;
@@ -120,9 +120,9 @@ pub(crate) fn print_call(checker: &mut Checker, call: &ast::ExprCall) {
                 }
             }
             Diagnostic::new(Print, call.func.range())
-        } else if call_path
+        } else if qualified_name
             .as_ref()
-            .is_some_and(|call_path| matches!(call_path.segments(), ["pprint", "pprint"]))
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pprint", "pprint"]))
         {
             Diagnostic::new(PPrint, call.func.range())
         } else {

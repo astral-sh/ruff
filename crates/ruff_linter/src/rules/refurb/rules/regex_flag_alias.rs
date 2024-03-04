@@ -60,7 +60,7 @@ pub(crate) fn regex_flag_alias(checker: &mut Checker, expr: &Expr) {
     let Some(flag) = checker
         .semantic()
         .resolve_qualified_name(expr)
-        .and_then(|call_path| match call_path.segments() {
+        .and_then(|qualified_name| match qualified_name.segments() {
             ["re", "A"] => Some(RegexFlag::Ascii),
             ["re", "I"] => Some(RegexFlag::IgnoreCase),
             ["re", "L"] => Some(RegexFlag::Locale),

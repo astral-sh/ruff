@@ -136,7 +136,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
         // Allow Boolean type hints in setters.
         if decorator_list.iter().any(|decorator| {
             UnqualifiedName::from_expr(&decorator.expression)
-                .is_some_and(|call_path| call_path.segments() == [name, "setter"])
+                .is_some_and(|unqualified_name| unqualified_name.segments() == [name, "setter"])
         }) {
             return;
         }
@@ -195,11 +195,10 @@ fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel)
                 return false;
             }
 
-            let call_path = semantic.resolve_qualified_name(value);
-            if call_path
-                .as_ref()
-                .is_some_and(|call_path| semantic.match_typing_call_path(call_path, "Union"))
-            {
+            let qualified_name = semantic.resolve_qualified_name(value);
+            if qualified_name.as_ref().is_some_and(|qualified_name| {
+                semantic.match_typing_qualified_name(qualified_name, "Union")
+            }) {
                 if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                     elts.iter()
                         .any(|elt| match_annotation_to_complex_bool(elt, semantic))
@@ -207,10 +206,9 @@ fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel)
                     // Union with a single type is an invalid type annotation
                     false
                 }
-            } else if call_path
-                .as_ref()
-                .is_some_and(|call_path| semantic.match_typing_call_path(call_path, "Optional"))
-            {
+            } else if qualified_name.as_ref().is_some_and(|qualified_name| {
+                semantic.match_typing_qualified_name(qualified_name, "Optional")
+            }) {
                 match_annotation_to_complex_bool(slice, semantic)
             } else {
                 false

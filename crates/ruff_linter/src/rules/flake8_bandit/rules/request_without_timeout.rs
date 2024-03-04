@@ -53,9 +53,9 @@ pub(crate) fn request_without_timeout(checker: &mut Checker, call: &ast::ExprCal
     if checker
         .semantic()
         .resolve_qualified_name(&call.func)
-        .is_some_and(|call_path| {
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.segments(),
+                qualified_name.segments(),
                 [
                     "requests",
                     "get" | "options" | "head" | "post" | "put" | "patch" | "delete"

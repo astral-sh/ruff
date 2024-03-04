@@ -96,15 +96,15 @@ pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) 
     let Some(kind) = checker
         .semantic()
         .resolve_qualified_name(func)
-        .and_then(|call_path| {
+        .and_then(|qualified_name| {
             if checker
                 .semantic()
-                .match_typing_call_path(&call_path, "ParamSpec")
+                .match_typing_qualified_name(&qualified_name, "ParamSpec")
             {
                 Some(VarKind::ParamSpec)
             } else if checker
                 .semantic()
-                .match_typing_call_path(&call_path, "TypeVar")
+                .match_typing_qualified_name(&qualified_name, "TypeVar")
             {
                 Some(VarKind::TypeVar)
             } else {

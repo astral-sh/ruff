@@ -70,7 +70,9 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
             && checker
                 .semantic()
                 .resolve_qualified_name(func)
-                .is_some_and(|call_path| matches!(call_path.segments(), ["functools", "lru_cache"]))
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["functools", "lru_cache"])
+                })
         {
             let mut diagnostic = Diagnostic::new(
                 LRUCacheWithoutParameters,

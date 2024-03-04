@@ -248,13 +248,16 @@ impl AlwaysFixableViolation for TypeAliasWithoutAnnotation {
     }
 }
 
-fn is_allowed_negated_math_attribute(call_path: &QualifiedName) -> bool {
-    matches!(call_path.segments(), ["math", "inf" | "e" | "pi" | "tau"])
+fn is_allowed_negated_math_attribute(qualified_name: &QualifiedName) -> bool {
+    matches!(
+        qualified_name.segments(),
+        ["math", "inf" | "e" | "pi" | "tau"]
+    )
 }
 
-fn is_allowed_math_attribute(call_path: &QualifiedName) -> bool {
+fn is_allowed_math_attribute(qualified_name: &QualifiedName) -> bool {
     matches!(
-        call_path.segments(),
+        qualified_name.segments(),
         ["math", "inf" | "nan" | "e" | "pi" | "tau"]
             | [
                 "sys",
@@ -437,9 +440,9 @@ fn is_type_var_like_call(expr: &Expr, semantic: &SemanticModel) -> bool {
     };
     semantic
         .resolve_qualified_name(func)
-        .is_some_and(|call_path| {
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.segments(),
+                qualified_name.segments(),
                 [
                     "typing" | "typing_extensions",
                     "TypeVar" | "TypeVarTuple" | "NewType" | "ParamSpec"
@@ -483,9 +486,9 @@ fn is_enum(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
             // If the base class is `enum.Enum`, `enum.Flag`, etc., then this is an enum.
             if semantic
                 .resolve_qualified_name(map_subscript(expr))
-                .is_some_and(|call_path| {
+                .is_some_and(|qualified_name| {
                     matches!(
-                        call_path.segments(),
+                        qualified_name.segments(),
                         [
                             "enum",
                             "Enum" | "Flag" | "IntEnum" | "IntFlag" | "StrEnum" | "ReprEnum"

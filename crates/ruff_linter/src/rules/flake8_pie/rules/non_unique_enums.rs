@@ -63,7 +63,7 @@ pub(crate) fn non_unique_enums(checker: &mut Checker, parent: &Stmt, body: &[Stm
         checker
             .semantic()
             .resolve_qualified_name(expr)
-            .is_some_and(|call_path| matches!(call_path.segments(), ["enum", "Enum"]))
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["enum", "Enum"]))
     }) {
         return;
     }
@@ -78,7 +78,7 @@ pub(crate) fn non_unique_enums(checker: &mut Checker, parent: &Stmt, body: &[Stm
             if checker
                 .semantic()
                 .resolve_qualified_name(func)
-                .is_some_and(|call_path| matches!(call_path.segments(), ["enum", "auto"]))
+                .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["enum", "auto"]))
             {
                 continue;
             }

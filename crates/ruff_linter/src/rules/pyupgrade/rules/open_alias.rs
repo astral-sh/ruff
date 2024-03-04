@@ -50,7 +50,7 @@ pub(crate) fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
     if checker
         .semantic()
         .resolve_qualified_name(func)
-        .is_some_and(|call_path| matches!(call_path.segments(), ["io", "open"]))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["io", "open"]))
     {
         let mut diagnostic = Diagnostic::new(OpenAlias, expr.range());
         if checker.semantic().is_builtin("open") {

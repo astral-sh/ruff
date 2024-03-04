@@ -801,7 +801,7 @@ pub fn collect_import_from_member<'a>(
     module: Option<&'a str>,
     member: &'a str,
 ) -> QualifiedName<'a> {
-    let mut call_path_builder = QualifiedNameBuilder::with_capacity(
+    let mut qualified_name_builder = QualifiedNameBuilder::with_capacity(
         level.unwrap_or_default() as usize
             + module
                 .map(|module| module.split('.').count())
@@ -813,20 +813,20 @@ pub fn collect_import_from_member<'a>(
     if let Some(level) = level {
         if level > 0 {
             for _ in 0..level {
-                call_path_builder.push(".");
+                qualified_name_builder.push(".");
             }
         }
     }
 
     // Add the remaining segments.
     if let Some(module) = module {
-        call_path_builder.extend(module.split('.'));
+        qualified_name_builder.extend(module.split('.'));
     }
 
     // Add the member.
-    call_path_builder.push(member);
+    qualified_name_builder.push(member);
 
-    call_path_builder.build()
+    qualified_name_builder.build()
 }
 
 /// Format the call path for a relative import, or `None` if the relative import extends beyond
@@ -839,28 +839,28 @@ pub fn from_relative_import<'a>(
     // The remaining segments to the call path (e.g., given `bar.baz`, `["baz"]`).
     tail: &[&'a str],
 ) -> Option<QualifiedName<'a>> {
-    let mut call_path_builder =
+    let mut qualified_name_builder =
         QualifiedNameBuilder::with_capacity(module.len() + import.len() + tail.len());
 
     // Start with the module path.
-    call_path_builder.extend(module.iter().map(String::as_str));
+    qualified_name_builder.extend(module.iter().map(String::as_str));
 
     // Remove segments based on the number of dots.
     for segment in import {
         if *segment == "." {
-            if call_path_builder.is_empty() {
+            if qualified_name_builder.is_empty() {
                 return None;
             }
-            call_path_builder.pop();
+            qualified_name_builder.pop();
         } else {
-            call_path_builder.push(segment);
+            qualified_name_builder.push(segment);
         }
     }
 
     // Add the remaining segments.
-    call_path_builder.extend_from_slice(tail);
+    qualified_name_builder.extend_from_slice(tail);
 
-    Some(call_path_builder.build())
+    Some(qualified_name_builder.build())
 }
 
 /// Given an imported module (based on its relative import level and module name), return the

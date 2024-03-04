@@ -95,9 +95,9 @@ impl<'a> QualifiedNameBuilder<'a> {
         }
     }
 
-    pub fn from_qualified_name(call_path: QualifiedName<'a>) -> Self {
+    pub fn from_qualified_name(qualified_name: QualifiedName<'a>) -> Self {
         Self {
-            segments: call_path.segments,
+            segments: qualified_name.segments,
         }
     }
 
@@ -133,16 +133,11 @@ impl<'a> QualifiedNameBuilder<'a> {
 
 impl Display for QualifiedName<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        format_call_path_segments(self.segments(), f)
+        format_qualified_name_segments(self.segments(), f)
     }
 }
 
-/// Convert an `Expr` to its call path (like `List`, or `typing.List`).
-pub fn compose_call_path(expr: &Expr) -> Option<String> {
-    UnqualifiedName::from_expr(expr).map(|call_path| call_path.to_string())
-}
-
-pub fn format_call_path_segments(segments: &[&str], w: &mut dyn Write) -> std::fmt::Result {
+pub fn format_qualified_name_segments(segments: &[&str], w: &mut dyn Write) -> std::fmt::Result {
     if segments.first().is_some_and(|first| first.is_empty()) {
         // If the first segment is empty, the `CallPath` is that of a builtin.
         // Ex) `["", "bool"]` -> `"bool"`
@@ -194,21 +189,6 @@ pub struct UnqualifiedName<'a> {
 }
 
 impl<'a> UnqualifiedName<'a> {
-    /// Create a [`UnqualifiedName`] from a dotted name.
-    ///
-    /// ```rust
-    /// # use smallvec::smallvec;
-    /// # use ruff_python_ast::name::{UnqualifiedName};
-    ///
-    /// assert_eq!(UnqualifiedName::from_dotted("typing.List").segments(), ["typing", "List"]);
-    /// assert_eq!(UnqualifiedName::from_dotted("list").segments(), ["list"]);
-    /// ```
-    pub fn from_dotted(name: &'a str) -> Self {
-        Self {
-            segments: name.split('.').collect(),
-        }
-    }
-
     pub fn from_expr(expr: &'a Expr) -> Option<Self> {
         let segments = collect_segments(expr)?;
         Some(Self { segments })
@@ -239,6 +219,15 @@ impl Display for UnqualifiedName<'_> {
         }
 
         Ok(())
+    }
+}
+
+impl<'a> FromIterator<&'a str> for UnqualifiedName<'a> {
+    #[inline]
+    fn from_iter<T: IntoIterator<Item = &'a str>>(iter: T) -> Self {
+        Self {
+            segments: iter.into_iter().collect(),
+        }
     }
 }
 

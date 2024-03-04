@@ -64,7 +64,7 @@ pub(crate) fn re_sub_positional_args(checker: &mut Checker, call: &ast::ExprCall
     let Some(method) = checker
         .semantic()
         .resolve_qualified_name(&call.func)
-        .and_then(|call_path| match call_path.segments() {
+        .and_then(|qualified_name| match qualified_name.segments() {
             ["re", "sub"] => Some(Method::Sub),
             ["re", "subn"] => Some(Method::Subn),
             ["re", "split"] => Some(Method::Split),

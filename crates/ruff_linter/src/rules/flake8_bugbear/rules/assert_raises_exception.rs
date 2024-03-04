@@ -99,7 +99,7 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, items: &[WithItem])
             checker
                 .semantic()
                 .resolve_qualified_name(arg)
-                .and_then(|call_path| match call_path.segments() {
+                .and_then(|qualified_name| match qualified_name.segments() {
                     ["", "Exception"] => Some(ExceptionKind::Exception),
                     ["", "BaseException"] => Some(ExceptionKind::BaseException),
                     _ => None,
@@ -114,7 +114,7 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, items: &[WithItem])
         } else if checker
             .semantic()
             .resolve_qualified_name(func)
-            .is_some_and(|call_path| matches!(call_path.segments(), ["pytest", "raises"]))
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "raises"]))
             && arguments.find_keyword("match").is_none()
         {
             AssertionKind::PytestRaises

@@ -155,9 +155,11 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
 
     if !semantic
         .resolve_qualified_name(value)
-        .is_some_and(|call_path| {
-            matches!(call_path.segments(), ["collections", "abc", "Callable"])
-                || semantic.match_typing_call_path(&call_path, "Callable")
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["collections", "abc", "Callable"]
+            ) || semantic.match_typing_qualified_name(&qualified_name, "Callable")
         })
     {
         return None;

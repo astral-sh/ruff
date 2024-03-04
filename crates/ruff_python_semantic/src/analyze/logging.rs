@@ -27,9 +27,9 @@ pub fn is_logger_candidate(
 
     // If the symbol was imported from another module, ensure that it's either a user-specified
     // logger object, the `logging` module itself, or `flask.current_app.logger`.
-    if let Some(call_path) = semantic.resolve_qualified_name(value) {
+    if let Some(qualified_name) = semantic.resolve_qualified_name(value) {
         if matches!(
-            call_path.segments(),
+            qualified_name.segments(),
             ["logging"] | ["flask", "current_app", "logger"]
         ) {
             return true;
@@ -37,7 +37,7 @@ pub fn is_logger_candidate(
 
         if logger_objects
             .iter()
-            .any(|logger| QualifiedName::from_dotted_name(logger) == call_path)
+            .any(|logger| QualifiedName::from_dotted_name(logger) == qualified_name)
         {
             return true;
         }
@@ -47,8 +47,8 @@ pub fn is_logger_candidate(
 
     // Otherwise, if the symbol was defined in the current module, match against some common
     // logger names.
-    if let Some(call_path) = UnqualifiedName::from_expr(value) {
-        if let Some(tail) = call_path.segments().last() {
+    if let Some(name) = UnqualifiedName::from_expr(value) {
+        if let Some(tail) = name.segments().last() {
             if tail.starts_with("log")
                 || tail.ends_with("logger")
                 || tail.ends_with("logging")
@@ -79,7 +79,7 @@ pub fn exc_info<'a>(arguments: &'a Arguments, semantic: &SemanticModel) -> Optio
         .value
         .as_call_expr()
         .and_then(|call| semantic.resolve_qualified_name(&call.func))
-        .is_some_and(|call_path| matches!(call_path.segments(), ["sys", "exc_info"]))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["sys", "exc_info"]))
     {
         return Some(exc_info);
     }

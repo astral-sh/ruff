@@ -57,13 +57,13 @@ pub(crate) fn sync_call(checker: &mut Checker, call: &ExprCall) {
     }
 
     let Some(method_name) = ({
-        let Some(call_path) = checker
+        let Some(qualified_name) = checker
             .semantic()
             .resolve_qualified_name(call.func.as_ref())
         else {
             return;
         };
-        MethodName::try_from(&call_path)
+        MethodName::try_from(&qualified_name)
     }) else {
         return;
     };

@@ -42,43 +42,45 @@ pub fn match_annotated_subscript<'a>(
     typing_modules: impl Iterator<Item = &'a str>,
     extend_generics: &[String],
 ) -> Option<SubscriptKind> {
-    semantic.resolve_qualified_name(expr).and_then(|call_path| {
-        if is_standard_library_literal(call_path.segments()) {
-            return Some(SubscriptKind::Literal);
-        }
+    semantic
+        .resolve_qualified_name(expr)
+        .and_then(|qualified_name| {
+            if is_standard_library_literal(qualified_name.segments()) {
+                return Some(SubscriptKind::Literal);
+            }
 
-        if is_standard_library_generic(call_path.segments())
-            || extend_generics
-                .iter()
-                .map(|target| QualifiedName::from_dotted_name(target))
-                .any(|target| call_path == target)
-        {
-            return Some(SubscriptKind::Generic);
-        }
+            if is_standard_library_generic(qualified_name.segments())
+                || extend_generics
+                    .iter()
+                    .map(|target| QualifiedName::from_dotted_name(target))
+                    .any(|target| qualified_name == target)
+            {
+                return Some(SubscriptKind::Generic);
+            }
 
-        if is_pep_593_generic_type(call_path.segments()) {
-            return Some(SubscriptKind::PEP593Annotation);
-        }
+            if is_pep_593_generic_type(qualified_name.segments()) {
+                return Some(SubscriptKind::PEP593Annotation);
+            }
 
-        for module in typing_modules {
-            let module_call_path = QualifiedName::imported(module);
-            if call_path.starts_with(&module_call_path) {
-                if let Some(member) = call_path.segments().last() {
-                    if is_literal_member(member) {
-                        return Some(SubscriptKind::Literal);
-                    }
-                    if is_standard_library_generic_member(member) {
-                        return Some(SubscriptKind::Generic);
-                    }
-                    if is_pep_593_generic_member(member) {
-                        return Some(SubscriptKind::PEP593Annotation);
+            for module in typing_modules {
+                let module_qualified_name = QualifiedName::imported(module);
+                if qualified_name.starts_with(&module_qualified_name) {
+                    if let Some(member) = qualified_name.segments().last() {
+                        if is_literal_member(member) {
+                            return Some(SubscriptKind::Literal);
+                        }
+                        if is_standard_library_generic_member(member) {
+                            return Some(SubscriptKind::Generic);
+                        }
+                        if is_pep_593_generic_member(member) {
+                            return Some(SubscriptKind::PEP593Annotation);
+                        }
                     }
                 }
             }
-        }
 
-        None
-    })
+            None
+        })
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -105,8 +107,8 @@ pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<Module
         .seen_module(Modules::TYPING | Modules::TYPING_EXTENSIONS)
         .then(|| semantic.resolve_qualified_name(expr))
         .flatten()
-        .and_then(|call_path| {
-            let [module, member] = call_path.segments() else {
+        .and_then(|qualified_name| {
+            let [module, member] = qualified_name.segments() else {
                 return None;
             };
             as_pep_585_generic(module, member).map(|(module, member)| {
@@ -123,8 +125,8 @@ pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<Module
 pub fn is_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
-        .is_some_and(|call_path| {
-            let [module, name] = call_path.segments() else {
+        .is_some_and(|qualified_name| {
+            let [module, name] = qualified_name.segments() else {
                 return false;
             };
             has_pep_585_generic(module, name)
@@ -199,10 +201,10 @@ pub fn to_pep604_operator(
     semantic
         .resolve_qualified_name(value)
         .as_ref()
-        .and_then(|call_path| {
-            if semantic.match_typing_call_path(call_path, "Optional") {
+        .and_then(|qualified_name| {
+            if semantic.match_typing_qualified_name(qualified_name, "Optional") {
                 Some(Pep604Operator::Optional)
-            } else if semantic.match_typing_call_path(call_path, "Union") {
+            } else if semantic.match_typing_qualified_name(qualified_name, "Union") {
                 Some(Pep604Operator::Union)
             } else {
                 None
@@ -221,20 +223,20 @@ pub fn is_immutable_annotation(
         Expr::Name(_) | Expr::Attribute(_) => {
             semantic
                 .resolve_qualified_name(expr)
-                .is_some_and(|call_path| {
-                    is_immutable_non_generic_type(call_path.segments())
-                        || is_immutable_generic_type(call_path.segments())
+                .is_some_and(|qualified_name| {
+                    is_immutable_non_generic_type(qualified_name.segments())
+                        || is_immutable_generic_type(qualified_name.segments())
                         || extend_immutable_calls
                             .iter()
-                            .any(|target| call_path == *target)
+                            .any(|target| qualified_name == *target)
                 })
         }
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => semantic
             .resolve_qualified_name(value)
-            .is_some_and(|call_path| {
-                if is_immutable_generic_type(call_path.segments()) {
+            .is_some_and(|qualified_name| {
+                if is_immutable_generic_type(qualified_name.segments()) {
                     true
-                } else if matches!(call_path.segments(), ["typing", "Union"]) {
+                } else if matches!(qualified_name.segments(), ["typing", "Union"]) {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                         elts.iter().all(|elt| {
                             is_immutable_annotation(elt, semantic, extend_immutable_calls)
@@ -242,9 +244,9 @@ pub fn is_immutable_annotation(
                     } else {
                         false
                     }
-                } else if matches!(call_path.segments(), ["typing", "Optional"]) {
+                } else if matches!(qualified_name.segments(), ["typing", "Optional"]) {
                     is_immutable_annotation(slice, semantic, extend_immutable_calls)
-                } else if is_pep_593_generic_type(call_path.segments()) {
+                } else if is_pep_593_generic_type(qualified_name.segments()) {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                         elts.first().is_some_and(|elt| {
                             is_immutable_annotation(elt, semantic, extend_immutable_calls)
@@ -278,11 +280,11 @@ pub fn is_immutable_func(
 ) -> bool {
     semantic
         .resolve_qualified_name(func)
-        .is_some_and(|call_path| {
-            is_immutable_return_type(call_path.segments())
+        .is_some_and(|qualified_name| {
+            is_immutable_return_type(qualified_name.segments())
                 || extend_immutable_calls
                     .iter()
-                    .any(|target| call_path == *target)
+                    .any(|target| qualified_name == *target)
         })
 }
 
@@ -344,8 +346,11 @@ pub fn is_sys_version_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> boo
     any_over_expr(test, &|expr| {
         semantic
             .resolve_qualified_name(expr)
-            .is_some_and(|call_path| {
-                matches!(call_path.segments(), ["sys", "version_info" | "platform"])
+            .is_some_and(|qualified_name| {
+                matches!(
+                    qualified_name.segments(),
+                    ["sys", "version_info" | "platform"]
+                )
             })
     })
 }
@@ -617,18 +622,18 @@ impl TypeChecker for IoBaseChecker {
     fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
         semantic
             .resolve_qualified_name(annotation)
-            .is_some_and(|call_path| {
-                if semantic.match_typing_call_path(&call_path, "IO") {
+            .is_some_and(|qualified_name| {
+                if semantic.match_typing_qualified_name(&qualified_name, "IO") {
                     return true;
                 }
-                if semantic.match_typing_call_path(&call_path, "BinaryIO") {
+                if semantic.match_typing_qualified_name(&qualified_name, "BinaryIO") {
                     return true;
                 }
-                if semantic.match_typing_call_path(&call_path, "TextIO") {
+                if semantic.match_typing_qualified_name(&qualified_name, "TextIO") {
                     return true;
                 }
                 matches!(
-                    call_path.segments(),
+                    qualified_name.segments(),
                     [
                         "io",
                         "IOBase"
@@ -662,9 +667,9 @@ impl TypeChecker for IoBaseChecker {
                 if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
                     return semantic
                         .resolve_qualified_name(func)
-                        .is_some_and(|call_path| {
+                        .is_some_and(|qualified_name| {
                             matches!(
-                                call_path.segments(),
+                                qualified_name.segments(),
                                 [
                                     "pathlib",
                                     "Path" | "PurePath" | "PurePosixPath" | "PureWindowsPath"
@@ -678,9 +683,9 @@ impl TypeChecker for IoBaseChecker {
         // Ex) `open("file.txt")`
         semantic
             .resolve_qualified_name(func.as_ref())
-            .is_some_and(|call_path| {
+            .is_some_and(|qualified_name| {
                 matches!(
-                    call_path.segments(),
+                    qualified_name.segments(),
                     ["io", "open" | "open_code"] | ["os" | "", "open"]
                 )
             })

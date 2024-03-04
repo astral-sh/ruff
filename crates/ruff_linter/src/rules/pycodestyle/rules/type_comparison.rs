@@ -115,7 +115,9 @@ fn deprecated_type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
                 if checker
                     .semantic()
                     .resolve_qualified_name(value.as_ref())
-                    .is_some_and(|call_path| matches!(call_path.segments(), ["types", ..]))
+                    .is_some_and(|qualified_name| {
+                        matches!(qualified_name.segments(), ["types", ..])
+                    })
                 {
                     checker.diagnostics.push(Diagnostic::new(
                         TypeComparison {
@@ -313,7 +315,7 @@ fn is_dtype(expr: &Expr, semantic: &SemanticModel) -> bool {
         // Ex) `np.dtype(obj)`
         Expr::Call(ast::ExprCall { func, .. }) => semantic
             .resolve_qualified_name(func)
-            .is_some_and(|call_path| matches!(call_path.segments(), ["numpy", "dtype"])),
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["numpy", "dtype"])),
         // Ex) `obj.dtype`
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
             // Ex) `obj.dtype`

@@ -136,7 +136,7 @@ pub(crate) fn unrecognized_version_info(checker: &mut Checker, test: &Expr) {
     if !checker
         .semantic()
         .resolve_qualified_name(map_subscript(left))
-        .is_some_and(|call_path| matches!(call_path.segments(), ["sys", "version_info"]))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["sys", "version_info"]))
     {
         return;
     }

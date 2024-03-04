@@ -52,7 +52,9 @@ pub(crate) fn locals_in_render_function(checker: &mut Checker, call: &ast::ExprC
     if !checker
         .semantic()
         .resolve_qualified_name(&call.func)
-        .is_some_and(|call_path| matches!(call_path.segments(), ["django", "shortcuts", "render"]))
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["django", "shortcuts", "render"])
+        })
     {
         return;
     }
@@ -73,5 +75,5 @@ fn is_locals_call(expr: &Expr, semantic: &SemanticModel) -> bool {
     };
     semantic
         .resolve_qualified_name(func)
-        .is_some_and(|call_path| matches!(call_path.segments(), ["", "locals"]))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "locals"]))
 }

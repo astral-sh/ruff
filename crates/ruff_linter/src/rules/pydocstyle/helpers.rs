@@ -54,10 +54,10 @@ pub(crate) fn should_ignore_definition(
     function.decorator_list.iter().any(|decorator| {
         semantic
             .resolve_qualified_name(map_callable(&decorator.expression))
-            .is_some_and(|call_path| {
+            .is_some_and(|qualified_name| {
                 ignore_decorators
                     .iter()
-                    .any(|decorator| QualifiedName::from_dotted_name(decorator) == call_path)
+                    .any(|decorator| QualifiedName::from_dotted_name(decorator) == qualified_name)
             })
     })
 }

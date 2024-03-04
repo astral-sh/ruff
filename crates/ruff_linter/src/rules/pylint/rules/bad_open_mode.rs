@@ -91,7 +91,9 @@ fn is_open(func: &Expr, semantic: &SemanticModel) -> Option<Kind> {
             match value.as_ref() {
                 Expr::Call(ast::ExprCall { func, .. }) => semantic
                     .resolve_qualified_name(func)
-                    .is_some_and(|call_path| matches!(call_path.segments(), ["pathlib", "Path"]))
+                    .is_some_and(|qualified_name| {
+                        matches!(qualified_name.segments(), ["pathlib", "Path"])
+                    })
                     .then_some(Kind::Pathlib),
                 _ => None,
             }

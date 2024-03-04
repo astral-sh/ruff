@@ -77,10 +77,10 @@ fn runtime_required_base_class(
     base_classes: &[String],
     semantic: &SemanticModel,
 ) -> bool {
-    analyze::class::any_call_path(class_def, semantic, &|call_path| {
+    analyze::class::any_qualified_name(class_def, semantic, &|qualified_name| {
         base_classes
             .iter()
-            .any(|base_class| QualifiedName::from_dotted_name(base_class) == call_path)
+            .any(|base_class| QualifiedName::from_dotted_name(base_class) == qualified_name)
     })
 }
 
@@ -96,10 +96,10 @@ fn runtime_required_decorators(
     decorator_list.iter().any(|decorator| {
         semantic
             .resolve_qualified_name(map_callable(&decorator.expression))
-            .is_some_and(|call_path| {
+            .is_some_and(|qualified_name| {
                 decorators
                     .iter()
-                    .any(|base_class| QualifiedName::from_dotted_name(base_class) == call_path)
+                    .any(|base_class| QualifiedName::from_dotted_name(base_class) == qualified_name)
             })
     })
 }
@@ -120,16 +120,16 @@ pub(crate) fn is_dataclass_meta_annotation(annotation: &Expr, semantic: &Semanti
         if class_def.decorator_list.iter().any(|decorator| {
             semantic
                 .resolve_qualified_name(map_callable(&decorator.expression))
-                .is_some_and(|call_path| {
-                    matches!(call_path.segments(), ["dataclasses", "dataclass"])
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["dataclasses", "dataclass"])
                 })
         }) {
             // Determine whether the annotation is `typing.ClassVar` or `dataclasses.InitVar`.
             return semantic
                 .resolve_qualified_name(map_subscript(annotation))
-                .is_some_and(|call_path| {
-                    matches!(call_path.segments(), ["dataclasses", "InitVar"])
-                        || semantic.match_typing_call_path(&call_path, "ClassVar")
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["dataclasses", "InitVar"])
+                        || semantic.match_typing_qualified_name(&qualified_name, "ClassVar")
                 });
         }
     }
@@ -155,8 +155,8 @@ pub(crate) fn is_singledispatch_interface(
     function_def.decorator_list.iter().any(|decorator| {
         semantic
             .resolve_qualified_name(&decorator.expression)
-            .is_some_and(|call_path| {
-                matches!(call_path.segments(), ["functools", "singledispatch"])
+            .is_some_and(|qualified_name| {
+                matches!(qualified_name.segments(), ["functools", "singledispatch"])
             })
     })
 }

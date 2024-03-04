@@ -104,10 +104,10 @@ fn check_patch_call(call: &ast::ExprCall, index: usize) -> Option<Diagnostic> {
 
 /// PT008
 pub(crate) fn patch_with_lambda(call: &ast::ExprCall) -> Option<Diagnostic> {
-    let call_path = UnqualifiedName::from_expr(&call.func)?;
+    let name = UnqualifiedName::from_expr(&call.func)?;
 
     if matches!(
-        call_path.segments(),
+        name.segments(),
         [
             "mocker"
                 | "class_mocker"
@@ -120,7 +120,7 @@ pub(crate) fn patch_with_lambda(call: &ast::ExprCall) -> Option<Diagnostic> {
     ) {
         check_patch_call(call, 1)
     } else if matches!(
-        call_path.segments(),
+        name.segments(),
         [
             "mocker"
                 | "class_mocker"

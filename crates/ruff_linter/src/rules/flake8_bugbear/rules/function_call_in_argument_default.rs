@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::name::{compose_call_path, QualifiedName};
+use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::analyze::typing::{
@@ -107,7 +107,7 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
                 {
                     self.diagnostics.push((
                         FunctionCallInDefaultArgument {
-                            name: compose_call_path(func),
+                            name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
                         }
                         .into(),
                         expr.range(),

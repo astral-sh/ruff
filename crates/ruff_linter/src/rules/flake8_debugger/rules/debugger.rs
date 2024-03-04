@@ -52,9 +52,9 @@ pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
         checker
             .semantic()
             .resolve_qualified_name(func)
-            .and_then(|call_path| {
-                if is_debugger_call(&call_path) {
-                    Some(DebuggerUsingType::Call(call_path.to_string()))
+            .and_then(|qualified_name| {
+                if is_debugger_call(&qualified_name) {
+                    Some(DebuggerUsingType::Call(qualified_name.to_string()))
                 } else {
                     None
                 }
@@ -72,20 +72,20 @@ pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> 
         let mut builder =
             QualifiedNameBuilder::from_qualified_name(QualifiedName::imported(module));
         builder.push(name);
-        let call_path = builder.build();
+        let qualified_name = builder.build();
 
-        if is_debugger_call(&call_path) {
+        if is_debugger_call(&qualified_name) {
             return Some(Diagnostic::new(
                 Debugger {
-                    using_type: DebuggerUsingType::Import(call_path.to_string()),
+                    using_type: DebuggerUsingType::Import(qualified_name.to_string()),
                 },
                 stmt.range(),
             ));
         }
     } else {
-        let call_path = QualifiedName::imported(name);
+        let qualified_name = QualifiedName::imported(name);
 
-        if is_debugger_import(&call_path) {
+        if is_debugger_import(&qualified_name) {
             return Some(Diagnostic::new(
                 Debugger {
                     using_type: DebuggerUsingType::Import(name.to_string()),
@@ -97,9 +97,9 @@ pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> 
     None
 }
 
-fn is_debugger_call(call_path: &QualifiedName) -> bool {
+fn is_debugger_call(qualified_name: &QualifiedName) -> bool {
     matches!(
-        call_path.segments(),
+        qualified_name.segments(),
         ["pdb" | "pudb" | "ipdb", "set_trace"]
             | ["ipdb", "sset_trace"]
             | ["IPython", "terminal", "embed", "InteractiveShellEmbed"]
@@ -117,13 +117,13 @@ fn is_debugger_call(call_path: &QualifiedName) -> bool {
     )
 }
 
-fn is_debugger_import(call_path: &QualifiedName) -> bool {
+fn is_debugger_import(qualified_name: &QualifiedName) -> bool {
     // Constructed by taking every pattern in `is_debugger_call`, removing the last element in
     // each pattern, and de-duplicating the values.
     // As a special-case, we omit `builtins` to allow `import builtins`, which is far more general
     // than (e.g.) `import celery.contrib.rdb`.
     matches!(
-        call_path.segments(),
+        qualified_name.segments(),
         ["pdb" | "pudb" | "ipdb" | "debugpy" | "ptvsd"]
             | ["IPython", "terminal", "embed"]
             | ["IPython", "frontend", "terminal", "embed",]

@@ -100,7 +100,9 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
             if checker
                 .semantic()
                 .resolve_qualified_name(func)
-                .is_some_and(|call_path| matches!(call_path.segments(), ["ctypes", "WinError"]))
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["ctypes", "WinError"])
+                })
             {
                 return;
             }

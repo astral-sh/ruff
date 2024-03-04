@@ -66,9 +66,9 @@ pub(crate) fn useless_with_lock(checker: &mut Checker, with: &ast::StmtWith) {
         if !checker
             .semantic()
             .resolve_qualified_name(call.func.as_ref())
-            .is_some_and(|call_path| {
+            .is_some_and(|qualified_name| {
                 matches!(
-                    call_path.segments(),
+                    qualified_name.segments(),
                     [
                         "threading",
                         "Lock" | "RLock" | "Condition" | "Semaphore" | "BoundedSemaphore"

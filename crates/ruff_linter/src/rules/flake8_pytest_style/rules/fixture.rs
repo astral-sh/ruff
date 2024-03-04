@@ -646,9 +646,9 @@ impl<'a> Visitor<'a> for SkipFunctionsVisitor<'a> {
                 }
             }
             Expr::Call(ast::ExprCall { func, .. }) => {
-                if UnqualifiedName::from_expr(func).is_some_and(|call_path| {
-                    matches!(call_path.segments(), ["request", "addfinalizer"])
-                }) {
+                if UnqualifiedName::from_expr(func)
+                    .is_some_and(|name| matches!(name.segments(), ["request", "addfinalizer"]))
+                {
                     self.addfinalizer_call = Some(expr);
                 };
                 visitor::walk_expr(self, expr);

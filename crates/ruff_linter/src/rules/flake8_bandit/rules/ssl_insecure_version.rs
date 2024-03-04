@@ -52,7 +52,7 @@ pub(crate) fn ssl_insecure_version(checker: &mut Checker, call: &ExprCall) {
     let Some(keyword) = checker
         .semantic()
         .resolve_qualified_name(call.func.as_ref())
-        .and_then(|call_path| match call_path.segments() {
+        .and_then(|qualified_name| match qualified_name.segments() {
             ["ssl", "wrap_socket"] => Some("ssl_version"),
             ["OpenSSL", "SSL", "Context"] => Some("method"),
             _ => None,

@@ -402,15 +402,15 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
     // libraries.
     if semantic
         .resolve_qualified_name(func)
-        .is_some_and(|call_path| {
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.segments(),
+                qualified_name.segments(),
                 ["" | "builtins" | "sys" | "_thread" | "pytest", "exit"]
                     | ["" | "builtins", "quit"]
                     | ["os" | "posix", "_exit" | "abort"]
                     | ["_winapi", "ExitProcess"]
                     | ["pytest", "fail" | "skip" | "xfail"]
-            ) || semantic.match_typing_call_path(&call_path, "assert_never")
+            ) || semantic.match_typing_qualified_name(&qualified_name, "assert_never")
         })
     {
         return true;
@@ -433,11 +433,11 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    let Some(call_path) = semantic.resolve_qualified_name(returns) else {
+    let Some(qualified_name) = semantic.resolve_qualified_name(returns) else {
         return false;
     };
 
-    semantic.match_typing_call_path(&call_path, "NoReturn")
+    semantic.match_typing_qualified_name(&qualified_name, "NoReturn")
 }
 
 /// RET503

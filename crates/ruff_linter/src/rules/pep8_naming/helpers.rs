@@ -33,9 +33,9 @@ pub(super) fn is_named_tuple_assignment(stmt: &Stmt, semantic: &SemanticModel) -
     };
     semantic
         .resolve_qualified_name(func)
-        .is_some_and(|call_path| {
-            matches!(call_path.segments(), ["collections", "namedtuple"])
-                || semantic.match_typing_call_path(&call_path, "NamedTuple")
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["collections", "namedtuple"])
+                || semantic.match_typing_qualified_name(&qualified_name, "NamedTuple")
         })
 }
 
@@ -68,9 +68,9 @@ pub(super) fn is_type_var_assignment(stmt: &Stmt, semantic: &SemanticModel) -> b
     };
     semantic
         .resolve_qualified_name(func)
-        .is_some_and(|call_path| {
-            semantic.match_typing_call_path(&call_path, "TypeVar")
-                || semantic.match_typing_call_path(&call_path, "NewType")
+        .is_some_and(|qualified_name| {
+            semantic.match_typing_qualified_name(&qualified_name, "TypeVar")
+                || semantic.match_typing_qualified_name(&qualified_name, "NewType")
         })
 }
 
@@ -122,8 +122,8 @@ pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &Semanti
         }
 
         // Match against, e.g., `apps.get_model("zerver", "Attachment")`.
-        if let Some(call_path) = UnqualifiedName::from_expr(func.as_ref()) {
-            if matches!(call_path.segments(), [.., "get_model"]) {
+        if let Some(unqualified_name) = UnqualifiedName::from_expr(func.as_ref()) {
+            if matches!(unqualified_name.segments(), [.., "get_model"]) {
                 if let Some(argument) =
                     arguments.find_argument("model_name", arguments.args.len().saturating_sub(1))
                 {
@@ -139,9 +139,9 @@ pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &Semanti
         }
 
         // Match against, e.g., `import_string("zerver.models.Attachment")`.
-        if let Some(call_path) = semantic.resolve_qualified_name(func.as_ref()) {
+        if let Some(qualified_name) = semantic.resolve_qualified_name(func.as_ref()) {
             if matches!(
-                call_path.segments(),
+                qualified_name.segments(),
                 ["django", "utils", "module_loading", "import_string"]
             ) {
                 if let Some(argument) = arguments.find_argument("dotted_path", 0) {

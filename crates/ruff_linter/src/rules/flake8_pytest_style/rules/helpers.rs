@@ -8,11 +8,10 @@ pub(super) fn get_mark_decorators(
     decorators: &[Decorator],
 ) -> impl Iterator<Item = (&Decorator, &str)> {
     decorators.iter().filter_map(|decorator| {
-        let Some(call_path) = UnqualifiedName::from_expr(map_callable(&decorator.expression))
-        else {
+        let Some(name) = UnqualifiedName::from_expr(map_callable(&decorator.expression)) else {
             return None;
         };
-        let ["pytest", "mark", marker] = call_path.segments() else {
+        let ["pytest", "mark", marker] = name.segments() else {
             return None;
         };
         Some((decorator, *marker))
@@ -22,25 +21,29 @@ pub(super) fn get_mark_decorators(
 pub(super) fn is_pytest_fail(call: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(call)
-        .is_some_and(|call_path| matches!(call_path.segments(), ["pytest", "fail"]))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "fail"]))
 }
 
 pub(super) fn is_pytest_fixture(decorator: &Decorator, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(map_callable(&decorator.expression))
-        .is_some_and(|call_path| matches!(call_path.segments(), ["pytest", "fixture"]))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "fixture"]))
 }
 
 pub(super) fn is_pytest_yield_fixture(decorator: &Decorator, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(map_callable(&decorator.expression))
-        .is_some_and(|call_path| matches!(call_path.segments(), ["pytest", "yield_fixture"]))
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["pytest", "yield_fixture"])
+        })
 }
 
 pub(super) fn is_pytest_parametrize(decorator: &Decorator, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(map_callable(&decorator.expression))
-        .is_some_and(|call_path| matches!(call_path.segments(), ["pytest", "mark", "parametrize"]))
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["pytest", "mark", "parametrize"])
+        })
 }
 
 pub(super) fn keyword_is_literal(keyword: &Keyword, literal: &str) -> bool {

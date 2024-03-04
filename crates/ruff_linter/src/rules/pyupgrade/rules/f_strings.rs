@@ -466,9 +466,9 @@ pub(crate) fn f_strings(
             checker
                 .semantic()
                 .resolve_qualified_name(call.func.as_ref())
-                .map_or(false, |call_path| {
+                .map_or(false, |qualified_name| {
                     matches!(
-                        call_path.segments(),
+                        qualified_name.segments(),
                         ["django", "utils", "translation", "gettext" | "gettext_lazy"]
                     )
                 })

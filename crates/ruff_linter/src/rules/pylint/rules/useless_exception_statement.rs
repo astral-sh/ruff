@@ -65,9 +65,9 @@ pub(crate) fn useless_exception_statement(checker: &mut Checker, expr: &ast::Stm
 fn is_builtin_exception(expr: &Expr, semantic: &SemanticModel) -> bool {
     return semantic
         .resolve_qualified_name(expr)
-        .is_some_and(|call_path| {
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.segments(),
+                qualified_name.segments(),
                 [
                     "",
                     "SystemExit"

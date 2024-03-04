@@ -101,8 +101,8 @@ fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
 
     semantic
         .resolve_qualified_name(func)
-        .is_some_and(|call_path| {
-            match call_path.segments() {
+        .is_some_and(|qualified_name| {
+            match qualified_name.segments() {
                 ["itertools", "cycle" | "count"] => true,
                 ["itertools", "repeat"] => {
                     // Ex) `itertools.repeat(1)`

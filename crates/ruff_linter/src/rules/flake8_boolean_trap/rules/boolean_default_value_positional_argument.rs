@@ -120,7 +120,7 @@ pub(crate) fn boolean_default_value_positional_argument(
             // Allow Boolean defaults in setters.
             if decorator_list.iter().any(|decorator| {
                 UnqualifiedName::from_expr(&decorator.expression)
-                    .is_some_and(|call_path| call_path.segments() == [name, "setter"])
+                    .is_some_and(|unqualified_name| unqualified_name.segments() == [name, "setter"])
             }) {
                 return;
             }

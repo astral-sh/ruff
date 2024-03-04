@@ -82,20 +82,20 @@ pub(crate) fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &
     let Some(kind) = checker
         .semantic()
         .resolve_qualified_name(func)
-        .and_then(|call_path| {
+        .and_then(|qualified_name| {
             if checker
                 .semantic()
-                .match_typing_call_path(&call_path, "ParamSpec")
+                .match_typing_qualified_name(&qualified_name, "ParamSpec")
             {
                 Some(VarKind::ParamSpec)
             } else if checker
                 .semantic()
-                .match_typing_call_path(&call_path, "TypeVar")
+                .match_typing_qualified_name(&qualified_name, "TypeVar")
             {
                 Some(VarKind::TypeVar)
             } else if checker
                 .semantic()
-                .match_typing_call_path(&call_path, "TypeVarTuple")
+                .match_typing_qualified_name(&qualified_name, "TypeVarTuple")
             {
                 Some(VarKind::TypeVarTuple)
             } else {

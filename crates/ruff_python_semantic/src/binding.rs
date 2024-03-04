@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::name::format_call_path_segments;
+use ruff_python_ast::name::format_qualified_name_segments;
 use ruff_python_ast::Stmt;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -561,7 +561,7 @@ pub trait Imported<'a> {
     /// Returns the fully-qualified name of the imported symbol.
     fn qualified_name(&self) -> String {
         let mut output = String::new();
-        format_call_path_segments(self.call_path(), &mut output).unwrap();
+        format_qualified_name_segments(self.call_path(), &mut output).unwrap();
         output
     }
 }

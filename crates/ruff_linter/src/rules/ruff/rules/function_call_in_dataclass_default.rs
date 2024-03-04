@@ -2,8 +2,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::name::compose_call_path;
-use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_semantic::analyze::typing::is_immutable_func;
 use ruff_text_size::Ranged;
 
@@ -103,7 +102,7 @@ pub(crate) fn function_call_in_dataclass_default(
                 {
                     checker.diagnostics.push(Diagnostic::new(
                         FunctionCallInDataclassDefaultArgument {
-                            name: compose_call_path(func),
+                            name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
                         },
                         expr.range(),
                     ));

@@ -73,8 +73,11 @@ impl Violation for CachedInstanceMethod {
 fn is_cache_func(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
-        .is_some_and(|call_path| {
-            matches!(call_path.segments(), ["functools", "lru_cache" | "cache"])
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["functools", "lru_cache" | "cache"]
+            )
         })
 }
 

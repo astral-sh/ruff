@@ -64,7 +64,9 @@ pub(crate) fn call_date_today(checker: &mut Checker, func: &Expr, location: Text
     if checker
         .semantic()
         .resolve_qualified_name(func)
-        .is_some_and(|call_path| matches!(call_path.segments(), ["datetime", "date", "today"]))
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["datetime", "date", "today"])
+        })
     {
         checker
             .diagnostics

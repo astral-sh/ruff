@@ -60,9 +60,9 @@ pub(crate) fn blocking_os_call(checker: &mut Checker, call: &ExprCall) {
     }
 }
 
-fn is_unsafe_os_method(call_path: &QualifiedName) -> bool {
+fn is_unsafe_os_method(qualified_name: &QualifiedName) -> bool {
     matches!(
-        call_path.segments(),
+        qualified_name.segments(),
         [
             "os",
             "popen"

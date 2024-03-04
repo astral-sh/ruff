@@ -18,7 +18,7 @@ pub fn is_staticmethod(decorator_list: &[Decorator], semantic: &SemanticModel) -
     decorator_list.iter().any(|decorator| {
         semantic
             .resolve_qualified_name(map_callable(&decorator.expression))
-            .is_some_and(|call_path| matches!(call_path.segments(), ["", "staticmethod"]))
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "staticmethod"]))
     })
 }
 
@@ -27,7 +27,7 @@ pub fn is_classmethod(decorator_list: &[Decorator], semantic: &SemanticModel) ->
     decorator_list.iter().any(|decorator| {
         semantic
             .resolve_qualified_name(map_callable(&decorator.expression))
-            .is_some_and(|call_path| matches!(call_path.segments(), ["", "classmethod"]))
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "classmethod"]))
     })
 }
 
@@ -50,9 +50,9 @@ pub fn is_abstract(decorator_list: &[Decorator], semantic: &SemanticModel) -> bo
     decorator_list.iter().any(|decorator| {
         semantic
             .resolve_qualified_name(map_callable(&decorator.expression))
-            .is_some_and(|call_path| {
+            .is_some_and(|qualified_name| {
                 matches!(
-                    call_path.segments(),
+                    qualified_name.segments(),
                     [
                         "abc",
                         "abstractmethod"
@@ -76,13 +76,13 @@ pub fn is_property(
     decorator_list.iter().any(|decorator| {
         semantic
             .resolve_qualified_name(map_callable(&decorator.expression))
-            .is_some_and(|call_path| {
+            .is_some_and(|qualified_name| {
                 matches!(
-                    call_path.segments(),
+                    qualified_name.segments(),
                     ["", "property"] | ["functools", "cached_property"]
                 ) || extra_properties
                     .iter()
-                    .any(|extra_property| extra_property.segments() == call_path.segments())
+                    .any(|extra_property| extra_property.segments() == qualified_name.segments())
             })
     })
 }
@@ -187,9 +187,9 @@ pub(crate) fn function_visibility(function: &ast::StmtFunctionDef) -> Visibility
 pub fn method_visibility(function: &ast::StmtFunctionDef) -> Visibility {
     // Is this a setter or deleter?
     if function.decorator_list.iter().any(|decorator| {
-        UnqualifiedName::from_expr(&decorator.expression).is_some_and(|call_path| {
-            call_path.segments() == [function.name.as_str(), "setter"]
-                || call_path.segments() == [function.name.as_str(), "deleter"]
+        UnqualifiedName::from_expr(&decorator.expression).is_some_and(|name| {
+            name.segments() == [function.name.as_str(), "setter"]
+                || name.segments() == [function.name.as_str(), "deleter"]
         })
     }) {
         return Visibility::Private;

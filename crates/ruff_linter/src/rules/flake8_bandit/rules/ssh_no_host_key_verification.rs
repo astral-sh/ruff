@@ -61,9 +61,9 @@ pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCal
     if !checker
         .semantic()
         .resolve_qualified_name(map_callable(policy_argument))
-        .is_some_and(|call_path| {
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.segments(),
+                qualified_name.segments(),
                 ["paramiko", "client", "AutoAddPolicy" | "WarningPolicy"]
                     | ["paramiko", "AutoAddPolicy" | "WarningPolicy"]
             )
@@ -72,9 +72,9 @@ pub(crate) fn ssh_no_host_key_verification(checker: &mut Checker, call: &ExprCal
         return;
     }
 
-    if typing::resolve_assignment(value, checker.semantic()).is_some_and(|call_path| {
+    if typing::resolve_assignment(value, checker.semantic()).is_some_and(|qualified_name| {
         matches!(
-            call_path.segments(),
+            qualified_name.segments(),
             ["paramiko", "client", "SSHClient"] | ["paramiko", "SSHClient"]
         )
     }) {

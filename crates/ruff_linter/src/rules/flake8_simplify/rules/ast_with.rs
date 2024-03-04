@@ -100,9 +100,9 @@ fn explicit_with_items(checker: &mut Checker, with_items: &[WithItem]) -> bool {
     checker
         .semantic()
         .resolve_qualified_name(&expr_call.func)
-        .is_some_and(|call_path| {
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.segments(),
+                qualified_name.segments(),
                 ["asyncio", "timeout" | "timeout_at"]
                     | ["anyio", "CancelScope" | "fail_after" | "move_on_after"]
                     | [

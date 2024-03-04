@@ -123,11 +123,11 @@ fn duplicate_handler_exceptions<'a>(
     let mut duplicates: FxHashSet<UnqualifiedName> = FxHashSet::default();
     let mut unique_elts: Vec<&Expr> = Vec::default();
     for type_ in elts {
-        if let Some(call_path) = UnqualifiedName::from_expr(type_) {
-            if seen.contains_key(&call_path) {
-                duplicates.insert(call_path);
+        if let Some(name) = UnqualifiedName::from_expr(type_) {
+            if seen.contains_key(&name) {
+                duplicates.insert(name);
             } else {
-                seen.entry(call_path).or_insert(type_);
+                seen.entry(name).or_insert(type_);
                 unique_elts.push(type_);
             }
         }
@@ -140,7 +140,7 @@ fn duplicate_handler_exceptions<'a>(
                 DuplicateHandlerException {
                     names: duplicates
                         .into_iter()
-                        .map(|call_path| call_path.segments().join("."))
+                        .map(|qualified_name| qualified_name.segments().join("."))
                         .sorted()
                         .collect::<Vec<String>>(),
                 },
@@ -183,11 +183,11 @@ pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHand
         };
         match type_.as_ref() {
             Expr::Attribute(_) | Expr::Name(_) => {
-                if let Some(call_path) = UnqualifiedName::from_expr(type_) {
-                    if seen.contains(&call_path) {
-                        duplicates.entry(call_path).or_default().push(type_);
+                if let Some(name) = UnqualifiedName::from_expr(type_) {
+                    if seen.contains(&name) {
+                        duplicates.entry(name).or_default().push(type_);
                     } else {
-                        seen.insert(call_path);
+                        seen.insert(name);
                     }
                 }
             }

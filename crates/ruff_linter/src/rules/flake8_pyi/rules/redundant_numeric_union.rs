@@ -90,11 +90,11 @@ fn check_annotation(checker: &mut Checker, annotation: &Expr) {
     let mut has_int = false;
 
     let mut func = |expr: &Expr, _parent: &Expr| {
-        let Some(call_path) = checker.semantic().resolve_qualified_name(expr) else {
+        let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) else {
             return;
         };
 
-        match call_path.segments() {
+        match qualified_name.segments() {
             ["" | "builtins", "int"] => has_int = true,
             ["" | "builtins", "float"] => has_float = true,
             ["" | "builtins", "complex"] => has_complex = true,

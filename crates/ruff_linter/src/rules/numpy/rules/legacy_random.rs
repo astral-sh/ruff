@@ -68,10 +68,10 @@ pub(crate) fn legacy_random(checker: &mut Checker, expr: &Expr) {
         checker
             .semantic()
             .resolve_qualified_name(expr)
-            .and_then(|call_path| {
+            .and_then(|qualified_name| {
                 // seeding state
                 if matches!(
-                    call_path.segments(),
+                    qualified_name.segments(),
                     [
                         "numpy",
                         "random",
@@ -131,7 +131,7 @@ pub(crate) fn legacy_random(checker: &mut Checker, expr: &Expr) {
                     "zipf"
                     ]
                 ) {
-                    Some(call_path.segments()[2])
+                    Some(qualified_name.segments()[2])
                 } else {
                     None
                 }

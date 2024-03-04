@@ -78,7 +78,7 @@ pub(crate) fn redundant_log_base(checker: &mut Checker, call: &ast::ExprCall) {
         .semantic()
         .resolve_qualified_name(&call.func)
         .as_ref()
-        .is_some_and(|call_path| matches!(call_path.segments(), ["math", "log"]))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["math", "log"]))
     {
         return;
     }
@@ -91,7 +91,7 @@ pub(crate) fn redundant_log_base(checker: &mut Checker, call: &ast::ExprCall) {
         .semantic()
         .resolve_qualified_name(base)
         .as_ref()
-        .is_some_and(|call_path| matches!(call_path.segments(), ["math", "e"]))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["math", "e"]))
     {
         Base::E
     } else {

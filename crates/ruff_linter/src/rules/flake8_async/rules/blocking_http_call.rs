@@ -41,9 +41,9 @@ impl Violation for BlockingHttpCallInAsyncFunction {
     }
 }
 
-fn is_blocking_http_call(call_path: &QualifiedName) -> bool {
+fn is_blocking_http_call(qualified_name: &QualifiedName) -> bool {
     matches!(
-        call_path.segments(),
+        qualified_name.segments(),
         ["urllib", "request", "urlopen"]
             | [
                 "httpx" | "requests",

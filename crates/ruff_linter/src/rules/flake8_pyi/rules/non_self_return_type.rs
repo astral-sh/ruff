@@ -233,9 +233,9 @@ fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool
 fn is_metaclass_base(base: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(base)
-        .is_some_and(|call_path| {
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.segments(),
+                qualified_name.segments(),
                 ["" | "builtins", "type"] | ["abc", "ABCMeta"] | ["enum", "EnumMeta" | "EnumType"]
             )
         })
@@ -282,9 +282,9 @@ fn is_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool 
     bases.iter().any(|expr| {
         semantic
             .resolve_qualified_name(map_subscript(expr))
-            .is_some_and(|call_path| {
+            .is_some_and(|qualified_name| {
                 matches!(
-                    call_path.segments(),
+                    qualified_name.segments(),
                     ["typing", "Iterator"] | ["collections", "abc", "Iterator"]
                 )
             })
@@ -295,9 +295,9 @@ fn is_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool 
 fn is_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(map_subscript(expr))
-        .is_some_and(|call_path| {
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.segments(),
+                qualified_name.segments(),
                 ["typing", "Iterable" | "Iterator"]
                     | ["collections", "abc", "Iterable" | "Iterator"]
             )
@@ -312,9 +312,9 @@ fn is_async_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) ->
     bases.iter().any(|expr| {
         semantic
             .resolve_qualified_name(map_subscript(expr))
-            .is_some_and(|call_path| {
+            .is_some_and(|qualified_name| {
                 matches!(
-                    call_path.segments(),
+                    qualified_name.segments(),
                     ["typing", "AsyncIterator"] | ["collections", "abc", "AsyncIterator"]
                 )
             })
@@ -325,9 +325,9 @@ fn is_async_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) ->
 fn is_async_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(map_subscript(expr))
-        .is_some_and(|call_path| {
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.segments(),
+                qualified_name.segments(),
                 ["typing", "AsyncIterable" | "AsyncIterator"]
                     | ["collections", "abc", "AsyncIterable" | "AsyncIterator"]
             )

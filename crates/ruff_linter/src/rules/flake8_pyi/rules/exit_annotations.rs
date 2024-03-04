@@ -244,11 +244,11 @@ fn non_none_annotation_element<'a>(
 ) -> Option<&'a Expr> {
     // E.g., `typing.Union` or `typing.Optional`
     if let Expr::Subscript(ExprSubscript { value, slice, .. }) = annotation {
-        let call_path = semantic.resolve_qualified_name(value);
+        let qualified_name = semantic.resolve_qualified_name(value);
 
-        if call_path
+        if qualified_name
             .as_ref()
-            .is_some_and(|value| semantic.match_typing_call_path(value, "Optional"))
+            .is_some_and(|value| semantic.match_typing_qualified_name(value, "Optional"))
         {
             return if slice.is_none_literal_expr() {
                 None
@@ -257,9 +257,9 @@ fn non_none_annotation_element<'a>(
             };
         }
 
-        if !call_path
+        if !qualified_name
             .as_ref()
-            .is_some_and(|value| semantic.match_typing_call_path(value, "Union"))
+            .is_some_and(|value| semantic.match_typing_qualified_name(value, "Union"))
         {
             return None;
         }
@@ -307,9 +307,9 @@ fn is_object_or_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
         .as_ref()
-        .is_some_and(|call_path| {
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.segments(),
+                qualified_name.segments(),
                 ["" | "builtins", "object"] | ["_typeshed", "Unused"]
             )
         })
@@ -320,7 +320,12 @@ fn is_base_exception(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
         .as_ref()
-        .is_some_and(|call_path| matches!(call_path.segments(), ["" | "builtins", "BaseException"]))
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["" | "builtins", "BaseException"]
+            )
+        })
 }
 
 /// Return `true` if the [`Expr`] is the `types.TracebackType` type.
@@ -328,7 +333,9 @@ fn is_traceback_type(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
         .as_ref()
-        .is_some_and(|call_path| matches!(call_path.segments(), ["types", "TracebackType"]))
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["types", "TracebackType"])
+        })
 }
 
 /// Return `true` if the [`Expr`] is, e.g., `Type[BaseException]`.
@@ -341,7 +348,9 @@ fn is_base_exception_type(expr: &Expr, semantic: &SemanticModel) -> bool {
         || semantic
             .resolve_qualified_name(value)
             .as_ref()
-            .is_some_and(|call_path| matches!(call_path.segments(), ["" | "builtins", "type"]))
+            .is_some_and(|qualified_name| {
+                matches!(qualified_name.segments(), ["" | "builtins", "type"])
+            })
     {
         is_base_exception(slice, semantic)
     } else {
