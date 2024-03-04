@@ -64,18 +64,6 @@ pub struct GlobalConfigArgs {
 }
 
 impl GlobalConfigArgs {
-    pub fn new(
-        log_level_args: LogLevelArgs,
-        config_flags: Vec<SingleConfigArgument>,
-        isolated: bool,
-    ) -> Self {
-        Self {
-            log_level_args,
-            config: config_flags,
-            isolated,
-        }
-    }
-
     pub fn log_level(&self) -> LogLevel {
         LogLevel::from(&self.log_level_args)
     }

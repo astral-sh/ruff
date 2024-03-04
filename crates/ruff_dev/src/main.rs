@@ -4,10 +4,7 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use ruff::{
-    args::{GlobalConfigArgs, LogLevelArgs},
-    check,
-};
+use ruff::{args::GlobalConfigArgs, check};
 use ruff_linter::logging::set_up_logging;
 use std::process::ExitCode;
 
@@ -31,30 +28,8 @@ const ROOT_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../");
 struct Args {
     #[command(subcommand)]
     command: Command,
-    #[arg(
-        long,
-        action = clap::ArgAction::Append,
-        value_name = "CONFIG_OPTION",
-        value_parser = ruff::args::ConfigArgumentParser,
-        global = true,
-        help_heading = "Global configuration options"
-    )]
-    config: Vec<ruff::args::SingleConfigArgument>,
-    #[arg(long, help_heading = "Global configuration options", global = true)]
-    isolated: bool,
-}
-
-impl Args {
-    #[must_use]
-    fn partition(self) -> (Command, GlobalConfigArgs) {
-        let Args {
-            command,
-            config,
-            isolated,
-        } = self;
-        let global_options = GlobalConfigArgs::new(LogLevelArgs::default(), config, isolated);
-        (command, global_options)
-    }
+    #[clap(flatten)]
+    global_options: GlobalConfigArgs,
 }
 
 #[derive(Subcommand)]
@@ -100,8 +75,10 @@ enum Command {
 }
 
 fn main() -> Result<ExitCode> {
-    let args = Args::parse();
-    let (command, global_options) = args.partition();
+    let Args {
+        command,
+        global_options,
+    } = Args::parse();
     #[allow(clippy::print_stdout)]
     match command {
         Command::GenerateAll(args) => generate_all::main(&args)?,
