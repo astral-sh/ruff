@@ -120,7 +120,7 @@ fn is_non_callable_value(value: &Expr) -> bool {
             | Expr::ListComp(_)
             | Expr::SetComp(_)
             | Expr::DictComp(_)
-            | Expr::GeneratorExp(_)
+            | Expr::Generator(_)
             | Expr::FString(_))
 }
 

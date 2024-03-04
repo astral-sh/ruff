@@ -267,7 +267,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
     let node = body.clone();
     let node1 = orelse.clone();
     let node2 = orelse.clone();
-    let node3 = ast::ExprIfExp {
+    let node3 = ast::ExprIf {
         test: Box::new(node2),
         body: Box::new(node1),
         orelse: Box::new(node),

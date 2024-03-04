@@ -4,7 +4,7 @@ use ruff_python_trivia::{PythonWhitespace, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::SourceComment;
-use crate::expression::expr_generator_exp::GeneratorExpParentheses;
+use crate::expression::expr_generator::GeneratorExpParentheses;
 use crate::expression::is_expression_huggable;
 use crate::expression::parentheses::{empty_parenthesized, parenthesized, Parentheses};
 use crate::other::commas;
@@ -40,7 +40,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
             match args.as_ref() {
                 [arg] if keywords.is_empty() => {
                     match arg {
-                        Expr::GeneratorExp(generator_exp) => joiner.entry(
+                        Expr::Generator(generator_exp) => joiner.entry(
                             generator_exp,
                             &generator_exp
                                 .format()

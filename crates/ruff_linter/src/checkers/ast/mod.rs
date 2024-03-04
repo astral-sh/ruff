@@ -1000,7 +1000,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 generators,
                 range: _,
             })
-            | Expr::GeneratorExp(ast::ExprGeneratorExp {
+            | Expr::Generator(ast::ExprGenerator {
                 elt,
                 generators,
                 range: _,
@@ -1048,7 +1048,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit.lambdas.push(self.semantic.snapshot());
                 self.analyze.lambdas.push(self.semantic.snapshot());
             }
-            Expr::IfExp(ast::ExprIfExp {
+            Expr::If(ast::ExprIf {
                 test,
                 body,
                 orelse,
@@ -1372,7 +1372,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.flags |= SemanticModelFlags::F_STRING;
                 visitor::walk_expr(self, expr);
             }
-            Expr::NamedExpr(ast::ExprNamedExpr {
+            Expr::Named(ast::ExprNamed {
                 target,
                 value,
                 range: _,
@@ -1388,7 +1388,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         // Step 3: Clean-up
         match expr {
             Expr::Lambda(_)
-            | Expr::GeneratorExp(_)
+            | Expr::Generator(_)
             | Expr::ListComp(_)
             | Expr::DictComp(_)
             | Expr::SetComp(_) => {

@@ -558,16 +558,16 @@ impl From<StmtContinue> for Stmt {
 pub enum Expr {
     #[is(name = "bool_op_expr")]
     BoolOp(ExprBoolOp),
-    #[is(name = "named_expr_expr")]
-    NamedExpr(ExprNamedExpr),
+    #[is(name = "named_expr")]
+    Named(ExprNamed),
     #[is(name = "bin_op_expr")]
     BinOp(ExprBinOp),
     #[is(name = "unary_op_expr")]
     UnaryOp(ExprUnaryOp),
     #[is(name = "lambda_expr")]
     Lambda(ExprLambda),
-    #[is(name = "if_exp_expr")]
-    IfExp(ExprIfExp),
+    #[is(name = "if_expr")]
+    If(ExprIf),
     #[is(name = "dict_expr")]
     Dict(ExprDict),
     #[is(name = "set_expr")]
@@ -578,8 +578,8 @@ pub enum Expr {
     SetComp(ExprSetComp),
     #[is(name = "dict_comp_expr")]
     DictComp(ExprDictComp),
-    #[is(name = "generator_exp_expr")]
-    GeneratorExp(ExprGeneratorExp),
+    #[is(name = "generator_expr")]
+    Generator(ExprGenerator),
     #[is(name = "await_expr")]
     Await(ExprAwait),
     #[is(name = "yield_expr")]
@@ -695,15 +695,15 @@ impl From<ExprBoolOp> for Expr {
 
 /// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprNamedExpr {
+pub struct ExprNamed {
     pub range: TextRange,
     pub target: Box<Expr>,
     pub value: Box<Expr>,
 }
 
-impl From<ExprNamedExpr> for Expr {
-    fn from(payload: ExprNamedExpr) -> Self {
-        Expr::NamedExpr(payload)
+impl From<ExprNamed> for Expr {
+    fn from(payload: ExprNamed) -> Self {
+        Expr::Named(payload)
     }
 }
 
@@ -752,16 +752,16 @@ impl From<ExprLambda> for Expr {
 
 /// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprIfExp {
+pub struct ExprIf {
     pub range: TextRange,
     pub test: Box<Expr>,
     pub body: Box<Expr>,
     pub orelse: Box<Expr>,
 }
 
-impl From<ExprIfExp> for Expr {
-    fn from(payload: ExprIfExp) -> Self {
-        Expr::IfExp(payload)
+impl From<ExprIf> for Expr {
+    fn from(payload: ExprIf) -> Self {
+        Expr::If(payload)
     }
 }
 
@@ -837,16 +837,16 @@ impl From<ExprDictComp> for Expr {
 
 /// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprGeneratorExp {
+pub struct ExprGenerator {
     pub range: TextRange,
     pub elt: Box<Expr>,
     pub generators: Vec<Comprehension>,
     pub parenthesized: bool,
 }
 
-impl From<ExprGeneratorExp> for Expr {
-    fn from(payload: ExprGeneratorExp) -> Self {
-        Expr::GeneratorExp(payload)
+impl From<ExprGenerator> for Expr {
+    fn from(payload: ExprGenerator) -> Self {
+        Expr::Generator(payload)
     }
 }
 
@@ -3534,7 +3534,7 @@ impl Ranged for crate::nodes::ExprBoolOp {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprNamedExpr {
+impl Ranged for crate::nodes::ExprNamed {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -3554,7 +3554,7 @@ impl Ranged for crate::nodes::ExprLambda {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprIfExp {
+impl Ranged for crate::nodes::ExprIf {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -3584,7 +3584,7 @@ impl Ranged for crate::nodes::ExprDictComp {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprGeneratorExp {
+impl Ranged for crate::nodes::ExprGenerator {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -3663,17 +3663,17 @@ impl Ranged for crate::Expr {
     fn range(&self) -> TextRange {
         match self {
             Self::BoolOp(node) => node.range(),
-            Self::NamedExpr(node) => node.range(),
+            Self::Named(node) => node.range(),
             Self::BinOp(node) => node.range(),
             Self::UnaryOp(node) => node.range(),
             Self::Lambda(node) => node.range(),
-            Self::IfExp(node) => node.range(),
+            Self::If(node) => node.range(),
             Self::Dict(node) => node.range(),
             Self::Set(node) => node.range(),
             Self::ListComp(node) => node.range(),
             Self::SetComp(node) => node.range(),
             Self::DictComp(node) => node.range(),
-            Self::GeneratorExp(node) => node.range(),
+            Self::Generator(node) => node.range(),
             Self::Await(node) => node.range(),
             Self::Yield(node) => node.range(),
             Self::YieldFrom(node) => node.range(),
@@ -3883,14 +3883,14 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
         assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
         assert_eq!(std::mem::size_of::<ExprFString>(), 48);
-        assert_eq!(std::mem::size_of::<ExprGeneratorExp>(), 48);
-        assert_eq!(std::mem::size_of::<ExprIfExp>(), 32);
+        assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
+        assert_eq!(std::mem::size_of::<ExprIf>(), 32);
         assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
         assert_eq!(std::mem::size_of::<ExprLambda>(), 24);
         assert_eq!(std::mem::size_of::<ExprList>(), 40);
         assert_eq!(std::mem::size_of::<ExprListComp>(), 40);
         assert_eq!(std::mem::size_of::<ExprName>(), 40);
-        assert_eq!(std::mem::size_of::<ExprNamedExpr>(), 24);
+        assert_eq!(std::mem::size_of::<ExprNamed>(), 24);
         assert_eq!(std::mem::size_of::<ExprNoneLiteral>(), 8);
         assert_eq!(std::mem::size_of::<ExprNumberLiteral>(), 32);
         assert_eq!(std::mem::size_of::<ExprSet>(), 32);

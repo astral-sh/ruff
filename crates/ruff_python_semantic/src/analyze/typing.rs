@@ -466,8 +466,8 @@ fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -> bo
             binding.source.is_some_and(|source| {
                 semantic
                     .expressions(source)
-                    .find_map(|expr| expr.as_named_expr_expr())
-                    .and_then(|ast::ExprNamedExpr { target, value, .. }| {
+                    .find_map(|expr| expr.as_named_expr())
+                    .and_then(|ast::ExprNamed { target, value, .. }| {
                         match_value(binding, target.as_ref(), value.as_ref())
                     })
                     .is_some_and(|value| T::match_initializer(value, semantic))
@@ -818,8 +818,8 @@ pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) ->
             let parent_id = binding.source?;
             let parent = semantic
                 .expressions(parent_id)
-                .find_map(|expr| expr.as_named_expr_expr());
-            if let Some(ast::ExprNamedExpr { target, value, .. }) = parent {
+                .find_map(|expr| expr.as_named_expr());
+            if let Some(ast::ExprNamed { target, value, .. }) = parent {
                 return match_value(binding, target.as_ref(), value.as_ref());
             }
         }

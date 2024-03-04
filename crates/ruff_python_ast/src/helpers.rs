@@ -115,7 +115,7 @@ where
             Expr::Await(_)
                 | Expr::Call(_)
                 | Expr::DictComp(_)
-                | Expr::GeneratorExp(_)
+                | Expr::Generator(_)
                 | Expr::ListComp(_)
                 | Expr::SetComp(_)
                 | Expr::Subscript(_)
@@ -139,7 +139,7 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         Expr::FString(ast::ExprFString { value, .. }) => value
             .elements()
             .any(|expr| any_over_f_string_element(expr, func)),
-        Expr::NamedExpr(ast::ExprNamedExpr {
+        Expr::Named(ast::ExprNamed {
             target,
             value,
             range: _,
@@ -149,7 +149,7 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         }
         Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => any_over_expr(operand, func),
         Expr::Lambda(ast::ExprLambda { body, .. }) => any_over_expr(body, func),
-        Expr::IfExp(ast::ExprIfExp {
+        Expr::If(ast::ExprIf {
             test,
             body,
             orelse,
@@ -178,7 +178,7 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
             generators,
             range: _,
         })
-        | Expr::GeneratorExp(ast::ExprGeneratorExp {
+        | Expr::Generator(ast::ExprGenerator {
             elt,
             generators,
             range: _,
@@ -1045,7 +1045,7 @@ pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -
             return true;
         }
         if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = parent {
-            if value.is_if_exp_expr() {
+            if value.is_if_expr() {
                 return true;
             }
         }
@@ -1270,14 +1270,14 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
             Expr::Tuple(_) => true,
 
             // These expressions must resolve to the inner expression.
-            Expr::IfExp(ast::ExprIfExp { body, orelse, .. }) => inner(body) && inner(orelse),
-            Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => inner(value),
+            Expr::If(ast::ExprIf { body, orelse, .. }) => inner(body) && inner(orelse),
+            Expr::Named(ast::ExprNamed { value, .. }) => inner(value),
 
             // These expressions are complex. We can't determine whether they're empty or not.
             Expr::BoolOp(ast::ExprBoolOp { .. }) => false,
             Expr::BinOp(ast::ExprBinOp { .. }) => false,
             Expr::UnaryOp(ast::ExprUnaryOp { .. }) => false,
-            Expr::GeneratorExp(_) => false,
+            Expr::Generator(_) => false,
             Expr::Await(_) => false,
             Expr::Yield(_) => false,
             Expr::YieldFrom(_) => false,
