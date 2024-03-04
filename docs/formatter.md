@@ -11,7 +11,7 @@ The Ruff formatter is available as of Ruff [v0.1.2](https://astral.sh/blog/the-r
 directories, and formats all discovered Python files:
 
 ```shell
-ruff format                 # Format all files in the current directory.
+ruff format                  # Format all files in the current directory.
 ruff format /path/to/file.py  # Format a single file.
 ```
 
