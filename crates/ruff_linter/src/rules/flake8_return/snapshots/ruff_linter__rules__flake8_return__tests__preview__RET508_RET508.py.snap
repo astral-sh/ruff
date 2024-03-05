@@ -1,0 +1,181 @@
+---
+source: crates/ruff_linter/src/rules/flake8_return/mod.rs
+---
+RET508.py:8:9: RET508 [*] Unnecessary `elif` after `break` statement
+   |
+ 6 |         if i > y:  # [no-else-break]
+ 7 |             break
+ 8 |         elif i > w:
+   |         ^^^^ RET508
+ 9 |             break
+10 |         else:
+   |
+   = help: Remove unnecessary `elif`
+
+ℹ Safe fix
+5 5 |     for i in x:
+6 6 |         if i > y:  # [no-else-break]
+7 7 |             break
+8   |-        elif i > w:
+  8 |+        if i > w:
+9 9 |             break
+10 10 |         else:
+11 11 |             a = z
+
+RET508.py:22:9: RET508 [*] Unnecessary `elif` after `break` statement
+   |
+20 |                 b = 2
+21 |             break
+22 |         elif z:
+   |         ^^^^ RET508
+23 |             c = 2
+24 |         else:
+   |
+   = help: Remove unnecessary `elif`
+
+ℹ Safe fix
+19 19 |             else:
+20 20 |                 b = 2
+21 21 |             break
+22    |-        elif z:
+   22 |+        if z:
+23 23 |             c = 2
+24 24 |         else:
+25 25 |             c = 3
+
+RET508.py:33:9: RET508 [*] Unnecessary `else` after `break` statement
+   |
+31 |         if i > y:  # [no-else-break]
+32 |             break
+33 |         else:
+   |         ^^^^ RET508
+34 |             a = z
+   |
+   = help: Remove unnecessary `else`
+
+ℹ Safe fix
+30 30 |     for i in x:
+31 31 |         if i > y:  # [no-else-break]
+32 32 |             break
+33    |-        else:
+34    |-            a = z
+   33 |+        a = z
+35 34 | 
+36 35 | 
+37 36 | def foo3(x, y, z):
+
+RET508.py:44:13: RET508 [*] Unnecessary `else` after `break` statement
+   |
+42 |                 b = 2
+43 |                 break
+44 |             else:
+   |             ^^^^ RET508
+45 |                 c = 3
+46 |                 break
+   |
+   = help: Remove unnecessary `else`
+
+ℹ Safe fix
+41 41 |             if z:  # [no-else-break]
+42 42 |                 b = 2
+43 43 |                 break
+44    |-            else:
+45    |-                c = 3
+46    |-                break
+   44 |+            c = 3
+   45 |+            break
+47 46 |         else:
+48 47 |             d = 4
+49 48 |             break
+
+RET508.py:60:9: RET508 [*] Unnecessary `else` after `break` statement
+   |
+58 |                 b = 2
+59 |             break
+60 |         else:
+   |         ^^^^ RET508
+61 |             c = 3
+62 |         break
+   |
+   = help: Remove unnecessary `else`
+
+ℹ Safe fix
+57 57 |             else:
+58 58 |                 b = 2
+59 59 |             break
+60    |-        else:
+61    |-            c = 3
+   60 |+        c = 3
+62 61 |         break
+63 62 | 
+64 63 | 
+
+RET508.py:71:13: RET508 [*] Unnecessary `else` after `break` statement
+   |
+69 |                 a = 4
+70 |                 break
+71 |             else:
+   |             ^^^^ RET508
+72 |                 b = 2
+73 |         else:
+   |
+   = help: Remove unnecessary `else`
+
+ℹ Safe fix
+68 68 |             if y:  # [no-else-break]
+69 69 |                 a = 4
+70 70 |                 break
+71    |-            else:
+72    |-                b = 2
+   71 |+            b = 2
+73 72 |         else:
+74 73 |             c = 3
+75 74 |         break
+
+RET508.py:82:9: RET508 [*] Unnecessary `else` after `break` statement
+   |
+80 |         if x:  # [no-else-break]
+81 |             break
+82 |         else:
+   |         ^^^^ RET508
+83 |             try:
+84 |                 return
+   |
+   = help: Remove unnecessary `else`
+
+ℹ Safe fix
+79 79 |     for i in range(10):
+80 80 |         if x:  # [no-else-break]
+81 81 |             break
+82    |-        else:
+83    |-            try:
+84    |-                return
+85    |-            except ValueError:
+86    |-                break
+   82 |+        try:
+   83 |+            return
+   84 |+        except ValueError:
+   85 |+            break
+87 86 | 
+88 87 | 
+89 88 | ###
+
+RET508.py:158:13: RET508 [*] Unnecessary `else` after `break` statement
+    |
+156 |             if i > w:
+157 |                 break
+158 |             else:
+    |             ^^^^ RET508
+159 |                 a = z
+    |
+    = help: Remove unnecessary `else`
+
+ℹ Safe fix
+155 155 |         else:
+156 156 |             if i > w:
+157 157 |                 break
+158     |-            else:
+159     |-                a = z
+    158 |+            a = z
+
+

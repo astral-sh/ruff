@@ -274,10 +274,12 @@ def foo(wait: bool = True):
     time.sleep(1) if wait else None
 
 
-a = "".join((
-    "",  # comment
-    "" if True else "",
-))
+a = "".join(
+    (
+        "",  # comment
+        "" if True else "",
+    )
+)
 ```
 
 ## Black Output
@@ -389,10 +391,10 @@ def foo(wait: bool = True):
     time.sleep(1) if wait else None
 
 
-a = "".join((
-    "",  # comment
-    "" if True else "",
-))
+a = "".join(
+    (
+        "",  # comment
+        "" if True else "",
+    )
+)
 ```
-
-

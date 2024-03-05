@@ -109,7 +109,7 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
         return;
     }
 
-    let [arg] = args.as_slice() else {
+    let [arg] = &**args else {
         return;
     };
 

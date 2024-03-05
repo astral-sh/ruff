@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -48,14 +49,16 @@ pub(crate) fn async_function_with_timeout(
     if !function_def.is_async {
         return;
     }
+
+    // If `trio` isn't in scope, avoid raising the diagnostic.
+    if !checker.semantic().seen_module(Modules::TRIO) {
+        return;
+    }
+
+    // If the function doesn't have a `timeout` parameter, avoid raising the diagnostic.
     let Some(timeout) = function_def.parameters.find("timeout") else {
         return;
     };
-
-    // If `trio` isn't in scope, avoid raising the diagnostic.
-    if !checker.semantic().seen(&["trio"]) {
-        return;
-    }
 
     checker.diagnostics.push(Diagnostic::new(
         TrioAsyncFunctionWithTimeout,

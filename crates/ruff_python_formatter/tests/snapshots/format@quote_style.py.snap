@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/quote_styl
 ---
 ## Input
 ```python
-'single'
+'single' # this string is treated as a docstring
 "double"
 r'r single'
 r"r double"
@@ -69,10 +69,12 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
-'single'
+"single"  # this string is treated as a docstring
+
 'double'
 r'r single'
 r'r double'
@@ -129,19 +131,6 @@ def docstring_single():
 ```
 
 
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -1,4 +1,5 @@
- 'single'
-+
- 'double'
- r'r single'
- r'r double'
-```
-
-
 ### Output 2
 ```
 indent-style               = space
@@ -154,10 +143,12 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
-"single"
+"single"  # this string is treated as a docstring
+
 "double"
 r"r single"
 r"r double"
@@ -214,19 +205,6 @@ def docstring_single():
 ```
 
 
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -1,4 +1,5 @@
- "single"
-+
- "double"
- r"r single"
- r"r double"
-```
-
-
 ### Output 3
 ```
 indent-style               = space
@@ -239,10 +217,12 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
-'single'
+'single'  # this string is treated as a docstring
+
 "double"
 r'r single'
 r"r double"
@@ -259,21 +239,21 @@ rb"rb double"
 rb'br single'
 rb"br double"
 
-"""single triple"""
+'''single triple'''
 """double triple"""
-r"""r single triple"""
+r'''r single triple'''
 r"""r double triple"""
-f"""f single triple"""
+f'''f single triple'''
 f"""f double triple"""
-rf"""fr single triple"""
+rf'''fr single triple'''
 rf"""fr double triple"""
-rf"""rf single triple"""
+rf'''rf single triple'''
 rf"""rf double triple"""
-b"""b single triple"""
+b'''b single triple'''
 b"""b double triple"""
-rb"""rb single triple"""
+rb'''rb single triple'''
 rb"""rb double triple"""
-rb"""br single triple"""
+rb'''br single triple'''
 rb"""br double triple"""
 
 'single1' 'single2'
@@ -283,7 +263,7 @@ rb"""br double triple"""
 
 
 def docstring_single_triple():
-    """single triple"""
+    '''single triple'''
 
 
 def docstring_double_triple():
@@ -295,20 +275,7 @@ def docstring_double():
 
 
 def docstring_single():
-    "single"
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -1,4 +1,5 @@
- 'single'
-+
- "double"
- r'r single'
- r"r double"
+    'single'
 ```
 
 

@@ -39,6 +39,8 @@ fn check_project_include_defaults() {
         [BASEPATH]/include-test/subdirectory/c.py
 
         ----- stderr -----
+        warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `nested-project/pyproject.toml`:
+          - 'select' -> 'lint.select'
         "###);
     });
 }

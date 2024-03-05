@@ -101,14 +101,14 @@ pub(crate) fn unrecognized_platform(checker: &mut Checker, test: &Expr) {
         return;
     };
 
-    let ([op], [right]) = (ops.as_slice(), comparators.as_slice()) else {
+    let ([op], [right]) = (&**ops, &**comparators) else {
         return;
     };
 
     if !checker
         .semantic()
-        .resolve_call_path(left)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["sys", "platform"]))
+        .resolve_qualified_name(left)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["sys", "platform"]))
     {
         return;
     }

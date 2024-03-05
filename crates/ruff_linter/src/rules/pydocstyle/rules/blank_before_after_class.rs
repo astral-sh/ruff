@@ -37,7 +37,7 @@ use crate::registry::Rule;
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// [D211]: https://docs.astral.sh/ruff/rules/blank-line-before-class
 #[violation]
@@ -84,7 +84,7 @@ impl AlwaysFixableViolation for OneBlankLineBeforeClass {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -134,7 +134,7 @@ impl AlwaysFixableViolation for OneBlankLineAfterClass {
 /// ```
 ///
 /// ## Options
-/// - `pydocstyle.convention`
+/// - `lint.pydocstyle.convention`
 ///
 /// [D203]: https://docs.astral.sh/ruff/rules/one-blank-line-before-class
 #[violation]

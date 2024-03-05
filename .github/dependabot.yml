@@ -9,6 +9,10 @@ updates:
       actions:
         patterns:
           - "*"
+    ignore:
+      # The latest versions of these are not compatible with our release workflow
+      - dependency-name: "actions/upload-artifact"
+      - dependency-name: "actions/download-artifact"
 
   - package-ecosystem: "cargo"
     directory: "/"

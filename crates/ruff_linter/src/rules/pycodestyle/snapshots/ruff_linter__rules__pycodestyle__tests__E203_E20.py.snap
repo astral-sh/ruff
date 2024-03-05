@@ -231,6 +231,8 @@ E20.py:149:10: E203 [*] Whitespace before ':'
 148 | #: E203:1:10
 149 | ham[upper  :]
     |          ^^ E203
+150 | 
+151 | #: Okay
     |
     = help: Remove whitespace before ':'
 
@@ -240,5 +242,21 @@ E20.py:149:10: E203 [*] Whitespace before ':'
 148 148 | #: E203:1:10
 149     |-ham[upper  :]
     149 |+ham[upper:]
+150 150 | 
+151 151 | #: Okay
+152 152 | ham[lower +1 :, "columnname"]
 
+E20.py:155:14: E203 [*] Whitespace before ':'
+    |
+154 | #: E203:1:13
+155 | ham[lower + 1  :, "columnname"]
+    |              ^^ E203
+    |
+    = help: Remove whitespace before ':'
 
+ℹ Safe fix
+152 152 | ham[lower +1 :, "columnname"]
+153 153 | 
+154 154 | #: E203:1:13
+155     |-ham[lower + 1  :, "columnname"]
+    155 |+ham[lower + 1:, "columnname"]

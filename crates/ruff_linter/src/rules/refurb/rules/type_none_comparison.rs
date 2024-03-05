@@ -59,7 +59,7 @@ impl Violation for TypeNoneComparison {
 
 /// FURB169
 pub(crate) fn type_none_comparison(checker: &mut Checker, compare: &ast::ExprCompare) {
-    let ([op], [right]) = (compare.ops.as_slice(), compare.comparators.as_slice()) else {
+    let ([op], [right]) = (&*compare.ops, &*compare.comparators) else {
         return;
     };
 

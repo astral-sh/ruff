@@ -11,6 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [lib]
+doctest = false
 
 [dependencies]
 ruff_text_size = { path = "../ruff_text_size" }

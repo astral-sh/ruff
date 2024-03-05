@@ -11,6 +11,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "foo ",
             is_raw: false,
+            triple_quoted: false,
         },
         2..6,
     ),
@@ -26,6 +27,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "bar ",
             is_raw: false,
+            triple_quoted: false,
         },
         9..13,
     ),
@@ -81,6 +83,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: " baz",
             is_raw: false,
+            triple_quoted: false,
         },
         29..33,
     ),
@@ -96,6 +99,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "foo ",
             is_raw: false,
+            triple_quoted: false,
         },
         37..41,
     ),
@@ -111,6 +115,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "bar",
             is_raw: false,
+            triple_quoted: false,
         },
         44..47,
     ),
@@ -126,6 +131,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: " some ",
             is_raw: false,
+            triple_quoted: false,
         },
         49..55,
     ),
@@ -141,6 +147,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "another",
             is_raw: false,
+            triple_quoted: false,
         },
         58..65,
     ),

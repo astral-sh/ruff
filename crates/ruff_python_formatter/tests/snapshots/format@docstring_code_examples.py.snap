@@ -1369,6 +1369,7 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -2740,6 +2741,7 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -4111,6 +4113,7 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -5482,6 +5485,7 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -6853,6 +6857,7 @@ docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -7338,10 +7343,8 @@ def rst_literal_subsequent_line_not_indented():
     Do cool stuff::
 
      if True:
-         cool_stuff(
-             '''
-     hiya'''
-         )
+         cool_stuff('''
+     hiya''')
 
     Done.
     """
@@ -7816,13 +7819,11 @@ def markdown_nested_fences():
     Do cool stuff.
 
     ``````
-    do_something(
-        '''
+    do_something('''
     ```
     did i trick you?
     ```
-    '''
-    )
+    ''')
     ``````
 
     Done.
@@ -8209,42 +8210,6 @@ def markdown_skipped_rst_directive():
 ```
 
 
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -480,10 +480,8 @@
-     Do cool stuff::
- 
-      if True:
--         cool_stuff(
--             '''
--     hiya'''
--         )
-+         cool_stuff('''
-+     hiya''')
- 
-     Done.
-     """
-@@ -958,13 +956,11 @@
-     Do cool stuff.
- 
-     ``````
--    do_something(
--        '''
-+    do_something('''
-     ```
-     did i trick you?
-     ```
--    '''
--    )
-+    ''')
-     ``````
- 
-     Done.
-```
-
-
 ### Output 6
 ```
 indent-style               = space
@@ -8257,6 +8222,7 @@ docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -8742,10 +8708,8 @@ def rst_literal_subsequent_line_not_indented():
   Do cool stuff::
 
    if True:
-     cool_stuff(
-       '''
-   hiya'''
-     )
+     cool_stuff('''
+   hiya''')
 
   Done.
   """
@@ -9220,13 +9184,11 @@ def markdown_nested_fences():
   Do cool stuff.
 
   ``````
-  do_something(
-    '''
+  do_something('''
   ```
   did i trick you?
   ```
-  '''
-  )
+  ''')
   ``````
 
   Done.
@@ -9613,42 +9575,6 @@ def markdown_skipped_rst_directive():
 ```
 
 
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -480,10 +480,8 @@
-   Do cool stuff::
- 
-    if True:
--     cool_stuff(
--       '''
--   hiya'''
--     )
-+     cool_stuff('''
-+   hiya''')
- 
-   Done.
-   """
-@@ -958,13 +956,11 @@
-   Do cool stuff.
- 
-   ``````
--  do_something(
--    '''
-+  do_something('''
-   ```
-   did i trick you?
-   ```
--  '''
--  )
-+  ''')
-   ``````
- 
-   Done.
-```
-
-
 ### Output 7
 ```
 indent-style               = tab
@@ -9661,6 +9587,7 @@ docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -10155,10 +10082,8 @@ def rst_literal_subsequent_line_not_indented():
 	Do cool stuff::
 
 	 if True:
-	         cool_stuff(
-	                 '''
-	 hiya'''
-	         )
+	         cool_stuff('''
+	 hiya''')
 
 	Done.
 	"""
@@ -10633,13 +10558,11 @@ def markdown_nested_fences():
 	Do cool stuff.
 
 	``````
-	do_something(
-	        '''
+	do_something('''
 	```
 	did i trick you?
 	```
-	'''
-	)
+	''')
 	``````
 
 	Done.
@@ -11026,42 +10949,6 @@ def markdown_skipped_rst_directive():
 ```
 
 
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -489,10 +489,8 @@
- 	Do cool stuff::
- 
- 	 if True:
--	         cool_stuff(
--	                 '''
--	 hiya'''
--	         )
-+	         cool_stuff('''
-+	 hiya''')
- 
- 	Done.
- 	"""
-@@ -967,13 +965,11 @@
- 	Do cool stuff.
- 
- 	``````
--	do_something(
--	        '''
-+	do_something('''
- 	```
- 	did i trick you?
- 	```
--	'''
--	)
-+	''')
- 	``````
- 
- 	Done.
-```
-
-
 ### Output 8
 ```
 indent-style               = tab
@@ -11074,6 +10961,7 @@ docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -11559,10 +11447,8 @@ def rst_literal_subsequent_line_not_indented():
 	Do cool stuff::
 
 	 if True:
-	     cool_stuff(
-	         '''
-	 hiya'''
-	     )
+	     cool_stuff('''
+	 hiya''')
 
 	Done.
 	"""
@@ -12037,13 +11923,11 @@ def markdown_nested_fences():
 	Do cool stuff.
 
 	``````
-	do_something(
-	    '''
+	do_something('''
 	```
 	did i trick you?
 	```
-	'''
-	)
+	''')
 	``````
 
 	Done.
@@ -12430,42 +12314,6 @@ def markdown_skipped_rst_directive():
 ```
 
 
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -480,10 +480,8 @@
- 	Do cool stuff::
- 
- 	 if True:
--	     cool_stuff(
--	         '''
--	 hiya'''
--	     )
-+	     cool_stuff('''
-+	 hiya''')
- 
- 	Done.
- 	"""
-@@ -958,13 +956,11 @@
- 	Do cool stuff.
- 
- 	``````
--	do_something(
--	    '''
-+	do_something('''
- 	```
- 	did i trick you?
- 	```
--	'''
--	)
-+	''')
- 	``````
- 
- 	Done.
-```
-
-
 ### Output 9
 ```
 indent-style               = space
@@ -12478,6 +12326,7 @@ docstring-code             = Enabled
 docstring-code-line-width  = 60
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -12972,10 +12821,8 @@ def rst_literal_subsequent_line_not_indented():
     Do cool stuff::
 
      if True:
-         cool_stuff(
-             '''
-     hiya'''
-         )
+         cool_stuff('''
+     hiya''')
 
     Done.
     """
@@ -13450,13 +13297,11 @@ def markdown_nested_fences():
     Do cool stuff.
 
     ``````
-    do_something(
-        '''
+    do_something('''
     ```
     did i trick you?
     ```
-    '''
-    )
+    ''')
     ``````
 
     Done.
@@ -13843,42 +13688,6 @@ def markdown_skipped_rst_directive():
 ```
 
 
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -489,10 +489,8 @@
-     Do cool stuff::
- 
-      if True:
--         cool_stuff(
--             '''
--     hiya'''
--         )
-+         cool_stuff('''
-+     hiya''')
- 
-     Done.
-     """
-@@ -967,13 +965,11 @@
-     Do cool stuff.
- 
-     ``````
--    do_something(
--        '''
-+    do_something('''
-     ```
-     did i trick you?
-     ```
--    '''
--    )
-+    ''')
-     ``````
- 
-     Done.
-```
-
-
 ### Output 10
 ```
 indent-style               = space
@@ -13891,6 +13700,7 @@ docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -14376,10 +14186,8 @@ def rst_literal_subsequent_line_not_indented():
     Do cool stuff::
 
      if True:
-         cool_stuff(
-             '''
-     hiya'''
-         )
+         cool_stuff('''
+     hiya''')
 
     Done.
     """
@@ -14854,13 +14662,11 @@ def markdown_nested_fences():
     Do cool stuff.
 
     ``````
-    do_something(
-        '''
+    do_something('''
     ```
     did i trick you?
     ```
-    '''
-    )
+    ''')
     ``````
 
     Done.
@@ -15244,42 +15050,6 @@ def markdown_skipped_rst_directive():
     Done.
     """
     pass
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -480,10 +480,8 @@
-     Do cool stuff::
- 
-      if True:
--         cool_stuff(
--             '''
--     hiya'''
--         )
-+         cool_stuff('''
-+     hiya''')
- 
-     Done.
-     """
-@@ -958,13 +956,11 @@
-     Do cool stuff.
- 
-     ``````
--    do_something(
--        '''
-+    do_something('''
-     ```
-     did i trick you?
-     ```
--    '''
--    )
-+    ''')
-     ``````
- 
-     Done.
 ```
 
 

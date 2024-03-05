@@ -12,6 +12,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [lib]
+doctest = false
 
 [dependencies]
 log = { workspace = true }

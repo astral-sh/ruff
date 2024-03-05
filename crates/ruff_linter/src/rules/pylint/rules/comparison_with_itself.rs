@@ -84,10 +84,10 @@ pub(crate) fn comparison_with_itself(
                 {
                     continue;
                 }
-                let [Expr::Name(left_arg)] = left_call.arguments.args.as_slice() else {
+                let [Expr::Name(left_arg)] = &*left_call.arguments.args else {
                     continue;
                 };
-                let [Expr::Name(right_right)] = right_call.arguments.args.as_slice() else {
+                let [Expr::Name(right_right)] = &*right_call.arguments.args else {
                     continue;
                 };
                 if left_arg.id != right_right.id {

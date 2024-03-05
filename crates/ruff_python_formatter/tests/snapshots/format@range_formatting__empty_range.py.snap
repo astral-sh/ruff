@@ -1,0 +1,18 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/empty_range.py
+---
+## Input
+```python
+def  test():
+    <RANGE_START><RANGE_END>print( "test" )
+```
+
+## Output
+```python
+def  test():
+    print( "test" )
+```
+
+
+

@@ -322,7 +322,7 @@ fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> SourceCodeSnipp
     let call = ast::ExprCall {
         func: Box::new(name.into()),
         arguments: ast::Arguments {
-            args: vec![],
+            args: Box::from([]),
             keywords: open.keywords.iter().copied().cloned().collect(),
             range: TextRange::default(),
         },

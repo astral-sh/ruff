@@ -84,6 +84,7 @@ enum Reason<'a> {
     NoMatch,
     UserDefinedSection,
     NoSections,
+    DisabledSection(&'a ImportSection),
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -96,9 +97,11 @@ pub(crate) fn categorize<'a>(
     known_modules: &'a KnownModules,
     target_version: PythonVersion,
     no_sections: bool,
+    section_order: &'a [ImportSection],
+    default_section: &'a ImportSection,
 ) -> &'a ImportSection {
     let module_base = module_name.split('.').next().unwrap();
-    let (import_type, reason) = {
+    let (mut import_type, mut reason) = {
         if matches!(level, None | Some(0)) && module_base == "__future__" {
             (&ImportSection::Known(ImportType::Future), Reason::Future)
         } else if no_sections {
@@ -134,12 +137,14 @@ pub(crate) fn categorize<'a>(
                 Reason::KnownFirstParty,
             )
         } else {
-            (
-                &ImportSection::Known(ImportType::ThirdParty),
-                Reason::NoMatch,
-            )
+            (default_section, Reason::NoMatch)
         }
     };
+    // If a value is not in `section_order` then map it to `default_section`.
+    if !section_order.contains(import_type) {
+        reason = Reason::DisabledSection(import_type);
+        import_type = default_section;
+    }
     debug!(
         "Categorized '{}' as {:?} ({:?})",
         module_name, import_type, reason
@@ -176,6 +181,8 @@ pub(crate) fn categorize_imports<'a>(
     known_modules: &'a KnownModules,
     target_version: PythonVersion,
     no_sections: bool,
+    section_order: &'a [ImportSection],
+    default_section: &'a ImportSection,
 ) -> BTreeMap<&'a ImportSection, ImportBlock<'a>> {
     let mut block_by_type: BTreeMap<&ImportSection, ImportBlock> = BTreeMap::default();
     // Categorize `Stmt::Import`.
@@ -189,6 +196,8 @@ pub(crate) fn categorize_imports<'a>(
             known_modules,
             target_version,
             no_sections,
+            section_order,
+            default_section,
         );
         block_by_type
             .entry(import_type)
@@ -207,6 +216,8 @@ pub(crate) fn categorize_imports<'a>(
             known_modules,
             target_version,
             no_sections,
+            section_order,
+            default_section,
         );
         block_by_type
             .entry(classification)
@@ -225,6 +236,8 @@ pub(crate) fn categorize_imports<'a>(
             known_modules,
             target_version,
             no_sections,
+            section_order,
+            default_section,
         );
         block_by_type
             .entry(classification)
@@ -243,6 +256,8 @@ pub(crate) fn categorize_imports<'a>(
             known_modules,
             target_version,
             no_sections,
+            section_order,
+            default_section,
         );
         block_by_type
             .entry(classification)

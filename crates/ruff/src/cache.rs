@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::fs::{self, File};
 use std::hash::Hasher;
-use std::io::{self, BufReader, BufWriter, Write};
+use std::io::{self, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
@@ -15,6 +15,7 @@ use rayon::iter::ParallelIterator;
 use rayon::iter::{IntoParallelIterator, ParallelBridge};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
+use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
@@ -165,15 +166,29 @@ impl Cache {
             return Ok(());
         }
 
-        let file = File::create(&self.path)
-            .with_context(|| format!("Failed to create cache file '{}'", self.path.display()))?;
-        let writer = BufWriter::new(file);
-        bincode::serialize_into(writer, &self.package).with_context(|| {
+        // Write the cache to a temporary file first and then rename it for an "atomic" write.
+        // Protects against data loss if the process is killed during the write and races between different ruff
+        // processes, resulting in a corrupted cache file. https://github.com/astral-sh/ruff/issues/8147#issuecomment-1943345964
+        let mut temp_file =
+            NamedTempFile::new_in(self.path.parent().expect("Write path must have a parent"))
+                .context("Failed to create temporary file")?;
+
+        // Serialize to in-memory buffer because hyperfine benchmark showed that it's faster than
+        // using a `BufWriter` and our cache files are small enough that streaming isn't necessary.
+        let serialized =
+            bincode::serialize(&self.package).context("Failed to serialize cache data")?;
+        temp_file
+            .write_all(&serialized)
+            .context("Failed to write serialized cache to temporary file.")?;
+
+        temp_file.persist(&self.path).with_context(|| {
             format!(
-                "Failed to serialise cache to file '{}'",
+                "Failed to rename temporary cache file to {}",
                 self.path.display()
             )
-        })
+        })?;
+
+        Ok(())
     }
 
     /// Applies the pending changes without storing the cache to disk.
@@ -368,7 +383,7 @@ pub(crate) fn init(path: &Path) -> Result<()> {
     let gitignore_path = path.join(".gitignore");
     if !gitignore_path.exists() {
         let mut file = fs::File::create(gitignore_path)?;
-        file.write_all(b"*")?;
+        file.write_all(b"# Automatically created by ruff.\n*\n")?;
     }
 
     Ok(())
@@ -1050,6 +1065,7 @@ mod tests {
                 &self.settings.formatter,
                 PySourceType::Python,
                 FormatMode::Write,
+                None,
                 Some(cache),
             )
         }

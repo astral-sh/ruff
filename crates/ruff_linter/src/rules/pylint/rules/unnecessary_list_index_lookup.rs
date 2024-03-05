@@ -72,7 +72,7 @@ pub(crate) fn unnecessary_list_index_lookup(checker: &mut Checker, stmt_for: &St
 
 /// PLR1736
 pub(crate) fn unnecessary_list_index_lookup_comprehension(checker: &mut Checker, expr: &Expr) {
-    let (Expr::GeneratorExp(ast::ExprGeneratorExp {
+    let (Expr::Generator(ast::ExprGenerator {
         elt, generators, ..
     })
     | Expr::DictComp(ast::ExprDictComp {
@@ -126,8 +126,10 @@ fn enumerate_items<'a>(
 
     // Check that the function is the `enumerate` builtin.
     if !semantic
-        .resolve_call_path(func.as_ref())
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["builtins" | "", "enumerate"]))
+        .resolve_qualified_name(func.as_ref())
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["builtins" | "", "enumerate"])
+        })
     {
         return None;
     }

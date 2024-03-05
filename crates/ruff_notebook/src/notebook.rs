@@ -454,6 +454,7 @@ mod tests {
     #[test_case("cell_magic", false)]
     #[test_case("valid_cell_magic", true)]
     #[test_case("automagic", false)]
+    #[test_case("automagic_assignment", true)]
     #[test_case("automagics", false)]
     #[test_case("automagic_before_code", false)]
     #[test_case("automagic_after_code", true)]

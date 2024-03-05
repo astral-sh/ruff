@@ -2,9 +2,9 @@
 /// can be used as `list[int]`).
 ///
 /// See: <https://docs.python.org/3/library/typing.html>
-pub fn is_standard_library_generic(call_path: &[&str]) -> bool {
+pub fn is_standard_library_generic(qualified_name: &[&str]) -> bool {
     matches!(
-        call_path,
+        qualified_name,
         ["", "dict" | "frozenset" | "list" | "set" | "tuple" | "type"]
             | [
                 "collections" | "typing" | "typing_extensions",
@@ -118,13 +118,16 @@ pub fn is_standard_library_generic(call_path: &[&str]) -> bool {
 /// See: <https://docs.python.org/3/library/typing.html>
 ///
 /// [PEP 593]: https://peps.python.org/pep-0593/
-pub fn is_pep_593_generic_type(call_path: &[&str]) -> bool {
-    matches!(call_path, ["typing" | "typing_extensions", "Annotated"])
+pub fn is_pep_593_generic_type(qualified_name: &[&str]) -> bool {
+    matches!(
+        qualified_name,
+        ["typing" | "typing_extensions", "Annotated"]
+    )
 }
 
 /// Returns `true` if a call path is `Literal`.
-pub fn is_standard_library_literal(call_path: &[&str]) -> bool {
-    matches!(call_path, ["typing" | "typing_extensions", "Literal"])
+pub fn is_standard_library_literal(qualified_name: &[&str]) -> bool {
+    matches!(qualified_name, ["typing" | "typing_extensions", "Literal"])
 }
 
 /// Returns `true` if a name matches that of a generic from the Python standard library (e.g.
@@ -219,9 +222,9 @@ pub fn is_literal_member(member: &str) -> bool {
 
 /// Returns `true` if a call path represents that of an immutable, non-generic type from the Python
 /// standard library (e.g. `int` or `str`).
-pub fn is_immutable_non_generic_type(call_path: &[&str]) -> bool {
+pub fn is_immutable_non_generic_type(qualified_name: &[&str]) -> bool {
     matches!(
-        call_path,
+        qualified_name,
         ["collections", "abc", "Sized"]
             | ["typing", "LiteralString" | "Sized"]
             | [
@@ -241,9 +244,9 @@ pub fn is_immutable_non_generic_type(call_path: &[&str]) -> bool {
 
 /// Returns `true` if a call path represents that of an immutable, generic type from the Python
 /// standard library (e.g. `tuple`).
-pub fn is_immutable_generic_type(call_path: &[&str]) -> bool {
+pub fn is_immutable_generic_type(qualified_name: &[&str]) -> bool {
     matches!(
-        call_path,
+        qualified_name,
         ["", "tuple"]
             | [
                 "collections",
@@ -279,9 +282,9 @@ pub fn is_immutable_generic_type(call_path: &[&str]) -> bool {
 
 /// Returns `true` if a call path represents a function from the Python standard library that
 /// returns a mutable value (e.g., `dict`).
-pub fn is_mutable_return_type(call_path: &[&str]) -> bool {
+pub fn is_mutable_return_type(qualified_name: &[&str]) -> bool {
     matches!(
-        call_path,
+        qualified_name,
         ["", "dict" | "list" | "set"]
             | [
                 "collections",
@@ -292,9 +295,9 @@ pub fn is_mutable_return_type(call_path: &[&str]) -> bool {
 
 /// Returns `true` if a call path represents a function from the Python standard library that
 /// returns a immutable value (e.g., `bool`).
-pub fn is_immutable_return_type(call_path: &[&str]) -> bool {
+pub fn is_immutable_return_type(qualified_name: &[&str]) -> bool {
     matches!(
-        call_path,
+        qualified_name,
         ["datetime", "date" | "datetime" | "timedelta"]
             | ["decimal", "Decimal"]
             | ["fractions", "Fraction"]

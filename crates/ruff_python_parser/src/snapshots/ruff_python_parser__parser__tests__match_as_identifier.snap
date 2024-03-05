@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "parse_suite(source, \"<test>\").unwrap()"
+expression: parse_suite(source).unwrap()
 ---
 [
     Expr(
@@ -52,6 +52,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: false,
                 },
             ),
         },
@@ -105,6 +106,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: false,
                 },
             ),
         },
@@ -385,6 +387,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                             range: 298..300,
                                             elts: [],
                                             ctx: Load,
+                                            parenthesized: true,
                                         },
                                     ),
                                 ],
@@ -425,6 +428,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                             range: 329..331,
                                             elts: [],
                                             ctx: Load,
+                                            parenthesized: true,
                                         },
                                     ),
                                 ],
@@ -505,6 +509,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                         ),
                                     ],
                                     ctx: Load,
+                                    parenthesized: false,
                                 },
                             ),
                             ctx: Load,
@@ -548,6 +553,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                         ),
                                     ],
                                     ctx: Load,
+                                    parenthesized: true,
                                 },
                             ),
                             ctx: Load,
@@ -617,8 +623,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
     If(
         StmtIf {
             range: 508..527,
-            test: NamedExpr(
-                ExprNamedExpr {
+            test: Named(
+                ExprNamed {
                     range: 511..521,
                     target: Name(
                         ExprName {

@@ -8,7 +8,7 @@ use ruff_python_ast::identifier::Identifier;
 /// Checks for functions or methods with too many statements.
 ///
 /// By default, this rule allows up to 50 statements, as configured by the
-/// [`pylint.max-statements`] option.
+/// [`lint.pylint.max-statements`] option.
 ///
 /// ## Why is this bad?
 /// Functions or methods with many statements are harder to understand
@@ -44,7 +44,7 @@ use ruff_python_ast::identifier::Identifier;
 /// ```
 ///
 /// ## Options
-/// - `pylint.max-statements`
+/// - `lint.pylint.max-statements`
 #[violation]
 pub struct TooManyStatements {
     statements: usize,

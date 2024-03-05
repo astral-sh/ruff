@@ -61,7 +61,7 @@ jobs:
           echo 'EOF' >> $GITHUB_OUTPUT
 
       - name: Find existing comment
-        uses: peter-evans/find-comment@v2
+        uses: peter-evans/find-comment@v3
         if: steps.generate-comment.outcome == 'success'
         id: find-comment
         with:
@@ -71,7 +71,7 @@ jobs:
 
       - name: Create or update comment
         if: steps.find-comment.outcome == 'success'
-        uses: peter-evans/create-or-update-comment@v3
+        uses: peter-evans/create-or-update-comment@v4
         with:
           comment-id: ${{ steps.find-comment.outputs.comment-id }}
           issue-number: ${{ steps.pr-number.outputs.pr-number }}

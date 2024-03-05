@@ -57,15 +57,6 @@ pub(crate) fn mixed_case_variable_in_class_scope(
     name: &str,
     arguments: Option<&Arguments>,
 ) {
-    if checker
-        .settings
-        .pep8_naming
-        .ignore_names
-        .iter()
-        .any(|ignore_name| ignore_name.matches(name))
-    {
-        return;
-    }
     if !helpers::is_mixed_case(name) {
         return;
     }
@@ -75,6 +66,10 @@ pub(crate) fn mixed_case_variable_in_class_scope(
     if helpers::is_named_tuple_assignment(parent, checker.semantic())
         || helpers::is_typed_dict_class(arguments, checker.semantic())
     {
+        return;
+    }
+
+    if checker.settings.pep8_naming.ignore_names.matches(name) {
         return;
     }
 

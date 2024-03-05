@@ -27,10 +27,16 @@ use crate::docstrings::Docstring;
 ///     """Return the pathname of the KOS root directory."""
 /// ```
 ///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent quotes, making the rule redundant.
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+///
+/// [formatter]: https://docs.astral.sh/ruff/formatter/
 #[violation]
 pub struct TripleSingleQuotes {
     expected_quote: Quote,
@@ -80,14 +86,12 @@ pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
 
-                if checker.settings.preview.is_enabled() {
-                    let body = docstring.body().as_str();
-                    if !body.ends_with('\'') {
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            format!("{prefixes}'''{body}'''"),
-                            docstring.range(),
-                        )));
-                    }
+                let body = docstring.body().as_str();
+                if !body.ends_with('\'') {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        format!("{prefixes}'''{body}'''"),
+                        docstring.range(),
+                    )));
                 }
 
                 checker.diagnostics.push(diagnostic);
@@ -98,14 +102,12 @@ pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
 
-                if checker.settings.preview.is_enabled() {
-                    let body = docstring.body().as_str();
-                    if !body.ends_with('"') {
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            format!("{prefixes}\"\"\"{body}\"\"\""),
-                            docstring.range(),
-                        )));
-                    }
+                let body = docstring.body().as_str();
+                if !body.ends_with('"') {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        format!("{prefixes}\"\"\"{body}\"\"\""),
+                        docstring.range(),
+                    )));
                 }
 
                 checker.diagnostics.push(diagnostic);

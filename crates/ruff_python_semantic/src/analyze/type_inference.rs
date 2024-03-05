@@ -76,7 +76,7 @@ impl From<&Expr> for ResolvedPythonType {
             Expr::List(_) => ResolvedPythonType::Atom(PythonType::List),
             Expr::ListComp(_) => ResolvedPythonType::Atom(PythonType::List),
             Expr::Tuple(_) => ResolvedPythonType::Atom(PythonType::Tuple),
-            Expr::GeneratorExp(_) => ResolvedPythonType::Atom(PythonType::Generator),
+            Expr::Generator(_) => ResolvedPythonType::Atom(PythonType::Generator),
             Expr::FString(_) => ResolvedPythonType::Atom(PythonType::String),
             Expr::StringLiteral(_) => ResolvedPythonType::Atom(PythonType::String),
             Expr::BytesLiteral(_) => ResolvedPythonType::Atom(PythonType::Bytes),
@@ -97,10 +97,8 @@ impl From<&Expr> for ResolvedPythonType {
             Expr::NoneLiteral(_) => ResolvedPythonType::Atom(PythonType::None),
             Expr::EllipsisLiteral(_) => ResolvedPythonType::Atom(PythonType::Ellipsis),
             // Simple container expressions.
-            Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => {
-                ResolvedPythonType::from(value.as_ref())
-            }
-            Expr::IfExp(ast::ExprIfExp { body, orelse, .. }) => {
+            Expr::Named(ast::ExprNamed { value, .. }) => ResolvedPythonType::from(value.as_ref()),
+            Expr::If(ast::ExprIf { body, orelse, .. }) => {
                 let body = ResolvedPythonType::from(body.as_ref());
                 let orelse = ResolvedPythonType::from(orelse.as_ref());
                 body.union(orelse)

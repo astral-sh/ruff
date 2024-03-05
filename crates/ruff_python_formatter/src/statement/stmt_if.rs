@@ -1,6 +1,7 @@
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{ElifElseClause, StmtIf};
+use ruff_text_size::Ranged;
 
 use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
@@ -81,7 +82,12 @@ pub(crate) fn format_elif_else_clause(
             clause_header(
                 ClauseHeader::ElifElse(item),
                 trailing_colon_comment,
-                &format_with(|f| {
+                &format_with(|f: &mut PyFormatter| {
+                    f.options()
+                        .source_map_generation()
+                        .is_enabled()
+                        .then_some(source_position(item.start()))
+                        .fmt(f)?;
                     if let Some(test) = test {
                         write!(
                             f,
@@ -98,6 +104,10 @@ pub(crate) fn format_elif_else_clause(
             )
             .with_leading_comments(leading_comments, last_node),
             clause_body(body, trailing_colon_comment),
+            f.options()
+                .source_map_generation()
+                .is_enabled()
+                .then_some(source_position(item.end()))
         ]
     )
 }

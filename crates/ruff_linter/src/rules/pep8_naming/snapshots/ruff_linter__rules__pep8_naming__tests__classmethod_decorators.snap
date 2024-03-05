@@ -1,15 +1,26 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-N805.py:7:20: N805 First argument of a method should be named `self`
+N805.py:7:20: N805 [*] First argument of a method should be named `self`
   |
 6 | class Class:
 7 |     def bad_method(this):
   |                    ^^^^ N805
 8 |         pass
   |
+  = help: Rename `this` to `self`
 
-N805.py:12:30: N805 First argument of a method should be named `self`
+ℹ Unsafe fix
+4 4 | 
+5 5 | 
+6 6 | class Class:
+7   |-    def bad_method(this):
+  7 |+    def bad_method(self):
+8 8 |         pass
+9 9 | 
+10 10 |     if False:
+
+N805.py:12:30: N805 [*] First argument of a method should be named `self`
    |
 10 |     if False:
 11 | 
@@ -17,17 +28,39 @@ N805.py:12:30: N805 First argument of a method should be named `self`
    |                              ^^^^ N805
 13 |             pass
    |
+   = help: Rename `this` to `self`
 
-N805.py:64:29: N805 First argument of a method should be named `self`
+ℹ Unsafe fix
+9  9  | 
+10 10 |     if False:
+11 11 | 
+12    |-        def extra_bad_method(this):
+   12 |+        def extra_bad_method(self):
+13 13 |             pass
+14 14 | 
+15 15 |     def good_method(self):
+
+N805.py:64:29: N805 [*] First argument of a method should be named `self`
    |
 62 |         pass
 63 | 
-64 |     def bad_method_pos_only(this, blah, /, self, something: str):
+64 |     def bad_method_pos_only(this, blah, /, something: str):
    |                             ^^^^ N805
 65 |         pass
    |
+   = help: Rename `this` to `self`
 
-N805.py:70:13: N805 First argument of a method should be named `self`
+ℹ Unsafe fix
+61 61 |     def good_method_pos_only(self, blah, /, something: str):
+62 62 |         pass
+63 63 | 
+64    |-    def bad_method_pos_only(this, blah, /, something: str):
+   64 |+    def bad_method_pos_only(self, blah, /, something: str):
+65 65 |         pass
+66 66 | 
+67 67 | 
+
+N805.py:70:13: N805 [*] First argument of a method should be named `self`
    |
 68 | class ModelClass:
 69 |     @hybrid_property
@@ -35,21 +68,144 @@ N805.py:70:13: N805 First argument of a method should be named `self`
    |             ^^^ N805
 71 |         pass
    |
+   = help: Rename `cls` to `self`
 
-N805.py:78:13: N805 First argument of a method should be named `self`
+ℹ Unsafe fix
+67 67 | 
+68 68 | class ModelClass:
+69 69 |     @hybrid_property
+70    |-    def bad(cls):
+   70 |+    def bad(self):
+71 71 |         pass
+72 72 | 
+73 73 |     @bad.expression
+
+N805.py:78:13: N805 [*] First argument of a method should be named `self`
    |
 77 |     @bad.wtf
 78 |     def bad(cls):
    |             ^^^ N805
 79 |         pass
    |
+   = help: Rename `cls` to `self`
 
-N805.py:94:19: N805 First argument of a method should be named `self`
+ℹ Unsafe fix
+75 75 |         pass
+76 76 | 
+77 77 |     @bad.wtf
+78    |-    def bad(cls):
+   78 |+    def bad(self):
+79 79 |         pass
+80 80 | 
+81 81 |     @hybrid_property
+
+N805.py:94:19: N805 [*] First argument of a method should be named `self`
    |
 93 |     @foobar.thisisstatic
 94 |     def badstatic(foo):
    |                   ^^^ N805
 95 |         pass
    |
+   = help: Rename `foo` to `self`
 
+ℹ Unsafe fix
+91 91 |         pass
+92 92 | 
+93 93 |     @foobar.thisisstatic
+94    |-    def badstatic(foo):
+   94 |+    def badstatic(self):
+95 95 |         pass
+96 96 | 
+97 97 | class SelfInArgsClass:
 
+N805.py:98:26: N805 First argument of a method should be named `self`
+   |
+97 | class SelfInArgsClass:
+98 |     def self_as_argument(this, self):
+   |                          ^^^^ N805
+99 |         pass
+   |
+   = help: Rename `this` to `self`
+
+N805.py:101:35: N805 First argument of a method should be named `self`
+    |
+ 99 |         pass
+100 | 
+101 |     def self_as_pos_only_argument(this, self, /):
+    |                                   ^^^^ N805
+102 |         pass
+    |
+    = help: Rename `this` to `self`
+
+N805.py:104:34: N805 First argument of a method should be named `self`
+    |
+102 |         pass
+103 | 
+104 |     def self_as_kw_only_argument(this, *, self):
+    |                                  ^^^^ N805
+105 |         pass
+    |
+    = help: Rename `this` to `self`
+
+N805.py:107:24: N805 First argument of a method should be named `self`
+    |
+105 |         pass
+106 | 
+107 |     def self_as_varags(this, *self):
+    |                        ^^^^ N805
+108 |         pass
+    |
+    = help: Rename `this` to `self`
+
+N805.py:110:24: N805 First argument of a method should be named `self`
+    |
+108 |         pass
+109 | 
+110 |     def self_as_kwargs(this, **self):
+    |                        ^^^^ N805
+111 |         pass
+    |
+    = help: Rename `this` to `self`
+
+N805.py:114:20: N805 [*] First argument of a method should be named `self`
+    |
+113 | class RenamingInMethodBodyClass:
+114 |     def bad_method(this):
+    |                    ^^^^ N805
+115 |         this = this
+116 |         this
+    |
+    = help: Rename `this` to `self`
+
+ℹ Unsafe fix
+111 111 |         pass
+112 112 | 
+113 113 | class RenamingInMethodBodyClass:
+114     |-    def bad_method(this):
+115     |-        this = this
+116     |-        this
+    114 |+    def bad_method(self):
+    115 |+        self = self
+    116 |+        self
+117 117 | 
+118 118 |     def bad_method(this):
+119 119 |         self = this
+
+N805.py:118:20: N805 [*] First argument of a method should be named `self`
+    |
+116 |         this
+117 | 
+118 |     def bad_method(this):
+    |                    ^^^^ N805
+119 |         self = this
+    |
+    = help: Rename `this` to `self`
+
+ℹ Unsafe fix
+115 115 |         this = this
+116 116 |         this
+117 117 | 
+118     |-    def bad_method(this):
+119     |-        self = this
+    118 |+    def bad_method(self):
+    119 |+        self = self

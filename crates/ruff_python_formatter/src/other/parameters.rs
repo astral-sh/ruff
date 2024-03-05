@@ -3,12 +3,12 @@ use std::usize;
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::Parameters;
 use ruff_python_ast::{AnyNodeRef, AstNode};
-use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{CommentLinePosition, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::{
     dangling_comments, dangling_open_parenthesis_comments, leading_comments, leading_node_comments,
-    trailing_comments, CommentLinePosition, SourceComment,
+    trailing_comments, SourceComment,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::empty_parenthesized;

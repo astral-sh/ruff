@@ -47,7 +47,7 @@ fn do_fuzz(case: &[u8]) -> Corpus {
                 );
             }
             Err(err) => {
-                let offset = err.location.to_usize();
+                let offset = err.location().to_usize();
                 assert!(
                     code.is_char_boundary(offset),
                     "Invalid error location {} (not at char boundary)",

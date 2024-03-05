@@ -52,7 +52,7 @@ impl Violation for MagicValueComparison {
     fn message(&self) -> String {
         let MagicValueComparison { value } = self;
         format!(
-            "Magic value used in comparison, consider replacing {value} with a constant variable"
+            "Magic value used in comparison, consider replacing `{value}` with a constant variable"
         )
     }
 }
@@ -86,8 +86,10 @@ fn is_magic_value(literal_expr: LiteralExpressionRef, allowed_types: &[ConstantT
             !matches!(value.to_str(), "" | "__main__")
         }
         LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
+            #[allow(clippy::float_cmp)]
+            ast::Number::Float(value) => !(*value == 0.0 || *value == 1.0),
             ast::Number::Int(value) => !matches!(*value, Int::ZERO | Int::ONE),
-            _ => true,
+            ast::Number::Complex { .. } => true,
         },
         LiteralExpressionRef::BytesLiteral(_) => true,
     }
@@ -111,7 +113,7 @@ pub(crate) fn magic_value_comparison(checker: &mut Checker, left: &Expr, compara
             if is_magic_value(value, &checker.settings.pylint.allow_magic_value_types) {
                 checker.diagnostics.push(Diagnostic::new(
                     MagicValueComparison {
-                        value: checker.generator().expr(comparison_expr),
+                        value: checker.locator().slice(comparison_expr).to_string(),
                     },
                     comparison_expr.range(),
                 ));

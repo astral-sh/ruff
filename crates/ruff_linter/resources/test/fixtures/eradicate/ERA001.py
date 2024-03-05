@@ -28,3 +28,11 @@ dictionary = {
 }
 
 #import os  # noqa
+
+# case 1:
+# try:
+# try:  # with comment
+# try: print()
+# except:
+# except Foo:
+# except Exception as e: print(e)

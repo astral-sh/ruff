@@ -1,4 +1,5 @@
 use crate::comments::Comments;
+use crate::other::f_string::FStringContext;
 use crate::string::QuoteChar;
 use crate::PyFormatOptions;
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
@@ -22,6 +23,8 @@ pub struct PyFormatContext<'a> {
     /// quote style that is inverted from the one here in order to ensure that
     /// the formatted Python code will be valid.
     docstring: Option<QuoteChar>,
+    /// The state of the formatter with respect to f-strings.
+    f_string_state: FStringState,
 }
 
 impl<'a> PyFormatContext<'a> {
@@ -33,6 +36,7 @@ impl<'a> PyFormatContext<'a> {
             node_level: NodeLevel::TopLevel(TopLevelStatementPosition::Other),
             indent_level: IndentLevel::new(0),
             docstring: None,
+            f_string_state: FStringState::Outside,
         }
     }
 
@@ -86,7 +90,16 @@ impl<'a> PyFormatContext<'a> {
         }
     }
 
+    pub(crate) fn f_string_state(&self) -> FStringState {
+        self.f_string_state
+    }
+
+    pub(crate) fn set_f_string_state(&mut self, f_string_state: FStringState) {
+        self.f_string_state = f_string_state;
+    }
+
     /// Returns `true` if preview mode is enabled.
+    #[allow(unused)]
     pub(crate) const fn is_preview(&self) -> bool {
         self.options.preview().is_enabled()
     }
@@ -113,6 +126,18 @@ impl Debug for PyFormatContext<'_> {
             .field("source", &self.contents)
             .finish()
     }
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub(crate) enum FStringState {
+    /// The formatter is inside an f-string expression element i.e., between the
+    /// curly brace in `f"foo {x}"`.
+    ///
+    /// The containing `FStringContext` is the surrounding f-string context.
+    InsideExpressionElement(FStringContext),
+    /// The formatter is outside an f-string.
+    #[default]
+    Outside,
 }
 
 /// The position of a top-level statement in the module.
@@ -330,5 +355,67 @@ where
             .state_mut()
             .context_mut()
             .set_indent_level(self.saved_level);
+    }
+}
+
+pub(crate) struct WithFStringState<'a, B, D>
+where
+    D: DerefMut<Target = B>,
+    B: Buffer<Context = PyFormatContext<'a>>,
+{
+    buffer: D,
+    saved_location: FStringState,
+}
+
+impl<'a, B, D> WithFStringState<'a, B, D>
+where
+    D: DerefMut<Target = B>,
+    B: Buffer<Context = PyFormatContext<'a>>,
+{
+    pub(crate) fn new(expr_location: FStringState, mut buffer: D) -> Self {
+        let context = buffer.state_mut().context_mut();
+        let saved_location = context.f_string_state();
+
+        context.set_f_string_state(expr_location);
+
+        Self {
+            buffer,
+            saved_location,
+        }
+    }
+}
+
+impl<'a, B, D> Deref for WithFStringState<'a, B, D>
+where
+    D: DerefMut<Target = B>,
+    B: Buffer<Context = PyFormatContext<'a>>,
+{
+    type Target = B;
+
+    fn deref(&self) -> &Self::Target {
+        &self.buffer
+    }
+}
+
+impl<'a, B, D> DerefMut for WithFStringState<'a, B, D>
+where
+    D: DerefMut<Target = B>,
+    B: Buffer<Context = PyFormatContext<'a>>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buffer
+    }
+}
+
+impl<'a, B, D> Drop for WithFStringState<'a, B, D>
+where
+    D: DerefMut<Target = B>,
+    B: Buffer<Context = PyFormatContext<'a>>,
+{
+    fn drop(&mut self) {
+        self.buffer
+            .state_mut()
+            .context_mut()
+            .set_f_string_state(self.saved_location);
     }
 }

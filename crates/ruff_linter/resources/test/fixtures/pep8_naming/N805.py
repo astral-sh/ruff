@@ -61,7 +61,7 @@ class PosOnlyClass:
     def good_method_pos_only(self, blah, /, something: str):
         pass
 
-    def bad_method_pos_only(this, blah, /, self, something: str):
+    def bad_method_pos_only(this, blah, /, something: str):
         pass
 
 
@@ -93,3 +93,27 @@ class ModelClass:
     @foobar.thisisstatic
     def badstatic(foo):
         pass
+
+class SelfInArgsClass:
+    def self_as_argument(this, self):
+        pass
+
+    def self_as_pos_only_argument(this, self, /):
+        pass
+
+    def self_as_kw_only_argument(this, *, self):
+        pass
+
+    def self_as_varags(this, *self):
+        pass
+
+    def self_as_kwargs(this, **self):
+        pass
+
+class RenamingInMethodBodyClass:
+    def bad_method(this):
+        this = this
+        this
+
+    def bad_method(this):
+        self = this

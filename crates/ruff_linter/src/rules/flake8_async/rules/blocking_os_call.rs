@@ -2,7 +2,8 @@ use ruff_python_ast::ExprCall;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::CallPath;
+use ruff_python_ast::name::QualifiedName;
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -42,24 +43,26 @@ impl Violation for BlockingOsCallInAsyncFunction {
 
 /// ASYNC102
 pub(crate) fn blocking_os_call(checker: &mut Checker, call: &ExprCall) {
-    if checker.semantic().in_async_context() {
-        if checker
-            .semantic()
-            .resolve_call_path(call.func.as_ref())
-            .as_ref()
-            .is_some_and(is_unsafe_os_method)
-        {
-            checker.diagnostics.push(Diagnostic::new(
-                BlockingOsCallInAsyncFunction,
-                call.func.range(),
-            ));
+    if checker.semantic().seen_module(Modules::OS) {
+        if checker.semantic().in_async_context() {
+            if checker
+                .semantic()
+                .resolve_qualified_name(call.func.as_ref())
+                .as_ref()
+                .is_some_and(is_unsafe_os_method)
+            {
+                checker.diagnostics.push(Diagnostic::new(
+                    BlockingOsCallInAsyncFunction,
+                    call.func.range(),
+                ));
+            }
         }
     }
 }
 
-fn is_unsafe_os_method(call_path: &CallPath) -> bool {
+fn is_unsafe_os_method(qualified_name: &QualifiedName) -> bool {
     matches!(
-        call_path.as_slice(),
+        qualified_name.segments(),
         [
             "os",
             "popen"

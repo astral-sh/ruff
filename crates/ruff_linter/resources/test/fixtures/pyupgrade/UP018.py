@@ -33,7 +33,7 @@ bool(b"")
 bool(1.0)
 int().denominator
 
-# These become string or byte literals
+# These become literals
 str()
 str("foo")
 str("""
@@ -53,3 +53,9 @@ bool(False)
 
 # These become a literal but retain parentheses
 int(1).denominator
+
+# These too are literals in spirit
+int(+1)
+int(-1)
+float(+1.0)
+float(-1.0)

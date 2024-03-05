@@ -72,14 +72,14 @@ impl Violation for PrintEmptyString {
 pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
     if !checker
         .semantic()
-        .resolve_call_path(&call.func)
+        .resolve_qualified_name(&call.func)
         .as_ref()
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "print"]))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "print"]))
     {
         return;
     }
 
-    match &call.arguments.args.as_slice() {
+    match &*call.arguments.args {
         // Ex) `print("")` or `print("", sep="\t")`
         [arg] if is_empty_string(arg) => {
             let reason = if call.arguments.find_keyword("sep").is_some() {
@@ -211,16 +211,30 @@ fn generate_suggestion(call: &ast::ExprCall, separator: Separator, generator: Ge
     let mut call = call.clone();
 
     // Remove all empty string positional arguments.
-    call.arguments.args.retain(|arg| !is_empty_string(arg));
+    call.arguments.args = call
+        .arguments
+        .args
+        .iter()
+        .filter(|arg| !is_empty_string(arg))
+        .cloned()
+        .collect::<Vec<_>>()
+        .into_boxed_slice();
 
     // Remove the `sep` keyword argument if it exists.
     if separator == Separator::Remove {
-        call.arguments.keywords.retain(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .map_or(true, |arg| arg.as_str() != "sep")
-        });
+        call.arguments.keywords = call
+            .arguments
+            .keywords
+            .iter()
+            .filter(|keyword| {
+                keyword
+                    .arg
+                    .as_ref()
+                    .map_or(true, |arg| arg.as_str() != "sep")
+            })
+            .cloned()
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
     }
 
     generator.expr(&call.into())

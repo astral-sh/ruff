@@ -5,11 +5,12 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, ElifElseClause, Stmt};
 use ruff_python_codegen::Stylist;
+use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::rules::pyupgrade::fixes::adjust_indentation;
+use crate::fix::edits::adjust_indentation;
 
 /// ## What it does
 /// Checks for `else` blocks that consist of a single `if` statement.
@@ -84,13 +85,15 @@ pub(crate) fn collapsible_else_if(checker: &mut Checker, stmt: &Stmt) {
         CollapsibleElseIf,
         TextRange::new(else_clause.start(), first.start()),
     );
-
-    if checker.settings.preview.is_enabled() {
-        diagnostic.try_set_fix(|| {
-            convert_to_elif(first, else_clause, checker.locator(), checker.stylist())
-        });
-    }
-
+    diagnostic.try_set_fix(|| {
+        convert_to_elif(
+            first,
+            else_clause,
+            checker.locator(),
+            checker.indexer(),
+            checker.stylist(),
+        )
+    });
     checker.diagnostics.push(diagnostic);
 }
 
@@ -99,6 +102,7 @@ fn convert_to_elif(
     first: &Stmt,
     else_clause: &ElifElseClause,
     locator: &Locator,
+    indexer: &Indexer,
     stylist: &Stylist,
 ) -> Result<Fix> {
     let inner_if_line_start = locator.line_start(first.start());
@@ -114,6 +118,7 @@ fn convert_to_elif(
         TextRange::new(inner_if_line_start, inner_if_line_end),
         indentation,
         locator,
+        indexer,
         stylist,
     )?;
 

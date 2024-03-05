@@ -39,9 +39,9 @@ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = (
     Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb()
 )
 
-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: (
-    Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-) = Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb()
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = (
+    Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb()
+)
 
 JSONSerializable: TypeAlias = (
     "str | int | float | bool | None | list | tuple | JSONMapping"
@@ -61,39 +61,9 @@ JSONSerializable: str | int | float | bool | None | list | tuple | JSONMapping =
 
 # Regression test: Don't forget the parentheses in the annotation when breaking
 class DefaultRunner:
-    task_runner_cls: TaskRunnerProtocol | typing.Callable[
-        [], typing.Any
-    ] = DefaultTaskRunner
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -7,9 +7,9 @@
-     Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb()
- )
- 
--bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: (
--    Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
--) = Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb()
-+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = (
-+    Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb()
-+)
- 
- JSONSerializable: TypeAlias = (
-     "str | int | float | bool | None | list | tuple | JSONMapping"
-@@ -29,6 +29,6 @@
- 
- # Regression test: Don't forget the parentheses in the annotation when breaking
- class DefaultRunner:
--    task_runner_cls: TaskRunnerProtocol | typing.Callable[
--        [], typing.Any
--    ] = DefaultTaskRunner
-+    task_runner_cls: TaskRunnerProtocol | typing.Callable[[], typing.Any] = (
-+        DefaultTaskRunner
-+    )
+    task_runner_cls: TaskRunnerProtocol | typing.Callable[[], typing.Any] = (
+        DefaultTaskRunner
+    )
 ```
 
 

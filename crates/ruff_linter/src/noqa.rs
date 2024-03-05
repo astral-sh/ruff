@@ -235,6 +235,7 @@ impl FileExemption {
     pub(crate) fn try_extract(
         contents: &str,
         comment_ranges: &CommentRanges,
+        external: &[String],
         path: &Path,
         locator: &Locator,
     ) -> Option<Self> {
@@ -263,6 +264,11 @@ impl FileExemption {
                         }
                         ParsedFileExemption::Codes(codes) => {
                             exempt_codes.extend(codes.into_iter().filter_map(|code| {
+                                // Ignore externally-defined rules.
+                                if external.iter().any(|external| code.starts_with(external)) {
+                                    return None;
+                                }
+
                                 if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
                                 {
                                     Some(rule.noqa_code())
@@ -458,6 +464,7 @@ pub(crate) fn add_noqa(
     diagnostics: &[Diagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
+    external: &[String],
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
 ) -> Result<usize> {
@@ -466,6 +473,7 @@ pub(crate) fn add_noqa(
         diagnostics,
         locator,
         comment_ranges,
+        external,
         noqa_line_for,
         line_ending,
     );
@@ -478,6 +486,7 @@ fn add_noqa_inner(
     diagnostics: &[Diagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
+    external: &[String],
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
 ) -> (usize, String) {
@@ -487,7 +496,8 @@ fn add_noqa_inner(
 
     // Whether the file is exempted from all checks.
     // Codes that are globally exempted (within the current file).
-    let exemption = FileExemption::try_extract(locator.contents(), comment_ranges, path, locator);
+    let exemption =
+        FileExemption::try_extract(locator.contents(), comment_ranges, external, path, locator);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
 
     // Mark any non-ignored diagnostics.
@@ -1001,6 +1011,7 @@ mod tests {
             &[],
             &Locator::new(contents),
             &CommentRanges::default(),
+            &[],
             &noqa_line_for,
             LineEnding::Lf,
         );
@@ -1021,6 +1032,7 @@ mod tests {
             &diagnostics,
             &Locator::new(contents),
             &CommentRanges::default(),
+            &[],
             &noqa_line_for,
             LineEnding::Lf,
         );
@@ -1048,6 +1060,7 @@ mod tests {
             &diagnostics,
             &Locator::new(contents),
             &comment_ranges,
+            &[],
             &noqa_line_for,
             LineEnding::Lf,
         );
@@ -1075,6 +1088,7 @@ mod tests {
             &diagnostics,
             &Locator::new(contents),
             &comment_ranges,
+            &[],
             &noqa_line_for,
             LineEnding::Lf,
         );

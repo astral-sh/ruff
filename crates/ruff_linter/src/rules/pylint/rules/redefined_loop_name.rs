@@ -233,6 +233,10 @@ impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
 /// x = cast(int, x)
 /// ```
 fn assignment_is_cast_expr(value: &Expr, target: &Expr, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_typing() {
+        return false;
+    }
+
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, .. },
@@ -301,6 +305,7 @@ fn assignment_targets_from_expr<'a>(
             ctx: ExprContext::Store,
             elts,
             range: _,
+            parenthesized: _,
         }) => Box::new(
             elts.iter()
                 .flat_map(|elt| assignment_targets_from_expr(elt, dummy_variable_rgx)),

@@ -203,6 +203,12 @@ impl PyFormatOptions {
         self.preview = preview;
         self
     }
+
+    #[must_use]
+    pub fn with_source_map_generation(mut self, source_map: SourceMapGeneration) -> Self {
+        self.source_map_generation = source_map;
+        self
+    }
 }
 
 impl FormatOptions for PyFormatOptions {
@@ -224,7 +230,6 @@ impl FormatOptions for PyFormatOptions {
             line_width: self.line_width,
             line_ending: self.line_ending,
             indent_style: self.indent_style,
-            source_map_generation: self.source_map_generation,
         }
     }
 }
@@ -241,6 +246,12 @@ pub enum QuoteStyle {
     #[default]
     Double,
     Preserve,
+}
+
+impl QuoteStyle {
+    pub const fn is_preserve(self) -> bool {
+        matches!(self, QuoteStyle::Preserve)
+    }
 }
 
 impl fmt::Display for QuoteStyle {
@@ -454,4 +465,13 @@ pub enum PythonVersion {
     Py310,
     Py311,
     Py312,
+}
+
+impl PythonVersion {
+    /// Return `true` if the current version supports [PEP 701].
+    ///
+    /// [PEP 701]: https://peps.python.org/pep-0701/
+    pub fn supports_pep_701(self) -> bool {
+        self >= Self::Py312
+    }
 }

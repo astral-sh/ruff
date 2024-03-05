@@ -59,6 +59,11 @@ impl Violation for TypeParamNameMismatch {
 
 /// PLC0132
 pub(crate) fn type_param_name_mismatch(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
+    // If the typing modules were never imported, we'll never match below.
+    if !checker.semantic().seen_typing() {
+        return;
+    }
+
     let [target] = targets else {
         return;
     };
@@ -84,26 +89,26 @@ pub(crate) fn type_param_name_mismatch(checker: &mut Checker, value: &Expr, targ
 
     let Some(kind) = checker
         .semantic()
-        .resolve_call_path(func)
-        .and_then(|call_path| {
+        .resolve_qualified_name(func)
+        .and_then(|qualified_name| {
             if checker
                 .semantic()
-                .match_typing_call_path(&call_path, "ParamSpec")
+                .match_typing_qualified_name(&qualified_name, "ParamSpec")
             {
                 Some(VarKind::ParamSpec)
             } else if checker
                 .semantic()
-                .match_typing_call_path(&call_path, "TypeVar")
+                .match_typing_qualified_name(&qualified_name, "TypeVar")
             {
                 Some(VarKind::TypeVar)
             } else if checker
                 .semantic()
-                .match_typing_call_path(&call_path, "TypeVarTuple")
+                .match_typing_qualified_name(&qualified_name, "TypeVarTuple")
             {
                 Some(VarKind::TypeVarTuple)
             } else if checker
                 .semantic()
-                .match_typing_call_path(&call_path, "NewType")
+                .match_typing_qualified_name(&qualified_name, "NewType")
             {
                 Some(VarKind::NewType)
             } else {

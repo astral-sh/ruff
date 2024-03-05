@@ -26,13 +26,29 @@ pub(crate) fn main(args: &Args) -> Result<()> {
     for rule in Rule::iter() {
         if let Some(explanation) = rule.explanation() {
             let mut output = String::new();
+
             output.push_str(&format!("# {} ({})", rule.as_ref(), rule.noqa_code()));
-            output.push('\n');
             output.push('\n');
 
             let (linter, _) = Linter::parse_code(&rule.noqa_code().to_string()).unwrap();
             if linter.url().is_some() {
                 output.push_str(&format!("Derived from the **{}** linter.", linter.name()));
+                output.push('\n');
+                output.push('\n');
+            }
+
+            if rule.is_deprecated() {
+                output.push_str(
+                    r"**Warning: This rule is deprecated and will be removed in a future release.**",
+                );
+                output.push('\n');
+                output.push('\n');
+            }
+
+            if rule.is_removed() {
+                output.push_str(
+                    r"**Warning: This rule has been removed and its documentation is only available for historical reasons.**",
+                );
                 output.push('\n');
                 output.push('\n');
             }
@@ -116,7 +132,7 @@ fn process_documentation(documentation: &str, out: &mut String, rule_name: &str)
                     }
                 }
 
-                let anchor = option.replace('.', "-");
+                let anchor = option.replace('.', "_");
                 out.push_str(&format!("- [`{option}`][{option}]\n"));
                 after.push_str(&format!("[{option}]: ../settings.md#{anchor}\n"));
 
@@ -142,13 +158,13 @@ mod tests {
         let mut output = String::new();
         process_documentation(
             "
-See also [`mccabe.max-complexity`] and [`task-tags`].
+See also [`lint.mccabe.max-complexity`] and [`lint.task-tags`].
 Something [`else`][other].
 
 ## Options
 
-- `task-tags`
-- `mccabe.max-complexity`
+- `lint.task-tags`
+- `lint.mccabe.max-complexity`
 
 [other]: http://example.com.",
             &mut output,
@@ -157,18 +173,18 @@ Something [`else`][other].
         assert_eq!(
             output,
             "
-See also [`mccabe.max-complexity`][mccabe.max-complexity] and [`task-tags`][task-tags].
+See also [`lint.mccabe.max-complexity`][lint.mccabe.max-complexity] and [`lint.task-tags`][lint.task-tags].
 Something [`else`][other].
 
 ## Options
 
-- [`task-tags`][task-tags]
-- [`mccabe.max-complexity`][mccabe.max-complexity]
+- [`lint.task-tags`][lint.task-tags]
+- [`lint.mccabe.max-complexity`][lint.mccabe.max-complexity]
 
 [other]: http://example.com.
 
-[task-tags]: ../settings.md#task-tags
-[mccabe.max-complexity]: ../settings.md#mccabe-max-complexity
+[lint.task-tags]: ../settings.md#lint_task-tags
+[lint.mccabe.max-complexity]: ../settings.md#lint_mccabe_max-complexity
 "
         );
     }

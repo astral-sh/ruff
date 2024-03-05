@@ -25,7 +25,7 @@ ruff_python_trivia = { path = "../ruff_python_trivia" }
 ruff_workspace = { path = "../ruff_workspace", features = ["schemars"]}
 
 anyhow = { workspace = true }
-clap = { workspace = true }
+clap = { workspace = true, features = ["wrap_help"] }
 ignore = { workspace = true }
 imara-diff = { workspace = true }
 indicatif = { workspace = true }

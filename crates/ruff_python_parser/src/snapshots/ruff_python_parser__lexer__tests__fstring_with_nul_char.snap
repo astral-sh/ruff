@@ -11,6 +11,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\\0",
             is_raw: false,
+            triple_quoted: false,
         },
         2..4,
     ),

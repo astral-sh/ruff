@@ -2,7 +2,8 @@ use ruff_formatter::{format_args, write};
 use ruff_python_ast::AstNode;
 use ruff_python_ast::StmtNonlocal;
 
-use crate::comments::{SourceComment, SuppressionKind};
+use crate::comments::SourceComment;
+use crate::has_skip_comment;
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -53,6 +54,6 @@ impl FormatNodeRule<StmtNonlocal> for FormatStmtNonlocal {
         trailing_comments: &[SourceComment],
         context: &PyFormatContext,
     ) -> bool {
-        SuppressionKind::has_skip_comment(trailing_comments, context.source())
+        has_skip_comment(trailing_comments, context.source())
     }
 }

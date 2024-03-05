@@ -59,11 +59,11 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
             })),
             arguments: Arguments {
                 args: if let Some(msg) = msg {
-                    vec![msg.clone()]
+                    Box::from([msg.clone()])
                 } else {
-                    vec![]
+                    Box::from([])
                 },
-                keywords: vec![],
+                keywords: Box::from([]),
                 range: TextRange::default(),
             },
             range: TextRange::default(),

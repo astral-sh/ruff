@@ -111,6 +111,10 @@ impl Violation for MissingTypeKwargs {
     }
 }
 
+/// ## Deprecation
+/// This rule is commonly disabled because type checkers can infer this type without annotation.
+/// It will be removed in a future release.
+///
 /// ## What it does
 /// Checks that instance method `self` arguments have type annotations.
 ///
@@ -148,6 +152,10 @@ impl Violation for MissingTypeSelf {
     }
 }
 
+/// ## Deprecation
+/// This rule is commonly disabled because type checkers can infer this type without annotation.
+/// It will be removed in a future release.
+///
 /// ## What it does
 /// Checks that class method `cls` arguments have type annotations.
 ///

@@ -184,8 +184,15 @@ impl<'a> Iterator for NewlineWithTrailingNewline<'a> {
     type Item = Line<'a>;
 
     #[inline]
-    fn next(&mut self) -> Option<Line<'a>> {
+    fn next(&mut self) -> Option<Self::Item> {
         self.underlying.next().or_else(|| self.trailing.take())
+    }
+}
+
+impl DoubleEndedIterator for NewlineWithTrailingNewline<'_> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.trailing.take().or_else(|| self.underlying.next_back())
     }
 }
 

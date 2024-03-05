@@ -530,13 +530,11 @@ print("below nested functions")
 class Path:
     if sys.version_info >= (3, 11):
 
-        def joinpath(self):
-            ...
+        def joinpath(self): ...
 
     # The .open method comes from pathlib.pyi and should be kept in sync.
     @overload
-    def open(self):
-        ...
+    def open(self): ...
 
 
 def fakehttp():
@@ -568,20 +566,14 @@ if True:
         pass
 
 
-def overload1():
-    ...  # trailing comment
+def overload1(): ...  # trailing comment
+def overload1(a: int): ...
 
 
-def overload1(a: int):
-    ...
+def overload2(): ...  # trailing comment
 
 
-def overload2():
-    ...  # trailing comment
-
-
-def overload2(a: int):
-    ...
+def overload2(a: int): ...
 
 
 def overload3():
@@ -589,8 +581,7 @@ def overload3():
     # trailing comment
 
 
-def overload3(a: int):
-    ...
+def overload3(a: int): ...
 
 
 def overload4():
@@ -598,73 +589,7 @@ def overload4():
     # trailing comment
 
 
-def overload4(a: int):
-    ...
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -245,13 +245,11 @@
- class Path:
-     if sys.version_info >= (3, 11):
- 
--        def joinpath(self):
--            ...
-+        def joinpath(self): ...
- 
-     # The .open method comes from pathlib.pyi and should be kept in sync.
-     @overload
--    def open(self):
--        ...
-+    def open(self): ...
- 
- 
- def fakehttp():
-@@ -283,20 +281,14 @@
-         pass
- 
- 
--def overload1():
--    ...  # trailing comment
-+def overload1(): ...  # trailing comment
-+def overload1(a: int): ...
- 
- 
--def overload1(a: int):
--    ...
-+def overload2(): ...  # trailing comment
- 
- 
--def overload2():
--    ...  # trailing comment
--
--
--def overload2(a: int):
--    ...
-+def overload2(a: int): ...
- 
- 
- def overload3():
-@@ -304,8 +296,7 @@
-     # trailing comment
- 
- 
--def overload3(a: int):
--    ...
-+def overload3(a: int): ...
- 
- 
- def overload4():
-@@ -313,5 +304,4 @@
-     # trailing comment
- 
- 
--def overload4(a: int):
--    ...
-+def overload4(a: int): ...
+def overload4(a: int): ...
 ```
 
 

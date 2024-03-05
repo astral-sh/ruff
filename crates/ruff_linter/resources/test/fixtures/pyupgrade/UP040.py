@@ -46,3 +46,8 @@ x: typing.TypeAlias = list[T]
 # OK
 x: TypeAlias
 x: int = 1
+
+# Ensure that "T" appears only once  in the type parameters for the modernized
+# type alias.
+T = typing.TypeVar["T"]
+Decorator: TypeAlias = typing.Callable[[T], T]

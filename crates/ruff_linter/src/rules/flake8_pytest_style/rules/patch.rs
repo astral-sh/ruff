@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::collect_call_path;
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Parameters};
@@ -56,11 +56,8 @@ struct LambdaBodyVisitor<'a> {
     uses_args: bool,
 }
 
-impl<'a, 'b> Visitor<'b> for LambdaBodyVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_expr(&mut self, expr: &'b Expr) {
+impl<'a> Visitor<'a> for LambdaBodyVisitor<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
                 if self.parameters.includes(id) {
@@ -107,10 +104,10 @@ fn check_patch_call(call: &ast::ExprCall, index: usize) -> Option<Diagnostic> {
 
 /// PT008
 pub(crate) fn patch_with_lambda(call: &ast::ExprCall) -> Option<Diagnostic> {
-    let call_path = collect_call_path(&call.func)?;
+    let name = UnqualifiedName::from_expr(&call.func)?;
 
     if matches!(
-        call_path.as_slice(),
+        name.segments(),
         [
             "mocker"
                 | "class_mocker"
@@ -123,7 +120,7 @@ pub(crate) fn patch_with_lambda(call: &ast::ExprCall) -> Option<Diagnostic> {
     ) {
         check_patch_call(call, 1)
     } else if matches!(
-        call_path.as_slice(),
+        name.segments(),
         [
             "mocker"
                 | "class_mocker"

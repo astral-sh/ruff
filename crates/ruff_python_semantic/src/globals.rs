@@ -48,8 +48,8 @@ impl<'a> Globals<'a> {
         builder.finish()
     }
 
-    pub(crate) fn get(&self, name: &str) -> Option<&TextRange> {
-        self.0.get(name)
+    pub(crate) fn get(&self, name: &str) -> Option<TextRange> {
+        self.0.get(name).copied()
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = (&&'a str, &TextRange)> + '_ {

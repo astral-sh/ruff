@@ -9,7 +9,7 @@ UP006_1.py:9:10: UP006 [*] Use `collections.defaultdict` instead of `typing.Defa
    |
    = help: Replace with `collections.defaultdict`
 
-ℹ Unsafe fix
+ℹ Safe fix
 6  6  |     from collections import defaultdict
 7  7  | 
 8  8  | 

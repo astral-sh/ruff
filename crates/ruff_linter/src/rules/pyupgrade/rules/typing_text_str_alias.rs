@@ -2,6 +2,7 @@ use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -46,10 +47,14 @@ impl Violation for TypingTextStrAlias {
 
 /// UP019
 pub(crate) fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
+    if !checker.semantic().seen_module(Modules::TYPING) {
+        return;
+    }
+
     if checker
         .semantic()
-        .resolve_call_path(expr)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["typing", "Text"]))
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["typing", "Text"]))
     {
         let mut diagnostic = Diagnostic::new(TypingTextStrAlias, expr.range());
         if checker.semantic().is_builtin("str") {

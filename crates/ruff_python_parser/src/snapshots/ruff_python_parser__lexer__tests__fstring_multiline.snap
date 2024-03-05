@@ -11,6 +11,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\nhello\n    world\n",
             is_raw: false,
+            triple_quoted: true,
         },
         4..21,
     ),
@@ -26,6 +27,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\n    world\nhello\n",
             is_raw: false,
+            triple_quoted: true,
         },
         29..46,
     ),
@@ -41,6 +43,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "some ",
             is_raw: false,
+            triple_quoted: false,
         },
         52..57,
     ),
@@ -56,6 +59,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "multiline\nallowed ",
             is_raw: false,
+            triple_quoted: true,
         },
         62..80,
     ),
@@ -85,6 +89,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: " string",
             is_raw: false,
+            triple_quoted: false,
         },
         87..94,
     ),

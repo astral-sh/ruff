@@ -3,6 +3,7 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -48,6 +49,10 @@ impl Violation for TarfileUnsafeMembers {
 
 /// S202
 pub(crate) fn tarfile_unsafe_members(checker: &mut Checker, call: &ast::ExprCall) {
+    if !checker.semantic().seen_module(Modules::TARFILE) {
+        return;
+    }
+
     if !call
         .func
         .as_attribute_expr()
@@ -62,10 +67,6 @@ pub(crate) fn tarfile_unsafe_members(checker: &mut Checker, call: &ast::ExprCall
         .and_then(|keyword| keyword.value.as_string_literal_expr())
         .is_some_and(|value| matches!(value.value.to_str(), "data" | "tar"))
     {
-        return;
-    }
-
-    if !checker.semantic().seen(&["tarfile"]) {
         return;
     }
 

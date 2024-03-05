@@ -10,6 +10,7 @@ RET507.py:8:9: RET507 Unnecessary `elif` after `continue` statement
  9 |             continue
 10 |         else:
    |
+   = help: Remove unnecessary `elif`
 
 RET507.py:22:9: RET507 Unnecessary `elif` after `continue` statement
    |
@@ -20,6 +21,7 @@ RET507.py:22:9: RET507 Unnecessary `elif` after `continue` statement
 23 |             c = 2
 24 |         else:
    |
+   = help: Remove unnecessary `elif`
 
 RET507.py:36:9: RET507 Unnecessary `else` after `continue` statement
    |
@@ -29,6 +31,7 @@ RET507.py:36:9: RET507 Unnecessary `else` after `continue` statement
    |         ^^^^ RET507
 37 |             a = z
    |
+   = help: Remove unnecessary `else`
 
 RET507.py:47:13: RET507 Unnecessary `else` after `continue` statement
    |
@@ -39,6 +42,7 @@ RET507.py:47:13: RET507 Unnecessary `else` after `continue` statement
 48 |                 c = 3
 49 |                 continue
    |
+   = help: Remove unnecessary `else`
 
 RET507.py:63:9: RET507 Unnecessary `else` after `continue` statement
    |
@@ -49,6 +53,7 @@ RET507.py:63:9: RET507 Unnecessary `else` after `continue` statement
 64 |             c = 3
 65 |         continue
    |
+   = help: Remove unnecessary `else`
 
 RET507.py:74:13: RET507 Unnecessary `else` after `continue` statement
    |
@@ -59,6 +64,7 @@ RET507.py:74:13: RET507 Unnecessary `else` after `continue` statement
 75 |                 b = 2
 76 |         else:
    |
+   = help: Remove unnecessary `else`
 
 RET507.py:85:9: RET507 Unnecessary `else` after `continue` statement
    |
@@ -69,5 +75,6 @@ RET507.py:85:9: RET507 Unnecessary `else` after `continue` statement
 86 |             try:
 87 |                 return
    |
+   = help: Remove unnecessary `else`
 
 

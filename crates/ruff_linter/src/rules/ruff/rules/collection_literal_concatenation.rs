@@ -162,6 +162,7 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
             elts: new_elts,
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            parenthesized: true,
         }
         .into(),
     };

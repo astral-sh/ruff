@@ -55,10 +55,8 @@ pub(crate) fn unnecessary_spread(checker: &mut Checker, dict: &ast::ExprDict) {
             // inside a dict.
             if let Expr::Dict(inner) = value {
                 let mut diagnostic = Diagnostic::new(UnnecessarySpread, value.range());
-                if checker.settings.preview.is_enabled() {
-                    if let Some(fix) = unnecessary_spread_fix(inner, prev_end, checker.locator()) {
-                        diagnostic.set_fix(fix);
-                    }
+                if let Some(fix) = unnecessary_spread_fix(inner, prev_end, checker.locator()) {
+                    diagnostic.set_fix(fix);
                 }
                 checker.diagnostics.push(diagnostic);
             }

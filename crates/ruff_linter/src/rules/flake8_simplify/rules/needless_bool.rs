@@ -161,8 +161,8 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt_if: &ast::StmtIf) {
             let value_node = ast::ExprCall {
                 func: Box::new(func_node.into()),
                 arguments: Arguments {
-                    args: vec![if_test.clone()],
-                    keywords: vec![],
+                    args: Box::from([if_test.clone()]),
+                    keywords: Box::from([]),
                     range: TextRange::default(),
                 },
                 range: TextRange::default(),

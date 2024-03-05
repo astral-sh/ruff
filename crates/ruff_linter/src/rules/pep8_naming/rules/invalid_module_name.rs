@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_stdlib::identifiers::{is_migration_name, is_module_name};
 use ruff_text_size::TextRange;
 
-use crate::settings::types::IdentifierPattern;
+use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
 /// Checks for module names that do not follow the `snake_case` naming
@@ -50,7 +50,7 @@ impl Violation for InvalidModuleName {
 pub(crate) fn invalid_module_name(
     path: &Path,
     package: Option<&Path>,
-    ignore_names: &[IdentifierPattern],
+    ignore_names: &IgnoreNames,
 ) -> Option<Diagnostic> {
     if !path
         .extension()
@@ -66,13 +66,6 @@ pub(crate) fn invalid_module_name(
             path.file_stem().unwrap().to_string_lossy()
         };
 
-        if ignore_names
-            .iter()
-            .any(|ignore_name| ignore_name.matches(&module_name))
-        {
-            return None;
-        }
-
         // As a special case, we allow files in `versions` and `migrations` directories to start
         // with a digit (e.g., `0001_initial.py`), to support common conventions used by Django
         // and other frameworks.
@@ -81,7 +74,12 @@ pub(crate) fn invalid_module_name(
         } else {
             is_module_name(&module_name)
         };
+
         if !is_valid_module_name {
+            // Ignore any explicitly-allowed names.
+            if ignore_names.matches(&module_name) {
+                return None;
+            }
             return Some(Diagnostic::new(
                 InvalidModuleName {
                     name: module_name.to_string(),

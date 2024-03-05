@@ -14,10 +14,6 @@ pub struct PrinterOptions {
 
     /// The type of line ending to apply to the printed input
     pub line_ending: LineEnding,
-
-    /// Whether the printer should build a source map that allows mapping positions in the source document
-    /// to positions in the formatted document.
-    pub source_map_generation: SourceMapGeneration,
 }
 
 impl<'a, O> From<&'a O> for PrinterOptions

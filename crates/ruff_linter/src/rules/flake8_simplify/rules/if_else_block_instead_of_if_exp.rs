@@ -152,7 +152,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &mut Checker, stmt_if: &a
 }
 
 fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Expr) -> Stmt {
-    let node = ast::ExprIfExp {
+    let node = ast::ExprIf {
         test: Box::new(test.clone()),
         body: Box::new(body_value.clone()),
         orelse: Box::new(orelse_value.clone()),

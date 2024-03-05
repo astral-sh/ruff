@@ -31,7 +31,13 @@ use ruff_text_size::TextSize;
 /// ```
 ///
 /// ## References
-/// - [mypy](https://mypy.readthedocs.io/en/stable/common_issues.html#spurious-errors-and-locally-silencing-the-checker)
+/// Mypy supports a [built-in setting](https://mypy.readthedocs.io/en/stable/error_code_list2.html#check-that-type-ignore-include-an-error-code-ignore-without-code)
+/// to enforce that all `type: ignore` annotations include an error code, akin
+/// to enabling this rule:
+/// ```toml
+/// [tool.mypy]
+/// enable_error_code = ["ignore-without-code"]
+/// ```
 #[violation]
 pub struct BlanketTypeIgnore;
 

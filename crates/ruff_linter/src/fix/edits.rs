@@ -8,6 +8,7 @@ use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Stmt};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_python_trivia::textwrap::dedent_to;
 use ruff_python_trivia::{
     has_leading_content, is_python_whitespace, CommentRanges, PythonWhitespace, SimpleTokenKind,
     SimpleTokenizer,
@@ -15,7 +16,9 @@ use ruff_python_trivia::{
 use ruff_source_file::{Locator, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
+use crate::cst::matchers::{match_function_def, match_indented_block, match_statement};
 use crate::fix::codemods;
+use crate::fix::codemods::CodegenStylist;
 use crate::line_width::{IndentWidth, LineLength, LineWidthBuilder};
 
 /// Return the `Fix` to use when deleting a `Stmt`.
@@ -56,6 +59,51 @@ pub(crate) fn delete_stmt(
             let range = locator.full_lines_range(stmt.range());
             Edit::range_deletion(range)
         }
+    }
+}
+
+/// Generate a [`Edit`] to delete a comment (for example: a `noqa` directive).
+pub(crate) fn delete_comment(range: TextRange, locator: &Locator) -> Edit {
+    let line_range = locator.line_range(range.start());
+
+    // Compute the leading space.
+    let prefix = locator.slice(TextRange::new(line_range.start(), range.start()));
+    let leading_space_len = prefix.text_len() - prefix.trim_whitespace_end().text_len();
+
+    // Compute the trailing space.
+    let suffix = locator.slice(TextRange::new(range.end(), line_range.end()));
+    let trailing_space_len = suffix.text_len() - suffix.trim_whitespace_start().text_len();
+
+    // Ex) `# noqa`
+    if line_range
+        == TextRange::new(
+            range.start() - leading_space_len,
+            range.end() + trailing_space_len,
+        )
+    {
+        let full_line_end = locator.full_line_end(line_range.end());
+        Edit::deletion(line_range.start(), full_line_end)
+    }
+    // Ex) `x = 1  # noqa`
+    else if range.end() + trailing_space_len == line_range.end() {
+        Edit::deletion(range.start() - leading_space_len, line_range.end())
+    }
+    // Ex) `x = 1  # noqa  # type: ignore`
+    else if locator
+        .slice(TextRange::new(
+            range.end() + trailing_space_len,
+            line_range.end(),
+        ))
+        .starts_with('#')
+    {
+        Edit::deletion(range.start(), range.end() + trailing_space_len)
+    }
+    // Ex) `x = 1  # noqa here`
+    else {
+        Edit::deletion(
+            range.start() + "# ".text_len(),
+            range.end() + trailing_space_len,
+        )
     }
 }
 
@@ -163,6 +211,50 @@ pub(crate) fn add_argument(
     } else {
         // Case 2: no arguments. Add argument, without any trailing comma.
         Edit::insertion(argument.to_string(), arguments.start() + TextSize::from(1))
+    }
+}
+
+/// Safely adjust the indentation of the indented block at [`TextRange`].
+///
+/// The [`TextRange`] is assumed to represent an entire indented block, including the leading
+/// indentation of that block. For example, to dedent the body here:
+/// ```python
+/// if True:
+///     print("Hello, world!")
+/// ```
+///
+/// The range would be the entirety of `    print("Hello, world!")`.
+pub(crate) fn adjust_indentation(
+    range: TextRange,
+    indentation: &str,
+    locator: &Locator,
+    indexer: &Indexer,
+    stylist: &Stylist,
+) -> Result<String> {
+    // If the range includes a multi-line string, use LibCST to ensure that we don't adjust the
+    // whitespace _within_ the string.
+    if indexer.multiline_ranges().intersects(range) || indexer.fstring_ranges().intersects(range) {
+        let contents = locator.slice(range);
+
+        let module_text = format!("def f():{}{contents}", stylist.line_ending().as_str());
+
+        let mut tree = match_statement(&module_text)?;
+
+        let embedding = match_function_def(&mut tree)?;
+
+        let indented_block = match_indented_block(&mut embedding.body)?;
+        indented_block.indent = Some(indentation);
+
+        let module_text = indented_block.codegen_stylist(stylist);
+        let module_text = module_text
+            .strip_prefix(stylist.line_ending().as_str())
+            .unwrap()
+            .to_string();
+        Ok(module_text)
+    } else {
+        // Otherwise, we can do a simple adjustment ourselves.
+        let contents = locator.slice(range);
+        Ok(dedent_to(contents, indentation))
     }
 }
 

@@ -45,8 +45,7 @@ def wat():
 @deco2(with_args=True)
 # leading 3
 @deco3
-def decorated1():
-    ...
+def decorated1(): ...
 
 
 # leading 1
@@ -54,8 +53,7 @@ def decorated1():
 # leading 2
 @deco2(with_args=True)
 # leading function comment
-def decorated1():
-    ...
+def decorated1(): ...
 
 
 # Note: this is fixed in
@@ -65,8 +63,7 @@ some_instruction
 
 
 # This comment should be split from `some_instruction` by two lines but isn't.
-def g():
-    ...
+def g(): ...
 
 
 if __name__ == "__main__":

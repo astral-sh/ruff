@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 /// An import with its surrounding context.
 pub(crate) struct ImportBinding<'a> {
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
-    pub(crate) import: AnyImport<'a>,
+    pub(crate) import: AnyImport<'a, 'a>,
     /// The binding for the imported symbol.
     pub(crate) binding: &'a Binding<'a>,
     /// The first reference to the imported symbol.

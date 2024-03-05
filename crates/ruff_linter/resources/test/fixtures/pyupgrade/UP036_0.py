@@ -215,3 +215,13 @@ if sys.version_info[:2] > (3,13):
 
 if sys.version_info[:3] > (3,13):
     print("py3")
+
+if sys.version_info > (3,0):
+    f"this is\
+    allowed too"
+
+    f"""the indentation on
+    this line is significant"""
+
+    "this is\
+    allowed too"

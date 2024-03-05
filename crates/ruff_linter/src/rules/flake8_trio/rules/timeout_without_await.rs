@@ -3,6 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::AwaitVisitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{StmtWith, WithItem};
+use ruff_python_semantic::Modules;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_trio::method_name::MethodName;
@@ -49,10 +50,16 @@ pub(crate) fn timeout_without_await(
     with_stmt: &StmtWith,
     with_items: &[WithItem],
 ) {
+    if !checker.semantic().seen_module(Modules::TRIO) {
+        return;
+    }
+
     let Some(method_name) = with_items.iter().find_map(|item| {
         let call = item.context_expr.as_call_expr()?;
-        let call_path = checker.semantic().resolve_call_path(call.func.as_ref())?;
-        MethodName::try_from(&call_path)
+        let qualified_name = checker
+            .semantic()
+            .resolve_qualified_name(call.func.as_ref())?;
+        MethodName::try_from(&qualified_name)
     }) else {
         return;
     };

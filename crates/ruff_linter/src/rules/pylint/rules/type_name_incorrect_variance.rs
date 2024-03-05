@@ -65,6 +65,11 @@ impl Violation for TypeNameIncorrectVariance {
 
 /// PLC0105
 pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) {
+    // If the typing modules were never imported, we'll never match below.
+    if !checker.semantic().seen_typing() {
+        return;
+    }
+
     let Expr::Call(ast::ExprCall {
         func, arguments, ..
     }) = value
@@ -90,16 +95,16 @@ pub(crate) fn type_name_incorrect_variance(checker: &mut Checker, value: &Expr) 
 
     let Some(kind) = checker
         .semantic()
-        .resolve_call_path(func)
-        .and_then(|call_path| {
+        .resolve_qualified_name(func)
+        .and_then(|qualified_name| {
             if checker
                 .semantic()
-                .match_typing_call_path(&call_path, "ParamSpec")
+                .match_typing_qualified_name(&qualified_name, "ParamSpec")
             {
                 Some(VarKind::ParamSpec)
             } else if checker
                 .semantic()
-                .match_typing_call_path(&call_path, "TypeVar")
+                .match_typing_qualified_name(&qualified_name, "TypeVar")
             {
                 Some(VarKind::TypeVar)
             } else {

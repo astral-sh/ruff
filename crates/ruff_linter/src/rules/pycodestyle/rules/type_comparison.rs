@@ -114,8 +114,10 @@ fn deprecated_type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
                 // Ex) `type(obj) is types.NoneType`
                 if checker
                     .semantic()
-                    .resolve_call_path(value.as_ref())
-                    .is_some_and(|call_path| matches!(call_path.as_slice(), ["types", ..]))
+                    .resolve_qualified_name(value.as_ref())
+                    .is_some_and(|qualified_name| {
+                        matches!(qualified_name.segments(), ["types", ..])
+                    })
                 {
                     checker.diagnostics.push(Diagnostic::new(
                         TypeComparison {
@@ -162,7 +164,14 @@ pub(crate) fn preview_type_comparison(checker: &mut Checker, compare: &ast::Expr
         .filter(|(_, op)| matches!(op, CmpOp::Eq | CmpOp::NotEq))
         .map(|((left, right), _)| (left, right))
     {
+        // If either expression is a type...
         if is_type(left, checker.semantic()) || is_type(right, checker.semantic()) {
+            // And neither is a `dtype`...
+            if is_dtype(left, checker.semantic()) || is_dtype(right, checker.semantic()) {
+                continue;
+            }
+
+            // Disallow the comparison.
             checker.diagnostics.push(Diagnostic::new(
                 TypeComparison {
                     preview: PreviewMode::Enabled,
@@ -291,6 +300,26 @@ fn is_type(expr: &Expr, semantic: &SemanticModel) -> bool {
                     | "Warning"
                     | "ZeroDivisionError"
             ) && semantic.is_builtin(id)
+        }
+        _ => false,
+    }
+}
+
+/// Returns `true` if the [`Expr`] appears to be a reference to a NumPy dtype, since:
+/// > `dtype` are a bit of a strange beast, but definitely best thought of as instances, not
+/// > classes, and they are meant to be comparable not just to their own class, but also to the
+/// corresponding scalar types (e.g., `x.dtype == np.float32`) and strings (e.g.,
+/// `x.dtype == ['i1,i4']`; basically, __eq__ always tries to do `dtype(other)`).
+fn is_dtype(expr: &Expr, semantic: &SemanticModel) -> bool {
+    match expr {
+        // Ex) `np.dtype(obj)`
+        Expr::Call(ast::ExprCall { func, .. }) => semantic
+            .resolve_qualified_name(func)
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["numpy", "dtype"])),
+        // Ex) `obj.dtype`
+        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+            // Ex) `obj.dtype`
+            attr.as_str() == "dtype"
         }
         _ => false,
     }

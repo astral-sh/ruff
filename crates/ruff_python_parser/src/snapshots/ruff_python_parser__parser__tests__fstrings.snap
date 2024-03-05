@@ -111,6 +111,7 @@ expression: parse_ast
                                                             ),
                                                         ],
                                                         ctx: Load,
+                                                        parenthesized: false,
                                                     },
                                                 ),
                                                 debug_text: None,
@@ -501,6 +502,7 @@ expression: parse_ast
                                                             ),
                                                         ],
                                                         ctx: Load,
+                                                        parenthesized: false,
                                                     },
                                                 ),
                                                 debug_text: Some(
@@ -931,6 +933,47 @@ expression: parse_ast
                                                         ],
                                                     },
                                                 ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 374..392,
+            value: FString(
+                ExprFString {
+                    range: 374..392,
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 374..392,
+                                    elements: [
+                                        Expression(
+                                            FStringExpressionElement {
+                                                range: 376..391,
+                                                expression: Name(
+                                                    ExprName {
+                                                        range: 381..384,
+                                                        id: "foo",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: Some(
+                                                    DebugText {
+                                                        leading: " (  ",
+                                                        trailing: " )  = ",
+                                                    },
+                                                ),
+                                                conversion: None,
+                                                format_spec: None,
                                             },
                                         ),
                                     ],

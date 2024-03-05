@@ -8,7 +8,7 @@ use ruff_python_ast::identifier::Identifier;
 /// Checks for functions or methods with too many branches.
 ///
 /// By default, this rule allows up to 12 branches. This can be configured
-/// using the [`pylint.max-branches`] option.
+/// using the [`lint.pylint.max-branches`] option.
 ///
 /// ## Why is this bad?
 /// Functions or methods with many branches are harder to understand
@@ -67,7 +67,7 @@ use ruff_python_ast::identifier::Identifier;
 /// ```
 ///
 /// ## Options
-/// - `pylint.max-branches`
+/// - `lint.pylint.max-branches`
 #[violation]
 pub struct TooManyBranches {
     branches: usize,

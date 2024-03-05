@@ -328,6 +328,7 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -628,8 +629,9 @@ with (
     pass
 
 with (
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b,
+    (
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    ) as b,
     c as d,
 ):
     pass
@@ -667,25 +669,6 @@ with Child(aaaaaaaaa, bbbbbbbbbbbbbbb, cccccc), Document(
 ```
 
 
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -295,8 +295,9 @@
-     pass
- 
- with (
--    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--    + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b,
-+    (
-+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-+    ) as b,
-     c as d,
- ):
-     pass
-```
-
-
 ### Output 2
 ```
 indent-style               = space
@@ -698,6 +681,7 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Enabled
 target_version             = Py39
+source_type                = Python
 ```
 
 ```python

@@ -7,7 +7,6 @@ use crate::expression::parentheses::{
     is_expression_parenthesized, parenthesized, Parentheses, Parenthesize,
 };
 use crate::prelude::*;
-use crate::preview::is_wrap_multiple_context_managers_in_parens_enabled;
 
 #[derive(Default)]
 pub struct FormatWithItem;
@@ -30,9 +29,7 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
         );
 
         // Remove the parentheses of the `with_items` if the with statement adds parentheses
-        if f.context().node_level().is_parenthesized()
-            && is_wrap_multiple_context_managers_in_parens_enabled(f.context())
-        {
+        if f.context().node_level().is_parenthesized() {
             if is_parenthesized {
                 // ...except if the with item is parenthesized, then use this with item as a preferred breaking point
                 // or when it has comments, then parenthesize it to prevent comments from moving.

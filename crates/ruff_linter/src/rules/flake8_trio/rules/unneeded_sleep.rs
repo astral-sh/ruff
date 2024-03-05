@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -42,6 +43,10 @@ impl Violation for TrioUnneededSleep {
 
 /// TRIO110
 pub(crate) fn unneeded_sleep(checker: &mut Checker, while_stmt: &ast::StmtWhile) {
+    if !checker.semantic().seen_module(Modules::TRIO) {
+        return;
+    }
+
     // The body should be a single `await` call.
     let [stmt] = while_stmt.body.as_slice() else {
         return;
@@ -58,8 +63,8 @@ pub(crate) fn unneeded_sleep(checker: &mut Checker, while_stmt: &ast::StmtWhile)
 
     if checker
         .semantic()
-        .resolve_call_path(func.as_ref())
-        .is_some_and(|path| matches!(path.as_slice(), ["trio", "sleep" | "sleep_until"]))
+        .resolve_qualified_name(func.as_ref())
+        .is_some_and(|path| matches!(path.segments(), ["trio", "sleep" | "sleep_until"]))
     {
         checker
             .diagnostics

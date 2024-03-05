@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::Imported;
 use ruff_python_semantic::{Binding, BindingKind};
@@ -29,6 +29,12 @@ use crate::renamer::Renamer;
 /// ```python
 /// from collections.abc import Set as AbstractSet
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe for `Set` imports defined at the
+/// top-level of a module. Top-level symbols are implicitly exported by the
+/// module, and so renaming a top-level symbol may break downstream modules
+/// that import it.
 #[violation]
 pub struct UnaliasedCollectionsAbcSetImport;
 
@@ -69,7 +75,15 @@ pub(crate) fn unaliased_collections_abc_set_import(
         diagnostic.try_set_fix(|| {
             let scope = &checker.semantic().scopes[binding.scope];
             let (edit, rest) = Renamer::rename(name, "AbstractSet", scope, checker.semantic())?;
-            Ok(Fix::unsafe_edits(edit, rest))
+            Ok(Fix::applicable_edits(
+                edit,
+                rest,
+                if scope.kind.is_module() {
+                    Applicability::Unsafe
+                } else {
+                    Applicability::Safe
+                },
+            ))
         });
     }
     Some(diagnostic)

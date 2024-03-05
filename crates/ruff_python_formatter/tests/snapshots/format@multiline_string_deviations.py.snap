@@ -84,14 +84,12 @@ call(
 
 # Black applies the hugging recursively. We don't (consistent with the hugging style).
 path.write_text(
-    textwrap.dedent(
-        """\
+    textwrap.dedent("""\
     A triple-quoted string
     actually leveraging the textwrap.dedent functionality
     that ends in a trailing newline,
     representing e.g. file contents.
-"""
-    )
+""")
 )
 
 
@@ -106,30 +104,6 @@ generated_readme = (
 <Add content here!>
 """.strip().format(project_name)
 )
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -31,14 +31,12 @@
- 
- # Black applies the hugging recursively. We don't (consistent with the hugging style).
- path.write_text(
--    textwrap.dedent(
--        """\
-+    textwrap.dedent("""\
-     A triple-quoted string
-     actually leveraging the textwrap.dedent functionality
-     that ends in a trailing newline,
-     representing e.g. file contents.
--"""
--    )
-+""")
- )
- 
- 
 ```
 
 

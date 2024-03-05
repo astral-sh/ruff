@@ -1,10 +1,11 @@
 use std::hash::BuildHasherDefault;
 
+use rustc_hash::FxHashSet;
+
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Arguments, Expr, ExprCall, ExprDict, ExprStringLiteral};
+use ruff_python_ast::{Expr, ExprCall, ExprDict, ExprStringLiteral};
 use ruff_text_size::Ranged;
-use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::Checker;
 
@@ -37,15 +38,14 @@ impl Violation for RepeatedKeywordArgument {
 }
 
 pub(crate) fn repeated_keyword_argument(checker: &mut Checker, call: &ExprCall) {
-    let ExprCall {
-        arguments: Arguments { keywords, .. },
-        ..
-    } = call;
+    let ExprCall { arguments, .. } = call;
 
-    let mut seen =
-        FxHashSet::with_capacity_and_hasher(keywords.len(), BuildHasherDefault::default());
+    let mut seen = FxHashSet::with_capacity_and_hasher(
+        arguments.keywords.len(),
+        BuildHasherDefault::default(),
+    );
 
-    for keyword in keywords {
+    for keyword in arguments.keywords.iter() {
         if let Some(id) = &keyword.arg {
             // Ex) `func(a=1, a=2)`
             if !seen.insert(id.as_str()) {

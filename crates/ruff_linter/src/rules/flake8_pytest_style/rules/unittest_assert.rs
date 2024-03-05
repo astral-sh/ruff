@@ -173,8 +173,8 @@ fn assert(expr: &Expr, msg: Option<&Expr>) -> Stmt {
 fn compare(left: &Expr, cmp_op: CmpOp, right: &Expr) -> Expr {
     Expr::Compare(ast::ExprCompare {
         left: Box::new(left.clone()),
-        ops: vec![cmp_op],
-        comparators: vec![right.clone()],
+        ops: Box::from([cmp_op]),
+        comparators: Box::from([right.clone()]),
         range: TextRange::default(),
     })
 }
@@ -390,8 +390,8 @@ impl UnittestAssert {
                 let node1 = ast::ExprCall {
                     func: Box::new(node.into()),
                     arguments: Arguments {
-                        args: vec![(**obj).clone(), (**cls).clone()],
-                        keywords: vec![],
+                        args: Box::from([(**obj).clone(), (**cls).clone()]),
+                        keywords: Box::from([]),
                         range: TextRange::default(),
                     },
                     range: TextRange::default(),
@@ -434,8 +434,8 @@ impl UnittestAssert {
                 let node2 = ast::ExprCall {
                     func: Box::new(node1.into()),
                     arguments: Arguments {
-                        args: vec![(**regex).clone(), (**text).clone()],
-                        keywords: vec![],
+                        args: Box::from([(**regex).clone(), (**text).clone()]),
+                        keywords: Box::from([]),
                         range: TextRange::default(),
                     },
                     range: TextRange::default(),

@@ -8,7 +8,6 @@ use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::settings::types::PreviewMode;
 
 /// ## What it does
 /// Checks for `is` and `is not` comparisons against constant literals, like
@@ -91,7 +90,7 @@ pub(crate) fn invalid_literal_comparison(
         if matches!(op, CmpOp::Is | CmpOp::IsNot)
             && (helpers::is_constant_non_singleton(left)
                 || helpers::is_constant_non_singleton(right)
-                || (matches!(checker.settings.preview, PreviewMode::Enabled)
+                || (checker.settings.preview.is_enabled()
                     && (helpers::is_mutable_iterable_initializer(left)
                         || helpers::is_mutable_iterable_initializer(right))))
         {

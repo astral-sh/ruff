@@ -23,7 +23,7 @@ For details, see [Black compatibility](#black-compatibility).
 
 ## Getting started
 
-The Ruff formatter is available in Beta as of Ruff v0.1.2.
+The Ruff formatter is available as of Ruff v0.1.2.
 
 ### CLI
 
@@ -208,37 +208,167 @@ on both `first()` and `second()`:
 ]
 ```
 
-#### Line width vs. line length
+#### Parenthesizing long nested-expressions
 
-Ruff uses the Unicode width of a line to determine if a line fits. Black's stable style uses
-character width, while Black's preview style uses Unicode width for strings ([#3445](https://github.com/psf/black/pull/3445)),
-and character width for all other tokens. Ruff's behavior is closer to Black's preview style than
-Black's stable style, although Ruff _also_ uses Unicode width for identifiers and comments.
-
-#### Walruses in slice expressions
-
-Black avoids inserting space around `:=` operators within slices. For example, the following adheres
-to Black stable style:
+Black 24 and newer parenthesizes long conditional expressions and type annotations in function parameters:
 
 ```python
-# Input
-x[y:=1]
-
 # Black
-x[y:=1]
-```
+[
+    "____________________________",
+    "foo",
+    "bar",
+    (
+        "baz"
+        if some_really_looooooooong_variable
+        else "some other looooooooooooooong value"
+    ),
+]
 
-Ruff will instead add space around the `:=` operator:
-
-```python
-# Input
-x[y:=1]
+def foo(
+  i: int,
+  x: (
+    Loooooooooooooooooooooooong
+    | Looooooooooooooooong
+    | Looooooooooooooooooooong
+    | Looooooong
+  ),
+  *,
+  s: str,
+) -> None:
+  pass
 
 # Ruff
-x[y := 1]
+[
+  "____________________________",
+  "foo",
+  "bar",
+  "baz" if some_really_looooooooong_variable else "some other looooooooooooooong value"
+]
+
+def foo(
+  i: int,
+  x: Loooooooooooooooooooooooong
+     | Looooooooooooooooong
+     | Looooooooooooooooooooong
+     | Looooooong,
+  *,
+  s: str,
+) -> None:
+  pass
 ```
 
-This will likely be incorporated into Black's preview style ([#3823](https://github.com/psf/black/pull/3823)).
+We agree that Ruff's formatting (that matches Black's 23) is hard to read and needs improvement. But we aren't convinced that parenthesizing long nested expressions is the best solution, especially when considering expression formatting holistically. That's why we want to defer the decision until we've explored alternative nested expression formatting styles. See [psf/Black#4123](https://github.com/psf/black/issues/4123) for an in-depth explanation of our concerns and an outline of possible alternatives.
+
+#### Call expressions with a single multiline string argument
+
+Unlike Black, Ruff preserves the indentation of a single multiline-string argument in a call expression:
+
+```python
+# Input
+call(
+  """"
+  A multiline
+  string
+  """
+)
+
+dedent(""""
+    A multiline
+    string
+""")
+
+# Black
+call(
+  """"
+  A multiline
+  string
+  """
+)
+
+dedent(
+  """"
+  A multiline
+  string
+"""
+)
+
+
+# Ruff
+call(
+  """"
+  A multiline
+  string
+  """
+)
+
+dedent(""""
+    A multiline
+    string
+""")
+```
+
+Black intended to ship a similar style change as part of the 2024 style that always removes the indent. It turned out that this change was too disruptive to justify the cases where it improved formatting. Ruff introduced the new heuristic of preserving the indent. We believe it's a good compromise that improves formatting but minimizes disruption for users.
+
+#### Blank lines at the start of a block
+
+Black 24 and newer allows blank lines at the start of a block, where Ruff always removes them:
+
+```python
+# Black
+if x:
+
+  a = 123
+
+# Ruff
+if x:
+  a = 123
+```
+
+Currently, we are concerned that allowing blank lines at the start of a block leads [to unintentional blank lines when refactoring or moving code](https://github.com/astral-sh/ruff/issues/8893#issuecomment-1867259744). However, we will consider adopting Black's formatting at a later point with an improved heuristic. The style change is tracked in [#9745](https://github.com/astral-sh/ruff/issues/9745).
+
+#### Hex codes and Unicode sequences
+
+Ruff normalizes hex codes and Unicode sequences in strings ([#9280](https://github.com/astral-sh/ruff/pull/9280)). Black intended to ship this change as part of the 2024 style but accidentally didn't.
+
+```python
+# Black
+a = "\x1B"
+b = "\u200B"
+c = "\U0001F977"
+d = "\N{CYRILLIC small LETTER BYELORUSSIAN-UKRAINIAN I}"
+
+# Ruff
+a = "\x1b"
+b = "\u200b"
+c = "\U0001f977"
+d = "\N{CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I}"
+```
+
+#### Module docstrings
+
+Ruff formats module docstrings similar to class or function docstrings, whereas Black does not.
+
+```python
+# Input
+"""Module docstring
+
+"""
+
+# Black
+"""Module docstring
+
+"""
+
+# Ruff
+"""Module docstring"""
+
+```
+
+#### Line width vs. line length
+
+Ruff uses the Unicode width of a line to determine if a line fits. Black uses Unicode width for strings,
+and character width for all other tokens. Ruff _also_ uses Unicode width for identifiers and comments.
 
 #### `global` and `nonlocal` names are broken across multiple lines by continuations
 
@@ -606,44 +736,3 @@ df.drop(columns=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]).drop_duplicates(a).rename
     }
 ).to_csv(path / "aaaaaa.csv", index=False).other(a)
 ```
-
-#### Expressions with (non-pragma) trailing comments are split more often ([#7823](https://github.com/astral-sh/ruff/issues/7823))
-
-Both Ruff and Black will break the following expression over multiple lines, since it then allows
-the expression to fit within the configured line width:
-
-```python
-# Input
-some_long_variable_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-
-# Black
-some_long_variable_name = (
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-)
-
-# Ruff
-some_long_variable_name = (
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-)
-```
-
-However, if the expression ends in a trailing comment, Black will avoid wrapping the expression
-in some cases, while Ruff will wrap as long as it allows the expanded lines to fit within the line
-length limit:
-
-```python
-# Input
-some_long_variable_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"  # a trailing comment
-
-# Black
-some_long_variable_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"  # a trailing comment
-
-# Ruff
-some_long_variable_name = (
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-)  # a trailing comment
-```
-
-Doing so leads to fewer overlong lines while retaining the comment's intent. As pragma comments
-(like `# noqa` and `# type: ignore`) are ignored when computing line width, this behavior only
-applies to non-pragma comments.

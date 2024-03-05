@@ -4,6 +4,7 @@ use js_sys::Error;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
+use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{FormatResult, Formatted, IndentStyle};
 use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
@@ -108,7 +109,8 @@ impl Workspace {
     pub fn new(options: JsValue) -> Result<Workspace, Error> {
         let options: Options = serde_wasm_bindgen::from_value(options).map_err(into_error)?;
         let configuration =
-            Configuration::from_options(options, Path::new(".")).map_err(into_error)?;
+            Configuration::from_options(options, Some(Path::new(".")), Path::new("."))
+                .map_err(into_error)?;
         let settings = configuration
             .into_settings(Path::new("."))
             .map_err(into_error)?;
@@ -292,7 +294,8 @@ impl<'a> ParsedModule<'a> {
         // TODO(konstin): Add an options for py/pyi to the UI (2/2)
         let options = settings
             .formatter
-            .to_format_options(PySourceType::default(), self.source_code);
+            .to_format_options(PySourceType::default(), self.source_code)
+            .with_source_map_generation(SourceMapGeneration::Enabled);
 
         format_module_ast(
             &self.module,

@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 /// Checks for function definitions that include too many arguments.
 ///
 /// By default, this rule allows up to five arguments, as configured by the
-/// [`pylint.max-args`] option.
+/// [`lint.pylint.max-args`] option.
 ///
 /// ## Why is this bad?
 /// Functions with many arguments are harder to understand, maintain, and call.
@@ -42,7 +42,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Options
-/// - `pylint.max-args`
+/// - `lint.pylint.max-args`
 #[violation]
 pub struct TooManyArguments {
     c_args: usize,

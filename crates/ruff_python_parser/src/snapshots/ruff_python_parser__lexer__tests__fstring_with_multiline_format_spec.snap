@@ -11,6 +11,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "__",
             is_raw: false,
+            triple_quoted: true,
         },
         4..6,
     ),
@@ -36,6 +37,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "d\n",
             is_raw: false,
+            triple_quoted: true,
         },
         14..16,
     ),
@@ -47,6 +49,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "__",
             is_raw: false,
+            triple_quoted: true,
         },
         17..19,
     ),
@@ -66,6 +69,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "__",
             is_raw: false,
+            triple_quoted: true,
         },
         27..29,
     ),
@@ -91,6 +95,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "a\n        b\n          c\n",
             is_raw: false,
+            triple_quoted: true,
         },
         37..61,
     ),
@@ -102,6 +107,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "__",
             is_raw: false,
+            triple_quoted: true,
         },
         62..64,
     ),
@@ -121,6 +127,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "__",
             is_raw: false,
+            triple_quoted: false,
         },
         70..72,
     ),
@@ -146,6 +153,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "d",
             is_raw: false,
+            triple_quoted: false,
         },
         80..81,
     ),
@@ -161,6 +169,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "__",
             is_raw: false,
+            triple_quoted: false,
         },
         83..85,
     ),
@@ -180,6 +189,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "__",
             is_raw: false,
+            triple_quoted: false,
         },
         89..91,
     ),
@@ -205,6 +215,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "a",
             is_raw: false,
+            triple_quoted: false,
         },
         99..100,
     ),
@@ -230,6 +241,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "__",
             is_raw: false,
+            triple_quoted: false,
         },
         112..114,
     ),

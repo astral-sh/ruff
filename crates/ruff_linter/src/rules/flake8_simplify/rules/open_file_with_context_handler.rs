@@ -63,9 +63,12 @@ fn match_async_exit_stack(semantic: &SemanticModel) -> bool {
         if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
-                    if semantic.resolve_call_path(func).is_some_and(|call_path| {
-                        matches!(call_path.as_slice(), ["contextlib", "AsyncExitStack"])
-                    }) {
+                    if semantic
+                        .resolve_qualified_name(func)
+                        .is_some_and(|qualified_name| {
+                            matches!(qualified_name.segments(), ["contextlib", "AsyncExitStack"])
+                        })
+                    {
                         return true;
                     }
                 }
@@ -94,9 +97,12 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
         if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
-                    if semantic.resolve_call_path(func).is_some_and(|call_path| {
-                        matches!(call_path.as_slice(), ["contextlib", "ExitStack"])
-                    }) {
+                    if semantic
+                        .resolve_qualified_name(func)
+                        .is_some_and(|qualified_name| {
+                            matches!(qualified_name.segments(), ["contextlib", "ExitStack"])
+                        })
+                    {
                         return true;
                     }
                 }
@@ -114,8 +120,10 @@ fn is_open(checker: &mut Checker, func: &Expr) -> bool {
             match value.as_ref() {
                 Expr::Call(ast::ExprCall { func, .. }) => checker
                     .semantic()
-                    .resolve_call_path(func)
-                    .is_some_and(|call_path| matches!(call_path.as_slice(), ["pathlib", "Path"])),
+                    .resolve_qualified_name(func)
+                    .is_some_and(|qualified_name| {
+                        matches!(qualified_name.segments(), ["pathlib", "Path"])
+                    }),
                 _ => false,
             }
         }

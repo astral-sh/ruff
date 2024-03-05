@@ -2,8 +2,8 @@ use std::path::Path;
 
 use ruff_python_ast::{self as ast, Decorator};
 
-use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 
 use crate::model::SemanticModel;
 
@@ -17,8 +17,8 @@ pub enum Visibility {
 pub fn is_staticmethod(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
     decorator_list.iter().any(|decorator| {
         semantic
-            .resolve_call_path(map_callable(&decorator.expression))
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "staticmethod"]))
+            .resolve_qualified_name(map_callable(&decorator.expression))
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "staticmethod"]))
     })
 }
 
@@ -26,8 +26,8 @@ pub fn is_staticmethod(decorator_list: &[Decorator], semantic: &SemanticModel) -
 pub fn is_classmethod(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
     decorator_list.iter().any(|decorator| {
         semantic
-            .resolve_call_path(map_callable(&decorator.expression))
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "classmethod"]))
+            .resolve_qualified_name(map_callable(&decorator.expression))
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "classmethod"]))
     })
 }
 
@@ -49,10 +49,10 @@ pub fn is_override(decorator_list: &[Decorator], semantic: &SemanticModel) -> bo
 pub fn is_abstract(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
     decorator_list.iter().any(|decorator| {
         semantic
-            .resolve_call_path(map_callable(&decorator.expression))
-            .is_some_and(|call_path| {
+            .resolve_qualified_name(map_callable(&decorator.expression))
+            .is_some_and(|qualified_name| {
                 matches!(
-                    call_path.as_slice(),
+                    qualified_name.segments(),
                     [
                         "abc",
                         "abstractmethod"
@@ -70,19 +70,19 @@ pub fn is_abstract(decorator_list: &[Decorator], semantic: &SemanticModel) -> bo
 /// `@property`-like decorators.
 pub fn is_property(
     decorator_list: &[Decorator],
-    extra_properties: &[CallPath],
+    extra_properties: &[QualifiedName],
     semantic: &SemanticModel,
 ) -> bool {
     decorator_list.iter().any(|decorator| {
         semantic
-            .resolve_call_path(map_callable(&decorator.expression))
-            .is_some_and(|call_path| {
+            .resolve_qualified_name(map_callable(&decorator.expression))
+            .is_some_and(|qualified_name| {
                 matches!(
-                    call_path.as_slice(),
+                    qualified_name.segments(),
                     ["", "property"] | ["functools", "cached_property"]
                 ) || extra_properties
                     .iter()
-                    .any(|extra_property| extra_property.as_slice() == call_path.as_slice())
+                    .any(|extra_property| extra_property.segments() == qualified_name.segments())
             })
     })
 }
@@ -187,9 +187,9 @@ pub(crate) fn function_visibility(function: &ast::StmtFunctionDef) -> Visibility
 pub fn method_visibility(function: &ast::StmtFunctionDef) -> Visibility {
     // Is this a setter or deleter?
     if function.decorator_list.iter().any(|decorator| {
-        collect_call_path(&decorator.expression).is_some_and(|call_path| {
-            call_path.as_slice() == [function.name.as_str(), "setter"]
-                || call_path.as_slice() == [function.name.as_str(), "deleter"]
+        UnqualifiedName::from_expr(&decorator.expression).is_some_and(|name| {
+            name.segments() == [function.name.as_str(), "setter"]
+                || name.segments() == [function.name.as_str(), "deleter"]
         })
     }) {
         return Visibility::Private;

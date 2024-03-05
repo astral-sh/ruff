@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "parse_suite(source, \"<test>\").unwrap()"
+expression: parse_suite(source).unwrap()
 ---
 [
     With(
@@ -171,6 +171,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: Some(
@@ -220,6 +221,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: Some(
@@ -309,8 +311,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 164..170,
-                    context_expr: NamedExpr(
-                        ExprNamedExpr {
+                    context_expr: Named(
+                        ExprNamed {
                             range: 164..170,
                             target: Name(
                                 ExprName {
@@ -348,8 +350,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 183..196,
-                    context_expr: NamedExpr(
-                        ExprNamedExpr {
+                    context_expr: Named(
+                        ExprNamed {
                             range: 184..190,
                             target: Name(
                                 ExprName {
@@ -421,8 +423,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 226..234,
-                    context_expr: NamedExpr(
-                        ExprNamedExpr {
+                    context_expr: Named(
+                        ExprNamed {
                             range: 227..233,
                             target: Name(
                                 ExprName {
@@ -479,8 +481,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 },
                 WithItem {
                     range: 256..264,
-                    context_expr: NamedExpr(
-                        ExprNamedExpr {
+                    context_expr: Named(
+                        ExprNamed {
                             range: 257..263,
                             target: Name(
                                 ExprName {
@@ -529,8 +531,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 },
                 WithItem {
                     range: 281..289,
-                    context_expr: NamedExpr(
-                        ExprNamedExpr {
+                    context_expr: Named(
+                        ExprNamed {
                             range: 282..288,
                             target: Name(
                                 ExprName {

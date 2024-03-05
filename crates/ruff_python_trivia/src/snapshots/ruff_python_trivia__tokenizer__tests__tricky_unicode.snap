@@ -4,7 +4,7 @@ expression: test_case.tokens()
 ---
 [
     SimpleToken {
-        kind: Other,
+        kind: Name,
         range: 0..6,
     },
 ]

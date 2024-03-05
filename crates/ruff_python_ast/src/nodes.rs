@@ -8,7 +8,6 @@ use std::slice::{Iter, IterMut};
 
 use itertools::Itertools;
 
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::{int, LiteralExpressionRef};
@@ -160,7 +159,7 @@ pub enum Stmt {
 pub struct StmtIpyEscapeCommand {
     pub range: TextRange,
     pub kind: IpyEscapeKind,
-    pub value: String,
+    pub value: Box<str>,
 }
 
 impl From<StmtIpyEscapeCommand> for Stmt {
@@ -559,16 +558,16 @@ impl From<StmtContinue> for Stmt {
 pub enum Expr {
     #[is(name = "bool_op_expr")]
     BoolOp(ExprBoolOp),
-    #[is(name = "named_expr_expr")]
-    NamedExpr(ExprNamedExpr),
+    #[is(name = "named_expr")]
+    Named(ExprNamed),
     #[is(name = "bin_op_expr")]
     BinOp(ExprBinOp),
     #[is(name = "unary_op_expr")]
     UnaryOp(ExprUnaryOp),
     #[is(name = "lambda_expr")]
     Lambda(ExprLambda),
-    #[is(name = "if_exp_expr")]
-    IfExp(ExprIfExp),
+    #[is(name = "if_expr")]
+    If(ExprIf),
     #[is(name = "dict_expr")]
     Dict(ExprDict),
     #[is(name = "set_expr")]
@@ -579,8 +578,8 @@ pub enum Expr {
     SetComp(ExprSetComp),
     #[is(name = "dict_comp_expr")]
     DictComp(ExprDictComp),
-    #[is(name = "generator_exp_expr")]
-    GeneratorExp(ExprGeneratorExp),
+    #[is(name = "generator_expr")]
+    Generator(ExprGenerator),
     #[is(name = "await_expr")]
     Await(ExprAwait),
     #[is(name = "yield_expr")]
@@ -671,7 +670,7 @@ impl Expr {
 pub struct ExprIpyEscapeCommand {
     pub range: TextRange,
     pub kind: IpyEscapeKind,
-    pub value: String,
+    pub value: Box<str>,
 }
 
 impl From<ExprIpyEscapeCommand> for Expr {
@@ -696,15 +695,15 @@ impl From<ExprBoolOp> for Expr {
 
 /// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprNamedExpr {
+pub struct ExprNamed {
     pub range: TextRange,
     pub target: Box<Expr>,
     pub value: Box<Expr>,
 }
 
-impl From<ExprNamedExpr> for Expr {
-    fn from(payload: ExprNamedExpr) -> Self {
-        Expr::NamedExpr(payload)
+impl From<ExprNamed> for Expr {
+    fn from(payload: ExprNamed) -> Self {
+        Expr::Named(payload)
     }
 }
 
@@ -753,16 +752,16 @@ impl From<ExprLambda> for Expr {
 
 /// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprIfExp {
+pub struct ExprIf {
     pub range: TextRange,
     pub test: Box<Expr>,
     pub body: Box<Expr>,
     pub orelse: Box<Expr>,
 }
 
-impl From<ExprIfExp> for Expr {
-    fn from(payload: ExprIfExp) -> Self {
-        Expr::IfExp(payload)
+impl From<ExprIf> for Expr {
+    fn from(payload: ExprIf) -> Self {
+        Expr::If(payload)
     }
 }
 
@@ -838,15 +837,16 @@ impl From<ExprDictComp> for Expr {
 
 /// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprGeneratorExp {
+pub struct ExprGenerator {
     pub range: TextRange,
     pub elt: Box<Expr>,
     pub generators: Vec<Comprehension>,
+    pub parenthesized: bool,
 }
 
-impl From<ExprGeneratorExp> for Expr {
-    fn from(payload: ExprGeneratorExp) -> Self {
-        Expr::GeneratorExp(payload)
+impl From<ExprGenerator> for Expr {
+    fn from(payload: ExprGenerator) -> Self {
+        Expr::Generator(payload)
     }
 }
 
@@ -894,8 +894,8 @@ impl From<ExprYieldFrom> for Expr {
 pub struct ExprCompare {
     pub range: TextRange,
     pub left: Box<Expr>,
-    pub ops: Vec<CmpOp>,
-    pub comparators: Vec<Expr>,
+    pub ops: Box<[CmpOp]>,
+    pub comparators: Box<[Expr]>,
 }
 
 impl From<ExprCompare> for Expr {
@@ -949,7 +949,7 @@ impl Ranged for FStringExpressionElement {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FStringLiteralElement {
     pub range: TextRange,
-    pub value: String,
+    pub value: Box<str>,
 }
 
 impl Ranged for FStringLiteralElement {
@@ -962,7 +962,7 @@ impl Deref for FStringLiteralElement {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        self.value.as_str()
+        &self.value
     }
 }
 
@@ -1384,7 +1384,7 @@ impl Default for StringLiteralValueInner {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StringLiteral {
     pub range: TextRange,
-    pub value: String,
+    pub value: Box<str>,
     pub unicode: bool,
 }
 
@@ -1398,7 +1398,7 @@ impl Deref for StringLiteral {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        self.value.as_str()
+        &self.value
     }
 }
 
@@ -1426,14 +1426,16 @@ struct ConcatenatedStringLiteral {
     /// Each string literal that makes up the concatenated string.
     strings: Vec<StringLiteral>,
     /// The concatenated string value.
-    value: OnceCell<String>,
+    value: OnceCell<Box<str>>,
 }
 
 impl ConcatenatedStringLiteral {
     /// Extracts a string slice containing the entire concatenated string.
     fn to_str(&self) -> &str {
-        self.value
-            .get_or_init(|| self.strings.iter().map(StringLiteral::as_str).collect())
+        self.value.get_or_init(|| {
+            let concatenated: String = self.strings.iter().map(StringLiteral::as_str).collect();
+            concatenated.into_boxed_str()
+        })
     }
 }
 
@@ -1605,7 +1607,7 @@ impl Default for BytesLiteralValueInner {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct BytesLiteral {
     pub range: TextRange,
-    pub value: Vec<u8>,
+    pub value: Box<[u8]>,
 }
 
 impl Ranged for BytesLiteral {
@@ -1618,7 +1620,7 @@ impl Deref for BytesLiteral {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        self.value.as_slice()
+        &self.value
     }
 }
 
@@ -1794,42 +1796,14 @@ pub struct ExprTuple {
     pub range: TextRange,
     pub elts: Vec<Expr>,
     pub ctx: ExprContext,
+
+    /// Whether the tuple is parenthesized in the source code.
+    pub parenthesized: bool,
 }
 
 impl From<ExprTuple> for Expr {
     fn from(payload: ExprTuple) -> Self {
         Expr::Tuple(payload)
-    }
-}
-
-impl ExprTuple {
-    /// Return `true` if a tuple is parenthesized in the source code.
-    pub fn is_parenthesized(&self, source: &str) -> bool {
-        let Some(elt) = self.elts.first() else {
-            return true;
-        };
-
-        // Count the number of open parentheses between the start of the tuple and the first element.
-        let open_parentheses_count =
-            SimpleTokenizer::new(source, TextRange::new(self.start(), elt.start()))
-                .skip_trivia()
-                .filter(|token| token.kind() == SimpleTokenKind::LParen)
-                .count();
-        if open_parentheses_count == 0 {
-            return false;
-        }
-
-        // Count the number of parentheses between the end of the first element and its trailing comma.
-        let close_parentheses_count =
-            SimpleTokenizer::new(source, TextRange::new(elt.end(), self.end()))
-                .skip_trivia()
-                .take_while(|token| token.kind() != SimpleTokenKind::Comma)
-                .filter(|token| token.kind() == SimpleTokenKind::RParen)
-                .count();
-
-        // If the number of open parentheses is greater than the number of close parentheses, the tuple
-        // is parenthesized.
-        open_parentheses_count > close_parentheses_count
     }
 }
 
@@ -2985,8 +2959,8 @@ pub struct ParameterWithDefault {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arguments {
     pub range: TextRange,
-    pub args: Vec<Expr>,
-    pub keywords: Vec<Keyword>,
+    pub args: Box<[Expr]>,
+    pub keywords: Box<[Keyword]>,
 }
 
 /// An entry in the argument list of a function call.
@@ -3560,7 +3534,7 @@ impl Ranged for crate::nodes::ExprBoolOp {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprNamedExpr {
+impl Ranged for crate::nodes::ExprNamed {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -3580,7 +3554,7 @@ impl Ranged for crate::nodes::ExprLambda {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprIfExp {
+impl Ranged for crate::nodes::ExprIf {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -3610,7 +3584,7 @@ impl Ranged for crate::nodes::ExprDictComp {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprGeneratorExp {
+impl Ranged for crate::nodes::ExprGenerator {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -3689,17 +3663,17 @@ impl Ranged for crate::Expr {
     fn range(&self) -> TextRange {
         match self {
             Self::BoolOp(node) => node.range(),
-            Self::NamedExpr(node) => node.range(),
+            Self::Named(node) => node.range(),
             Self::BinOp(node) => node.range(),
             Self::UnaryOp(node) => node.range(),
             Self::Lambda(node) => node.range(),
-            Self::IfExp(node) => node.range(),
+            Self::If(node) => node.range(),
             Self::Dict(node) => node.range(),
             Self::Set(node) => node.range(),
             Self::ListComp(node) => node.range(),
             Self::SetComp(node) => node.range(),
             Self::DictComp(node) => node.range(),
-            Self::GeneratorExp(node) => node.range(),
+            Self::Generator(node) => node.range(),
             Self::Await(node) => node.range(),
             Self::Yield(node) => node.range(),
             Self::YieldFrom(node) => node.range(),
@@ -3880,18 +3854,54 @@ impl Ranged for crate::nodes::ParameterWithDefault {
     }
 }
 
-#[cfg(target_pointer_width = "64")]
-mod size_assertions {
-    use static_assertions::assert_eq_size;
-
+#[cfg(test)]
+mod tests {
     #[allow(clippy::wildcard_imports)]
     use super::*;
 
-    assert_eq_size!(Stmt, [u8; 144]);
-    assert_eq_size!(StmtFunctionDef, [u8; 144]);
-    assert_eq_size!(StmtClassDef, [u8; 104]);
-    assert_eq_size!(StmtTry, [u8; 112]);
-    assert_eq_size!(Expr, [u8; 80]);
-    assert_eq_size!(Pattern, [u8; 96]);
-    assert_eq_size!(Mod, [u8; 32]);
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn size() {
+        assert!(std::mem::size_of::<Stmt>() <= 144);
+        assert!(std::mem::size_of::<StmtFunctionDef>() <= 144);
+        assert!(std::mem::size_of::<StmtClassDef>() <= 104);
+        assert!(std::mem::size_of::<StmtTry>() <= 112);
+        assert!(std::mem::size_of::<Mod>() <= 32);
+        // 96 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<Pattern>(), 88 | 96));
+
+        assert_eq!(std::mem::size_of::<Expr>(), 64);
+        assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
+        assert_eq!(std::mem::size_of::<ExprAwait>(), 16);
+        assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
+        assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 12);
+        assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 40);
+        assert_eq!(std::mem::size_of::<ExprCall>(), 56);
+        assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
+        assert_eq!(std::mem::size_of::<ExprDict>(), 56);
+        assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
+        assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
+        assert_eq!(std::mem::size_of::<ExprFString>(), 48);
+        assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
+        assert_eq!(std::mem::size_of::<ExprIf>(), 32);
+        assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
+        assert_eq!(std::mem::size_of::<ExprLambda>(), 24);
+        assert_eq!(std::mem::size_of::<ExprList>(), 40);
+        assert_eq!(std::mem::size_of::<ExprListComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprName>(), 40);
+        assert_eq!(std::mem::size_of::<ExprNamed>(), 24);
+        assert_eq!(std::mem::size_of::<ExprNoneLiteral>(), 8);
+        assert_eq!(std::mem::size_of::<ExprNumberLiteral>(), 32);
+        assert_eq!(std::mem::size_of::<ExprSet>(), 32);
+        assert_eq!(std::mem::size_of::<ExprSetComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprSlice>(), 32);
+        assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
+        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 48);
+        assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
+        assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
+        assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
+        assert_eq!(std::mem::size_of::<ExprYield>(), 16);
+        assert_eq!(std::mem::size_of::<ExprYieldFrom>(), 16);
+    }
 }

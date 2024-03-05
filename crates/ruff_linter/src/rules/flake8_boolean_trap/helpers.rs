@@ -45,7 +45,7 @@ pub(super) fn is_allowed_func_call(name: &str) -> bool {
 
 /// Returns `true` if a function definition is allowed to use a boolean trap.
 pub(super) fn is_allowed_func_def(name: &str) -> bool {
-    matches!(name, "__setitem__")
+    matches!(name, "__setitem__" | "__post_init__")
 }
 
 /// Returns `true` if an argument is allowed to use a boolean trap. To return

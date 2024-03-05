@@ -25,7 +25,7 @@ use crate::checkers::ast::Checker;
 ///         rec = 1 / n
 ///         print(f"reciprocal of {n} is {rec}")
 ///         return rec
-///     except ZeroDivisionError as exc:
+///     except ZeroDivisionError:
 ///         logging.exception("Exception occurred")
 /// ```
 ///
@@ -37,7 +37,7 @@ use crate::checkers::ast::Checker;
 /// def reciprocal(n):
 ///     try:
 ///         rec = 1 / n
-///     except ZeroDivisionError as exc:
+///     except ZeroDivisionError:
 ///         logging.exception("Exception occurred")
 ///     else:
 ///         print(f"reciprocal of {n} is {rec}")

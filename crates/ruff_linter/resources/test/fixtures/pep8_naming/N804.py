@@ -50,6 +50,29 @@ class MetaClass(ABCMeta):
     def static_method(not_cls) -> bool:
         return False
 
+class ClsInArgsClass(ABCMeta):
+    def cls_as_argument(this, cls):
+        pass
+
+    def cls_as_pos_only_argument(this, cls, /):
+        pass
+
+    def cls_as_kw_only_argument(this, *, cls):
+        pass
+
+    def cls_as_varags(this, *cls):
+        pass
+
+    def cls_as_kwargs(this, **cls):
+        pass
+
+class RenamingInMethodBodyClass(ABCMeta):
+    def bad_method(this):
+        this = this
+        this
+
+    def bad_method(this):
+        self = this
 
 def func(x):
     return x

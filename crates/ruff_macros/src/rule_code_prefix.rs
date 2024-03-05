@@ -89,21 +89,30 @@ fn attributes_for_prefix(
     codes: &BTreeSet<String>,
     attributes: &BTreeMap<String, &[Attribute]>,
 ) -> proc_macro2::TokenStream {
-    match if_all_same(codes.iter().map(|code| attributes[code])) {
-        Some(attr) => quote!(#(#attr)*),
-        None => quote!(),
+    let attrs = intersection_all(codes.iter().map(|code| attributes[code]));
+    match attrs.as_slice() {
+        [] => quote!(),
+        [..] => quote!(#(#attrs)*),
     }
 }
 
-/// If all values in an iterator are the same, return that value. Otherwise,
-/// return `None`.
-pub(crate) fn if_all_same<T: PartialEq>(iter: impl Iterator<Item = T>) -> Option<T> {
-    let mut iter = iter.peekable();
-    let first = iter.next()?;
-    if iter.all(|x| x == first) {
-        Some(first)
+/// Collect all the items from an iterable of slices that are present in all slices.
+pub(crate) fn intersection_all<'a, T: PartialEq>(
+    mut slices: impl Iterator<Item = &'a [T]>,
+) -> Vec<&'a T> {
+    if let Some(slice) = slices.next() {
+        // Collect all the items in the first slice
+        let mut intersection = Vec::with_capacity(slice.len());
+        for item in slice {
+            intersection.push(item);
+        }
+        // Then only keep items that are present in each of the remaining slices
+        for slice in slices {
+            intersection.retain(|item| slice.contains(item));
+        }
+        intersection
     } else {
-        None
+        Vec::new()
     }
 }
 

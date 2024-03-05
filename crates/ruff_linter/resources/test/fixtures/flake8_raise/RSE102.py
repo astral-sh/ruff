@@ -93,3 +93,15 @@ def func():
 
 # OK
 raise func()
+
+
+# OK
+future = executor.submit(float, "a")
+if future.exception():
+    raise future.exception()
+
+
+# RSE102
+future = executor.submit(float, "a")
+if future.exception():
+    raise future.Exception()

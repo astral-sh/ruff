@@ -107,6 +107,7 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Enabled
 target_version             = Py39
+source_type                = Python
 ```
 
 ```python

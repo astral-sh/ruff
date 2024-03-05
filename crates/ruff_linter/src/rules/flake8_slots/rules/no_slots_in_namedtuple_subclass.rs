@@ -73,8 +73,10 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
         };
         checker
             .semantic()
-            .resolve_call_path(func)
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["collections", "namedtuple"]))
+            .resolve_qualified_name(func)
+            .is_some_and(|qualified_name| {
+                matches!(qualified_name.segments(), ["collections", "namedtuple"])
+            })
     }) {
         if !has_slots(&class.body) {
             checker.diagnostics.push(Diagnostic::new(

@@ -165,11 +165,21 @@ nested_comment: None | [
 
 ## Output
 ```python
-x1: A[b] | EventHandler | EventSpec | list[
-    EventHandler | EventSpec
-] | Other | More | AndMore | None = None
+x1: (
+    A[b]
+    | EventHandler
+    | EventSpec
+    | list[EventHandler | EventSpec]
+    | Other
+    | More
+    | AndMore
+    | None
+) = None
 
-x2: "VeryLongClassNameWithAwkwardGenericSubtype[int] |" "VeryLongClassNameWithAwkwardGenericSubtype[str]"
+x2: (
+    "VeryLongClassNameWithAwkwardGenericSubtype[int] |"
+    "VeryLongClassNameWithAwkwardGenericSubtype[str]"
+)
 
 x6: VeryLongClassNameWithAwkwardGenericSubtype[
     integeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeer,
@@ -215,12 +225,16 @@ x11: None | [
     datasets.VideoDataset,
 ] = None
 
-x12: None | [
-    datasets.ImageDataset,
-    datasets.TabularDataset,
-    datasets.TextDataset,
-    datasets.VideoDataset,
-] | Other = None
+x12: (
+    None
+    | [
+        datasets.ImageDataset,
+        datasets.TabularDataset,
+        datasets.TextDataset,
+        datasets.VideoDataset,
+    ]
+    | Other
+) = None
 
 
 x13: [
@@ -242,27 +256,34 @@ x14: [
     datasets.VideoDataset,
 ] = None
 
-x15: [
-    datasets.ImageDataset,
-    datasets.TabularDataset,
-    datasets.TextDataset,
-    datasets.VideoDataset,
-] | [
-    datasets.ImageDataset,
-    datasets.TabularDataset,
-    datasets.TextDataset,
-    datasets.VideoDataset,
-] | Other = None
+x15: (
+    [
+        datasets.ImageDataset,
+        datasets.TabularDataset,
+        datasets.TextDataset,
+        datasets.VideoDataset,
+    ]
+    | [
+        datasets.ImageDataset,
+        datasets.TabularDataset,
+        datasets.TextDataset,
+        datasets.VideoDataset,
+    ]
+    | Other
+) = None
 
-x16: None | Literal[
-    "split",
-    "a bit longer",
-    "records",
-    "index",
-    "table",
-    "columns",
-    "values",
-] = None
+x16: (
+    None
+    | Literal[
+        "split",
+        "a bit longer",
+        "records",
+        "index",
+        "table",
+        "columns",
+        "values",
+    ]
+) = None
 
 x17: None | [
     datasets.ImageDataset,
@@ -273,9 +294,13 @@ x17: None | [
 
 
 class Test:
-    safe_age: Decimal  #  the user's age, used to determine if it's safe for them to use ruff
+    safe_age: (
+        Decimal  #  the user's age, used to determine if it's safe for them to use ruff
+    )
     applied_fixes: int  # the number of fixes that this user applied. Used for ranking the users with the most applied fixes.
-    string_annotation: "Test"  # a long comment after a quoted, runtime-only type annotation
+    string_annotation: (
+        "Test"  # a long comment after a quoted, runtime-only type annotation
+    )
 
 
 ##########
@@ -321,130 +346,6 @@ nested_comment: None | [
     # a list of strings
     str
 ] = None
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -1,8 +1,18 @@
--x1: A[b] | EventHandler | EventSpec | list[
--    EventHandler | EventSpec
--] | Other | More | AndMore | None = None
-+x1: (
-+    A[b]
-+    | EventHandler
-+    | EventSpec
-+    | list[EventHandler | EventSpec]
-+    | Other
-+    | More
-+    | AndMore
-+    | None
-+) = None
- 
--x2: "VeryLongClassNameWithAwkwardGenericSubtype[int] |" "VeryLongClassNameWithAwkwardGenericSubtype[str]"
-+x2: (
-+    "VeryLongClassNameWithAwkwardGenericSubtype[int] |"
-+    "VeryLongClassNameWithAwkwardGenericSubtype[str]"
-+)
- 
- x6: VeryLongClassNameWithAwkwardGenericSubtype[
-     integeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeer,
-@@ -48,12 +58,16 @@
-     datasets.VideoDataset,
- ] = None
- 
--x12: None | [
--    datasets.ImageDataset,
--    datasets.TabularDataset,
--    datasets.TextDataset,
--    datasets.VideoDataset,
--] | Other = None
-+x12: (
-+    None
-+    | [
-+        datasets.ImageDataset,
-+        datasets.TabularDataset,
-+        datasets.TextDataset,
-+        datasets.VideoDataset,
-+    ]
-+    | Other
-+) = None
- 
- 
- x13: [
-@@ -75,27 +89,34 @@
-     datasets.VideoDataset,
- ] = None
- 
--x15: [
--    datasets.ImageDataset,
--    datasets.TabularDataset,
--    datasets.TextDataset,
--    datasets.VideoDataset,
--] | [
--    datasets.ImageDataset,
--    datasets.TabularDataset,
--    datasets.TextDataset,
--    datasets.VideoDataset,
--] | Other = None
-+x15: (
-+    [
-+        datasets.ImageDataset,
-+        datasets.TabularDataset,
-+        datasets.TextDataset,
-+        datasets.VideoDataset,
-+    ]
-+    | [
-+        datasets.ImageDataset,
-+        datasets.TabularDataset,
-+        datasets.TextDataset,
-+        datasets.VideoDataset,
-+    ]
-+    | Other
-+) = None
- 
--x16: None | Literal[
--    "split",
--    "a bit longer",
--    "records",
--    "index",
--    "table",
--    "columns",
--    "values",
--] = None
-+x16: (
-+    None
-+    | Literal[
-+        "split",
-+        "a bit longer",
-+        "records",
-+        "index",
-+        "table",
-+        "columns",
-+        "values",
-+    ]
-+) = None
- 
- x17: None | [
-     datasets.ImageDataset,
-@@ -106,9 +127,13 @@
- 
- 
- class Test:
--    safe_age: Decimal  #  the user's age, used to determine if it's safe for them to use ruff
-+    safe_age: (
-+        Decimal  #  the user's age, used to determine if it's safe for them to use ruff
-+    )
-     applied_fixes: int  # the number of fixes that this user applied. Used for ranking the users with the most applied fixes.
--    string_annotation: "Test"  # a long comment after a quoted, runtime-only type annotation
-+    string_annotation: (
-+        "Test"  # a long comment after a quoted, runtime-only type annotation
-+    )
- 
- 
- ##########
 ```
 
 

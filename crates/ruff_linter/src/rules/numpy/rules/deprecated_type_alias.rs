@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Expr;
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -49,22 +50,34 @@ impl Violation for NumpyDeprecatedTypeAlias {
 
 /// NPY001
 pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
-    if let Some(type_name) = checker
-        .semantic()
-        .resolve_call_path(expr)
-        .and_then(|call_path| {
-            if matches!(
-                call_path.as_slice(),
-                [
-                    "numpy",
-                    "bool" | "int" | "float" | "complex" | "object" | "str" | "long" | "unicode"
-                ]
-            ) {
-                Some(call_path[1])
-            } else {
-                None
-            }
-        })
+    if !checker.semantic().seen_module(Modules::NUMPY) {
+        return;
+    }
+
+    if let Some(type_name) =
+        checker
+            .semantic()
+            .resolve_qualified_name(expr)
+            .and_then(|qualified_name| {
+                if matches!(
+                    qualified_name.segments(),
+                    [
+                        "numpy",
+                        "bool"
+                            | "int"
+                            | "float"
+                            | "complex"
+                            | "object"
+                            | "str"
+                            | "long"
+                            | "unicode"
+                    ]
+                ) {
+                    Some(qualified_name.segments()[1])
+                } else {
+                    None
+                }
+            })
     {
         let mut diagnostic = Diagnostic::new(
             NumpyDeprecatedTypeAlias {

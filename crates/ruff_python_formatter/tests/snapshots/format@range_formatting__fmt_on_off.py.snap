@@ -1,0 +1,62 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/fmt_on_off.py
+---
+## Input
+```python
+class MyClass:
+
+    # Range that falls entirely in a suppressed range
+    # fmt: off<RANGE_START>
+    def method(  self  ):
+        print   ( "str" )
+    <RANGE_END># fmt: on
+
+    # This should net get formatted because it isn't in a formatting range.
+    def not_in_formatting_range ( self): ...
+
+
+    # Range that starts in a suppressed range and ends in a formatting range
+    # fmt: off<RANGE_START>
+    def other(  self):
+        print   ( "str" )
+
+    # fmt: on
+
+    def formatted  ( self):
+        pass
+    <RANGE_END>
+    def outside_formatting_range (self): pass
+
+```
+
+## Output
+```python
+class MyClass:
+
+    # Range that falls entirely in a suppressed range
+    # fmt: off
+    def method(  self  ):
+        print   ( "str" )
+    # fmt: on
+
+    # This should net get formatted because it isn't in a formatting range.
+    def not_in_formatting_range ( self): ...
+
+
+    # Range that starts in a suppressed range and ends in a formatting range
+    # fmt: off
+    def other(  self):
+        print   ( "str" )
+
+    # fmt: on
+
+    def formatted(self):
+        pass
+
+    def outside_formatting_range (self): pass
+
+```
+
+
+

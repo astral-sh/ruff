@@ -230,4 +230,20 @@ UP040.py:44:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 46 46 | # OK
 47 47 | x: TypeAlias
 
+UP040.py:53:1: UP040 [*] Type alias `Decorator` uses `TypeAlias` annotation instead of the `type` keyword
+   |
+51 | # type alias.
+52 | T = typing.TypeVar["T"]
+53 | Decorator: TypeAlias = typing.Callable[[T], T]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+   |
+   = help: Use the `type` keyword
+
+ℹ Unsafe fix
+50 50 | # Ensure that "T" appears only once  in the type parameters for the modernized
+51 51 | # type alias.
+52 52 | T = typing.TypeVar["T"]
+53    |-Decorator: TypeAlias = typing.Callable[[T], T]
+   53 |+type Decorator[T] = typing.Callable[[T], T]
+
 

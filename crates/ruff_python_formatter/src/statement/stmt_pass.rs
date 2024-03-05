@@ -1,7 +1,7 @@
 use ruff_python_ast::StmtPass;
 
-use crate::comments::{SourceComment, SuppressionKind};
-use crate::prelude::*;
+use crate::comments::SourceComment;
+use crate::{has_skip_comment, prelude::*};
 
 #[derive(Default)]
 pub struct FormatStmtPass;
@@ -16,6 +16,6 @@ impl FormatNodeRule<StmtPass> for FormatStmtPass {
         trailing_comments: &[SourceComment],
         context: &PyFormatContext,
     ) -> bool {
-        SuppressionKind::has_skip_comment(trailing_comments, context.source())
+        has_skip_comment(trailing_comments, context.source())
     }
 }

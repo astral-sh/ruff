@@ -2,6 +2,7 @@ use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -50,10 +51,16 @@ impl Violation for CollectionsNamedTuple {
 
 /// PYI024
 pub(crate) fn collections_named_tuple(checker: &mut Checker, expr: &Expr) {
+    if !checker.semantic().seen_module(Modules::COLLECTIONS) {
+        return;
+    }
+
     if checker
         .semantic()
-        .resolve_call_path(expr)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["collections", "namedtuple"]))
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["collections", "namedtuple"])
+        })
     {
         checker
             .diagnostics

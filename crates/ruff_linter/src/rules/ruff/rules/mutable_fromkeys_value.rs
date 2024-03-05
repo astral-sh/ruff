@@ -84,7 +84,7 @@ pub(crate) fn mutable_fromkeys_value(checker: &mut Checker, call: &ast::ExprCall
     }
 
     // Check that the value parameter is a mutable object.
-    let [keys, value] = call.arguments.args.as_slice() else {
+    let [keys, value] = &*call.arguments.args else {
         return;
     };
     if !is_mutable_expr(value, checker.semantic()) {

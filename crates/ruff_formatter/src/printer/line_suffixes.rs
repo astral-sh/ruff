@@ -21,8 +21,7 @@ impl<'a> LineSuffixes<'a> {
     /// Takes all the pending line suffixes.
     pub(super) fn take_pending<'l>(
         &'l mut self,
-    ) -> impl Iterator<Item = LineSuffixEntry<'a>> + DoubleEndedIterator + 'l + ExactSizeIterator
-    {
+    ) -> impl DoubleEndedIterator<Item = LineSuffixEntry<'a>> + 'l + ExactSizeIterator {
         self.suffixes.drain(..)
     }
 

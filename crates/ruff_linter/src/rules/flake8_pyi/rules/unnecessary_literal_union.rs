@@ -72,6 +72,7 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
                     elts,
                     range: _,
                     ctx: _,
+                    parenthesized: _,
                 }) = slice.as_ref()
                 {
                     for expr in elts {
@@ -116,13 +117,14 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
         expr.range(),
     );
 
-    if checker.settings.preview.is_enabled() {
+    diagnostic.set_fix({
         let literal = Expr::Subscript(ast::ExprSubscript {
             value: Box::new(literal_subscript.clone()),
             slice: Box::new(Expr::Tuple(ast::ExprTuple {
                 elts: literal_exprs.into_iter().cloned().collect(),
                 range: TextRange::default(),
                 ctx: ExprContext::Load,
+                parenthesized: true,
             })),
             range: TextRange::default(),
             ctx: ExprContext::Load,
@@ -130,10 +132,10 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
 
         if other_exprs.is_empty() {
             // if the union is only literals, we just replace the whole thing with a single literal
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            Fix::safe_edit(Edit::range_replacement(
                 checker.generator().expr(&literal),
                 expr.range(),
-            )));
+            ))
         } else {
             let elts: Vec<Expr> = std::iter::once(literal)
                 .chain(other_exprs.into_iter().cloned())
@@ -148,6 +150,7 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
                             elts,
                             range: TextRange::default(),
                             ctx: ExprContext::Load,
+                            parenthesized: true,
                         })),
                         range: TextRange::default(),
                         ctx: ExprContext::Load,
@@ -156,12 +159,9 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
                 checker.generator().expr(&pep_604_union(&elts))
             };
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                content,
-                expr.range(),
-            )));
+            Fix::safe_edit(Edit::range_replacement(content, expr.range()))
         }
-    }
+    });
 
     checker.diagnostics.push(diagnostic);
 }

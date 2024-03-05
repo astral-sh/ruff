@@ -1,0 +1,61 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/same_line_body.py
+---
+## Input
+```python
+def  test(<RANGE_START>a ): <RANGE_END>print("body" )
+
+
+def  test2(  a):    <RANGE_START>print("body"  )<RANGE_END>
+
+
+def  test3(  a):    <RANGE_START>print("body"  )
+
+print("more"   )<RANGE_END>
+print("after"  )
+
+
+# The if header and the print statement together are longer than 100 characters.
+# The print statement should either be wrapped to fit at the end of the if statement, or be converted to a
+# suite body
+if aaaaaaaaaaaa + bbbbbbbbbbbbbb + cccccccccccccccccc + ddd:   <RANGE_START>print("aaaa long body, should wrap or be intented"  )<RANGE_END>
+
+# This print statement is too-long even when intented. It should be wrapped
+if aaaaaaaaaaaa + bbbbbbbbbbbbbb + cccccccccccccccccc + ddd: <RANGE_START>print("aaaa long body, should wrap or be intented", "more content to make it exceed the 88 chars limit")<RANGE_END>
+```
+
+## Output
+```python
+def test(a):
+    print("body")
+
+
+def  test2(  a):
+    print("body")
+
+
+def  test3(  a):
+    print("body")
+
+
+print("more")
+print("after"  )
+
+
+# The if header and the print statement together are longer than 100 characters.
+# The print statement should either be wrapped to fit at the end of the if statement, or be converted to a
+# suite body
+if aaaaaaaaaaaa + bbbbbbbbbbbbbb + cccccccccccccccccc + ddd:
+    print("aaaa long body, should wrap or be intented")
+
+# This print statement is too-long even when intented. It should be wrapped
+if aaaaaaaaaaaa + bbbbbbbbbbbbbb + cccccccccccccccccc + ddd:
+    print(
+        "aaaa long body, should wrap or be intented",
+        "more content to make it exceed the 88 chars limit",
+    )
+```
+
+
+

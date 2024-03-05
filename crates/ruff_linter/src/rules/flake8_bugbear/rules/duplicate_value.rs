@@ -61,11 +61,9 @@ pub(crate) fn duplicate_value(checker: &mut Checker, set: &ast::ExprSet) {
                     elt.range(),
                 );
 
-                if checker.settings.preview.is_enabled() {
-                    diagnostic.try_set_fix(|| {
-                        remove_member(set, index, checker.locator().contents()).map(Fix::safe_edit)
-                    });
-                }
+                diagnostic.try_set_fix(|| {
+                    remove_member(set, index, checker.locator().contents()).map(Fix::safe_edit)
+                });
 
                 checker.diagnostics.push(diagnostic);
             }

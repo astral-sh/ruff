@@ -50,7 +50,7 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
         return;
     };
 
-    for base in &arguments.args {
+    for base in arguments.args.iter() {
         let Expr::Name(ast::ExprName { id, .. }) = base else {
             continue;
         };

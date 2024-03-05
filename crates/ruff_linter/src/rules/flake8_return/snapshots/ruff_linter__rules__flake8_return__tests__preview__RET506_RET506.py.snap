@@ -1,0 +1,166 @@
+---
+source: crates/ruff_linter/src/rules/flake8_return/mod.rs
+---
+RET506.py:8:5: RET506 [*] Unnecessary `elif` after `raise` statement
+   |
+ 6 |         a = 1
+ 7 |         raise Exception(y)
+ 8 |     elif z:
+   |     ^^^^ RET506
+ 9 |         b = 2
+10 |         raise Exception(w)
+   |
+   = help: Remove unnecessary `elif`
+
+ℹ Safe fix
+5 5 |     if x:  # [no-else-raise]
+6 6 |         a = 1
+7 7 |         raise Exception(y)
+8   |-    elif z:
+  8 |+    if z:
+9 9 |         b = 2
+10 10 |         raise Exception(w)
+11 11 |     else:
+
+RET506.py:23:5: RET506 [*] Unnecessary `elif` after `raise` statement
+   |
+21 |             b = 2
+22 |         raise Exception(x)
+23 |     elif z:
+   |     ^^^^ RET506
+24 |         raise Exception(y)
+25 |     else:
+   |
+   = help: Remove unnecessary `elif`
+
+ℹ Safe fix
+20 20 |         else:
+21 21 |             b = 2
+22 22 |         raise Exception(x)
+23    |-    elif z:
+   23 |+    if z:
+24 24 |         raise Exception(y)
+25 25 |     else:
+26 26 |         c = 3
+
+RET506.py:34:5: RET506 [*] Unnecessary `else` after `raise` statement
+   |
+32 |         a = 1
+33 |         raise Exception(y)
+34 |     else:
+   |     ^^^^ RET506
+35 |         b = 2
+36 |         raise Exception(z)
+   |
+   = help: Remove unnecessary `else`
+
+ℹ Safe fix
+31 31 |     if x:  # [no-else-raise]
+32 32 |         a = 1
+33 33 |         raise Exception(y)
+34    |-    else:
+35    |-        b = 2
+36    |-        raise Exception(z)
+   34 |+    b = 2
+   35 |+    raise Exception(z)
+37 36 | 
+38 37 | 
+39 38 | def foo3(x, y, z):
+
+RET506.py:45:9: RET506 [*] Unnecessary `else` after `raise` statement
+   |
+43 |             b = 2
+44 |             raise Exception(y)
+45 |         else:
+   |         ^^^^ RET506
+46 |             c = 3
+47 |             raise Exception(x)
+   |
+   = help: Remove unnecessary `else`
+
+ℹ Safe fix
+42 42 |         if y:  # [no-else-raise]
+43 43 |             b = 2
+44 44 |             raise Exception(y)
+45    |-        else:
+46    |-            c = 3
+47    |-            raise Exception(x)
+   45 |+        c = 3
+   46 |+        raise Exception(x)
+48 47 |     else:
+49 48 |         d = 4
+50 49 |         raise Exception(z)
+
+RET506.py:60:5: RET506 [*] Unnecessary `else` after `raise` statement
+   |
+58 |             b = 2
+59 |         raise Exception(x)
+60 |     else:
+   |     ^^^^ RET506
+61 |         c = 3
+62 |     raise Exception(y)
+   |
+   = help: Remove unnecessary `else`
+
+ℹ Safe fix
+57 57 |         else:
+58 58 |             b = 2
+59 59 |         raise Exception(x)
+60    |-    else:
+61    |-        c = 3
+   60 |+    c = 3
+62 61 |     raise Exception(y)
+63 62 | 
+64 63 | 
+
+RET506.py:70:9: RET506 [*] Unnecessary `else` after `raise` statement
+   |
+68 |             a = 4
+69 |             raise Exception(x)
+70 |         else:
+   |         ^^^^ RET506
+71 |             b = 2
+72 |     else:
+   |
+   = help: Remove unnecessary `else`
+
+ℹ Safe fix
+67 67 |         if y:  # [no-else-raise]
+68 68 |             a = 4
+69 69 |             raise Exception(x)
+70    |-        else:
+71    |-            b = 2
+   70 |+        b = 2
+72 71 |     else:
+73 72 |         c = 3
+74 73 |     raise Exception(y)
+
+RET506.py:80:5: RET506 [*] Unnecessary `else` after `raise` statement
+   |
+78 |     if x:  # [no-else-raise]
+79 |         raise Exception(True)
+80 |     else:
+   |     ^^^^ RET506
+81 |         try:
+82 |             raise Exception(False)
+   |
+   = help: Remove unnecessary `else`
+
+ℹ Safe fix
+77 77 | def bar4(x):
+78 78 |     if x:  # [no-else-raise]
+79 79 |         raise Exception(True)
+80    |-    else:
+81    |-        try:
+82    |-            raise Exception(False)
+83    |-        except ValueError:
+84    |-            raise Exception(None)
+   80 |+    try:
+   81 |+        raise Exception(False)
+   82 |+    except ValueError:
+   83 |+        raise Exception(None)
+85 84 | 
+86 85 | 
+87 86 | ###
+
+

@@ -1,11 +1,9 @@
-use ruff_python_ast::{self as ast, Expr};
-
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
-
+/// ## Removed
+/// This rule is identical to [S307] which should be used instead.
+///
 /// ## What it does
 /// Checks for uses of the builtin `eval()` function.
 ///
@@ -29,28 +27,15 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `eval`](https://docs.python.org/3/library/functions.html#eval)
 /// - [_Eval really is dangerous_ by Ned Batchelder](https://nedbatchelder.com/blog/201206/eval_really_is_dangerous.html)
+///
+/// [S307]: https://docs.astral.sh/ruff/rules/suspicious-eval-usage/
 #[violation]
 pub struct Eval;
 
+/// PGH001
 impl Violation for Eval {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("No builtin `eval()` allowed")
     }
-}
-
-/// PGH001
-pub(crate) fn no_eval(checker: &mut Checker, func: &Expr) {
-    let Expr::Name(ast::ExprName { id, .. }) = func else {
-        return;
-    };
-    if id != "eval" {
-        return;
-    }
-    if !checker.semantic().is_builtin("eval") {
-        return;
-    }
-    checker
-        .diagnostics
-        .push(Diagnostic::new(Eval, func.range()));
 }

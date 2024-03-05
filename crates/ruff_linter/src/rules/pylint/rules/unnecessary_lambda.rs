@@ -222,10 +222,7 @@ struct NameFinder<'a> {
     names: Vec<&'a ast::ExprName>,
 }
 
-impl<'a, 'b> Visitor<'b> for NameFinder<'a>
-where
-    'b: 'a,
-{
+impl<'a> Visitor<'a> for NameFinder<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         if let Expr::Name(expr_name) = expr {
             self.names.push(expr_name);

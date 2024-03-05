@@ -3,7 +3,7 @@ source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
 UP018.py:37:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
    |
-36 | # These become string or byte literals
+36 | # These become literals
 37 | str()
    | ^^^^^ UP018
 38 | str("foo")
@@ -14,7 +14,7 @@ UP018.py:37:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 ℹ Safe fix
 34 34 | int().denominator
 35 35 | 
-36 36 | # These become string or byte literals
+36 36 | # These become literals
 37    |-str()
    37 |+""
 38 38 | str("foo")
@@ -23,7 +23,7 @@ UP018.py:37:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 
 UP018.py:38:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
    |
-36 | # These become string or byte literals
+36 | # These become literals
 37 | str()
 38 | str("foo")
    | ^^^^^^^^^^ UP018
@@ -34,7 +34,7 @@ UP018.py:38:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 
 ℹ Safe fix
 35 35 | 
-36 36 | # These become string or byte literals
+36 36 | # These become literals
 37 37 | str()
 38    |-str("foo")
    38 |+"foo"
@@ -55,7 +55,7 @@ UP018.py:39:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
    = help: Replace with string literal
 
 ℹ Safe fix
-36 36 | # These become string or byte literals
+36 36 | # These become literals
 37 37 | str()
 38 38 | str("foo")
 39    |-str("""
@@ -304,6 +304,8 @@ UP018.py:55:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 54 | # These become a literal but retain parentheses
 55 | int(1).denominator
    | ^^^^^^ UP018
+56 | 
+57 | # These too are literals in spirit
    |
    = help: Replace with integer literal
 
@@ -313,5 +315,82 @@ UP018.py:55:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 54 54 | # These become a literal but retain parentheses
 55    |-int(1).denominator
    55 |+(1).denominator
+56 56 | 
+57 57 | # These too are literals in spirit
+58 58 | int(+1)
+
+UP018.py:58:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+   |
+57 | # These too are literals in spirit
+58 | int(+1)
+   | ^^^^^^^ UP018
+59 | int(-1)
+60 | float(+1.0)
+   |
+   = help: Replace with integer literal
+
+ℹ Safe fix
+55 55 | int(1).denominator
+56 56 | 
+57 57 | # These too are literals in spirit
+58    |-int(+1)
+   58 |++1
+59 59 | int(-1)
+60 60 | float(+1.0)
+61 61 | float(-1.0)
+
+UP018.py:59:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+   |
+57 | # These too are literals in spirit
+58 | int(+1)
+59 | int(-1)
+   | ^^^^^^^ UP018
+60 | float(+1.0)
+61 | float(-1.0)
+   |
+   = help: Replace with integer literal
+
+ℹ Safe fix
+56 56 | 
+57 57 | # These too are literals in spirit
+58 58 | int(+1)
+59    |-int(-1)
+   59 |+-1
+60 60 | float(+1.0)
+61 61 | float(-1.0)
+
+UP018.py:60:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
+   |
+58 | int(+1)
+59 | int(-1)
+60 | float(+1.0)
+   | ^^^^^^^^^^^ UP018
+61 | float(-1.0)
+   |
+   = help: Replace with float literal
+
+ℹ Safe fix
+57 57 | # These too are literals in spirit
+58 58 | int(+1)
+59 59 | int(-1)
+60    |-float(+1.0)
+   60 |++1.0
+61 61 | float(-1.0)
+
+UP018.py:61:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
+   |
+59 | int(-1)
+60 | float(+1.0)
+61 | float(-1.0)
+   | ^^^^^^^^^^^ UP018
+   |
+   = help: Replace with float literal
+
+ℹ Safe fix
+58 58 | int(+1)
+59 59 | int(-1)
+60 60 | float(+1.0)
+61    |-float(-1.0)
+   61 |+-1.0
 
 

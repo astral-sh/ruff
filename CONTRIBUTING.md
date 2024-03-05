@@ -26,6 +26,10 @@ Welcome! We're happy to have you here. Thank you in advance for your contributio
 - [`cargo dev`](#cargo-dev)
 - [Subsystems](#subsystems)
     - [Compilation Pipeline](#compilation-pipeline)
+    - [Import Categorization](#import-categorization)
+        - [Project root](#project-root)
+        - [Package root](#package-root)
+        - [Import categorization](#import-categorization-1)
 
 ## The Basics
 
@@ -35,7 +39,7 @@ For small changes (e.g., bug fixes), feel free to submit a PR.
 
 For larger changes (e.g., new lint rules, new functionality, new configuration options), consider
 creating an [**issue**](https://github.com/astral-sh/ruff/issues) outlining your proposed change.
-You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5) to discuss your idea with the
+You can also join us on [**Discord**](https://discord.com/invite/astral-sh) to discuss your idea with the
 community. We've labeled [beginner-friendly tasks](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
 in the issue tracker, along with [bugs](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Abug)
 and [improvements](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Aaccepted)
@@ -63,7 +67,7 @@ You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
 cargo install cargo-insta
 ```
 
-and pre-commit to run some validation checks:
+And you'll need pre-commit to run some validation checks:
 
 ```shell
 pipx install pre-commit  # or `pip install pre-commit` if you have a virtualenv
@@ -75,6 +79,16 @@ when making a commit:
 ```shell
 pre-commit install
 ```
+
+We recommend [nextest](https://nexte.st/) to run Ruff's test suite (via `cargo nextest run`),
+though it's not strictly necessary:
+
+```shell
+cargo install cargo-nextest --locked
+```
+
+Throughout this guide, any usages of `cargo test` can be replaced with `cargo nextest run`,
+if you choose to install `nextest`.
 
 ### Development
 
@@ -231,7 +245,7 @@ Once you've completed the code for the rule itself, you can define tests with th
     For example, if you're adding a new rule named `E402`, you would run:
 
     ```shell
-    cargo run -p ruff -- check crates/ruff_linter/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402
+    cargo run -p ruff -- check crates/ruff_linter/resources/test/fixtures/pycodestyle/E402.py --no-cache --preview --select E402
     ```
 
     **Note:** Only a subset of rules are enabled by default. When testing a new rule, ensure that
@@ -302,7 +316,7 @@ To preview any changes to the documentation locally:
     ```
 
 The documentation should then be available locally at
-[http://127.0.0.1:8000/docs/](http://127.0.0.1:8000/docs/).
+[http://127.0.0.1:8000/ruff/](http://127.0.0.1:8000/ruff/).
 
 ## Release Process
 
@@ -372,6 +386,11 @@ We have several ways of benchmarking and profiling Ruff:
 - Our main performance benchmark comparing Ruff with other tools on the CPython codebase
 - Microbenchmarks which run the linter or the formatter on individual files. These run on pull requests.
 - Profiling the linter on either the microbenchmarks or entire projects
+
+> \[!NOTE\]
+> When running benchmarks, ensure that your CPU is otherwise idle (e.g., close any background
+> applications, like web browsers). You may also want to switch your CPU to a "performance"
+> mode, if it exists, especially when benchmarking short-lived processes.
 
 ### CPython Benchmark
 

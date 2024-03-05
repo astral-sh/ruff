@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
@@ -92,20 +94,27 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
 
     // TODO(zanie): We should check for generic type variables used in the value and define them
     //              as type params instead
-    let mut diagnostic = Diagnostic::new(NonPEP695TypeAlias { name: name.clone() }, stmt.range());
-    let mut visitor = TypeVarReferenceVisitor {
-        vars: vec![],
-        semantic: checker.semantic(),
+    let vars = {
+        let mut visitor = TypeVarReferenceVisitor {
+            vars: vec![],
+            semantic: checker.semantic(),
+        };
+        visitor.visit_expr(value);
+        visitor.vars
     };
-    visitor.visit_expr(value);
 
-    let type_params = if visitor.vars.is_empty() {
+    // Type variables must be unique; filter while preserving order.
+    let vars = vars
+        .into_iter()
+        .unique_by(|TypeVar { name, .. }| name.id.as_str())
+        .collect::<Vec<_>>();
+
+    let type_params = if vars.is_empty() {
         None
     } else {
         Some(ast::TypeParams {
             range: TextRange::default(),
-            type_params: visitor
-                .vars
+            type_params: vars
                 .into_iter()
                 .map(|TypeVar { name, restriction }| {
                     TypeParam::TypeVar(TypeParamTypeVar {
@@ -118,6 +127,7 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
                                     range: TextRange::default(),
                                     elts: constraints.into_iter().cloned().collect(),
                                     ctx: ast::ExprContext::Load,
+                                    parenthesized: true,
                                 })))
                             }
                             None => None,
@@ -128,6 +138,8 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
         })
     };
 
+    let mut diagnostic = Diagnostic::new(NonPEP695TypeAlias { name: name.clone() }, stmt.range());
+
     let edit = Edit::range_replacement(
         checker.generator().stmt(&Stmt::from(StmtTypeAlias {
             range: TextRange::default(),
@@ -137,7 +149,6 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
         })),
         stmt.range(),
     );
-
     // The fix is only safe in a type stub because new-style aliases have different runtime behavior
     // See https://github.com/astral-sh/ruff/issues/6434
     let fix = if checker.source_type.is_stub() {
@@ -145,8 +156,8 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
     } else {
         Fix::unsafe_edit(edit)
     };
-
     diagnostic.set_fix(fix);
+
     checker.diagnostics.push(diagnostic);
 }
 

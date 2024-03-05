@@ -70,7 +70,7 @@ pub(crate) fn unnecessary_dict_index_lookup(checker: &mut Checker, stmt_for: &St
 
 /// PLR1733
 pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &mut Checker, expr: &Expr) {
-    let (Expr::GeneratorExp(ast::ExprGeneratorExp {
+    let (Expr::Generator(ast::ExprGenerator {
         elt, generators, ..
     })
     | Expr::DictComp(ast::ExprDictComp {

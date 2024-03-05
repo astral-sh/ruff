@@ -50,11 +50,8 @@ struct ControlFlowVisitor<'a> {
     continues: Vec<&'a Stmt>,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for ControlFlowVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> StatementVisitor<'a> for ControlFlowVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
@@ -78,10 +75,10 @@ fn has_control_flow(stmt: &Stmt) -> bool {
 fn check_type_check_call(checker: &mut Checker, call: &Expr) -> bool {
     checker
         .semantic()
-        .resolve_call_path(call)
-        .is_some_and(|call_path| {
+        .resolve_qualified_name(call)
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.as_slice(),
+                qualified_name.segments(),
                 ["", "isinstance" | "issubclass" | "callable"]
             )
         })
@@ -103,10 +100,10 @@ fn check_type_check_test(checker: &mut Checker, test: &Expr) -> bool {
 fn is_builtin_exception(checker: &mut Checker, exc: &Expr) -> bool {
     return checker
         .semantic()
-        .resolve_call_path(exc)
-        .is_some_and(|call_path| {
+        .resolve_qualified_name(exc)
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.as_slice(),
+                qualified_name.segments(),
                 [
                     "",
                     "ArithmeticError"

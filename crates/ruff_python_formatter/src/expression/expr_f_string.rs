@@ -48,6 +48,24 @@ impl NeedsParentheses for ExprFString {
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
             OptionalParentheses::Multiline
+        // TODO(dhruvmanila): Ideally what we want here is a new variant which
+        // is something like:
+        // - If the expression fits by just adding the parentheses, then add them and
+        //   avoid breaking the f-string expression. So,
+        //   ```
+        //   xxxxxxxxx = (
+        //       f"aaaaaaaaaaaa { xxxxxxx + yyyyyyyy } bbbbbbbbbbbbb"
+        //   )
+        //   ```
+        // - But, if the expression is too long to fit even with parentheses, then
+        //   don't add the parentheses and instead break the expression at `soft_line_break`.
+        //   ```
+        //   xxxxxxxxx = f"aaaaaaaaaaaa {
+        //       xxxxxxxxx + yyyyyyyyyy
+        //   } bbbbbbbbbbbbb"
+        //   ```
+        // This isn't decided yet, refer to the relevant discussion:
+        // https://github.com/astral-sh/ruff/discussions/9785
         } else if AnyString::FString(self).is_multiline(context.source()) {
             OptionalParentheses::Never
         } else {

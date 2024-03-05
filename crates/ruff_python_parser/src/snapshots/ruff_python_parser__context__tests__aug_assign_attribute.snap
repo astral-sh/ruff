@@ -54,6 +54,7 @@ expression: parse_ast
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: true,
                 },
             ),
         },

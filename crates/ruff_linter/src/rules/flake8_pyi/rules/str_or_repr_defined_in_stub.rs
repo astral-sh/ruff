@@ -80,9 +80,9 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
 
     if checker
         .semantic()
-        .resolve_call_path(returns)
-        .map_or(true, |call_path| {
-            !matches!(call_path.as_slice(), ["" | "builtins", "str"])
+        .resolve_qualified_name(returns)
+        .map_or(true, |qualified_name| {
+            !matches!(qualified_name.segments(), ["" | "builtins", "str"])
         })
     {
         return;

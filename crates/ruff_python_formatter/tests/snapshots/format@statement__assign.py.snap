@@ -87,9 +87,7 @@ c = b[dddddd, aaaaaa] =  (
 ## Output
 ```python
 # break left hand side
-a1akjdshflkjahdslkfjlasfdahjlfds = (
-    bakjdshflkjahdslkfjlasfdahjlfds
-) = (
+a1akjdshflkjahdslkfjlasfdahjlfds = bakjdshflkjahdslkfjlasfdahjlfds = (
     cakjdshflkjahdslkfjlasfdahjlfds
 ) = kjaödkjaföjfahlfdalfhaöfaöfhaöfha = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = 3
 
@@ -97,15 +95,13 @@ a1akjdshflkjahdslkfjlasfdahjlfds = (
 a2 = b2 = 2
 
 # Break the last element
-a = (
-    asdf
-) = (
+a = asdf = (
     fjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfal
 ) = 1
 
-aa = [
-    bakjdshflkjahdslkfjlasfdahjlfds
-] = dddd = ddd = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = [3]
+aa = [bakjdshflkjahdslkfjlasfdahjlfds] = dddd = ddd = (
+    fkjaödkjaföjfahlfdalfhaöfaöfhaöfha
+) = g = [3]
 
 aa = [] = dddd = ddd = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = [3]
 
@@ -166,42 +162,6 @@ c = b[dddddd, aaaaaa] = (
     a[aaaaaaa, bbbbbbbbbbbbbbbbbbb]
     # comment
 ) = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -1,7 +1,5 @@
- # break left hand side
--a1akjdshflkjahdslkfjlasfdahjlfds = (
--    bakjdshflkjahdslkfjlasfdahjlfds
--) = (
-+a1akjdshflkjahdslkfjlasfdahjlfds = bakjdshflkjahdslkfjlasfdahjlfds = (
-     cakjdshflkjahdslkfjlasfdahjlfds
- ) = kjaödkjaföjfahlfdalfhaöfaöfhaöfha = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = 3
- 
-@@ -9,15 +7,13 @@
- a2 = b2 = 2
- 
- # Break the last element
--a = (
--    asdf
--) = (
-+a = asdf = (
-     fjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfal
- ) = 1
- 
--aa = [
--    bakjdshflkjahdslkfjlasfdahjlfds
--] = dddd = ddd = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = [3]
-+aa = [bakjdshflkjahdslkfjlasfdahjlfds] = dddd = ddd = (
-+    fkjaödkjaföjfahlfdalfhaöfaöfhaöfha
-+) = g = [3]
- 
- aa = [] = dddd = ddd = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = [3]
- 
 ```
 
 

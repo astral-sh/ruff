@@ -25,6 +25,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "=10",
             is_raw: false,
+            triple_quoted: false,
         },
         5..8,
     ),
@@ -36,6 +37,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: " ",
             is_raw: false,
+            triple_quoted: false,
         },
         9..10,
     ),
@@ -75,6 +77,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: " ",
             is_raw: false,
+            triple_quoted: false,
         },
         19..20,
     ),
@@ -124,6 +127,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: " ",
             is_raw: false,
+            triple_quoted: false,
         },
         31..32,
     ),

@@ -308,11 +308,8 @@ impl std::fmt::Debug for Token {
 /// assert_eq!(printed.as_code(), r#""Hello 'Ruff'""#);
 /// assert_eq!(printed.sourcemap(), [
 ///     SourceMarker { source: TextSize::new(0), dest: TextSize::new(0) },
-///     SourceMarker { source: TextSize::new(0), dest: TextSize::new(7) },
 ///     SourceMarker { source: TextSize::new(8), dest: TextSize::new(7) },
-///     SourceMarker { source: TextSize::new(8), dest: TextSize::new(13) },
 ///     SourceMarker { source: TextSize::new(14), dest: TextSize::new(13) },
-///     SourceMarker { source: TextSize::new(14), dest: TextSize::new(14) },
 ///     SourceMarker { source: TextSize::new(20), dest: TextSize::new(14) },
 /// ]);
 ///
@@ -328,24 +325,30 @@ pub struct SourcePosition(TextSize);
 
 impl<Context> Format<Context> for SourcePosition {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
+        if let Some(FormatElement::SourcePosition(last_position)) = f.buffer.elements().last() {
+            if *last_position == self.0 {
+                return Ok(());
+            }
+        }
+
         f.write_element(FormatElement::SourcePosition(self.0));
 
         Ok(())
     }
 }
 
-/// Creates a text from a dynamic string with its optional start-position in the source document.
+/// Creates a text from a dynamic string.
+///
 /// This is done by allocating a new string internally.
-pub fn text(text: &str, position: Option<TextSize>) -> Text {
+pub fn text(text: &str) -> Text {
     debug_assert_no_newlines(text);
 
-    Text { text, position }
+    Text { text }
 }
 
 #[derive(Eq, PartialEq)]
 pub struct Text<'a> {
     text: &'a str,
-    position: Option<TextSize>,
 }
 
 impl<Context> Format<Context> for Text<'_>
@@ -353,10 +356,6 @@ where
     Context: FormatContext,
 {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        if let Some(source_position) = self.position {
-            f.write_element(FormatElement::SourcePosition(source_position));
-        }
-
         f.write_element(FormatElement::Text {
             text: self.text.to_string().into_boxed_str(),
             text_width: TextWidth::from_text(self.text, f.options().indent_width()),
@@ -2286,7 +2285,7 @@ impl<Context, T> std::fmt::Debug for FormatWith<Context, T> {
 ///                 let mut join = f.join_with(&separator);
 ///
 ///                 for item in &self.items {
-///                     join.entry(&format_with(|f| write!(f, [text(item, None)])));
+///                     join.entry(&format_with(|f| write!(f, [text(item)])));
 ///                 }
 ///                 join.finish()
 ///             })),
@@ -2371,7 +2370,7 @@ where
 /// let mut count = 0;
 ///
 /// let value = format_once(|f| {
-///     write!(f, [text(&std::format!("Formatted {count}."), None)])
+///     write!(f, [text(&std::format!("Formatted {count}."))])
 /// });
 ///
 /// format!(SimpleFormatContext::default(), [value]).expect("Formatting once works fine");

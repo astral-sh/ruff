@@ -129,4 +129,11 @@ E721.py:59:4: E721 Use `is` and `is not` for type comparisons, or `isinstance()`
 61 | #: Okay
    |
 
+E721.py:140:1: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+    |
+139 | #: E721
+140 | dtype == float
+    | ^^^^^^^^^^^^^^ E721
+    |
+
 

@@ -52,14 +52,15 @@ use ruff_text_size::Ranged;
 /// - [The Python Standard Library](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
 #[violation]
 pub struct AsyncioDanglingTask {
+    expr: String,
     method: Method,
 }
 
 impl Violation for AsyncioDanglingTask {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AsyncioDanglingTask { method } = self;
-        format!("Store a reference to the return value of `asyncio.{method}`")
+        let AsyncioDanglingTask { expr, method } = self;
+        format!("Store a reference to the return value of `{expr}.{method}`")
     }
 }
 
@@ -70,33 +71,44 @@ pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Op
     };
 
     // Ex) `asyncio.create_task(...)`
-    if let Some(method) =
-        semantic
-            .resolve_call_path(func)
-            .and_then(|call_path| match call_path.as_slice() {
-                ["asyncio", "create_task"] => Some(Method::CreateTask),
-                ["asyncio", "ensure_future"] => Some(Method::EnsureFuture),
-                _ => None,
-            })
+    if let Some(method) = semantic
+        .resolve_qualified_name(func)
+        .and_then(|qualified_name| match qualified_name.segments() {
+            ["asyncio", "create_task"] => Some(Method::CreateTask),
+            ["asyncio", "ensure_future"] => Some(Method::EnsureFuture),
+            _ => None,
+        })
     {
         return Some(Diagnostic::new(
-            AsyncioDanglingTask { method },
+            AsyncioDanglingTask {
+                expr: "asyncio".to_string(),
+                method,
+            },
             expr.range(),
         ));
     }
 
-    // Ex) `loop = asyncio.get_running_loop(); loop.create_task(...)`
+    // Ex) `loop = ...; loop.create_task(...)`
     if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() {
         if attr == "create_task" {
-            if typing::resolve_assignment(value, semantic).is_some_and(|call_path| {
-                matches!(call_path.as_slice(), ["asyncio", "get_running_loop"])
-            }) {
-                return Some(Diagnostic::new(
-                    AsyncioDanglingTask {
-                        method: Method::CreateTask,
-                    },
-                    expr.range(),
-                ));
+            if let Expr::Name(name) = value.as_ref() {
+                if typing::resolve_assignment(value, semantic).is_some_and(|qualified_name| {
+                    matches!(
+                        qualified_name.segments(),
+                        [
+                            "asyncio",
+                            "get_event_loop" | "get_running_loop" | "new_event_loop"
+                        ]
+                    )
+                }) {
+                    return Some(Diagnostic::new(
+                        AsyncioDanglingTask {
+                            expr: name.id.to_string(),
+                            method: Method::CreateTask,
+                        },
+                        expr.range(),
+                    ));
+                }
             }
         }
     }

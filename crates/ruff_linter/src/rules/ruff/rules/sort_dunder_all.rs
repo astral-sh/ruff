@@ -107,7 +107,7 @@ pub(crate) fn sort_dunder_all_extend_call(
         ..
     }: &ast::ExprCall,
 ) {
-    let ([value_passed], []) = (args.as_slice(), keywords.as_slice()) else {
+    let ([value_passed], []) = (&**args, &**keywords) else {
         return;
     };
     let ast::Expr::Attribute(ast::ExprAttribute {
@@ -152,9 +152,13 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
 
     let (elts, range, kind) = match node {
         ast::Expr::List(ast::ExprList { elts, range, .. }) => (elts, *range, SequenceKind::List),
-        ast::Expr::Tuple(tuple_node @ ast::ExprTuple { elts, range, .. }) => {
-            (elts, *range, SequenceKind::Tuple(tuple_node))
-        }
+        ast::Expr::Tuple(tuple_node @ ast::ExprTuple { elts, range, .. }) => (
+            elts,
+            *range,
+            SequenceKind::Tuple {
+                parenthesized: tuple_node.parenthesized,
+            },
+        ),
         _ => return,
     };
 
@@ -166,7 +170,7 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
     let mut diagnostic = Diagnostic::new(UnsortedDunderAll, range);
 
     if let SortClassification::UnsortedAndMaybeFixable { items } = elts_analysis {
-        if let Some(fix) = create_fix(range, elts, &items, &kind, checker) {
+        if let Some(fix) = create_fix(range, elts, &items, kind, checker) {
             diagnostic.set_fix(fix);
         }
     }
@@ -187,7 +191,7 @@ fn create_fix(
     range: TextRange,
     elts: &[ast::Expr],
     string_items: &[&str],
-    kind: &SequenceKind,
+    kind: SequenceKind,
     checker: &Checker,
 ) -> Option<Fix> {
     let locator = checker.locator();

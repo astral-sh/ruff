@@ -60,7 +60,7 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
     }
 
     // Verify that the call has exactly two arguments (no `step`).
-    let [start, _] = call.arguments.args.as_slice() else {
+    let [start, _] = &*call.arguments.args else {
         return;
     };
 

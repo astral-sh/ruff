@@ -213,11 +213,11 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                         diagnostic.range(),
                                     )));
                                     context.push_diagnostic(diagnostic);
-                                } else if iter
-                                    .peek()
-                                    .is_some_and(|token| token.kind() == TokenKind::Rsqb)
-                                {
+                                } else if iter.peek().is_some_and(|token| {
+                                    matches!(token.kind(), TokenKind::Rsqb | TokenKind::Comma)
+                                }) {
                                     // Allow `foo[1 :]`, but not `foo[1  :]`.
+                                    // Or `foo[index :, 2]`, but not `foo[index  :, 2]`.
                                     if let (Whitespace::Many | Whitespace::Tab, offset) = whitespace
                                     {
                                         let mut diagnostic = Diagnostic::new(

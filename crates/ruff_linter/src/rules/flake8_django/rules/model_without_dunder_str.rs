@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::{analyze, SemanticModel};
+use ruff_python_semantic::{analyze, Modules, SemanticModel};
 
 use crate::checkers::ast::Checker;
 
@@ -52,6 +52,10 @@ impl Violation for DjangoModelWithoutDunderStr {
 
 /// DJ008
 pub(crate) fn model_without_dunder_str(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+    if !checker.semantic().seen_module(Modules::DJANGO) {
+        return;
+    }
+
     if !is_non_abstract_model(class_def, checker.semantic()) {
         return;
     }

@@ -57,6 +57,7 @@ def import_fixture(fixture: Path, fixture_set: str):
 
             if "--minimum-version=" in flags:
                 [_, version] = flags.split("--minimum-version=", 1)
+                version = version.split(" ", 1)[0]
                 # Convert 3.10 to py310
                 options["target_version"] = f"py{version.strip().replace('.', '')}"
 
@@ -68,6 +69,9 @@ def import_fixture(fixture: Path, fixture_set: str):
         options_path = fixture_path.with_suffix(".options.json")
 
         if len(options) > 0:
+            if extension == "pyi":
+                options["source_type"] = "Stub"
+
             with options_path.open("w") as options_file:
                 json.dump(options, options_file)
         elif os.path.exists(options_path):

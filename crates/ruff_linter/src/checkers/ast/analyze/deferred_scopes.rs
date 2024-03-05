@@ -7,8 +7,8 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix;
 use crate::rules::{
-    flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments, pyflakes, pylint,
-    ruff,
+    flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments, pep8_naming,
+    pyflakes, pylint, ruff,
 };
 
 /// Run lint rules over all deferred scopes in the [`SemanticModel`].
@@ -18,6 +18,8 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
         Rule::ImportShadowedByLoopVar,
+        Rule::InvalidFirstArgumentNameForMethod,
+        Rule::InvalidFirstArgumentNameForClassMethod,
         Rule::NoSelfUse,
         Rule::RedefinedArgumentFromLocal,
         Rule::RedefinedWhileUnused,
@@ -40,6 +42,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::UnusedPrivateTypedDict,
         Rule::UnusedStaticMethodArgument,
         Rule::UnusedVariable,
+        Rule::SingledispatchMethod,
     ]) {
         return;
     }
@@ -256,25 +259,23 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         diagnostic.set_parent(range.start());
                     }
 
-                    if checker.settings.preview.is_enabled() {
-                        if let Some(import) = binding.as_any_import() {
-                            if let Some(source) = binding.source {
-                                diagnostic.try_set_fix(|| {
-                                    let statement = checker.semantic().statement(source);
-                                    let parent = checker.semantic().parent_statement(source);
-                                    let edit = fix::edits::remove_unused_imports(
-                                        std::iter::once(import.member_name().as_ref()),
-                                        statement,
-                                        parent,
-                                        checker.locator(),
-                                        checker.stylist(),
-                                        checker.indexer(),
-                                    )?;
-                                    Ok(Fix::safe_edit(edit).isolate(Checker::isolation(
-                                        checker.semantic().parent_statement_id(source),
-                                    )))
-                                });
-                            }
+                    if let Some(import) = binding.as_any_import() {
+                        if let Some(source) = binding.source {
+                            diagnostic.try_set_fix(|| {
+                                let statement = checker.semantic().statement(source);
+                                let parent = checker.semantic().parent_statement(source);
+                                let edit = fix::edits::remove_unused_imports(
+                                    std::iter::once(import.member_name().as_ref()),
+                                    statement,
+                                    parent,
+                                    checker.locator(),
+                                    checker.stylist(),
+                                    checker.indexer(),
+                                )?;
+                                Ok(Fix::safe_edit(edit).isolate(Checker::isolation(
+                                    checker.semantic().parent_statement_id(source),
+                                )))
+                            });
                         }
                     }
 
@@ -283,17 +284,21 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
             }
         }
 
-        if checker.enabled(Rule::UnusedPrivateTypeVar) {
-            flake8_pyi::rules::unused_private_type_var(checker, scope, &mut diagnostics);
-        }
-        if checker.enabled(Rule::UnusedPrivateProtocol) {
-            flake8_pyi::rules::unused_private_protocol(checker, scope, &mut diagnostics);
-        }
-        if checker.enabled(Rule::UnusedPrivateTypeAlias) {
-            flake8_pyi::rules::unused_private_type_alias(checker, scope, &mut diagnostics);
-        }
-        if checker.enabled(Rule::UnusedPrivateTypedDict) {
-            flake8_pyi::rules::unused_private_typed_dict(checker, scope, &mut diagnostics);
+        if checker.source_type.is_stub()
+            || matches!(scope.kind, ScopeKind::Module | ScopeKind::Function(_))
+        {
+            if checker.enabled(Rule::UnusedPrivateTypeVar) {
+                flake8_pyi::rules::unused_private_type_var(checker, scope, &mut diagnostics);
+            }
+            if checker.enabled(Rule::UnusedPrivateProtocol) {
+                flake8_pyi::rules::unused_private_protocol(checker, scope, &mut diagnostics);
+            }
+            if checker.enabled(Rule::UnusedPrivateTypeAlias) {
+                flake8_pyi::rules::unused_private_type_alias(checker, scope, &mut diagnostics);
+            }
+            if checker.enabled(Rule::UnusedPrivateTypedDict) {
+                flake8_pyi::rules::unused_private_typed_dict(checker, scope, &mut diagnostics);
+            }
         }
 
         if checker.enabled(Rule::AsyncioDanglingTask) {
@@ -386,6 +391,17 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
             if checker.enabled(Rule::TooManyLocals) {
                 pylint::rules::too_many_locals(checker, scope, &mut diagnostics);
+            }
+
+            if checker.enabled(Rule::SingledispatchMethod) {
+                pylint::rules::singledispatch_method(checker, scope, &mut diagnostics);
+            }
+
+            if checker.any_enabled(&[
+                Rule::InvalidFirstArgumentNameForClassMethod,
+                Rule::InvalidFirstArgumentNameForMethod,
+            ]) {
+                pep8_naming::rules::invalid_first_argument_name(checker, scope, &mut diagnostics);
             }
         }
     }

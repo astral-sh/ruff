@@ -129,14 +129,14 @@ pub(crate) fn unrecognized_version_info(checker: &mut Checker, test: &Expr) {
         return;
     };
 
-    let ([op], [comparator]) = (ops.as_slice(), comparators.as_slice()) else {
+    let ([op], [comparator]) = (&**ops, &**comparators) else {
         return;
     };
 
     if !checker
         .semantic()
-        .resolve_call_path(map_subscript(left))
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["sys", "version_info"]))
+        .resolve_qualified_name(map_subscript(left))
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["sys", "version_info"]))
     {
         return;
     }

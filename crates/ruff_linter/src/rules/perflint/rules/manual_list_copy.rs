@@ -76,7 +76,7 @@ pub(crate) fn manual_list_copy(checker: &mut Checker, target: &Expr, body: &[Stm
         return;
     }
 
-    let [arg] = args.as_slice() else {
+    let [arg] = &**args else {
         return;
     };
 

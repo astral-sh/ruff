@@ -11,6 +11,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: "foo ",
             is_raw: false,
+            triple_quoted: false,
         },
         2..6,
     ),
@@ -36,6 +37,7 @@ expression: lex_source(source)
         FStringMiddle {
             value: " bar",
             is_raw: false,
+            triple_quoted: false,
         },
         12..16,
     ),

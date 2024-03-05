@@ -13,6 +13,7 @@ description = "WebAssembly bindings for Ruff"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+doctest = false
 
 [features]
 default = ["console_error_panic_hook"]

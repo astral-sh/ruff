@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "parse_suite(source, \"<test>\").unwrap()"
+expression: parse_suite(source).unwrap()
 ---
 [
     With(
@@ -166,8 +166,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 78..91,
-                    context_expr: IfExp(
-                        ExprIfExp {
+                    context_expr: If(
+                        ExprIf {
                             range: 78..91,
                             test: NumberLiteral(
                                 ExprNumberLiteral {
@@ -214,8 +214,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 103..121,
-                    context_expr: IfExp(
-                        ExprIfExp {
+                    context_expr: If(
+                        ExprIf {
                             range: 103..116,
                             test: NumberLiteral(
                                 ExprNumberLiteral {
@@ -275,6 +275,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             range: 133..135,
                             elts: [],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: None,
@@ -301,6 +302,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             range: 147..149,
                             elts: [],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: Some(
@@ -433,6 +435,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: Some(
@@ -523,6 +526,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: Some(
@@ -571,6 +575,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: None,
@@ -611,6 +616,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: Some(
@@ -667,6 +673,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: None,
@@ -715,6 +722,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: Some(
@@ -744,8 +752,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 362..368,
-                    context_expr: NamedExpr(
-                        ExprNamedExpr {
+                    context_expr: Named(
+                        ExprNamed {
                             range: 362..368,
                             target: Name(
                                 ExprName {
@@ -783,8 +791,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 381..394,
-                    context_expr: NamedExpr(
-                        ExprNamedExpr {
+                    context_expr: Named(
+                        ExprNamed {
                             range: 382..388,
                             target: Name(
                                 ExprName {
@@ -834,8 +842,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ExprTuple {
                             range: 406..422,
                             elts: [
-                                NamedExpr(
-                                    ExprNamedExpr {
+                                Named(
+                                    ExprNamed {
                                         range: 407..413,
                                         target: Name(
                                             ExprName {
@@ -854,8 +862,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                         ),
                                     },
                                 ),
-                                NamedExpr(
-                                    ExprNamedExpr {
+                                Named(
+                                    ExprNamed {
                                         range: 415..421,
                                         target: Name(
                                             ExprName {
@@ -876,6 +884,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: None,
@@ -901,8 +910,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ExprTuple {
                             range: 434..450,
                             elts: [
-                                NamedExpr(
-                                    ExprNamedExpr {
+                                Named(
+                                    ExprNamed {
                                         range: 435..441,
                                         target: Name(
                                             ExprName {
@@ -921,8 +930,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                         ),
                                     },
                                 ),
-                                NamedExpr(
-                                    ExprNamedExpr {
+                                Named(
+                                    ExprNamed {
                                         range: 443..449,
                                         target: Name(
                                             ExprName {
@@ -943,6 +952,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: Some(

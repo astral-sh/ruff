@@ -11,7 +11,7 @@ use super::helpers::get_mark_decorators;
 
 /// ## What it does
 /// Checks for argument-free `@pytest.mark.<marker>()` decorators with or
-/// without parentheses, depending on the `flake8-pytest-style.mark-parentheses`
+/// without parentheses, depending on the [`lint.flake8-pytest-style.mark-parentheses`]
 /// setting.
 ///
 /// ## Why is this bad?
@@ -42,7 +42,7 @@ use super::helpers::get_mark_decorators;
 /// ```
 ///
 /// ## Options
-/// - `flake8-pytest-style.mark-parentheses`
+/// - `lint.flake8-pytest-style.mark-parentheses`
 ///
 /// ## References
 /// - [`pytest` documentation: Marks](https://docs.pytest.org/en/latest/reference/reference.html#marks)

@@ -1,0 +1,25 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/whitespace_only_range.py
+---
+## Input
+```python
+def  test():
+    pass  <RANGE_START>
+
+<RANGE_END>
+
+def  test_formatted(): pass
+```
+
+## Output
+```python
+def  test():
+    pass
+
+
+def  test_formatted(): pass
+```
+
+
+

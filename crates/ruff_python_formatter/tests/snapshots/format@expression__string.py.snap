@@ -159,10 +159,12 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
 "' test"
+
 '" test'
 
 '" test'
@@ -322,34 +324,10 @@ x = (
 # https://github.com/astral-sh/ruff/issues/7460
 trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
 
-a = f"""\x1F"""
-a = """\x1F"""
+a = f"""\x1f"""
+a = """\x1f"""
 a = """\\x1F"""
-a = """\\\x1F"""
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -1,4 +1,5 @@
- "' test"
-+
- '" test'
- 
- '" test'
-@@ -158,7 +159,7 @@
- # https://github.com/astral-sh/ruff/issues/7460
- trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
- 
--a = f"""\x1F"""
--a = """\x1F"""
-+a = f"""\x1f"""
-+a = """\x1f"""
- a = """\\x1F"""
--a = """\\\x1F"""
-+a = """\\\x1f"""
+a = """\\\x1f"""
 ```
 
 
@@ -365,10 +343,12 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
 "' test"
+
 '" test'
 
 '" test'
@@ -528,34 +508,10 @@ x = (
 # https://github.com/astral-sh/ruff/issues/7460
 trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
 
-a = f"""\x1F"""
-a = """\x1F"""
+a = f"""\x1f"""
+a = """\x1f"""
 a = """\\x1F"""
-a = """\\\x1F"""
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -1,4 +1,5 @@
- "' test"
-+
- '" test'
- 
- '" test'
-@@ -158,7 +159,7 @@
- # https://github.com/astral-sh/ruff/issues/7460
- trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
- 
--a = f"""\x1F"""
--a = """\x1F"""
-+a = f"""\x1f"""
-+a = """\x1f"""
- a = """\\x1F"""
--a = """\\\x1F"""
-+a = """\\\x1f"""
+a = """\\\x1f"""
 ```
 
 

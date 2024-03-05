@@ -95,19 +95,22 @@ impl Transformer for Normalizer {
                 &string_literal.value,
                 "<DOCTEST-CODE-SNIPPET: Removed by normalizer>\n",
             )
-            .into_owned();
+            .into_owned()
+            .into_boxed_str();
         string_literal.value = STRIP_RST_BLOCKS
             .replace_all(
                 &string_literal.value,
                 "<RSTBLOCK-CODE-SNIPPET: Removed by normalizer>\n",
             )
-            .into_owned();
+            .into_owned()
+            .into_boxed_str();
         string_literal.value = STRIP_MARKDOWN_BLOCKS
             .replace_all(
                 &string_literal.value,
                 "<MARKDOWN-CODE-SNIPPET: Removed by normalizer>\n",
             )
-            .into_owned();
+            .into_owned()
+            .into_boxed_str();
         // Normalize a string by (2) stripping any leading and trailing space from each
         // line, and (3) removing any blank lines from the start and end of the string.
         string_literal.value = string_literal
@@ -117,6 +120,7 @@ impl Transformer for Normalizer {
             .collect::<Vec<_>>()
             .join("\n")
             .trim()
-            .to_owned();
+            .to_owned()
+            .into_boxed_str();
     }
 }

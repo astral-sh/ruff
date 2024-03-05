@@ -13,6 +13,7 @@ license = { workspace = true }
 
 [lib]
 bench = false
+doctest = false
 
 [[bench]]
 name = "linter"

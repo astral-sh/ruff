@@ -23,14 +23,24 @@ pub(super) fn is_untyped_exception(type_: Option<&Expr>, semantic: &SemanticMode
     type_.map_or(true, |type_| {
         if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &type_ {
             elts.iter().any(|type_| {
-                semantic.resolve_call_path(type_).is_some_and(|call_path| {
-                    matches!(call_path.as_slice(), ["", "Exception" | "BaseException"])
-                })
+                semantic
+                    .resolve_qualified_name(type_)
+                    .is_some_and(|qualified_name| {
+                        matches!(
+                            qualified_name.segments(),
+                            ["", "Exception" | "BaseException"]
+                        )
+                    })
             })
         } else {
-            semantic.resolve_call_path(type_).is_some_and(|call_path| {
-                matches!(call_path.as_slice(), ["", "Exception" | "BaseException"])
-            })
+            semantic
+                .resolve_qualified_name(type_)
+                .is_some_and(|qualified_name| {
+                    matches!(
+                        qualified_name.segments(),
+                        ["", "Exception" | "BaseException"]
+                    )
+                })
         }
     })
 }
