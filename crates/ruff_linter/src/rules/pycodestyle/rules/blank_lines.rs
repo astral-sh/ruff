@@ -152,7 +152,7 @@ impl AlwaysFixableViolation for BlankLinesTopLevel {
 ///
 /// Note: The rule respects the following `isort` settings when determining the maximum number of blank lines allowed between two statements:
 /// * [`lint.isort.lines-after-imports`]: For top-level statements directly following an import statement.
-/// * [`lint.isort.lines-between-types`]: For `import` statements directly following an `from..import` statement or vice versa.
+/// * [`lint.isort.lines-between-types`]: For `import` statements directly following a `from ... import ...` statement or vice versa.
 ///
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
@@ -754,8 +754,9 @@ impl<'a> BlankLinesChecker<'a> {
             // Mimic the isort rules for the number of blank lines before classes and functions
             if state.follows.is_any_import() {
                 // Fallback to the default if the value is too large for an u32 or if it is negative.
-                // A negative value means that isort should determine the blank lines automatically
-                // Defaulting to 2 is correct because the variable is only used when testing the
+                // A negative value means that isort should determine the blank lines automatically.
+                // `isort` defaults to 2 if before a class or function definition and 1 otherwise.
+                // Defaulting to 2 here is correct because the variable is only used when testing the
                 // blank lines before a class or function definition.
                 u32::try_from(self.lines_after_imports).unwrap_or(BLANK_LINES_TOP_LEVEL)
             } else {
@@ -809,7 +810,7 @@ impl<'a> BlankLinesChecker<'a> {
             BLANK_LINES_NESTED_LEVEL
         };
 
-        // If between `import` and `from..import` or the other way round,
+        // If between `import` and `from .. import ..` or the other way round,
         // allow up to `lines_between_types` newlines for isort compatibility.
         // We let `isort` remove extra blank lines when the imports belong
         // to different sections.
@@ -818,11 +819,7 @@ impl<'a> BlankLinesChecker<'a> {
             (LogicalLineKind::Import, Follows::FromImport)
                 | (LogicalLineKind::FromImport, Follows::Import)
         ) {
-            if self.lines_between_types == 0 {
-                max_lines_level
-            } else {
-                u32::try_from(self.lines_between_types).unwrap_or(u32::MAX)
-            }
+            max_lines_level.max(u32::try_from(self.lines_between_types).unwrap_or(u32::MAX))
         } else {
             expected_blank_lines_before_definition
         };
