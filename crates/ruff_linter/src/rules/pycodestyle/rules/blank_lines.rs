@@ -8,6 +8,7 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::lexer::LexicalError;
@@ -51,9 +52,14 @@ const BLANK_LINES_NESTED_LEVEL: u32 = 1;
 ///         pass
 /// ```
 ///
+/// ## Typing stub files (`.pyi`)
+/// The typing style guide recommends to not use blank lines between methods except to group
+/// them. That's why this rule is not enabled in typing stub files.
+///
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E301.html)
+/// - [Typing Style Guide](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)
 #[violation]
 pub struct BlankLineBetweenMethods;
 
@@ -96,9 +102,14 @@ impl AlwaysFixableViolation for BlankLineBetweenMethods {
 ///     pass
 /// ```
 ///
+/// ## Typing stub files (`.pyi`)
+/// The typing style guide recommends to not use blank lines between classes and functions except to group
+/// them. That's why this rule is not enabled in typing stub files.
+///
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E302.html)
+/// - [Typing Style Guide](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)
 #[violation]
 pub struct BlankLinesTopLevel {
     actual_blank_lines: u32,
@@ -150,6 +161,9 @@ impl AlwaysFixableViolation for BlankLinesTopLevel {
 ///     pass
 /// ```
 ///
+/// ## Typing stub files (`.pyi`)
+/// The rule allows at most one blank line in typing stub files in accordance to the typing style guide recommendation.
+///
 /// Note: The rule respects the following `isort` settings when determining the maximum number of blank lines allowed between two statements:
 /// * [`lint.isort.lines-after-imports`]: For top-level statements directly following an import statement.
 /// * [`lint.isort.lines-between-types`]: For `import` statements directly following a `from ... import ...` statement or vice versa.
@@ -157,6 +171,7 @@ impl AlwaysFixableViolation for BlankLinesTopLevel {
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E303.html)
+/// - [Typing Style Guide](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)
 #[violation]
 pub struct TooManyBlankLines {
     actual_blank_lines: u32,
@@ -246,9 +261,14 @@ impl AlwaysFixableViolation for BlankLineAfterDecorator {
 /// user = User()
 /// ```
 ///
+/// ## Typing stub files (`.pyi`)
+/// The typing style guide recommends to not use blank lines between statements except to group
+/// them. That's why this rule is not enabled in typing stub files.
+///
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E305.html)
+/// - [Typing Style Guide](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)
 #[violation]
 pub struct BlankLinesAfterFunctionOrClass {
     actual_blank_lines: u32,
@@ -295,9 +315,14 @@ impl AlwaysFixableViolation for BlankLinesAfterFunctionOrClass {
 ///         pass
 /// ```
 ///
+/// ## Typing stub files (`.pyi`)
+/// The typing style guide recommends to not use blank lines between classes and functions except to group
+/// them. That's why this rule is not enabled in typing stub files.
+///
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E306.html)
+/// - [Typing Style Guide](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)
 #[violation]
 pub struct BlankLinesBeforeNestedDefinition;
 
@@ -628,6 +653,7 @@ pub(crate) struct BlankLinesChecker<'a> {
     indent_width: IndentWidth,
     lines_after_imports: isize,
     lines_between_types: usize,
+    source_type: PySourceType,
 }
 
 impl<'a> BlankLinesChecker<'a> {
@@ -635,6 +661,7 @@ impl<'a> BlankLinesChecker<'a> {
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
         settings: &crate::settings::LinterSettings,
+        source_type: PySourceType,
     ) -> BlankLinesChecker<'a> {
         BlankLinesChecker {
             stylist,
@@ -642,6 +669,7 @@ impl<'a> BlankLinesChecker<'a> {
             indent_width: settings.tab_size,
             lines_after_imports: settings.isort.lines_after_imports,
             lines_between_types: settings.isort.lines_between_types,
+            source_type,
         }
     }
 
@@ -739,6 +767,8 @@ impl<'a> BlankLinesChecker<'a> {
             && !matches!(state.follows, Follows::Docstring | Follows::Decorator)
             // Do not trigger when the def follows an if/while/etc...
             && prev_indent_length.is_some_and(|prev_indent_length| prev_indent_length >= line.indent_length)
+            // Blank lines in stub files are only used for grouping. Don't enforce blank lines.
+            && !self.source_type.is_stub()
         {
             // E301
             let mut diagnostic = Diagnostic::new(BlankLineBetweenMethods, line.first_token_range);
@@ -750,20 +780,31 @@ impl<'a> BlankLinesChecker<'a> {
             diagnostics.push(diagnostic);
         }
 
+        // Blank lines in stub files are used to group definitions. Don't enforce blank lines.
+        let max_lines_level = if self.source_type.is_stub() {
+            1
+        } else {
+            if line.indent_length == 0 {
+                BLANK_LINES_TOP_LEVEL
+            } else {
+                BLANK_LINES_NESTED_LEVEL
+            }
+        };
+
         let expected_blank_lines_before_definition = if line.indent_length == 0 {
             // Mimic the isort rules for the number of blank lines before classes and functions
             if state.follows.is_any_import() {
                 // Fallback to the default if the value is too large for an u32 or if it is negative.
                 // A negative value means that isort should determine the blank lines automatically.
-                // `isort` defaults to 2 if before a class or function definition and 1 otherwise.
-                // Defaulting to 2 here is correct because the variable is only used when testing the
+                // `isort` defaults to 2 if before a class or function definition (except in stubs where it is one) and 1 otherwise.
+                // Defaulting to 2 (or 1 in stubs) here is correct because the variable is only used when testing the
                 // blank lines before a class or function definition.
-                u32::try_from(self.lines_after_imports).unwrap_or(BLANK_LINES_TOP_LEVEL)
+                u32::try_from(self.lines_after_imports).unwrap_or(max_lines_level)
             } else {
-                BLANK_LINES_TOP_LEVEL
+                max_lines_level
             }
         } else {
-            BLANK_LINES_NESTED_LEVEL
+            max_lines_level
         };
 
         if line.preceding_blank_lines < expected_blank_lines_before_definition
@@ -775,6 +816,8 @@ impl<'a> BlankLinesChecker<'a> {
             && line.indent_length == 0
             // Only apply to functions or classes.
             && line.kind.is_class_function_or_decorator()
+            // Blank lines in stub files are used to group definitions. Don't enforce blank lines.
+            && !self.source_type.is_stub()
         {
             // E302
             let mut diagnostic = Diagnostic::new(
@@ -803,12 +846,6 @@ impl<'a> BlankLinesChecker<'a> {
 
             diagnostics.push(diagnostic);
         }
-
-        let max_lines_level = if line.indent_length == 0 {
-            BLANK_LINES_TOP_LEVEL
-        } else {
-            BLANK_LINES_NESTED_LEVEL
-        };
 
         // If between `import` and `from .. import ..` or the other way round,
         // allow up to `lines_between_types` newlines for isort compatibility.
@@ -893,6 +930,8 @@ impl<'a> BlankLinesChecker<'a> {
             && line.indent_length == 0
             && !line.is_comment_only
             && !line.kind.is_class_function_or_decorator()
+            // Blank lines in stub files are used for grouping, don't enforce blank lines.
+            && !self.source_type.is_stub()
         {
             // E305
             let mut diagnostic = Diagnostic::new(
@@ -933,6 +972,8 @@ impl<'a> BlankLinesChecker<'a> {
             && prev_indent_length.is_some_and(|prev_indent_length| prev_indent_length >= line.indent_length)
             // Allow groups of one-liners.
             && !(matches!(state.follows, Follows::Def) && line.last_token != TokenKind::Colon)
+            // Blank lines in stub files are only used for grouping. Don't enforce blank lines.
+            && !self.source_type.is_stub()
         {
             // E306
             let mut diagnostic =
