@@ -91,71 +91,7 @@ DEFAULT_TARGETS = [
         repo=Repository(owner="zulip", name="zulip", ref="main"),
         check_options=CheckOptions(select="ALL"),
     ),
-    Project(
-        repo=Repository(owner="indico", name="indico", ref="master"),
-        # Remove once indico removed S401 from their ignore configuration
-        config_overrides={
-            "lint.ignore": [
-                "E226",  # allow omitting whitespace around arithmetic operators
-                "E731",
-                # allow assigning lambdas (it's useful for single-line functions defined inside other functions)
-                "N818",  # not all our exceptions are errors
-                "RUF012",  # ultra-noisy and dicts in classvars are very common
-                "RUF015",  # not always more readable, and we don't do it for huge lists
-                "RUF022",  # autofix messes up out formatting instead of just sorting
-                "RUF027",  # also triggers on i18n functions -> too noisy for now
-                "D205",  # too many docstrings which have no summary line
-                "D301",  # https://github.com/astral-sh/ruff/issues/8696
-                "D1",  # we have way too many missing docstrings :(
-                "D401",  # too noisy (but maybe useful to go through at some point)
-                "D412",  # we do not use section, and in click docstrings those blank lines are useful
-                "S101",  # we use asserts outside tests, and do not run python with `-O` (also see B011)
-                "S113",  # enforcing timeouts would likely require config in some places - maybe later
-                "S311",  # false positives, it does not care about the context
-                "S324",  # all our md5/sha1 usages are for non-security purposes
-                "S404",  # useless, triggers on *all* subprocess imports
-                "S403",  # there's already a warning on using pickle, no need to have one for the import
-                "S405",  # we don't use lxml in unsafe ways
-                "S603",  # useless, triggers on *all* subprocess calls: https://github.com/astral-sh/ruff/issues/4045
-                "S607",  # we trust the PATH to be sane
-                "B011",  # we don't run python with `-O` (also see S101)
-                "B904",  # possibly useful but too noisy
-                "COM812",  # trailing commas on multiline lists are nice, but we have 2.5k violations
-                "PIE807",  # `lambda: []` is much clearer for `load_default` in schemas
-                "PT004",  # pretty weird + not a pytest convention: https://github.com/astral-sh/ruff/issues/8796
-                "PT005",  # ^ likewise
-                "PT011",  # very noisy
-                "PT015",  # nice for tests but not so nice elsewhere
-                "PT018",  # ^ likewise
-                "SIM102",  # sometimes nested ifs are more readable
-                "SIM103",  # sometimes this is more readable (especially when checking multiple conditions)
-                "SIM105",  # try-except-pass is faster and people are used to it
-                "SIM108",  # noisy ternary
-                "SIM114",  # sometimes separate ifs are more readable (especially if they just return a bool)
-                "SIM117",  # nested context managers may be more readable
-                "PLC0415",  # local imports are there for a reason
-                "PLC2701",  # some private imports are needed
-                "PLR09",  # too-many-<whatever> is just noisy
-                "PLR0913",  # very noisy
-                "PLR2004",  # extremely noisy and generally annoying
-                "PLR6201",  # sets are faster (by a factor of 10!) but it's noisy and we're in nanoseconds territory
-                "PLR6301",  # extremely noisy and generally annoying
-                "PLW0108",  # a lambda often makes it more clear what you actually want
-                "PLW1510",  # we often do not care about the status code of commands
-                "PLW1514",  # we expect UTF8 environments everywhere
-                "PLW1641",  # false positives with SA comparator classes
-                "PLW2901",  # noisy and reassigning to the loop var is usually intentional
-                "TRY002",  # super noisy, and those exceptions are pretty exceptional anyway
-                "TRY003",  # super noisy and also useless w/ werkzeugs http exceptions
-                "TRY300",  # kind of strange in many cases
-                "TRY301",  # sometimes doing that is actually useful
-                "TRY400",  # not all exceptions need exception logging
-                "PERF203",  # noisy, false positives, and not applicable for 3.11+
-                "FURB113",  # less readable
-                "FURB140",  # less readable and actually slower in 3.12+
-            ]
-        },
-    ),
+    Project(repo=Repository(owner="indico", name="indico", ref="master")),
     # Jupyter Notebooks
     Project(
         # fork of `huggingface` without syntax errors in notebooks
@@ -174,7 +110,8 @@ DEFAULT_TARGETS = [
             "include": ["*.ipynb"],
             # TODO(charlie): Re-enable after fixing typo.
             "exclude": [
-                "examples/dalle/Image_generations_edits_and_variations_with_DALL-E.ipynb"
+                "examples/dalle/Image_generations_edits_and_variations_with_DALL-E.ipynb",
+                "examples/How_to_handle_rate_limits.ipynb",
             ],
         },
     ),

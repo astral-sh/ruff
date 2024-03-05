@@ -383,7 +383,7 @@ pub(crate) fn init(path: &Path) -> Result<()> {
     let gitignore_path = path.join(".gitignore");
     if !gitignore_path.exists() {
         let mut file = fs::File::create(gitignore_path)?;
-        file.write_all(b"*")?;
+        file.write_all(b"# Automatically created by ruff.\n*\n")?;
     }
 
     Ok(())

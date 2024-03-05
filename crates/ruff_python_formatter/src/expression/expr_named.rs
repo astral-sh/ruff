@@ -1,6 +1,6 @@
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::ExprNamedExpr;
+use ruff_python_ast::ExprNamed;
 
 use crate::comments::{dangling_comments, SourceComment};
 use crate::expression::parentheses::{
@@ -9,11 +9,11 @@ use crate::expression::parentheses::{
 use crate::prelude::*;
 
 #[derive(Default)]
-pub struct FormatExprNamedExpr;
+pub struct FormatExprNamed;
 
-impl FormatNodeRule<ExprNamedExpr> for FormatExprNamedExpr {
-    fn fmt_fields(&self, item: &ExprNamedExpr, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprNamedExpr {
+impl FormatNodeRule<ExprNamed> for FormatExprNamed {
+    fn fmt_fields(&self, item: &ExprNamed, f: &mut PyFormatter) -> FormatResult<()> {
+        let ExprNamed {
             target,
             value,
             range: _,
@@ -53,7 +53,7 @@ impl FormatNodeRule<ExprNamedExpr> for FormatExprNamedExpr {
     }
 }
 
-impl NeedsParentheses for ExprNamedExpr {
+impl NeedsParentheses for ExprNamed {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,

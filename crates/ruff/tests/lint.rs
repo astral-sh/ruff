@@ -12,7 +12,7 @@ use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 use tempfile::TempDir;
 
 const BIN_NAME: &str = "ruff";
-const STDIN_BASE_OPTIONS: &[&str] = &["--no-cache", "--output-format", "concise"];
+const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
 
 fn tempdir_filter(tempdir: &TempDir) -> String {
     format!(r"{}\\?/?", escape(tempdir.path().to_str().unwrap()))
@@ -246,7 +246,6 @@ OTHER = "OTHER"
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .arg("check")
         .args(STDIN_BASE_OPTIONS)
         .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
         // Explicitly pass test.py, should be linted regardless of it being excluded by lint.exclude
@@ -293,7 +292,6 @@ inline-quotes = "single"
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .arg("check")
         .args(STDIN_BASE_OPTIONS)
         .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
         .args(["--stdin-filename", "generated.py"])
@@ -386,7 +384,6 @@ inline-quotes = "single"
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .arg("check")
         .args(STDIN_BASE_OPTIONS)
         .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
         .args(["--stdin-filename", "generated.py"])
@@ -435,7 +432,6 @@ inline-quotes = "single"
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .arg("check")
         .args(STDIN_BASE_OPTIONS)
         .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
         .args(["--stdin-filename", "generated.py"])
@@ -495,7 +491,6 @@ ignore = ["D203", "D212"]
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(sub_dir)
-        .arg("check")
         .args(STDIN_BASE_OPTIONS)
         , @r###"
     success: true
@@ -854,7 +849,7 @@ fn deprecated_config_option_overridden_via_cli() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:7: N801 Class name `lowercase` should use CapWords convention 
+    -:1:7: N801 Class name `lowercase` should use CapWords convention
     Found 1 error.
 
     ----- stderr -----
@@ -921,7 +916,6 @@ include = ["*.ipy"]
     }, {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .arg("check")
         .args(STDIN_BASE_OPTIONS)
         .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
         .args(["--extension", "ipy:ipynb"])
@@ -930,6 +924,199 @@ include = ["*.ipy"]
     exit_code: 1
     ----- stdout -----
     main.ipy:cell 1:1:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn file_noqa_external() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+external = ["AAA"]
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+# flake8: noqa: AAA101, BBB102
+import os
+"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:3:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Invalid rule code provided to `# ruff: noqa` at -:2: BBB102
+    "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn required_version_exact_mismatch() -> Result<()> {
+    let version = env!("CARGO_PKG_VERSION");
+
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+required-version = "0.1.0"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (version, "[VERSION]")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+import os
+"#), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Required version `==0.1.0` does not match the running version `[VERSION]`
+    "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn required_version_exact_match() -> Result<()> {
+    let version = env!("CARGO_PKG_VERSION");
+
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        format!(
+            r#"
+required-version = "{version}"
+"#
+        ),
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (version, "[VERSION]")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+import os
+"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:2:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn required_version_bound_mismatch() -> Result<()> {
+    let version = env!("CARGO_PKG_VERSION");
+
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        format!(
+            r#"
+required-version = ">{version}"
+"#
+        ),
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (version, "[VERSION]")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+import os
+"#), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Required version `>[VERSION]` does not match the running version `[VERSION]`
+    "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn required_version_bound_match() -> Result<()> {
+    let version = env!("CARGO_PKG_VERSION");
+
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+required-version = ">=0.1.0"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (version, "[VERSION]")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+import os
+"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:2:8: F401 [*] `os` imported but unused
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
 

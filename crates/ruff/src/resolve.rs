@@ -16,12 +16,11 @@ use crate::args::ConfigArguments;
 /// Resolve the relevant settings strategy and defaults for the current
 /// invocation.
 pub fn resolve(
-    isolated: bool,
     config_arguments: &ConfigArguments,
     stdin_filename: Option<&Path>,
 ) -> Result<PyprojectConfig> {
     // First priority: if we're running in isolated mode, use the default settings.
-    if isolated {
+    if config_arguments.isolated {
         let config = config_arguments.transform(Configuration::default());
         let settings = config.into_settings(&path_dedot::CWD)?;
         debug!("Isolated mode, not reading any pyproject.toml");

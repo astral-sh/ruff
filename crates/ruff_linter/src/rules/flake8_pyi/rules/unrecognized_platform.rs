@@ -107,8 +107,8 @@ pub(crate) fn unrecognized_platform(checker: &mut Checker, test: &Expr) {
 
     if !checker
         .semantic()
-        .resolve_call_path(left)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["sys", "platform"]))
+        .resolve_qualified_name(left)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["sys", "platform"]))
     {
         return;
     }

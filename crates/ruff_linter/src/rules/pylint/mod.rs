@@ -20,6 +20,7 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
+    #[test_case(Rule::SingledispatchMethod, Path::new("singledispatch_method.py"))]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
     #[test_case(Rule::BadOpenMode, Path::new("bad_open_mode.py"))]
@@ -175,6 +176,10 @@ mod tests {
     #[test_case(
         Rule::UnnecessaryDictIndexLookup,
         Path::new("unnecessary_dict_index_lookup.py")
+    )]
+    #[test_case(
+        Rule::UselessExceptionStatement,
+        Path::new("useless_exception_statement.py")
     )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

@@ -229,7 +229,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 #[derive(Debug)]
 struct ImportBinding<'a> {
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
-    import: AnyImport<'a>,
+    import: AnyImport<'a, 'a>,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
     range: TextRange,
     /// The range of the import's parent statement.

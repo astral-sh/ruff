@@ -17,11 +17,11 @@ pub(super) use lalrpop_util::ParseError as LalrpopError;
 
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprBooleanLiteral, ExprBytesLiteral,
-    ExprCall, ExprCompare, ExprDict, ExprDictComp, ExprEllipsisLiteral, ExprFString,
-    ExprGeneratorExp, ExprIfExp, ExprIpyEscapeCommand, ExprLambda, ExprList, ExprListComp,
-    ExprName, ExprNamedExpr, ExprNoneLiteral, ExprNumberLiteral, ExprSet, ExprSetComp, ExprSlice,
-    ExprStarred, ExprStringLiteral, ExprSubscript, ExprTuple, ExprUnaryOp, ExprYield,
-    ExprYieldFrom, Mod, ModModule, Suite,
+    ExprCall, ExprCompare, ExprDict, ExprDictComp, ExprEllipsisLiteral, ExprFString, ExprGenerator,
+    ExprIf, ExprIpyEscapeCommand, ExprLambda, ExprList, ExprListComp, ExprName, ExprNamed,
+    ExprNoneLiteral, ExprNumberLiteral, ExprSet, ExprSetComp, ExprSlice, ExprStarred,
+    ExprStringLiteral, ExprSubscript, ExprTuple, ExprUnaryOp, ExprYield, ExprYieldFrom, Mod,
+    ModModule, Suite,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -409,9 +409,9 @@ impl From<ExprBoolOp> for ParenthesizedExpr {
         Expr::BoolOp(payload).into()
     }
 }
-impl From<ExprNamedExpr> for ParenthesizedExpr {
-    fn from(payload: ExprNamedExpr) -> Self {
-        Expr::NamedExpr(payload).into()
+impl From<ExprNamed> for ParenthesizedExpr {
+    fn from(payload: ExprNamed) -> Self {
+        Expr::Named(payload).into()
     }
 }
 impl From<ExprBinOp> for ParenthesizedExpr {
@@ -429,9 +429,9 @@ impl From<ExprLambda> for ParenthesizedExpr {
         Expr::Lambda(payload).into()
     }
 }
-impl From<ExprIfExp> for ParenthesizedExpr {
-    fn from(payload: ExprIfExp) -> Self {
-        Expr::IfExp(payload).into()
+impl From<ExprIf> for ParenthesizedExpr {
+    fn from(payload: ExprIf) -> Self {
+        Expr::If(payload).into()
     }
 }
 impl From<ExprDict> for ParenthesizedExpr {
@@ -459,9 +459,9 @@ impl From<ExprDictComp> for ParenthesizedExpr {
         Expr::DictComp(payload).into()
     }
 }
-impl From<ExprGeneratorExp> for ParenthesizedExpr {
-    fn from(payload: ExprGeneratorExp) -> Self {
-        Expr::GeneratorExp(payload).into()
+impl From<ExprGenerator> for ParenthesizedExpr {
+    fn from(payload: ExprGenerator) -> Self {
+        Expr::Generator(payload).into()
     }
 }
 impl From<ExprAwait> for ParenthesizedExpr {

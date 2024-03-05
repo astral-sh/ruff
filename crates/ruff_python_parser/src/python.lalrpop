@@ -1028,7 +1028,7 @@ WithItems: Vec<ast::WithItem> = {
         // ```
         // In this case, the `(` and `)` are part of the `with` statement.
         // The same applies to `yield` and `yield from`.
-        let item = if item.optional_vars.is_none() && matches!(item.context_expr, ast::Expr::NamedExpr(_) | ast::Expr::Yield(_) | ast::Expr::YieldFrom(_)) {
+        let item = if item.optional_vars.is_none() && matches!(item.context_expr, ast::Expr::Named(_) | ast::Expr::Yield(_) | ast::Expr::YieldFrom(_)) {
             ast::WithItem {
                 range: item.range().add_start(TextSize::new(1)).sub_end(TextSize::new(1)),
                 context_expr: item.context_expr,
@@ -1330,7 +1330,7 @@ YieldExpr: crate::parser::ParenthesizedExpr = {
 };
 
 Test<Goal>: crate::parser::ParenthesizedExpr = {
-    <location:@L> <body:OrTest<"all">> "if" <test:OrTest<"all">> "else" <orelse:Test<"all">> <end_location:@R> => ast::ExprIfExp {
+    <location:@L> <body:OrTest<"all">> "if" <test:OrTest<"all">> "else" <orelse:Test<"all">> <end_location:@R> => ast::ExprIf {
         test: Box::new(test.into()),
         body: Box::new(body.into()),
         orelse: Box::new(orelse.into()),
@@ -1355,7 +1355,7 @@ NamedExpressionName: crate::parser::ParenthesizedExpr = {
 
 NamedExpression: crate::parser::ParenthesizedExpr = {
     <location:@L> <target:NamedExpressionName> ":=" <value:Test<"all">> <end_location:@R> => {
-        ast::ExprNamedExpr {
+        ast::ExprNamed {
             target: Box::new(target.into()),
             value: Box::new(value.into()),
             range: (location..end_location).into(),
@@ -1770,7 +1770,7 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
         expr: e.into(),
         range: (location..end_location).into(),
     },
-    <location:@L> "(" <elt:NamedExpressionTest> <generators:CompFor> ")" <end_location:@R> => ast::ExprGeneratorExp {
+    <location:@L> "(" <elt:NamedExpressionTest> <generators:CompFor> ")" <end_location:@R> => ast::ExprGenerator {
         elt: Box::new(elt.into()),
         generators,
         range: (location..end_location).into(),
@@ -1921,8 +1921,8 @@ Arguments: ast::Arguments = {
 FunctionArgument: (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr) = {
     <location:@L> <elt:NamedExpressionTest> <generators:CompFor?> <end_location:@R> => {
         let expr = match generators {
-            Some(generators) => ast::Expr::GeneratorExp(
-                ast::ExprGeneratorExp {
+            Some(generators) => ast::Expr::Generator(
+                ast::ExprGenerator {
                     elt: Box::new(elt.into()),
                     generators,
                     range: (location..end_location).into(),
