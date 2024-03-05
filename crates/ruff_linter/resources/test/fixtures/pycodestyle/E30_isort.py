@@ -55,3 +55,8 @@ def read_line(fd: int = 0) -> bytearray: ...
 
 
 def flush() -> None: ...
+
+
+from typing import Any, Sequence
+
+class MissingCommand(TypeError): ...  # noqa: N818
