@@ -185,7 +185,7 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
             }
 
             match arg {
-                Expr::GeneratorExp(ast::ExprGeneratorExp {
+                Expr::Generator(ast::ExprGenerator {
                     elt, generators, ..
                 }) => match match_simple_comprehension(elt, generators) {
                     Some(range) => IterationTarget {

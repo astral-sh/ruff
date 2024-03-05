@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::{compose_call_path, from_qualified_name, CallPath};
+use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::analyze::typing::{
@@ -81,12 +81,15 @@ impl Violation for FunctionCallInDefaultArgument {
 
 struct ArgumentDefaultVisitor<'a, 'b> {
     semantic: &'a SemanticModel<'b>,
-    extend_immutable_calls: &'a [CallPath<'b>],
+    extend_immutable_calls: &'a [QualifiedName<'b>],
     diagnostics: Vec<(DiagnosticKind, TextRange)>,
 }
 
 impl<'a, 'b> ArgumentDefaultVisitor<'a, 'b> {
-    fn new(semantic: &'a SemanticModel<'b>, extend_immutable_calls: &'a [CallPath<'b>]) -> Self {
+    fn new(
+        semantic: &'a SemanticModel<'b>,
+        extend_immutable_calls: &'a [QualifiedName<'b>],
+    ) -> Self {
         Self {
             semantic,
             extend_immutable_calls,
@@ -104,7 +107,7 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
                 {
                     self.diagnostics.push((
                         FunctionCallInDefaultArgument {
-                            name: compose_call_path(func),
+                            name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
                         }
                         .into(),
                         expr.range(),
@@ -123,12 +126,12 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
 /// B008
 pub(crate) fn function_call_in_argument_default(checker: &mut Checker, parameters: &Parameters) {
     // Map immutable calls to (module, member) format.
-    let extend_immutable_calls: Vec<CallPath> = checker
+    let extend_immutable_calls: Vec<QualifiedName> = checker
         .settings
         .flake8_bugbear
         .extend_immutable_calls
         .iter()
-        .map(|target| from_qualified_name(target))
+        .map(|target| QualifiedName::from_dotted_name(target))
         .collect();
 
     let mut visitor = ArgumentDefaultVisitor::new(checker.semantic(), &extend_immutable_calls);

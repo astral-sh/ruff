@@ -1,4 +1,4 @@
-use ruff_python_ast::call_path::CallPath;
+use ruff_python_ast::name::QualifiedName;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(super) enum MethodName {
@@ -70,8 +70,8 @@ impl MethodName {
 }
 
 impl MethodName {
-    pub(super) fn try_from(call_path: &CallPath<'_>) -> Option<Self> {
-        match call_path.as_slice() {
+    pub(super) fn try_from(qualified_name: &QualifiedName<'_>) -> Option<Self> {
+        match qualified_name.segments() {
             ["trio", "CancelScope"] => Some(Self::CancelScope),
             ["trio", "aclose_forcefully"] => Some(Self::AcloseForcefully),
             ["trio", "fail_after"] => Some(Self::FailAfter),

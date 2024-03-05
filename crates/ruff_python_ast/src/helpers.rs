@@ -2,13 +2,12 @@ use std::borrow::Cow;
 use std::path::Path;
 
 use rustc_hash::FxHashMap;
-use smallvec::SmallVec;
 
 use ruff_python_trivia::{indentation_at_offset, CommentRanges, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::call_path::CallPath;
+use crate::name::{QualifiedName, QualifiedNameBuilder};
 use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::StatementVisitor;
 use crate::visitor::Visitor;
@@ -116,7 +115,7 @@ where
             Expr::Await(_)
                 | Expr::Call(_)
                 | Expr::DictComp(_)
-                | Expr::GeneratorExp(_)
+                | Expr::Generator(_)
                 | Expr::ListComp(_)
                 | Expr::SetComp(_)
                 | Expr::Subscript(_)
@@ -140,7 +139,7 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         Expr::FString(ast::ExprFString { value, .. }) => value
             .elements()
             .any(|expr| any_over_f_string_element(expr, func)),
-        Expr::NamedExpr(ast::ExprNamedExpr {
+        Expr::Named(ast::ExprNamed {
             target,
             value,
             range: _,
@@ -150,7 +149,7 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         }
         Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => any_over_expr(operand, func),
         Expr::Lambda(ast::ExprLambda { body, .. }) => any_over_expr(body, func),
-        Expr::IfExp(ast::ExprIfExp {
+        Expr::If(ast::ExprIf {
             test,
             body,
             orelse,
@@ -179,7 +178,7 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
             generators,
             range: _,
         })
-        | Expr::GeneratorExp(ast::ExprGeneratorExp {
+        | Expr::Generator(ast::ExprGenerator {
             elt,
             generators,
             range: _,
@@ -793,16 +792,16 @@ pub fn to_module_path(package: &Path, path: &Path) -> Option<Vec<String>> {
 /// ```rust
 /// # use ruff_python_ast::helpers::collect_import_from_member;
 ///
-/// assert_eq!(collect_import_from_member(None, None, "bar").as_slice(), ["bar"]);
-/// assert_eq!(collect_import_from_member(Some(1), None, "bar").as_slice(), [".", "bar"]);
-/// assert_eq!(collect_import_from_member(Some(1), Some("foo"), "bar").as_slice(), [".", "foo", "bar"]);
+/// assert_eq!(collect_import_from_member(None, None, "bar").segments(), ["bar"]);
+/// assert_eq!(collect_import_from_member(Some(1), None, "bar").segments(), [".", "bar"]);
+/// assert_eq!(collect_import_from_member(Some(1), Some("foo"), "bar").segments(), [".", "foo", "bar"]);
 /// ```
 pub fn collect_import_from_member<'a>(
     level: Option<u32>,
     module: Option<&'a str>,
     member: &'a str,
-) -> CallPath<'a> {
-    let mut call_path: CallPath = SmallVec::with_capacity(
+) -> QualifiedName<'a> {
+    let mut qualified_name_builder = QualifiedNameBuilder::with_capacity(
         level.unwrap_or_default() as usize
             + module
                 .map(|module| module.split('.').count())
@@ -814,20 +813,20 @@ pub fn collect_import_from_member<'a>(
     if let Some(level) = level {
         if level > 0 {
             for _ in 0..level {
-                call_path.push(".");
+                qualified_name_builder.push(".");
             }
         }
     }
 
     // Add the remaining segments.
     if let Some(module) = module {
-        call_path.extend(module.split('.'));
+        qualified_name_builder.extend(module.split('.'));
     }
 
     // Add the member.
-    call_path.push(member);
+    qualified_name_builder.push(member);
 
-    call_path
+    qualified_name_builder.build()
 }
 
 /// Format the call path for a relative import, or `None` if the relative import extends beyond
@@ -839,28 +838,29 @@ pub fn from_relative_import<'a>(
     import: &[&'a str],
     // The remaining segments to the call path (e.g., given `bar.baz`, `["baz"]`).
     tail: &[&'a str],
-) -> Option<CallPath<'a>> {
-    let mut call_path: CallPath = SmallVec::with_capacity(module.len() + import.len() + tail.len());
+) -> Option<QualifiedName<'a>> {
+    let mut qualified_name_builder =
+        QualifiedNameBuilder::with_capacity(module.len() + import.len() + tail.len());
 
     // Start with the module path.
-    call_path.extend(module.iter().map(String::as_str));
+    qualified_name_builder.extend(module.iter().map(String::as_str));
 
     // Remove segments based on the number of dots.
     for segment in import {
         if *segment == "." {
-            if call_path.is_empty() {
+            if qualified_name_builder.is_empty() {
                 return None;
             }
-            call_path.pop();
+            qualified_name_builder.pop();
         } else {
-            call_path.push(segment);
+            qualified_name_builder.push(segment);
         }
     }
 
     // Add the remaining segments.
-    call_path.extend_from_slice(tail);
+    qualified_name_builder.extend_from_slice(tail);
 
-    Some(call_path)
+    Some(qualified_name_builder.build())
 }
 
 /// Given an imported module (based on its relative import level and module name), return the
@@ -903,10 +903,7 @@ pub struct NameFinder<'a> {
     pub names: FxHashMap<&'a str, &'a ast::ExprName>,
 }
 
-impl<'a, 'b> Visitor<'b> for NameFinder<'a>
-where
-    'b: 'a,
-{
+impl<'a> Visitor<'a> for NameFinder<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         if let Expr::Name(name) = expr {
             self.names.insert(&name.id, name);
@@ -922,10 +919,7 @@ pub struct StoredNameFinder<'a> {
     pub names: FxHashMap<&'a str, &'a ast::ExprName>,
 }
 
-impl<'a, 'b> Visitor<'b> for StoredNameFinder<'a>
-where
-    'b: 'a,
-{
+impl<'a> Visitor<'a> for StoredNameFinder<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         if let Expr::Name(name) = expr {
             if name.ctx.is_store() {
@@ -943,11 +937,8 @@ pub struct ReturnStatementVisitor<'a> {
     pub is_generator: bool,
 }
 
-impl<'a, 'b> Visitor<'b> for ReturnStatementVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> Visitor<'a> for ReturnStatementVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
@@ -957,7 +948,7 @@ where
         }
     }
 
-    fn visit_expr(&mut self, expr: &'b Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr) {
         if let Expr::Yield(_) | Expr::YieldFrom(_) = expr {
             self.is_generator = true;
         } else {
@@ -972,11 +963,8 @@ pub struct RaiseStatementVisitor<'a> {
     pub raises: Vec<(TextRange, Option<&'a Expr>, Option<&'a Expr>)>,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for RaiseStatementVisitor<'b>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Raise(ast::StmtRaise {
                 exc,
@@ -1057,7 +1045,7 @@ pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -
             return true;
         }
         if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = parent {
-            if value.is_if_exp_expr() {
+            if value.is_if_expr() {
                 return true;
             }
         }
@@ -1282,14 +1270,14 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
             Expr::Tuple(_) => true,
 
             // These expressions must resolve to the inner expression.
-            Expr::IfExp(ast::ExprIfExp { body, orelse, .. }) => inner(body) && inner(orelse),
-            Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => inner(value),
+            Expr::If(ast::ExprIf { body, orelse, .. }) => inner(body) && inner(orelse),
+            Expr::Named(ast::ExprNamed { value, .. }) => inner(value),
 
             // These expressions are complex. We can't determine whether they're empty or not.
             Expr::BoolOp(ast::ExprBoolOp { .. }) => false,
             Expr::BinOp(ast::ExprBinOp { .. }) => false,
             Expr::UnaryOp(ast::ExprUnaryOp { .. }) => false,
-            Expr::GeneratorExp(_) => false,
+            Expr::Generator(_) => false,
             Expr::Await(_) => false,
             Expr::Yield(_) => false,
             Expr::YieldFrom(_) => false,

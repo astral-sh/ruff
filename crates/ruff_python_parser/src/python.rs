@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: d64ca7ff27121baee9d7a1b4d0f341932391a365fe75f115987b05bf2aaf538e
+// sha3: 7adb931f958c3646393245e0bbd0700fd671ccfdea81f378daa8816c9036ca75
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -35409,7 +35409,7 @@ fn __action159<
         // ```
         // In this case, the `(` and `)` are part of the `with` statement.
         // The same applies to `yield` and `yield from`.
-        let item = if item.optional_vars.is_none() && matches!(item.context_expr, ast::Expr::NamedExpr(_) | ast::Expr::Yield(_) | ast::Expr::YieldFrom(_)) {
+        let item = if item.optional_vars.is_none() && matches!(item.context_expr, ast::Expr::Named(_) | ast::Expr::Yield(_) | ast::Expr::YieldFrom(_)) {
             ast::WithItem {
                 range: item.range().add_start(TextSize::new(1)).sub_end(TextSize::new(1)),
                 context_expr: item.context_expr,
@@ -35892,7 +35892,7 @@ fn __action183<
 ) -> crate::parser::ParenthesizedExpr
 {
     {
-        ast::ExprNamedExpr {
+        ast::ExprNamed {
             target: Box::new(target.into()),
             value: Box::new(value.into()),
             range: (location..end_location).into(),
@@ -36796,8 +36796,8 @@ fn __action242<
 {
     {
         let expr = match generators {
-            Some(generators) => ast::Expr::GeneratorExp(
-                ast::ExprGeneratorExp {
+            Some(generators) => ast::Expr::Generator(
+                ast::ExprGenerator {
                     elt: Box::new(elt.into()),
                     generators,
                     range: (location..end_location).into(),
@@ -39128,7 +39128,7 @@ fn __action403<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> crate::parser::ParenthesizedExpr
 {
-    ast::ExprIfExp {
+    ast::ExprIf {
         test: Box::new(test.into()),
         body: Box::new(body.into()),
         orelse: Box::new(orelse.into()),
@@ -39545,7 +39545,7 @@ fn __action435<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> crate::parser::ParenthesizedExpr
 {
-    ast::ExprIfExp {
+    ast::ExprIf {
         test: Box::new(test.into()),
         body: Box::new(body.into()),
         orelse: Box::new(orelse.into()),
@@ -41410,7 +41410,7 @@ fn __action557<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> crate::parser::ParenthesizedExpr
 {
-    ast::ExprGeneratorExp {
+    ast::ExprGenerator {
         elt: Box::new(elt.into()),
         generators,
         range: (location..end_location).into(),
@@ -42115,7 +42115,7 @@ fn __action599<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> crate::parser::ParenthesizedExpr
 {
-    ast::ExprGeneratorExp {
+    ast::ExprGenerator {
         elt: Box::new(elt.into()),
         generators,
         range: (location..end_location).into(),

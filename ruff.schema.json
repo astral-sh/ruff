@@ -623,10 +623,10 @@
       ]
     },
     "required-version": {
-      "description": "Require a specific version of Ruff to be running (useful for unifying results across many environments, e.g., with a `pyproject.toml` file).",
+      "description": "Enforce a requirement on the version of Ruff, to enforce at runtime. If the version of Ruff does not meet the requirement, Ruff will exit with an error.\n\nUseful for unifying results across many environments, e.g., with a `pyproject.toml` file.\n\nAccepts a PEP 440 specifier, like `==0.3.1` or `>=0.3.1`.",
       "anyOf": [
         {
-          "$ref": "#/definitions/Version"
+          "$ref": "#/definitions/RequiredVersion"
         },
         {
           "type": "null"
@@ -2590,6 +2590,9 @@
         }
       ]
     },
+    "RequiredVersion": {
+      "type": "string"
+    },
     "RuleSelector": {
       "type": "string",
       "enum": [
@@ -3873,9 +3876,6 @@
           ]
         }
       ]
-    },
-    "Version": {
-      "type": "string"
     }
   }
 }

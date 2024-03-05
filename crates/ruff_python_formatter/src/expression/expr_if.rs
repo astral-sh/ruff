@@ -1,6 +1,6 @@
 use ruff_formatter::{write, FormatRuleWithOptions};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{Expr, ExprIfExp};
+use ruff_python_ast::{Expr, ExprIf};
 
 use crate::comments::leading_comments;
 use crate::expression::parentheses::{
@@ -10,11 +10,11 @@ use crate::expression::parentheses::{
 use crate::prelude::*;
 
 #[derive(Default, Copy, Clone)]
-pub enum ExprIfExpLayout {
+pub enum ExprIfLayout {
     #[default]
     Default,
 
-    /// The [`ExprIfExp`] is nested inside another [`ExprIfExp`], so it should not be given a new
+    /// The [`ExprIf`] is nested inside another [`ExprIf`], so it should not be given a new
     /// group. For example, avoid grouping the `else` clause in:
     /// ```python
     /// clone._iterable_class = (
@@ -29,12 +29,12 @@ pub enum ExprIfExpLayout {
 }
 
 #[derive(Default)]
-pub struct FormatExprIfExp {
-    layout: ExprIfExpLayout,
+pub struct FormatExprIf {
+    layout: ExprIfLayout,
 }
 
-impl FormatRuleWithOptions<ExprIfExp, PyFormatContext<'_>> for FormatExprIfExp {
-    type Options = ExprIfExpLayout;
+impl FormatRuleWithOptions<ExprIf, PyFormatContext<'_>> for FormatExprIf {
+    type Options = ExprIfLayout;
 
     fn with_options(mut self, options: Self::Options) -> Self {
         self.layout = options;
@@ -42,9 +42,9 @@ impl FormatRuleWithOptions<ExprIfExp, PyFormatContext<'_>> for FormatExprIfExp {
     }
 }
 
-impl FormatNodeRule<ExprIfExp> for FormatExprIfExp {
-    fn fmt_fields(&self, item: &ExprIfExp, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprIfExp {
+impl FormatNodeRule<ExprIf> for FormatExprIf {
+    fn fmt_fields(&self, item: &ExprIf, f: &mut PyFormatter) -> FormatResult<()> {
+        let ExprIf {
             range: _,
             test,
             body,
@@ -76,13 +76,13 @@ impl FormatNodeRule<ExprIfExp> for FormatExprIfExp {
         });
 
         match self.layout {
-            ExprIfExpLayout::Default => in_parentheses_only_group(&inner).fmt(f),
-            ExprIfExpLayout::Nested => inner.fmt(f),
+            ExprIfLayout::Default => in_parentheses_only_group(&inner).fmt(f),
+            ExprIfLayout::Nested => inner.fmt(f),
         }
     }
 }
 
-impl NeedsParentheses for ExprIfExp {
+impl NeedsParentheses for ExprIf {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,
@@ -104,14 +104,14 @@ struct FormatOrElse<'a> {
 impl Format<PyFormatContext<'_>> for FormatOrElse<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         match self.orelse {
-            Expr::IfExp(expr)
+            Expr::If(expr)
                 if !is_expression_parenthesized(
                     expr.into(),
                     f.context().comments().ranges(),
                     f.context().source(),
                 ) =>
             {
-                write!(f, [expr.format().with_options(ExprIfExpLayout::Nested)])
+                write!(f, [expr.format().with_options(ExprIfLayout::Nested)])
             }
             _ => write!(f, [in_parentheses_only_group(&self.orelse.format())]),
         }

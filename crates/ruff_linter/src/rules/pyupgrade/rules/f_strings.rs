@@ -146,9 +146,9 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
             Expr::BinOp(_)
             | Expr::UnaryOp(_)
             | Expr::BoolOp(_)
-            | Expr::NamedExpr(_)
+            | Expr::Named(_)
             | Expr::Compare(_)
-            | Expr::IfExp(_)
+            | Expr::If(_)
             | Expr::Lambda(_)
             | Expr::Await(_)
             | Expr::Yield(_)
@@ -166,7 +166,7 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
         // E.g., `{x, y}` should be parenthesized in `f"{(x, y)}"`.
         (
             _,
-            Expr::GeneratorExp(_)
+            Expr::Generator(_)
             | Expr::Dict(_)
             | Expr::Set(_)
             | Expr::SetComp(_)
@@ -175,7 +175,7 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
         (_, Expr::Subscript(ast::ExprSubscript { value, .. })) => {
             matches!(
                 value.as_ref(),
-                Expr::GeneratorExp(_)
+                Expr::Generator(_)
                     | Expr::Dict(_)
                     | Expr::Set(_)
                     | Expr::SetComp(_)
@@ -185,7 +185,7 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
         (_, Expr::Attribute(ast::ExprAttribute { value, .. })) => {
             matches!(
                 value.as_ref(),
-                Expr::GeneratorExp(_)
+                Expr::Generator(_)
                     | Expr::Dict(_)
                     | Expr::Set(_)
                     | Expr::SetComp(_)
@@ -195,7 +195,7 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
         (_, Expr::Call(ast::ExprCall { func, .. })) => {
             matches!(
                 func.as_ref(),
-                Expr::GeneratorExp(_)
+                Expr::Generator(_)
                     | Expr::Dict(_)
                     | Expr::Set(_)
                     | Expr::SetComp(_)
@@ -465,10 +465,10 @@ pub(crate) fn f_strings(
         expr.as_call_expr().is_some_and(|call| {
             checker
                 .semantic()
-                .resolve_call_path(call.func.as_ref())
-                .map_or(false, |call_path| {
+                .resolve_qualified_name(call.func.as_ref())
+                .map_or(false, |qualified_name| {
                     matches!(
-                        call_path.as_slice(),
+                        qualified_name.segments(),
                         ["django", "utils", "translation", "gettext" | "gettext_lazy"]
                     )
                 })

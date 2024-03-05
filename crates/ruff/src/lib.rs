@@ -7,6 +7,7 @@ use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
 use anyhow::Result;
+use args::GlobalConfigArgs;
 use clap::CommandFactory;
 use colored::Colorize;
 use log::warn;
@@ -117,7 +118,7 @@ fn resolve_default_files(files: Vec<PathBuf>, is_stdin: bool) -> Vec<PathBuf> {
 pub fn run(
     Args {
         command,
-        log_level_args,
+        global_options,
     }: Args,
     deprecated_alias_warning: Option<&'static str>,
 ) -> Result<ExitStatus> {
@@ -147,8 +148,7 @@ pub fn run(
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
-    let log_level = LogLevel::from(&log_level_args);
-    set_up_logging(&log_level)?;
+    set_up_logging(global_options.log_level())?;
 
     if let Some(deprecated_alias_warning) = deprecated_alias_warning {
         warn_user!("{}", deprecated_alias_warning);
@@ -181,38 +181,34 @@ pub fn run(
             Ok(ExitStatus::Success)
         }
         Command::Clean => {
-            commands::clean::clean(log_level)?;
+            commands::clean::clean(global_options.log_level())?;
             Ok(ExitStatus::Success)
         }
         Command::GenerateShellCompletion { shell } => {
             shell.generate(&mut Args::command(), &mut stdout());
             Ok(ExitStatus::Success)
         }
-        Command::Check(args) => check(args, log_level),
-        Command::Format(args) => format(args, log_level),
+        Command::Check(args) => check(args, global_options),
+        Command::Format(args) => format(args, global_options),
     }
 }
 
-fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    let (cli, config_arguments) = args.partition()?;
+fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
+    let (cli, config_arguments) = args.partition(global_options)?;
 
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
         commands::format_stdin::format_stdin(&cli, &config_arguments)
     } else {
-        commands::format::format(cli, &config_arguments, log_level)
+        commands::format::format(cli, &config_arguments)
     }
 }
 
-pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    let (cli, config_arguments) = args.partition()?;
+pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
+    let (cli, config_arguments) = args.partition(global_options)?;
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let pyproject_config = resolve::resolve(
-        cli.isolated,
-        &config_arguments,
-        cli.stdin_filename.as_deref(),
-    )?;
+    let pyproject_config = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
 
     let mut writer: Box<dyn Write> = match cli.output_file {
         Some(path) if !cli.watch => {
@@ -303,7 +299,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         }
         let modifications =
             commands::add_noqa::add_noqa(&files, &pyproject_config, &config_arguments)?;
-        if modifications > 0 && log_level >= LogLevel::Default {
+        if modifications > 0 && config_arguments.log_level >= LogLevel::Default {
             let s = if modifications == 1 { "" } else { "s" };
             #[allow(clippy::print_stderr)]
             {
@@ -315,7 +311,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
 
     let printer = Printer::new(
         output_format,
-        log_level,
+        config_arguments.log_level,
         fix_mode,
         unsafe_fixes,
         printer_flags,
@@ -372,11 +368,8 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                     };
 
                     if matches!(change_kind, ChangeKind::Configuration) {
-                        pyproject_config = resolve::resolve(
-                            cli.isolated,
-                            &config_arguments,
-                            cli.stdin_filename.as_deref(),
-                        )?;
+                        pyproject_config =
+                            resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
                     }
                     Printer::clear_screen()?;
                     printer.write_to_user("File change detected...\n");
