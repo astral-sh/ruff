@@ -170,9 +170,157 @@ impl<'a> QualifiedNameBuilder<'a> {
 pub struct UnqualifiedName<'a>(SegmentsInner<'a>);
 
 impl<'a> UnqualifiedName<'a> {
+    /// Convert an `Expr` to its [`UnqualifiedName`] (like `["typing", "List"]`).
     pub fn from_expr(expr: &'a Expr) -> Option<Self> {
-        let segments = collect_segments(expr)?;
-        Some(Self(segments))
+        // Unroll the loop up to eight times, to match the maximum number of expected attributes.
+        // In practice, unrolling appears to give about a 4x speed-up on this hot path.
+        let attr1 = match expr {
+            Expr::Attribute(attr1) => attr1,
+            // Ex) `foo`
+            Expr::Name(nodes::ExprName { id, .. }) => {
+                return Some(Self(SegmentsInner::from_slice(&[id.as_str()])))
+            }
+            _ => return None,
+        };
+
+        let attr2 = match attr1.value.as_ref() {
+            Expr::Attribute(attr2) => attr2,
+            // Ex) `foo.bar`
+            Expr::Name(nodes::ExprName { id, .. }) => {
+                return Some(Self(SegmentsInner::from_slice(&[
+                    id.as_str(),
+                    attr1.attr.as_str(),
+                ])))
+            }
+            _ => return None,
+        };
+
+        let attr3 = match attr2.value.as_ref() {
+            Expr::Attribute(attr3) => attr3,
+            // Ex) `foo.bar.baz`
+            Expr::Name(nodes::ExprName { id, .. }) => {
+                return Some(Self(SegmentsInner::from_slice(&[
+                    id.as_str(),
+                    attr2.attr.as_str(),
+                    attr1.attr.as_str(),
+                ])));
+            }
+            _ => return None,
+        };
+
+        let attr4 = match attr3.value.as_ref() {
+            Expr::Attribute(attr4) => attr4,
+            // Ex) `foo.bar.baz.bop`
+            Expr::Name(nodes::ExprName { id, .. }) => {
+                return Some(Self(SegmentsInner::from_slice(&[
+                    id.as_str(),
+                    attr3.attr.as_str(),
+                    attr2.attr.as_str(),
+                    attr1.attr.as_str(),
+                ])));
+            }
+            _ => return None,
+        };
+
+        let attr5 = match attr4.value.as_ref() {
+            Expr::Attribute(attr5) => attr5,
+            // Ex) `foo.bar.baz.bop.bap`
+            Expr::Name(nodes::ExprName { id, .. }) => {
+                return Some(Self(SegmentsInner::from_slice(&[
+                    id.as_str(),
+                    attr4.attr.as_str(),
+                    attr3.attr.as_str(),
+                    attr2.attr.as_str(),
+                    attr1.attr.as_str(),
+                ])));
+            }
+            _ => return None,
+        };
+
+        let attr6 = match attr5.value.as_ref() {
+            Expr::Attribute(attr6) => attr6,
+            // Ex) `foo.bar.baz.bop.bap.bab`
+            Expr::Name(nodes::ExprName { id, .. }) => {
+                return Some(Self(SegmentsInner::from_slice(&[
+                    id.as_str(),
+                    attr5.attr.as_str(),
+                    attr4.attr.as_str(),
+                    attr3.attr.as_str(),
+                    attr2.attr.as_str(),
+                    attr1.attr.as_str(),
+                ])));
+            }
+            _ => return None,
+        };
+
+        let attr7 = match attr6.value.as_ref() {
+            Expr::Attribute(attr7) => attr7,
+            // Ex) `foo.bar.baz.bop.bap.bab.bob`
+            Expr::Name(nodes::ExprName { id, .. }) => {
+                return Some(Self(SegmentsInner::from_slice(&[
+                    id.as_str(),
+                    attr6.attr.as_str(),
+                    attr5.attr.as_str(),
+                    attr4.attr.as_str(),
+                    attr3.attr.as_str(),
+                    attr2.attr.as_str(),
+                    attr1.attr.as_str(),
+                ])));
+            }
+            _ => return None,
+        };
+
+        let attr8 = match attr7.value.as_ref() {
+            Expr::Attribute(attr8) => attr8,
+            // Ex) `foo.bar.baz.bop.bap.bab.bob.bib`
+            Expr::Name(nodes::ExprName { id, .. }) => {
+                return Some(Self(SegmentsInner::from([
+                    id.as_str(),
+                    attr7.attr.as_str(),
+                    attr6.attr.as_str(),
+                    attr5.attr.as_str(),
+                    attr4.attr.as_str(),
+                    attr3.attr.as_str(),
+                    attr2.attr.as_str(),
+                    attr1.attr.as_str(),
+                ])));
+            }
+            _ => return None,
+        };
+
+        let mut segments = Vec::with_capacity(SMALL_LEN * 2);
+
+        let mut current = &*attr8.value;
+
+        loop {
+            current = match current {
+                Expr::Attribute(attr) => {
+                    segments.push(attr.attr.as_str());
+                    &*attr.value
+                }
+                Expr::Name(nodes::ExprName { id, .. }) => {
+                    segments.push(id.as_str());
+                    break;
+                }
+                _ => break,
+            }
+        }
+
+        segments.reverse();
+
+        // Append the attributes we visited before calling into the recursion.
+        segments.extend_from_slice(&[
+            attr8.attr.as_str(),
+            attr7.attr.as_str(),
+            attr6.attr.as_str(),
+            attr5.attr.as_str(),
+            attr4.attr.as_str(),
+            attr3.attr.as_str(),
+            attr2.attr.as_str(),
+            attr1.attr.as_str(),
+        ]);
+
+        Some(Self(SegmentsInner::from(segments)))
     }
 
     pub fn segments(&self) -> &[&'a str] {
@@ -415,156 +563,4 @@ impl<'a> SegmentsVec<'a> {
     fn as_slice(&self) -> &[&'a str] {
         &self.segments
     }
-}
-
-/// Convert an `Expr` to its [`QualifiedName`] segments (like `["typing", "List"]`).
-fn collect_segments(expr: &Expr) -> Option<SegmentsInner> {
-    // Records the value names before the attribute names (depth first)
-    fn record_attributes<'a>(expr: &'a Expr, segments: &mut Vec<&'a str>) {
-        match expr {
-            Expr::Attribute(attr) => {
-                // Depth first traversal
-                record_attributes(&attr.value, segments);
-                segments.push(attr.attr.as_str());
-            }
-            Expr::Name(nodes::ExprName { id, .. }) => {
-                segments.push(id.as_str());
-            }
-            _ => {}
-        }
-    }
-
-    // Unroll the loop up to eight times, to match the maximum number of expected attributes.
-    // In practice, unrolling appears to give about a 4x speed-up on this hot path.
-    let attr1 = match expr {
-        Expr::Attribute(attr1) => attr1,
-        // Ex) `foo`
-        Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(SegmentsInner::from_slice(&[id.as_str()]))
-        }
-        _ => return None,
-    };
-
-    let attr2 = match attr1.value.as_ref() {
-        Expr::Attribute(attr2) => attr2,
-        // Ex) `foo.bar`
-        Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(SegmentsInner::from_slice(&[
-                id.as_str(),
-                attr1.attr.as_str(),
-            ]))
-        }
-        _ => return None,
-    };
-
-    let attr3 = match attr2.value.as_ref() {
-        Expr::Attribute(attr3) => attr3,
-        // Ex) `foo.bar.baz`
-        Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(SegmentsInner::from_slice(&[
-                id.as_str(),
-                attr2.attr.as_str(),
-                attr1.attr.as_str(),
-            ]));
-        }
-        _ => return None,
-    };
-
-    let attr4 = match attr3.value.as_ref() {
-        Expr::Attribute(attr4) => attr4,
-        // Ex) `foo.bar.baz.bop`
-        Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(SegmentsInner::from_slice(&[
-                id.as_str(),
-                attr3.attr.as_str(),
-                attr2.attr.as_str(),
-                attr1.attr.as_str(),
-            ]));
-        }
-        _ => return None,
-    };
-
-    let attr5 = match attr4.value.as_ref() {
-        Expr::Attribute(attr5) => attr5,
-        // Ex) `foo.bar.baz.bop.bap`
-        Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(SegmentsInner::from_slice(&[
-                id.as_str(),
-                attr4.attr.as_str(),
-                attr3.attr.as_str(),
-                attr2.attr.as_str(),
-                attr1.attr.as_str(),
-            ]));
-        }
-        _ => return None,
-    };
-
-    let attr6 = match attr5.value.as_ref() {
-        Expr::Attribute(attr6) => attr6,
-        // Ex) `foo.bar.baz.bop.bap.bab`
-        Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(SegmentsInner::from_slice(&[
-                id.as_str(),
-                attr5.attr.as_str(),
-                attr4.attr.as_str(),
-                attr3.attr.as_str(),
-                attr2.attr.as_str(),
-                attr1.attr.as_str(),
-            ]));
-        }
-        _ => return None,
-    };
-
-    let attr7 = match attr6.value.as_ref() {
-        Expr::Attribute(attr7) => attr7,
-        // Ex) `foo.bar.baz.bop.bap.bab.bob`
-        Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(SegmentsInner::from_slice(&[
-                id.as_str(),
-                attr6.attr.as_str(),
-                attr5.attr.as_str(),
-                attr4.attr.as_str(),
-                attr3.attr.as_str(),
-                attr2.attr.as_str(),
-                attr1.attr.as_str(),
-            ]));
-        }
-        _ => return None,
-    };
-
-    let attr8 = match attr7.value.as_ref() {
-        Expr::Attribute(attr8) => attr8,
-        // Ex) `foo.bar.baz.bop.bap.bab.bob.bib`
-        Expr::Name(nodes::ExprName { id, .. }) => {
-            return Some(SegmentsInner::from([
-                id.as_str(),
-                attr7.attr.as_str(),
-                attr6.attr.as_str(),
-                attr5.attr.as_str(),
-                attr4.attr.as_str(),
-                attr3.attr.as_str(),
-                attr2.attr.as_str(),
-                attr1.attr.as_str(),
-            ]));
-        }
-        _ => return None,
-    };
-
-    let mut segments = Vec::with_capacity(SMALL_LEN * 2);
-
-    record_attributes(&attr8.value, &mut segments);
-
-    // Append the attributes we visited before calling into the recursion.
-    segments.extend_from_slice(&[
-        attr8.attr.as_str(),
-        attr7.attr.as_str(),
-        attr6.attr.as_str(),
-        attr5.attr.as_str(),
-        attr4.attr.as_str(),
-        attr3.attr.as_str(),
-        attr2.attr.as_str(),
-        attr1.attr.as_str(),
-    ]);
-
-    Some(SegmentsInner::from(segments))
 }
