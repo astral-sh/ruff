@@ -5,7 +5,7 @@ changes are a net-benefit before enabling them for everyone.
 
 Preview mode enables a collection of unstable features such as new lint rules and fixes, formatter style changes, interface updates, and more. Warnings about deprecated features may turn into errors when using preview mode.
 
-Enabling preview mode does not select all preview rules by default. See the [rules section](#using-rules-that-are-in-preview) for details on selecting preview rules.
+Enabling preview mode does not on its own enable all preview rules. See the [rules section](#using-rules-that-are-in-preview) for details on selecting preview rules.
 
 ## Enabling preview mode
 
@@ -128,7 +128,7 @@ Similarly, it would _not_ be enabled via the `ALL` selector:
     ruff check --select ALL
     ```
 
-However, it would be enabled in any of the above cases if you enabled preview mode:
+However, it _would_ be enabled in any of the above cases if you enabled preview mode:
 
 === "pyproject.toml"
 
