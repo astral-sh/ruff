@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::Result;
 use log::debug;
@@ -34,13 +34,8 @@ pub fn resolve(
     // Second priority: the user specified a `pyproject.toml` file. Use that
     // `pyproject.toml` for _all_ configuration, and resolve paths relative to the
     // current working directory. (This matches ESLint's behavior.)
-    if let Some(pyproject) = config_arguments
-        .config_file()
-        .map(|config| config.display().to_string())
-        .map(|config| shellexpand::full(&config).map(|config| PathBuf::from(config.as_ref())))
-        .transpose()?
-    {
-        let settings = resolve_root_settings(&pyproject, Relativity::Cwd, config_arguments)?;
+    if let Some(pyproject) = config_arguments.config_file() {
+        let settings = resolve_root_settings(pyproject, Relativity::Cwd, config_arguments)?;
         debug!(
             "Using user-specified configuration file at: {}",
             pyproject.display()
@@ -48,7 +43,7 @@ pub fn resolve(
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Fixed,
             settings,
-            Some(pyproject),
+            Some(pyproject.to_path_buf()),
         ));
     }
 
