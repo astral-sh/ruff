@@ -6,7 +6,7 @@ Ok(
     [
         FunctionDef(
             StmtFunctionDef {
-                range: 0..29,
+                range: 0..46,
                 is_async: false,
                 decorator_list: [],
                 name: Identifier {
@@ -15,7 +15,7 @@ Ok(
                 },
                 type_params: None,
                 parameters: Parameters {
-                    range: 5..23,
+                    range: 5..40,
                     posonlyargs: [
                         ParameterWithDefault {
                             range: 6..7,
@@ -74,15 +74,33 @@ Ok(
                             ),
                         },
                     ],
-                    vararg: None,
+                    vararg: Some(
+                        Parameter {
+                            range: 24..29,
+                            name: Identifier {
+                                id: "args",
+                                range: 25..29,
+                            },
+                            annotation: None,
+                        },
+                    ),
                     kwonlyargs: [],
-                    kwarg: None,
+                    kwarg: Some(
+                        Parameter {
+                            range: 31..39,
+                            name: Identifier {
+                                id: "kwargs",
+                                range: 33..39,
+                            },
+                            annotation: None,
+                        },
+                    ),
                 },
                 returns: None,
                 body: [
                     Pass(
                         StmtPass {
-                            range: 25..29,
+                            range: 42..46,
                         },
                     ),
                 ],

@@ -176,19 +176,27 @@ mod tests {
     function_and_lambda! {
         test_function_no_args: "def f(): pass",
         test_function_pos_args: "def f(a, b, c): pass",
-        test_function_pos_args_with_defaults: "def f(a, b=20, c=30): pass",
+        test_function_posonly_and_pos_args: "def f(a, /, b, c): pass",
+        test_function_pos_args_with_defaults: "def f(a, b=20, /, c=30): pass",
+        test_function_pos_args_with_defaults_and_varargs_and_kwargs: "def f(a, b=20, /, c=30, *args, **kwargs): pass",
         test_function_kw_only_args: "def f(*, a, b, c): pass",
         test_function_kw_only_args_with_defaults: "def f(*, a, b=20, c=30): pass",
-        test_function_pos_and_kw_only_args: "def f(a, b, c, *, d, e, f): pass",
-        test_function_pos_and_kw_only_args_with_defaults: "def f(a, b, c, *, d, e=20, f=30): pass",
-        test_function_pos_and_kw_only_args_with_defaults_and_varargs: "def f(a, b, c, *args, d, e=20, f=30): pass",
-        test_function_pos_and_kw_only_args_with_defaults_and_varargs_and_kwargs: "def f(a, b, c, *args, d, e=20, f=30, **kwargs): pass",
+        test_function_kw_only_args_with_defaults_and_varargs: "def f(*args, a, b=20, c=30): pass",
+        test_function_kw_only_args_with_defaults_and_kwargs: "def f(*, a, b=20, c=30, **kwargs): pass",
+        test_function_kw_only_args_with_defaults_and_varargs_and_kwargs: "def f(*args, a, b=20, c=30, **kwargs): pass",
+        test_function_pos_and_kw_only_args: "def f(a, b, /, c, *, d, e, f): pass",
+        test_function_pos_and_kw_only_args_with_defaults: "def f(a, b, /, c, *, d, e=20, f=30): pass",
+        test_function_pos_and_kw_only_args_with_defaults_and_varargs: "def f(a, b, /, c, *args, d, e=20, f=30): pass",
+        test_function_pos_and_kw_only_args_with_defaults_and_kwargs: "def f(a, b, /, c, *, d, e=20, f=30, **kwargs): pass",
+        test_function_pos_and_kw_only_args_with_defaults_and_varargs_and_kwargs: "def f(a, b, /, c, *args, d, e=20, f=30, **kwargs): pass",
         test_lambda_no_args: "lambda: 1",
         test_lambda_pos_args: "lambda a, b, c: 1",
-        test_lambda_pos_args_with_defaults: "lambda a, b=20, c=30: 1",
+        test_lambda_posonly_args: "lambda a, b, /, c: 1",
+        test_lambda_pos_args_with_defaults: "lambda a, b=20, /, c=30: 1",
         test_lambda_kw_only_args: "lambda *, a, b, c: 1",
         test_lambda_kw_only_args_with_defaults: "lambda *, a, b=20, c=30: 1",
-        test_lambda_pos_and_kw_only_args: "lambda a, b, c, *, d, e: 0",
+        test_lambda_pos_and_kw_only_args: "lambda a, b, /, c, *, d, e: 0",
+        test_lambda_pos_and_kw_only_args_and_vararg_and_kwarg: "lambda a, b, /, c, *d, e, **f: 0",
     }
 
     fn function_parse_error(src: &str) -> LexicalErrorType {
@@ -227,6 +235,8 @@ mod tests {
         test_duplicates_l5: "lambda a, *, **a: 1", LexicalErrorType::DuplicateArgumentError("a".to_string().into_boxed_str()),
         test_default_arg_error_f: "def f(a, b=20, c): pass", LexicalErrorType::DefaultArgumentError,
         test_default_arg_error_l: "lambda a, b=20, c: 1", LexicalErrorType::DefaultArgumentError,
+        test_named_arguments_follow_bare_star_1: "def f(*): pass", LexicalErrorType::OtherError("named arguments must follow bare *".to_string().into_boxed_str()),
+        test_named_arguments_follow_bare_star_2: "def f(*, **kwargs): pass", LexicalErrorType::OtherError("named arguments must follow bare *".to_string().into_boxed_str()),
 
         // Check some calls.
         test_positional_arg_error_f: "f(b=20, c)", LexicalErrorType::PositionalArgumentError,

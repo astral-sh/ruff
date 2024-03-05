@@ -6,7 +6,7 @@ Ok(
     [
         FunctionDef(
             StmtFunctionDef {
-                range: 0..29,
+                range: 0..23,
                 is_async: false,
                 decorator_list: [],
                 name: Identifier {
@@ -15,7 +15,7 @@ Ok(
                 },
                 type_params: None,
                 parameters: Parameters {
-                    range: 5..23,
+                    range: 5..17,
                     posonlyargs: [
                         ParameterWithDefault {
                             range: 6..7,
@@ -29,49 +29,31 @@ Ok(
                             },
                             default: None,
                         },
-                        ParameterWithDefault {
-                            range: 9..13,
-                            parameter: Parameter {
-                                range: 9..10,
-                                name: Identifier {
-                                    id: "b",
-                                    range: 9..10,
-                                },
-                                annotation: None,
-                            },
-                            default: Some(
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 11..13,
-                                        value: Int(
-                                            20,
-                                        ),
-                                    },
-                                ),
-                            ),
-                        },
                     ],
                     args: [
                         ParameterWithDefault {
-                            range: 18..22,
+                            range: 12..13,
                             parameter: Parameter {
-                                range: 18..19,
+                                range: 12..13,
                                 name: Identifier {
-                                    id: "c",
-                                    range: 18..19,
+                                    id: "b",
+                                    range: 12..13,
                                 },
                                 annotation: None,
                             },
-                            default: Some(
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        range: 20..22,
-                                        value: Int(
-                                            30,
-                                        ),
-                                    },
-                                ),
-                            ),
+                            default: None,
+                        },
+                        ParameterWithDefault {
+                            range: 15..16,
+                            parameter: Parameter {
+                                range: 15..16,
+                                name: Identifier {
+                                    id: "c",
+                                    range: 15..16,
+                                },
+                                annotation: None,
+                            },
+                            default: None,
                         },
                     ],
                     vararg: None,
@@ -82,7 +64,7 @@ Ok(
                 body: [
                     Pass(
                         StmtPass {
-                            range: 25..29,
+                            range: 19..23,
                         },
                     ),
                 ],

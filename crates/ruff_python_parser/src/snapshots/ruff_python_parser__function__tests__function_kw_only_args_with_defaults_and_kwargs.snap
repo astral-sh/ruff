@@ -6,7 +6,7 @@ Ok(
     [
         FunctionDef(
             StmtFunctionDef {
-                range: 0..29,
+                range: 0..39,
                 is_async: false,
                 decorator_list: [],
                 name: Identifier {
@@ -15,34 +15,37 @@ Ok(
                 },
                 type_params: None,
                 parameters: Parameters {
-                    range: 5..23,
-                    posonlyargs: [
+                    range: 5..33,
+                    posonlyargs: [],
+                    args: [],
+                    vararg: None,
+                    kwonlyargs: [
                         ParameterWithDefault {
-                            range: 6..7,
+                            range: 9..10,
                             parameter: Parameter {
-                                range: 6..7,
+                                range: 9..10,
                                 name: Identifier {
                                     id: "a",
-                                    range: 6..7,
+                                    range: 9..10,
                                 },
                                 annotation: None,
                             },
                             default: None,
                         },
                         ParameterWithDefault {
-                            range: 9..13,
+                            range: 12..16,
                             parameter: Parameter {
-                                range: 9..10,
+                                range: 12..13,
                                 name: Identifier {
                                     id: "b",
-                                    range: 9..10,
+                                    range: 12..13,
                                 },
                                 annotation: None,
                             },
                             default: Some(
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 11..13,
+                                        range: 14..16,
                                         value: Int(
                                             20,
                                         ),
@@ -50,8 +53,6 @@ Ok(
                                 ),
                             ),
                         },
-                    ],
-                    args: [
                         ParameterWithDefault {
                             range: 18..22,
                             parameter: Parameter {
@@ -74,15 +75,22 @@ Ok(
                             ),
                         },
                     ],
-                    vararg: None,
-                    kwonlyargs: [],
-                    kwarg: None,
+                    kwarg: Some(
+                        Parameter {
+                            range: 24..32,
+                            name: Identifier {
+                                id: "kwargs",
+                                range: 26..32,
+                            },
+                            annotation: None,
+                        },
+                    ),
                 },
                 returns: None,
                 body: [
                     Pass(
                         StmtPass {
-                            range: 25..29,
+                            range: 35..39,
                         },
                     ),
                 ],
