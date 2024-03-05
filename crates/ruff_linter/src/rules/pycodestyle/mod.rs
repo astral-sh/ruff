@@ -16,7 +16,7 @@ mod tests {
 
     use crate::line_width::LineLength;
     use crate::registry::Rule;
-    use crate::rules::pycodestyle;
+    use crate::rules::{isort, pycodestyle};
     use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
@@ -138,18 +138,85 @@ mod tests {
         Path::new("E25.py")
     )]
     #[test_case(Rule::MissingWhitespaceAroundParameterEquals, Path::new("E25.py"))]
+    fn logical(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pycodestyle").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::BlankLineBetweenMethods, Path::new("E30.py"))]
     #[test_case(Rule::BlankLinesTopLevel, Path::new("E30.py"))]
     #[test_case(Rule::TooManyBlankLines, Path::new("E30.py"))]
     #[test_case(Rule::BlankLineAfterDecorator, Path::new("E30.py"))]
     #[test_case(Rule::BlankLinesAfterFunctionOrClass, Path::new("E30.py"))]
     #[test_case(Rule::BlankLinesBeforeNestedDefinition, Path::new("E30.py"))]
-
-    fn logical(rule_code: Rule, path: &Path) -> Result<()> {
+    fn blank_lines(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pycodestyle").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    /// Tests the compatibility of the blank line top level rule and isort.
+    #[test_case(-1, 0)]
+    #[test_case(1, 1)]
+    #[test_case(0, 0)]
+    #[test_case(4, 4)]
+    fn blank_lines_top_level_isort_compatibility(
+        lines_after_imports: isize,
+        lines_between_types: usize,
+    ) -> Result<()> {
+        let snapshot = format!(
+            "blank_lines_top_level_isort_compatibility-lines-after({lines_after_imports})-between({lines_between_types})"
+        );
+        let diagnostics = test_path(
+            Path::new("pycodestyle").join("E30_isort.py"),
+            &settings::LinterSettings {
+                isort: isort::settings::Settings {
+                    lines_after_imports,
+                    lines_between_types,
+                    ..isort::settings::Settings::default()
+                },
+                ..settings::LinterSettings::for_rules([
+                    Rule::BlankLinesTopLevel,
+                    Rule::UnsortedImports,
+                ])
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    /// Tests the compatibility of the blank line too many lines and isort.
+    #[test_case(-1, 0)]
+    #[test_case(1, 1)]
+    #[test_case(0, 0)]
+    #[test_case(4, 4)]
+    fn too_many_blank_lines_isort_compatibility(
+        lines_after_imports: isize,
+        lines_between_types: usize,
+    ) -> Result<()> {
+        let snapshot = format!("too_many_blank_lines_isort_compatibility-lines-after({lines_after_imports})-between({lines_between_types})");
+        let diagnostics = test_path(
+            Path::new("pycodestyle").join("E30_isort.py"),
+            &settings::LinterSettings {
+                isort: isort::settings::Settings {
+                    lines_after_imports,
+                    lines_between_types,
+                    ..isort::settings::Settings::default()
+                },
+                ..settings::LinterSettings::for_rules([
+                    Rule::TooManyBlankLines,
+                    Rule::UnsortedImports,
+                ])
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

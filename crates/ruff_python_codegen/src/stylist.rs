@@ -12,6 +12,7 @@ use ruff_source_file::{find_newline, LineEnding};
 use ruff_python_ast::str::leading_quote;
 use ruff_source_file::Locator;
 
+#[derive(Debug, Clone)]
 pub struct Stylist<'a> {
     locator: &'a Locator<'a>,
     indentation: Indentation,
@@ -145,7 +146,7 @@ impl fmt::Display for Quote {
 }
 
 /// The indentation style used in Python source code.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Indentation(String);
 
 impl Indentation {

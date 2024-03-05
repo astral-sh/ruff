@@ -41,14 +41,7 @@ pub(crate) fn check_tokens(
         Rule::BlankLinesAfterFunctionOrClass,
         Rule::BlankLinesBeforeNestedDefinition,
     ]) {
-        let mut blank_lines_checker = BlankLinesChecker::default();
-        blank_lines_checker.check_lines(
-            tokens,
-            locator,
-            stylist,
-            settings.tab_size,
-            &mut diagnostics,
-        );
+        BlankLinesChecker::new(locator, stylist, settings).check_lines(tokens, &mut diagnostics);
     }
 
     if settings.rules.enabled(Rule::BlanketNOQA) {
