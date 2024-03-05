@@ -447,17 +447,6 @@ pub(crate) fn f_strings(
         contents.insert(0, ' ');
     }
 
-    // Avoid refactors that exceed the line length limit.
-    if !fits_or_shrinks(
-        &contents,
-        template.into(),
-        checker.locator(),
-        checker.settings.pycodestyle.max_line_length,
-        checker.settings.tab_size,
-    ) {
-        return;
-    }
-
     // Finally, avoid refactors that would introduce a runtime error.
     // For example, Django's `gettext` supports `format`-style arguments, but not f-strings.
     // See: https://docs.djangoproject.com/en/4.2/topics/i18n/translation
@@ -479,17 +468,27 @@ pub(crate) fn f_strings(
 
     let mut diagnostic = Diagnostic::new(FString, call.range());
 
+    // Avoid refactors that exceed the line length limit or make it exceed by more.
+    let f_string_fits_or_shrinks = fits_or_shrinks(
+        &contents,
+        template.into(),
+        checker.locator(),
+        checker.settings.pycodestyle.max_line_length,
+        checker.settings.tab_size,
+    );
+
     // Avoid fix if there are comments within the call:
     // ```
     // "{}".format(
     //     0,  # 0
     // )
     // ```
-    if !checker
+    let has_comments = checker
         .indexer()
         .comment_ranges()
-        .intersects(call.arguments.range())
-    {
+        .intersects(call.arguments.range());
+
+    if f_string_fits_or_shrinks && !has_comments {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             contents,
             call.range(),
