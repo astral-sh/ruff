@@ -945,6 +945,53 @@ UP032_0.py:129:1: UP032 [*] Use f-string instead of `format` call
 131 131 | ###
 132 132 | # Non-errors
 
+UP032_0.py:160:1: UP032 Use f-string instead of `format` call
+    |
+158 |   r'"\N{snowman} {}".format(a)'
+159 |   
+160 | / "123456789 {}".format(
+161 | |     11111111111111111111111111111111111111111111111111111111111111111111111111,
+162 | | )
+    | |_^ UP032
+163 |   
+164 |   """
+    |
+    = help: Convert to f-string
+
+UP032_0.py:164:1: UP032 Use f-string instead of `format` call
+    |
+162 |   )
+163 |   
+164 | / """
+165 | | {}
+166 | | {}
+167 | | {}
+168 | | """.format(
+169 | | 1,
+170 | | 2,
+171 | | 111111111111111111111111111111111111111111111111111111111111111111111111111111111111111,
+172 | | )
+    | |_^ UP032
+173 |   
+174 |   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """{}
+    |
+    = help: Convert to f-string
+
+UP032_0.py:174:84: UP032 Use f-string instead of `format` call
+    |
+172 |   )
+173 |   
+174 |   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = """{}
+    |  ____________________________________________________________________________________^
+175 | | """.format(
+176 | |     111111
+177 | | )
+    | |_^ UP032
+178 |   
+179 |   "{}".format(
+    |
+    = help: Convert to f-string
+
 UP032_0.py:202:1: UP032 Use f-string instead of `format` call
     |
 200 |   "{}".format(**c)
@@ -1218,5 +1265,3 @@ UP032_0.py:254:1: UP032 [*] Use f-string instead of `format` call
 253 253 | # The dictionary should be parenthesized.
 254     |-"{}".format({0: 1}())
     254 |+f"{({0: 1}())}"
-
-
