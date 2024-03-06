@@ -4,7 +4,13 @@ expression: lex_source(source)
 ---
 [
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
+        ),
         0..2,
     ),
     (
@@ -24,8 +30,11 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "=10",
-            is_raw: false,
-            triple_quoted: false,
+            flags: StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
         },
         5..8,
     ),
@@ -36,8 +45,11 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " ",
-            is_raw: false,
-            triple_quoted: false,
+            flags: StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
         },
         9..10,
     ),
@@ -76,8 +88,11 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " ",
-            is_raw: false,
-            triple_quoted: false,
+            flags: StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
         },
         19..20,
     ),
@@ -126,8 +141,11 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " ",
-            is_raw: false,
-            triple_quoted: false,
+            flags: StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
         },
         31..32,
     ),
@@ -164,7 +182,13 @@ expression: lex_source(source)
         40..41,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
+        ),
         41..42,
     ),
     (

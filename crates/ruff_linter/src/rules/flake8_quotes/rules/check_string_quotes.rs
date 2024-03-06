@@ -383,13 +383,13 @@ struct FStringRangeBuilder {
 impl FStringRangeBuilder {
     fn visit_token(&mut self, token: &Tok, range: TextRange) {
         match token {
-            Tok::FStringStart => {
+            Tok::FStringStart(_) => {
                 if self.nesting == 0 {
                     self.start_location = range.start();
                 }
                 self.nesting += 1;
             }
-            Tok::FStringEnd => {
+            Tok::FStringEnd(_) => {
                 self.nesting = self.nesting.saturating_sub(1);
                 if self.nesting == 0 {
                     self.end_location = range.end();
@@ -456,7 +456,7 @@ pub(crate) fn check_string_quotes(
                     // If this is a string, add it to the sequence.
                     sequence.push(range);
                 }
-                Tok::FStringEnd => {
+                Tok::FStringEnd(_) => {
                     // If this is the end of an f-string, add the entire f-string
                     // range to the sequence.
                     sequence.push(fstring_range_builder.finish());

@@ -4,14 +4,23 @@ expression: lex_source(source)
 ---
 [
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    F_PREFIX,
+                ),
+            ),
+        ),
         0..2,
     ),
     (
         FStringMiddle {
             value: "\\",
-            is_raw: false,
-            triple_quoted: false,
+            flags: StringFlags(
+                StringFlagsInner(
+                    F_PREFIX,
+                ),
+            ),
         },
         2..3,
     ),
@@ -30,18 +39,33 @@ expression: lex_source(source)
         7..8,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    F_PREFIX,
+                ),
+            ),
+        ),
         8..9,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    F_PREFIX,
+                ),
+            ),
+        ),
         10..12,
     ),
     (
         FStringMiddle {
             value: "\\\\",
-            is_raw: false,
-            triple_quoted: false,
+            flags: StringFlags(
+                StringFlagsInner(
+                    F_PREFIX,
+                ),
+            ),
         },
         12..14,
     ),
@@ -60,39 +84,75 @@ expression: lex_source(source)
         18..19,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    F_PREFIX,
+                ),
+            ),
+        ),
         19..20,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    F_PREFIX,
+                ),
+            ),
+        ),
         21..23,
     ),
     (
         FStringMiddle {
             value: "\\{foo}",
-            is_raw: false,
-            triple_quoted: false,
+            flags: StringFlags(
+                StringFlagsInner(
+                    F_PREFIX,
+                ),
+            ),
         },
         23..31,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    F_PREFIX,
+                ),
+            ),
+        ),
         31..32,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    F_PREFIX,
+                ),
+            ),
+        ),
         33..35,
     ),
     (
         FStringMiddle {
             value: "\\\\{foo}",
-            is_raw: false,
-            triple_quoted: false,
+            flags: StringFlags(
+                StringFlagsInner(
+                    F_PREFIX,
+                ),
+            ),
         },
         35..44,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    F_PREFIX,
+                ),
+            ),
+        ),
         44..45,
     ),
     (

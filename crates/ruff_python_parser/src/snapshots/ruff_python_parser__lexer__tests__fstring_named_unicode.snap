@@ -4,19 +4,34 @@ expression: lex_source(source)
 ---
 [
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
+        ),
         0..2,
     ),
     (
         FStringMiddle {
             value: "\\N{BULLET} normal \\Nope \\N",
-            is_raw: false,
-            triple_quoted: false,
+            flags: StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
         },
         2..28,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
+        ),
         28..29,
     ),
     (

@@ -4,14 +4,23 @@ expression: lex_source(source)
 ---
 [
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
+        ),
         0..2,
     ),
     (
         FStringMiddle {
             value: "\\",
-            is_raw: false,
-            triple_quoted: false,
+            flags: StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
         },
         2..3,
     ),
@@ -32,8 +41,11 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "\\\"\\",
-            is_raw: false,
-            triple_quoted: false,
+            flags: StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
         },
         6..9,
     ),
@@ -58,13 +70,22 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " \\\"\\\"\\\n end",
-            is_raw: false,
-            triple_quoted: false,
+            flags: StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
         },
         13..24,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
+        ),
         24..25,
     ),
     (

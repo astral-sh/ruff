@@ -4,46 +4,85 @@ expression: lex_source(source)
 ---
 [
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | TRIPLE_QUOTED | F_PREFIX,
+                ),
+            ),
+        ),
         0..4,
     ),
     (
         FStringMiddle {
             value: "\nhello\n    world\n",
-            is_raw: false,
-            triple_quoted: true,
+            flags: StringFlags(
+                StringFlagsInner(
+                    DOUBLE | TRIPLE_QUOTED | F_PREFIX,
+                ),
+            ),
         },
         4..21,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | TRIPLE_QUOTED | F_PREFIX,
+                ),
+            ),
+        ),
         21..24,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    TRIPLE_QUOTED | F_PREFIX,
+                ),
+            ),
+        ),
         25..29,
     ),
     (
         FStringMiddle {
             value: "\n    world\nhello\n",
-            is_raw: false,
-            triple_quoted: true,
+            flags: StringFlags(
+                StringFlagsInner(
+                    TRIPLE_QUOTED | F_PREFIX,
+                ),
+            ),
         },
         29..46,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    TRIPLE_QUOTED | F_PREFIX,
+                ),
+            ),
+        ),
         46..49,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
+        ),
         50..52,
     ),
     (
         FStringMiddle {
             value: "some ",
-            is_raw: false,
-            triple_quoted: false,
+            flags: StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
         },
         52..57,
     ),
@@ -52,14 +91,23 @@ expression: lex_source(source)
         57..58,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | TRIPLE_QUOTED | F_PREFIX,
+                ),
+            ),
+        ),
         58..62,
     ),
     (
         FStringMiddle {
             value: "multiline\nallowed ",
-            is_raw: false,
-            triple_quoted: true,
+            flags: StringFlags(
+                StringFlagsInner(
+                    DOUBLE | TRIPLE_QUOTED | F_PREFIX,
+                ),
+            ),
         },
         62..80,
     ),
@@ -78,7 +126,13 @@ expression: lex_source(source)
         82..83,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | TRIPLE_QUOTED | F_PREFIX,
+                ),
+            ),
+        ),
         83..86,
     ),
     (
@@ -88,13 +142,22 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " string",
-            is_raw: false,
-            triple_quoted: false,
+            flags: StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
         },
         87..94,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
+        ),
         94..95,
     ),
     (

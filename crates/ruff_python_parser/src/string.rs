@@ -437,13 +437,9 @@ pub(crate) fn parse_string_literal(
 
 pub(crate) fn parse_fstring_literal_element(
     source: Box<str>,
-    is_raw: bool,
+    flags: StringFlags,
     range: TextRange,
 ) -> Result<ast::FStringElement, LexicalError> {
-    let mut flags = StringFlags::default();
-    if is_raw {
-        flags = flags.with_r_prefix().unwrap();
-    }
     StringParser::new(source, flags, range.start(), range).parse_fstring_middle()
 }
 

@@ -55,7 +55,7 @@ fn detect_quote(tokens: &[LexResult], locator: &Locator) -> Quote {
         Tok::String { flags, .. } if !flags.is_triple_quoted() => Some(*range),
         // No need to check if it's triple-quoted as f-strings cannot be used
         // as docstrings.
-        Tok::FStringStart => Some(*range),
+        Tok::FStringStart(_) => Some(*range),
         _ => None,
     });
 

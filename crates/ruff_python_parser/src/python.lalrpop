@@ -1637,8 +1637,8 @@ FStringExpr: StringType = {
 FStringMiddlePattern: ast::FStringElement = {
     FStringReplacementField,
     <location:@L> <fstring_middle:fstring_middle> <end_location:@R> =>? {
-        let (source, is_raw, _) = fstring_middle;
-        Ok(parse_fstring_literal_element(source, is_raw, (location..end_location).into())?)
+        let (source, flags) = fstring_middle;
+        Ok(parse_fstring_literal_element(source, flags, (location..end_location).into())?)
     }
 };
 
@@ -2002,8 +2002,8 @@ extern {
         Dedent => token::Tok::Dedent,
         StartModule => token::Tok::StartModule,
         StartExpression => token::Tok::StartExpression,
-        FStringStart => token::Tok::FStringStart,
-        FStringEnd => token::Tok::FStringEnd,
+        FStringStart => token::Tok::FStringStart(StringFlags),
+        FStringEnd => token::Tok::FStringEnd(StringFlags),
         "!" => token::Tok::Exclamation,
         "?" => token::Tok::Question,
         "+" => token::Tok::Plus,
@@ -2099,8 +2099,7 @@ extern {
         },
         fstring_middle => token::Tok::FStringMiddle {
             value: <Box<str>>,
-            is_raw: <bool>,
-            triple_quoted: <bool>
+            flags: <StringFlags>,
         },
         name => token::Tok::Name { name: <Box<str>> },
         ipy_escape_command => token::Tok::IpyEscapeCommand {

@@ -37,7 +37,7 @@ use ruff_python_ast::{Int, IpyEscapeKind};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::lexer::cursor::{Cursor, EOF_CHAR};
-use crate::lexer::fstring::{FStringContext, FStringContextFlags, FStrings};
+use crate::lexer::fstring::{FStringContext, FStrings};
 use crate::lexer::indentation::{Indentation, Indentations};
 use crate::{
     soft_keywords::SoftKeywordTransformer, string::FStringErrorType,
@@ -547,19 +547,19 @@ impl<'source> Lexer<'source> {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), quote);
 
-        let mut flags = FStringContextFlags::empty();
+        let mut flags = StringFlags::default().with_f_prefix().unwrap();
         if quote == '"' {
-            flags |= FStringContextFlags::DOUBLE;
+            flags = flags.with_double_quotes();
         }
         if is_raw_string {
-            flags |= FStringContextFlags::RAW;
+            flags = flags.with_r_prefix().unwrap();
         }
         if self.cursor.eat_char2(quote, quote) {
-            flags |= FStringContextFlags::TRIPLE;
+            flags = flags.with_triple_quotes();
         }
 
         self.fstrings.push(FStringContext::new(flags, self.nesting));
-        Tok::FStringStart
+        Tok::FStringStart(flags)
     }
 
     /// Lex a f-string middle or end token.
@@ -572,10 +572,10 @@ impl<'source> Lexer<'source> {
         if fstring.is_triple_quoted() {
             let quote_char = fstring.quote_char();
             if self.cursor.eat_char3(quote_char, quote_char, quote_char) {
-                return Ok(Some(Tok::FStringEnd));
+                return Ok(Some(Tok::FStringEnd(fstring.flags)));
             }
         } else if self.cursor.eat_char(fstring.quote_char()) {
-            return Ok(Some(Tok::FStringEnd));
+            return Ok(Some(Tok::FStringEnd(fstring.flags)));
         }
 
         // We have to decode `{{` and `}}` into `{` and `}` respectively. As an
@@ -692,8 +692,7 @@ impl<'source> Lexer<'source> {
         };
         Ok(Some(Tok::FStringMiddle {
             value: value.into_boxed_str(),
-            is_raw: fstring.is_raw_string(),
-            triple_quoted: fstring.is_triple_quoted(),
+            flags: fstring.flags,
         }))
     }
 
@@ -853,7 +852,7 @@ impl<'source> Lexer<'source> {
             if !fstring.is_in_expression(self.nesting) {
                 match self.lex_fstring_middle_or_end() {
                     Ok(Some(tok)) => {
-                        if tok == Tok::FStringEnd {
+                        if tok.is_f_string_end() {
                             self.fstrings.pop();
                         }
                         return Ok((tok, self.token_range()));

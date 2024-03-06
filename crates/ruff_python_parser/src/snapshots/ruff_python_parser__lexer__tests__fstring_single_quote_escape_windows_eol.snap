@@ -4,19 +4,34 @@ expression: fstring_single_quote_escape_eol(WINDOWS_EOL)
 ---
 [
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    F_PREFIX,
+                ),
+            ),
+        ),
         0..2,
     ),
     (
         FStringMiddle {
             value: "text \\\r\n more text",
-            is_raw: false,
-            triple_quoted: false,
+            flags: StringFlags(
+                StringFlagsInner(
+                    F_PREFIX,
+                ),
+            ),
         },
         2..20,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    F_PREFIX,
+                ),
+            ),
+        ),
         20..21,
     ),
     (

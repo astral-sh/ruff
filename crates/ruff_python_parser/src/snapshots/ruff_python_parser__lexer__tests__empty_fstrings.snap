@@ -4,11 +4,23 @@ expression: lex_source(source)
 ---
 [
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
+        ),
         0..2,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
+        ),
         2..3,
     ),
     (
@@ -23,19 +35,43 @@ expression: lex_source(source)
         4..6,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
+        ),
         7..9,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | F_PREFIX,
+                ),
+            ),
+        ),
         9..10,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    F_PREFIX,
+                ),
+            ),
+        ),
         11..13,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    F_PREFIX,
+                ),
+            ),
+        ),
         13..14,
     ),
     (
@@ -50,19 +86,43 @@ expression: lex_source(source)
         15..17,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | TRIPLE_QUOTED | F_PREFIX,
+                ),
+            ),
+        ),
         18..22,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | TRIPLE_QUOTED | F_PREFIX,
+                ),
+            ),
+        ),
         22..25,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    TRIPLE_QUOTED | F_PREFIX,
+                ),
+            ),
+        ),
         26..30,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    TRIPLE_QUOTED | F_PREFIX,
+                ),
+            ),
+        ),
         30..33,
     ),
     (

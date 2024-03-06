@@ -45,19 +45,18 @@ pub enum Tok {
     },
     /// Token value for the start of an f-string. This includes the `f`/`F`/`fr` prefix
     /// and the opening quote(s).
-    FStringStart,
+    FStringStart(StringFlags),
     /// Token value that includes the portion of text inside the f-string that's not
     /// part of the expression part and isn't an opening or closing brace.
     FStringMiddle {
         /// The string value.
         value: Box<str>,
-        /// Whether the string is raw or not.
-        is_raw: bool,
-        /// Whether the string is triple quoted.
-        triple_quoted: bool,
+        /// Flags that can be queried to determine the quote style
+        /// and prefixes of the string
+        flags: StringFlags
     },
     /// Token value for the end of an f-string. This includes the closing quote.
-    FStringEnd,
+    FStringEnd(StringFlags),
     /// Token value for IPython escape commands. These are recognized by the lexer
     /// only when the mode is [`Mode::Ipython`].
     IpyEscapeCommand {
@@ -247,9 +246,9 @@ impl fmt::Display for Tok {
                 let quotes = flags.quote_str();
                 write!(f, "{prefixes}{quotes}{value}{quotes}")
             }
-            FStringStart => f.write_str("FStringStart"),
+            FStringStart(_) => f.write_str("FStringStart"),
             FStringMiddle { value, .. } => f.write_str(value),
-            FStringEnd => f.write_str("FStringEnd"),
+            FStringEnd(_) => f.write_str("FStringEnd"),
             IpyEscapeCommand { kind, value } => write!(f, "{kind}{value}"),
             Newline => f.write_str("Newline"),
             NonLogicalNewline => f.write_str("NonLogicalNewline"),
@@ -703,9 +702,9 @@ impl TokenKind {
             Tok::Float { .. } => TokenKind::Float,
             Tok::Complex { .. } => TokenKind::Complex,
             Tok::String { .. } => TokenKind::String,
-            Tok::FStringStart => TokenKind::FStringStart,
+            Tok::FStringStart(_) => TokenKind::FStringStart,
             Tok::FStringMiddle { .. } => TokenKind::FStringMiddle,
-            Tok::FStringEnd => TokenKind::FStringEnd,
+            Tok::FStringEnd(_) => TokenKind::FStringEnd,
             Tok::IpyEscapeCommand { .. } => TokenKind::EscapeCommand,
             Tok::Comment(_) => TokenKind::Comment,
             Tok::Newline => TokenKind::Newline,

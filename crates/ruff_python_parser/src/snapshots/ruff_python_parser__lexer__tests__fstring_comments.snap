@@ -4,14 +4,23 @@ expression: lex_source(source)
 ---
 [
     (
-        FStringStart,
+        FStringStart(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | TRIPLE_QUOTED | F_PREFIX,
+                ),
+            ),
+        ),
         0..4,
     ),
     (
         FStringMiddle {
             value: "\n# not a comment ",
-            is_raw: false,
-            triple_quoted: true,
+            flags: StringFlags(
+                StringFlagsInner(
+                    DOUBLE | TRIPLE_QUOTED | F_PREFIX,
+                ),
+            ),
         },
         4..21,
     ),
@@ -46,13 +55,22 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " # not a comment\n",
-            is_raw: false,
-            triple_quoted: true,
+            flags: StringFlags(
+                StringFlagsInner(
+                    DOUBLE | TRIPLE_QUOTED | F_PREFIX,
+                ),
+            ),
         },
         42..59,
     ),
     (
-        FStringEnd,
+        FStringEnd(
+            StringFlags(
+                StringFlagsInner(
+                    DOUBLE | TRIPLE_QUOTED | F_PREFIX,
+                ),
+            ),
+        ),
         59..62,
     ),
     (
