@@ -68,7 +68,7 @@ pub(crate) fn too_many_newlines_at_end_of_file(
         }
     }
 
-    if count > 1 {
+    if count >= 1 {
         let start = start_pos.unwrap();
         let end = end_pos.unwrap();
         let range = TextRange::new(start, end);
