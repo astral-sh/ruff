@@ -13,7 +13,7 @@
 ### Rule changes
 
 - \[`flake8-debugger`\] Check for use of `debugpy` and `ptvsd` debug modules (#10177) ([#10194](https://github.com/astral-sh/ruff/pull/10194))
-- \[`pyupgrade`\] Generate diagnostic for all valid f-string conversions regardless of line-length (`UP032`) ([#10238](https://github.com/astral-sh/ruff/pull/10238))
+- \[`pyupgrade`\] Generate diagnostic for all valid f-string conversions regardless of line length (`UP032`) ([#10238](https://github.com/astral-sh/ruff/pull/10238))
 - \[`pep8_naming`\] Add fixes `N804` and `N805` ([#10215](https://github.com/astral-sh/ruff/pull/10215))
 
 ### CLI
