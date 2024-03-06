@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.3.1
+
+### Preview features
+
+- \[`pycodestyle`\] Fix E301 not triggering on decorated methods. ([#10117](https://github.com/astral-sh/ruff/pull/10117))
+- \[`pycodestyle`\] Respect `isort` settings in blank line rules (`E3*`) ([#10096](https://github.com/astral-sh/ruff/pull/10096))
+- \[`pycodestyle`\] Make blank lines in typing stub files optional (`E3*`) ([#10098](https://github.com/astral-sh/ruff/pull/10098))
+- \[`pylint`\] Implement `singledispatch-method` (`E1519`) ([#10140](https://github.com/astral-sh/ruff/pull/10140))
+- \[`pylint`\] Implement `useless-exception-statement` (`W0133`) ([#10176](https://github.com/astral-sh/ruff/pull/10176))
+
+### Rule changes
+
+- \[`flake8-debugger`\] Check for use of `debugpy` and `ptvsd` debug modules (#10177) ([#10194](https://github.com/astral-sh/ruff/pull/10194))
+- \[`pyupgrade`\] Generate diagnostic for all valid f-string conversions regardless of line-length (`UP032`) ([#10238](https://github.com/astral-sh/ruff/pull/10238))
+- \[`pep8_naming`\] Add fixes `N804` and `N805` ([#10215](https://github.com/astral-sh/ruff/pull/10215))
+
+### CLI
+
+- Colorize the output of `ruff format --diff` ([#10110](https://github.com/astral-sh/ruff/pull/10110))
+- Make `--config` and `--isolated` global flags ([#10150](https://github.com/astral-sh/ruff/pull/10150))
+- Move shell expansion into `--config` lookup ([#10219](https://github.com/astral-sh/ruff/pull/10219))
+
+### Configuration
+
+- Accept a PEP 440 version specifier for `required-version` ([#10216](https://github.com/astral-sh/ruff/pull/10216))
+- Implement isort's `default-section` setting ([#10149](https://github.com/astral-sh/ruff/pull/10149))
+
+### Bug fixes
+
+- Remove trailing space from `CapWords` message ([#10220](https://github.com/astral-sh/ruff/pull/10220))
+- Respect external codes in file-level exemptions ([#10203](https://github.com/astral-sh/ruff/pull/10203))
+- \[`flake8-raise`\] Avoid false-positives for parens-on-raise with `futures.exception()` (`RSE102`) ([#10206](https://github.com/astral-sh/ruff/pull/10206))
+- \[`pylint`\] Add fix for unary expressions in `PLC2801` ([#9587](https://github.com/astral-sh/ruff/pull/9587))
+- \[`ruff`\] Fix RUF028 not allowing `# fmt: skip` on match cases ([#10178](https://github.com/astral-sh/ruff/pull/10178))
+
 ## 0.3.0
 
 This release introduces the new Ruff formatter 2024.2 style and adds a new lint rule to
