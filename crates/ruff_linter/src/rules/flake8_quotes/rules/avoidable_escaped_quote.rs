@@ -1,6 +1,5 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::str::leading_quote;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 use ruff_source_file::Locator;
@@ -176,9 +175,7 @@ pub(crate) fn avoidable_escaped_quote(
                 }
 
                 // Check if we're using the preferred quotation style.
-                if !leading_quote(locator.slice(tok_range)).is_some_and(|text| {
-                    contains_quote(text, quotes_settings.inline_quotes.as_char())
-                }) {
+                if !contains_quote(flags.quote_str(), quotes_settings.inline_quotes.as_char()) {
                     continue;
                 }
 
@@ -318,11 +315,7 @@ pub(crate) fn unnecessary_escaped_quote(
                     continue;
                 }
 
-                let leading = match leading_quote(locator.slice(tok_range)) {
-                    Some("\"") => Quote::Double,
-                    Some("'") => Quote::Single,
-                    _ => continue,
-                };
+                let leading = flags.quote_style();
                 if !contains_escaped_quote(string_contents, leading.opposite().as_char()) {
                     continue;
                 }

@@ -207,7 +207,7 @@ pub(crate) fn invalid_escape_sequence(
                 invalid_escape_char.range(),
             );
 
-            if flags.map_or(false, |flags| flags.is_ustring()) {
+            if flags.is_some_and(|flags| flags.is_ustring()) {
                 // Replace the Unicode prefix with `r`.
                 diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                     "r".to_string(),

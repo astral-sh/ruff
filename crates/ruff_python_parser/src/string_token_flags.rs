@@ -1,4 +1,5 @@
 use bitflags::bitflags;
+
 use ruff_text_size::TextSize;
 
 bitflags! {
@@ -227,11 +228,13 @@ impl StringFlags {
     }
 }
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+/// TODO: Use this enum in `crates/ruff_python_formatter/src/string/mod.rs`?
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum QuoteStyle {
     /// E.g. '
     Single,
     /// E.g. "
+    #[default]
     Double,
 }
 
@@ -240,6 +243,14 @@ impl QuoteStyle {
         match self {
             Self::Single => '\'',
             Self::Double => '"',
+        }
+    }
+
+    #[must_use]
+    pub const fn opposite(self) -> Self {
+        match self {
+            Self::Single => Self::Double,
+            Self::Double => Self::Single,
         }
     }
 }

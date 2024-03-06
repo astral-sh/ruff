@@ -53,7 +53,7 @@ pub enum Tok {
         value: Box<str>,
         /// Flags that can be queried to determine the quote style
         /// and prefixes of the string
-        flags: StringFlags
+        flags: StringFlags,
     },
     /// Token value for the end of an f-string. This includes the closing quote.
     FStringEnd(StringFlags),
