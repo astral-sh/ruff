@@ -54,7 +54,7 @@ pub(crate) fn too_many_newlines_at_end_of_file(
 
     for &(ref tok, range) in lxr.iter().rev().flatten() {
         match tok {
-            Tok::NonLogicalNewline | Tok::Newline => {
+            Tok::NonLogicalNewline => {
                 if count == 0 {
                     end_pos = Some(range.end());
                 }
@@ -69,7 +69,7 @@ pub(crate) fn too_many_newlines_at_end_of_file(
     }
 
     if count > 1 {
-        let start = start_pos.unwrap() + TextSize::from(1);
+        let start = start_pos.unwrap();
         let end = end_pos.unwrap();
         let range = TextRange::new(start, end);
         let mut diagnostic = Diagnostic::new(TooManyNewlinesAtEndOfFile, range);
