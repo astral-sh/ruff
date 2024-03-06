@@ -71,7 +71,7 @@ impl AlwaysFixableViolation for NoneComparison {
 }
 
 /// ## What it does
-/// Checks for equality comparisons to booleans.
+/// Checks for equality comparisons to boolean literals.
 ///
 /// ## Why is this bad?
 /// [PEP 8] recommends against using the equality operators `==` and `!=` to
