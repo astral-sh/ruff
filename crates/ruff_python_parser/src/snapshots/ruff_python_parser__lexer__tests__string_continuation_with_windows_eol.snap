@@ -6,8 +6,11 @@ expression: string_continuation_with_eol(WINDOWS_EOL)
     (
         String {
             value: "abc\\\r\ndef",
-            kind: String,
-            triple_quoted: false,
+            flags: StringFlags(
+                StringFlagsInner(
+                    DOUBLE,
+                ),
+            ),
         },
         0..11,
     ),

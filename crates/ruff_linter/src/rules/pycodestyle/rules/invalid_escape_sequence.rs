@@ -3,7 +3,7 @@ use memchr::memchr_iter;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{StringKind, Tok};
+use ruff_python_parser::Tok;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -66,7 +66,7 @@ pub(crate) fn invalid_escape_sequence(
     token: &Tok,
     token_range: TextRange,
 ) {
-    let (token_source_code, string_start_location) = match token {
+    let (token_source_code, string_start_location, flags) = match token {
         Tok::FStringMiddle { value, is_raw, .. } => {
             if *is_raw {
                 return;
@@ -74,13 +74,13 @@ pub(crate) fn invalid_escape_sequence(
             let Some(range) = indexer.fstring_ranges().innermost(token_range.start()) else {
                 return;
             };
-            (&**value, range.start())
+            (&**value, range.start(), None)
         }
-        Tok::String { kind, .. } => {
-            if kind.is_raw() {
+        Tok::String { flags, .. } => {
+            if flags.is_raw() {
                 return;
             }
-            (locator.slice(token_range), token_range.start())
+            (locator.slice(token_range), token_range.start(), Some(flags))
         }
         _ => return,
     };
@@ -207,13 +207,7 @@ pub(crate) fn invalid_escape_sequence(
                 invalid_escape_char.range(),
             );
 
-            if matches!(
-                token,
-                Tok::String {
-                    kind: StringKind::Unicode,
-                    ..
-                }
-            ) {
+            if flags.map_or(false, |flags| flags.is_ustring()) {
                 // Replace the Unicode prefix with `r`.
                 diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                     "r".to_string(),

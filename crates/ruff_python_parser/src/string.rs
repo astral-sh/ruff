@@ -6,7 +6,8 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::lexer::{LexicalError, LexicalErrorType};
-use crate::token::{StringKind, Tok};
+use crate::string_token_flags::StringFlags;
+use crate::token::Tok;
 
 pub(crate) enum StringType {
     Str(ast::StringLiteral),
@@ -42,17 +43,17 @@ enum EscapedChar {
 struct StringParser {
     source: Box<str>,
     cursor: usize,
-    kind: StringKind,
+    flags: StringFlags,
     offset: TextSize,
     range: TextRange,
 }
 
 impl StringParser {
-    fn new(source: Box<str>, kind: StringKind, offset: TextSize, range: TextRange) -> Self {
+    fn new(source: Box<str>, flags: StringFlags, offset: TextSize, range: TextRange) -> Self {
         Self {
             source,
             cursor: 0,
-            kind,
+            flags,
             offset,
             range,
         }
@@ -177,9 +178,9 @@ impl StringParser {
             'v' => '\x0b',
             o @ '0'..='7' => self.parse_octet(o as u8),
             'x' => self.parse_unicode_literal(2)?,
-            'u' if !self.kind.is_any_bytes() => self.parse_unicode_literal(4)?,
-            'U' if !self.kind.is_any_bytes() => self.parse_unicode_literal(8)?,
-            'N' if !self.kind.is_any_bytes() => self.parse_unicode_name()?,
+            'u' if !self.flags.is_bytestring() => self.parse_unicode_literal(4)?,
+            'U' if !self.flags.is_bytestring() => self.parse_unicode_literal(8)?,
+            'N' if !self.flags.is_bytestring() => self.parse_unicode_name()?,
             // Special cases where the escape sequence is not a single character
             '\n' => return Ok(None),
             '\r' => {
@@ -190,7 +191,7 @@ impl StringParser {
                 return Ok(None);
             }
             _ => {
-                if self.kind.is_any_bytes() && !first_char.is_ascii() {
+                if self.flags.is_bytestring() && !first_char.is_ascii() {
                     return Err(LexicalError::new(
                         LexicalErrorType::OtherError(
                             "bytes can only contain ASCII literal characters"
@@ -257,7 +258,7 @@ impl StringParser {
                 // This is still an invalid escape sequence, but we don't want to
                 // raise a syntax error as is done by the CPython parser. It might
                 // be supported in the future, refer to point 3: https://peps.python.org/pep-0701/#rejected-ideas
-                b'\\' if !self.kind.is_raw() && self.peek_byte().is_some() => {
+                b'\\' if !self.flags.is_raw() && self.peek_byte().is_some() => {
                     match self.parse_escaped_char()? {
                         None => {}
                         Some(EscapedChar::Literal(c)) => value.push(c),
@@ -302,7 +303,7 @@ impl StringParser {
             ));
         }
 
-        if self.kind.is_raw() {
+        if self.flags.is_raw() {
             // For raw strings, no escaping is necessary.
             return Ok(StringType::Bytes(ast::BytesLiteral {
                 value: self.source.into_boxed_bytes(),
@@ -355,11 +356,11 @@ impl StringParser {
     }
 
     fn parse_string(mut self) -> Result<StringType, LexicalError> {
-        if self.kind.is_raw() {
+        if self.flags.is_raw() {
             // For raw strings, no escaping is necessary.
             return Ok(StringType::Str(ast::StringLiteral {
                 value: self.source,
-                unicode: self.kind.is_unicode(),
+                unicode: self.flags.is_ustring(),
                 range: self.range,
             }));
         }
@@ -368,7 +369,7 @@ impl StringParser {
             // If the string doesn't contain any escape sequences, return the owned string.
             return Ok(StringType::Str(ast::StringLiteral {
                 value: self.source,
-                unicode: self.kind.is_unicode(),
+                unicode: self.flags.is_ustring(),
                 range: self.range,
             }));
         };
@@ -405,13 +406,13 @@ impl StringParser {
 
         Ok(StringType::Str(ast::StringLiteral {
             value: value.into_boxed_str(),
-            unicode: self.kind.is_unicode(),
+            unicode: self.flags.is_ustring(),
             range: self.range,
         }))
     }
 
     fn parse(self) -> Result<StringType, LexicalError> {
-        if self.kind.is_any_bytes() {
+        if self.flags.is_bytestring() {
             self.parse_bytes()
         } else {
             self.parse_string()
@@ -421,18 +422,17 @@ impl StringParser {
 
 pub(crate) fn parse_string_literal(
     source: Box<str>,
-    kind: StringKind,
-    triple_quoted: bool,
+    flags: StringFlags,
     range: TextRange,
 ) -> Result<StringType, LexicalError> {
     let start_location = range.start()
-        + kind.prefix_len()
-        + if triple_quoted {
+        + flags.prefix_len()
+        + if flags.is_triple_quoted() {
             TextSize::from(3)
         } else {
             TextSize::from(1)
         };
-    StringParser::new(source, kind, start_location, range).parse()
+    StringParser::new(source, flags, start_location, range).parse()
 }
 
 pub(crate) fn parse_fstring_literal_element(
@@ -440,12 +440,11 @@ pub(crate) fn parse_fstring_literal_element(
     is_raw: bool,
     range: TextRange,
 ) -> Result<ast::FStringElement, LexicalError> {
-    let kind = if is_raw {
-        StringKind::RawString
-    } else {
-        StringKind::String
-    };
-    StringParser::new(source, kind, range.start(), range).parse_fstring_middle()
+    let mut flags = StringFlags::default();
+    if is_raw {
+        flags = flags.with_r_prefix().unwrap();
+    }
+    StringParser::new(source, flags, range.start(), range).parse_fstring_middle()
 }
 
 pub(crate) fn concatenated_strings(

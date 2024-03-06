@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 7adb931f958c3646393245e0bbd0700fd671ccfdea81f378daa8816c9036ca75
+// sha3: d0cb0b81f6cc49a4bf503daaf8d1e706dda2e0132faece48a18357988389e775
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -9,7 +9,8 @@ use crate::{
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
     string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
-    token::{self, StringKind},
+    string_token_flags::StringFlags,
+    token,
     invalid,
 };
 use lalrpop_util::ParseError;
@@ -33,7 +34,8 @@ mod __parse__Top {
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
     string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
-    token::{self, StringKind},
+    string_token_flags::StringFlags,
+    token,
     invalid,
 };
     use lalrpop_util::ParseError;
@@ -54,7 +56,7 @@ mod __parse__Top {
         Variant4(Int),
         Variant5((IpyEscapeKind, Box<str>)),
         Variant6(Box<str>),
-        Variant7((Box<str>, StringKind, bool)),
+        Variant7((Box<str>, StringFlags)),
         Variant8(core::option::Option<token::Tok>),
         Variant9(Option<Box<ast::Parameter>>),
         Variant10(core::option::Option<Option<Box<ast::Parameter>>>),
@@ -6094,7 +6096,7 @@ mod __parse__Top {
             token::Tok::Int { value: _ } if true => Some(97),
             token::Tok::IpyEscapeCommand { kind: _, value: _ } if true => Some(98),
             token::Tok::Name { name: _ } if true => Some(99),
-            token::Tok::String { value: _, kind: _, triple_quoted: _ } if true => Some(100),
+            token::Tok::String { value: _, flags: _ } if true => Some(100),
             _ => None,
         }
     }
@@ -6132,7 +6134,7 @@ mod __parse__Top {
                 _ => unreachable!(),
             },
             100 => match __token {
-                token::Tok::String { value: __tok0, kind: __tok1, triple_quoted: __tok2 } if true => __Symbol::Variant7((__tok0, __tok1, __tok2)),
+                token::Tok::String { value: __tok0, flags: __tok1 } if true => __Symbol::Variant7((__tok0, __tok1)),
                 _ => unreachable!(),
             },
             _ => unreachable!(),
@@ -18326,7 +18328,7 @@ mod __parse__Top {
     fn __pop_Variant7<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, (Box<str>, StringKind, bool), TextSize)
+    ) -> (TextSize, (Box<str>, StringFlags), TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant7(__v), __r)) => (__l, __v, __r),
@@ -36367,13 +36369,13 @@ fn __action217<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, string, _): (TextSize, (Box<str>, StringKind, bool), TextSize),
+    (_, string, _): (TextSize, (Box<str>, StringFlags), TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<StringType,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
-        let (source, kind, triple_quoted) = string;
-        Ok(parse_string_literal(source, kind, triple_quoted, (location..end_location).into())?)
+        let (source, flags) = string;
+        Ok(parse_string_literal(source, flags, (location..end_location).into())?)
     }
 }
 
@@ -52773,7 +52775,7 @@ fn __action937<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, (Box<str>, StringKind, bool), TextSize),
+    __0: (TextSize, (Box<str>, StringFlags), TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> Result<StringType,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -70051,7 +70053,7 @@ fn __action1494<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, (Box<str>, StringKind, bool), TextSize),
+    __0: (TextSize, (Box<str>, StringFlags), TextSize),
 ) -> Result<StringType,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;

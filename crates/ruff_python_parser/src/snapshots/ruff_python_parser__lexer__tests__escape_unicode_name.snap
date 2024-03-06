@@ -6,8 +6,11 @@ expression: lex_source(source)
     (
         String {
             value: "\\N{EN SPACE}",
-            kind: String,
-            triple_quoted: false,
+            flags: StringFlags(
+                StringFlagsInner(
+                    DOUBLE,
+                ),
+            ),
         },
         0..14,
     ),

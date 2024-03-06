@@ -12,7 +12,8 @@ use crate::{
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
     string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
-    token::{self, StringKind},
+    string_token_flags::StringFlags,
+    token,
     invalid,
 };
 use lalrpop_util::ParseError;
@@ -1619,8 +1620,8 @@ StringLiteralOrFString: StringType = {
 
 StringLiteral: StringType = {
     <location:@L> <string:string> <end_location:@R> =>? {
-        let (source, kind, triple_quoted) = string;
-        Ok(parse_string_literal(source, kind, triple_quoted, (location..end_location).into())?)
+        let (source, flags) = string;
+        Ok(parse_string_literal(source, flags, (location..end_location).into())?)
     }
 };
 
@@ -2094,8 +2095,7 @@ extern {
         complex => token::Tok::Complex { real: <f64>, imag: <f64> },
         string => token::Tok::String {
             value: <Box<str>>,
-            kind: <StringKind>,
-            triple_quoted: <bool>
+            flags: <StringFlags>,
         },
         fstring_middle => token::Tok::FStringMiddle {
             value: <Box<str>>,

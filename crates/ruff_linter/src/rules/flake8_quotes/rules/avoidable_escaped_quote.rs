@@ -169,10 +169,9 @@ pub(crate) fn avoidable_escaped_quote(
         match tok {
             Tok::String {
                 value: string_contents,
-                kind,
-                triple_quoted,
+                flags,
             } => {
-                if kind.is_raw() || *triple_quoted {
+                if flags.is_raw() || flags.is_triple_quoted() {
                     continue;
                 }
 
@@ -192,7 +191,7 @@ pub(crate) fn avoidable_escaped_quote(
                     let mut diagnostic = Diagnostic::new(AvoidableEscapedQuote, tok_range);
                     let fixed_contents = format!(
                         "{prefix}{quote}{value}{quote}",
-                        prefix = kind.as_str(),
+                        prefix = flags.prefix_str(),
                         quote = quotes_settings.inline_quotes.opposite().as_char(),
                         value = unescape_string(
                             string_contents,
@@ -314,10 +313,9 @@ pub(crate) fn unnecessary_escaped_quote(
         match tok {
             Tok::String {
                 value: string_contents,
-                kind,
-                triple_quoted,
+                flags,
             } => {
-                if kind.is_raw() || *triple_quoted {
+                if flags.is_raw() || flags.is_triple_quoted() {
                     continue;
                 }
 
@@ -333,7 +331,7 @@ pub(crate) fn unnecessary_escaped_quote(
                 let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, tok_range);
                 let fixed_contents = format!(
                     "{prefix}{quote}{value}{quote}",
-                    prefix = kind.as_str(),
+                    prefix = flags.prefix_str(),
                     quote = leading.as_char(),
                     value = unescape_string(string_contents, leading.opposite().as_char())
                 );
