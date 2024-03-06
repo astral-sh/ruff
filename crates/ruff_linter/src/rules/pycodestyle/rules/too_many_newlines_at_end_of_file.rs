@@ -49,8 +49,8 @@ pub(crate) fn too_many_newlines_at_end_of_file(locator: &Locator) -> Option<Diag
     let newline_regex = Regex::new(r"(\r\n){2,}$|\n{2,}$|\r{2,}$").unwrap();
 
     if let Some(mat) = newline_regex.find(source) {
-        let start_pos = TextSize::new(mat.start() as u32 + 1);
-        let end_pos = TextSize::new(mat.end() as u32);
+        let start_pos = TextSize::new((mat.start() + 1).try_into().unwrap());
+        let end_pos = TextSize::new(mat.end().try_into().unwrap());
 
         // Calculate the TextRange to keep only one newline at the end
         let range = TextRange::new(start_pos, end_pos);
