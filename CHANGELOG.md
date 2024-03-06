@@ -20,7 +20,7 @@
 
 - Colorize the output of `ruff format --diff` ([#10110](https://github.com/astral-sh/ruff/pull/10110))
 - Make `--config` and `--isolated` global flags ([#10150](https://github.com/astral-sh/ruff/pull/10150))
-- Move shell expansion into `--config` lookup ([#10219](https://github.com/astral-sh/ruff/pull/10219))
+- Correctly expand tildes and environment variables in paths passed to `--config` ([#10219](https://github.com/astral-sh/ruff/pull/10219))
 
 ### Configuration
 
