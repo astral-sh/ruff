@@ -254,7 +254,6 @@ impl Rule {
             | Rule::MissingCopyrightNotice
             | Rule::MissingNewlineAtEndOfFile
             | Rule::MixedSpacesAndTabs
-            | Rule::TooManyNewlinesAtEndOfFile
             | Rule::TrailingWhitespace => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AvoidableEscapedQuote
@@ -301,6 +300,7 @@ impl Rule {
             | Rule::SingleLineImplicitStringConcatenation
             | Rule::TabIndentation
             | Rule::TooManyBlankLines
+            | Rule::TooManyNewlinesAtEndOfFile
             | Rule::TrailingCommaOnBareTuple
             | Rule::TypeCommentInStub
             | Rule::UselessSemicolon

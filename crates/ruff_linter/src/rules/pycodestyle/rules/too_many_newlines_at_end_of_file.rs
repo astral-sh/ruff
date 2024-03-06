@@ -1,10 +1,9 @@
-use regex::Regex;
-
-use ruff_text_size::{TextRange, TextSize};
-
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::Tok;
 use ruff_source_file::Locator;
+use ruff_text_size::{TextRange, TextSize};
 
 /// ## What it does
 /// Checks for files with too many new lines at the end of the file.
@@ -37,27 +36,44 @@ impl AlwaysFixableViolation for TooManyNewlinesAtEndOfFile {
 }
 
 /// W391
-pub(crate) fn too_many_newlines_at_end_of_file(locator: &Locator) -> Option<Diagnostic> {
+pub(crate) fn too_many_newlines_at_end_of_file(
+    diagnostics: &mut Vec<Diagnostic>,
+    lxr: &[LexResult],
+    locator: &Locator
+) {
     let source = locator.contents();
 
     // Ignore empty and BOM only files
     if source.is_empty() || source == "\u{feff}" {
-        return None;
+        return;
     }
 
-    // Regex to match multiple newline characters at the end of the file
-    let newline_regex = Regex::new(r"(\r\n){2,}$|\n{2,}$|\r{2,}$").unwrap();
+    let mut count = 0;
+    let mut start_pos: Option<TextSize> = None;
+    let mut end_pos: Option<TextSize> = None;
 
-    if let Some(mat) = newline_regex.find(source) {
-        let start_pos = TextSize::new((mat.start() + 1).try_into().unwrap());
-        let end_pos = TextSize::new(mat.end().try_into().unwrap());
+    for &(ref tok, range) in lxr.iter().rev().flatten() {
+        match tok {
+            Tok::NonLogicalNewline | Tok::Newline => {
+                if count == 0 {
+                    end_pos = Some(range.end());
+                }
+                count += 1;
+            }
+            Tok::Dedent => continue,
+            _ => {
+                start_pos = Some(range.end());
+                break;
+            }
+        }
+    }
 
-        // Calculate the TextRange to keep only one newline at the end
-        let range = TextRange::new(start_pos, end_pos);
+    if count > 1 {
+        let start = start_pos.unwrap() + TextSize::from(1);
+        let end = end_pos.unwrap();
+        let range = TextRange::new(start, end);
         let mut diagnostic = Diagnostic::new(TooManyNewlinesAtEndOfFile, range);
-        diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start_pos, end_pos)));
-        return Some(diagnostic);
+        diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
+        diagnostics.push(diagnostic);
     }
-
-    None
 }
