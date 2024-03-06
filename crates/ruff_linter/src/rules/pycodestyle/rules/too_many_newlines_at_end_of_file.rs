@@ -1,6 +1,6 @@
 use regex::Regex;
 
-use ruff_text_size::{TextSize, TextRange};
+use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -37,9 +37,7 @@ impl AlwaysFixableViolation for TooManyNewlinesAtEndOfFile {
 }
 
 /// W391
-pub(crate) fn too_many_newlines_at_end_of_file(
-    locator: &Locator,
-) -> Option<Diagnostic> {
+pub(crate) fn too_many_newlines_at_end_of_file(locator: &Locator) -> Option<Diagnostic> {
     let source = locator.contents();
 
     // Ignore empty and BOM only files
