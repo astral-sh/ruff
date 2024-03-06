@@ -298,25 +298,25 @@ mod tests {
 
     #[test]
     fn test_is_known_type() {
-        assert!(is_known_type(&QualifiedName::from_slice(&["", "int"]), 11));
+        assert!(is_known_type(&QualifiedName::builtin("int"), 11));
         assert!(is_known_type(
-            &QualifiedName::from_slice(&["builtins", "int"]),
+            &QualifiedName::from_iter(["builtins", "int"]),
             11
         ));
         assert!(is_known_type(
-            &QualifiedName::from_slice(&["typing", "Optional"]),
+            &QualifiedName::from_iter(["typing", "Optional"]),
             11
         ));
         assert!(is_known_type(
-            &QualifiedName::from_slice(&["typing_extensions", "Literal"]),
+            &QualifiedName::from_iter(["typing_extensions", "Literal"]),
             11
         ));
         assert!(is_known_type(
-            &QualifiedName::from_slice(&["zoneinfo", "ZoneInfo"]),
+            &QualifiedName::from_iter(["zoneinfo", "ZoneInfo"]),
             11
         ));
         assert!(!is_known_type(
-            &QualifiedName::from_slice(&["zoneinfo", "ZoneInfo"]),
+            &QualifiedName::from_iter(["zoneinfo", "ZoneInfo"]),
             8
         ));
     }

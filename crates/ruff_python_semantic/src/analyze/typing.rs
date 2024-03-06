@@ -63,7 +63,7 @@ pub fn match_annotated_subscript<'a>(
             }
 
             for module in typing_modules {
-                let module_qualified_name = QualifiedName::imported(module);
+                let module_qualified_name = QualifiedName::user_defined(module);
                 if qualified_name.starts_with(&module_qualified_name) {
                     if let Some(member) = qualified_name.segments().last() {
                         if is_literal_member(member) {
