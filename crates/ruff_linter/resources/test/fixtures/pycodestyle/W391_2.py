@@ -1,4 +1,4 @@
-# Unix style
+# Windows style
 def foo() -> None:
     pass
 

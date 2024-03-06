@@ -1,3 +1,4 @@
+# Unix style
 def foo() -> None:
     pass
 
