@@ -39,7 +39,7 @@ impl AlwaysFixableViolation for TooManyNewlinesAtEndOfFile {
 pub(crate) fn too_many_newlines_at_end_of_file(
     diagnostics: &mut Vec<Diagnostic>,
     lxr: &[LexResult],
-    locator: &Locator
+    locator: &Locator,
 ) {
     let source = locator.contents();
 
