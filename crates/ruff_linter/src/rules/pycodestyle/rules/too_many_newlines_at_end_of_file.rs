@@ -5,6 +5,22 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 
+/// ## What it does
+/// Checks for files with too many new lines at the end of the file.
+///
+/// ## Why is this bad?
+/// Trailing blank lines are superfluous.
+/// However the last line should end with a new line.
+///
+/// ## Example
+/// ```python
+/// spam(1)\n\n\n
+/// ```
+///
+/// Use instead:
+/// ```python
+/// spam(1)\n
+/// ```
 #[violation]
 pub struct TooManyNewlinesAtEndOfFile;
 
@@ -31,7 +47,7 @@ pub(crate) fn too_many_newlines_at_end_of_file(
     }
 
     // Regex to match multiple newline characters at the end of the file
-    let newline_regex = Regex::new(r"(\n|\r\n){2,}$").unwrap();
+    let newline_regex = Regex::new(r"(\n|\r){2,}$").unwrap();
 
     if let Some(mat) = newline_regex.find(source) {
         let start_pos = mat.start();
