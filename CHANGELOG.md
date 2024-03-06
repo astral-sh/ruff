@@ -31,7 +31,7 @@
 
 - Remove trailing space from `CapWords` message ([#10220](https://github.com/astral-sh/ruff/pull/10220))
 - Respect external codes in file-level exemptions ([#10203](https://github.com/astral-sh/ruff/pull/10203))
-- \[`flake8-raise`\] Avoid false-positives for parens-on-raise with `futures.exception()` (`RSE102`) ([#10206](https://github.com/astral-sh/ruff/pull/10206))
+- \[`flake8-raise`\] Avoid false-positives for parens-on-raise with `future.exception()` (`RSE102`) ([#10206](https://github.com/astral-sh/ruff/pull/10206))
 - \[`pylint`\] Add fix for unary expressions in `PLC2801` ([#9587](https://github.com/astral-sh/ruff/pull/9587))
 - \[`ruff`\] Fix RUF028 not allowing `# fmt: skip` on match cases ([#10178](https://github.com/astral-sh/ruff/pull/10178))
 
