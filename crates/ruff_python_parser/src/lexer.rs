@@ -179,9 +179,9 @@ impl<'source> Lexer<'source> {
                 return Ok(self.lex_fstring_start(quote, true));
             }
             (_, quote @ ('\'' | '"')) => {
-                if let Ok(string_kind) = StringFlags::try_from(first) {
+                if let Ok(flags) = StringFlags::try_from(first) {
                     self.cursor.bump();
-                    return self.lex_string(string_kind, quote);
+                    return self.lex_string(flags, quote);
                 }
             }
             (_, second @ ('r' | 'R' | 'b' | 'B')) if is_quote(self.cursor.second()) => {
@@ -194,11 +194,8 @@ impl<'source> Lexer<'source> {
                         flags.map(StringFlags::with_b_prefix)
                     }
                 };
-                if let Ok(Ok(mut flags)) = flags {
+                if let Ok(Ok(flags)) = flags {
                     let quote = self.cursor.bump().unwrap();
-                    if quote == '"' {
-                        flags = flags.with_double_quotes();
-                    }
                     return self.lex_string(flags, quote);
                 }
             }
@@ -552,7 +549,9 @@ impl<'source> Lexer<'source> {
             flags = flags.with_double_quotes();
         }
         if is_raw_string {
-            flags = flags.with_r_prefix().unwrap();
+            flags = flags.with_r_prefix().expect(
+                "Expected it to always be valid to combine the `f` and `r` prefixes on a string",
+            );
         }
         if self.cursor.eat_char2(quote, quote) {
             flags = flags.with_triple_quotes();
@@ -700,6 +699,10 @@ impl<'source> Lexer<'source> {
     fn lex_string(&mut self, mut flags: StringFlags, quote: char) -> Result<Tok, LexicalError> {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), quote);
+
+        if quote == '"' {
+            flags = flags.with_double_quotes();
+        }
 
         // If the next two characters are also the quote character, then we have a triple-quoted
         // string; consume those two characters and ensure that we require a triple-quote to close

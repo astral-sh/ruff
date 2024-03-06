@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 
-use ruff_text_size::TextSize;
+use ruff_text_size::{TextLen, TextSize};
 
 bitflags! {
     /// [String and Bytes literals]: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
@@ -40,10 +40,10 @@ bitflags! {
     }
 }
 
-impl TryFrom<&char> for StringFlagsInner {
+impl TryFrom<char> for StringFlagsInner {
     type Error = String;
 
-    fn try_from(value: &char) -> Result<Self, String> {
+    fn try_from(value: char) -> Result<Self, String> {
         let result = match value {
             '\'' => Self::empty(),
             '"' => Self::DOUBLE,
@@ -57,42 +57,26 @@ impl TryFrom<&char> for StringFlagsInner {
     }
 }
 
-impl TryFrom<char> for StringFlagsInner {
-    type Error = String;
-
-    fn try_from(value: char) -> Result<Self, String> {
-        Self::try_from(&value)
-    }
-}
-
-const DISALLOWED_USTRING_PREFIXES: StringFlagsInner = StringFlagsInner::B_PREFIX
+const DISALLOWED_U_STRING_PREFIXES: StringFlagsInner = StringFlagsInner::B_PREFIX
     .union(StringFlagsInner::F_PREFIX)
     .union(StringFlagsInner::R_PREFIX);
 
-const DISALLOWED_BSTRING_PREFIXES: StringFlagsInner =
+const DISALLOWED_B_STRING_PREFIXES: StringFlagsInner =
     StringFlagsInner::U_PREFIX.union(StringFlagsInner::F_PREFIX);
 
-const DISALLOWED_FSTRING_PREFIXES: StringFlagsInner =
+const DISALLOWED_F_STRING_PREFIXES: StringFlagsInner =
     StringFlagsInner::U_PREFIX.union(StringFlagsInner::B_PREFIX);
 
-const DISALLOWED_RSTRING_PREFIXES: StringFlagsInner = StringFlagsInner::U_PREFIX;
+const DISALLOWED_R_STRING_PREFIXES: StringFlagsInner = StringFlagsInner::U_PREFIX;
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct StringFlags(StringFlagsInner);
-
-impl TryFrom<&char> for StringFlags {
-    type Error = String;
-
-    fn try_from(value: &char) -> Result<Self, String> {
-        Ok(Self(StringFlagsInner::try_from(value)?))
-    }
-}
 
 impl TryFrom<char> for StringFlags {
     type Error = String;
 
     fn try_from(value: char) -> Result<Self, String> {
-        Self::try_from(&value)
+        Ok(Self(StringFlagsInner::try_from(value)?))
     }
 }
 
@@ -162,13 +146,7 @@ impl StringFlags {
     }
 
     pub fn prefix_len(self) -> TextSize {
-        if self.is_ustring() {
-            return TextSize::from(1);
-        }
-        let len = u32::from(self.is_bytestring())
-            + u32::from(self.is_raw())
-            + u32::from(self.is_fstring());
-        len.into()
+        self.prefix_str().text_len()
     }
 
     pub fn quote_len(self) -> TextSize {
@@ -192,7 +170,7 @@ impl StringFlags {
     }
 
     pub fn with_u_prefix(mut self) -> Result<Self, &'static str> {
-        if self.0.intersects(DISALLOWED_USTRING_PREFIXES) {
+        if self.0.intersects(DISALLOWED_U_STRING_PREFIXES) {
             Err("U-strings cannot have any other prefixes set")
         } else {
             self.0 |= StringFlagsInner::U_PREFIX;
@@ -201,7 +179,7 @@ impl StringFlags {
     }
 
     pub fn with_b_prefix(mut self) -> Result<Self, &'static str> {
-        if self.0.intersects(DISALLOWED_BSTRING_PREFIXES) {
+        if self.0.intersects(DISALLOWED_B_STRING_PREFIXES) {
             Err("Bytestrings cannot have the `u` or `f` prefix also set")
         } else {
             self.0 |= StringFlagsInner::B_PREFIX;
@@ -210,7 +188,7 @@ impl StringFlags {
     }
 
     pub fn with_f_prefix(mut self) -> Result<Self, &'static str> {
-        if self.0.intersects(DISALLOWED_FSTRING_PREFIXES) {
+        if self.0.intersects(DISALLOWED_F_STRING_PREFIXES) {
             Err("F-strings cannot have the `b` or `u` prefix also set")
         } else {
             self.0 |= StringFlagsInner::F_PREFIX;
@@ -219,7 +197,7 @@ impl StringFlags {
     }
 
     pub fn with_r_prefix(mut self) -> Result<Self, &'static str> {
-        if self.0.intersects(DISALLOWED_RSTRING_PREFIXES) {
+        if self.0.intersects(DISALLOWED_R_STRING_PREFIXES) {
             Err("Raw strings cannot have the `u` prefix also set")
         } else {
             self.0 |= StringFlagsInner::R_PREFIX;
