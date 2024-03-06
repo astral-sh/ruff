@@ -11,6 +11,3 @@ def bar() -> None:
 if __name__ == '__main__':
     foo()
     bar()
-
-
-

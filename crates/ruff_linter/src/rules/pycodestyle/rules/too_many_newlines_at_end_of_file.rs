@@ -1,8 +1,9 @@
-use ruff_text_size::{TextLen, TextRange};
+use regex::Regex;
+
+use ruff_text_size::{TextSize, TextRange};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 
 /// ## What it does
@@ -27,7 +28,7 @@ pub struct TooManyNewlinesAtEndOfFile;
 impl AlwaysFixableViolation for TooManyNewlinesAtEndOfFile {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Too many newlines at the end of file".to_string()
+        format!("Too many newlines at the end of file")
     }
 
     fn fix_title(&self) -> String {
@@ -47,20 +48,16 @@ pub(crate) fn too_many_newlines_at_end_of_file(
     }
 
     // Regex to match multiple newline characters at the end of the file
-    let newline_regex = Regex::new(r"(\n|\r){2,}$").unwrap();
+    let newline_regex = Regex::new(r"(\r\n){2,}$|\n{2,}$|\r{2,}$").unwrap();
 
     if let Some(mat) = newline_regex.find(source) {
-        let start_pos = mat.start();
-        let end_pos = mat.end();
+        let start_pos = TextSize::new(mat.start() as u32 + 1);
+        let end_pos = TextSize::new(mat.end() as u32);
 
         // Calculate the TextRange to keep only one newline at the end
-        let range = TextRange::new(
-            TextLen::from(start_pos as u32 + 1),  // Keep one newline
-            TextLen::from(end_pos as u32),
-        );
-
+        let range = TextRange::new(start_pos, end_pos);
         let mut diagnostic = Diagnostic::new(TooManyNewlinesAtEndOfFile, range);
-        diagnostic.set_fix(Fix::safe_edit(Edit::deletion(range)));
+        diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start_pos, end_pos)));
         return Some(diagnostic);
     }
 
