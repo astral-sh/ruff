@@ -487,9 +487,8 @@ impl<'src> Parser<'src> {
                 if self.eat(TokenKind::Comma) {
                     trailing_comma_range = Some(maybe_comma_range);
                     continue;
-                } else {
-                    trailing_comma_range = None;
                 }
+                trailing_comma_range = None;
 
                 if kind.is_list_terminator(self) {
                     break;
