@@ -7,6 +7,7 @@ use crate::expression::parentheses::{
     is_expression_parenthesized, parenthesized, Parentheses, Parenthesize,
 };
 use crate::prelude::*;
+use crate::preview::is_with_single_item_pre_39_enabled;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
 pub enum WithItemLayout {
@@ -49,7 +50,7 @@ pub enum WithItemLayout {
     /// with a, b:
     ///     ...
     /// ```
-    Python38OrOlder,
+    Python38OrOlder { single: bool },
 
     /// A with item where the `with` formatting adds parentheses around all context managers if necessary.
     ///
@@ -135,8 +136,10 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
                 )?;
             }
 
-            WithItemLayout::Python38OrOlder => {
-                let parenthesize = if is_parenthesized {
+            WithItemLayout::Python38OrOlder { single } => {
+                let parenthesize = if (single && is_with_single_item_pre_39_enabled(f.context()))
+                    || is_parenthesized
+                {
                     Parenthesize::IfBreaks
                 } else {
                     Parenthesize::IfRequired

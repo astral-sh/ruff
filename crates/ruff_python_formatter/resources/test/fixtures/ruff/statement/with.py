@@ -318,3 +318,13 @@ with (
     )
 ):
     pass
+
+with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:
+    pass
+
+with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as b:
+    pass
+
+if True:
+    with anyio.CancelScope(shield=True) if get_running_loop() else contextlib.nullcontext() as b:
+        pass

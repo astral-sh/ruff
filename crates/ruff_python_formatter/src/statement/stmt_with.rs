@@ -104,7 +104,9 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                             WithItemsLayout::Python38OrOlder => f
                                 .join_with(format_args![token(","), space()])
                                 .entries(with_stmt.items.iter().map(|item| {
-                                    item.format().with_options(WithItemLayout::Python38OrOlder)
+                                    item.format().with_options(WithItemLayout::Python38OrOlder {
+                                        single: with_stmt.items.len() == 1,
+                                    })
                                 }))
                                 .finish(),
 
