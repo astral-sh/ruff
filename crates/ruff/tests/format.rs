@@ -523,7 +523,7 @@ from module import =
     ----- stdout -----
 
     ----- stderr -----
-    error: Failed to parse main.py:2:20: expecting an identifier
+    error: Failed to parse main.py:2:20: Unexpected token =
     "###);
 
     Ok(())
