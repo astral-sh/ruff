@@ -19,24 +19,23 @@ fn invalid_syntax() {
 
         let program = Program::parse_str(&source, Mode::Module);
 
-        assert_ne!(
-            &program.parse_errors,
-            &[],
+        assert!(
+            !program.is_valid(),
             "{input_path:?}: Expected parser to generate at least one syntax error for a program containing syntax errors."
         );
 
-        validate_ast(&program.ast, source.text_len(), input_path);
+        validate_ast(program.ast(), source.text_len(), input_path);
 
         let mut output = String::new();
         writeln!(&mut output, "## AST").unwrap();
-        writeln!(&mut output, "\n ```\n{:#?}\n```", &program.ast).unwrap();
+        writeln!(&mut output, "\n ```\n{:#?}\n```", program.ast()).unwrap();
 
         writeln!(&mut output, "## Errors\n").unwrap();
 
         let line_index = LineIndex::from_source_text(&source);
         let source_code = SourceCode::new(&source, &line_index);
 
-        for error in &program.parse_errors {
+        for error in program.errors() {
             writeln!(
                 &mut output,
                 "{}\n",
@@ -68,13 +67,13 @@ fn valid_syntax() {
 
         let program = Program::parse_str(&source, Mode::Module);
 
-        if !program.parse_errors.is_empty() {
+        if !program.is_valid() {
             let line_index = LineIndex::from_source_text(&source);
             let source_code = SourceCode::new(&source, &line_index);
 
             let mut message = "Expected no syntax errors for a valid program but the parser generated the following errors:\n".to_string();
 
-            for error in &program.parse_errors {
+            for error in program.errors() {
                 writeln!(
                     &mut message,
                     "{}\n",
@@ -90,11 +89,11 @@ fn valid_syntax() {
             panic!("{input_path:?}: {message}");
         }
 
-        validate_ast(&program.ast, source.text_len(), input_path);
+        validate_ast(program.ast(), source.text_len(), input_path);
 
         let mut output = String::new();
         writeln!(&mut output, "## AST").unwrap();
-        writeln!(&mut output, "\n ```\n{:#?}\n```", &program.ast).unwrap();
+        writeln!(&mut output, "\n ```\n{:#?}\n```", program.ast()).unwrap();
 
         insta::with_settings!({
             omit_expression => true,
