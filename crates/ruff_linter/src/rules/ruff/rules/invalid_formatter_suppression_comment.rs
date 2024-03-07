@@ -339,5 +339,8 @@ const fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
         | AnyNodeRef::FString(_)
         | AnyNodeRef::StringLiteral(_)
         | AnyNodeRef::BytesLiteral(_) => false,
+        AnyNodeRef::FStringInvalidElement(_)
+        | AnyNodeRef::ExprInvalid(_)
+        | AnyNodeRef::PatternMatchInvalid(_) => unreachable!(),
     }
 }
