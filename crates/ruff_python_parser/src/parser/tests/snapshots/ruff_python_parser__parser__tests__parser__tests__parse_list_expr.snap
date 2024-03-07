@@ -268,8 +268,8 @@ Program {
                                             arguments: Arguments {
                                                 range: 76..100,
                                                 args: [
-                                                    GeneratorExp(
-                                                        ExprGeneratorExp {
+                                                    Generator(
+                                                        ExprGenerator {
                                                             range: 77..99,
                                                             elt: Call(
                                                                 ExprCall {
@@ -337,6 +337,7 @@ Program {
                                                                     is_async: false,
                                                                 },
                                                             ],
+                                                            parenthesized: false,
                                                         },
                                                     ),
                                                 ],

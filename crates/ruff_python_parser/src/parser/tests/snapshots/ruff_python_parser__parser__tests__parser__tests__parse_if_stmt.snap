@@ -287,8 +287,8 @@ Program {
                 If(
                     StmtIf {
                         range: 175..187,
-                        test: NamedExpr(
-                            ExprNamedExpr {
+                        test: Named(
+                            ExprNamed {
                                 range: 178..182,
                                 target: Name(
                                     ExprName {

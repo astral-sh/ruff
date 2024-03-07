@@ -126,8 +126,8 @@ Module(
                 StmtAssign {
                     range: 315..328,
                     targets: [
-                        NamedExpr(
-                            ExprNamedExpr {
+                        Named(
+                            ExprNamed {
                                 range: 316..322,
                                 target: Name(
                                     ExprName {
@@ -275,8 +275,8 @@ Module(
                 StmtAssign {
                     range: 367..385,
                     targets: [
-                        IfExp(
-                            ExprIfExp {
+                        If(
+                            ExprIf {
                                 range: 367..380,
                                 test: Name(
                                     ExprName {
@@ -558,8 +558,8 @@ Module(
                 StmtAssign {
                     range: 479..499,
                     targets: [
-                        GeneratorExp(
-                            ExprGeneratorExp {
+                        Generator(
+                            ExprGenerator {
                                 range: 479..494,
                                 elt: Name(
                                     ExprName {
@@ -589,6 +589,7 @@ Module(
                                         is_async: false,
                                     },
                                 ],
+                                parenthesized: true,
                             },
                         ),
                     ],
@@ -1667,6 +1668,3 @@ Module(
 53 | (x, foo(), y) = (42, 42, 42)
    | ^^^^^^^^^^^^^ Syntax Error: invalid assignment target
    |
-
-
-

@@ -540,8 +540,8 @@ Program {
                                                     range: 228..229,
                                                 },
                                             ),
-                                            value: IfExp(
-                                                ExprIfExp {
+                                            value: If(
+                                                ExprIf {
                                                     range: 230..249,
                                                     test: BooleanLiteral(
                                                         ExprBooleanLiteral {

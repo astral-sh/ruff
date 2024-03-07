@@ -10,8 +10,8 @@ Program {
                 Expr(
                     StmtExpr {
                         range: 1..18,
-                        value: GeneratorExp(
-                            ExprGeneratorExp {
+                        value: Generator(
+                            ExprGenerator {
                                 range: 1..18,
                                 elt: Name(
                                     ExprName {
@@ -41,6 +41,7 @@ Program {
                                         is_async: false,
                                     },
                                 ],
+                                parenthesized: true,
                             },
                         ),
                     },
@@ -48,8 +49,8 @@ Program {
                 Expr(
                     StmtExpr {
                         range: 19..42,
-                        value: GeneratorExp(
-                            ExprGeneratorExp {
+                        value: Generator(
+                            ExprGenerator {
                                 range: 19..42,
                                 elt: Name(
                                     ExprName {
@@ -79,6 +80,7 @@ Program {
                                         is_async: true,
                                     },
                                 ],
+                                parenthesized: true,
                             },
                         ),
                     },
@@ -86,8 +88,8 @@ Program {
                 Expr(
                     StmtExpr {
                         range: 43..84,
-                        value: GeneratorExp(
-                            ExprGeneratorExp {
+                        value: Generator(
+                            ExprGenerator {
                                 range: 43..84,
                                 elt: Name(
                                     ExprName {
@@ -171,6 +173,7 @@ Program {
                                         is_async: false,
                                     },
                                 ],
+                                parenthesized: true,
                             },
                         ),
                     },
@@ -178,8 +181,8 @@ Program {
                 Expr(
                     StmtExpr {
                         range: 85..130,
-                        value: GeneratorExp(
-                            ExprGeneratorExp {
+                        value: Generator(
+                            ExprGenerator {
                                 range: 85..130,
                                 elt: Name(
                                     ExprName {
@@ -276,6 +279,7 @@ Program {
                                         is_async: false,
                                     },
                                 ],
+                                parenthesized: true,
                             },
                         ),
                     },
@@ -283,8 +287,8 @@ Program {
                 Expr(
                     StmtExpr {
                         range: 131..182,
-                        value: GeneratorExp(
-                            ExprGeneratorExp {
+                        value: Generator(
+                            ExprGenerator {
                                 range: 131..182,
                                 elt: Name(
                                     ExprName {
@@ -381,6 +385,7 @@ Program {
                                         is_async: true,
                                     },
                                 ],
+                                parenthesized: true,
                             },
                         ),
                     },
@@ -401,8 +406,8 @@ Program {
                                 arguments: Arguments {
                                     range: 184..198,
                                     args: [
-                                        GeneratorExp(
-                                            ExprGeneratorExp {
+                                        Generator(
+                                            ExprGenerator {
                                                 range: 185..197,
                                                 elt: Name(
                                                     ExprName {
@@ -432,6 +437,7 @@ Program {
                                                         is_async: false,
                                                     },
                                                 ],
+                                                parenthesized: false,
                                             },
                                         ),
                                     ],
@@ -464,8 +470,8 @@ Program {
                                                 ctx: Load,
                                             },
                                         ),
-                                        GeneratorExp(
-                                            ExprGeneratorExp {
+                                        Generator(
+                                            ExprGenerator {
                                                 range: 204..216,
                                                 elt: Name(
                                                     ExprName {
@@ -495,6 +501,7 @@ Program {
                                                         is_async: false,
                                                     },
                                                 ],
+                                                parenthesized: false,
                                             },
                                         ),
                                     ],
@@ -527,8 +534,8 @@ Program {
                                                 ctx: Load,
                                             },
                                         ),
-                                        GeneratorExp(
-                                            ExprGeneratorExp {
+                                        Generator(
+                                            ExprGenerator {
                                                 range: 223..238,
                                                 elt: Name(
                                                     ExprName {
@@ -574,6 +581,7 @@ Program {
                                                         is_async: false,
                                                     },
                                                 ],
+                                                parenthesized: false,
                                             },
                                         ),
                                     ],

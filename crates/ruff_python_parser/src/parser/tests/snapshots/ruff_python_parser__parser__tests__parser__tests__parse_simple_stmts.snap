@@ -108,8 +108,8 @@ Program {
                 Expr(
                     StmtExpr {
                         range: 44..57,
-                        value: IfExp(
-                            ExprIfExp {
+                        value: If(
+                            ExprIf {
                                 range: 44..57,
                                 test: Name(
                                     ExprName {

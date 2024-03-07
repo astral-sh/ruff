@@ -12,8 +12,8 @@ Module(
             If(
                 StmtIf {
                     range: 0..19,
-                    test: NamedExpr(
-                        ExprNamedExpr {
+                    test: Named(
+                        ExprNamed {
                             range: 3..9,
                             target: Name(
                                 ExprName {
@@ -45,8 +45,8 @@ Module(
             Expr(
                 StmtExpr {
                     range: 21..29,
-                    value: NamedExpr(
-                        ExprNamedExpr {
+                    value: Named(
+                        ExprNamed {
                             range: 22..28,
                             target: Name(
                                 ExprName {
@@ -71,4 +71,3 @@ Module(
     },
 )
 ```
-

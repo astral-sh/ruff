@@ -326,8 +326,8 @@ Program {
                 Expr(
                     StmtExpr {
                         range: 122..147,
-                        value: IfExp(
-                            ExprIfExp {
+                        value: If(
+                            ExprIf {
                                 range: 122..147,
                                 test: BooleanLiteral(
                                     ExprBooleanLiteral {

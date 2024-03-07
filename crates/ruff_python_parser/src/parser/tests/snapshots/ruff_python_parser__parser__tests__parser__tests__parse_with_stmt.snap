@@ -550,8 +550,8 @@ Program {
                         items: [
                             WithItem {
                                 range: 291..297,
-                                context_expr: NamedExpr(
-                                    ExprNamedExpr {
+                                context_expr: Named(
+                                    ExprNamed {
                                         range: 291..297,
                                         target: Name(
                                             ExprName {
@@ -685,8 +685,8 @@ Program {
                                     ExprTuple {
                                         range: 365..376,
                                         elts: [
-                                            NamedExpr(
-                                                ExprNamedExpr {
+                                            Named(
+                                                ExprNamed {
                                                     range: 366..372,
                                                     target: Name(
                                                         ExprName {

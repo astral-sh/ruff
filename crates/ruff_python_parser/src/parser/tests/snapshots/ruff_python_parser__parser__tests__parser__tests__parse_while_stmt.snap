@@ -224,8 +224,8 @@ Program {
                 While(
                     StmtWhile {
                         range: 152..169,
-                        test: NamedExpr(
-                            ExprNamedExpr {
+                        test: Named(
+                            ExprNamed {
                                 range: 158..164,
                                 target: Name(
                                     ExprName {

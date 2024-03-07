@@ -10,8 +10,8 @@ Program {
                 Expr(
                     StmtExpr {
                         range: 1..7,
-                        value: NamedExpr(
-                            ExprNamedExpr {
+                        value: Named(
+                            ExprNamed {
                                 range: 2..6,
                                 target: Name(
                                     ExprName {
@@ -39,8 +39,8 @@ Program {
                             ExprSet {
                                 range: 8..18,
                                 elts: [
-                                    NamedExpr(
-                                        ExprNamedExpr {
+                                    Named(
+                                        ExprNamed {
                                             range: 10..16,
                                             target: Name(
                                                 ExprName {
@@ -71,8 +71,8 @@ Program {
                             ExprList {
                                 range: 19..27,
                                 elts: [
-                                    NamedExpr(
-                                        ExprNamedExpr {
+                                    Named(
+                                        ExprNamed {
                                             range: 20..26,
                                             target: Name(
                                                 ExprName {
@@ -100,8 +100,8 @@ Program {
                 Expr(
                     StmtExpr {
                         range: 28..40,
-                        value: NamedExpr(
-                            ExprNamedExpr {
+                        value: Named(
+                            ExprNamed {
                                 range: 29..39,
                                 target: Name(
                                     ExprName {
@@ -150,8 +150,8 @@ Program {
                                             ctx: Load,
                                         },
                                     ),
-                                    NamedExpr(
-                                        ExprNamedExpr {
+                                    Named(
+                                        ExprNamed {
                                             range: 44..56,
                                             target: Name(
                                                 ExprName {
@@ -205,8 +205,8 @@ Program {
                                             ctx: Load,
                                         },
                                     ),
-                                    NamedExpr(
-                                        ExprNamedExpr {
+                                    Named(
+                                        ExprNamed {
                                             range: 62..72,
                                             target: Name(
                                                 ExprName {
@@ -260,8 +260,8 @@ Program {
                                             ctx: Load,
                                         },
                                     ),
-                                    NamedExpr(
-                                        ExprNamedExpr {
+                                    Named(
+                                        ExprNamed {
                                             range: 78..86,
                                             target: Name(
                                                 ExprName {
@@ -299,8 +299,8 @@ Program {
                                 arguments: Arguments {
                                     range: 89..101,
                                     args: [
-                                        NamedExpr(
-                                            ExprNamedExpr {
+                                        Named(
+                                            ExprNamed {
                                                 range: 90..94,
                                                 target: Name(
                                                     ExprName {
@@ -318,8 +318,8 @@ Program {
                                                 ),
                                             },
                                         ),
-                                        NamedExpr(
-                                            ExprNamedExpr {
+                                        Named(
+                                            ExprNamed {
                                                 range: 96..100,
                                                 target: Name(
                                                     ExprName {

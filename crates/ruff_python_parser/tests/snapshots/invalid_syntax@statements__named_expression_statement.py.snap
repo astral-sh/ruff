@@ -12,8 +12,8 @@ Module(
             Expr(
                 StmtExpr {
                     range: 120..128,
-                    value: NamedExpr(
-                        ExprNamedExpr {
+                    value: Named(
+                        ExprNamed {
                             range: 121..127,
                             target: NumberLiteral(
                                 ExprNumberLiteral {
@@ -47,6 +47,3 @@ Module(
 3 | (5 := 3)
   |  ^ Syntax Error: invalid assignment target
   |
-
-
-

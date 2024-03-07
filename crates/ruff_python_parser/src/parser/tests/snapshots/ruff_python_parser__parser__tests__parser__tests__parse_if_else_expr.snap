@@ -10,8 +10,8 @@ Program {
                 Expr(
                     StmtExpr {
                         range: 1..17,
-                        value: IfExp(
-                            ExprIfExp {
+                        value: If(
+                            ExprIf {
                                 range: 1..17,
                                 test: BooleanLiteral(
                                     ExprBooleanLiteral {
@@ -40,8 +40,8 @@ Program {
                 Expr(
                     StmtExpr {
                         range: 18..36,
-                        value: IfExp(
-                            ExprIfExp {
+                        value: If(
+                            ExprIf {
                                 range: 18..36,
                                 test: Name(
                                     ExprName {
@@ -79,8 +79,8 @@ Program {
                 Expr(
                     StmtExpr {
                         range: 37..62,
-                        value: IfExp(
-                            ExprIfExp {
+                        value: If(
+                            ExprIf {
                                 range: 37..62,
                                 test: Name(
                                     ExprName {
@@ -96,8 +96,8 @@ Program {
                                         ctx: Load,
                                     },
                                 ),
-                                orelse: IfExp(
-                                    ExprIfExp {
+                                orelse: If(
+                                    ExprIf {
                                         range: 49..62,
                                         test: Name(
                                             ExprName {
@@ -129,8 +129,8 @@ Program {
                 Expr(
                     StmtExpr {
                         range: 63..85,
-                        value: IfExp(
-                            ExprIfExp {
+                        value: If(
+                            ExprIf {
                                 range: 63..85,
                                 test: Compare(
                                     ExprCompare {
@@ -200,8 +200,8 @@ Program {
                 Expr(
                     StmtExpr {
                         range: 86..109,
-                        value: IfExp(
-                            ExprIfExp {
+                        value: If(
+                            ExprIf {
                                 range: 86..109,
                                 test: Name(
                                     ExprName {
@@ -245,8 +245,8 @@ Program {
                 Expr(
                     StmtExpr {
                         range: 110..128,
-                        value: IfExp(
-                            ExprIfExp {
+                        value: If(
+                            ExprIf {
                                 range: 110..128,
                                 test: Name(
                                     ExprName {
@@ -293,8 +293,8 @@ Program {
                 Expr(
                     StmtExpr {
                         range: 129..155,
-                        value: IfExp(
-                            ExprIfExp {
+                        value: If(
+                            ExprIf {
                                 range: 129..155,
                                 test: BoolOp(
                                     ExprBoolOp {
@@ -349,8 +349,8 @@ Program {
                                             ),
                                         },
                                     ),
-                                    IfExp(
-                                        ExprIfExp {
+                                    If(
+                                        ExprIf {
                                             range: 159..172,
                                             test: Name(
                                                 ExprName {

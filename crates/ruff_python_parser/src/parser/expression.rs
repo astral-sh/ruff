@@ -1674,7 +1674,7 @@ enum Precedence {
 }
 
 impl Precedence {
-    fn increment_precedence(&self) -> Precedence {
+    fn increment_precedence(self) -> Precedence {
         match self {
             Precedence::Or => Precedence::And,
             Precedence::And => Precedence::Not,

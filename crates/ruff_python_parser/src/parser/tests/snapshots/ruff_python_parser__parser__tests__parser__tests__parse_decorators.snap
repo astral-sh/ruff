@@ -286,8 +286,8 @@ Program {
                         decorator_list: [
                             Decorator {
                                 range: 94..112,
-                                expression: NamedExpr(
-                                    ExprNamedExpr {
+                                expression: Named(
+                                    ExprNamed {
                                         range: 95..112,
                                         target: Name(
                                             ExprName {

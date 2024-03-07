@@ -2124,8 +2124,8 @@ Program {
                 Match(
                     StmtMatch {
                         range: 1516..1610,
-                        subject: NamedExpr(
-                            ExprNamedExpr {
+                        subject: Named(
+                            ExprNamed {
                                 range: 1522..1528,
                                 target: Name(
                                     ExprName {
@@ -2309,8 +2309,8 @@ Program {
                                     },
                                 ),
                                 guard: Some(
-                                    NamedExpr(
-                                        ExprNamedExpr {
+                                    Named(
+                                        ExprNamed {
                                             range: 1651..1657,
                                             target: Name(
                                                 ExprName {

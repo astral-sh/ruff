@@ -624,8 +624,8 @@ Program {
                                                 ctx: Store,
                                             },
                                         ),
-                                        iter: IfExp(
-                                            ExprIfExp {
+                                        iter: If(
+                                            ExprIf {
                                                 range: 287..303,
                                                 test: BooleanLiteral(
                                                     ExprBooleanLiteral {
@@ -688,8 +688,8 @@ Program {
                                                 ctx: Store,
                                             },
                                         ),
-                                        iter: IfExp(
-                                            ExprIfExp {
+                                        iter: If(
+                                            ExprIf {
                                                 range: 324..346,
                                                 test: BooleanLiteral(
                                                     ExprBooleanLiteral {
@@ -760,8 +760,8 @@ Program {
                                         iter: Await(
                                             ExprAwait {
                                                 range: 366..390,
-                                                value: IfExp(
-                                                    ExprIfExp {
+                                                value: If(
+                                                    ExprIf {
                                                         range: 373..389,
                                                         test: BooleanLiteral(
                                                             ExprBooleanLiteral {
@@ -839,8 +839,8 @@ Program {
                                                 arguments: Arguments {
                                                     range: 410..429,
                                                     args: [
-                                                        IfExp(
-                                                            ExprIfExp {
+                                                        If(
+                                                            ExprIf {
                                                                 range: 411..428,
                                                                 test: BooleanLiteral(
                                                                     ExprBooleanLiteral {
