@@ -37,6 +37,8 @@ impl Format<PyFormatContext<'_>> for FormatFStringElement<'_> {
             FStringElement::Expression(expression) => {
                 FormatFStringExpressionElement::new(expression, self.context).fmt(f)
             }
+            #[allow(deprecated)]
+            FStringElement::Invalid(_) => unreachable!(),
         }
     }
 }

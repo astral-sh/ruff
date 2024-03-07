@@ -556,7 +556,6 @@ impl From<StmtContinue> for Stmt {
 }
 
 /// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)
-#[allow(deprecated)]
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Expr {
     #[is(name = "bool_op_expr")]
@@ -626,9 +625,8 @@ pub enum Expr {
     #[is(name = "ipy_escape_command_expr")]
     IpyEscapeCommand(ExprIpyEscapeCommand),
 
+    // TODO(dhruvmanila): Remove this variant
     #[is(name = "invalid_expr")]
-    #[deprecated]
-    #[allow(deprecated)]
     Invalid(ExprInvalid),
 }
 
@@ -1391,13 +1389,11 @@ impl From<FString> for Expr {
 }
 
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
-#[allow(deprecated)]
 pub enum FStringElement {
     Literal(FStringLiteralElement),
     Expression(FStringExpressionElement),
 
-    #[allow(deprecated)]
-    #[deprecated]
+    // TODO(dhruvmanila): Remove this variant
     Invalid(FStringInvalidElement),
 }
 
@@ -3174,7 +3170,6 @@ pub struct MatchCase {
 
 /// See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
-#[allow(deprecated)]
 pub enum Pattern {
     MatchValue(PatternMatchValue),
     MatchSingleton(PatternMatchSingleton),
@@ -3184,7 +3179,8 @@ pub enum Pattern {
     MatchStar(PatternMatchStar),
     MatchAs(PatternMatchAs),
     MatchOr(PatternMatchOr),
-    #[deprecated]
+
+    // TODO(dhruvmanila): Remove this variant
     Invalid(PatternMatchInvalid),
 }
 
