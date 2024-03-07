@@ -39,11 +39,36 @@ pub(crate) fn parse_tokens(
 
 #[derive(Debug)]
 pub struct Program {
-    pub ast: ast::Mod,
-    pub parse_errors: Vec<ParseError>,
+    ast: ast::Mod,
+    parse_errors: Vec<ParseError>,
 }
 
 impl Program {
+    /// Returns the parsed AST.
+    pub fn ast(&self) -> &ast::Mod {
+        &self.ast
+    }
+
+    /// Returns a list of syntax errors found during parsing.
+    pub fn errors(&self) -> &[ParseError] {
+        &self.parse_errors
+    }
+
+    /// Consumes the `Program` and returns the parsed AST.
+    pub fn into_ast(self) -> ast::Mod {
+        self.ast
+    }
+
+    /// Consumes the `Program` and returns a list of syntax errors found during parsing.
+    pub fn into_errors(self) -> Vec<ParseError> {
+        self.parse_errors
+    }
+
+    /// Returns `true` if the program is valid i.e., it has no syntax errors.
+    pub fn is_valid(&self) -> bool {
+        self.parse_errors.is_empty()
+    }
+
     pub fn parse_str(source: &str, mode: Mode) -> Program {
         let tokens = lex(source, mode);
         Self::parse_tokens(source, tokens.collect(), mode)
