@@ -428,7 +428,7 @@ impl<'src> Parser<'src> {
                 Pattern::MatchAs(ast::PatternMatchAs {
                     range,
                     pattern: None,
-                    name: if name.contains("_") {
+                    name: if name.contains('_') {
                         None
                     } else {
                         Some(ast::Identifier {

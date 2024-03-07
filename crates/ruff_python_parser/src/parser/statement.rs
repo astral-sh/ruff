@@ -375,7 +375,7 @@ impl<'src> Parser<'src> {
 
         let parenthesized = self.eat(TokenKind::Lpar);
         let names =
-            self.parse_delimited_list(RecoveryContextKind::ImportNames, |p| p.parse_alias(), true);
+            self.parse_delimited_list(RecoveryContextKind::ImportNames, Parser::parse_alias, true);
 
         if parenthesized {
             self.expect(TokenKind::Rpar);
@@ -1460,7 +1460,7 @@ impl<'src> Parser<'src> {
 
         let type_params = self.parse_delimited_list(
             RecoveryContextKind::TypeParams,
-            |p| p.parse_type_param(),
+            Parser::parse_type_param,
             true,
         );
 
