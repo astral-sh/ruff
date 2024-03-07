@@ -9,6 +9,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
+use crate::fix::snippet::SourceCodeSnippet;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum EqCmpOp {
@@ -105,44 +106,50 @@ impl AlwaysFixableViolation for NoneComparison {
 pub struct TrueFalseComparison {
     value: bool,
     op: EqCmpOp,
-    cond: Option<String>,
+    cond: Option<SourceCodeSnippet>,
 }
 
 impl AlwaysFixableViolation for TrueFalseComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
         let TrueFalseComparison { value, op, cond } = self;
-        match (value, op, cond) {
-            (true, EqCmpOp::Eq, Some(cond)) => {
+        let Some(cond) = cond else {
+            return "Avoid equality comparisons to `True` or `False`".to_string();
+        };
+        let cond = cond.truncated_display();
+        match (value, op) {
+            (true, EqCmpOp::Eq) => {
                 format!("Avoid equality comparisons to `True`; use `if {cond}:` for truth checks")
             }
-            (true, EqCmpOp::NotEq, Some(cond)) => {
+            (true, EqCmpOp::NotEq) => {
                 format!(
                     "Avoid inequality comparisons to `True`; use `if not {cond}:` for false checks"
                 )
             }
-            (false, EqCmpOp::Eq, Some(cond)) => {
+            (false, EqCmpOp::Eq) => {
                 format!(
                     "Avoid equality comparisons to `False`; use `if not {cond}:` for false checks"
                 )
             }
-            (false, EqCmpOp::NotEq, Some(cond)) => {
+            (false, EqCmpOp::NotEq) => {
                 format!(
                     "Avoid inequality comparisons to `False`; use `if {cond}:` for truth checks"
                 )
             }
-            _ => format!("Avoid equality comparisons to `True` or `False`"),
         }
     }
 
     fn fix_title(&self) -> String {
         let TrueFalseComparison { value, op, cond } = self;
-        match (value, op, cond) {
-            (_, _, None) => "Replace comparison".to_string(),
-            (true, EqCmpOp::Eq, Some(cond)) => format!("Replace with `{cond}`"),
-            (true, EqCmpOp::NotEq, Some(cond)) => format!("Replace with `not {cond}`"),
-            (false, EqCmpOp::Eq, Some(cond)) => format!("Replace with `not {cond}`"),
-            (false, EqCmpOp::NotEq, Some(cond)) => format!("Replace with `{cond}`"),
+        let cond = match cond {
+            Some(cond) if cond.full_display().is_some() => cond.full_display().unwrap().to_string(),
+            _ => return "Replace comparison".to_string(),
+        };
+        match (value, op) {
+            (true, EqCmpOp::Eq) => format!("Replace with `{cond}`"),
+            (true, EqCmpOp::NotEq) => format!("Replace with `not {cond}`"),
+            (false, EqCmpOp::Eq) => format!("Replace with `not {cond}`"),
+            (false, EqCmpOp::NotEq) => format!("Replace with `{cond}`"),
         }
     }
 }
@@ -187,7 +194,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                     match op {
                         EqCmpOp::Eq => {
                             let cond = if compare.ops.len() < 2 {
-                                Some(checker.locator().slice(next).into())
+                                Some(SourceCodeSnippet::from_str(checker.locator().slice(next)))
                             } else {
                                 None
                             };
@@ -204,7 +211,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                         }
                         EqCmpOp::NotEq => {
                             let cond = if compare.ops.len() < 2 {
-                                Some(checker.locator().slice(next).into())
+                                Some(SourceCodeSnippet::from_str(checker.locator().slice(next)))
                             } else {
                                 None
                             };
@@ -258,7 +265,9 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                     match op {
                         EqCmpOp::Eq => {
                             let cond = if compare.ops.len() < 2 {
-                                Some(checker.locator().slice(comparator).into())
+                                Some(SourceCodeSnippet::from_str(
+                                    checker.locator().slice(comparator),
+                                ))
                             } else {
                                 None
                             };
@@ -275,7 +284,9 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                         }
                         EqCmpOp::NotEq => {
                             let cond = if compare.ops.len() < 2 {
-                                Some(checker.locator().slice(comparator).into())
+                                Some(SourceCodeSnippet::from_str(
+                                    checker.locator().slice(comparator),
+                                ))
                             } else {
                                 None
                             };
