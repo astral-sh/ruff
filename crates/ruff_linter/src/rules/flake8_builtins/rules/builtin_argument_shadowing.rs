@@ -73,7 +73,7 @@ pub(crate) fn builtin_argument_shadowing(checker: &mut Checker, parameter: &Para
             BuiltinArgumentShadowing {
                 name: parameter.name.to_string(),
             },
-            parameter.range(),
+            parameter.name.range(),
         ));
     }
 }
