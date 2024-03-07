@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use ruff_notebook::CellOffsets;
 use std::cmp::Ordering;
 use std::num::NonZeroU32;
 use std::slice::Iter;
@@ -654,6 +655,7 @@ pub(crate) struct BlankLinesChecker<'a> {
     lines_after_imports: isize,
     lines_between_types: usize,
     source_type: PySourceType,
+    cell_offsets: Option<&'a CellOffsets>,
 }
 
 impl<'a> BlankLinesChecker<'a> {
@@ -662,6 +664,7 @@ impl<'a> BlankLinesChecker<'a> {
         stylist: &'a Stylist<'a>,
         settings: &crate::settings::LinterSettings,
         source_type: PySourceType,
+        cell_offsets: Option<&'a CellOffsets>,
     ) -> BlankLinesChecker<'a> {
         BlankLinesChecker {
             stylist,
@@ -670,6 +673,7 @@ impl<'a> BlankLinesChecker<'a> {
             lines_after_imports: settings.isort.lines_after_imports,
             lines_between_types: settings.isort.lines_between_types,
             source_type,
+            cell_offsets,
         }
     }
 
@@ -818,6 +822,9 @@ impl<'a> BlankLinesChecker<'a> {
             && line.kind.is_class_function_or_decorator()
             // Blank lines in stub files are used to group definitions. Don't enforce blank lines.
             && !self.source_type.is_stub()
+            // Do not add blank lines at the start of cells in notebooks.
+            && !self.cell_offsets
+                    .is_some_and(|cell_offsets| cell_offsets.contains(&line.first_token_range.start()))
         {
             // E302
             let mut diagnostic = Diagnostic::new(
@@ -932,6 +939,9 @@ impl<'a> BlankLinesChecker<'a> {
             && !line.kind.is_class_function_or_decorator()
             // Blank lines in stub files are used for grouping, don't enforce blank lines.
             && !self.source_type.is_stub()
+            // Do not add blank lines at the start of cells in notebooks.
+            && !self.cell_offsets
+                    .is_some_and(|cell_offsets| cell_offsets.contains(&line.first_token_range.start()))
         {
             // E305
             let mut diagnostic = Diagnostic::new(
