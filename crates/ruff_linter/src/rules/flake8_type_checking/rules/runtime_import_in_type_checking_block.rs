@@ -189,7 +189,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 {
                     let mut diagnostic = Diagnostic::new(
                         RuntimeImportInTypeCheckingBlock {
-                            qualified_name: import.qualified_name(),
+                            qualified_name: import.qualified_name().to_string(),
                             strategy: Strategy::MoveImport,
                         },
                         range,
@@ -218,7 +218,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 {
                     let mut diagnostic = Diagnostic::new(
                         RuntimeImportInTypeCheckingBlock {
-                            qualified_name: import.qualified_name(),
+                            qualified_name: import.qualified_name().to_string(),
                             strategy: Strategy::QuoteUsages,
                         },
                         range,
@@ -245,7 +245,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 {
                     let mut diagnostic = Diagnostic::new(
                         RuntimeImportInTypeCheckingBlock {
-                            qualified_name: import.qualified_name(),
+                            qualified_name: import.qualified_name().to_string(),
                             strategy: Strategy::MoveImport,
                         },
                         range,

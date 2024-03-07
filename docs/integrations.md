@@ -14,7 +14,7 @@ Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-c
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.3.0
+  rev: v0.3.1
   hooks:
     # Run the linter.
     - id: ruff
@@ -27,7 +27,7 @@ To enable lint fixes, add the `--fix` argument to the lint hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.3.0
+  rev: v0.3.1
   hooks:
     # Run the linter.
     - id: ruff
@@ -41,7 +41,7 @@ To run the hooks over Jupyter Notebooks too, add `jupyter` to the list of allowe
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.3.0
+  rev: v0.3.1
   hooks:
     # Run the linter.
     - id: ruff
@@ -417,7 +417,7 @@ Alternatively, you can include `ruff-action` as a step in any other workflow fil
 `ruff-action` accepts optional configuration parameters via `with:`, including:
 
 - `version`: The Ruff version to install (default: latest).
-- `options`: The command-line arguments to pass to Ruff (default: `"check"`).
+- `args`: The command-line arguments to pass to Ruff (default: `"check"`).
 - `src`: The source paths to pass to Ruff (default: `"."`).
 
 For example, to run `ruff check --select B ./src` using Ruff version `0.0.259`:
@@ -425,7 +425,7 @@ For example, to run `ruff check --select B ./src` using Ruff version `0.0.259`:
 ```yaml
 - uses: chartboost/ruff-action@v1
   with:
-    src: "./src"
     version: 0.0.259
-    args: --select B
+    args: check --select B
+    src: "./src"
 ```

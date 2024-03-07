@@ -24,7 +24,6 @@ itertools = { workspace = true }
 once_cell = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true, optional = true }
-smallvec = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

@@ -4,7 +4,7 @@ use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 
 use ruff_python_ast::helpers::from_relative_import;
-use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder, UnqualifiedName};
+use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::{self as ast, Expr, Operator, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -194,10 +194,7 @@ impl<'a> SemanticModel<'a> {
 
         if self.typing_modules.iter().any(|module| {
             let module = QualifiedName::from_dotted_name(module);
-            let mut builder = QualifiedNameBuilder::from_qualified_name(module);
-            builder.push(target);
-            let target_path = builder.build();
-            qualified_name == &target_path
+            qualified_name == &module.append_member(target)
         }) {
             return true;
         }
@@ -617,8 +614,8 @@ impl<'a> SemanticModel<'a> {
         }
 
         // Grab, e.g., `pyarrow` from `import pyarrow as pa`.
-        let call_path = import.call_path();
-        let segment = call_path.last()?;
+        let call_path = import.qualified_name();
+        let segment = call_path.segments().last()?;
         if *segment == symbol {
             return None;
         }
@@ -692,8 +689,12 @@ impl<'a> SemanticModel<'a> {
             BindingKind::Import(Import { qualified_name }) => {
                 let unqualified_name = UnqualifiedName::from_expr(value)?;
                 let (_, tail) = unqualified_name.segments().split_first()?;
-                let resolved: QualifiedName =
-                    qualified_name.iter().chain(tail.iter()).copied().collect();
+                let resolved: QualifiedName = qualified_name
+                    .segments()
+                    .iter()
+                    .chain(tail.iter())
+                    .copied()
+                    .collect();
                 Some(resolved)
             }
             BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
@@ -702,6 +703,7 @@ impl<'a> SemanticModel<'a> {
 
                 Some(
                     qualified_name
+                        .segments()
                         .iter()
                         .take(1)
                         .chain(tail.iter())
@@ -714,19 +716,25 @@ impl<'a> SemanticModel<'a> {
                 let (_, tail) = value_name.segments().split_first()?;
 
                 let resolved: QualifiedName = if qualified_name
+                    .segments()
                     .first()
                     .map_or(false, |segment| *segment == ".")
                 {
-                    from_relative_import(self.module_path?, qualified_name, tail)?
+                    from_relative_import(self.module_path?, qualified_name.segments(), tail)?
                 } else {
-                    qualified_name.iter().chain(tail.iter()).copied().collect()
+                    qualified_name
+                        .segments()
+                        .iter()
+                        .chain(tail.iter())
+                        .copied()
+                        .collect()
                 };
                 Some(resolved)
             }
             BindingKind::Builtin => {
                 if value.is_name_expr() {
                     // Ex) `dict`
-                    Some(QualifiedName::from_slice(&["", head.id.as_str()]))
+                    Some(QualifiedName::builtin(head.id.as_str()))
                 } else {
                     // Ex) `dict.__dict__`
                     let value_name = UnqualifiedName::from_expr(value)?;
@@ -780,7 +788,7 @@ impl<'a> SemanticModel<'a> {
                         // `import sys`         -> `sys.exit`
                         // `import sys as sys2` -> `sys2.exit`
                         BindingKind::Import(Import { qualified_name }) => {
-                            if qualified_name.as_ref() == module_path.as_slice() {
+                            if qualified_name.segments() == module_path.as_slice() {
                                 if let Some(source) = binding.source {
                                     // Verify that `sys` isn't bound in an inner scope.
                                     if self
@@ -803,7 +811,7 @@ impl<'a> SemanticModel<'a> {
                         // `from os.path import join as join2` -> `join2`
                         BindingKind::FromImport(FromImport { qualified_name }) => {
                             if let Some((target_member, target_module)) =
-                                qualified_name.split_last()
+                                qualified_name.segments().split_last()
                             {
                                 if target_module == module_path.as_slice()
                                     && target_member == &member
@@ -831,7 +839,7 @@ impl<'a> SemanticModel<'a> {
                         // Ex) Given `module="os.path"` and `object="join"`:
                         // `import os.path ` -> `os.path.join`
                         BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
-                            if qualified_name.starts_with(&module_path) {
+                            if qualified_name.segments().starts_with(&module_path) {
                                 if let Some(source) = binding.source {
                                     // Verify that `os` isn't bound in an inner scope.
                                     if self

@@ -71,26 +71,33 @@ impl AlwaysFixableViolation for NoneComparison {
 }
 
 /// ## What it does
-/// Checks for comparisons to booleans which are not using the `is` operator.
+/// Checks for equality comparisons to boolean literals.
 ///
 /// ## Why is this bad?
-/// According to [PEP 8], "Comparisons to singletons like None should always be done with
-/// is or is not, never the equality operators."
+/// [PEP 8] recommends against using the equality operators `==` and `!=` to
+/// compare values to `True` or `False`.
+///
+/// Instead, use `if cond:` or `if not cond:` to check for truth values.
+///
+/// If you intend to check if a value is the boolean literal `True` or `False`,
+/// consider using `is` or `is not` to check for identity instead.
 ///
 /// ## Example
 /// ```python
-/// if arg == True:
-///     pass
-/// if False == arg:
-///     pass
+/// if foo == True:
+///     ...
+///
+/// if bar == False:
+///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// if arg is True:
-///     pass
-/// if arg is False:
-///     pass
+/// if foo:
+///     ...
+///
+/// if not bar:
+///     ...
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
@@ -103,16 +110,20 @@ impl AlwaysFixableViolation for TrueFalseComparison {
         let TrueFalseComparison(value, op) = self;
         match (value, op) {
             (true, EqCmpOp::Eq) => {
-                format!("Comparison to `True` should be `cond is True` or `if cond:`")
+                format!("Avoid equality comparisons to `True`; use `if cond:` for truth checks")
             }
             (true, EqCmpOp::NotEq) => {
-                format!("Comparison to `True` should be `cond is not True` or `if not cond:`")
+                format!(
+                    "Avoid inequality comparisons to `True`; use `if not cond:` for false checks"
+                )
             }
             (false, EqCmpOp::Eq) => {
-                format!("Comparison to `False` should be `cond is False` or `if not cond:`")
+                format!(
+                    "Avoid equality comparisons to `False`; use `if not cond:` for false checks"
+                )
             }
             (false, EqCmpOp::NotEq) => {
-                format!("Comparison to `False` should be `cond is not False` or `if cond:`")
+                format!("Avoid inequality comparisons to `False`; use `if cond:` for truth checks")
             }
         }
     }
@@ -120,10 +131,10 @@ impl AlwaysFixableViolation for TrueFalseComparison {
     fn fix_title(&self) -> String {
         let TrueFalseComparison(value, op) = self;
         match (value, op) {
-            (true, EqCmpOp::Eq) => "Replace with `cond is True`".to_string(),
-            (true, EqCmpOp::NotEq) => "Replace with `cond is not True`".to_string(),
-            (false, EqCmpOp::Eq) => "Replace with `cond is False`".to_string(),
-            (false, EqCmpOp::NotEq) => "Replace with `cond is not False`".to_string(),
+            (true, EqCmpOp::Eq) => "Replace with `cond`".to_string(),
+            (true, EqCmpOp::NotEq) => "Replace with `not cond`".to_string(),
+            (false, EqCmpOp::Eq) => "Replace with `not cond`".to_string(),
+            (false, EqCmpOp::NotEq) => "Replace with `cond`".to_string(),
         }
     }
 }

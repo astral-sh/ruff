@@ -26,8 +26,8 @@ use super::helpers::is_empty_or_null_string;
 ///
 /// def test_foo():
 ///     with pytest.raises(MyError):
-///         setup()  # may raise `MyError`
-///         func_to_test()
+///         setup()
+///         func_to_test()  # not executed if `setup()` raises `MyError`
 ///         assert foo()  # not executed
 /// ```
 ///
@@ -38,7 +38,7 @@ use super::helpers::is_empty_or_null_string;
 ///
 /// def test_foo():
 ///     setup()
-///     with pytest.raises(MyException):
+///     with pytest.raises(MyError):
 ///         func_to_test()
 ///     assert foo()
 /// ```

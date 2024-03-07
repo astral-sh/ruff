@@ -178,7 +178,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         {
             let mut diagnostic = Diagnostic::new(
                 UnusedImport {
-                    name: import.qualified_name(),
+                    name: import.qualified_name().to_string(),
                     context: if in_except_handler {
                         Some(UnusedImportContext::ExceptHandler)
                     } else if in_init {
@@ -212,7 +212,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
     {
         let mut diagnostic = Diagnostic::new(
             UnusedImport {
-                name: import.qualified_name(),
+                name: import.qualified_name().to_string(),
                 context: None,
                 multiple: false,
             },
