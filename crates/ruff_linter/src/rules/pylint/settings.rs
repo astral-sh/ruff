@@ -99,7 +99,7 @@ impl fmt::Display for Settings {
                 self.max_statements,
                 self.max_public_methods,
                 self.max_locals,
-                self.max_module_lines
+                self.max_module_lines,
             ]
         }
         Ok(())

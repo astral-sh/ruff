@@ -38,6 +38,7 @@ use crate::settings::LinterSettings;
 /// ```
 ///
 /// Use instead:
+///
 /// `__init__.py`
 /// ```python
 /// __all__ = ["is_palindrome", "main"]

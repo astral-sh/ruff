@@ -2487,6 +2487,15 @@
           "format": "uint",
           "minimum": 0.0
         },
+        "max-module-lines": {
+          "description": "Maximum number of lines within a module (see: `PLC0302`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
         "max-nested-blocks": {
           "description": "Maximum number of nested blocks allowed within a function or method body (see: `PLR1702`).",
           "type": [

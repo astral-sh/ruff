@@ -2804,6 +2804,11 @@ pub struct PylintOptions {
     /// (see: `PLR1702`).
     #[option(default = r"5", value_type = "int", example = r"max-nested-blocks = 5")]
     pub max_nested_blocks: Option<usize>,
+
+    /// Maximum number of lines within a module
+    /// (see: `PLC0302`).
+    #[option(default = r"2000", value_type = "int", example = r"max-module-lines = 1000")]
+    pub max_module_lines: Option<usize>,
 }
 
 impl PylintOptions {
