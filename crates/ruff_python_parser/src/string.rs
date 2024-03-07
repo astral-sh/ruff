@@ -76,7 +76,7 @@ impl StringParser {
 
     #[inline]
     fn range(&self, start_location: TextSize) -> TextRange {
-        TextRange::new(dbg!(start_location), dbg!(self.offset))
+        TextRange::new(start_location, self.offset)
     }
 
     /// Returns the next byte in the string, if there is one.
