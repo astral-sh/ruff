@@ -2,7 +2,7 @@ use ruff_python_ast::{Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
+use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -69,10 +69,7 @@ pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
 /// Checks for the presence of a debugger import.
 pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<Diagnostic> {
     if let Some(module) = module {
-        let mut builder =
-            QualifiedNameBuilder::from_qualified_name(QualifiedName::imported(module));
-        builder.push(name);
-        let qualified_name = builder.build();
+        let qualified_name = QualifiedName::user_defined(module).append_member(name);
 
         if is_debugger_call(&qualified_name) {
             return Some(Diagnostic::new(
@@ -83,7 +80,7 @@ pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> 
             ));
         }
     } else {
-        let qualified_name = QualifiedName::imported(name);
+        let qualified_name = QualifiedName::user_defined(name);
 
         if is_debugger_import(&qualified_name) {
             return Some(Diagnostic::new(

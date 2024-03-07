@@ -43,6 +43,7 @@ use ruff_python_ast::helpers::{
     collect_import_from_member, extract_handled_exceptions, is_docstring_stmt, to_module_path,
 };
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::visitor::{walk_except_handler, walk_f_string_element, walk_pattern, Visitor};
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
@@ -418,11 +419,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.semantic.add_module(module);
 
                     if alias.asname.is_none() && alias.name.contains('.') {
-                        let qualified_name: Box<[&str]> = alias.name.split('.').collect();
+                        let qualified_name = QualifiedName::user_defined(&alias.name);
                         self.add_binding(
                             module,
                             alias.identifier(),
-                            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }),
+                            BindingKind::SubmoduleImport(SubmoduleImport {
+                                qualified_name: Box::new(qualified_name),
+                            }),
                             BindingFlags::EXTERNAL,
                         );
                     } else {
@@ -439,11 +442,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
 
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let qualified_name: Box<[&str]> = alias.name.split('.').collect();
+                        let qualified_name = QualifiedName::user_defined(&alias.name);
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::Import(Import { qualified_name }),
+                            BindingKind::Import(Import {
+                                qualified_name: Box::new(qualified_name),
+                            }),
                             flags,
                         );
                     }
@@ -503,12 +508,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         // Attempt to resolve any relative imports; but if we don't know the current
                         // module path, or the relative import extends beyond the package root,
                         // fallback to a literal representation (e.g., `[".", "foo"]`).
-                        let qualified_name = collect_import_from_member(level, module, &alias.name)
-                            .into_boxed_slice();
+                        let qualified_name = collect_import_from_member(level, module, &alias.name);
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::FromImport(FromImport { qualified_name }),
+                            BindingKind::FromImport(FromImport {
+                                qualified_name: Box::new(qualified_name),
+                            }),
                             flags,
                         );
                     }

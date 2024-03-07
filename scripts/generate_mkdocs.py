@@ -173,7 +173,7 @@ def main() -> None:
     # Add the nav section to mkdocs.yml.
     config["nav"] = [{section.title: section.filename} for section in SECTIONS]
 
-    with Path("mkdocs.generated.yml").open("w+") as fp:
+    with Path("mkdocs.generated.yml").open("w+", encoding="utf8") as fp:
         yaml.safe_dump(config, fp)
 
 
