@@ -27,17 +27,6 @@ await x = 42
 a < b < c = 42
 foo() = 42
 
-# N.B. It looks like the parser can't generate a top-level
-# FormattedValue, where as the official Python AST permits
-# representing a single f-string containing just a variable as a
-# FormattedValue directly.
-#
-# Bottom line is that because of this, this test is (at present)
-# duplicative with the `fstring` test. That is, in theory these tests
-# could fail independently, but in practice their failure or success
-# is coupled.
-#
-# See: https://docs.python.org/3/library/ast.html#ast.FormattedValue
 f"{quux}" = 42
 f"{foo} and {bar}" = 42
 
