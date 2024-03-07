@@ -54,21 +54,21 @@ pub(crate) fn too_many_newlines_at_end_of_file(
 
     for &(ref tok, range) in lxr.iter().rev().flatten() {
         match tok {
-            Tok::NonLogicalNewline => {
+            Tok::NonLogicalNewline | Tok::Newline => {
                 if count == 0 {
                     end_pos = Some(range.end());
                 }
+                start_pos = Some(range.end());
                 count += 1;
             }
             Tok::Dedent => continue,
             _ => {
-                start_pos = Some(range.end());
                 break;
             }
         }
     }
 
-    if count >= 1 {
+    if count > 1 {
         let start = start_pos.unwrap();
         let end = end_pos.unwrap();
         let range = TextRange::new(start, end);
