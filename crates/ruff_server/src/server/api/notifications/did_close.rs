@@ -12,15 +12,16 @@ impl super::Notification for DidClose {
 }
 
 impl super::SyncNotification for DidClose {
-    #[tracing::instrument(skip_all, fields(file=%params.text_document.uri))]
+    #[tracing::instrument(skip_all, fields(file=%uri))]
     fn run(
         session: &mut Session,
         _notifier: Notifier,
-        params: types::DidCloseTextDocumentParams,
+        types::DidCloseTextDocumentParams {
+            text_document: types::TextDocumentIdentifier { uri },
+        }: types::DidCloseTextDocumentParams,
     ) -> Result<()> {
-        super::define_document_url!(params: &types::DidCloseTextDocumentParams);
         session
-            .close_document(document_url(&params))
+            .close_document(&uri)
             .with_failure_code(lsp_server::ErrorCode::InternalError)
     }
 }

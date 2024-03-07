@@ -1,5 +1,5 @@
 use ruff_formatter::PrintedRange;
-use ruff_python_formatter::{format_module_source, format_range};
+use ruff_python_formatter::format_module_source;
 use ruff_text_size::TextRange;
 use ruff_workspace::FormatterSettings;
 
@@ -16,7 +16,7 @@ pub(crate) fn format(
     Ok(formatted.into_code())
 }
 
-pub(crate) fn range_format(
+pub(crate) fn format_range(
     document: &Document,
     formatter_settings: &FormatterSettings,
     range: TextRange,
@@ -25,5 +25,9 @@ pub(crate) fn range_format(
     let format_options = formatter_settings
         .to_format_options(ruff_python_ast::PySourceType::Python, document.contents());
 
-    Ok(format_range(document.contents(), range, format_options)?)
+    Ok(ruff_python_formatter::format_range(
+        document.contents(),
+        range,
+        format_options,
+    )?)
 }

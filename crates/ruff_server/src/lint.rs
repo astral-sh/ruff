@@ -18,7 +18,7 @@ use ruff_python_parser::AsMode;
 use ruff_source_file::Locator;
 use serde::{Deserialize, Serialize};
 
-use crate::{PositionEncoding, DIAGNOSTIC_NAME};
+use crate::{edit::ToRangeExt, PositionEncoding, DIAGNOSTIC_NAME};
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct DiagnosticFix {
@@ -32,6 +32,7 @@ pub(crate) fn check(
     encoding: PositionEncoding,
 ) -> Vec<lsp_types::Diagnostic> {
     let contents = document.contents();
+    let index = document.index().clone();
 
     let source_type = PySourceType::default();
 
@@ -42,7 +43,7 @@ pub(crate) fn check(
     let tokens: Vec<LexResult> = ruff_python_parser::tokenize(contents, source_type.as_mode());
 
     // Map row and column locations to byte slices (lazily).
-    let locator = Locator::new(contents);
+    let locator = Locator::with_index(contents, index);
 
     // Detect the current code style (lazily).
     let stylist = Stylist::from_tokens(&tokens, &locator);
@@ -100,7 +101,7 @@ fn to_lsp_diagnostic(
             .flatten()
     });
     lsp_types::Diagnostic {
-        range: crate::edit::text_range_to_range(range, document, encoding),
+        range: range.to_range(document.contents(), document.index(), encoding),
         severity: Some(lsp_types::DiagnosticSeverity::ERROR),
         code: Some(lsp_types::NumberOrString::String(
             rule.noqa_code().to_string(),

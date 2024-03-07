@@ -31,8 +31,6 @@ jod-thread = { workspace = true }
 libc = { workspace = true }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
-notify = { workspace = true }
-phf = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -9,15 +9,15 @@ use types::CodeActionKind;
 use types::CodeActionOptions;
 use types::DiagnosticOptions;
 use types::OneOf;
-use types::PositionEncodingKind;
 use types::TextDocumentSyncCapability;
 use types::TextDocumentSyncKind;
 use types::TextDocumentSyncOptions;
 use types::WorkDoneProgressOptions;
 use types::WorkspaceFoldersServerCapabilities;
 
-use self::schedule::main_thread;
+use self::schedule::main_loop_thread;
 use crate::session::Session;
+use crate::PositionEncoding;
 
 mod api;
 mod client;
@@ -65,7 +65,7 @@ impl Server {
     }
 
     pub fn run(self) -> crate::Result<()> {
-        let result = main_thread(move || Self::main_loop(&self.conn, self.session))?.join();
+        let result = main_loop_thread(move || Self::main_loop(&self.conn, self.session))?.join();
         self.threads.join()?;
         result
     }
@@ -74,7 +74,6 @@ impl Server {
         // TODO(jane): Make thread count configurable
         let mut scheduler = schedule::Scheduler::new(session, 4, &connection.sender);
         for msg in &connection.receiver {
-            scheduler.process_events();
             let task = match msg {
                 lsp::Message::Request(req) => {
                     if connection.handle_shutdown(&req)? {
@@ -99,12 +98,17 @@ impl Server {
         let position_encoding = client_capabilities
             .general
             .as_ref()
-            .and_then(|g| g.position_encodings.as_ref())
-            .and_then(|e| e.first())
-            .cloned()
-            .unwrap_or(PositionEncodingKind::UTF8);
+            .and_then(|general_capabilities| general_capabilities.position_encodings.as_ref())
+            .and_then(|encodings| {
+                encodings
+                    .iter()
+                    .cloned()
+                    .filter_map(|encoding| PositionEncoding::try_from(encoding).ok())
+                    .max() // this selects the highest priority position encoding
+            })
+            .unwrap_or_default();
         types::ServerCapabilities {
-            position_encoding: Some(position_encoding),
+            position_encoding: Some(position_encoding.into()),
             code_action_provider: Some(types::CodeActionProviderCapability::Options(
                 CodeActionOptions {
                     code_action_kinds: Some(vec![

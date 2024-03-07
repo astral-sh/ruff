@@ -14,7 +14,7 @@ type BackgroundFnBuilder<'s> = Box<dyn FnOnce(&Session) -> BackgroundFn + 's>;
 
 /// Describes how the task should be run.
 #[derive(Clone, Copy, Debug, Default)]
-pub(super) enum BackgroundSchedule {
+pub(in crate::server) enum BackgroundSchedule {
     /// The task should be run on the background thread designated
     /// for formatting actions. This is a high priority thread.
     Fmt,
@@ -58,35 +58,16 @@ pub(in crate::server) struct SyncTask<'s> {
 
 impl<'s> Task<'s> {
     /// Creates a new background task.
-    #[allow(dead_code)] // TODO: remove once we have a regular background task in our implementation
-    pub(crate) fn background_thread(
+    pub(crate) fn background(
+        schedule: BackgroundSchedule,
         func: impl FnOnce(&Session) -> Box<dyn FnOnce(Notifier, Responder) + Send + 'static> + 's,
     ) -> Self {
         Self::Background(BackgroundTaskBuilder {
-            schedule: BackgroundSchedule::Worker,
+            schedule,
             builder: Box::new(func),
         })
     }
-    /// Creates a new high-priority background task.
-    pub(crate) fn low_latency_thread(
-        func: impl FnOnce(&Session) -> Box<dyn FnOnce(Notifier, Responder) + Send + 'static> + 's,
-    ) -> Self {
-        Self::Background(BackgroundTaskBuilder {
-            schedule: BackgroundSchedule::LatencySensitive,
-            builder: Box::new(func),
-        })
-    }
-    /// Creates a new high-priority background task,
-    /// designated for the formatting thread.
-    pub(crate) fn fmt_thread(
-        func: impl FnOnce(&Session) -> Box<dyn FnOnce(Notifier, Responder) + Send + 'static> + 's,
-    ) -> Self {
-        Self::Background(BackgroundTaskBuilder {
-            schedule: BackgroundSchedule::Fmt,
-            builder: Box::new(func),
-        })
-    }
-    /// Creates a new local background task.
+    /// Creates a new local task.
     pub(crate) fn local(func: impl FnOnce(&mut Session, Notifier, Responder) + 's) -> Self {
         Self::Sync(SyncTask {
             func: Box::new(func),

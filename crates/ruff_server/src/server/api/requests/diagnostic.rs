@@ -1,21 +1,21 @@
 use crate::server::{client::Notifier, Result};
-use crate::session::SessionSnapshot;
+use crate::session::DocumentSnapshot;
 use lsp_types::{self as types, request as req};
 use types::{
     DocumentDiagnosticReportResult, FullDocumentDiagnosticReport,
     RelatedFullDocumentDiagnosticReport,
 };
 
-pub(crate) struct Diagnostic;
+pub(crate) struct DocumentDiagnostic;
 
-impl super::Request for Diagnostic {
+impl super::Request for DocumentDiagnostic {
     type RequestType = req::DocumentDiagnosticRequest;
 }
 
-impl super::BackgroundRequest for Diagnostic {
+impl super::BackgroundDocumentRequest for DocumentDiagnostic {
     super::define_document_url!(params: &types::DocumentDiagnosticParams);
     fn run_with_snapshot(
-        snapshot: SessionSnapshot,
+        snapshot: DocumentSnapshot,
         _notifier: Notifier,
         _params: types::DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {

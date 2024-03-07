@@ -5,10 +5,10 @@ mod format_range;
 
 use super::{
     define_document_url,
-    traits::{BackgroundRequest, Request},
+    traits::{BackgroundDocumentRequest, Request},
 };
 pub(super) use code_action::CodeAction;
-pub(super) use diagnostic::Diagnostic;
+pub(super) use diagnostic::DocumentDiagnostic;
 pub(super) use format::Format;
 pub(super) use format_range::FormatRange;
 

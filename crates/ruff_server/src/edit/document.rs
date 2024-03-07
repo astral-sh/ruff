@@ -3,17 +3,20 @@ use ruff_source_file::LineIndex;
 
 use crate::PositionEncoding;
 
-use super::range::text_range;
+use super::RangeExt;
+
+pub(crate) type DocumentVersion = i32;
 
 #[derive(Debug, Clone)]
 pub struct Document {
     contents: String,
     index: LineIndex,
-    version: i32,
+    version: DocumentVersion,
 }
 
+/* Mutable API */
 impl Document {
-    pub fn new(contents: String, version: i32) -> Self {
+    pub fn new(contents: String, version: DocumentVersion) -> Self {
         let index = LineIndex::from_source_text(&contents);
         Self {
             contents,
@@ -21,32 +24,23 @@ impl Document {
             version,
         }
     }
-    // TODO(jane): I would personally be in favor of removing access to this method and only
-    // allowing document mutation via specialized methods.
-    pub(crate) fn modify(&mut self, func: impl FnOnce(&mut String, &mut i32)) {
-        self.modify_with_manual_index(|c, v, i| {
-            func(c, v);
-            *i = LineIndex::from_source_text(c);
-        });
+
+    pub fn contents(&self) -> &str {
+        &self.contents
     }
 
-    // A private function for overriding how we update the line index by default.
-    fn modify_with_manual_index(
-        &mut self,
-        func: impl FnOnce(&mut String, &mut i32, &mut LineIndex),
-    ) {
-        let old_version = self.version;
-        func(&mut self.contents, &mut self.version, &mut self.index);
-        debug_assert!(self.version >= old_version);
+    pub fn index(&self) -> &LineIndex {
+        &self.index
     }
-}
 
-/* Mutable API */
-impl Document {
+    pub fn version(&self) -> DocumentVersion {
+        self.version
+    }
+
     pub fn apply_changes(
         &mut self,
         changes: Vec<lsp_types::TextDocumentContentChangeEvent>,
-        new_version: i32,
+        new_version: DocumentVersion,
         encoding: PositionEncoding,
     ) {
         if let [lsp_types::TextDocumentContentChangeEvent {
@@ -62,7 +56,7 @@ impl Document {
         }
 
         let mut new_contents = self.contents().to_string();
-        let mut active_index = None;
+        let mut active_index = std::borrow::Cow::Borrowed(self.index());
 
         let mut last_position = Position {
             line: u32::MAX,
@@ -77,16 +71,12 @@ impl Document {
         {
             if let Some(range) = range {
                 if last_position <= range.end {
-                    active_index.replace(LineIndex::from_source_text(&new_contents));
+                    active_index =
+                        std::borrow::Cow::Owned(LineIndex::from_source_text(&new_contents));
                 }
 
                 last_position = range.start;
-                let range = text_range(
-                    range,
-                    &new_contents,
-                    active_index.as_ref().unwrap_or(self.index()),
-                    encoding,
-                );
+                let range = range.to_text_range(&new_contents, &active_index, encoding);
 
                 new_contents.replace_range(
                     usize::from(range.start())..usize::from(range.end()),
@@ -104,17 +94,28 @@ impl Document {
             *version = new_version;
         });
     }
-}
 
-/* Immutable API */
-impl Document {
-    pub fn contents(&self) -> &str {
-        &self.contents
+    pub fn update_version(&mut self, new_version: DocumentVersion) {
+        self.modify_with_manual_index(|_, version, _| {
+            *version = new_version;
+        });
     }
-    pub fn index(&self) -> &LineIndex {
-        &self.index
+
+    // A private function for modifying the document's internal state
+    fn modify(&mut self, func: impl FnOnce(&mut String, &mut DocumentVersion)) {
+        self.modify_with_manual_index(|c, v, i| {
+            func(c, v);
+            *i = LineIndex::from_source_text(c);
+        });
     }
-    pub fn version(&self) -> i32 {
-        self.version
+
+    // A private function for overriding how we update the line index by default.
+    fn modify_with_manual_index(
+        &mut self,
+        func: impl FnOnce(&mut String, &mut DocumentVersion, &mut LineIndex),
+    ) {
+        let old_version = self.version;
+        func(&mut self.contents, &mut self.version, &mut self.index);
+        debug_assert!(self.version >= old_version);
     }
 }

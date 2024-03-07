@@ -42,10 +42,11 @@ struct Job {
 
 impl Pool {
     pub(crate) fn new(threads: usize) -> Pool {
-        const STACK_SIZE: usize = 8 * 1024 * 1024;
+        // Override OS defaults to avoid stack overflows on platforms with low stack size defaults.
+        const STACK_SIZE: usize = 2 * 1024 * 1024;
         const INITIAL_PRIORITY: ThreadPriority = ThreadPriority::Worker;
 
-        let (job_sender, job_receiver) = crossbeam::channel::unbounded();
+        let (job_sender, job_receiver) = crossbeam::channel::bounded(threads);
         let extant_tasks = Arc::new(AtomicUsize::new(0));
 
         let mut handles = Vec::with_capacity(threads);

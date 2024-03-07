@@ -22,5 +22,5 @@ pub(crate) type Result<T> = anyhow::Result<T>;
 
 /* functions */
 pub(crate) fn version() -> &'static str {
-    env!("CARGO_PKG_VERSION")
+    ruff_linter::VERSION
 }

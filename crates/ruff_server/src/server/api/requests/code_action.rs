@@ -1,6 +1,8 @@
-use crate::edit::text_range_to_range;
+use crate::edit::ToRangeExt;
+use crate::server::api::LSPResult;
 use crate::server::{client::Notifier, Result};
-use crate::session::SessionSnapshot;
+use crate::session::DocumentSnapshot;
+use anyhow::Context;
 use lsp_types::{self as types, request as req};
 use ruff_text_size::Ranged;
 
@@ -10,10 +12,10 @@ impl super::Request for CodeAction {
     type RequestType = req::CodeActionRequest;
 }
 
-impl super::BackgroundRequest for CodeAction {
+impl super::BackgroundDocumentRequest for CodeAction {
     super::define_document_url!(params: &types::CodeActionParams);
     fn run_with_snapshot(
-        snapshot: SessionSnapshot,
+        snapshot: DocumentSnapshot,
         _notifier: Notifier,
         params: types::CodeActionParams,
     ) -> Result<Option<types::CodeActionResponse>> {
@@ -21,19 +23,29 @@ impl super::BackgroundRequest for CodeAction {
         let url = snapshot.url();
         let encoding = snapshot.encoding();
         let version = document.version();
-        let actions = params
+        let actions: Result<Vec<_>> = params
             .context
             .diagnostics
             .into_iter()
-            .filter_map(|diagnostic| {
-                let diagnostic_fix: crate::lint::DiagnosticFix =
-                    serde_json::from_value(diagnostic.data?).ok()?;
+            .map(|diagnostic| {
+                let diagnostic_fix: crate::lint::DiagnosticFix = serde_json::from_value(
+                    diagnostic
+                        .data
+                        .context("Diagnostic did not have any associated data")
+                        .with_failure_code(lsp_server::ErrorCode::InternalError)?,
+                )
+                .map_err(|err| anyhow::anyhow!("failed to deserialize diagnostic data: {err}"))
+                .with_failure_code(lsp_server::ErrorCode::ParseError)?;
                 let edits = diagnostic_fix
                     .fix
                     .edits()
                     .iter()
                     .map(|edit| types::TextEdit {
-                        range: text_range_to_range(edit.range(), document, encoding),
+                        range: edit.range().to_range(
+                            document.contents(),
+                            document.index(),
+                            encoding,
+                        ),
                         new_text: edit.content().unwrap_or_default().to_string(),
                     });
 
@@ -49,7 +61,7 @@ impl super::BackgroundRequest for CodeAction {
                     .kind
                     .suggestion
                     .unwrap_or(diagnostic_fix.kind.name);
-                Some(types::CodeAction {
+                Ok(types::CodeAction {
                     title,
                     kind: Some(types::CodeActionKind::QUICKFIX),
                     edit: Some(types::WorkspaceEdit {
@@ -58,10 +70,12 @@ impl super::BackgroundRequest for CodeAction {
                     }),
                     ..Default::default()
                 })
-            });
+            })
+            .collect();
 
         Ok(Some(
-            actions
+            actions?
+                .into_iter()
                 .map(types::CodeActionOrCommand::CodeAction)
                 .collect(),
         ))

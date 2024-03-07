@@ -15,7 +15,7 @@ pub(crate) struct Notifier(ClientSender);
 pub(crate) struct Responder(ClientSender);
 
 impl Client {
-    pub(in crate::server) fn new(sender: &ClientSender) -> Self {
+    pub(super) fn new(sender: &ClientSender) -> Self {
         Self {
             notifier: Notifier(sender.clone()),
             responder: Responder(sender.clone()),

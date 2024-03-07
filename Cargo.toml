@@ -69,7 +69,6 @@ once_cell = { version = "1.19.0" }
 path-absolutize = { version = "3.1.1" }
 pathdiff = { version = "0.2.1" }
 pep440_rs = { version = "0.4.0", features = ["serde"] }
-phf = { version = "0.11.2", features = ["macros"] }
 pretty_assertions = "1.3.0"
 proc-macro2 = { version = "1.0.78" }
 pyproject-toml = { version = "0.9.0" }

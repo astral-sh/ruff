@@ -12,27 +12,30 @@ impl super::Notification for DidChange {
 }
 
 impl super::SyncNotification for DidChange {
-    #[tracing::instrument(skip_all, fields(file=%params.text_document.uri))]
+    #[tracing::instrument(skip_all, fields(file=%uri))]
     fn run(
         session: &mut Session,
         _notifier: Notifier,
-        params: types::DidChangeTextDocumentParams,
+        types::DidChangeTextDocumentParams {
+            text_document:
+                types::VersionedTextDocumentIdentifier {
+                    uri,
+                    version: new_version,
+                },
+            content_changes,
+        }: types::DidChangeTextDocumentParams,
     ) -> Result<()> {
-        super::define_document_url!(params: &types::DidChangeTextDocumentParams);
+        let encoding = session.encoding();
+        let document = session
+            .document_controller(&uri)
+            .with_failure_code(lsp_server::ErrorCode::InvalidParams)?;
 
-        if params.content_changes.is_empty() {
+        if content_changes.is_empty() {
+            document.update_version(new_version);
             return Ok(());
         }
 
-        let new_version = params.text_document.version;
-
-        let encoding = session.encoding();
-
-        let document = session
-            .document_controller(document_url(&params))
-            .with_failure_code(lsp_server::ErrorCode::InvalidParams)?;
-
-        document.apply_changes(params.content_changes, new_version, encoding);
+        document.apply_changes(content_changes, new_version, encoding);
 
         Ok(())
     }
