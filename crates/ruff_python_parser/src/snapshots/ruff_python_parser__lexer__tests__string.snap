@@ -6,99 +6,110 @@ expression: lex_source(source)
     (
         String {
             value: "double",
-            flags: StringFlags(
-                StringFlagsInner(
+            kind: StringKind {
+                quote_flags: QuoteFlags(
                     DOUBLE,
                 ),
-            ),
+                prefix: None,
+            },
         },
         0..8,
     ),
     (
         String {
             value: "single",
-            flags: StringFlags(
-                StringFlagsInner(
+            kind: StringKind {
+                quote_flags: QuoteFlags(
                     0x0,
                 ),
-            ),
+                prefix: None,
+            },
         },
         9..17,
     ),
     (
         String {
             value: "can\\'t",
-            flags: StringFlags(
-                StringFlagsInner(
+            kind: StringKind {
+                quote_flags: QuoteFlags(
                     0x0,
                 ),
-            ),
+                prefix: None,
+            },
         },
         18..26,
     ),
     (
         String {
             value: "\\\\\\\"",
-            flags: StringFlags(
-                StringFlagsInner(
+            kind: StringKind {
+                quote_flags: QuoteFlags(
                     DOUBLE,
                 ),
-            ),
+                prefix: None,
+            },
         },
         27..33,
     ),
     (
         String {
             value: "\\t\\r\\n",
-            flags: StringFlags(
-                StringFlagsInner(
+            kind: StringKind {
+                quote_flags: QuoteFlags(
                     0x0,
                 ),
-            ),
+                prefix: None,
+            },
         },
         34..42,
     ),
     (
         String {
             value: "\\g",
-            flags: StringFlags(
-                StringFlagsInner(
+            kind: StringKind {
+                quote_flags: QuoteFlags(
                     0x0,
                 ),
-            ),
+                prefix: None,
+            },
         },
         43..47,
     ),
     (
         String {
             value: "raw\\'",
-            flags: StringFlags(
-                StringFlagsInner(
-                    R_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    R,
+                ),
+            },
         },
         48..56,
     ),
     (
         String {
             value: "\\420",
-            flags: StringFlags(
-                StringFlagsInner(
+            kind: StringKind {
+                quote_flags: QuoteFlags(
                     0x0,
                 ),
-            ),
+                prefix: None,
+            },
         },
         57..63,
     ),
     (
         String {
             value: "\\200\\0a",
-            flags: StringFlags(
-                StringFlagsInner(
+            kind: StringKind {
+                quote_flags: QuoteFlags(
                     0x0,
                 ),
-            ),
+                prefix: None,
+            },
         },
         64..73,
     ),

@@ -52,10 +52,10 @@ impl<'a> Stylist<'a> {
 fn detect_quote(tokens: &[LexResult]) -> Quote {
     for (token, _) in tokens.iter().flatten() {
         match token {
-            Tok::String { flags, .. } if !flags.is_triple_quoted() => {
-                return flags.quote_style().into()
+            Tok::String { kind, .. } if !kind.is_triple_quoted() => {
+                return kind.quote_style().into()
             }
-            Tok::FStringStart(flags) => return flags.quote_style().into(),
+            Tok::FStringStart(kind) => return kind.quote_style().into(),
             _ => continue,
         }
     }

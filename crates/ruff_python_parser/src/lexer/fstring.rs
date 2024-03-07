@@ -1,9 +1,9 @@
-use crate::string_token_flags::StringFlags;
+use crate::string_token_flags::StringKind;
 
 /// The context representing the current f-string that the lexer is in.
 #[derive(Debug)]
 pub(crate) struct FStringContext {
-    pub(crate) flags: StringFlags,
+    kind: StringKind,
 
     /// The level of nesting for the lexer when it entered the current f-string.
     /// The nesting level includes all kinds of parentheses i.e., round, square,
@@ -17,12 +17,16 @@ pub(crate) struct FStringContext {
 }
 
 impl FStringContext {
-    pub(crate) const fn new(flags: StringFlags, nesting: u32) -> Self {
+    pub(crate) const fn new(kind: StringKind, nesting: u32) -> Self {
         Self {
-            flags,
+            kind,
             nesting,
             format_spec_depth: 0,
         }
+    }
+
+    pub(crate) const fn kind(&self) -> StringKind {
+        self.kind
     }
 
     pub(crate) const fn nesting(&self) -> u32 {
@@ -31,27 +35,27 @@ impl FStringContext {
 
     /// Returns the quote character for the current f-string.
     pub(crate) const fn quote_char(&self) -> char {
-        self.flags.quote_style().as_char()
+        self.kind.quote_style().as_char()
     }
 
     /// Returns the triple quotes for the current f-string if it is a triple-quoted
     /// f-string, `None` otherwise.
     pub(crate) const fn triple_quotes(&self) -> Option<&'static str> {
         if self.is_triple_quoted() {
-            Some(self.flags.quote_str())
+            Some(self.kind.quote_str())
         } else {
             None
         }
     }
 
     /// Returns `true` if the current f-string is a raw f-string.
-    pub(crate) const fn is_raw_string(&self) -> bool {
-        self.flags.is_raw()
+    pub(crate) fn is_raw_string(&self) -> bool {
+        self.kind.is_rawstring()
     }
 
     /// Returns `true` if the current f-string is a triple-quoted f-string.
     pub(crate) const fn is_triple_quoted(&self) -> bool {
-        self.flags.is_triple_quoted()
+        self.kind.is_triple_quoted()
     }
 
     /// Calculates the number of open parentheses for the current f-string

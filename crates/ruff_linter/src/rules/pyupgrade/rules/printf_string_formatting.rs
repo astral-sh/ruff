@@ -9,7 +9,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
-use ruff_python_parser::{lexer, AsMode, StringFlags, Tok};
+use ruff_python_parser::{lexer, AsMode, StringKind, Tok};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -352,7 +352,7 @@ fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
 /// UP031
 pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
-    let mut strings: Vec<(TextRange, StringFlags)> = vec![];
+    let mut strings: Vec<(TextRange, StringKind)> = vec![];
     let mut extension = None;
     for (tok, range) in lexer::lex_starts_at(
         checker.locator().slice(expr),
@@ -362,7 +362,7 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     .flatten()
     {
         match tok {
-            Tok::String { flags, .. } => strings.push((range, flags)),
+            Tok::String { kind, .. } => strings.push((range, kind)),
             // If we hit a right paren, we have to preserve it.
             Tok::Rpar => extension = Some(range),
             // Break as soon as we find the modulo symbol.
@@ -380,11 +380,10 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     let mut num_positional_arguments = 0;
     let mut num_keyword_arguments = 0;
     let mut format_strings = Vec::with_capacity(strings.len());
-    for (range, flags) in &strings {
+    for (range, kind) in &strings {
         let string = checker.locator().slice(*range);
-        let quote_len = usize::from(flags.quote_len());
-        let string =
-            &string[(usize::from(flags.prefix_len()) + quote_len)..(string.len() - quote_len)];
+        let string = &string
+            [usize::from(kind.opener_len())..(string.len() - usize::from(kind.closer_len()))];
 
         // Parse the format string (e.g. `"%s"`) into a list of `PercentFormat`.
         let Ok(format_string) = CFormatString::from_str(string) else {
@@ -407,14 +406,7 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
         }
 
         // Convert the `%`-format string to a `.format` string.
-        let quotes = flags.quote_str();
-        format_strings.push(format!(
-            "{}{}{}{}",
-            flags.prefix_str(),
-            quotes,
-            percent_to_format(&format_string),
-            quotes
-        ));
+        format_strings.push(kind.format_string_contents(&percent_to_format(&format_string)));
     }
 
     // Parse the parameters.

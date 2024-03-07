@@ -6,11 +6,12 @@ expression: lex_source(source)
     (
         String {
             value: "\\N{EN SPACE}",
-            flags: StringFlags(
-                StringFlagsInner(
+            kind: StringKind {
+                quote_flags: QuoteFlags(
                     DOUBLE,
                 ),
-            ),
+                prefix: None,
+            },
         },
         0..14,
     ),

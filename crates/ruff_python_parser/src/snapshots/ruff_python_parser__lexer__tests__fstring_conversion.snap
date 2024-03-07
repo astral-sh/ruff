@@ -5,11 +5,14 @@ expression: lex_source(source)
 [
     (
         FStringStart(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         0..2,
     ),
@@ -40,11 +43,14 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " ",
-            flags: StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         7..8,
     ),
@@ -79,11 +85,14 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " ",
-            flags: StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         14..15,
     ),
@@ -104,11 +113,14 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: ".3f!r",
-            flags: StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         18..23,
     ),
@@ -119,21 +131,27 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " {x!r}",
-            flags: StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         24..32,
     ),
     (
         FStringEnd(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         32..33,
     ),

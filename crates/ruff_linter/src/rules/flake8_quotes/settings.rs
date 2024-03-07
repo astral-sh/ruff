@@ -22,6 +22,15 @@ impl Default for Quote {
     }
 }
 
+impl From<ruff_python_parser::QuoteStyle> for Quote {
+    fn from(value: ruff_python_parser::QuoteStyle) -> Self {
+        match value {
+            ruff_python_parser::QuoteStyle::Double => Self::Double,
+            ruff_python_parser::QuoteStyle::Single => Self::Single,
+        }
+    }
+}
+
 #[derive(Debug, CacheKey)]
 pub struct Settings {
     pub inline_quotes: Quote,

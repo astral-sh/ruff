@@ -168,14 +168,14 @@ pub(crate) fn avoidable_escaped_quote(
         match tok {
             Tok::String {
                 value: string_contents,
-                flags,
+                kind,
             } => {
-                if flags.is_raw() || flags.is_triple_quoted() {
+                if kind.is_rawstring() || kind.is_triple_quoted() {
                     continue;
                 }
 
                 // Check if we're using the preferred quotation style.
-                if !contains_quote(flags.quote_str(), quotes_settings.inline_quotes.as_char()) {
+                if Quote::from(kind.quote_style()) != quotes_settings.inline_quotes {
                     continue;
                 }
 
@@ -188,7 +188,7 @@ pub(crate) fn avoidable_escaped_quote(
                     let mut diagnostic = Diagnostic::new(AvoidableEscapedQuote, tok_range);
                     let fixed_contents = format!(
                         "{prefix}{quote}{value}{quote}",
-                        prefix = flags.prefix_str(),
+                        prefix = kind.prefix_str(),
                         quote = quotes_settings.inline_quotes.opposite().as_char(),
                         value = unescape_string(
                             string_contents,
@@ -202,12 +202,11 @@ pub(crate) fn avoidable_escaped_quote(
                     diagnostics.push(diagnostic);
                 }
             }
-            Tok::FStringStart(flags) => {
-                let text = locator.slice(tok_range);
+            Tok::FStringStart(kind) => {
                 // Check for escaped quote only if we're using the preferred quotation
                 // style and it isn't a triple-quoted f-string.
-                let check_for_escaped_quote = !flags.is_triple_quoted()
-                    && contains_quote(text, quotes_settings.inline_quotes.as_char());
+                let check_for_escaped_quote = !kind.is_triple_quoted()
+                    && Quote::from(kind.quote_style()) == quotes_settings.inline_quotes;
                 fstrings.push(FStringContext::new(
                     check_for_escaped_quote,
                     tok_range,
@@ -216,8 +215,8 @@ pub(crate) fn avoidable_escaped_quote(
             }
             Tok::FStringMiddle {
                 value: string_contents,
-                flags,
-            } if !flags.is_raw() => {
+                kind,
+            } if !kind.is_rawstring() => {
                 let Some(context) = fstrings.last_mut() else {
                     continue;
                 };
@@ -309,13 +308,13 @@ pub(crate) fn unnecessary_escaped_quote(
         match tok {
             Tok::String {
                 value: string_contents,
-                flags,
+                kind,
             } => {
-                if flags.is_raw() || flags.is_triple_quoted() {
+                if kind.is_rawstring() || kind.is_triple_quoted() {
                     continue;
                 }
 
-                let leading = flags.quote_style();
+                let leading = kind.quote_style();
                 if !contains_escaped_quote(string_contents, leading.opposite().as_char()) {
                     continue;
                 }
@@ -323,7 +322,7 @@ pub(crate) fn unnecessary_escaped_quote(
                 let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, tok_range);
                 let fixed_contents = format!(
                     "{prefix}{quote}{value}{quote}",
-                    prefix = flags.prefix_str(),
+                    prefix = kind.prefix_str(),
                     quote = leading.as_char(),
                     value = unescape_string(string_contents, leading.opposite().as_char())
                 );
@@ -333,16 +332,11 @@ pub(crate) fn unnecessary_escaped_quote(
                 )));
                 diagnostics.push(diagnostic);
             }
-            Tok::FStringStart(flags) => {
-                let text = locator.slice(tok_range);
+            Tok::FStringStart(kind) => {
                 // Check for escaped quote only if we're using the preferred quotation
                 // style and it isn't a triple-quoted f-string.
-                let check_for_escaped_quote = !flags.is_triple_quoted();
-                let quote_style = if contains_quote(text, Quote::Single.as_char()) {
-                    Quote::Single
-                } else {
-                    Quote::Double
-                };
+                let check_for_escaped_quote = !kind.is_triple_quoted();
+                let quote_style = Quote::from(kind.quote_style());
                 fstrings.push(FStringContext::new(
                     check_for_escaped_quote,
                     tok_range,
@@ -351,8 +345,8 @@ pub(crate) fn unnecessary_escaped_quote(
             }
             Tok::FStringMiddle {
                 value: string_contents,
-                flags,
-            } if !flags.is_raw() => {
+                kind,
+            } if !kind.is_rawstring() => {
                 let Some(context) = fstrings.last_mut() else {
                     continue;
                 };

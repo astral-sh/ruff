@@ -5,32 +5,41 @@ expression: lex_source(source)
 [
     (
         FStringStart(
-            StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         0..2,
     ),
     (
         FStringMiddle {
             value: "\\0",
-            flags: StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         2..4,
     ),
     (
         FStringEnd(
-            StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         4..5,
     ),

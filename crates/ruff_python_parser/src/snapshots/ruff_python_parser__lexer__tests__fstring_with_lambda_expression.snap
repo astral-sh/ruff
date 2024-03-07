@@ -5,11 +5,14 @@ expression: lex_source(source)
 [
     (
         FStringStart(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         0..2,
     ),
@@ -51,11 +54,14 @@ expression: lex_source(source)
     ),
     (
         FStringEnd(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         16..17,
     ),
@@ -65,11 +71,14 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         18..20,
     ),
@@ -119,11 +128,14 @@ expression: lex_source(source)
     ),
     (
         FStringEnd(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         36..37,
     ),

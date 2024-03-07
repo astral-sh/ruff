@@ -4,7 +4,7 @@
 //! loosely based on the token definitions found in the [CPython source].
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h;
-use crate::string_token_flags::StringFlags;
+use crate::string_token_flags::StringKind;
 use crate::Mode;
 
 use ruff_python_ast::{Int, IpyEscapeKind};
@@ -41,11 +41,11 @@ pub enum Tok {
         value: Box<str>,
         /// Flags that can be queried to determine the quote style
         /// and prefixes of the string
-        flags: StringFlags,
+        kind: StringKind,
     },
     /// Token value for the start of an f-string. This includes the `f`/`F`/`fr` prefix
     /// and the opening quote(s).
-    FStringStart(StringFlags),
+    FStringStart(StringKind),
     /// Token value that includes the portion of text inside the f-string that's not
     /// part of the expression part and isn't an opening or closing brace.
     FStringMiddle {
@@ -53,10 +53,10 @@ pub enum Tok {
         value: Box<str>,
         /// Flags that can be queried to determine the quote style
         /// and prefixes of the string
-        flags: StringFlags,
+        kind: StringKind,
     },
     /// Token value for the end of an f-string. This includes the closing quote.
-    FStringEnd(StringFlags),
+    FStringEnd(StringKind),
     /// Token value for IPython escape commands. These are recognized by the lexer
     /// only when the mode is [`Mode::Ipython`].
     IpyEscapeCommand {
@@ -241,10 +241,8 @@ impl fmt::Display for Tok {
             Int { value } => write!(f, "'{value}'"),
             Float { value } => write!(f, "'{value}'"),
             Complex { real, imag } => write!(f, "{real}j{imag}"),
-            String { value, flags } => {
-                let prefixes = flags.prefix_str();
-                let quotes = flags.quote_str();
-                write!(f, "{prefixes}{quotes}{value}{quotes}")
+            String { value, kind } => {
+                write!(f, "{}", kind.format_string_contents(value))
             }
             FStringStart(_) => f.write_str("FStringStart"),
             FStringMiddle { value, .. } => f.write_str(value),

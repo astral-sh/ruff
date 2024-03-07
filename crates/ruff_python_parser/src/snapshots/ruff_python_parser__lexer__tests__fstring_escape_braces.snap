@@ -5,22 +5,28 @@ expression: lex_source(source)
 [
     (
         FStringStart(
-            StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         0..2,
     ),
     (
         FStringMiddle {
             value: "\\",
-            flags: StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         2..3,
     ),
@@ -40,32 +46,41 @@ expression: lex_source(source)
     ),
     (
         FStringEnd(
-            StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         8..9,
     ),
     (
         FStringStart(
-            StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         10..12,
     ),
     (
         FStringMiddle {
             value: "\\\\",
-            flags: StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         12..14,
     ),
@@ -85,73 +100,94 @@ expression: lex_source(source)
     ),
     (
         FStringEnd(
-            StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         19..20,
     ),
     (
         FStringStart(
-            StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         21..23,
     ),
     (
         FStringMiddle {
             value: "\\{foo}",
-            flags: StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         23..31,
     ),
     (
         FStringEnd(
-            StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         31..32,
     ),
     (
         FStringStart(
-            StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         33..35,
     ),
     (
         FStringMiddle {
             value: "\\\\{foo}",
-            flags: StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         35..44,
     ),
     (
         FStringEnd(
-            StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         44..45,
     ),

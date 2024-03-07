@@ -6,11 +6,12 @@ expression: string_continuation_with_eol(UNIX_EOL)
     (
         String {
             value: "abc\\\ndef",
-            flags: StringFlags(
-                StringFlagsInner(
+            kind: StringKind {
+                quote_flags: QuoteFlags(
                     DOUBLE,
                 ),
-            ),
+                prefix: None,
+            },
         },
         0..10,
     ),

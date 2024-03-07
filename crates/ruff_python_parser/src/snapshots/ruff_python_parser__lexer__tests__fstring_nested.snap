@@ -5,22 +5,28 @@ expression: lex_source(source)
 [
     (
         FStringStart(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         0..2,
     ),
     (
         FStringMiddle {
             value: "foo ",
-            flags: StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         2..6,
     ),
@@ -30,22 +36,28 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         7..9,
     ),
     (
         FStringMiddle {
             value: "bar ",
-            flags: StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         9..13,
     ),
@@ -65,11 +77,14 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         18..20,
     ),
@@ -89,11 +104,14 @@ expression: lex_source(source)
     ),
     (
         FStringEnd(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         25..26,
     ),
@@ -103,11 +121,14 @@ expression: lex_source(source)
     ),
     (
         FStringEnd(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         27..28,
     ),
@@ -118,42 +139,54 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " baz",
-            flags: StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         29..33,
     ),
     (
         FStringEnd(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         33..34,
     ),
     (
         FStringStart(
-            StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         35..37,
     ),
     (
         FStringMiddle {
             value: "foo ",
-            flags: StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         37..41,
     ),
@@ -163,32 +196,41 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         42..44,
     ),
     (
         FStringMiddle {
             value: "bar",
-            flags: StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         44..47,
     ),
     (
         FStringEnd(
-            StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         47..48,
     ),
@@ -199,11 +241,14 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " some ",
-            flags: StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         49..55,
     ),
@@ -213,32 +258,41 @@ expression: lex_source(source)
     ),
     (
         FStringStart(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         56..58,
     ),
     (
         FStringMiddle {
             value: "another",
-            flags: StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         58..65,
     ),
     (
         FStringEnd(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         65..66,
     ),
@@ -248,11 +302,14 @@ expression: lex_source(source)
     ),
     (
         FStringEnd(
-            StringFlags(
-                StringFlagsInner(
-                    F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    0x0,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         67..68,
     ),

@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_literal::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
-use ruff_python_parser::{lexer, AsMode, StringFlags, Tok};
+use ruff_python_parser::{lexer, AsMode, StringKind, Tok};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 
@@ -218,12 +218,12 @@ fn is_valid_dict(
 pub(crate) fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
     let content = checker.locator().slice(expr);
-    let mut strings: Vec<(TextRange, StringFlags)> = vec![];
+    let mut strings: Vec<(TextRange, StringKind)> = vec![];
     for (tok, range) in
         lexer::lex_starts_at(content, checker.source_type.as_mode(), expr.start()).flatten()
     {
         match tok {
-            Tok::String { flags, .. } => strings.push((range, flags)),
+            Tok::String { kind, .. } => strings.push((range, kind)),
             // Break as soon as we find the modulo symbol.
             Tok::Percent => break,
             _ => {}

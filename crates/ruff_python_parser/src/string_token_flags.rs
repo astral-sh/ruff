@@ -3,10 +3,9 @@ use bitflags::bitflags;
 use ruff_text_size::{TextLen, TextSize};
 
 bitflags! {
-    /// [String and Bytes literals]: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
-    /// [PEP 701]: https://peps.python.org/pep-0701/
+    /// The kind of quote used for a string
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash)]
-    struct StringFlagsInner: u8 {
+    struct QuoteFlags: u8 {
         /// The string uses double quotes (`"`).
         /// If this flag is not set, the string uses single quotes (`'`).
         const DOUBLE = 1 << 0;
@@ -14,101 +13,148 @@ bitflags! {
         /// The string is triple-quoted:
         /// it begins and ends with three consecutive quote characters.
         const TRIPLE_QUOTED = 1 << 1;
-
-        /// The string has a `u` or `U` prefix.
-        /// While this prefix is a no-op at runtime,
-        /// strings with this prefix can have no other prefixes set.
-        const U_PREFIX = 1 << 2;
-
-        /// The string has a `b` or `B` prefix.
-        /// This means that the string is a sequence of `int`s at runtime,
-        /// rather than a sequence of `str`s.
-        /// Strings with this flag can also be raw strings,
-        /// but can have no other prefixes.
-        const B_PREFIX = 1 << 3;
-
-        /// The string has a `f` or `F` prefix, meaning it is an f-string.
-        /// F-strings can also be raw strings,
-        /// but can have no other prefixes.
-        const F_PREFIX = 1 << 4;
-
-        /// The string has an `r` or `R` prefix, meaning it is a raw string.
-        /// F-strings and byte-strings can be raw,
-        /// as can strings with no other prefixes.
-        /// U-strings cannot be raw.
-        const R_PREFIX = 1 << 5;
     }
 }
 
-impl TryFrom<char> for StringFlagsInner {
+/// [String and Bytes literals]: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
+/// [PEP 701]: https://peps.python.org/pep-0701/
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub(crate) enum StringPrefix {
+    /// The string has a `u` or `U` prefix.
+    /// While this prefix is a no-op at runtime,
+    /// strings with this prefix can have no other prefixes set.
+    U,
+
+    /// The string has an `r` or `R` prefix, meaning it is a raw string.
+    /// F-strings and byte-strings can be raw,
+    /// as can strings with no other prefixes.
+    /// U-strings cannot be raw.
+    R,
+
+    /// The string has a `f` or `F` prefix, meaning it is an f-string.
+    /// F-strings can also be raw strings,
+    /// but can have no other prefixes.
+    F,
+
+    /// The string has a `b` or `B` prefix.
+    /// This means that the string is a sequence of `int`s at runtime,
+    /// rather than a sequence of `str`s.
+    /// Bytestrings can also be raw strings,
+    /// but can have no other prefixes.
+    B,
+
+    /// A string that has has any one of the prefixes
+    /// `{"rf", "rF", "Rf", "RF", "fr", "fR", "Fr", "FR"}`
+    /// Semantically, these all have the same meaning:
+    /// the string is both an f-string and a raw-string
+    RF,
+
+    /// A string that has has any one of the prefixes
+    /// `{"rb", "rB", "Rb", "RB", "br", "bR", "Br", "BR"}`
+    /// Semantically, these all have the same meaning:
+    /// the string is both an bytestring and a raw-string
+    RB,
+}
+
+impl TryFrom<char> for StringPrefix {
     type Error = String;
 
     fn try_from(value: char) -> Result<Self, String> {
         let result = match value {
-            '\'' => Self::empty(),
-            '"' => Self::DOUBLE,
-            'r' | 'R' => Self::R_PREFIX,
-            'u' | 'U' => Self::U_PREFIX,
-            'b' | 'B' => Self::B_PREFIX,
-            'f' | 'F' => Self::F_PREFIX,
-            _ => return Err(format!("Unexpected prefix or quote '{value}'")),
+            'r' | 'R' => Self::R,
+            'u' | 'U' => Self::U,
+            'b' | 'B' => Self::B,
+            'f' | 'F' => Self::F,
+            _ => return Err(format!("Unexpected prefix '{value}'")),
         };
         Ok(result)
     }
 }
 
-const DISALLOWED_U_STRING_PREFIXES: StringFlagsInner = StringFlagsInner::B_PREFIX
-    .union(StringFlagsInner::F_PREFIX)
-    .union(StringFlagsInner::R_PREFIX);
-
-const DISALLOWED_B_STRING_PREFIXES: StringFlagsInner =
-    StringFlagsInner::U_PREFIX.union(StringFlagsInner::F_PREFIX);
-
-const DISALLOWED_F_STRING_PREFIXES: StringFlagsInner =
-    StringFlagsInner::U_PREFIX.union(StringFlagsInner::B_PREFIX);
-
-const DISALLOWED_R_STRING_PREFIXES: StringFlagsInner = StringFlagsInner::U_PREFIX;
-
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct StringFlags(StringFlagsInner);
-
-impl TryFrom<char> for StringFlags {
+impl TryFrom<[char; 2]> for StringPrefix {
     type Error = String;
 
-    fn try_from(value: char) -> Result<Self, String> {
-        Ok(Self(StringFlagsInner::try_from(value)?))
+    fn try_from(value: [char; 2]) -> Result<Self, String> {
+        match value {
+            ['r' | 'R', 'f' | 'F'] | ['f' | 'F', 'r' | 'R'] => Ok(Self::RF),
+            ['r' | 'R', 'b' | 'B'] | ['b' | 'B', 'r' | 'R'] => Ok(Self::RB),
+            _ => Err(format!("Unexpected prefix '{}{}'", value[0], value[1])),
+        }
     }
 }
 
-impl StringFlags {
-    pub const fn is_raw(self) -> bool {
-        self.0.contains(StringFlagsInner::R_PREFIX)
+impl StringPrefix {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::U => "u",
+            Self::B => "b",
+            Self::F => "f",
+            Self::R => "r",
+            Self::RB => "rb",
+            Self::RF => "rf",
+        }
+    }
+}
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct StringKind {
+    quote_flags: QuoteFlags,
+    prefix: Option<StringPrefix>,
+}
+
+impl StringKind {
+    pub(crate) const fn with_prefix(prefix: StringPrefix) -> Self {
+        Self {
+            quote_flags: QuoteFlags::empty(),
+            prefix: Some(prefix),
+        }
     }
 
-    pub const fn is_bytestring(self) -> bool {
-        self.0.contains(StringFlagsInner::B_PREFIX)
+    /// Does the string have any prefixes?
+    pub const fn has_prefix(self) -> bool {
+        self.prefix.is_some()
     }
 
-    pub const fn is_fstring(self) -> bool {
-        self.0.contains(StringFlagsInner::F_PREFIX)
-    }
-
+    /// Does the string have a `u` or `U` prefix?
     pub const fn is_ustring(self) -> bool {
-        self.0.contains(StringFlagsInner::U_PREFIX)
+        matches!(self.prefix, Some(StringPrefix::U))
     }
 
+    /// Does the string have an `r` or `R` prefix?
+    pub const fn is_rawstring(self) -> bool {
+        matches!(
+            self.prefix,
+            Some(StringPrefix::R | StringPrefix::RF | StringPrefix::RB)
+        )
+    }
+
+    /// Does the string have an `f` or `F` prefix?
+    pub const fn is_fstring(self) -> bool {
+        matches!(self.prefix, Some(StringPrefix::F | StringPrefix::RF))
+    }
+
+    /// Does the string have a `b` or `B` prefix?
+    pub const fn is_bytestring(self) -> bool {
+        matches!(self.prefix, Some(StringPrefix::B | StringPrefix::RB))
+    }
+
+    /// Does the string use single or double quotes in its opener and closer?
     pub const fn quote_style(self) -> QuoteStyle {
-        if self.0.contains(StringFlagsInner::DOUBLE) {
+        if self.quote_flags.contains(QuoteFlags::DOUBLE) {
             QuoteStyle::Double
         } else {
             QuoteStyle::Single
         }
     }
 
+    /// Is the string triple-quoted, i.e.,
+    /// does it begin and end with three consecutive quote characters?
     pub const fn is_triple_quoted(self) -> bool {
-        self.0.contains(StringFlagsInner::TRIPLE_QUOTED)
+        self.quote_flags.contains(QuoteFlags::TRIPLE_QUOTED)
     }
 
+    /// A `str` representation of the quotes used to start and close.
+    /// This does not include any prefixes the string has in its opener.
     pub const fn quote_str(self) -> &'static str {
         if self.is_triple_quoted() {
             match self.quote_style() {
@@ -123,90 +169,69 @@ impl StringFlags {
         }
     }
 
+    /// A `str` representation of the prefixes used (if any)
+    /// in the string's opener.
     pub const fn prefix_str(self) -> &'static str {
-        if self.is_ustring() {
-            return "u";
+        if let Some(prefix) = self.prefix {
+            prefix.as_str()
+        } else {
+            ""
         }
-        if self.is_bytestring() {
-            if self.is_raw() {
-                return "rb";
-            }
-            return "b";
-        }
-        if self.is_fstring() {
-            if self.is_raw() {
-                return "rf";
-            }
-            return "f";
-        }
-        if self.is_raw() {
-            return "r";
-        }
-        ""
     }
 
+    /// The length of the prefixes used (if any) in the string's opener.
     pub fn prefix_len(self) -> TextSize {
         self.prefix_str().text_len()
     }
 
-    pub fn quote_len(self) -> TextSize {
+    /// The length of the quotes used to start and close the string.
+    /// This does not include the length of any prefixes the string has
+    /// in its opener.
+    pub const fn quote_len(self) -> TextSize {
         if self.is_triple_quoted() {
-            TextSize::from(3)
+            TextSize::new(3)
         } else {
-            TextSize::from(1)
+            TextSize::new(1)
         }
+    }
+
+    /// The total length of the string's opener,
+    /// i.e., the length of the prefixes plus the length
+    /// of the quotes used to open the string.
+    pub fn opener_len(self) -> TextSize {
+        self.prefix_len() + self.quote_len()
+    }
+
+    /// The total length of the string's closer.
+    /// This is always equal to `self.quote_len()`,
+    /// but is provided here for symmetry with the `opener_len()` method.
+    pub const fn closer_len(self) -> TextSize {
+        self.quote_len()
+    }
+
+    pub fn format_string_contents(self, contents: &str) -> String {
+        format!(
+            "{}{}{}{}",
+            self.prefix_str(),
+            self.quote_str(),
+            contents,
+            self.quote_str()
+        )
     }
 
     #[must_use]
     pub fn with_double_quotes(mut self) -> Self {
-        self.0 |= StringFlagsInner::DOUBLE;
+        self.quote_flags |= QuoteFlags::DOUBLE;
         self
     }
 
     #[must_use]
     pub fn with_triple_quotes(mut self) -> Self {
-        self.0 |= StringFlagsInner::TRIPLE_QUOTED;
+        self.quote_flags |= QuoteFlags::TRIPLE_QUOTED;
         self
-    }
-
-    pub fn with_u_prefix(mut self) -> Result<Self, &'static str> {
-        if self.0.intersects(DISALLOWED_U_STRING_PREFIXES) {
-            Err("U-strings cannot have any other prefixes set")
-        } else {
-            self.0 |= StringFlagsInner::U_PREFIX;
-            Ok(self)
-        }
-    }
-
-    pub fn with_b_prefix(mut self) -> Result<Self, &'static str> {
-        if self.0.intersects(DISALLOWED_B_STRING_PREFIXES) {
-            Err("Bytestrings cannot have the `u` or `f` prefix also set")
-        } else {
-            self.0 |= StringFlagsInner::B_PREFIX;
-            Ok(self)
-        }
-    }
-
-    pub fn with_f_prefix(mut self) -> Result<Self, &'static str> {
-        if self.0.intersects(DISALLOWED_F_STRING_PREFIXES) {
-            Err("F-strings cannot have the `b` or `u` prefix also set")
-        } else {
-            self.0 |= StringFlagsInner::F_PREFIX;
-            Ok(self)
-        }
-    }
-
-    pub fn with_r_prefix(mut self) -> Result<Self, &'static str> {
-        if self.0.intersects(DISALLOWED_R_STRING_PREFIXES) {
-            Err("Raw strings cannot have the `u` prefix also set")
-        } else {
-            self.0 |= StringFlagsInner::R_PREFIX;
-            Ok(self)
-        }
     }
 }
 
-/// TODO: Use this enum in `crates/ruff_python_formatter/src/string/mod.rs`?
 #[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum QuoteStyle {
     /// E.g. '

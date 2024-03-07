@@ -5,22 +5,28 @@ expression: lex_source(source)
 [
     (
         FStringStart(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX | R_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    RF,
+                ),
+            },
         ),
         0..3,
     ),
     (
         FStringMiddle {
             value: "\\N",
-            flags: StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX | R_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    RF,
+                ),
+            },
         },
         3..5,
     ),
@@ -41,21 +47,27 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " normal",
-            flags: StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX | R_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    RF,
+                ),
+            },
         },
         13..20,
     ),
     (
         FStringEnd(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | F_PREFIX | R_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE,
                 ),
-            ),
+                prefix: Some(
+                    RF,
+                ),
+            },
         ),
         20..21,
     ),

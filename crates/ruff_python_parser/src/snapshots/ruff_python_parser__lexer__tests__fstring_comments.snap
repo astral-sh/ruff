@@ -5,22 +5,28 @@ expression: lex_source(source)
 [
     (
         FStringStart(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | TRIPLE_QUOTED | F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE | TRIPLE_QUOTED,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         0..4,
     ),
     (
         FStringMiddle {
             value: "\n# not a comment ",
-            flags: StringFlags(
-                StringFlagsInner(
-                    DOUBLE | TRIPLE_QUOTED | F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE | TRIPLE_QUOTED,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         4..21,
     ),
@@ -55,21 +61,27 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " # not a comment\n",
-            flags: StringFlags(
-                StringFlagsInner(
-                    DOUBLE | TRIPLE_QUOTED | F_PREFIX,
+            kind: StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE | TRIPLE_QUOTED,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         },
         42..59,
     ),
     (
         FStringEnd(
-            StringFlags(
-                StringFlagsInner(
-                    DOUBLE | TRIPLE_QUOTED | F_PREFIX,
+            StringKind {
+                quote_flags: QuoteFlags(
+                    DOUBLE | TRIPLE_QUOTED,
                 ),
-            ),
+                prefix: Some(
+                    F,
+                ),
+            },
         ),
         59..62,
     ),

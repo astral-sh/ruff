@@ -6,11 +6,12 @@ expression: triple_quoted_eol(UNIX_EOL)
     (
         String {
             value: "\n test string\n ",
-            flags: StringFlags(
-                StringFlagsInner(
+            kind: StringKind {
+                quote_flags: QuoteFlags(
                     DOUBLE | TRIPLE_QUOTED,
                 ),
-            ),
+                prefix: None,
+            },
         },
         0..21,
     ),
