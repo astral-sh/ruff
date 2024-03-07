@@ -113,7 +113,7 @@ fn local_notification_task<'a, N: traits::SyncNotification>(
     let (id, params) = cast_notification::<N>(notif)?;
     Ok(Task::local(move |session, notifier, _| {
         if let Err(err) = N::run(session, notifier, params) {
-            tracing::error!("An error occured while running {id}: {err}");
+            tracing::error!("An error occurred while running {id}: {err}");
         }
     }))
 }
@@ -131,7 +131,7 @@ fn background_notification_thread<'a, N: traits::BackgroundDocumentNotification>
         };
         Box::new(move |notifier, _| {
             if let Err(err) = N::run_with_snapshot(snapshot, notifier, params) {
-                tracing::error!("An error occured while running {id}: {err}");
+                tracing::error!("An error occurred while running {id}: {err}");
             }
         })
     }))

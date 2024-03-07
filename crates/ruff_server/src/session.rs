@@ -292,7 +292,7 @@ impl Workspace {
 
     fn find_configuration_or_fallback(root: &Path) -> RuffConfiguration {
         find_configuration_from_root(root).unwrap_or_else(|err| {
-            tracing::error!("The following error occured when trying to find a configuration file at `{}`:\n{err}", root.display());
+            tracing::error!("The following error occurred when trying to find a configuration file at `{}`:\n{err}", root.display());
             tracing::error!("Falling back to default configuration for `{}`", root.display());
             RuffConfiguration::default()
         })
