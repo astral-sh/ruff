@@ -184,14 +184,14 @@ impl<'source> Lexer<'source> {
             (_, quote @ ('\'' | '"')) => {
                 if let Ok(prefix) = StringPrefix::try_from(first) {
                     self.cursor.bump();
-                    return self.lex_string(StringKind::with_prefix(prefix), quote);
+                    return self.lex_string(StringKind::from_prefix(prefix), quote);
                 }
             }
             (_, second @ ('r' | 'R' | 'b' | 'B')) if is_quote(self.cursor.second()) => {
                 self.cursor.bump();
                 if let Ok(prefix) = StringPrefix::try_from([first, second]) {
                     let quote = self.cursor.bump().unwrap();
-                    return self.lex_string(StringKind::with_prefix(prefix), quote);
+                    return self.lex_string(StringKind::from_prefix(prefix), quote);
                 }
             }
             _ => {}
@@ -539,7 +539,7 @@ impl<'source> Lexer<'source> {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), quote);
 
-        let mut kind = StringKind::with_prefix({
+        let mut kind = StringKind::from_prefix({
             if is_raw_string {
                 StringPrefix::RawFormat
             } else {
@@ -1064,8 +1064,7 @@ impl<'source> Lexer<'source> {
             c if is_ascii_identifier_start(c) => self.lex_identifier(c)?,
             '0'..='9' => self.lex_number(c)?,
             '#' => return Ok((self.lex_comment(), self.token_range())),
-            '\'' => self.lex_string(StringKind::default(), c)?,
-            '"' => self.lex_string(StringKind::default().with_double_quotes(), c)?,
+            '\'' | '"' => self.lex_string(StringKind::default(), c)?,
             '=' => {
                 if self.cursor.eat_char('=') {
                     Tok::EqEqual

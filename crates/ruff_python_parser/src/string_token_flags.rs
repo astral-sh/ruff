@@ -5,7 +5,8 @@ use bitflags::bitflags;
 use ruff_text_size::{TextLen, TextSize};
 
 bitflags! {
-    /// The kind of quote used for a string
+    /// Flags that can be queried to obtain information
+    /// regarding the prefixes and quotes used for a string literal
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash)]
     struct StringFlags: u8 {
         /// The string uses double quotes (`"`).
@@ -125,7 +126,7 @@ impl StringPrefix {
 pub struct StringKind(StringFlags);
 
 impl StringKind {
-    pub(crate) const fn with_prefix(prefix: StringPrefix) -> Self {
+    pub(crate) const fn from_prefix(prefix: StringPrefix) -> Self {
         Self(prefix.as_flags())
     }
 
