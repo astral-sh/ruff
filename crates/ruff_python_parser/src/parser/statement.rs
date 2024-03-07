@@ -52,6 +52,23 @@ const SIMPLE_STMT_SET2: TokenSet = SIMPLE_STMT_SET.union(EXPR_SET);
 
 const STMTS_SET: TokenSet = SIMPLE_STMT_SET2.union(COMPOUND_STMT_SET);
 
+/// Tokens that represent operators that can be used in augmented assignments.
+const AUGMENTED_ASSIGN_SET: TokenSet = TokenSet::new([
+    TokenKind::PlusEqual,
+    TokenKind::MinusEqual,
+    TokenKind::StarEqual,
+    TokenKind::DoubleStarEqual,
+    TokenKind::SlashEqual,
+    TokenKind::DoubleSlashEqual,
+    TokenKind::PercentEqual,
+    TokenKind::AtEqual,
+    TokenKind::AmperEqual,
+    TokenKind::VbarEqual,
+    TokenKind::CircumflexEqual,
+    TokenKind::LeftShiftEqual,
+    TokenKind::RightShiftEqual,
+]);
+
 impl<'src> Parser<'src> {
     fn at_compound_stmt(&self) -> bool {
         self.at_ts(COMPOUND_STMT_SET)
@@ -603,6 +620,12 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses an augmented assignment statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at an augmented assignment token.
+    ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-augmented_assignment_stmt>
     fn parse_augmented_assignment_statement(
         &mut self,
@@ -611,8 +634,7 @@ impl<'src> Parser<'src> {
         start: TextSize,
     ) -> ast::StmtAugAssign {
         // Consume the operator
-        // FIXME(micha): assert that it is an augmented assign token
-        self.next_token();
+        self.bump_ts(AUGMENTED_ASSIGN_SET);
 
         if !helpers::is_valid_aug_assignment_target(&target.expr) {
             self.add_error(ParseErrorType::AugAssignmentError, target.range());

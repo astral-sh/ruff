@@ -347,6 +347,21 @@ impl<'src> Parser<'src> {
         self.next_token()
     }
 
+    /// Bumps the current token assuming it is found in the given token set.
+    ///
+    /// # Panics
+    ///
+    /// If the current token is not found in the given token set.
+    ///
+    /// # Returns
+    ///
+    /// The current token.
+    fn bump_ts(&mut self, ts: TokenSet) -> (Tok, TextRange) {
+        assert!(ts.contains(self.current_kind()));
+
+        self.next_token()
+    }
+
     fn expect(&mut self, expected: TokenKind) -> bool {
         if self.eat(expected) {
             return true;
