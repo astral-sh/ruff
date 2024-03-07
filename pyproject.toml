@@ -60,7 +60,8 @@ include = [
 extend-exclude = [
   "crates/ruff/resources/",
   "crates/ruff_linter/resources/",
-  "crates/ruff_python_formatter/resources/"
+  "crates/ruff_python_formatter/resources/",
+  "crates/ruff_python_parser/resources/"
 ]
 
 [tool.ruff.lint]
