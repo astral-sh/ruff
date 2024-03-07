@@ -237,7 +237,7 @@ pub(crate) fn avoidable_escaped_quote(
                     context.push_fstring_middle_range(tok_range);
                 }
             }
-            Tok::FStringEnd(_) => {
+            Tok::FStringEnd => {
                 let Some(context) = fstrings.pop() else {
                     continue;
                 };
@@ -358,7 +358,7 @@ pub(crate) fn unnecessary_escaped_quote(
                     context.push_fstring_middle_range(tok_range);
                 }
             }
-            Tok::FStringEnd(_) => {
+            Tok::FStringEnd => {
                 let Some(context) = fstrings.pop() else {
                     continue;
                 };

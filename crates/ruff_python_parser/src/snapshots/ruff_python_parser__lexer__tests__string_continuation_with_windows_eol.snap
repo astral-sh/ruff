@@ -7,10 +7,9 @@ expression: string_continuation_with_eol(WINDOWS_EOL)
         String {
             value: "abc\\\r\ndef",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: None,
+                prefix: "",
+                triple_quoted: false,
+                quote_style: Double,
             },
         },
         0..11,

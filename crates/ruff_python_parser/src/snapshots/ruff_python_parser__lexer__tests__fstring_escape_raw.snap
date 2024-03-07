@@ -6,12 +6,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
+                prefix: "rf",
+                triple_quoted: false,
+                quote_style: Double,
             },
         ),
         0..3,
@@ -20,12 +17,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\\",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
+                prefix: "rf",
+                triple_quoted: false,
+                quote_style: Double,
             },
         },
         3..4,
@@ -48,12 +42,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\\\"\\",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
+                prefix: "rf",
+                triple_quoted: false,
+                quote_style: Double,
             },
         },
         7..10,
@@ -80,27 +71,15 @@ expression: lex_source(source)
         FStringMiddle {
             value: " \\\"\\\"\\\n end",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
+                prefix: "rf",
+                triple_quoted: false,
+                quote_style: Double,
             },
         },
         14..25,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
-            },
-        ),
+        FStringEnd,
         25..26,
     ),
     (

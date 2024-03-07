@@ -7,10 +7,9 @@ expression: lex_source(source)
         String {
             value: "double",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: None,
+                prefix: "",
+                triple_quoted: false,
+                quote_style: Double,
             },
         },
         0..8,
@@ -19,10 +18,9 @@ expression: lex_source(source)
         String {
             value: "single",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    0x0,
-                ),
-                prefix: None,
+                prefix: "",
+                triple_quoted: false,
+                quote_style: Single,
             },
         },
         9..17,
@@ -31,10 +29,9 @@ expression: lex_source(source)
         String {
             value: "can\\'t",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    0x0,
-                ),
-                prefix: None,
+                prefix: "",
+                triple_quoted: false,
+                quote_style: Single,
             },
         },
         18..26,
@@ -43,10 +40,9 @@ expression: lex_source(source)
         String {
             value: "\\\\\\\"",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: None,
+                prefix: "",
+                triple_quoted: false,
+                quote_style: Double,
             },
         },
         27..33,
@@ -55,10 +51,9 @@ expression: lex_source(source)
         String {
             value: "\\t\\r\\n",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    0x0,
-                ),
-                prefix: None,
+                prefix: "",
+                triple_quoted: false,
+                quote_style: Single,
             },
         },
         34..42,
@@ -67,10 +62,9 @@ expression: lex_source(source)
         String {
             value: "\\g",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    0x0,
-                ),
-                prefix: None,
+                prefix: "",
+                triple_quoted: false,
+                quote_style: Single,
             },
         },
         43..47,
@@ -79,12 +73,9 @@ expression: lex_source(source)
         String {
             value: "raw\\'",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    0x0,
-                ),
-                prefix: Some(
-                    R,
-                ),
+                prefix: "r",
+                triple_quoted: false,
+                quote_style: Single,
             },
         },
         48..56,
@@ -93,10 +84,9 @@ expression: lex_source(source)
         String {
             value: "\\420",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    0x0,
-                ),
-                prefix: None,
+                prefix: "",
+                triple_quoted: false,
+                quote_style: Single,
             },
         },
         57..63,
@@ -105,10 +95,9 @@ expression: lex_source(source)
         String {
             value: "\\200\\0a",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    0x0,
-                ),
-                prefix: None,
+                prefix: "",
+                triple_quoted: false,
+                quote_style: Single,
             },
         },
         64..73,

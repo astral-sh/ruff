@@ -6,12 +6,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    F,
-                ),
+                prefix: "f",
+                triple_quoted: false,
+                quote_style: Double,
             },
         ),
         0..2,
@@ -53,16 +50,7 @@ expression: lex_source(source)
         15..16,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    F,
-                ),
-            },
-        ),
+        FStringEnd,
         16..17,
     ),
     (
@@ -72,12 +60,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    F,
-                ),
+                prefix: "f",
+                triple_quoted: false,
+                quote_style: Double,
             },
         ),
         18..20,
@@ -127,16 +112,7 @@ expression: lex_source(source)
         35..36,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    F,
-                ),
-            },
-        ),
+        FStringEnd,
         36..37,
     ),
     (

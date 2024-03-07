@@ -90,7 +90,7 @@ impl FStringRangesBuilder {
             Tok::FStringStart(_) => {
                 self.start_locations.push(range.start());
             }
-            Tok::FStringEnd(_) => {
+            Tok::FStringEnd => {
                 if let Some(start) = self.start_locations.pop() {
                     self.raw.insert(start, TextRange::new(start, range.end()));
                 }

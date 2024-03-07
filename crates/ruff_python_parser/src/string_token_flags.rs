@@ -1,3 +1,5 @@
+use std::fmt;
+
 use bitflags::bitflags;
 
 use ruff_text_size::{TextLen, TextSize};
@@ -5,7 +7,7 @@ use ruff_text_size::{TextLen, TextSize};
 bitflags! {
     /// The kind of quote used for a string
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash)]
-    struct QuoteFlags: u8 {
+    struct StringFlags: u8 {
         /// The string uses double quotes (`"`).
         /// If this flag is not set, the string uses single quotes (`'`).
         const DOUBLE = 1 << 0;
@@ -13,6 +15,29 @@ bitflags! {
         /// The string is triple-quoted:
         /// it begins and ends with three consecutive quote characters.
         const TRIPLE_QUOTED = 1 << 1;
+
+        /// The string has a `u` or `U` prefix.
+        /// While this prefix is a no-op at runtime,
+        /// strings with this prefix can have no other prefixes set.
+        const U_PREFIX = 1 << 2;
+
+        /// The string has a `b` or `B` prefix.
+        /// This means that the string is a sequence of `int`s at runtime,
+        /// rather than a sequence of `str`s.
+        /// Strings with this flag can also be raw strings,
+        /// but can have no other prefixes.
+        const B_PREFIX = 1 << 3;
+
+        /// The string has a `f` or `F` prefix, meaning it is an f-string.
+        /// F-strings can also be raw strings,
+        /// but can have no other prefixes.
+        const F_PREFIX = 1 << 4;
+
+        /// The string has an `r` or `R` prefix, meaning it is a raw string.
+        /// F-strings and byte-strings can be raw,
+        /// as can strings with no other prefixes.
+        /// U-strings cannot be raw.
+        const R_PREFIX = 1 << 5;
     }
 }
 
@@ -23,37 +48,37 @@ pub(crate) enum StringPrefix {
     /// The string has a `u` or `U` prefix.
     /// While this prefix is a no-op at runtime,
     /// strings with this prefix can have no other prefixes set.
-    U,
+    Unicode,
 
     /// The string has an `r` or `R` prefix, meaning it is a raw string.
     /// F-strings and byte-strings can be raw,
     /// as can strings with no other prefixes.
     /// U-strings cannot be raw.
-    R,
+    Raw,
 
     /// The string has a `f` or `F` prefix, meaning it is an f-string.
     /// F-strings can also be raw strings,
     /// but can have no other prefixes.
-    F,
+    Format,
 
     /// The string has a `b` or `B` prefix.
     /// This means that the string is a sequence of `int`s at runtime,
     /// rather than a sequence of `str`s.
     /// Bytestrings can also be raw strings,
     /// but can have no other prefixes.
-    B,
+    Bytes,
 
     /// A string that has has any one of the prefixes
     /// `{"rf", "rF", "Rf", "RF", "fr", "fR", "Fr", "FR"}`
     /// Semantically, these all have the same meaning:
     /// the string is both an f-string and a raw-string
-    RF,
+    RawFormat,
 
     /// A string that has has any one of the prefixes
     /// `{"rb", "rB", "Rb", "RB", "br", "bR", "Br", "BR"}`
     /// Semantically, these all have the same meaning:
     /// the string is both an bytestring and a raw-string
-    RB,
+    RawBytes,
 }
 
 impl TryFrom<char> for StringPrefix {
@@ -61,10 +86,10 @@ impl TryFrom<char> for StringPrefix {
 
     fn try_from(value: char) -> Result<Self, String> {
         let result = match value {
-            'r' | 'R' => Self::R,
-            'u' | 'U' => Self::U,
-            'b' | 'B' => Self::B,
-            'f' | 'F' => Self::F,
+            'r' | 'R' => Self::Raw,
+            'u' | 'U' => Self::Unicode,
+            'b' | 'B' => Self::Bytes,
+            'f' | 'F' => Self::Format,
             _ => return Err(format!("Unexpected prefix '{value}'")),
         };
         Ok(result)
@@ -76,71 +101,57 @@ impl TryFrom<[char; 2]> for StringPrefix {
 
     fn try_from(value: [char; 2]) -> Result<Self, String> {
         match value {
-            ['r' | 'R', 'f' | 'F'] | ['f' | 'F', 'r' | 'R'] => Ok(Self::RF),
-            ['r' | 'R', 'b' | 'B'] | ['b' | 'B', 'r' | 'R'] => Ok(Self::RB),
+            ['r' | 'R', 'f' | 'F'] | ['f' | 'F', 'r' | 'R'] => Ok(Self::RawFormat),
+            ['r' | 'R', 'b' | 'B'] | ['b' | 'B', 'r' | 'R'] => Ok(Self::RawBytes),
             _ => Err(format!("Unexpected prefix '{}{}'", value[0], value[1])),
         }
     }
 }
 
 impl StringPrefix {
-    const fn as_str(self) -> &'static str {
+    const fn as_flags(self) -> StringFlags {
         match self {
-            Self::U => "u",
-            Self::B => "b",
-            Self::F => "f",
-            Self::R => "r",
-            Self::RB => "rb",
-            Self::RF => "rf",
+            Self::Bytes => StringFlags::B_PREFIX,
+            Self::Format => StringFlags::F_PREFIX,
+            Self::Raw => StringFlags::R_PREFIX,
+            Self::RawBytes => StringFlags::R_PREFIX.union(StringFlags::B_PREFIX),
+            Self::RawFormat => StringFlags::R_PREFIX.union(StringFlags::F_PREFIX),
+            Self::Unicode => StringFlags::U_PREFIX,
         }
     }
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct StringKind {
-    quote_flags: QuoteFlags,
-    prefix: Option<StringPrefix>,
-}
+#[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct StringKind(StringFlags);
 
 impl StringKind {
     pub(crate) const fn with_prefix(prefix: StringPrefix) -> Self {
-        Self {
-            quote_flags: QuoteFlags::empty(),
-            prefix: Some(prefix),
-        }
-    }
-
-    /// Does the string have any prefixes?
-    pub const fn has_prefix(self) -> bool {
-        self.prefix.is_some()
+        Self(prefix.as_flags())
     }
 
     /// Does the string have a `u` or `U` prefix?
     pub const fn is_ustring(self) -> bool {
-        matches!(self.prefix, Some(StringPrefix::U))
+        self.0.contains(StringFlags::U_PREFIX)
     }
 
     /// Does the string have an `r` or `R` prefix?
     pub const fn is_rawstring(self) -> bool {
-        matches!(
-            self.prefix,
-            Some(StringPrefix::R | StringPrefix::RF | StringPrefix::RB)
-        )
+        self.0.contains(StringFlags::R_PREFIX)
     }
 
     /// Does the string have an `f` or `F` prefix?
     pub const fn is_fstring(self) -> bool {
-        matches!(self.prefix, Some(StringPrefix::F | StringPrefix::RF))
+        self.0.contains(StringFlags::F_PREFIX)
     }
 
     /// Does the string have a `b` or `B` prefix?
     pub const fn is_bytestring(self) -> bool {
-        matches!(self.prefix, Some(StringPrefix::B | StringPrefix::RB))
+        self.0.contains(StringFlags::B_PREFIX)
     }
 
     /// Does the string use single or double quotes in its opener and closer?
     pub const fn quote_style(self) -> QuoteStyle {
-        if self.quote_flags.contains(QuoteFlags::DOUBLE) {
+        if self.0.contains(StringFlags::DOUBLE) {
             QuoteStyle::Double
         } else {
             QuoteStyle::Single
@@ -150,7 +161,7 @@ impl StringKind {
     /// Is the string triple-quoted, i.e.,
     /// does it begin and end with three consecutive quote characters?
     pub const fn is_triple_quoted(self) -> bool {
-        self.quote_flags.contains(QuoteFlags::TRIPLE_QUOTED)
+        self.0.contains(StringFlags::TRIPLE_QUOTED)
     }
 
     /// A `str` representation of the quotes used to start and close.
@@ -172,11 +183,25 @@ impl StringKind {
     /// A `str` representation of the prefixes used (if any)
     /// in the string's opener.
     pub const fn prefix_str(self) -> &'static str {
-        if let Some(prefix) = self.prefix {
-            prefix.as_str()
-        } else {
-            ""
+        if self.0.contains(StringFlags::F_PREFIX) {
+            if self.0.contains(StringFlags::R_PREFIX) {
+                return "rf";
+            }
+            return "f";
         }
+        if self.0.contains(StringFlags::B_PREFIX) {
+            if self.0.contains(StringFlags::R_PREFIX) {
+                return "rb";
+            }
+            return "b";
+        }
+        if self.0.contains(StringFlags::R_PREFIX) {
+            return "r";
+        }
+        if self.0.contains(StringFlags::U_PREFIX) {
+            return "u";
+        }
+        ""
     }
 
     /// The length of the prefixes used (if any) in the string's opener.
@@ -221,14 +246,24 @@ impl StringKind {
 
     #[must_use]
     pub fn with_double_quotes(mut self) -> Self {
-        self.quote_flags |= QuoteFlags::DOUBLE;
+        self.0 |= StringFlags::DOUBLE;
         self
     }
 
     #[must_use]
     pub fn with_triple_quotes(mut self) -> Self {
-        self.quote_flags |= QuoteFlags::TRIPLE_QUOTED;
+        self.0 |= StringFlags::TRIPLE_QUOTED;
         self
+    }
+}
+
+impl fmt::Debug for StringKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("StringKind")
+            .field("prefix", &self.prefix_str())
+            .field("triple_quoted", &self.is_triple_quoted())
+            .field("quote_style", &self.quote_style())
+            .finish()
     }
 }
 

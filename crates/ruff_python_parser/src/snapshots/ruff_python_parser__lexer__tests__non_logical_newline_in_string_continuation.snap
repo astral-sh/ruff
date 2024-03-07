@@ -15,10 +15,9 @@ expression: lex_source(source)
         String {
             value: "a",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    0x0,
-                ),
-                prefix: None,
+                prefix: "",
+                triple_quoted: false,
+                quote_style: Single,
             },
         },
         6..9,
@@ -31,10 +30,9 @@ expression: lex_source(source)
         String {
             value: "b",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    0x0,
-                ),
-                prefix: None,
+                prefix: "",
+                triple_quoted: false,
+                quote_style: Single,
             },
         },
         14..17,
@@ -51,10 +49,9 @@ expression: lex_source(source)
         String {
             value: "c",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    0x0,
-                ),
-                prefix: None,
+                prefix: "",
+                triple_quoted: false,
+                quote_style: Single,
             },
         },
         23..26,
@@ -63,10 +60,9 @@ expression: lex_source(source)
         String {
             value: "d",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    0x0,
-                ),
-                prefix: None,
+                prefix: "",
+                triple_quoted: false,
+                quote_style: Single,
             },
         },
         33..36,

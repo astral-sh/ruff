@@ -6,12 +6,9 @@ expression: fstring_single_quote_escape_eol(MAC_EOL)
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    0x0,
-                ),
-                prefix: Some(
-                    F,
-                ),
+                prefix: "f",
+                triple_quoted: false,
+                quote_style: Single,
             },
         ),
         0..2,
@@ -20,27 +17,15 @@ expression: fstring_single_quote_escape_eol(MAC_EOL)
         FStringMiddle {
             value: "text \\\r more text",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    0x0,
-                ),
-                prefix: Some(
-                    F,
-                ),
+                prefix: "f",
+                triple_quoted: false,
+                quote_style: Single,
             },
         },
         2..19,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    0x0,
-                ),
-                prefix: Some(
-                    F,
-                ),
-            },
-        ),
+        FStringEnd,
         19..20,
     ),
     (

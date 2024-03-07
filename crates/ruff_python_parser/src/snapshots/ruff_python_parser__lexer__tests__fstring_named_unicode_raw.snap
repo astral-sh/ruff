@@ -6,12 +6,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
+                prefix: "rf",
+                triple_quoted: false,
+                quote_style: Double,
             },
         ),
         0..3,
@@ -20,12 +17,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\\N",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
+                prefix: "rf",
+                triple_quoted: false,
+                quote_style: Double,
             },
         },
         3..5,
@@ -48,27 +42,15 @@ expression: lex_source(source)
         FStringMiddle {
             value: " normal",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
+                prefix: "rf",
+                triple_quoted: false,
+                quote_style: Double,
             },
         },
         13..20,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
-            },
-        ),
+        FStringEnd,
         20..21,
     ),
     (

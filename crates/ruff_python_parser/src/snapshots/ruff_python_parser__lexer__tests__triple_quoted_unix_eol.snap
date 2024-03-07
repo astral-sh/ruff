@@ -7,10 +7,9 @@ expression: triple_quoted_eol(UNIX_EOL)
         String {
             value: "\n test string\n ",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE | TRIPLE_QUOTED,
-                ),
-                prefix: None,
+                prefix: "",
+                triple_quoted: true,
+                quote_style: Double,
             },
         },
         0..21,

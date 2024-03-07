@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: e82afa897fd7600035c04a04226146caec297d2e351011e84c973913682e0d6c
+// sha3: 0b9eaa3a721e4f2b0fa9ab3b3c7a070c2cac5809879d53f64cba51993ef3244e
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -6084,7 +6084,7 @@ mod __parse__Top {
             token::Tok::Rbrace if true => Some(86),
             token::Tok::Tilde if true => Some(87),
             token::Tok::Dedent if true => Some(88),
-            token::Tok::FStringEnd(StringKind) if true => Some(89),
+            token::Tok::FStringEnd if true => Some(89),
             token::Tok::FStringStart(StringKind) if true => Some(90),
             token::Tok::Indent if true => Some(91),
             token::Tok::StartExpression if true => Some(92),

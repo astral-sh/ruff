@@ -6,12 +6,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE | TRIPLE_QUOTED,
-                ),
-                prefix: Some(
-                    F,
-                ),
+                prefix: "f",
+                triple_quoted: true,
+                quote_style: Double,
             },
         ),
         0..4,
@@ -20,38 +17,23 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\nhello\n    world\n",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE | TRIPLE_QUOTED,
-                ),
-                prefix: Some(
-                    F,
-                ),
+                prefix: "f",
+                triple_quoted: true,
+                quote_style: Double,
             },
         },
         4..21,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE | TRIPLE_QUOTED,
-                ),
-                prefix: Some(
-                    F,
-                ),
-            },
-        ),
+        FStringEnd,
         21..24,
     ),
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    TRIPLE_QUOTED,
-                ),
-                prefix: Some(
-                    F,
-                ),
+                prefix: "f",
+                triple_quoted: true,
+                quote_style: Single,
             },
         ),
         25..29,
@@ -60,38 +42,23 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\n    world\nhello\n",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    TRIPLE_QUOTED,
-                ),
-                prefix: Some(
-                    F,
-                ),
+                prefix: "f",
+                triple_quoted: true,
+                quote_style: Single,
             },
         },
         29..46,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    TRIPLE_QUOTED,
-                ),
-                prefix: Some(
-                    F,
-                ),
-            },
-        ),
+        FStringEnd,
         46..49,
     ),
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    F,
-                ),
+                prefix: "f",
+                triple_quoted: false,
+                quote_style: Double,
             },
         ),
         50..52,
@@ -100,12 +67,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: "some ",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    F,
-                ),
+                prefix: "f",
+                triple_quoted: false,
+                quote_style: Double,
             },
         },
         52..57,
@@ -117,12 +81,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE | TRIPLE_QUOTED,
-                ),
-                prefix: Some(
-                    F,
-                ),
+                prefix: "f",
+                triple_quoted: true,
+                quote_style: Double,
             },
         ),
         58..62,
@@ -131,12 +92,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: "multiline\nallowed ",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE | TRIPLE_QUOTED,
-                ),
-                prefix: Some(
-                    F,
-                ),
+                prefix: "f",
+                triple_quoted: true,
+                quote_style: Double,
             },
         },
         62..80,
@@ -156,16 +114,7 @@ expression: lex_source(source)
         82..83,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE | TRIPLE_QUOTED,
-                ),
-                prefix: Some(
-                    F,
-                ),
-            },
-        ),
+        FStringEnd,
         83..86,
     ),
     (
@@ -176,27 +125,15 @@ expression: lex_source(source)
         FStringMiddle {
             value: " string",
             kind: StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    F,
-                ),
+                prefix: "f",
+                triple_quoted: false,
+                quote_style: Double,
             },
         },
         87..94,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    F,
-                ),
-            },
-        ),
+        FStringEnd,
         94..95,
     ),
     (

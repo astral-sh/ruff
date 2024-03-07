@@ -2003,7 +2003,7 @@ extern {
         StartModule => token::Tok::StartModule,
         StartExpression => token::Tok::StartExpression,
         FStringStart => token::Tok::FStringStart(StringKind),
-        FStringEnd => token::Tok::FStringEnd(StringKind),
+        FStringEnd => token::Tok::FStringEnd,
         "!" => token::Tok::Exclamation,
         "?" => token::Tok::Question,
         "+" => token::Tok::Plus,

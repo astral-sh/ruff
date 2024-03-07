@@ -541,9 +541,9 @@ impl<'source> Lexer<'source> {
 
         let mut kind = StringKind::with_prefix({
             if is_raw_string {
-                StringPrefix::RF
+                StringPrefix::RawFormat
             } else {
-                StringPrefix::F
+                StringPrefix::Format
             }
         });
         if quote == '"' {
@@ -567,10 +567,10 @@ impl<'source> Lexer<'source> {
         if fstring.is_triple_quoted() {
             let quote_char = fstring.quote_char();
             if self.cursor.eat_char3(quote_char, quote_char, quote_char) {
-                return Ok(Some(Tok::FStringEnd(fstring.kind())));
+                return Ok(Some(Tok::FStringEnd));
             }
         } else if self.cursor.eat_char(fstring.quote_char()) {
-            return Ok(Some(Tok::FStringEnd(fstring.kind())));
+            return Ok(Some(Tok::FStringEnd));
         }
 
         // We have to decode `{{` and `}}` into `{` and `}` respectively. As an

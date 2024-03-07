@@ -6,261 +6,141 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    F,
-                ),
+                prefix: "f",
+                triple_quoted: false,
+                quote_style: Double,
             },
         ),
         0..2,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    F,
-                ),
-            },
-        ),
+        FStringEnd,
         2..3,
     ),
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    F,
-                ),
+                prefix: "f",
+                triple_quoted: false,
+                quote_style: Double,
             },
         ),
         4..6,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    F,
-                ),
-            },
-        ),
+        FStringEnd,
         6..7,
     ),
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
+                prefix: "rf",
+                triple_quoted: false,
+                quote_style: Double,
             },
         ),
         8..11,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
-            },
-        ),
+        FStringEnd,
         11..12,
     ),
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
+                prefix: "rf",
+                triple_quoted: false,
+                quote_style: Double,
             },
         ),
         13..16,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
-            },
-        ),
+        FStringEnd,
         16..17,
     ),
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
+                prefix: "rf",
+                triple_quoted: false,
+                quote_style: Double,
             },
         ),
         18..21,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
-            },
-        ),
+        FStringEnd,
         21..22,
     ),
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
+                prefix: "rf",
+                triple_quoted: false,
+                quote_style: Double,
             },
         ),
         23..26,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
-            },
-        ),
+        FStringEnd,
         26..27,
     ),
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
+                prefix: "rf",
+                triple_quoted: false,
+                quote_style: Double,
             },
         ),
         28..31,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
-            },
-        ),
+        FStringEnd,
         31..32,
     ),
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
+                prefix: "rf",
+                triple_quoted: false,
+                quote_style: Double,
             },
         ),
         33..36,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
-            },
-        ),
+        FStringEnd,
         36..37,
     ),
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
+                prefix: "rf",
+                triple_quoted: false,
+                quote_style: Double,
             },
         ),
         38..41,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
-            },
-        ),
+        FStringEnd,
         41..42,
     ),
     (
         FStringStart(
             StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
+                prefix: "rf",
+                triple_quoted: false,
+                quote_style: Double,
             },
         ),
         43..46,
     ),
     (
-        FStringEnd(
-            StringKind {
-                quote_flags: QuoteFlags(
-                    DOUBLE,
-                ),
-                prefix: Some(
-                    RF,
-                ),
-            },
-        ),
+        FStringEnd,
         46..47,
     ),
     (

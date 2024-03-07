@@ -247,7 +247,7 @@ pub(crate) fn trailing_commas(
                 fstrings = fstrings.saturating_add(1);
                 None
             }
-            Tok::FStringEnd(_) => {
+            Tok::FStringEnd => {
                 fstrings = fstrings.saturating_sub(1);
                 if fstrings == 0 {
                     indexer

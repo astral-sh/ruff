@@ -56,7 +56,7 @@ pub enum Tok {
         kind: StringKind,
     },
     /// Token value for the end of an f-string. This includes the closing quote.
-    FStringEnd(StringKind),
+    FStringEnd,
     /// Token value for IPython escape commands. These are recognized by the lexer
     /// only when the mode is [`Mode::Ipython`].
     IpyEscapeCommand {
@@ -246,7 +246,7 @@ impl fmt::Display for Tok {
             }
             FStringStart(_) => f.write_str("FStringStart"),
             FStringMiddle { value, .. } => f.write_str(value),
-            FStringEnd(_) => f.write_str("FStringEnd"),
+            FStringEnd => f.write_str("FStringEnd"),
             IpyEscapeCommand { kind, value } => write!(f, "{kind}{value}"),
             Newline => f.write_str("Newline"),
             NonLogicalNewline => f.write_str("NonLogicalNewline"),
@@ -702,7 +702,7 @@ impl TokenKind {
             Tok::String { .. } => TokenKind::String,
             Tok::FStringStart(_) => TokenKind::FStringStart,
             Tok::FStringMiddle { .. } => TokenKind::FStringMiddle,
-            Tok::FStringEnd(_) => TokenKind::FStringEnd,
+            Tok::FStringEnd => TokenKind::FStringEnd,
             Tok::IpyEscapeCommand { .. } => TokenKind::EscapeCommand,
             Tok::Comment(_) => TokenKind::Comment,
             Tok::Newline => TokenKind::Newline,

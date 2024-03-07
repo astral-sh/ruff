@@ -116,13 +116,13 @@ pub(crate) fn implicit(
                     None => continue,
                 }
             }
-            (Tok::FStringEnd(_), Tok::String { .. }) => {
+            (Tok::FStringEnd, Tok::String { .. }) => {
                 match indexer.fstring_ranges().innermost(a_range.start()) {
                     Some(a_range) => (a_range, *b_range),
                     None => continue,
                 }
             }
-            (Tok::FStringEnd(_), Tok::FStringStart(_)) => {
+            (Tok::FStringEnd, Tok::FStringStart(_)) => {
                 match (
                     indexer.fstring_ranges().innermost(a_range.start()),
                     indexer.fstring_ranges().innermost(b_range.start()),
