@@ -2807,7 +2807,11 @@ pub struct PylintOptions {
 
     /// Maximum number of lines within a module
     /// (see: `PLC0302`).
-    #[option(default = r"2000", value_type = "int", example = r"max-module-lines = 1000")]
+    #[option(
+        default = r"2000",
+        value_type = "int",
+        example = r"max-module-lines = 1000"
+    )]
     pub max_module_lines: Option<usize>,
 }
 
