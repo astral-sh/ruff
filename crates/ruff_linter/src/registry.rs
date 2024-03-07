@@ -254,6 +254,7 @@ impl Rule {
             | Rule::MissingCopyrightNotice
             | Rule::MissingNewlineAtEndOfFile
             | Rule::MixedSpacesAndTabs
+            | Rule::TooManyLines
             | Rule::TrailingWhitespace => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AvoidableEscapedQuote

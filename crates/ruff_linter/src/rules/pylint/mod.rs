@@ -108,6 +108,7 @@ mod tests {
         Path::new("too_many_return_statements.py")
     )]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"))]
+    #[test_case(Rule::TooManyLines, Path::new("too_many_lines.py"))]
     #[test_case(Rule::TypeBivariance, Path::new("type_bivariance.py"))]
     #[test_case(
         Rule::TypeNameIncorrectVariance,
@@ -372,6 +373,22 @@ mod tests {
                     ..pylint::settings::Settings::default()
                 },
                 ..LinterSettings::for_rules(vec![Rule::TooManyLocals])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn too_many_lines() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_lines.py"),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    max_module_lines: 2001,
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules(vec![Rule::TooManyLines])
             },
         )?;
         assert_messages!(diagnostics);

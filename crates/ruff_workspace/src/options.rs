@@ -2828,6 +2828,7 @@ impl PylintOptions {
                 .unwrap_or(defaults.max_public_methods),
             max_locals: self.max_locals.unwrap_or(defaults.max_locals),
             max_nested_blocks: self.max_nested_blocks.unwrap_or(defaults.max_nested_blocks),
+            max_module_lines: self.max_nested_blocks.unwrap_or(defaults.max_module_lines),
         }
     }
 }

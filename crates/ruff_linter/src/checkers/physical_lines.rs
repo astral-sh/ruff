@@ -33,6 +33,7 @@ pub(crate) fn check_physical_lines(
     let enforce_blank_line_contains_whitespace =
         settings.rules.enabled(Rule::BlankLineWithWhitespace);
     let enforce_copyright_notice = settings.rules.enabled(Rule::MissingCopyrightNotice);
+    let enforce_too_many_lines = settings.rules.enabled(Rule::TooManyLines);
 
     let mut doc_lines_iter = doc_lines.iter().peekable();
 
@@ -79,6 +80,12 @@ pub(crate) fn check_physical_lines(
 
     if enforce_copyright_notice {
         if let Some(diagnostic) = missing_copyright_notice(locator, settings) {
+            diagnostics.push(diagnostic);
+        }
+    }
+
+    if enforce_too_many_lines {
+        if let Some(diagnostic) = pylint::rules::too_many_lines(locator, settings) {
             diagnostics.push(diagnostic);
         }
     }
