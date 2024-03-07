@@ -1,4 +1,4 @@
-use lsp_types::{Position, TextDocumentContentChangeEvent};
+use lsp_types::TextDocumentContentChangeEvent;
 use ruff_source_file::LineIndex;
 
 use crate::PositionEncoding;
@@ -7,14 +7,21 @@ use super::RangeExt;
 
 pub(crate) type DocumentVersion = i32;
 
+/// The state for an individual document in the server. Stays up-to-date
+/// with changes made by the user, including unsaved changes.
 #[derive(Debug, Clone)]
 pub struct Document {
+    /// The string contents of the document.
     contents: String,
+    /// A computed line index for the document. This should always reflect
+    /// the current version of `contents`. Using a function like [`Self::modify`]
+    /// will re-calculate the line index automatically when the `contents` value is updated.
     index: LineIndex,
+    /// The latest version of the document, set by the LSP client. The server will panic in
+    /// debug mode if we attempt to update the document with an 'older' version.
     version: DocumentVersion,
 }
 
-/* Mutable API */
 impl Document {
     pub fn new(contents: String, version: DocumentVersion) -> Self {
         let index = LineIndex::from_source_text(&contents);
@@ -55,13 +62,9 @@ impl Document {
             return;
         }
 
+        let old_contents = self.contents().to_string();
         let mut new_contents = self.contents().to_string();
         let mut active_index = std::borrow::Cow::Borrowed(self.index());
-
-        let mut last_position = Position {
-            line: u32::MAX,
-            character: u32::MAX,
-        };
 
         for TextDocumentContentChangeEvent {
             range,
@@ -70,12 +73,6 @@ impl Document {
         } in changes
         {
             if let Some(range) = range {
-                if last_position <= range.end {
-                    active_index =
-                        std::borrow::Cow::Owned(LineIndex::from_source_text(&new_contents));
-                }
-
-                last_position = range.start;
                 let range = range.to_text_range(&new_contents, &active_index, encoding);
 
                 new_contents.replace_range(
@@ -84,12 +81,17 @@ impl Document {
                 );
             } else {
                 new_contents = change;
-                last_position = Position::default();
+            }
+
+            if new_contents != old_contents {
+                active_index = std::borrow::Cow::Owned(LineIndex::from_source_text(&new_contents));
             }
         }
 
         self.modify_with_manual_index(|contents, version, index| {
-            *index = LineIndex::from_source_text(&new_contents);
+            if contents != &new_contents {
+                *index = LineIndex::from_source_text(&new_contents);
+            }
             *contents = new_contents;
             *version = new_version;
         });

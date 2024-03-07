@@ -44,8 +44,11 @@ impl Server {
 
         let workspaces = init_params
             .workspace_folders
-            .map(|f| f.into_iter().map(|w| w.uri).collect())
-            .or_else(|| init_params.root_uri.map(|u| vec![u])).ok_or_else(|| anyhow!("No workspace or root URI was given in the LSP initialization parameters. The server cannot start."))?;
+            .map(|folders| folders.into_iter().map(|folder| folder.uri).collect())
+            .or_else(|| init_params.root_uri.map(|u| vec![u]))
+            .ok_or_else(|| {
+                anyhow!("No workspace or root URI was given in the LSP initialization parameters. The server cannot start.")
+            })?;
 
         let initialize_data = serde_json::json!({
             "capabilities": server_capabilities,

@@ -50,7 +50,7 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
         }
     }
     .unwrap_or_else(|err| {
-        tracing::error!("Encountered error when routing request: {err}");
+        tracing::error!("Encountered error when routing request with ID {id}: {err}");
         let result: Result<()> = Err(err);
         Task::immediate(id, result)
     })
@@ -154,11 +154,11 @@ where
         .extract(Req::METHOD)
         .map_err(|err| match err {
             json_err @ server::ExtractError::JsonError { .. } => {
-                let err: anyhow::Error = json_err.into();
-                anyhow::anyhow!("JSON parsing failure:\n{err}")
+                anyhow::anyhow!("JSON parsing failure:\n{json_err}")
             }
             server::ExtractError::MethodMismatch(_) => {
-                unreachable!("A method mismatch should not be possible here")
+                unreachable!("A method mismatch should not be possible here unless you've used a different handler (`Req`) \
+                    than the one whose method name was matched against earlier.")
             }
         })
         .with_failure_code(server::ErrorCode::InternalError)
@@ -194,11 +194,11 @@ fn cast_notification<N>(
             .extract(N::METHOD)
             .map_err(|err| match err {
                 json_err @ server::ExtractError::JsonError { .. } => {
-                    let err: anyhow::Error = json_err.into();
-                    anyhow::anyhow!("JSON parsing failure:\n{err}")
+                    anyhow::anyhow!("JSON parsing failure:\n{json_err}")
                 }
                 server::ExtractError::MethodMismatch(_) => {
-                    unreachable!("A method mismatch should not be possible here")
+                    unreachable!("A method mismatch should not be possible here unless you've used a different handler (`N`) \
+                        than the one whose method name was matched against earlier.")
                 }
             })
             .with_failure_code(server::ErrorCode::InternalError)?,

@@ -15,10 +15,13 @@ use rustc_hash::FxHashMap;
 use crate::edit::{Document, DocumentVersion};
 use crate::PositionEncoding;
 
-/// The global state for the LSP.
+/// The global state for the LSP
 pub(crate) struct Session {
+    /// Workspace folders in the current session, which contain the state of all open files.
     workspaces: Workspaces,
+    /// The global position encoding, negotiated during LSP initialization.
     position_encoding: PositionEncoding,
+    /// Extension-specific settings, set by the client, that apply to all workspace folders.
     #[allow(dead_code)]
     lsp_settings: types::ExtensionSettings,
 }
@@ -53,7 +56,9 @@ pub(crate) struct OpenDocuments {
     documents: FxHashMap<Url, DocumentController>,
 }
 
-/// A handler to an underlying document, with a revision counter.
+/// A mutable handler to an underlying document.
+/// Handles copy-on-write mutation automatically when
+/// calling `deref_mut`.
 pub(crate) struct DocumentController {
     document: Arc<Document>,
 }
@@ -82,18 +87,18 @@ impl Session {
     pub(crate) fn take_snapshot(&self, url: &Url) -> Option<DocumentSnapshot> {
         Some(DocumentSnapshot {
             configuration: self.workspaces.configuration(url)?.clone(),
-            document_ref: self.workspaces.doc_snapshot(url)?,
+            document_ref: self.workspaces.snapshot(url)?,
             position_encoding: self.position_encoding,
             url: url.clone(),
         })
     }
 
     pub(crate) fn open_document(&mut self, url: &Url, contents: String, version: DocumentVersion) {
-        self.workspaces.open_document(url, contents, version);
+        self.workspaces.open(url, contents, version);
     }
 
     pub(crate) fn close_document(&mut self, url: &Url) -> crate::Result<()> {
-        self.workspaces.close_document(url)?;
+        self.workspaces.close(url)?;
         Ok(())
     }
 
@@ -102,7 +107,7 @@ impl Session {
         url: &Url,
     ) -> crate::Result<&mut DocumentController> {
         self.workspaces
-            .doc_controller(url)
+            .controller(url)
             .ok_or_else(|| anyhow!("Tried to open unavailable document `{url}`"))
     }
 
@@ -122,13 +127,13 @@ impl Session {
 }
 
 impl OpenDocuments {
-    fn doc_snapshot(&self, url: &Url) -> Option<DocumentRef> {
+    fn snapshot(&self, url: &Url) -> Option<DocumentRef> {
         Some(self.documents.get(url)?.make_ref())
     }
-    fn doc_controller(&mut self, url: &Url) -> Option<&mut DocumentController> {
+    fn controller(&mut self, url: &Url) -> Option<&mut DocumentController> {
         self.documents.get_mut(url)
     }
-    fn open_document(&mut self, url: &Url, contents: String, version: DocumentVersion) {
+    fn open(&mut self, url: &Url, contents: String, version: DocumentVersion) {
         if self
             .documents
             .insert(url.clone(), DocumentController::new(contents, version))
@@ -137,7 +142,7 @@ impl OpenDocuments {
             tracing::warn!("Opening document `{url}` that is already open!");
         }
     }
-    fn close_document(&mut self, url: &Url) -> crate::Result<()> {
+    fn close(&mut self, url: &Url) -> crate::Result<()> {
         let Some(_) = self.documents.remove(url) else {
             return Err(anyhow!(
                 "Tried to close document `{url}`, which was not open"
@@ -223,14 +228,14 @@ impl Workspaces {
         Ok(())
     }
 
-    fn doc_snapshot(&self, document_url: &Url) -> Option<DocumentRef> {
+    fn snapshot(&self, document_url: &Url) -> Option<DocumentRef> {
         self.workspace_for_url(document_url)
-            .and_then(|w| w.open_documents.doc_snapshot(document_url))
+            .and_then(|w| w.open_documents.snapshot(document_url))
     }
 
-    fn doc_controller(&mut self, document_url: &Url) -> Option<&mut DocumentController> {
+    fn controller(&mut self, document_url: &Url) -> Option<&mut DocumentController> {
         self.workspace_for_url_mut(document_url)
-            .and_then(|w| w.open_documents.doc_controller(document_url))
+            .and_then(|w| w.open_documents.controller(document_url))
     }
 
     fn configuration(&self, document_url: &Url) -> Option<&Arc<RuffConfiguration>> {
@@ -238,36 +243,33 @@ impl Workspaces {
             .map(|w| &w.configuration)
     }
 
-    fn open_document(&mut self, url: &Url, contents: String, version: DocumentVersion) {
+    fn open(&mut self, url: &Url, contents: String, version: DocumentVersion) {
         if let Some(w) = self.workspace_for_url_mut(url) {
-            w.open_documents.open_document(url, contents, version);
+            w.open_documents.open(url, contents, version);
         }
     }
 
-    fn close_document(&mut self, url: &Url) -> crate::Result<()> {
+    fn close(&mut self, url: &Url) -> crate::Result<()> {
         self.workspace_for_url_mut(url)
             .ok_or_else(|| anyhow!("Workspace not found for {url}"))?
             .open_documents
-            .close_document(url)
+            .close(url)
     }
 
     fn workspace_for_url(&self, url: &Url) -> Option<&Workspace> {
         let path = url.to_file_path().ok()?;
         self.0
-            .keys()
-            .filter(|p| path.starts_with(p))
-            .max_by_key(|p| p.as_os_str().len())
-            .and_then(|u| self.0.get(u))
+            .range(..path)
+            .next_back()
+            .map(|(_, workspace)| workspace)
     }
 
     fn workspace_for_url_mut(&mut self, url: &Url) -> Option<&mut Workspace> {
         let path = url.to_file_path().ok()?;
         self.0
-            .keys()
-            .filter(|p| path.starts_with(p))
-            .max_by_key(|p| p.as_os_str().len())
-            .cloned()
-            .and_then(|u| self.0.get_mut(&u))
+            .range_mut(..path)
+            .next_back()
+            .map(|(_, workspace)| workspace)
     }
 }
 
@@ -299,7 +301,7 @@ impl Workspace {
 
 pub(crate) fn find_configuration_from_root(root: &Path) -> crate::Result<RuffConfiguration> {
     let pyproject = ruff_workspace::pyproject::find_settings_toml(root)?
-        .ok_or_else(|| anyhow!("No pyproject.toml/ruff.toml file was found"))?;
+        .ok_or_else(|| anyhow!("No pyproject.toml/ruff.toml/.ruff.toml file was found"))?;
     let settings = ruff_workspace::resolver::resolve_root_settings(
         &pyproject,
         Relativity::Parent,
