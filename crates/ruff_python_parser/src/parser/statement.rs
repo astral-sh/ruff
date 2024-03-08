@@ -597,7 +597,9 @@ impl<'src> Parser<'src> {
             targets
                 .iter()
                 .filter(|target| !helpers::is_valid_assignment_target(target))
-                .for_each(|target| self.add_error(ParseErrorType::AssignmentError, target.range()));
+                .for_each(|target| {
+                    self.add_error(ParseErrorType::InvalidAssignmentTarget, target.range());
+                });
         }
 
         ast::StmtAssign {
@@ -614,7 +616,7 @@ impl<'src> Parser<'src> {
         start: TextSize,
     ) -> ast::StmtAnnAssign {
         if !helpers::is_valid_assignment_target(&target.expr) {
-            self.add_error(ParseErrorType::AssignmentError, target.range());
+            self.add_error(ParseErrorType::InvalidAssignmentTarget, target.range());
         }
 
         if matches!(target.expr, Expr::Tuple(_)) {
@@ -674,7 +676,10 @@ impl<'src> Parser<'src> {
         self.bump_ts(AUGMENTED_ASSIGN_SET);
 
         if !helpers::is_valid_aug_assignment_target(&target.expr) {
-            self.add_error(ParseErrorType::AugAssignmentError, target.range());
+            self.add_error(
+                ParseErrorType::InvalidAugmentedAssignmentTarget,
+                target.range(),
+            );
         }
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
