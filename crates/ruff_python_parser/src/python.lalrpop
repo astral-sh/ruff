@@ -1151,24 +1151,6 @@ ParameterList<ParameterType, StarParameterType, DoubleStarParameterType>: ast::P
             range: (location..end_location).into()
         })
     },
-    <location:@L> <param1:ParameterDefs<ParameterType>> <kw:("," <KwargParameter<DoubleStarParameterType>>)> ","? <end_location:@R> =>? {
-        validate_pos_params(&param1)?;
-        let (posonlyargs, args) = param1;
-
-        // Now gather rest of parameters:
-        let vararg = None;
-        let kwonlyargs = vec![];
-        let kwarg = kw;
-
-        Ok(ast::Parameters {
-            posonlyargs,
-            args,
-            kwonlyargs,
-            vararg,
-            kwarg,
-            range: (location..end_location).into()
-        })
-    },
     <location:@L> <params:ParameterListStarArgs<ParameterType, StarParameterType, DoubleStarParameterType>> ","? <end_location:@R> => {
         let (vararg, kwonlyargs, kwarg) = params;
         ast::Parameters {
@@ -1176,16 +1158,6 @@ ParameterList<ParameterType, StarParameterType, DoubleStarParameterType>: ast::P
             args: vec![],
             kwonlyargs,
             vararg,
-            kwarg,
-            range: (location..end_location).into()
-        }
-    },
-    <location:@L> <kwarg:KwargParameter<DoubleStarParameterType>> ","? <end_location:@R> => {
-        ast::Parameters {
-            posonlyargs: vec![],
-            args: vec![],
-            kwonlyargs: vec![],
-            vararg: None,
             kwarg,
             range: (location..end_location).into()
         }
@@ -1219,7 +1191,11 @@ UntypedParameter: ast::ParameterWithDefault = {
     },
 };
 StarUntypedParameter: ast::Parameter = {
-    <location:@L> <arg:Identifier> <end_location:@R> => ast::Parameter { name:arg, annotation: None, range: (location..end_location).into() },
+    <location:@L> "*" <arg:Identifier> <end_location:@R> => ast::Parameter { name:arg, annotation: None, range: (location..end_location).into() },
+};
+
+DoubleStarUntypedParameter: ast::Parameter = {
+    <location:@L> "**" <arg:Identifier> <end_location:@R> => ast::Parameter { name:arg, annotation: None, range: (location..end_location).into() },
 };
 
 TypedParameter: ast::ParameterWithDefault = {
@@ -1231,14 +1207,14 @@ TypedParameter: ast::ParameterWithDefault = {
 };
 
 StarTypedParameter: ast::Parameter = {
-    <location:@L> <name:Identifier> <annotation:(":" <TestOrStarExpr>)?> <end_location:@R> => {
+    <location:@L> "*" <name:Identifier> <annotation:(":" <TestOrStarExpr>)?> <end_location:@R> => {
         let annotation = annotation.map(ast::Expr::from).map(Box::new);
         ast::Parameter { name, annotation, range: (location..end_location).into() }
     },
 };
 
 DoubleStarTypedParameter: ast::Parameter = {
-    <location:@L> <name:Identifier> <annotation:(":" <Test<"all">>)?> <end_location:@R> => {
+    <location:@L> "**" <name:Identifier> <annotation:(":" <Test<"all">>)?> <end_location:@R> => {
         let annotation = annotation.map(ast::Expr::from).map(Box::new);
         ast::Parameter { name, annotation, range: (location..end_location).into() }
     },
@@ -1248,25 +1224,29 @@ DoubleStarTypedParameter: ast::Parameter = {
 // TODO: figure out another grammar that makes this inline no longer required.
 #[inline]
 ParameterListStarArgs<ParameterType, StarParameterType, DoubleStarParameterType>: (Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>) = {
-    <location:@L> "*" <va:StarParameterType?> <kwonlyargs:("," <ParameterDef<ParameterType>>)*> <kwarg:("," <KwargParameter<DoubleStarParameterType>>)?> =>? {
-        if va.is_none() && kwonlyargs.is_empty() && kwarg.is_none() {
+    <location:@L> <va:StarParameterType> <kwonlyargs:("," <ParameterDef<ParameterType>>)*> <kwarg:("," <DoubleStarParameterType>)?> =>? {
+        let kwarg = kwarg.map(Box::new);
+        let va = Some(Box::new(va));
+
+        Ok((va, kwonlyargs, kwarg))
+    },
+    <location:@L> "*" <kwonlyargs:("," <ParameterDef<ParameterType>>)*> <kwarg:("," <DoubleStarParameterType>)?> =>? {
+        if kwonlyargs.is_empty() {
             return Err(LexicalError::new(
                 LexicalErrorType::OtherError("named arguments must follow bare *".to_string().into_boxed_str()),
                 location,
             ))?;
         }
 
-        let kwarg = kwarg.flatten();
-        let va = va.map(Box::new);
+        let kwarg = kwarg.map(Box::new);
 
-        Ok((va, kwonlyargs, kwarg))
-    }
-};
+        Ok((None, kwonlyargs, kwarg))
+    },
+    <location:@L> <kwarg:(<DoubleStarParameterType>)> =>? {
+        let kwarg = Some(Box::new(kwarg));
 
-KwargParameter<ParameterType>: Option<Box<ast::Parameter>> = {
-    "**" <kwarg:ParameterType?> => {
-        kwarg.map(Box::new)
-    }
+        Ok((None, vec![], kwarg))
+    },
 };
 
 ClassDef: ast::Stmt = {
@@ -1365,7 +1345,7 @@ NamedExpression: crate::parser::ParenthesizedExpr = {
 };
 
 LambdaDef: crate::parser::ParenthesizedExpr = {
-    <location:@L> "lambda" <location_args:@L> <parameters:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> <end_location_args:@R> ":" <fstring_middle:fstring_middle?> <body:Test<"all">> <end_location:@R> =>? {
+    <location:@L> "lambda" <location_args:@L> <parameters:ParameterList<UntypedParameter, StarUntypedParameter, DoubleStarUntypedParameter>?> <end_location_args:@R> ":" <fstring_middle:fstring_middle?> <body:Test<"all">> <end_location:@R> =>? {
         if fstring_middle.is_some() {
             return Err(LexicalError::new(
                 LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),

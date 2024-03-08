@@ -6,13 +6,13 @@ Ok(
     [
         Expr(
             StmtExpr {
-                range: 0..29,
+                range: 0..32,
                 value: Lambda(
                     ExprLambda {
-                        range: 0..29,
+                        range: 0..32,
                         parameters: Some(
                             Parameters {
-                                range: 7..26,
+                                range: 7..29,
                                 posonlyargs: [
                                     ParameterWithDefault {
                                         range: 7..8,
@@ -53,39 +53,45 @@ Ok(
                                         default: None,
                                     },
                                 ],
-                                vararg: None,
+                                vararg: Some(
+                                    Parameter {
+                                        range: 19..21,
+                                        name: Identifier {
+                                            id: "d",
+                                            range: 20..21,
+                                        },
+                                        annotation: None,
+                                    },
+                                ),
                                 kwonlyargs: [
                                     ParameterWithDefault {
-                                        range: 22..23,
+                                        range: 23..24,
                                         parameter: Parameter {
-                                            range: 22..23,
-                                            name: Identifier {
-                                                id: "d",
-                                                range: 22..23,
-                                            },
-                                            annotation: None,
-                                        },
-                                        default: None,
-                                    },
-                                    ParameterWithDefault {
-                                        range: 25..26,
-                                        parameter: Parameter {
-                                            range: 25..26,
+                                            range: 23..24,
                                             name: Identifier {
                                                 id: "e",
-                                                range: 25..26,
+                                                range: 23..24,
                                             },
                                             annotation: None,
                                         },
                                         default: None,
                                     },
                                 ],
-                                kwarg: None,
+                                kwarg: Some(
+                                    Parameter {
+                                        range: 26..29,
+                                        name: Identifier {
+                                            id: "f",
+                                            range: 28..29,
+                                        },
+                                        annotation: None,
+                                    },
+                                ),
                             },
                         ),
                         body: NumberLiteral(
                             ExprNumberLiteral {
-                                range: 28..29,
+                                range: 31..32,
                                 value: Int(
                                     0,
                                 ),

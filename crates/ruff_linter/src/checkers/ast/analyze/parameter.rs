@@ -9,7 +9,7 @@ use crate::rules::{flake8_builtins, pep8_naming, pycodestyle};
 pub(crate) fn parameter(parameter: &Parameter, checker: &mut Checker) {
     if checker.enabled(Rule::AmbiguousVariableName) {
         if let Some(diagnostic) =
-            pycodestyle::rules::ambiguous_variable_name(&parameter.name, parameter.range())
+            pycodestyle::rules::ambiguous_variable_name(&parameter.name, parameter.name.range())
         {
             checker.diagnostics.push(diagnostic);
         }

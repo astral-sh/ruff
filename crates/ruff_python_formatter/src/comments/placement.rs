@@ -202,6 +202,14 @@ fn handle_enclosed_comment<'a>(
                 }
             })
         }
+        AnyNodeRef::Parameter(parameter) => {
+            // E.g. a comment between the `*` or `**` and the parameter name.
+            if comment.preceding_node().is_none() || comment.following_node().is_none() {
+                CommentPlacement::leading(parameter, comment)
+            } else {
+                CommentPlacement::Default(comment)
+            }
+        }
         AnyNodeRef::Arguments(_) | AnyNodeRef::TypeParams(_) | AnyNodeRef::PatternArguments(_) => {
             handle_bracketed_end_of_line_comment(comment, locator)
         }
