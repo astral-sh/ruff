@@ -253,15 +253,8 @@ impl<'src> Parser<'src> {
                 let mut target = parser.parse_conditional_expression_or_higher();
                 helpers::set_expr_ctx(&mut target.expr, ExprContext::Del);
 
-                // TODO(dhruvmanila): There are more restrictions on the targets here.
-                if matches!(target.expr, Expr::BoolOp(_) | Expr::Compare(_)) {
-                    parser.add_error(
-                        ParseErrorType::OtherError(format!(
-                            "`{}` not allowed in `del` statement",
-                            parser.src_text(&target.expr)
-                        )),
-                        &target.expr,
-                    );
+                if !helpers::is_valid_del_target(&target.expr) {
+                    parser.add_error(ParseErrorType::InvalidDeleteTarget, &target.expr);
                 }
                 target.expr
             },
@@ -597,7 +590,9 @@ impl<'src> Parser<'src> {
             targets
                 .iter()
                 .filter(|target| !helpers::is_valid_assignment_target(target))
-                .for_each(|target| self.add_error(ParseErrorType::AssignmentError, target.range()));
+                .for_each(|target| {
+                    self.add_error(ParseErrorType::InvalidAssignmentTarget, target.range());
+                });
         }
 
         ast::StmtAssign {
@@ -614,7 +609,7 @@ impl<'src> Parser<'src> {
         start: TextSize,
     ) -> ast::StmtAnnAssign {
         if !helpers::is_valid_assignment_target(&target.expr) {
-            self.add_error(ParseErrorType::AssignmentError, target.range());
+            self.add_error(ParseErrorType::InvalidAssignmentTarget, target.range());
         }
 
         if matches!(target.expr, Expr::Tuple(_)) {
@@ -674,7 +669,10 @@ impl<'src> Parser<'src> {
         self.bump_ts(AUGMENTED_ASSIGN_SET);
 
         if !helpers::is_valid_aug_assignment_target(&target.expr) {
-            self.add_error(ParseErrorType::AugAssignmentError, target.range());
+            self.add_error(
+                ParseErrorType::InvalidAugmentedAssignmentTarget,
+                target.range(),
+            );
         }
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
