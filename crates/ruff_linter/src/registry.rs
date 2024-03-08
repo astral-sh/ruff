@@ -327,6 +327,7 @@ impl Rule {
             | Rule::NoSpaceAfterBlockComment
             | Rule::NoSpaceAfterInlineComment
             | Rule::OverIndented
+            | Rule::RedundantBackslash
             | Rule::TabAfterComma
             | Rule::TabAfterKeyword
             | Rule::TabAfterOperator

@@ -9,8 +9,8 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::logical_lines::{
     extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
-    missing_whitespace_around_operator, space_after_comma, space_around_operator,
-    whitespace_around_keywords, whitespace_around_named_parameter_equals,
+    missing_whitespace_around_operator, redundant_backslash, space_after_comma,
+    space_around_operator, whitespace_around_keywords, whitespace_around_named_parameter_equals,
     whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
 };
 use crate::settings::LinterSettings;
@@ -73,6 +73,7 @@ pub(crate) fn check_logical_lines(
 
         if line.flags().contains(TokenFlags::BRACKET) {
             whitespace_before_parameters(&line, &mut context);
+            redundant_backslash(&line, &mut context);
         }
 
         // Extract the indentation level.

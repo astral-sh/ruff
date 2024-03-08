@@ -146,6 +146,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pycodestyle, "E401") => (RuleGroup::Stable, rules::pycodestyle::rules::MultipleImportsOnOneLine),
         (Pycodestyle, "E402") => (RuleGroup::Stable, rules::pycodestyle::rules::ModuleImportNotAtTopOfFile),
         (Pycodestyle, "E501") => (RuleGroup::Stable, rules::pycodestyle::rules::LineTooLong),
+        (Pycodestyle, "E502") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::RedundantBackslash),
         (Pycodestyle, "E701") => (RuleGroup::Stable, rules::pycodestyle::rules::MultipleStatementsOnOneLineColon),
         (Pycodestyle, "E702") => (RuleGroup::Stable, rules::pycodestyle::rules::MultipleStatementsOnOneLineSemicolon),
         (Pycodestyle, "E703") => (RuleGroup::Stable, rules::pycodestyle::rules::UselessSemicolon),
