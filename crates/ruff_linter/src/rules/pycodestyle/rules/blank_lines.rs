@@ -721,7 +721,10 @@ impl<'a> BlankLinesChecker<'a> {
             state.class_status.update(&logical_line);
             state.fn_status.update(&logical_line);
 
-            if state.is_not_first_logical_line {
+            if state.is_not_first_logical_line
+                // Ignore the first line of each cell in notebooks.
+                && !logical_line.is_cell_first_non_comment_line
+            {
                 self.check_line(&logical_line, &state, prev_indent_length, diagnostics);
             }
 
@@ -843,8 +846,6 @@ impl<'a> BlankLinesChecker<'a> {
             && line.kind.is_class_function_or_decorator()
             // Blank lines in stub files are used to group definitions. Don't enforce blank lines.
             && !self.source_type.is_stub()
-            // Do not add blank lines at the start of cells in notebooks.
-            && !line.is_cell_first_non_comment_line
         {
             // E302
             let mut diagnostic = Diagnostic::new(
@@ -959,8 +960,6 @@ impl<'a> BlankLinesChecker<'a> {
             && !line.kind.is_class_function_or_decorator()
             // Blank lines in stub files are used for grouping, don't enforce blank lines.
             && !self.source_type.is_stub()
-            // Do not add blank lines at the start of cells in notebooks.
-            && !line.is_cell_first_non_comment_line
         {
             // E305
             let mut diagnostic = Diagnostic::new(
