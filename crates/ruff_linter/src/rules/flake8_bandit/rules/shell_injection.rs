@@ -433,6 +433,7 @@ fn get_call_kind(func: &Expr, semantic: &SemanticModel) -> Option<CallKind> {
                     "Popen" | "call" | "check_call" | "check_output" | "run" => {
                         Some(CallKind::Subprocess)
                     }
+                    "getoutput" | "getstatusoutput" => Some(CallKind::Shell),
                     _ => None,
                 },
                 "popen2" => match submodule {
