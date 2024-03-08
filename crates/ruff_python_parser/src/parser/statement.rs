@@ -253,15 +253,8 @@ impl<'src> Parser<'src> {
                 let mut target = parser.parse_conditional_expression_or_higher();
                 helpers::set_expr_ctx(&mut target.expr, ExprContext::Del);
 
-                // TODO(dhruvmanila): There are more restrictions on the targets here.
-                if matches!(target.expr, Expr::BoolOp(_) | Expr::Compare(_)) {
-                    parser.add_error(
-                        ParseErrorType::OtherError(format!(
-                            "`{}` not allowed in `del` statement",
-                            parser.src_text(&target.expr)
-                        )),
-                        &target.expr,
-                    );
+                if !helpers::is_valid_del_target(&target.expr) {
+                    parser.add_error(ParseErrorType::InvalidDeleteTarget, &target.expr);
                 }
                 target.expr
             },
