@@ -15,30 +15,56 @@ use crate::string::{
 use crate::token_set::TokenSet;
 use crate::{FStringErrorType, Mode, ParseErrorType, Tok, TokenKind};
 
+use super::RecoveryContextKind;
+
 /// Tokens that can appear after an expression.
 /// FIXME: this isn't exhaustive.
-const END_EXPR_SET: TokenSet = TokenSet::new([
+pub(super) const END_EXPR_SET: TokenSet = TokenSet::new([
+    // Ex) `expr`
     TokenKind::Newline,
+    // Ex) `expr;`
     TokenKind::Semi,
+    // Ex) `data[expr:]`
     TokenKind::Colon,
+    // Ex) `expr` (without a newline)
     TokenKind::EndOfFile,
+    // Ex) `{expr}`
     TokenKind::Rbrace,
+    // Ex) `[expr]`
     TokenKind::Rsqb,
+    // Ex) `(expr)`
     TokenKind::Rpar,
+    // Ex) `expr,`
     TokenKind::Comma,
+    // Ex) ??
     TokenKind::Dedent,
+    // Ex) `expr if expr else expr`
+    TokenKind::If,
     TokenKind::Else,
     TokenKind::As,
     TokenKind::From,
     TokenKind::For,
     TokenKind::Async,
     TokenKind::In,
+    // Ex) `f"{expr=}"`
     TokenKind::Equal,
+    // Ex) `f"{expr!s}"`
+    TokenKind::Exclamation,
 ]);
 
+const END_SEQUENCE_SET: TokenSet = END_EXPR_SET.remove(TokenKind::Comma);
+
 impl<'src> Parser<'src> {
-    pub(super) fn at_expr(&mut self) -> bool {
+    pub(super) fn at_expr(&self) -> bool {
         self.at_ts(EXPR_SET)
+    }
+
+    pub(super) fn at_expr_end(&self) -> bool {
+        self.at_ts(END_EXPR_SET)
+    }
+
+    pub(super) fn at_sequence_end(&self) -> bool {
+        self.at_ts(END_SEQUENCE_SET)
     }
 
     /// Parses every Python expression.
@@ -411,8 +437,16 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses an argument list.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `(` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/expressions.html#grammar-token-python-grammar-argument_list>
     pub(super) fn parse_arguments(&mut self) -> ast::Arguments {
         let start = self.node_start();
+        self.bump(TokenKind::Lpar);
 
         let saved_context = self.set_ctx(ParserCtxFlags::ARGUMENTS);
 
@@ -421,12 +455,8 @@ impl<'src> Parser<'src> {
         let mut has_seen_kw_arg = false;
         let mut has_seen_kw_unpack = false;
 
-        #[allow(deprecated)]
-        self.parse_delimited(
-            true,
-            TokenKind::Lpar,
-            TokenKind::Comma,
-            TokenKind::Rpar,
+        self.parse_comma_separated_list(
+            RecoveryContextKind::Arguments,
             |parser| {
                 let argument_start = parser.node_start();
                 if parser.at(TokenKind::DoubleStar) {
@@ -498,8 +528,12 @@ impl<'src> Parser<'src> {
                     }
                 }
             },
+            true,
         );
+
         self.restore_ctx(ParserCtxFlags::ARGUMENTS, saved_context);
+
+        self.expect(TokenKind::Rpar);
 
         let arguments = ast::Arguments {
             range: self.node_range(start),
@@ -514,6 +548,12 @@ impl<'src> Parser<'src> {
         arguments
     }
 
+    /// Parses a subscript expression.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `[` token.
+    ///
     /// See: <https://docs.python.org/3/reference/expressions.html#subscriptions>
     fn parse_subscript_expression(
         &mut self,
@@ -548,16 +588,15 @@ impl<'src> Parser<'src> {
         let slice_start = self.node_start();
         let mut slice = self.parse_slice();
 
+        // If there are more than one element in the slice, we need to create a tuple
+        // expression to represent it.
         if self.eat(TokenKind::Comma) {
             let mut slices = vec![slice];
-            #[allow(deprecated)]
-            self.parse_separated(
+
+            self.parse_comma_separated_list(
+                RecoveryContextKind::Slices,
+                |parser| slices.push(parser.parse_slice()),
                 true,
-                TokenKind::Comma,
-                TokenSet::new([TokenKind::Rsqb]),
-                |parser| {
-                    slices.push(parser.parse_slice());
-                },
             );
 
             slice = Expr::Tuple(ast::ExprTuple {
@@ -1032,6 +1071,10 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses a list or a list comprehension expression.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `[` token.
     fn parse_list_like_expression(&mut self) -> Expr {
         let start = self.node_start();
 
@@ -1054,17 +1097,21 @@ impl<'src> Parser<'src> {
             });
         }
 
-        let parsed_expr = self.parse_named_expression_or_higher();
+        let first_element = self.parse_named_expression_or_higher();
 
         match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
-                Expr::ListComp(self.parse_list_comprehension_expression(parsed_expr.expr, start))
+                Expr::ListComp(self.parse_list_comprehension_expression(first_element.expr, start))
             }
-            _ => Expr::List(self.parse_list_expression(parsed_expr.expr, start)),
+            _ => Expr::List(self.parse_list_expression(first_element.expr, start)),
         }
     }
 
     /// Parses a set, dict, set comprehension, or dict comprehension.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `{` token.
     fn parse_set_or_dict_like_expression(&mut self) -> Expr {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
@@ -1186,7 +1233,6 @@ impl<'src> Parser<'src> {
 
         parsed
     }
-    const END_SEQUENCE_SET: TokenSet = END_EXPR_SET.remove(TokenKind::Comma);
 
     /// Parses multiple items separated by a comma into a `TupleExpr` node.
     /// Uses `parse_func` to parse each item.
@@ -1201,16 +1247,17 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprTuple {
         // In case of the tuple only having one element, we need to cover the
         // range of the comma.
-        if !self.at_ts(Self::END_SEQUENCE_SET) {
+        if !self.at_sequence_end() {
             self.expect(TokenKind::Comma);
         }
 
         let mut elts = vec![first_element];
 
-        #[allow(deprecated)]
-        self.parse_separated(true, TokenKind::Comma, Self::END_SEQUENCE_SET, |parser| {
-            elts.push(parse_func(parser).expr);
-        });
+        self.parse_comma_separated_list(
+            RecoveryContextKind::TupleElements,
+            |p| elts.push(parse_func(p).expr),
+            true,
+        );
 
         if parenthesized {
             self.expect(TokenKind::Rpar);
@@ -1224,18 +1271,21 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a list expression.
+    ///
     /// See: <https://docs.python.org/3/reference/expressions.html#list-displays>
     fn parse_list_expression(&mut self, first_element: Expr, start: TextSize) -> ast::ExprList {
-        if !self.at_ts(Self::END_SEQUENCE_SET) {
+        if !self.at_sequence_end() {
             self.expect(TokenKind::Comma);
         }
 
         let mut elts = vec![first_element];
 
-        #[allow(deprecated)]
-        self.parse_separated(true, TokenKind::Comma, Self::END_SEQUENCE_SET, |parser| {
-            elts.push(parser.parse_named_expression_or_higher().expr);
-        });
+        self.parse_comma_separated_list(
+            RecoveryContextKind::ListElements,
+            |parser| elts.push(parser.parse_named_expression_or_higher().expr),
+            true,
+        );
 
         self.expect(TokenKind::Rsqb);
 
@@ -1246,18 +1296,21 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a set expression.
+    ///
     /// See: <https://docs.python.org/3/reference/expressions.html#set-displays>
     fn parse_set_expression(&mut self, first_element: Expr, start: TextSize) -> ast::ExprSet {
-        if !self.at_ts(Self::END_SEQUENCE_SET) {
+        if !self.at_sequence_end() {
             self.expect(TokenKind::Comma);
         }
 
         let mut elts = vec![first_element];
 
-        #[allow(deprecated)]
-        self.parse_separated(true, TokenKind::Comma, Self::END_SEQUENCE_SET, |parser| {
-            elts.push(parser.parse_named_expression_or_higher().expr);
-        });
+        self.parse_comma_separated_list(
+            RecoveryContextKind::SetElements,
+            |parser| elts.push(parser.parse_named_expression_or_higher().expr),
+            true,
+        );
 
         self.expect(TokenKind::Rbrace);
 
@@ -1267,6 +1320,8 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a dictionary expression.
+    ///
     /// See: <https://docs.python.org/3/reference/expressions.html#dictionary-displays>
     fn parse_dictionary_expression(
         &mut self,
@@ -1274,24 +1329,27 @@ impl<'src> Parser<'src> {
         value: Expr,
         start: TextSize,
     ) -> ast::ExprDict {
-        if !self.at_ts(Self::END_SEQUENCE_SET) {
+        if !self.at_sequence_end() {
             self.expect(TokenKind::Comma);
         }
 
         let mut keys = vec![key];
         let mut values = vec![value];
 
-        #[allow(deprecated)]
-        self.parse_separated(true, TokenKind::Comma, Self::END_SEQUENCE_SET, |parser| {
-            if parser.eat(TokenKind::DoubleStar) {
-                keys.push(None);
-            } else {
-                keys.push(Some(parser.parse_conditional_expression_or_higher().expr));
+        self.parse_comma_separated_list(
+            RecoveryContextKind::DictElements,
+            |parser| {
+                if parser.eat(TokenKind::DoubleStar) {
+                    keys.push(None);
+                } else {
+                    keys.push(Some(parser.parse_conditional_expression_or_higher().expr));
 
-                parser.expect(TokenKind::Colon);
-            }
-            values.push(parser.parse_conditional_expression_or_higher().expr);
-        });
+                    parser.expect(TokenKind::Colon);
+                }
+                values.push(parser.parse_conditional_expression_or_higher().expr);
+            },
+            true,
+        );
 
         self.expect(TokenKind::Rbrace);
 
