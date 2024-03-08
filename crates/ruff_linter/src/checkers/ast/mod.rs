@@ -1348,7 +1348,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             {
                                 let mut iter = elts.iter();
                                 if let Some(expr) = iter.next() {
-                                    self.visit_expr(expr);
+                                    self.visit_type_definition(expr);
                                 }
                                 for expr in iter {
                                     self.visit_non_type_definition(expr);
