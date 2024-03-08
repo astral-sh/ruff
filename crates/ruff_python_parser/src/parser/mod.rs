@@ -489,7 +489,7 @@ impl<'src> Parser<'src> {
             .recovery_context
             .union(RecoveryContext::from_kind(recovery_context_kind));
 
-        while !recovery_context_kind.is_list_terminator(self) {
+        loop {
             progress.assert_progressing(self);
 
             // The end of file marker ends all lists.
@@ -499,17 +499,19 @@ impl<'src> Parser<'src> {
 
             if recovery_context_kind.is_list_element(self) {
                 parse_element(self);
+            } else if recovery_context_kind.is_list_terminator(self) {
+                break;
             } else {
-                let should_recover = self.is_enclosing_list_element_or_terminator();
-
                 // Not a recognised element. Add an error and either skip the token or break parsing the list
                 // if the token is recognised as an element or terminator of an enclosing list.
                 let error = recovery_context_kind.create_error(self);
                 self.add_error(error, self.current_token_range());
 
-                if should_recover {
+                // Run the error recovery: This also handles the case when an element is missing between two commas: `a,,b`
+                if self.is_enclosing_list_element_or_terminator() {
                     break;
                 }
+
                 self.next_token();
             }
         }
@@ -559,8 +561,6 @@ impl<'src> Parser<'src> {
 
         let mut trailing_comma_range: Option<TextRange> = None;
 
-        // TODO(dhruvmanila): I think this `loop` can be converted into a `while` loop
-        // similar to the one in the `parse_list` function above.
         loop {
             progress.assert_progressing(self);
 
@@ -587,15 +587,13 @@ impl<'src> Parser<'src> {
             } else if recovery_context_kind.is_list_terminator(self) {
                 break;
             } else {
-                // Run the error recovery: This also handles the case when an element is missing between two commas: `a,,b`
-                let should_recover = self.is_enclosing_list_element_or_terminator();
-
                 // Not a recognised element. Add an error and either skip the token or break parsing the list
                 // if the token is recognised as an element or terminator of an enclosing list.
                 let error = recovery_context_kind.create_error(self);
                 self.add_error(error, self.current_token_range());
 
-                if should_recover {
+                // Run the error recovery: This also handles the case when an element is missing between two commas: `a,,b`
+                if self.is_enclosing_list_element_or_terminator() {
                     break;
                 }
 
@@ -713,7 +711,6 @@ impl WithItemKind {
     }
 }
 
-#[repr(u8)]
 #[derive(Copy, Clone, Debug)]
 enum RecoveryContextKind {
     /// When parsing a list of statements at the module level i.e., at the top level of a file.

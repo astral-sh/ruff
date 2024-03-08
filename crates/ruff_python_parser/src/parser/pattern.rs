@@ -218,16 +218,6 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
-        // Return an empty `PatternMatchMapping` when finding a `}` right after the `{`
-        if self.eat(TokenKind::Rbrace) {
-            return ast::PatternMatchMapping {
-                range: self.node_range(start),
-                keys: vec![],
-                patterns: vec![],
-                rest: None,
-            };
-        }
-
         let mut keys = vec![];
         let mut patterns = vec![];
         let mut rest = None;
@@ -377,11 +367,11 @@ impl<'src> Parser<'src> {
 
         let mut patterns = vec![first_element];
 
-        patterns.extend_from_slice(&self.parse_comma_separated_list_into_vec(
+        self.parse_comma_separated_list(
             RecoveryContextKind::SequenceMatchPattern(parentheses),
-            Parser::parse_match_pattern,
+            |parser| patterns.push(parser.parse_match_pattern()),
             true,
-        ));
+        );
 
         if let Some(parentheses) = parentheses {
             self.expect(parentheses.closing_kind());
