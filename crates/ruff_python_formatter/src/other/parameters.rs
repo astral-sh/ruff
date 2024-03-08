@@ -457,6 +457,7 @@ pub(crate) fn find_parameter_separators(
         .map(Ranged::start)
         .or(parameters.vararg.as_ref().map(|first| first.start()))
         .or(star.as_ref().map(|star| star.separator.start()))
+        .or(parameters.kwarg.as_deref().map(Ranged::start))
         .unwrap_or(parameters.end());
     let slash = slash.map(|(preceding_end, slash)| ParameterSeparator {
         preceding_end,
