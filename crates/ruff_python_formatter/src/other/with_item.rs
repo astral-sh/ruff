@@ -22,6 +22,23 @@ pub enum WithItemLayout {
     /// This layout is used independent of the target version.
     SingleParenthesizedContextManager,
 
+    /// A with item that is the `with`s only context manager and it has no `target`.
+    ///
+    /// ```python
+    /// with a + b:
+    ///     ...
+    /// ```
+    ///
+    /// In this case, use [`maybe_parenthesize_expression`] to get the same formatting as when
+    /// formatting any other statement with a clause header.
+    ///
+    /// This layout is only used for Python 3.9+.
+    ///
+    /// Be careful that [`Self::SingleParenthesizedContextManager`] and this layout are compatible because
+    /// removing optional parentheses or adding parentheses will make the formatter pick the opposite layout
+    /// the second time the file gets formatted.
+    SingleWithoutTarget,
+
     /// This layout is used when the target python version doesn't support parenthesized context managers and
     /// it's either a single, unparenthesized with item or multiple items.
     ///
@@ -106,7 +123,8 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
                 }
             }
 
-            WithItemLayout::SingleParenthesizedContextManager => {
+            WithItemLayout::SingleParenthesizedContextManager
+            | WithItemLayout::SingleWithoutTarget => {
                 write!(
                     f,
                     [maybe_parenthesize_expression(

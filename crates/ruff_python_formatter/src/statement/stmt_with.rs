@@ -73,6 +73,11 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                                 optional_parentheses(&single.format()).fmt(f)
                             }
 
+                            WithItemsLayout::SingleWithoutTarget(single) => single
+                                .format()
+                                .with_options(WithItemLayout::SingleWithoutTarget)
+                                .fmt(f),
+
                             WithItemsLayout::SingleParenthesizedContextManager(single) => single
                                 .format()
                                 .with_options(WithItemLayout::SingleParenthesizedContextManager)
@@ -150,15 +155,35 @@ enum WithItemsLayout<'a> {
     ///
     /// In this case, prefer keeping the parentheses around the context expression instead of parenthesizing the entire
     /// with item.
+    ///
+    /// Ensure that this layout is compatible with [`Self::SingleWithoutTarget`] because removing the parentheses
+    /// results in the formatter taking that layout when formatting the file again
     SingleParenthesizedContextManager(&'a WithItem),
+
+    /// The with statement's only item has no target.
+    ///
+    /// ```python
+    /// with a + b:
+    ///     ...
+    /// ```
+    ///
+    /// In this case, use [`maybe_parenthesize_expression`] to format the context expression
+    /// to get the exact same formatting as when formatting an expression in any other clause header.
+    ///
+    /// Only used for Python 3.9+
+    ///
+    /// Be careful that [`Self::SingleParenthesizedContextManager`] and this layout are compatible because
+    /// adding parentheses around a [`WithItem`] will result in the context expression being parenthesized in
+    /// the next formatting pass.
+    SingleWithoutTarget(&'a WithItem),
 
     /// It's a single with item with a target. Use the optional parentheses layout (see [`optional_parentheses`])
     /// to mimic the `maybe_parenthesize_expression` behavior.
     ///
     /// ```python
     /// with (
-    ///     a + b
-    /// ) as b:
+    ///     a + b as b
+    /// ):
     ///     ...
     /// ```
     ///
@@ -275,7 +300,9 @@ impl<'a> WithItemsLayout<'a> {
 
         Ok(match with.items.as_slice() {
             [single] => {
-                if can_omit_optional_parentheses(&single.context_expr, context) {
+                if single.optional_vars.is_none() {
+                    Self::SingleWithoutTarget(single)
+                } else if can_omit_optional_parentheses(&single.context_expr, context) {
                     Self::SingleWithTarget(single)
                 } else {
                     Self::ParenthesizeIfExpands
