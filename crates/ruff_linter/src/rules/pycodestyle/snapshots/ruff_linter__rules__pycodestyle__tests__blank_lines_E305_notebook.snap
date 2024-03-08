@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E30.ipynb:47:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
+   |
+46 |     # another comment
+47 | fn()
+   | ^^ E305
+48 | # end
+49 | # E306:3:5
+   |
+   = help: Add missing blank line(s)
+
+ℹ Safe fix
+44 44 |     # comment
+45 45 | 
+46 46 |     # another comment
+   47 |+
+   48 |+
+47 49 | fn()
+48 50 | # end
+49 51 | # E306:3:5

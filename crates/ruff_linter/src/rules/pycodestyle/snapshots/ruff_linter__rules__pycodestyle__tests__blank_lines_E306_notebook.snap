@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E30.ipynb:52:5: E306 [*] Expected 1 blank line before a nested definition, found 0
+   |
+50 | def a():
+51 |     x = 1
+52 |     def b():
+   |     ^^^ E306
+53 |         pass
+54 | # end
+   |
+   = help: Add missing blank line
+
+ℹ Safe fix
+49 49 | # E306:3:5
+50 50 | def a():
+51 51 |     x = 1
+   52 |+
+52 53 |     def b():
+53 54 |         pass
+54 55 | # end
