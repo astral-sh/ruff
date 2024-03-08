@@ -74,7 +74,7 @@ impl<'src> Parser<'src> {
 
     fn parse_match_pattern_lhs(&mut self) -> Pattern {
         let start = self.node_start();
-        let mut lhs = match self.current_kind() {
+        let mut lhs = match self.current_token_kind() {
             TokenKind::Lbrace => Pattern::MatchMapping(self.parse_match_pattern_mapping()),
             TokenKind::Star => Pattern::MatchStar(self.parse_match_pattern_star()),
             TokenKind::Lpar | TokenKind::Lsqb => self.parse_delimited_match_pattern(),
@@ -261,13 +261,16 @@ impl<'src> Parser<'src> {
             SequenceMatchPatternParentheses::List
         };
 
-        if matches!(self.current_kind(), TokenKind::Newline | TokenKind::Colon) {
+        if matches!(
+            self.current_token_kind(),
+            TokenKind::Newline | TokenKind::Colon
+        ) {
             self.add_error(
                 ParseErrorType::OtherError(format!(
                     "missing `{closing}`",
                     closing = if parentheses.is_list() { "]" } else { ")" }
                 )),
-                self.current_range(),
+                self.current_token_range(),
             );
         }
 
@@ -330,7 +333,7 @@ impl<'src> Parser<'src> {
 
     fn parse_match_pattern_literal(&mut self) -> Pattern {
         let start = self.node_start();
-        match self.current_kind() {
+        match self.current_token_kind() {
             TokenKind::None => {
                 self.bump(TokenKind::None);
                 Pattern::MatchSingleton(ast::PatternMatchSingleton {
@@ -460,7 +463,7 @@ impl<'src> Parser<'src> {
                 } else {
                     self.add_error(
                         ParseErrorType::OtherError("Expression expected.".to_string()),
-                        self.current_range(),
+                        self.current_token_range(),
                     );
                     Expr::Name(ast::ExprName {
                         range: self.missing_node_range(),
@@ -478,7 +481,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_attr_expr_for_match_pattern(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
-        while self.current_kind() == TokenKind::Dot {
+        while self.current_token_kind() == TokenKind::Dot {
             lhs = Expr::Attribute(self.parse_attribute_expression(lhs, start));
         }
 
