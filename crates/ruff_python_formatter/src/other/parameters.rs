@@ -450,6 +450,7 @@ pub(crate) fn find_parameter_separators(
     // * `f(a, /, b)`
     // * `f(a, /, *b)`
     // * `f(a, /, *, b)`
+    // * `f(a, /, *, **b)`
     // * `f(a, /)`
     let slash_following_start = parameters
         .args
