@@ -211,7 +211,7 @@ impl<'src> Parser<'src> {
         // If it's not, you probably forgot to call `clear_ctx` somewhere.
         assert_eq!(self.ctx, ParserCtxFlags::empty());
         assert_eq!(
-            self.current_kind(),
+            self.current_token_kind(),
             TokenKind::EndOfFile,
             "Parser should be at the end of the file."
         );
@@ -279,7 +279,7 @@ impl<'src> Parser<'src> {
 
     /// Returns the start position for a node that starts at the current token.
     fn node_start(&self) -> TextSize {
-        self.current_range().start()
+        self.current_token_range().start()
     }
 
     fn node_range(&self, start: TextSize) -> TextRange {
@@ -326,7 +326,7 @@ impl<'src> Parser<'src> {
 
     fn peek_nth(&self, offset: usize) -> TokenKind {
         if offset == 0 {
-            self.current_kind()
+            self.current_token_kind()
         } else {
             self.tokens
                 .peek_nth(offset - 1)
@@ -334,40 +334,50 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Returns the current token kind along with its range.
+    ///
+    /// Use `current_token_kind` or `current_token_range` to only get the kind or range
+    /// respectively.
     #[inline]
     fn current_token(&self) -> (TokenKind, TextRange) {
-        (self.current_kind(), self.current_range())
+        (self.current_token_kind(), self.current_token_range())
     }
 
+    /// Returns the current token kind.
     #[inline]
-    fn current_kind(&self) -> TokenKind {
+    fn current_token_kind(&self) -> TokenKind {
         // TODO: Converting the token kind over and over again can be expensive.
         TokenKind::from_token(&self.current.0)
     }
 
+    /// Returns the range of the current token.
     #[inline]
-    fn current_range(&self) -> TextRange {
+    fn current_token_range(&self) -> TextRange {
         self.current.1
     }
 
+    /// Eat the current token if it is of the given kind, returning `true` in
+    /// that case. Otherwise, return `false`.
     fn eat(&mut self, kind: TokenKind) -> bool {
-        if !self.at(kind) {
-            return false;
+        if self.at(kind) {
+            self.next_token();
+            true
+        } else {
+            false
         }
-
-        self.next_token();
-        true
     }
 
     /// Bumps the current token assuming it is of the given kind.
     ///
     /// # Panics
+    ///
     /// If the current token is not of the given kind.
     ///
     /// # Returns
+    ///
     /// The current token
     fn bump(&mut self, kind: TokenKind) -> (Tok, TextRange) {
-        assert_eq!(self.current_kind(), kind);
+        assert_eq!(self.current_token_kind(), kind);
 
         self.next_token()
     }
@@ -382,7 +392,7 @@ impl<'src> Parser<'src> {
     ///
     /// The current token.
     fn bump_ts(&mut self, ts: TokenSet) -> (Tok, TextRange) {
-        assert!(ts.contains(self.current_kind()));
+        assert!(ts.contains(self.current_token_kind()));
 
         self.next_token()
     }
@@ -430,11 +440,11 @@ impl<'src> Parser<'src> {
     }
 
     fn at(&self, kind: TokenKind) -> bool {
-        self.current_kind() == kind
+        self.current_token_kind() == kind
     }
 
     fn at_ts(&self, ts: TokenSet) -> bool {
-        ts.contains(self.current_kind())
+        ts.contains(self.current_token_kind())
     }
 
     fn src_text<T>(&self, ranged: T) -> &'src str
@@ -487,7 +497,7 @@ impl<'src> Parser<'src> {
                 // Not a recognised element. Add an error and either skip the token or break parsing the list
                 // if the token is recognised as an element or terminator of an enclosing list.
                 let error = kind.create_error(self);
-                self.add_error(error, self.current_range());
+                self.add_error(error, self.current_token_range());
 
                 if should_recover {
                     break;
@@ -518,12 +528,12 @@ impl<'src> Parser<'src> {
         loop {
             progress.assert_progressing(self);
 
-            self.current_kind();
+            self.current_token_kind();
 
             if kind.is_list_element(self) {
                 elements.push(parse_element(self));
 
-                let maybe_comma_range = self.current_range();
+                let maybe_comma_range = self.current_token_range();
                 if self.eat(TokenKind::Comma) {
                     trailing_comma_range = Some(maybe_comma_range);
                     continue;
@@ -544,14 +554,14 @@ impl<'src> Parser<'src> {
                 // Not a recognised element. Add an error and either skip the token or break parsing the list
                 // if the token is recognised as an element or terminator of an enclosing list.
                 let error = kind.create_error(self);
-                self.add_error(error, self.current_range());
+                self.add_error(error, self.current_token_range());
 
                 if should_recover {
                     break;
                 }
 
                 if self.at(TokenKind::Comma) {
-                    trailing_comma_range = Some(self.current_range());
+                    trailing_comma_range = Some(self.current_token_range());
                 } else {
                     trailing_comma_range = None;
                 }
@@ -640,7 +650,7 @@ impl<'src> Parser<'src> {
 
     fn is_current_token_postfix(&self) -> bool {
         matches!(
-            self.current_kind(),
+            self.current_token_kind(),
             TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Dot
         )
     }
@@ -712,19 +722,19 @@ impl RecoveryContextKind {
 
             RecoveryContextKind::Elif => p.at(TokenKind::Else),
             RecoveryContextKind::Except => {
-                matches!(p.current_kind(), TokenKind::Finally | TokenKind::Else)
+                matches!(p.current_token_kind(), TokenKind::Finally | TokenKind::Else)
             }
 
             // TODO: Should `semi` be part of the simple statement recovery set instead?
             RecoveryContextKind::AssignmentTargets => {
-                matches!(p.current_kind(), TokenKind::Newline | TokenKind::Semi)
+                matches!(p.current_token_kind(), TokenKind::Newline | TokenKind::Semi)
             }
 
             // Tokens other than `]` are for better error recovery: For example, recover when we find the `:` of a clause header or
             // the equal of a type assignment.
             RecoveryContextKind::TypeParams => {
                 matches!(
-                    p.current_kind(),
+                    p.current_token_kind(),
                     TokenKind::Rsqb
                         | TokenKind::Newline
                         | TokenKind::Colon
@@ -733,7 +743,7 @@ impl RecoveryContextKind {
                 )
             }
             RecoveryContextKind::ImportNames => {
-                matches!(p.current_kind(), TokenKind::Rpar | TokenKind::Newline)
+                matches!(p.current_token_kind(), TokenKind::Rpar | TokenKind::Newline)
             }
         }
     }
@@ -747,7 +757,7 @@ impl RecoveryContextKind {
             RecoveryContextKind::AssignmentTargets => p.at(TokenKind::Equal),
             RecoveryContextKind::TypeParams => p.is_at_type_param(),
             RecoveryContextKind::ImportNames => {
-                matches!(p.current_kind(), TokenKind::Star | TokenKind::Name)
+                matches!(p.current_token_kind(), TokenKind::Star | TokenKind::Name)
             }
         }
     }
@@ -770,7 +780,7 @@ impl RecoveryContextKind {
                     .to_string(),
             ),
             RecoveryContextKind::AssignmentTargets => {
-                if p.current_kind().is_keyword() {
+                if p.current_token_kind().is_keyword() {
                     ParseErrorType::OtherError(
                         "The keyword is not allowed as a variable declaration name".to_string(),
                     )
