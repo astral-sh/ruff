@@ -280,8 +280,7 @@ pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool
         Pattern::MatchValue(ast::PatternMatchValue { value, range: _ }) => {
             any_over_expr(value, func)
         }
-        #[allow(deprecated)]
-        Pattern::MatchSingleton(_) | Pattern::Invalid(_) => false,
+        Pattern::MatchSingleton(_) => false,
         Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ }) => patterns
             .iter()
             .any(|pattern| any_over_pattern(pattern, func)),
