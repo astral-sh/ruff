@@ -730,8 +730,6 @@ impl<'a> Generator<'a> {
                     self.unparse_pattern(pattern);
                 }
             }
-            #[allow(deprecated)]
-            Pattern::Invalid(ast::PatternMatchInvalid { value, .. }) => self.p(value.as_str()),
         }
     }
 
