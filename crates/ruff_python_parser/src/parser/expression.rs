@@ -1551,11 +1551,18 @@ impl<'src> Parser<'src> {
         })
     }
 
+    /// Parses a named expression (`:=`).
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `:=` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/expressions.html#assignment-expressions>
     fn parse_named_expression(&mut self, mut target: Expr, start: TextSize) -> ast::ExprNamed {
         self.bump(TokenKind::ColonEqual);
 
-        if !helpers::is_valid_assignment_target(&target) {
-            self.add_error(ParseErrorType::NamedAssignmentError, target.range());
+        if !target.is_name_expr() {
+            self.add_error(ParseErrorType::InvalidNamedAssignmentTarget, target.range());
         }
         helpers::set_expr_ctx(&mut target, ExprContext::Store);
 
