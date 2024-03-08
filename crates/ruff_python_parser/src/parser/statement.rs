@@ -85,7 +85,7 @@ impl<'src> Parser<'src> {
     /// Parses a compound or a simple statement.
     pub(super) fn parse_statement(&mut self) -> Stmt {
         let start_offset = self.node_start();
-        match self.current_kind() {
+        match self.current_token_kind() {
             TokenKind::If => Stmt::If(self.parse_if_statement()),
             TokenKind::For => Stmt::For(self.parse_for_statement(start_offset)),
             TokenKind::While => Stmt::While(self.parse_while_statement()),
@@ -113,7 +113,7 @@ impl<'src> Parser<'src> {
         let has_eaten_newline = self.eat(TokenKind::Newline);
 
         if !has_eaten_newline && !has_eaten_semicolon && self.at_simple_stmt() {
-            let range = self.current_range();
+            let range = self.current_token_range();
             self.add_error(
                 ParseErrorType::SimpleStmtsInSameLine,
                 stmt.range().cover(range),
@@ -136,7 +136,7 @@ impl<'src> Parser<'src> {
 
             self.add_error(
                 ParseErrorType::SimpleStmtAndCompoundStmtInSameLine,
-                stmt.range().cover(self.current_range()),
+                stmt.range().cover(self.current_token_range()),
             );
         }
 
@@ -179,7 +179,7 @@ impl<'src> Parser<'src> {
 
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#simple-statements>
     fn parse_simple_statement(&mut self) -> Stmt {
-        match self.current_kind() {
+        match self.current_token_kind() {
             TokenKind::Return => Stmt::Return(self.parse_return_statement()),
             TokenKind::Import => Stmt::Import(self.parse_import_statement()),
             TokenKind::From => Stmt::ImportFrom(self.parse_from_import_statement()),
@@ -203,7 +203,7 @@ impl<'src> Parser<'src> {
                     Stmt::Assign(self.parse_assign_statement(parsed_expr, start))
                 } else if self.eat(TokenKind::Colon) {
                     Stmt::AnnAssign(self.parse_annotated_assignment_statement(parsed_expr, start))
-                } else if let Ok(op) = Operator::try_from(self.current_kind()) {
+                } else if let Ok(op) = Operator::try_from(self.current_token_kind()) {
                     Stmt::AugAssign(self.parse_augmented_assignment_statement(
                         parsed_expr,
                         op,
@@ -381,7 +381,7 @@ impl<'src> Parser<'src> {
         };
 
         if level == 0 && module.is_none() {
-            let range = self.current_range();
+            let range = self.current_token_range();
             self.add_error(
                 ParseErrorType::OtherError("missing module name".to_string()),
                 range,
@@ -777,7 +777,7 @@ impl<'src> Parser<'src> {
         };
 
         if !has_except && !has_finally {
-            let range = self.current_range();
+            let range = self.current_token_range();
             self.add_error(
                 ParseErrorType::OtherError(
                     "expecting `except` or `finally` after `try` block".to_string(),
@@ -952,7 +952,7 @@ impl<'src> Parser<'src> {
         let mut items = vec![];
 
         if !self.at_expr() {
-            let range = self.current_range();
+            let range = self.current_token_range();
             self.add_error(
                 ParseErrorType::OtherError("expecting expression after `with` keyword".to_string()),
                 range,
@@ -996,7 +996,7 @@ impl<'src> Parser<'src> {
             let mut has_seen_rpar = false;
             let mut has_seen_colon_equal = false;
             let mut has_seen_star = false;
-            let mut prev_token = self.current_kind();
+            let mut prev_token = self.current_token_kind();
             loop {
                 match self.peek_nth(index) {
                     TokenKind::Lpar => {
@@ -1170,7 +1170,7 @@ impl<'src> Parser<'src> {
 
         self.eat(TokenKind::Newline);
         if !self.eat(TokenKind::Indent) {
-            let range = self.current_range();
+            let range = self.current_token_range();
             self.add_error(
                 ParseErrorType::OtherError(
                     "expected an indented block after `match` statement".to_string(),
@@ -1194,7 +1194,7 @@ impl<'src> Parser<'src> {
         if !self.at(TokenKind::Case) {
             self.add_error(
                 ParseErrorType::OtherError("expecting `case` block after `match`".to_string()),
-                self.current_range(),
+                self.current_token_range(),
             );
         }
 
@@ -1239,7 +1239,7 @@ impl<'src> Parser<'src> {
         let async_start = self.node_start();
         self.bump(TokenKind::Async);
 
-        match self.current_kind() {
+        match self.current_token_kind() {
             TokenKind::Def => Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async: true,
                 ..self.parse_function_definition(vec![], async_start)
@@ -1255,7 +1255,10 @@ impl<'src> Parser<'src> {
             kind => {
                 // Although this statement is not a valid `async` statement,
                 // we still parse it.
-                self.add_error(ParseErrorType::StmtIsNotAsync(kind), self.current_range());
+                self.add_error(
+                    ParseErrorType::StmtIsNotAsync(kind),
+                    self.current_token_range(),
+                );
                 self.parse_statement()
             }
         }
@@ -1281,7 +1284,7 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Newline);
         }
 
-        match self.current_kind() {
+        match self.current_token_kind() {
             TokenKind::Def => {
                 Stmt::FunctionDef(self.parse_function_definition(decorators, start_offset))
             }
@@ -1301,7 +1304,7 @@ impl<'src> Parser<'src> {
                     ParseErrorType::OtherError(
                         "expected class, function definition or async function definition after decorator".to_string(),
                     ),
-                    self.current_range(),
+                    self.current_token_range(),
                 );
                 self.parse_statement()
             }
@@ -1323,7 +1326,7 @@ impl<'src> Parser<'src> {
             ParseErrorType::OtherError(format!(
                 "expected a single statement or an indented body after {parent_clause}"
             )),
-            self.current_range(),
+            self.current_token_range(),
         );
 
         Vec::new()
@@ -1402,7 +1405,7 @@ impl<'src> Parser<'src> {
             if has_seen_vararg {
                 parser.add_error(
                     ParseErrorType::ParamFollowsVarKeywordParam,
-                    parser.current_range(),
+                    parser.current_token_range(),
                 );
             }
 
@@ -1423,7 +1426,7 @@ impl<'src> Parser<'src> {
                 if has_seen_asterisk {
                     parser.add_error(
                         ParseErrorType::OtherError("`/` must be ahead of `*`".to_string()),
-                        parser.current_range(),
+                        parser.current_token_range(),
                     );
                 }
                 std::mem::swap(&mut args, &mut posonlyargs);
@@ -1433,7 +1436,10 @@ impl<'src> Parser<'src> {
                 // can't place `b` after `a=1`. Non-default parameters are only allowed after
                 // default parameters if we have a `*` before them, e.g. `a=1, *, b`.
                 if param.default.is_none() && has_seen_default_param && !has_seen_asterisk {
-                    parser.add_error(ParseErrorType::DefaultArgumentError, parser.current_range());
+                    parser.add_error(
+                        ParseErrorType::DefaultArgumentError,
+                        parser.current_token_range(),
+                    );
                 }
                 has_seen_default_param = param.default.is_some();
 
@@ -1447,14 +1453,14 @@ impl<'src> Parser<'src> {
                     return;
                 }
 
-                let range = parser.current_range();
+                let range = parser.current_token_range();
                 #[allow(deprecated)]
                 parser.skip_until(
                     ending_set.union(TokenSet::new([TokenKind::Comma, TokenKind::Colon])),
                 );
                 parser.add_error(
                     ParseErrorType::OtherError("expected parameter".to_string()),
-                    range.cover(parser.current_range()), // TODO(micha): This goes one token too far?
+                    range.cover(parser.current_token_range()), // TODO(micha): This goes one token too far?
                 );
             }
         });
@@ -1500,9 +1506,9 @@ impl<'src> Parser<'src> {
 
     pub(super) fn is_at_type_param(&self) -> bool {
         matches!(
-            self.current_kind(),
+            self.current_token_kind(),
             TokenKind::Star | TokenKind::DoubleStar | TokenKind::Name
-        ) || self.current_kind().is_keyword()
+        ) || self.current_token_kind().is_keyword()
     }
 
     fn parse_type_param(&mut self) -> ast::TypeParam {
