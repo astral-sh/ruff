@@ -6,7 +6,13 @@ use ruff_text_size::{TextLen, TextSize};
 
 bitflags! {
     /// Flags that can be queried to obtain information
-    /// regarding the prefixes and quotes used for a string literal
+    /// regarding the prefixes and quotes used for a string literal.
+    ///
+    /// Note that not all of these flags can be validly combined -- e.g.,
+    /// it is invalid to combine the `U_PREFIX` flag with any other
+    /// of the `*_PREFIX` flags. As such, the recommended way to set the
+    /// prefix flags is by calling the `as_flags()` method on the
+    /// `StringPrefix` enum.
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash)]
     struct StringFlags: u8 {
         /// The string uses double quotes (`"`).
@@ -42,6 +48,15 @@ bitflags! {
     }
 }
 
+/// Enumeration of all the possible valid prefixes
+/// prior to a Python string literal.
+///
+/// Using the `as_flags()` method on variants of this enum
+/// is the recommended way to set `*_PREFIX` flags from the
+/// `StringFlags` bitflag, as it means that you cannot accidentally
+/// set a combination of `*_PREFIX` flags that would be invalid
+/// at runtime in Python.
+///
 /// [String and Bytes literals]: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
 /// [PEP 701]: https://peps.python.org/pep-0701/
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]

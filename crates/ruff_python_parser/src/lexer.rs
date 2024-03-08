@@ -544,6 +544,7 @@ impl<'source> Lexer<'source> {
         } else {
             StringPrefix::Format
         }));
+
         if quote == '"' {
             kind = kind.with_double_quotes();
         }
