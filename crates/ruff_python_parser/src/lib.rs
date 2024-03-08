@@ -115,7 +115,8 @@ pub use parser::{
 };
 use ruff_python_ast::{Mod, PySourceType, Suite};
 pub use string::FStringErrorType;
-pub use token::{StringKind, Tok, TokenKind};
+pub use string_token_flags::{QuoteStyle, StringKind};
+pub use token::{Tok, TokenKind};
 
 use crate::lexer::LexResult;
 
@@ -127,6 +128,7 @@ pub mod lexer;
 mod parser;
 mod soft_keywords;
 mod string;
+mod string_token_flags;
 mod token;
 mod token_source;
 pub mod typing;

@@ -12,7 +12,8 @@ use crate::{
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
     string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
-    token::{self, StringKind},
+    string_token_flags::StringKind,
+    token,
     invalid,
 };
 use lalrpop_util::ParseError;
@@ -1619,8 +1620,8 @@ StringLiteralOrFString: StringType = {
 
 StringLiteral: StringType = {
     <location:@L> <string:string> <end_location:@R> =>? {
-        let (source, kind, triple_quoted) = string;
-        Ok(parse_string_literal(source, kind, triple_quoted, (location..end_location).into())?)
+        let (source, kind) = string;
+        Ok(parse_string_literal(source, kind, (location..end_location).into())?)
     }
 };
 
@@ -1636,8 +1637,8 @@ FStringExpr: StringType = {
 FStringMiddlePattern: ast::FStringElement = {
     FStringReplacementField,
     <location:@L> <fstring_middle:fstring_middle> <end_location:@R> =>? {
-        let (source, is_raw, _) = fstring_middle;
-        Ok(parse_fstring_literal_element(source, is_raw, (location..end_location).into())?)
+        let (source, kind) = fstring_middle;
+        Ok(parse_fstring_literal_element(source, kind, (location..end_location).into())?)
     }
 };
 
@@ -2001,7 +2002,7 @@ extern {
         Dedent => token::Tok::Dedent,
         StartModule => token::Tok::StartModule,
         StartExpression => token::Tok::StartExpression,
-        FStringStart => token::Tok::FStringStart,
+        FStringStart => token::Tok::FStringStart(StringKind),
         FStringEnd => token::Tok::FStringEnd,
         "!" => token::Tok::Exclamation,
         "?" => token::Tok::Question,
@@ -2095,12 +2096,10 @@ extern {
         string => token::Tok::String {
             value: <Box<str>>,
             kind: <StringKind>,
-            triple_quoted: <bool>
         },
         fstring_middle => token::Tok::FStringMiddle {
             value: <Box<str>>,
-            is_raw: <bool>,
-            triple_quoted: <bool>
+            kind: <StringKind>,
         },
         name => token::Tok::Name { name: <Box<str>> },
         ipy_escape_command => token::Tok::IpyEscapeCommand {

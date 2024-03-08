@@ -9,7 +9,6 @@ use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 use ruff_source_file::{find_newline, LineEnding};
 
-use ruff_python_ast::str::leading_quote;
 use ruff_source_file::Locator;
 
 #[derive(Debug, Clone)]
@@ -44,37 +43,22 @@ impl<'a> Stylist<'a> {
         Self {
             locator,
             indentation,
-            quote: detect_quote(tokens, locator),
+            quote: detect_quote(tokens),
             line_ending: OnceCell::default(),
         }
     }
 }
 
-fn detect_quote(tokens: &[LexResult], locator: &Locator) -> Quote {
-    let quote_range = tokens.iter().flatten().find_map(|(t, range)| match t {
-        Tok::String {
-            triple_quoted: false,
-            ..
-        } => Some(*range),
-        // No need to check if it's triple-quoted as f-strings cannot be used
-        // as docstrings.
-        Tok::FStringStart => Some(*range),
-        _ => None,
-    });
-
-    if let Some(quote_range) = quote_range {
-        let content = &locator.slice(quote_range);
-        if let Some(quotes) = leading_quote(content) {
-            return if quotes.contains('\'') {
-                Quote::Single
-            } else if quotes.contains('"') {
-                Quote::Double
-            } else {
-                unreachable!("Expected string to start with a valid quote prefix")
-            };
+fn detect_quote(tokens: &[LexResult]) -> Quote {
+    for (token, _) in tokens.iter().flatten() {
+        match token {
+            Tok::String { kind, .. } if !kind.is_triple_quoted() => {
+                return kind.quote_style().into()
+            }
+            Tok::FStringStart(kind) => return kind.quote_style().into(),
+            _ => continue,
         }
     }
-
     Quote::default()
 }
 
@@ -116,6 +100,15 @@ pub enum Quote {
     Single,
     #[default]
     Double,
+}
+
+impl From<ruff_python_parser::QuoteStyle> for Quote {
+    fn from(value: ruff_python_parser::QuoteStyle) -> Self {
+        match value {
+            ruff_python_parser::QuoteStyle::Double => Self::Double,
+            ruff_python_parser::QuoteStyle::Single => Self::Single,
+        }
+    }
 }
 
 impl From<Quote> for char {
