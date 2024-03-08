@@ -907,14 +907,6 @@ impl TokenKind {
     }
 }
 
-impl fmt::Display for TokenKind {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-        // or, alternatively:
-        // fmt::Debug::fmt(self, f)
-    }
-}
-
 impl From<&Tok> for TokenKind {
     fn from(value: &Tok) -> Self {
         Self::from_token(value)
