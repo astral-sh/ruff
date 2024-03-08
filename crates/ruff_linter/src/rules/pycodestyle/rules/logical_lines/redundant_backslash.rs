@@ -53,7 +53,7 @@ fn neuter_strings(text: &str, tokens: &[LogicalLineToken]) -> String {
             new_text.push_str(&text[last_end..token.start().to_usize() - offset]);
             let token_text =
                 &text[token.start().to_usize() - offset..token.end().to_usize() - offset];
-            new_text.push_str(&token_text.replace("\\", " "));
+            new_text.push_str(&token_text.replace('\\', " "));
             last_end = token.end().to_usize() - offset;
         }
     }
@@ -81,8 +81,8 @@ pub(crate) fn redundant_backslash(line: &LogicalLine, context: &mut LogicalLines
             }
             '\r' | '\n' => {
                 if !comment && backslash && parens > 0 {
-                    let start_s = TextSize::new(start as u32);
-                    let end_s = TextSize::new(cursor as u32);
+                    let start_s = TextSize::new(u32::try_from(start).unwrap());
+                    let end_s = TextSize::new(u32::try_from(cursor).unwrap());
                     let mut diagnostic =
                         Diagnostic::new(RedundantBackslash, TextRange::new(start_s, end_s));
                     diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start_s, end_s)));
