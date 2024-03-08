@@ -16,7 +16,11 @@ expression: parse_ast
                                     StringLiteral {
                                         range: 0..9,
                                         value: "Hello ",
-                                        unicode: true,
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: "u",
+                                            triple_quoted: false,
+                                        },
                                     },
                                 ),
                                 FString(
@@ -36,7 +40,11 @@ expression: parse_ast
                                     StringLiteral {
                                         range: 19..22,
                                         value: "!",
-                                        unicode: false,
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: "",
+                                            triple_quoted: false,
+                                        },
                                     },
                                 ),
                             ],

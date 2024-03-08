@@ -26,7 +26,11 @@ expression: parse_ast
                                                                 StringLiteral {
                                                                     range: 3..7,
                                                                     value: " f",
-                                                                    unicode: false,
+                                                                    flags: StringLiteralFlags {
+                                                                        quote_style: Double,
+                                                                        prefix: "",
+                                                                        triple_quoted: false,
+                                                                    },
                                                                 },
                                                             ),
                                                         },
@@ -228,7 +232,11 @@ expression: parse_ast
                                                                                     StringLiteral {
                                                                                         range: 46..49,
                                                                                         value: "}",
-                                                                                        unicode: false,
+                                                                                        flags: StringLiteralFlags {
+                                                                                            quote_style: Double,
+                                                                                            prefix: "",
+                                                                                            triple_quoted: false,
+                                                                                        },
                                                                                     },
                                                                                 ),
                                                                             },
@@ -299,7 +307,11 @@ expression: parse_ast
                                                                                     StringLiteral {
                                                                                         range: 62..65,
                                                                                         value: "{",
-                                                                                        unicode: false,
+                                                                                        flags: StringLiteralFlags {
+                                                                                            quote_style: Double,
+                                                                                            prefix: "",
+                                                                                            triple_quoted: false,
+                                                                                        },
                                                                                     },
                                                                                 ),
                                                                             },
@@ -632,7 +644,11 @@ expression: parse_ast
                                                     StringLiteral {
                                                         range: 173..179,
                                                         value: "foo ",
-                                                        unicode: false,
+                                                        flags: StringLiteralFlags {
+                                                            quote_style: Double,
+                                                            prefix: "",
+                                                            triple_quoted: false,
+                                                        },
                                                     },
                                                 ),
                                                 FString(
@@ -686,7 +702,11 @@ expression: parse_ast
                                                     StringLiteral {
                                                         range: 196..201,
                                                         value: "baz",
-                                                        unicode: false,
+                                                        flags: StringLiteralFlags {
+                                                            quote_style: Double,
+                                                            prefix: "",
+                                                            triple_quoted: false,
+                                                        },
                                                     },
                                                 ),
                                             ],
@@ -734,7 +754,11 @@ expression: parse_ast
                                             StringLiteral {
                                                 range: 227..232,
                                                 value: "one",
-                                                unicode: false,
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Double,
+                                                    prefix: "",
+                                                    triple_quoted: false,
+                                                },
                                             },
                                         ),
                                     },
@@ -766,12 +790,20 @@ expression: parse_ast
                                                     StringLiteral {
                                                         range: 256..269,
                                                         value: "implicitly ",
-                                                        unicode: false,
+                                                        flags: StringLiteralFlags {
+                                                            quote_style: Double,
+                                                            prefix: "",
+                                                            triple_quoted: false,
+                                                        },
                                                     },
                                                     StringLiteral {
                                                         range: 270..284,
                                                         value: "concatenated",
-                                                        unicode: false,
+                                                        flags: StringLiteralFlags {
+                                                            quote_style: Double,
+                                                            prefix: "",
+                                                            triple_quoted: false,
+                                                        },
                                                     },
                                                 ],
                                                 value: "implicitly concatenated",

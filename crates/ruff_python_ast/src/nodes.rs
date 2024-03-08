@@ -6,11 +6,12 @@ use std::fmt::Debug;
 use std::ops::Deref;
 use std::slice::{Iter, IterMut};
 
+use bitflags::bitflags;
 use itertools::Itertools;
 
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::{int, LiteralExpressionRef};
+use crate::{int, str::QuoteStyle, LiteralExpressionRef};
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -1266,7 +1267,9 @@ impl StringLiteralValue {
     /// For an implicitly concatenated string, it returns `true` only if the first
     /// string literal is a unicode string.
     pub fn is_unicode(&self) -> bool {
-        self.iter().next().map_or(false, |part| part.unicode)
+        self.iter()
+            .next()
+            .map_or(false, |part| part.flags.is_u_string())
     }
 
     /// Returns a slice of all the [`StringLiteral`] parts contained in this value.
@@ -1379,13 +1382,131 @@ impl Default for StringLiteralValueInner {
     }
 }
 
+bitflags! {
+    #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+    struct StringLiteralFlagsInner: u8 {
+        /// The string uses double quotes (`"`).
+        /// If this flag is not set, the string uses single quotes (`'`).
+        const DOUBLE = 1 << 0;
+
+        /// The string is triple-quoted:
+        /// it begins and ends with three consecutive quote characters.
+        const TRIPLE_QUOTED = 1 << 1;
+
+        /// The string has a `u` or `U` prefix.
+        /// While this prefix is a no-op at runtime,
+        /// strings with this prefix can have no other prefixes set;
+        /// it is therefore invalid for this flag to be set
+        /// if `R_PREFIX` is also set.
+        const U_PREFIX = 1 << 2;
+
+        /// The string has an `r` or `R` prefix, meaning it is a raw string.
+        /// It is invalid to set this flag if `U_PREFIX` is also set.
+        const R_PREFIX = 1 << 3;
+    }
+}
+
+/// Flags that can be queried to obtain information
+/// regarding the prefixes and quotes used for a string literal.
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct StringLiteralFlags(StringLiteralFlagsInner);
+
+impl StringLiteralFlags {
+    #[must_use]
+    pub fn with_double_quotes(mut self) -> Self {
+        self.0 |= StringLiteralFlagsInner::DOUBLE;
+        self
+    }
+
+    #[must_use]
+    pub fn with_triple_quotes(mut self) -> Self {
+        self.0 |= StringLiteralFlagsInner::TRIPLE_QUOTED;
+        self
+    }
+
+    #[must_use]
+    pub fn with_prefix(mut self, prefix: StringLiteralPrefix) -> Self {
+        match prefix {
+            StringLiteralPrefix::None => {}
+            StringLiteralPrefix::RString => self.0 |= StringLiteralFlagsInner::R_PREFIX,
+            StringLiteralPrefix::UString => self.0 |= StringLiteralFlagsInner::U_PREFIX,
+        };
+        self
+    }
+
+    pub const fn prefix(self) -> &'static str {
+        if self.0.contains(StringLiteralFlagsInner::U_PREFIX) {
+            debug_assert!(!self.0.contains(StringLiteralFlagsInner::R_PREFIX));
+            "u"
+        } else if self.0.contains(StringLiteralFlagsInner::R_PREFIX) {
+            "r"
+        } else {
+            ""
+        }
+    }
+
+    /// Does the string use single or double quotes in its opener and closer?
+    pub const fn quote_style(self) -> QuoteStyle {
+        if self.0.contains(StringLiteralFlagsInner::DOUBLE) {
+            QuoteStyle::Double
+        } else {
+            QuoteStyle::Single
+        }
+    }
+
+    /// Is the string triple-quoted, i.e.,
+    /// does it begin and end with three consecutive quote characters?
+    pub const fn is_triple_quoted(self) -> bool {
+        self.0.contains(StringLiteralFlagsInner::TRIPLE_QUOTED)
+    }
+
+    /// Does the string have a `u` or `U` prefix?
+    pub const fn is_u_string(&self) -> bool {
+        self.0.contains(StringLiteralFlagsInner::U_PREFIX)
+    }
+
+    /// Does the string have an `r` or `R` prefix?
+    pub const fn is_r_string(&self) -> bool {
+        self.0.contains(StringLiteralFlagsInner::R_PREFIX)
+    }
+}
+
+impl fmt::Debug for StringLiteralFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("StringLiteralFlags")
+            .field("quote_style", &self.quote_style())
+            .field("prefix", &self.prefix())
+            .field("triple_quoted", &self.is_triple_quoted())
+            .finish()
+    }
+}
+
+/// Enumerations of the valid prefixes a string literal can have.
+///
+/// Bytestrings and f-strings are excluded from this enumeration,
+/// as they are represented by different AST nodes.
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum StringLiteralPrefix {
+    /// Just a regular string with no prefixes
+    #[default]
+    None,
+
+    /// A string with a `u` or `U` prefix.
+    /// This is a no-op at runtime,
+    /// but is mutually exclusive with a string having an `r` prefix.
+    UString,
+
+    /// A "raw" string, that has an `r` or `R` prefix
+    RString,
+}
+
 /// An AST node that represents a single string literal which is part of an
 /// [`ExprStringLiteral`].
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StringLiteral {
     pub range: TextRange,
     pub value: Box<str>,
-    pub unicode: bool,
+    pub flags: StringLiteralFlags,
 }
 
 impl Ranged for StringLiteral {

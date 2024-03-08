@@ -3,6 +3,32 @@ use once_cell::sync::Lazy;
 
 use ruff_text_size::{TextLen, TextRange};
 
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq, is_macro::Is)]
+pub enum QuoteStyle {
+    /// E.g. '
+    Single,
+    /// E.g. "
+    #[default]
+    Double,
+}
+
+impl QuoteStyle {
+    pub const fn as_char(self) -> char {
+        match self {
+            Self::Single => '\'',
+            Self::Double => '"',
+        }
+    }
+
+    #[must_use]
+    pub const fn opposite(self) -> Self {
+        match self {
+            Self::Single => Self::Double,
+            Self::Double => Self::Single,
+        }
+    }
+}
+
 /// Includes all permutations of `r`, `u`, `f`, and `fr` (`ur` is invalid, as is `uf`). This
 /// includes all possible orders, and all possible casings, for both single and triple quotes.
 ///

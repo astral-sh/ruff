@@ -102,11 +102,11 @@ pub enum Quote {
     Double,
 }
 
-impl From<ruff_python_parser::QuoteStyle> for Quote {
-    fn from(value: ruff_python_parser::QuoteStyle) -> Self {
+impl From<ruff_python_ast::str::QuoteStyle> for Quote {
+    fn from(value: ruff_python_ast::str::QuoteStyle) -> Self {
         match value {
-            ruff_python_parser::QuoteStyle::Double => Self::Double,
-            ruff_python_parser::QuoteStyle::Single => Self::Single,
+            ruff_python_ast::str::QuoteStyle::Double => Self::Double,
+            ruff_python_ast::str::QuoteStyle::Single => Self::Single,
         }
     }
 }

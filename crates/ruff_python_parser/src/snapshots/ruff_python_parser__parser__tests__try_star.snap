@@ -32,7 +32,11 @@ expression: parse_ast
                                                             StringLiteral {
                                                                 range: 30..34,
                                                                 value: "eg",
-                                                                unicode: false,
+                                                                flags: StringLiteralFlags {
+                                                                    quote_style: Double,
+                                                                    prefix: "",
+                                                                    triple_quoted: false,
+                                                                },
                                                             },
                                                         ),
                                                     },

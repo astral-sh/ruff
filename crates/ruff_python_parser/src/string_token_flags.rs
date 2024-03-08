@@ -2,6 +2,7 @@ use std::fmt;
 
 use bitflags::bitflags;
 
+use ruff_python_ast::{str::QuoteStyle, StringLiteralPrefix};
 use ruff_text_size::{TextLen, TextSize};
 
 bitflags! {
@@ -287,28 +288,27 @@ impl fmt::Debug for StringKind {
     }
 }
 
-#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-pub enum QuoteStyle {
-    /// E.g. '
-    Single,
-    /// E.g. "
-    #[default]
-    Double,
-}
+impl From<StringKind> for ruff_python_ast::StringLiteralFlags {
+    fn from(value: StringKind) -> Self {
+        debug_assert!(!value.is_f_string());
+        debug_assert!(!value.is_byte_string());
 
-impl QuoteStyle {
-    pub const fn as_char(self) -> char {
-        match self {
-            Self::Single => '\'',
-            Self::Double => '"',
+        let mut new = ruff_python_ast::StringLiteralFlags::default();
+        if value.quote_style().is_double() {
+            new = new.with_double_quotes();
         }
-    }
-
-    #[must_use]
-    pub const fn opposite(self) -> Self {
-        match self {
-            Self::Single => Self::Double,
-            Self::Double => Self::Single,
+        if value.is_triple_quoted() {
+            new = new.with_triple_quotes();
         }
+        new.with_prefix({
+            if value.is_u_string() {
+                debug_assert!(!value.is_raw_string());
+                StringLiteralPrefix::UString
+            } else if value.is_raw_string() {
+                StringLiteralPrefix::RString
+            } else {
+                StringLiteralPrefix::None
+            }
+        })
     }
 }
