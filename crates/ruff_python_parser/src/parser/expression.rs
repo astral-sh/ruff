@@ -109,7 +109,7 @@ impl<'src> Parser<'src> {
     fn current_op(&mut self) -> (Precedence, TokenKind, Associativity) {
         const NOT_AN_OP: (Precedence, TokenKind, Associativity) =
             (Precedence::Unknown, TokenKind::Unknown, Associativity::Left);
-        let kind = self.current_kind();
+        let kind = self.current_token_kind();
 
         match kind {
             TokenKind::Or => (Precedence::Or, kind, Associativity::Left),
@@ -209,7 +209,7 @@ impl<'src> Parser<'src> {
 
     pub(super) fn parse_lhs_expression(&mut self) -> ParsedExpr {
         let start = self.node_start();
-        let mut lhs = match self.current_kind() {
+        let mut lhs = match self.current_token_kind() {
             TokenKind::Plus | TokenKind::Minus | TokenKind::Not | TokenKind::Tilde => {
                 Expr::UnaryOp(self.parse_unary_expression()).into()
             }
@@ -237,7 +237,7 @@ impl<'src> Parser<'src> {
     }
 
     pub(super) fn parse_identifier(&mut self) -> ast::Identifier {
-        let range = self.current_range();
+        let range = self.current_token_range();
 
         if self.at(TokenKind::Name) {
             let (Tok::Name { name }, _) = self.next_token() else {
@@ -248,7 +248,7 @@ impl<'src> Parser<'src> {
                 range,
             }
         } else {
-            if self.current_kind().is_keyword() {
+            if self.current_token_kind().is_keyword() {
                 let (tok, range) = self.next_token();
                 self.add_error(
                     ParseErrorType::OtherError(format!(
@@ -278,7 +278,7 @@ impl<'src> Parser<'src> {
     fn parse_atom(&mut self) -> ParsedExpr {
         let start = self.node_start();
 
-        let lhs = match self.current_kind() {
+        let lhs = match self.current_token_kind() {
             TokenKind::Float => {
                 let (Tok::Float { value }, _) = self.bump(TokenKind::Float) else {
                     unreachable!()
@@ -374,7 +374,7 @@ impl<'src> Parser<'src> {
                 } else {
                     self.add_error(
                         ParseErrorType::OtherError("Expression expected.".to_string()),
-                        self.current_range(),
+                        self.current_token_range(),
                     );
                     Expr::Name(ast::ExprName {
                         range: self.missing_node_range(),
@@ -390,7 +390,7 @@ impl<'src> Parser<'src> {
 
     fn parse_postfix_expression(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
         loop {
-            lhs = match self.current_kind() {
+            lhs = match self.current_token_kind() {
                 TokenKind::Lpar => Expr::Call(self.parse_call_expression(lhs, start)),
                 TokenKind::Lsqb => Expr::Subscript(self.parse_subscript_expression(lhs, start)),
                 TokenKind::Dot => Expr::Attribute(self.parse_attribute_expression(lhs, start)),
@@ -401,7 +401,7 @@ impl<'src> Parser<'src> {
 
     /// See: <https://docs.python.org/3/reference/expressions.html#calls>
     fn parse_call_expression(&mut self, lhs: Expr, start: TextSize) -> ast::ExprCall {
-        assert_eq!(self.current_kind(), TokenKind::Lpar);
+        assert_eq!(self.current_token_kind(), TokenKind::Lpar);
         let arguments = self.parse_arguments();
 
         ast::ExprCall {
@@ -444,7 +444,7 @@ impl<'src> Parser<'src> {
                     let start = parser.node_start();
                     let mut parsed_expr = parser.parse_named_expression_or_higher();
 
-                    match parser.current_kind() {
+                    match parser.current_token_kind() {
                         TokenKind::Async | TokenKind::For => {
                             parsed_expr = Expr::Generator(parser.parse_generator_expression(
                                 parsed_expr.expr,
@@ -528,7 +528,7 @@ impl<'src> Parser<'src> {
 
         // Create an error when receiving a empty slice to parse, e.g. `l[]`
         if !self.at(TokenKind::Colon) && !self.at_expr() {
-            let slice_range = TextRange::empty(self.current_range().start());
+            let slice_range = TextRange::empty(self.current_token_range().start());
             self.expect(TokenKind::Rsqb);
 
             let range = self.node_range(start);
@@ -629,9 +629,9 @@ impl<'src> Parser<'src> {
     fn parse_unary_expression(&mut self) -> ast::ExprUnaryOp {
         let start = self.node_start();
 
-        let op = UnaryOp::try_from(self.current_kind())
+        let op = UnaryOp::try_from(self.current_token_kind())
             .expect("Expected operator to be a unary operator token.");
-        self.bump(self.current_kind());
+        self.bump(self.current_token_kind());
 
         let operand = if matches!(op, UnaryOp::Not) {
             self.parse_expression_with_precedence(Precedence::Not)
@@ -681,7 +681,7 @@ impl<'src> Parser<'src> {
             let parsed_expr = self.parse_expression_with_precedence(op_bp);
             values.push(parsed_expr.expr);
 
-            if self.current_kind() != op {
+            if self.current_token_kind() != op {
                 break;
             }
 
@@ -703,7 +703,7 @@ impl<'src> Parser<'src> {
         op_bp: Precedence,
     ) -> ast::ExprCompare {
         let mut comparators = vec![];
-        let op = token_kind_to_cmp_op([op, self.current_kind()]).unwrap();
+        let op = token_kind_to_cmp_op([op, self.current_token_kind()]).unwrap();
         let mut ops = vec![op];
 
         if matches!(op, CmpOp::IsNot | CmpOp::NotIn) {
@@ -717,7 +717,7 @@ impl<'src> Parser<'src> {
             let parsed_expr = self.parse_expression_with_precedence(op_bp);
             comparators.push(parsed_expr.expr);
 
-            if let Ok(op) = token_kind_to_cmp_op([self.current_kind(), self.peek_nth(1)]) {
+            if let Ok(op) = token_kind_to_cmp_op([self.current_token_kind(), self.peek_nth(1)]) {
                 if matches!(op, CmpOp::IsNot | CmpOp::NotIn) {
                     self.next_token();
                 }
@@ -914,7 +914,7 @@ impl<'src> Parser<'src> {
         while !self.at_ts(FSTRING_END_SET) {
             progress.assert_progressing(self);
 
-            let element = match self.current_kind() {
+            let element = match self.current_token_kind() {
                 TokenKind::Lbrace => {
                     FStringElement::Expression(self.parse_fstring_expression_element())
                 }
@@ -961,7 +961,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_fstring_expression_element(&mut self) -> ast::FStringExpressionElement {
-        let range = self.current_range();
+        let range = self.current_token_range();
 
         let has_open_brace = self.eat(TokenKind::Lbrace);
         let value = self.parse_expression();
@@ -975,7 +975,8 @@ impl<'src> Parser<'src> {
             let leading_range = range
                 .add_start("{".text_len())
                 .cover_offset(value.range().start());
-            let trailing_range = TextRange::new(value.range().end(), self.current_range().start());
+            let trailing_range =
+                TextRange::new(value.range().end(), self.current_token_range().start());
             Some(ast::DebugText {
                 leading: self.src_text(leading_range).to_string(),
                 trailing: self.src_text(trailing_range).to_string(),
@@ -1013,7 +1014,7 @@ impl<'src> Parser<'src> {
             None
         };
 
-        let close_brace_range = self.current_range();
+        let close_brace_range = self.current_token_range();
         if has_open_brace && !self.eat(TokenKind::Rbrace) {
             self.add_error(
                 ParseErrorType::FStringError(FStringErrorType::UnclosedLbrace),
@@ -1040,7 +1041,7 @@ impl<'src> Parser<'src> {
         if self.at_ts(NEWLINE_EOF_SET) {
             self.add_error(
                 ParseErrorType::OtherError("missing closing bracket `]`".to_string()),
-                self.current_range(),
+                self.current_token_range(),
             );
         }
 
@@ -1055,7 +1056,7 @@ impl<'src> Parser<'src> {
 
         let parsed_expr = self.parse_named_expression_or_higher();
 
-        match self.current_kind() {
+        match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
                 Expr::ListComp(self.parse_list_comprehension_expression(parsed_expr.expr, start))
             }
@@ -1072,7 +1073,7 @@ impl<'src> Parser<'src> {
         if self.at_ts(NEWLINE_EOF_SET) {
             self.add_error(
                 ParseErrorType::OtherError("missing closing brace `}`".to_string()),
-                self.current_range(),
+                self.current_token_range(),
             );
         }
 
@@ -1093,7 +1094,7 @@ impl<'src> Parser<'src> {
 
         let key_or_value = self.parse_named_expression_or_higher();
 
-        match self.current_kind() {
+        match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
                 Expr::SetComp(self.parse_set_comprehension_expression(key_or_value.expr, start))
             }
@@ -1101,7 +1102,7 @@ impl<'src> Parser<'src> {
                 self.bump(TokenKind::Colon);
                 let value = self.parse_conditional_expression_or_higher();
 
-                if matches!(self.current_kind(), TokenKind::Async | TokenKind::For) {
+                if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
                     Expr::DictComp(self.parse_dictionary_comprehension_expression(
                         key_or_value.expr,
                         value.expr,
@@ -1128,7 +1129,7 @@ impl<'src> Parser<'src> {
 
         // Nice error message when having a unclosed open parenthesis `(`
         if self.at_ts(NEWLINE_EOF_SET) {
-            let range = self.current_range();
+            let range = self.current_token_range();
             self.add_error(
                 ParseErrorType::OtherError("missing closing parenthesis `)`".to_string()),
                 range,
@@ -1150,7 +1151,7 @@ impl<'src> Parser<'src> {
 
         let mut parsed_expr = self.parse_named_expression_or_higher();
 
-        let parsed = match self.current_kind() {
+        let parsed = match self.current_token_kind() {
             TokenKind::Comma => {
                 let tuple = self.parse_tuple_expression(
                     parsed_expr.expr,
@@ -1537,19 +1538,19 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::Colon);
 
         // Check for forbidden tokens in the `lambda`'s body
-        match self.current_kind() {
+        match self.current_token_kind() {
             TokenKind::Yield => self.add_error(
                 ParseErrorType::OtherError(
                     "`yield` not allowed in a `lambda` expression".to_string(),
                 ),
-                self.current_range(),
+                self.current_token_range(),
             ),
             TokenKind::Star => {
                 self.add_error(
                     ParseErrorType::OtherError(
                         "starred expression not allowed in a `lambda` expression".to_string(),
                     ),
-                    self.current_range(),
+                    self.current_token_range(),
                 );
             }
             TokenKind::DoubleStar => {
@@ -1558,7 +1559,7 @@ impl<'src> Parser<'src> {
                         "double starred expression not allowed in a `lambda` expression"
                             .to_string(),
                     ),
-                    self.current_range(),
+                    self.current_token_range(),
                 );
             }
             _ => {}

@@ -12,7 +12,7 @@ impl ParserProgress {
     fn has_progressed(self, p: &Parser) -> bool {
         match self.0 {
             None => true,
-            Some(snapshot) => snapshot != (p.current_kind(), p.current_range().start()),
+            Some(snapshot) => snapshot != (p.current_token_kind(), p.current_token_range().start()),
         }
     }
 
@@ -26,11 +26,11 @@ impl ParserProgress {
         assert!(
             self.has_progressed(p),
             "The parser is no longer progressing. Stuck at '{}' {:?}:{:?}",
-            p.src_text(p.current_range()),
-            p.current_kind(),
-            p.current_range(),
+            p.src_text(p.current_token_range()),
+            p.current_token_kind(),
+            p.current_token_range(),
         );
 
-        self.0 = Some((p.current_kind(), p.current_range().start()));
+        self.0 = Some((p.current_token_kind(), p.current_token_range().start()));
     }
 }
