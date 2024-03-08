@@ -428,16 +428,6 @@ impl<'src> Parser<'src> {
         inner(&mut self.errors, error, ranged.range());
     }
 
-    /// Skip tokens until [`TokenSet`]. Returns the range of the skipped tokens.
-    #[deprecated(note = "We should not perform error recovery outside of lists. Remove")]
-    fn skip_until(&mut self, token_set: TokenSet) {
-        let mut progress = ParserProgress::default();
-        while !self.at_ts(token_set) {
-            progress.assert_progressing(self);
-            self.next_token();
-        }
-    }
-
     /// Returns `true` if the current token is of the given kind.
     fn at(&self, kind: TokenKind) -> bool {
         self.current_token_kind() == kind
