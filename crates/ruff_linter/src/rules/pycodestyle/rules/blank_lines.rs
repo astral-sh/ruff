@@ -352,6 +352,9 @@ struct LogicalLineInfo {
     // `true` if this is not a blank but only consists of a comment.
     is_comment_only: bool,
 
+    /// If running on a notebook, whether the line is the first non-trivia line of its cell.
+    is_cell_first_non_comment_line: bool,
+
     /// `true` if the line is a string only (including trivia tokens) line, which is a docstring if coming right after a class/function definition.
     is_docstring: bool,
 
@@ -380,6 +383,10 @@ struct LinePreprocessor<'a> {
     /// Maximum number of consecutive blank lines between the current line and the previous non-comment logical line.
     /// One of its main uses is to allow a comment to directly precede a class/function definition.
     max_preceding_blank_lines: BlankLines,
+    /// The cell offsets of the notebook (if running on a notebook).
+    cell_offsets: Option<&'a CellOffsets>,
+    /// If running on a notebook, whether the line is the first non-trivia line of its cell.
+    is_cell_first_non_comment_line: bool,
 }
 
 impl<'a> LinePreprocessor<'a> {
@@ -387,6 +394,7 @@ impl<'a> LinePreprocessor<'a> {
         tokens: &'a [LexResult],
         locator: &'a Locator,
         indent_width: IndentWidth,
+        cell_offsets: Option<&'a CellOffsets>,
     ) -> LinePreprocessor<'a> {
         LinePreprocessor {
             tokens: tokens.iter(),
@@ -394,6 +402,8 @@ impl<'a> LinePreprocessor<'a> {
             line_start: TextSize::new(0),
             max_preceding_blank_lines: BlankLines::Zero,
             indent_width,
+            is_cell_first_non_comment_line: cell_offsets.is_some(),
+            cell_offsets,
         }
     }
 }
@@ -492,6 +502,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         last_token,
                         logical_line_end: range.end(),
                         is_comment_only: line_is_comment_only,
+                        is_cell_first_non_comment_line: self.is_cell_first_non_comment_line,
                         is_docstring,
                         indent_length,
                         blank_lines,
@@ -505,6 +516,15 @@ impl<'a> Iterator for LinePreprocessor<'a> {
 
                     // Set the start for the next logical line.
                     self.line_start = range.end();
+
+                    if self
+                        .cell_offsets
+                        .is_some_and(|cell_offsets| cell_offsets.contains(&self.line_start))
+                    {
+                        self.is_cell_first_non_comment_line = true;
+                    } else if !line_is_comment_only {
+                        self.is_cell_first_non_comment_line = false;
+                    }
 
                     return Some(logical_line);
                 }
@@ -681,7 +701,8 @@ impl<'a> BlankLinesChecker<'a> {
     pub(crate) fn check_lines(&self, tokens: &[LexResult], diagnostics: &mut Vec<Diagnostic>) {
         let mut prev_indent_length: Option<usize> = None;
         let mut state = BlankLinesState::default();
-        let line_preprocessor = LinePreprocessor::new(tokens, self.locator, self.indent_width);
+        let line_preprocessor =
+            LinePreprocessor::new(tokens, self.locator, self.indent_width, self.cell_offsets);
 
         for logical_line in line_preprocessor {
             // Reset `follows` after a dedent:
@@ -823,8 +844,7 @@ impl<'a> BlankLinesChecker<'a> {
             // Blank lines in stub files are used to group definitions. Don't enforce blank lines.
             && !self.source_type.is_stub()
             // Do not add blank lines at the start of cells in notebooks.
-            && !self.cell_offsets
-                    .is_some_and(|cell_offsets| cell_offsets.contains(&line.first_token_range.start()))
+            && !line.is_cell_first_non_comment_line
         {
             // E302
             let mut diagnostic = Diagnostic::new(
@@ -940,8 +960,7 @@ impl<'a> BlankLinesChecker<'a> {
             // Blank lines in stub files are used for grouping, don't enforce blank lines.
             && !self.source_type.is_stub()
             // Do not add blank lines at the start of cells in notebooks.
-            && !self.cell_offsets
-                    .is_some_and(|cell_offsets| cell_offsets.contains(&line.first_token_range.start()))
+            && !line.is_cell_first_non_comment_line
         {
             // E305
             let mut diagnostic = Diagnostic::new(

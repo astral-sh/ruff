@@ -238,6 +238,22 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::BlankLineBetweenMethods)]
+    #[test_case(Rule::BlankLinesTopLevel)]
+    #[test_case(Rule::TooManyBlankLines)]
+    #[test_case(Rule::BlankLineAfterDecorator)]
+    #[test_case(Rule::BlankLinesAfterFunctionOrClass)]
+    #[test_case(Rule::BlankLinesBeforeNestedDefinition)]
+    fn blank_lines_notebook(rule_code: Rule) -> Result<()> {
+        let snapshot = format!("blank_lines_{}_notebook", rule_code.noqa_code());
+        let diagnostics = test_path(
+            Path::new("pycodestyle").join("E30.ipynb"),
+            &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn blank_lines_typing_stub_isort() -> Result<()> {
         let diagnostics = test_path(
