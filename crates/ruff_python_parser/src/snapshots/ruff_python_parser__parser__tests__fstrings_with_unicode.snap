@@ -43,6 +43,11 @@ expression: parse_ast
                                                 },
                                             ),
                                         ],
+                                        flags: FStringFlags {
+                                            quote_style: Double,
+                                            raw: false,
+                                            triple_quoted: false,
+                                        },
                                     },
                                 ),
                                 Literal(
@@ -114,6 +119,11 @@ expression: parse_ast
                                                 },
                                             ),
                                         ],
+                                        flags: FStringFlags {
+                                            quote_style: Double,
+                                            raw: false,
+                                            triple_quoted: false,
+                                        },
                                     },
                                 ),
                                 Literal(
@@ -185,6 +195,11 @@ expression: parse_ast
                                                 },
                                             ),
                                         ],
+                                        flags: FStringFlags {
+                                            quote_style: Double,
+                                            raw: false,
+                                            triple_quoted: false,
+                                        },
                                     },
                                 ),
                                 Literal(
@@ -268,6 +283,11 @@ expression: parse_ast
                                                 },
                                             ),
                                         ],
+                                        flags: FStringFlags {
+                                            quote_style: Double,
+                                            raw: false,
+                                            triple_quoted: false,
+                                        },
                                     },
                                 ),
                                 Literal(

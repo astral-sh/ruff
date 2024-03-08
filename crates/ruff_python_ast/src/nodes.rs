@@ -1168,11 +1168,84 @@ impl Ranged for FStringPart {
     }
 }
 
+bitflags! {
+    #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
+    struct FStringFlagsInner: u8 {
+        /// The f-string uses double quotes (`"`) for its opener and closer.
+        /// If this flag is not set, the f-string uses single quotes (`'`)
+        /// for its opener and closer.
+        const DOUBLE = 1 << 0;
+
+        /// The f-string is triple-quoted:
+        /// it begins and ends with three consecutive quote characters.
+        const TRIPLE_QUOTED = 1 << 1;
+
+        /// The f-string has an `r` or `R` prefix, meaning it is a raw f-string.
+        const R_PREFIX = 1 << 3;
+    }
+}
+
+/// Flags that can be queried to obtain information
+/// regarding the prefixes and quotes used for an f-string.
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct FStringFlags(FStringFlagsInner);
+
+impl FStringFlags {
+    #[must_use]
+    pub fn with_double_quotes(mut self) -> Self {
+        self.0 |= FStringFlagsInner::DOUBLE;
+        self
+    }
+
+    #[must_use]
+    pub fn with_triple_quotes(mut self) -> Self {
+        self.0 |= FStringFlagsInner::TRIPLE_QUOTED;
+        self
+    }
+
+    #[must_use]
+    pub fn with_r_prefix(mut self) -> Self {
+        self.0 |= FStringFlagsInner::R_PREFIX;
+        self
+    }
+
+    /// Does the f-string have an `r` or `R` prefix?
+    pub const fn is_raw(self) -> bool {
+        self.0.contains(FStringFlagsInner::R_PREFIX)
+    }
+
+    /// Is the f-string triple-quoted, i.e.,
+    /// does it begin and end with three consecutive quote characters?
+    pub const fn is_triple_quoted(self) -> bool {
+        self.0.contains(FStringFlagsInner::TRIPLE_QUOTED)
+    }
+
+    /// Does the f-string use single or double quotes in its opener and closer?
+    pub const fn quote_style(self) -> QuoteStyle {
+        if self.0.contains(FStringFlagsInner::DOUBLE) {
+            QuoteStyle::Double
+        } else {
+            QuoteStyle::Single
+        }
+    }
+}
+
+impl fmt::Debug for FStringFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FStringFlags")
+            .field("quote_style", &self.quote_style())
+            .field("raw", &self.is_raw())
+            .field("triple_quoted", &self.is_triple_quoted())
+            .finish()
+    }
+}
+
 /// An AST node that represents a single f-string which is part of an [`ExprFString`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct FString {
     pub range: TextRange,
     pub elements: Vec<FStringElement>,
+    pub flags: FStringFlags,
 }
 
 impl Ranged for FString {

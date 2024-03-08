@@ -1626,10 +1626,11 @@ StringLiteral: StringType = {
 };
 
 FStringExpr: StringType = {
-    <location:@L> FStringStart <elements:FStringMiddlePattern*> FStringEnd <end_location:@R> => {
+    <location:@L> <start:fstring_start> <elements:FStringMiddlePattern*> FStringEnd <end_location:@R> => {
         StringType::FString(ast::FString {
             elements,
-            range: (location..end_location).into()
+            range: (location..end_location).into(),
+            flags: start.into()
         })
     }
 };
@@ -2002,7 +2003,7 @@ extern {
         Dedent => token::Tok::Dedent,
         StartModule => token::Tok::StartModule,
         StartExpression => token::Tok::StartExpression,
-        FStringStart => token::Tok::FStringStart(StringKind),
+        fstring_start => token::Tok::FStringStart(<StringKind>),
         FStringEnd => token::Tok::FStringEnd,
         "!" => token::Tok::Exclamation,
         "?" => token::Tok::Question,

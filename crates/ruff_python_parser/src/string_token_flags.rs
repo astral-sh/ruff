@@ -332,3 +332,23 @@ impl From<StringKind> for ruff_python_ast::BytesLiteralFlags {
         new
     }
 }
+
+impl From<StringKind> for ruff_python_ast::FStringFlags {
+    fn from(value: StringKind) -> ruff_python_ast::FStringFlags {
+        debug_assert!(value.is_f_string());
+        debug_assert!(!value.is_byte_string());
+        debug_assert!(!value.is_u_string());
+
+        let mut new = ruff_python_ast::FStringFlags::default();
+        if value.quote_style().is_double() {
+            new = new.with_double_quotes();
+        }
+        if value.is_triple_quoted() {
+            new = new.with_triple_quotes();
+        }
+        if value.is_raw_string() {
+            new = new.with_r_prefix();
+        }
+        new
+    }
+}

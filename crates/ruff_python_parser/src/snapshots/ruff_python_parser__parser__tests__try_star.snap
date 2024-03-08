@@ -280,6 +280,11 @@ expression: parse_ast
                                                                                     },
                                                                                 ),
                                                                             ],
+                                                                            flags: FStringFlags {
+                                                                                quote_style: Single,
+                                                                                raw: false,
+                                                                                triple_quoted: false,
+                                                                            },
                                                                         },
                                                                     ),
                                                                 ),
@@ -411,6 +416,11 @@ expression: parse_ast
                                                                                     },
                                                                                 ),
                                                                             ],
+                                                                            flags: FStringFlags {
+                                                                                quote_style: Single,
+                                                                                raw: false,
+                                                                                triple_quoted: false,
+                                                                            },
                                                                         },
                                                                     ),
                                                                 ),
