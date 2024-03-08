@@ -205,11 +205,7 @@ fn is_arguments_huggable(arguments: &Arguments, context: &PyFormatContext) -> bo
 
     // If the expression has a trailing comma, then we can't hug it.
     if options.magic_trailing_comma().is_respect()
-        && commas::has_magic_trailing_comma(
-            TextRange::new(arg.end(), arguments.end()),
-            options,
-            context,
-        )
+        && commas::has_magic_trailing_comma(TextRange::new(arg.end(), arguments.end()), context)
     {
         return false;
     }
