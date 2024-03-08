@@ -2500,42 +2500,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternKeyword {
     }
 }
 
-impl FormatRule<ast::PatternMatchInvalid, PyFormatContext<'_>>
-    for crate::pattern::pattern_match_invalid::FormatPatternMatchInvalid
-{
-    #[inline]
-    fn fmt(&self, node: &ast::PatternMatchInvalid, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::PatternMatchInvalid>::fmt(self, node, f)
-    }
-}
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::PatternMatchInvalid {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::PatternMatchInvalid,
-        crate::pattern::pattern_match_invalid::FormatPatternMatchInvalid,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::pattern::pattern_match_invalid::FormatPatternMatchInvalid::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchInvalid {
-    type Format = FormatOwnedWithRule<
-        ast::PatternMatchInvalid,
-        crate::pattern::pattern_match_invalid::FormatPatternMatchInvalid,
-        PyFormatContext<'ast>,
-    >;
-    fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(
-            self,
-            crate::pattern::pattern_match_invalid::FormatPatternMatchInvalid::default(),
-        )
-    }
-}
-
 impl FormatRule<ast::Comprehension, PyFormatContext<'_>>
     for crate::other::comprehension::FormatComprehension
 {
