@@ -2978,9 +2978,6 @@ pub enum Pattern {
     MatchStar(PatternMatchStar),
     MatchAs(PatternMatchAs),
     MatchOr(PatternMatchOr),
-
-    // TODO(dhruvmanila): Remove this variant
-    Invalid(PatternMatchInvalid),
 }
 
 /// See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)
@@ -3110,19 +3107,6 @@ pub struct PatternMatchOr {
 impl From<PatternMatchOr> for Pattern {
     fn from(payload: PatternMatchOr) -> Self {
         Pattern::MatchOr(payload)
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct PatternMatchInvalid {
-    pub value: String,
-    pub range: TextRange,
-}
-
-#[allow(deprecated)]
-impl From<PatternMatchInvalid> for Pattern {
-    fn from(payload: PatternMatchInvalid) -> Self {
-        Pattern::Invalid(payload)
     }
 }
 
@@ -4115,11 +4099,6 @@ impl Ranged for crate::nodes::PatternMatchOr {
         self.range
     }
 }
-impl Ranged for crate::nodes::PatternMatchInvalid {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
 impl Ranged for crate::Pattern {
     fn range(&self) -> TextRange {
         match self {
@@ -4131,8 +4110,6 @@ impl Ranged for crate::Pattern {
             Self::MatchStar(node) => node.range(),
             Self::MatchAs(node) => node.range(),
             Self::MatchOr(node) => node.range(),
-            #[allow(deprecated)]
-            Self::Invalid(node) => node.range(),
         }
     }
 }
