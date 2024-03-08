@@ -184,14 +184,14 @@ impl<'source> Lexer<'source> {
             (_, quote @ ('\'' | '"')) => {
                 if let Ok(prefix) = StringPrefix::try_from(first) {
                     self.cursor.bump();
-                    return self.lex_string(StringKind::from_prefix(prefix), quote);
+                    return self.lex_string(Some(prefix), quote);
                 }
             }
             (_, second @ ('r' | 'R' | 'b' | 'B')) if is_quote(self.cursor.second()) => {
                 self.cursor.bump();
                 if let Ok(prefix) = StringPrefix::try_from([first, second]) {
                     let quote = self.cursor.bump().unwrap();
-                    return self.lex_string(StringKind::from_prefix(prefix), quote);
+                    return self.lex_string(Some(prefix), quote);
                 }
             }
             _ => {}
@@ -539,13 +539,11 @@ impl<'source> Lexer<'source> {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), quote);
 
-        let mut kind = StringKind::from_prefix({
-            if is_raw_string {
-                StringPrefix::RawFormat
-            } else {
-                StringPrefix::Format
-            }
-        });
+        let mut kind = StringKind::from_prefix(Some(if is_raw_string {
+            StringPrefix::RawFormat
+        } else {
+            StringPrefix::Format
+        }));
         if quote == '"' {
             kind = kind.with_double_quotes();
         }
@@ -692,9 +690,15 @@ impl<'source> Lexer<'source> {
     }
 
     /// Lex a string literal.
-    fn lex_string(&mut self, mut kind: StringKind, quote: char) -> Result<Tok, LexicalError> {
+    fn lex_string(
+        &mut self,
+        prefix: Option<StringPrefix>,
+        quote: char,
+    ) -> Result<Tok, LexicalError> {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), quote);
+
+        let mut kind = StringKind::from_prefix(prefix);
 
         if quote == '"' {
             kind = kind.with_double_quotes();
@@ -1064,7 +1068,7 @@ impl<'source> Lexer<'source> {
             c if is_ascii_identifier_start(c) => self.lex_identifier(c)?,
             '0'..='9' => self.lex_number(c)?,
             '#' => return Ok((self.lex_comment(), self.token_range())),
-            '\'' | '"' => self.lex_string(StringKind::default(), c)?,
+            '\'' | '"' => self.lex_string(None, c)?,
             '=' => {
                 if self.cursor.eat_char('=') {
                     Tok::EqEqual

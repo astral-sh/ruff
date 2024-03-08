@@ -126,27 +126,31 @@ impl StringPrefix {
 pub struct StringKind(StringFlags);
 
 impl StringKind {
-    pub(crate) const fn from_prefix(prefix: StringPrefix) -> Self {
-        Self(prefix.as_flags())
+    pub(crate) const fn from_prefix(prefix: Option<StringPrefix>) -> Self {
+        if let Some(prefix) = prefix {
+            Self(prefix.as_flags())
+        } else {
+            Self(StringFlags::empty())
+        }
     }
 
     /// Does the string have a `u` or `U` prefix?
-    pub const fn is_ustring(self) -> bool {
+    pub const fn is_u_string(self) -> bool {
         self.0.contains(StringFlags::U_PREFIX)
     }
 
     /// Does the string have an `r` or `R` prefix?
-    pub const fn is_rawstring(self) -> bool {
+    pub const fn is_raw_string(self) -> bool {
         self.0.contains(StringFlags::R_PREFIX)
     }
 
     /// Does the string have an `f` or `F` prefix?
-    pub const fn is_fstring(self) -> bool {
+    pub const fn is_f_string(self) -> bool {
         self.0.contains(StringFlags::F_PREFIX)
     }
 
     /// Does the string have a `b` or `B` prefix?
-    pub const fn is_bytestring(self) -> bool {
+    pub const fn is_byte_string(self) -> bool {
         self.0.contains(StringFlags::B_PREFIX)
     }
 

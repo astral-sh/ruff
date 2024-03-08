@@ -170,7 +170,7 @@ pub(crate) fn avoidable_escaped_quote(
                 value: string_contents,
                 kind,
             } => {
-                if kind.is_rawstring() || kind.is_triple_quoted() {
+                if kind.is_raw_string() || kind.is_triple_quoted() {
                     continue;
                 }
 
@@ -216,7 +216,7 @@ pub(crate) fn avoidable_escaped_quote(
             Tok::FStringMiddle {
                 value: string_contents,
                 kind,
-            } if !kind.is_rawstring() => {
+            } if !kind.is_raw_string() => {
                 let Some(context) = fstrings.last_mut() else {
                     continue;
                 };
@@ -310,7 +310,7 @@ pub(crate) fn unnecessary_escaped_quote(
                 value: string_contents,
                 kind,
             } => {
-                if kind.is_rawstring() || kind.is_triple_quoted() {
+                if kind.is_raw_string() || kind.is_triple_quoted() {
                     continue;
                 }
 
@@ -346,7 +346,7 @@ pub(crate) fn unnecessary_escaped_quote(
             Tok::FStringMiddle {
                 value: string_contents,
                 kind,
-            } if !kind.is_rawstring() => {
+            } if !kind.is_raw_string() => {
                 let Some(context) = fstrings.last_mut() else {
                     continue;
                 };

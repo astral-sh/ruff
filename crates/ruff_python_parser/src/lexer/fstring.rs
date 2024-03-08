@@ -18,6 +18,7 @@ pub(crate) struct FStringContext {
 
 impl FStringContext {
     pub(crate) const fn new(kind: StringKind, nesting: u32) -> Self {
+        debug_assert!(kind.is_f_string());
         Self {
             kind,
             nesting,
@@ -26,6 +27,7 @@ impl FStringContext {
     }
 
     pub(crate) const fn kind(&self) -> StringKind {
+        debug_assert!(self.kind.is_f_string());
         self.kind
     }
 
@@ -50,7 +52,7 @@ impl FStringContext {
 
     /// Returns `true` if the current f-string is a raw f-string.
     pub(crate) fn is_raw_string(&self) -> bool {
-        self.kind.is_rawstring()
+        self.kind.is_raw_string()
     }
 
     /// Returns `true` if the current f-string is a triple-quoted f-string.
