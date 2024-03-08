@@ -8,25 +8,57 @@ use crate::parser::{Parser, SequenceMatchPatternParentheses};
 use crate::token_set::TokenSet;
 use crate::{ParseErrorType, Tok, TokenKind};
 
-const END_EXPR_SET: TokenSet = TokenSet::new([
-    TokenKind::Newline,
-    TokenKind::Semi,
-    TokenKind::Colon,
-    TokenKind::EndOfFile,
-    TokenKind::Rbrace,
-    TokenKind::Rsqb,
-    TokenKind::Rpar,
-    TokenKind::Comma,
-    TokenKind::Dedent,
-    TokenKind::Else,
-    TokenKind::As,
-    TokenKind::From,
-    TokenKind::For,
-    TokenKind::Async,
-    TokenKind::In,
+use super::RecoveryContextKind;
+
+/// The set of tokens that can start a literal pattern.
+const LITERAL_PATTERN_START_SET: TokenSet = TokenSet::new([
+    TokenKind::None,
+    TokenKind::True,
+    TokenKind::False,
+    TokenKind::String,
+    TokenKind::Int,
+    TokenKind::Float,
+    TokenKind::Complex,
 ]);
 
+/// The set of tokens that can start a pattern.
+const PATTERN_START_SET: TokenSet = TokenSet::new([
+    // Star pattern
+    TokenKind::Star,
+    // Capture pattern
+    // Wildcard pattern ('_' is a name token)
+    // Value pattern (name or attribute)
+    // Class pattern
+    TokenKind::Name,
+    // Group pattern
+    TokenKind::Lpar,
+    // Sequence pattern
+    TokenKind::Lsqb,
+    // Mapping pattern
+    TokenKind::Lbrace,
+])
+.union(LITERAL_PATTERN_START_SET);
+
+/// The set of tokens that can start a mapping pattern.
+const MAPPING_PATTERN_START_SET: TokenSet = TokenSet::new([
+    // Double star pattern
+    TokenKind::DoubleStar,
+    // Value pattern
+    TokenKind::Name,
+])
+.union(LITERAL_PATTERN_START_SET);
+
 impl<'src> Parser<'src> {
+    /// Returns `true` if the current token is a valid start of a pattern.
+    pub(super) fn at_pattern_start(&self) -> bool {
+        self.at_ts(PATTERN_START_SET)
+    }
+
+    /// Returns `true` if the current token is a valid start of a mapping pattern.
+    pub(super) fn at_mapping_pattern_start(&self) -> bool {
+        self.at_ts(MAPPING_PATTERN_START_SET)
+    }
+
     pub(super) fn parse_match_patterns(&mut self) -> Pattern {
         let start = self.node_start();
         let pattern = self.parse_match_pattern();
@@ -85,6 +117,9 @@ impl<'src> Parser<'src> {
             lhs = Pattern::MatchClass(self.parse_match_pattern_class(lhs, start));
         }
 
+        // TODO(dhruvmanila): This error isn't being reported (`1 + 2` can't be used as a pattern)
+        // literal_pattern:
+        //     | signed_number !('+' | '-')
         if self.at(TokenKind::Plus) || self.at(TokenKind::Minus) {
             let (operator_token, _) = self.next_token();
             let operator = if matches!(operator_token, Tok::Plus) {
@@ -172,18 +207,23 @@ impl<'src> Parser<'src> {
         lhs
     }
 
+    /// Parses a mapping pattern.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `{` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#mapping-patterns>
     fn parse_match_pattern_mapping(&mut self) -> ast::PatternMatchMapping {
         let start = self.node_start();
+        self.bump(TokenKind::Lbrace);
+
         let mut keys = vec![];
         let mut patterns = vec![];
         let mut rest = None;
 
-        #[allow(deprecated)]
-        self.parse_delimited(
-            true,
-            TokenKind::Lbrace,
-            TokenKind::Comma,
-            TokenKind::Rbrace,
+        self.parse_comma_separated_list(
+            RecoveryContextKind::MatchPatternMapping,
             |parser| {
                 if parser.eat(TokenKind::DoubleStar) {
                     rest = Some(parser.parse_identifier());
@@ -213,6 +253,7 @@ impl<'src> Parser<'src> {
                                 )),
                                 &pattern,
                             );
+                            #[allow(deprecated)]
                             Expr::Invalid(ast::ExprInvalid {
                                 value: parser.src_text(&pattern).into(),
                                 range: pattern.range(),
@@ -226,7 +267,13 @@ impl<'src> Parser<'src> {
                     patterns.push(parser.parse_match_pattern());
                 }
             },
+            true,
         );
+
+        // TODO(dhruvmanila): There can't be any other pattern after a `**` pattern.
+        // TODO(dhruvmanila): Duplicate literal keys should raise a SyntaxError.
+
+        self.expect(TokenKind::Rbrace);
 
         ast::PatternMatchMapping {
             range: self.node_range(start),
@@ -296,17 +343,19 @@ impl<'src> Parser<'src> {
         pattern
     }
 
+    /// Parses a sequence pattern.
+    ///
+    /// If the `parentheses` is `None`, it is an [open sequence pattern].
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#sequence-patterns>
+    ///
+    /// [open sequence pattern]: https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-open_sequence_pattern
     fn parse_sequence_match_pattern(
         &mut self,
-        first_elt: Pattern,
+        first_element: Pattern,
         start: TextSize,
         parentheses: Option<SequenceMatchPatternParentheses>,
     ) -> ast::PatternMatchSequence {
-        let ending = parentheses.map_or(
-            TokenKind::Colon,
-            SequenceMatchPatternParentheses::closing_kind,
-        );
-
         if parentheses.is_some_and(|parentheses| {
             self.at(parentheses.closing_kind()) || self.peek_nth(1) == parentheses.closing_kind()
         }) {
@@ -316,19 +365,22 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Comma);
         }
 
-        let mut patterns = vec![first_elt];
+        let mut patterns = vec![first_element];
 
-        #[allow(deprecated)]
-        self.parse_separated(true, TokenKind::Comma, [ending], |parser| {
-            patterns.push(parser.parse_match_pattern());
-        });
+        self.parse_comma_separated_list(
+            RecoveryContextKind::SequenceMatchPattern(parentheses),
+            |parser| patterns.push(parser.parse_match_pattern()),
+            true,
+        );
 
         if let Some(parentheses) = parentheses {
             self.expect(parentheses.closing_kind());
         }
 
-        let range = self.node_range(start);
-        ast::PatternMatchSequence { range, patterns }
+        ast::PatternMatchSequence {
+            range: self.node_range(start),
+            patterns,
+        }
     }
 
     fn parse_match_pattern_literal(&mut self) -> Pattern {
@@ -488,23 +540,31 @@ impl<'src> Parser<'src> {
         lhs
     }
 
+    /// Parses the [pattern arguments] in a class pattern.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `(` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#class-patterns>
+    ///
+    /// [pattern arguments]: https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-pattern_arguments
     fn parse_match_pattern_class(
         &mut self,
         cls: Pattern,
         start: TextSize,
     ) -> ast::PatternMatchClass {
+        self.bump(TokenKind::Lpar);
+
         let mut patterns = vec![];
         let mut keywords = vec![];
         let mut has_seen_pattern = false;
         let mut has_seen_keyword_pattern = false;
 
         let arguments_start = self.node_start();
-        #[allow(deprecated)]
-        self.parse_delimited(
-            true,
-            TokenKind::Lpar,
-            TokenKind::Comma,
-            TokenKind::Rpar,
+
+        self.parse_comma_separated_list(
+            RecoveryContextKind::MatchPatternClassArguments,
             |parser| {
                 let pattern_start = parser.node_start();
                 let pattern = parser.parse_match_pattern();
@@ -526,7 +586,7 @@ impl<'src> Parser<'src> {
                         });
                     } else {
                         #[allow(deprecated)]
-                        parser.skip_until(END_EXPR_SET);
+                        parser.skip_until(super::expression::END_EXPR_SET);
                         parser.add_error(
                             ParseErrorType::OtherError("`not valid keyword pattern".to_string()),
                             parser.node_range(pattern_start),
@@ -546,7 +606,10 @@ impl<'src> Parser<'src> {
                     );
                 }
             },
+            true,
         );
+
+        self.expect(TokenKind::Rpar);
 
         let arguments_range = self.node_range(arguments_start);
 
