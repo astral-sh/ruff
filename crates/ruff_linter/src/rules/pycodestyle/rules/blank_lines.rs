@@ -352,8 +352,8 @@ struct LogicalLineInfo {
     // `true` if this is not a blank but only consists of a comment.
     is_comment_only: bool,
 
-    /// If running on a notebook, whether the line is the first non-trivia line of its cell.
-    is_cell_first_non_comment_line: bool,
+    /// If running on a notebook, whether the line is the first logical line (or a comment preceding it) of its cell.
+    is_beginning_of_cell: bool,
 
     /// `true` if the line is a string only (including trivia tokens) line, which is a docstring if coming right after a class/function definition.
     is_docstring: bool,
@@ -385,8 +385,8 @@ struct LinePreprocessor<'a> {
     max_preceding_blank_lines: BlankLines,
     /// The cell offsets of the notebook (if running on a notebook).
     cell_offsets: Option<&'a CellOffsets>,
-    /// If running on a notebook, whether the line is the first non-trivia line of its cell.
-    is_cell_first_non_comment_line: bool,
+    /// If running on a notebook, whether the line is the first logical line (or a comment preceding it) of its cell.
+    is_beginning_of_cell: bool,
 }
 
 impl<'a> LinePreprocessor<'a> {
@@ -402,7 +402,7 @@ impl<'a> LinePreprocessor<'a> {
             line_start: TextSize::new(0),
             max_preceding_blank_lines: BlankLines::Zero,
             indent_width,
-            is_cell_first_non_comment_line: cell_offsets.is_some(),
+            is_beginning_of_cell: cell_offsets.is_some(),
             cell_offsets,
         }
     }
@@ -502,7 +502,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         last_token,
                         logical_line_end: range.end(),
                         is_comment_only: line_is_comment_only,
-                        is_cell_first_non_comment_line: self.is_cell_first_non_comment_line,
+                        is_beginning_of_cell: self.is_beginning_of_cell,
                         is_docstring,
                         indent_length,
                         blank_lines,
@@ -521,9 +521,9 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         .cell_offsets
                         .is_some_and(|cell_offsets| cell_offsets.contains(&self.line_start))
                     {
-                        self.is_cell_first_non_comment_line = true;
+                        self.is_beginning_of_cell = true;
                     } else if !line_is_comment_only {
-                        self.is_cell_first_non_comment_line = false;
+                        self.is_beginning_of_cell = false;
                     }
 
                     return Some(logical_line);
@@ -722,8 +722,8 @@ impl<'a> BlankLinesChecker<'a> {
             state.fn_status.update(&logical_line);
 
             if state.is_not_first_logical_line
-                // Ignore the first line of each cell in notebooks.
-                && !logical_line.is_cell_first_non_comment_line
+                // Ignore the first logical line (and any comment preceding it) of each cell in notebooks.
+                && !logical_line.is_beginning_of_cell
             {
                 self.check_line(&logical_line, &state, prev_indent_length, diagnostics);
             }
