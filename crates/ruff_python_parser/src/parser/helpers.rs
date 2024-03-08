@@ -56,6 +56,19 @@ pub(super) fn is_valid_aug_assignment_target(expr: &Expr) -> bool {
     )
 }
 
+/// Check if the given expression is itself or contains an expression that is
+/// valid as a target of a `del` statement.
+pub(super) fn is_valid_del_target(expr: &Expr) -> bool {
+    // https://github.com/python/cpython/blob/d864b0094f9875c5613cbb0b7f7f3ca8f1c6b606/Parser/action_helpers.c#L1150-L1180
+    match expr {
+        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            elts.iter().all(is_valid_del_target)
+        }
+        Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) => true,
+        _ => false,
+    }
+}
+
 /// Converts a [`TokenKind`] array of size 2 to its correspondent [`CmpOp`].
 pub(super) fn token_kind_to_cmp_op(kind: [TokenKind; 2]) -> Result<CmpOp, ()> {
     Ok(match kind {
