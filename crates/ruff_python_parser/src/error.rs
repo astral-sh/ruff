@@ -94,11 +94,13 @@ pub enum ParseErrorType {
     /// An empty slice was found during parsing, e.g `l[]`.
     EmptySlice,
     /// An invalid expression was found in the assignment `target`.
-    AssignmentError,
+    InvalidAssignmentTarget,
     /// An invalid expression was found in the named assignment `target`.
-    NamedAssignmentError,
+    InvalidNamedAssignmentTarget,
     /// An invalid expression was found in the augmented assignment `target`.
-    AugAssignmentError,
+    InvalidAugmentedAssignmentTarget,
+    /// An invalid expression was found in the delete `target`.
+    InvalidDeleteTarget,
     /// Multiple simple statements were found in the same line without a `;` separating them.
     SimpleStmtsInSameLine,
     /// An unexpected indentation was found during parsing.
@@ -182,9 +184,16 @@ impl std::fmt::Display for ParseErrorType {
                 write!(f, "invalid pattern `{pattern:?}`")
             }
             ParseErrorType::UnexpectedIndentation => write!(f, "unexpected indentation"),
-            ParseErrorType::AssignmentError => write!(f, "invalid assignment target"),
-            ParseErrorType::NamedAssignmentError => write!(f, "invalid assignment target"),
-            ParseErrorType::AugAssignmentError => write!(f, "invalid augmented assignment target"),
+            ParseErrorType::InvalidAssignmentTarget => write!(f, "invalid assignment target"),
+            ParseErrorType::InvalidNamedAssignmentTarget => {
+                write!(f, "invalid named assignment target")
+            }
+            ParseErrorType::InvalidAugmentedAssignmentTarget => {
+                write!(f, "invalid augmented assignment target")
+            }
+            ParseErrorType::InvalidDeleteTarget => {
+                write!(f, "invalid delete target")
+            }
             ParseErrorType::DuplicateArgumentError(arg_name) => {
                 write!(f, "duplicate argument '{arg_name}' in function definition")
             }
