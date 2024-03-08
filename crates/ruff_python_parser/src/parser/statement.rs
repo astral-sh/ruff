@@ -8,8 +8,8 @@ use ruff_text_size::{Ranged, TextSize};
 use crate::parser::expression::ParsedExpr;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
-    helpers, FunctionKind, Parser, ParserCtxFlags, RecoveryContext, RecoveryContextKind, EXPR_SET,
-    LITERAL_SET,
+    helpers, FunctionKind, Parser, ParserCtxFlags, RecoveryContext, RecoveryContextKind,
+    WithItemKind, EXPR_SET, LITERAL_SET,
 };
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, Tok, TokenKind};
@@ -70,7 +70,7 @@ const AUGMENTED_ASSIGN_SET: TokenSet = TokenSet::new([
 ]);
 
 impl<'src> Parser<'src> {
-    fn at_compound_stmt(&self) -> bool {
+    pub(super) fn at_compound_stmt(&self) -> bool {
         self.at_ts(COMPOUND_STMT_SET)
     }
 
@@ -78,7 +78,7 @@ impl<'src> Parser<'src> {
         self.at_ts(SIMPLE_STMT_SET2)
     }
 
-    pub(super) fn is_at_stmt(&self) -> bool {
+    pub(super) fn at_stmt(&self) -> bool {
         self.at_ts(STMTS_SET)
     }
 
@@ -239,31 +239,34 @@ impl<'src> Parser<'src> {
     /// Parses a delete statement.
     ///
     /// # Panics
+    ///
     /// If the parser isn't positioned at a `del` token.
+    ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-del_stmt>
     fn parse_delete_statement(&mut self) -> ast::StmtDelete {
         let start = self.node_start();
-
         self.bump(TokenKind::Del);
-        let mut targets = vec![];
 
-        #[allow(deprecated)]
-        self.parse_separated(true, TokenKind::Comma, [TokenKind::Newline], |parser| {
-            let mut target = parser.parse_conditional_expression_or_higher();
-            helpers::set_expr_ctx(&mut target.expr, ExprContext::Del);
+        let targets = self.parse_comma_separated_list_into_vec(
+            RecoveryContextKind::DeleteTargets,
+            |parser| {
+                let mut target = parser.parse_conditional_expression_or_higher();
+                helpers::set_expr_ctx(&mut target.expr, ExprContext::Del);
 
-            if matches!(target.expr, Expr::BoolOp(_) | Expr::Compare(_)) {
-                // Should we make `target` an `Expr::Invalid` here?
-                parser.add_error(
-                    ParseErrorType::OtherError(format!(
-                        "`{}` not allowed in `del` statement",
-                        parser.src_text(&target.expr)
-                    )),
-                    &target.expr,
-                );
-            }
-            targets.push(target.expr);
-        });
+                // TODO(dhruvmanila): There are more restrictions on the targets here.
+                if matches!(target.expr, Expr::BoolOp(_) | Expr::Compare(_)) {
+                    parser.add_error(
+                        ParseErrorType::OtherError(format!(
+                            "`{}` not allowed in `del` statement",
+                            parser.src_text(&target.expr)
+                        )),
+                        &target.expr,
+                    );
+                }
+                target.expr
+            },
+            true,
+        );
 
         ast::StmtDelete {
             targets,
@@ -337,16 +340,25 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses an import statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at an `import` token.
+    ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-import_stmt>
     fn parse_import_statement(&mut self) -> ast::StmtImport {
         let start = self.node_start();
         self.bump(TokenKind::Import);
 
-        let mut names = vec![];
-        #[allow(deprecated)]
-        self.parse_separated(false, TokenKind::Comma, [TokenKind::Newline], |parser| {
-            names.push(parser.parse_alias());
-        });
+        let names = self.parse_comma_separated_list_into_vec(
+            RecoveryContextKind::ImportNames,
+            Parser::parse_alias,
+            // `import a, b,` isn't allowed.
+            false,
+        );
+
+        // TODO(dhruvmanila): Error when `*` is used
 
         ast::StmtImport {
             range: self.node_range(start),
@@ -354,6 +366,13 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a `from` import statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `from` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-import_stmt>
     fn parse_from_import_statement(&mut self) -> ast::StmtImportFrom {
         const DOT_ELLIPSIS_SET: TokenSet = TokenSet::new([TokenKind::Dot, TokenKind::Ellipsis]);
 
@@ -391,8 +410,14 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::Import);
 
         let parenthesized = self.eat(TokenKind::Lpar);
-        let names =
-            self.parse_delimited_list(RecoveryContextKind::ImportNames, Parser::parse_alias, true);
+
+        let names = self.parse_comma_separated_list_into_vec(
+            RecoveryContextKind::ImportFromAsNames,
+            Parser::parse_alias,
+            true,
+        );
+
+        // TODO(dhruvmanila): Error when `*` is mixed with other names.
 
         if parenthesized {
             self.expect(TokenKind::Rpar);
@@ -451,16 +476,22 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a global statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `global` token.
+    ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-global_stmt>
     fn parse_global_statement(&mut self) -> ast::StmtGlobal {
         let start = self.node_start();
         self.bump(TokenKind::Global);
 
-        let mut names = vec![];
-        #[allow(deprecated)]
-        self.parse_separated(false, TokenKind::Comma, [TokenKind::Newline], |parser| {
-            names.push(parser.parse_identifier());
-        });
+        let names = self.parse_comma_separated_list_into_vec(
+            RecoveryContextKind::Identifiers,
+            Parser::parse_identifier,
+            false,
+        );
 
         ast::StmtGlobal {
             range: self.node_range(start),
@@ -468,16 +499,22 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a nonlocal statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `nonlocal` token.
+    ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-nonlocal_stmt>
     fn parse_nonlocal_statement(&mut self) -> ast::StmtNonlocal {
         let start = self.node_start();
         self.bump(TokenKind::Nonlocal);
 
-        let mut names = vec![];
-        #[allow(deprecated)]
-        self.parse_separated(false, TokenKind::Comma, [TokenKind::Newline], |parser| {
-            names.push(parser.parse_identifier());
-        });
+        let names = self.parse_comma_separated_list_into_vec(
+            RecoveryContextKind::Identifiers,
+            Parser::parse_identifier,
+            false,
+        );
 
         ast::StmtNonlocal {
             range: self.node_range(start),
@@ -541,10 +578,10 @@ impl<'src> Parser<'src> {
         let mut value = self.parse_expression();
 
         if self.at(TokenKind::Equal) {
-            self.parse_sequence(RecoveryContextKind::AssignmentTargets, |p| {
-                p.bump(TokenKind::Equal);
+            self.parse_list(RecoveryContextKind::AssignmentTargets, |parser| {
+                parser.bump(TokenKind::Equal);
 
-                let mut parsed_expr = p.parse_expression();
+                let mut parsed_expr = parser.parse_expression();
 
                 std::mem::swap(&mut value, &mut parsed_expr);
 
@@ -948,6 +985,9 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a list of with items.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-with_stmt_contents>
     fn parse_with_items(&mut self) -> Vec<ast::WithItem> {
         let mut items = vec![];
 
@@ -1042,29 +1082,33 @@ impl<'src> Parser<'src> {
             }
         }
 
-        if !treat_it_as_expr && has_seen_lpar {
+        let with_item_kind = if has_seen_lpar {
+            if treat_it_as_expr {
+                WithItemKind::ParenthesizedExpression
+            } else {
+                WithItemKind::Parenthesized
+            }
+        } else {
+            WithItemKind::Unparenthesized
+        };
+
+        if with_item_kind == WithItemKind::Parenthesized {
             self.bump(TokenKind::Lpar);
         }
 
-        let ending = if has_seen_lpar && treat_it_as_expr {
-            [TokenKind::Colon]
-        } else {
-            [TokenKind::Rpar]
-        };
-
         let mut is_last_parenthesized = false;
-        #[allow(deprecated)]
-        self.parse_separated(
-            // Only allow a trailing delimiter if we've seen a `(`.
-            has_seen_lpar,
-            TokenKind::Comma,
-            ending,
+
+        self.parse_comma_separated_list(
+            RecoveryContextKind::WithItems(with_item_kind),
             |parser| {
                 let parsed_with_item = parser.parse_with_item();
                 is_last_parenthesized = parsed_with_item.is_parenthesized;
                 items.push(parsed_with_item.item);
             },
+            // Only allow a trailing comma if the with item itself is parenthesized
+            with_item_kind == WithItemKind::Parenthesized,
         );
+
         // Special-case: if we have a parenthesized `WithItem` that was parsed as
         // an expression, then the item should _exclude_ the outer parentheses in
         // its range. For example:
@@ -1086,7 +1130,7 @@ impl<'src> Parser<'src> {
             }
         }
 
-        if !treat_it_as_expr && has_seen_lpar {
+        if with_item_kind == WithItemKind::Parenthesized {
             self.expect(TokenKind::Rpar);
         }
 
@@ -1336,7 +1380,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Indent);
 
         let statements =
-            self.parse_list(RecoveryContextKind::BlockStatements, Self::parse_statement);
+            self.parse_list_into_vec(RecoveryContextKind::BlockStatements, Self::parse_statement);
 
         self.expect(TokenKind::Dedent);
 
@@ -1380,6 +1424,9 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a parameter list.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-parameter_list>
     pub(super) fn parse_parameters(&mut self, function_kind: FunctionKind) -> ast::Parameters {
         let mut args = vec![];
         let mut posonlyargs = vec![];
@@ -1399,71 +1446,74 @@ impl<'src> Parser<'src> {
         let ending_set = TokenSet::new([TokenKind::Rarrow, ending]).union(COMPOUND_STMT_SET);
         let start = self.node_start();
 
-        #[allow(deprecated)]
-        self.parse_separated(true, TokenKind::Comma, ending_set, |parser| {
-            // Don't allow any parameter after we have seen a vararg `**kwargs`
-            if has_seen_vararg {
-                parser.add_error(
-                    ParseErrorType::ParamFollowsVarKeywordParam,
-                    parser.current_token_range(),
-                );
-            }
+        self.parse_comma_separated_list(
+            RecoveryContextKind::Parameters(function_kind),
+            |parser| {
+                // Don't allow any parameter after we have seen a vararg `**kwargs`
+                if has_seen_vararg {
+                    parser.add_error(
+                        ParseErrorType::ParamFollowsVarKeywordParam,
+                        parser.current_token_range(),
+                    );
+                }
 
-            if parser.eat(TokenKind::Star) {
-                has_seen_asterisk = true;
-                if parser.at(TokenKind::Comma) {
-                    has_seen_default_param = false;
-                } else if parser.at_expr() {
+                if parser.eat(TokenKind::Star) {
+                    has_seen_asterisk = true;
+                    if parser.at(TokenKind::Comma) {
+                        has_seen_default_param = false;
+                    } else if parser.at_expr() {
+                        let param = parser.parse_parameter(function_kind);
+                        vararg = Some(Box::new(param));
+                    }
+                } else if parser.eat(TokenKind::DoubleStar) {
+                    has_seen_vararg = true;
                     let param = parser.parse_parameter(function_kind);
-                    vararg = Some(Box::new(param));
-                }
-            } else if parser.eat(TokenKind::DoubleStar) {
-                has_seen_vararg = true;
-                let param = parser.parse_parameter(function_kind);
-                kwarg = Some(Box::new(param));
-            } else if parser.eat(TokenKind::Slash) {
-                // Don't allow `/` after a `*`
-                if has_seen_asterisk {
-                    parser.add_error(
-                        ParseErrorType::OtherError("`/` must be ahead of `*`".to_string()),
-                        parser.current_token_range(),
-                    );
-                }
-                std::mem::swap(&mut args, &mut posonlyargs);
-            } else if parser.at(TokenKind::Name) {
-                let param = parser.parse_parameter_with_default(function_kind);
-                // Don't allow non-default parameters after default parameters e.g. `a=1, b`,
-                // can't place `b` after `a=1`. Non-default parameters are only allowed after
-                // default parameters if we have a `*` before them, e.g. `a=1, *, b`.
-                if param.default.is_none() && has_seen_default_param && !has_seen_asterisk {
-                    parser.add_error(
-                        ParseErrorType::DefaultArgumentError,
-                        parser.current_token_range(),
-                    );
-                }
-                has_seen_default_param = param.default.is_some();
+                    kwarg = Some(Box::new(param));
+                } else if parser.eat(TokenKind::Slash) {
+                    // Don't allow `/` after a `*`
+                    if has_seen_asterisk {
+                        parser.add_error(
+                            ParseErrorType::OtherError("`/` must be ahead of `*`".to_string()),
+                            parser.current_token_range(),
+                        );
+                    }
+                    std::mem::swap(&mut args, &mut posonlyargs);
+                } else if parser.at(TokenKind::Name) {
+                    let param = parser.parse_parameter_with_default(function_kind);
+                    // Don't allow non-default parameters after default parameters e.g. `a=1, b`,
+                    // can't place `b` after `a=1`. Non-default parameters are only allowed after
+                    // default parameters if we have a `*` before them, e.g. `a=1, *, b`.
+                    if param.default.is_none() && has_seen_default_param && !has_seen_asterisk {
+                        parser.add_error(
+                            ParseErrorType::DefaultArgumentError,
+                            parser.current_token_range(),
+                        );
+                    }
+                    has_seen_default_param = param.default.is_some();
 
-                if has_seen_asterisk {
-                    kwonlyargs.push(param);
+                    if has_seen_asterisk {
+                        kwonlyargs.push(param);
+                    } else {
+                        args.push(param);
+                    }
                 } else {
-                    args.push(param);
-                }
-            } else {
-                if parser.at_ts(SIMPLE_STMT_SET) {
-                    return;
-                }
+                    if parser.at_ts(SIMPLE_STMT_SET) {
+                        return;
+                    }
 
-                let range = parser.current_token_range();
-                #[allow(deprecated)]
-                parser.skip_until(
-                    ending_set.union(TokenSet::new([TokenKind::Comma, TokenKind::Colon])),
-                );
-                parser.add_error(
-                    ParseErrorType::OtherError("expected parameter".to_string()),
-                    range.cover(parser.current_token_range()), // TODO(micha): This goes one token too far?
-                );
-            }
-        });
+                    let range = parser.current_token_range();
+                    #[allow(deprecated)]
+                    parser.skip_until(
+                        ending_set.union(TokenSet::new([TokenKind::Comma, TokenKind::Colon])),
+                    );
+                    parser.add_error(
+                        ParseErrorType::OtherError("expected parameter".to_string()),
+                        range.cover(parser.current_token_range()), // TODO(micha): This goes one token too far?
+                    );
+                }
+            },
+            true,
+        );
 
         let parameters = ast::Parameters {
             range: self.node_range(start),
@@ -1481,12 +1531,27 @@ impl<'src> Parser<'src> {
         parameters
     }
 
+    /// Try to parse a type parameter list. If the parser is not at the start of a
+    /// type parameter list, return `None`.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#type-parameter-lists>
+    fn try_parse_type_params(&mut self) -> Option<ast::TypeParams> {
+        self.at(TokenKind::Lsqb).then(|| self.parse_type_params())
+    }
+
+    /// Parses a type parameter list.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `[` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#type-parameter-lists>
     fn parse_type_params(&mut self) -> ast::TypeParams {
         let start = self.node_start();
 
         self.bump(TokenKind::Lsqb);
 
-        let type_params = self.parse_delimited_list(
+        let type_params = self.parse_comma_separated_list_into_vec(
             RecoveryContextKind::TypeParams,
             Parser::parse_type_param,
             true,
@@ -1500,17 +1565,17 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn try_parse_type_params(&mut self) -> Option<ast::TypeParams> {
-        self.at(TokenKind::Lsqb).then(|| self.parse_type_params())
-    }
-
-    pub(super) fn is_at_type_param(&self) -> bool {
+    /// Checks if the parser is currently positioned at the start of a type parameter.
+    pub(super) fn at_type_param(&self) -> bool {
         matches!(
             self.current_token_kind(),
             TokenKind::Star | TokenKind::DoubleStar | TokenKind::Name
         ) || self.current_token_kind().is_keyword()
     }
 
+    /// Parses a type parameter.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-type_param>
     fn parse_type_param(&mut self) -> ast::TypeParam {
         let start = self.node_start();
 
