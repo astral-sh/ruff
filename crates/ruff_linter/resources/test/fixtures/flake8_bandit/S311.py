@@ -15,6 +15,7 @@ random.choice()
 random.choices()
 random.uniform()
 random.triangular()
+random.randbytes()
 
 # Unrelated
 os.urandom()
