@@ -487,8 +487,6 @@ where
             Pattern::MatchStar(pattern) => pattern.visit_preorder(visitor),
             Pattern::MatchAs(pattern) => pattern.visit_preorder(visitor),
             Pattern::MatchOr(pattern) => pattern.visit_preorder(visitor),
-            #[allow(deprecated)]
-            Pattern::Invalid(_) => {}
         }
     }
     visitor.leave_node(node);
