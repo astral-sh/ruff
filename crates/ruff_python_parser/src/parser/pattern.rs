@@ -573,10 +573,9 @@ impl<'src> Parser<'src> {
                     has_seen_pattern = false;
                     has_seen_keyword_pattern = true;
 
-                    // Even in case the key pattern is invalid, we still need to parse
-                    // the value pattern to move the parser forward.
                     let value_pattern = parser.parse_match_pattern();
 
+                    // Key can only be an identifier
                     if let Pattern::MatchAs(ast::PatternMatchAs {
                         name: Some(attr), ..
                     }) = pattern
@@ -587,6 +586,16 @@ impl<'src> Parser<'src> {
                             range: parser.node_range(pattern_start),
                         });
                     } else {
+                        // In case it's not a valid keyword pattern, we'll add an empty identifier
+                        // to indicate that. This is to avoid dropping the parsed value pattern.
+                        keywords.push(ast::PatternKeyword {
+                            attr: ast::Identifier {
+                                id: String::new(),
+                                range: parser.missing_node_range(),
+                            },
+                            pattern: value_pattern,
+                            range: parser.node_range(pattern_start),
+                        });
                         parser.add_error(
                             ParseErrorType::OtherError("Invalid keyword pattern".to_string()),
                             parser.node_range(pattern_start),
