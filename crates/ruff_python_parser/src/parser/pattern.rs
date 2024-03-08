@@ -514,7 +514,7 @@ impl<'src> Parser<'src> {
                     Expr::Name(self.parse_name())
                 } else {
                     self.add_error(
-                        ParseErrorType::OtherError("Expression expected.".to_string()),
+                        ParseErrorType::OtherError("Expected a pattern".to_string()),
                         self.current_token_range(),
                     );
                     Expr::Name(ast::ExprName {
@@ -573,22 +573,22 @@ impl<'src> Parser<'src> {
                     has_seen_pattern = false;
                     has_seen_keyword_pattern = true;
 
+                    // Even in case the key pattern is invalid, we still need to parse
+                    // the value pattern to move the parser forward.
+                    let value_pattern = parser.parse_match_pattern();
+
                     if let Pattern::MatchAs(ast::PatternMatchAs {
                         name: Some(attr), ..
                     }) = pattern
                     {
-                        let pattern = parser.parse_match_pattern();
-
                         keywords.push(ast::PatternKeyword {
                             attr,
-                            pattern,
+                            pattern: value_pattern,
                             range: parser.node_range(pattern_start),
                         });
                     } else {
-                        #[allow(deprecated)]
-                        parser.skip_until(super::expression::END_EXPR_SET);
                         parser.add_error(
-                            ParseErrorType::OtherError("`not valid keyword pattern".to_string()),
+                            ParseErrorType::OtherError("Invalid keyword pattern".to_string()),
                             parser.node_range(pattern_start),
                         );
                     }
