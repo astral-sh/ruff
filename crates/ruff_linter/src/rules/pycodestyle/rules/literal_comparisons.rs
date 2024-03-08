@@ -141,9 +141,8 @@ impl AlwaysFixableViolation for TrueFalseComparison {
 
     fn fix_title(&self) -> String {
         let TrueFalseComparison { value, op, cond } = self;
-        let cond = match cond {
-            Some(cond) if cond.full_display().is_some() => cond.full_display().unwrap().to_string(),
-            _ => return "Replace comparison".to_string(),
+        let Some(cond) = cond.as_ref().and_then(|cond| cond.full_display()) else {
+            return "Replace comparison".to_string();
         };
         match (value, op) {
             (true, EqCmpOp::Eq) => format!("Replace with `{cond}`"),
@@ -193,7 +192,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                 if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = comparator {
                     match op {
                         EqCmpOp::Eq => {
-                            let cond = if compare.ops.len() < 2 {
+                            let cond = if compare.ops.len() == 1 {
                                 Some(SourceCodeSnippet::from_str(checker.locator().slice(next)))
                             } else {
                                 None
@@ -210,7 +209,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                             diagnostics.push(diagnostic);
                         }
                         EqCmpOp::NotEq => {
-                            let cond = if compare.ops.len() < 2 {
+                            let cond = if compare.ops.len() == 1 {
                                 Some(SourceCodeSnippet::from_str(checker.locator().slice(next)))
                             } else {
                                 None
@@ -264,7 +263,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                 if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = next {
                     match op {
                         EqCmpOp::Eq => {
-                            let cond = if compare.ops.len() < 2 {
+                            let cond = if compare.ops.len() == 1 {
                                 Some(SourceCodeSnippet::from_str(
                                     checker.locator().slice(comparator),
                                 ))
@@ -283,7 +282,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                             diagnostics.push(diagnostic);
                         }
                         EqCmpOp::NotEq => {
-                            let cond = if compare.ops.len() < 2 {
+                            let cond = if compare.ops.len() == 1 {
                                 Some(SourceCodeSnippet::from_str(
                                     checker.locator().slice(comparator),
                                 ))
