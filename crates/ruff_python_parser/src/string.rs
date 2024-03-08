@@ -308,6 +308,7 @@ impl StringParser {
             return Ok(StringType::Bytes(ast::BytesLiteral {
                 value: self.source.into_boxed_bytes(),
                 range: self.range,
+                flags: self.kind.into(),
             }));
         }
 
@@ -316,6 +317,7 @@ impl StringParser {
             return Ok(StringType::Bytes(ast::BytesLiteral {
                 value: self.source.into_boxed_bytes(),
                 range: self.range,
+                flags: self.kind.into(),
             }));
         };
 
@@ -352,6 +354,7 @@ impl StringParser {
         Ok(StringType::Bytes(ast::BytesLiteral {
             value: value.into_boxed_slice(),
             range: self.range,
+            flags: self.kind.into(),
         }))
     }
 
@@ -360,8 +363,8 @@ impl StringParser {
             // For raw strings, no escaping is necessary.
             return Ok(StringType::Str(ast::StringLiteral {
                 value: self.source,
-                unicode: self.kind.is_u_string(),
                 range: self.range,
+                flags: self.kind.into(),
             }));
         }
 
@@ -369,8 +372,8 @@ impl StringParser {
             // If the string doesn't contain any escape sequences, return the owned string.
             return Ok(StringType::Str(ast::StringLiteral {
                 value: self.source,
-                unicode: self.kind.is_u_string(),
                 range: self.range,
+                flags: self.kind.into(),
             }));
         };
 
@@ -406,8 +409,8 @@ impl StringParser {
 
         Ok(StringType::Str(ast::StringLiteral {
             value: value.into_boxed_str(),
-            unicode: self.kind.is_u_string(),
             range: self.range,
+            flags: self.kind.into(),
         }))
     }
 
