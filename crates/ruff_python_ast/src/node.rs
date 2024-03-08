@@ -102,7 +102,6 @@ pub enum AnyNode {
     PatternMatchOr(ast::PatternMatchOr),
     PatternArguments(PatternArguments),
     PatternKeyword(PatternKeyword),
-    PatternMatchInvalid(ast::PatternMatchInvalid),
     Comprehension(Comprehension),
     Arguments(Arguments),
     Parameters(Parameters),
@@ -202,7 +201,6 @@ impl AnyNode {
             | AnyNode::PatternMatchOr(_)
             | AnyNode::PatternArguments(_)
             | AnyNode::PatternKeyword(_)
-            | AnyNode::PatternMatchInvalid(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
@@ -303,7 +301,6 @@ impl AnyNode {
             | AnyNode::PatternMatchOr(_)
             | AnyNode::PatternArguments(_)
             | AnyNode::PatternKeyword(_)
-            | AnyNode::PatternMatchInvalid(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
@@ -403,7 +400,6 @@ impl AnyNode {
             | AnyNode::PatternMatchOr(_)
             | AnyNode::PatternArguments(_)
             | AnyNode::PatternKeyword(_)
-            | AnyNode::PatternMatchInvalid(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
@@ -435,8 +431,6 @@ impl AnyNode {
             AnyNode::PatternMatchStar(node) => Some(Pattern::MatchStar(node)),
             AnyNode::PatternMatchAs(node) => Some(Pattern::MatchAs(node)),
             AnyNode::PatternMatchOr(node) => Some(Pattern::MatchOr(node)),
-            #[allow(deprecated)]
-            AnyNode::PatternMatchInvalid(node) => Some(Pattern::Invalid(node)),
 
             AnyNode::ModModule(_)
             | AnyNode::ModExpression(_)
@@ -604,7 +598,6 @@ impl AnyNode {
             | AnyNode::PatternMatchOr(_)
             | AnyNode::PatternArguments(_)
             | AnyNode::PatternKeyword(_)
-            | AnyNode::PatternMatchInvalid(_)
             | AnyNode::Comprehension(_)
             | AnyNode::Arguments(_)
             | AnyNode::Parameters(_)
@@ -723,7 +716,6 @@ impl AnyNode {
             Self::PatternMatchOr(node) => AnyNodeRef::PatternMatchOr(node),
             Self::PatternArguments(node) => AnyNodeRef::PatternArguments(node),
             Self::PatternKeyword(node) => AnyNodeRef::PatternKeyword(node),
-            Self::PatternMatchInvalid(node) => AnyNodeRef::PatternMatchInvalid(node),
             Self::Comprehension(node) => AnyNodeRef::Comprehension(node),
             Self::Arguments(node) => AnyNodeRef::Arguments(node),
             Self::Parameters(node) => AnyNodeRef::Parameters(node),
@@ -3854,40 +3846,6 @@ impl AstNode for PatternKeyword {
         visitor.visit_pattern(pattern);
     }
 }
-impl AstNode for ast::PatternMatchInvalid {
-    fn cast(kind: AnyNode) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        if let AnyNode::PatternMatchInvalid(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::PatternMatchInvalid(node) = kind {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
-    fn as_any_node_ref(&self) -> AnyNodeRef {
-        AnyNodeRef::from(self)
-    }
-
-    fn into_any_node(self) -> AnyNode {
-        AnyNode::from(self)
-    }
-
-    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
-    where
-        V: PreorderVisitor<'a> + ?Sized,
-    {
-    }
-}
 
 impl AstNode for Comprehension {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -4705,8 +4663,6 @@ impl From<Pattern> for AnyNode {
             Pattern::MatchStar(node) => AnyNode::PatternMatchStar(node),
             Pattern::MatchAs(node) => AnyNode::PatternMatchAs(node),
             Pattern::MatchOr(node) => AnyNode::PatternMatchOr(node),
-            #[allow(deprecated)]
-            Pattern::Invalid(node) => AnyNode::PatternMatchInvalid(node),
         }
     }
 }
@@ -5157,12 +5113,6 @@ impl From<ast::PatternMatchOr> for AnyNode {
     }
 }
 
-impl From<ast::PatternMatchInvalid> for AnyNode {
-    fn from(node: ast::PatternMatchInvalid) -> Self {
-        AnyNode::PatternMatchInvalid(node)
-    }
-}
-
 impl From<PatternArguments> for AnyNode {
     fn from(node: PatternArguments) -> Self {
         AnyNode::PatternArguments(node)
@@ -5344,7 +5294,6 @@ impl Ranged for AnyNode {
             AnyNode::PatternMatchOr(node) => node.range(),
             AnyNode::PatternArguments(node) => node.range(),
             AnyNode::PatternKeyword(node) => node.range(),
-            AnyNode::PatternMatchInvalid(node) => node.range(),
             AnyNode::Comprehension(node) => node.range(),
             AnyNode::Arguments(node) => node.range(),
             AnyNode::Parameters(node) => node.range(),
@@ -5444,7 +5393,6 @@ pub enum AnyNodeRef<'a> {
     PatternMatchOr(&'a ast::PatternMatchOr),
     PatternArguments(&'a ast::PatternArguments),
     PatternKeyword(&'a ast::PatternKeyword),
-    PatternMatchInvalid(&'a ast::PatternMatchInvalid),
     Comprehension(&'a Comprehension),
     Arguments(&'a Arguments),
     Parameters(&'a Parameters),
@@ -5543,7 +5491,6 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::PatternMatchOr(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternArguments(node) => NonNull::from(*node).cast(),
             AnyNodeRef::PatternKeyword(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::PatternMatchInvalid(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Comprehension(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Arguments(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Parameters(node) => NonNull::from(*node).cast(),
@@ -5648,7 +5595,6 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::PatternMatchOr(_) => NodeKind::PatternMatchOr,
             AnyNodeRef::PatternArguments(_) => NodeKind::PatternArguments,
             AnyNodeRef::PatternKeyword(_) => NodeKind::PatternKeyword,
-            AnyNodeRef::PatternMatchInvalid(_) => NodeKind::PatternInvalid,
             AnyNodeRef::Comprehension(_) => NodeKind::Comprehension,
             AnyNodeRef::Arguments(_) => NodeKind::Arguments,
             AnyNodeRef::Parameters(_) => NodeKind::Parameters,
@@ -5748,7 +5694,6 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::PatternArguments(_)
             | AnyNodeRef::PatternKeyword(_)
-            | AnyNodeRef::PatternMatchInvalid(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
@@ -5848,7 +5793,6 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::PatternArguments(_)
             | AnyNodeRef::PatternKeyword(_)
-            | AnyNodeRef::PatternMatchInvalid(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
@@ -5947,7 +5891,6 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::PatternArguments(_)
             | AnyNodeRef::PatternKeyword(_)
-            | AnyNodeRef::PatternMatchInvalid(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
@@ -5978,8 +5921,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::PatternMatchClass(_)
             | AnyNodeRef::PatternMatchStar(_)
             | AnyNodeRef::PatternMatchAs(_)
-            | AnyNodeRef::PatternMatchOr(_)
-            | AnyNodeRef::PatternMatchInvalid(_) => true,
+            | AnyNodeRef::PatternMatchOr(_) => true,
 
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModExpression(_)
@@ -6147,7 +6089,6 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::PatternMatchOr(_)
             | AnyNodeRef::PatternArguments(_)
             | AnyNodeRef::PatternKeyword(_)
-            | AnyNodeRef::PatternMatchInvalid(_)
             | AnyNodeRef::Comprehension(_)
             | AnyNodeRef::Arguments(_)
             | AnyNodeRef::Parameters(_)
@@ -6258,7 +6199,6 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::PatternMatchOr(node) => node.visit_preorder(visitor),
             AnyNodeRef::PatternArguments(node) => node.visit_preorder(visitor),
             AnyNodeRef::PatternKeyword(node) => node.visit_preorder(visitor),
-            AnyNodeRef::PatternMatchInvalid(_) => {}
             AnyNodeRef::Comprehension(node) => node.visit_preorder(visitor),
             AnyNodeRef::Arguments(node) => node.visit_preorder(visitor),
             AnyNodeRef::Parameters(node) => node.visit_preorder(visitor),
@@ -6894,12 +6834,6 @@ impl<'a> From<&'a ast::PatternMatchOr> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::PatternMatchInvalid> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::PatternMatchInvalid) -> Self {
-        AnyNodeRef::PatternMatchInvalid(node)
-    }
-}
-
 impl<'a> From<&'a ast::PatternArguments> for AnyNodeRef<'a> {
     fn from(node: &'a ast::PatternArguments) -> Self {
         AnyNodeRef::PatternArguments(node)
@@ -7063,8 +6997,6 @@ impl<'a> From<&'a Pattern> for AnyNodeRef<'a> {
             Pattern::MatchStar(node) => AnyNodeRef::PatternMatchStar(node),
             Pattern::MatchAs(node) => AnyNodeRef::PatternMatchAs(node),
             Pattern::MatchOr(node) => AnyNodeRef::PatternMatchOr(node),
-            #[allow(deprecated)]
-            Pattern::Invalid(node) => AnyNodeRef::PatternMatchInvalid(node),
         }
     }
 }
@@ -7213,7 +7145,6 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchOr(node) => node.range(),
             AnyNodeRef::PatternArguments(node) => node.range(),
             AnyNodeRef::PatternKeyword(node) => node.range(),
-            AnyNodeRef::PatternMatchInvalid(node) => node.range(),
             AnyNodeRef::Comprehension(node) => node.range(),
             AnyNodeRef::Arguments(node) => node.range(),
             AnyNodeRef::Parameters(node) => node.range(),
@@ -7315,7 +7246,6 @@ pub enum NodeKind {
     PatternMatchOr,
     PatternArguments,
     PatternKeyword,
-    PatternInvalid,
     TypeIgnoreTypeIgnore,
     Comprehension,
     Arguments,
