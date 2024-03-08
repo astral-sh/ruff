@@ -1436,12 +1436,6 @@ impl<'src> Parser<'src> {
         let mut has_seen_vararg = false;
         let mut has_seen_default_param = false;
 
-        let ending = match function_kind {
-            FunctionKind::Lambda => TokenKind::Colon,
-            FunctionKind::FunctionDef => TokenKind::Rpar,
-        };
-
-        let ending_set = TokenSet::new([TokenKind::Rarrow, ending]).union(COMPOUND_STMT_SET);
         let start = self.node_start();
 
         self.parse_comma_separated_list(
@@ -1494,20 +1488,6 @@ impl<'src> Parser<'src> {
                     } else {
                         args.push(param);
                     }
-                } else {
-                    if parser.at_ts(SIMPLE_STMT_SET) {
-                        return;
-                    }
-
-                    let range = parser.current_token_range();
-                    #[allow(deprecated)]
-                    parser.skip_until(
-                        ending_set.union(TokenSet::new([TokenKind::Comma, TokenKind::Colon])),
-                    );
-                    parser.add_error(
-                        ParseErrorType::OtherError("expected parameter".to_string()),
-                        range.cover(parser.current_token_range()), // TODO(micha): This goes one token too far?
-                    );
                 }
             },
             true,
