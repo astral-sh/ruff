@@ -287,8 +287,6 @@ impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
                     patterns: patterns.iter().map(Into::into).collect(),
                 })
             }
-            #[allow(deprecated)]
-            ast::Pattern::Invalid(_) => Self::Invalid,
         }
     }
 }

@@ -706,8 +706,6 @@ pub fn walk_pattern<V: Transformer + ?Sized>(visitor: &V, pattern: &mut Pattern)
                 visitor.visit_pattern(pattern);
             }
         }
-        #[allow(deprecated)]
-        Pattern::Invalid(_) => {}
     }
 }
 
