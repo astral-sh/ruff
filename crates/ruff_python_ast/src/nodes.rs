@@ -1723,12 +1723,84 @@ impl Default for BytesLiteralValueInner {
     }
 }
 
+bitflags! {
+    #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
+    struct BytesLiteralFlagsInner: u8 {
+        /// The bytestring uses double quotes (`"`).
+        /// If this flag is not set, the bytestring uses single quotes (`'`).
+        const DOUBLE = 1 << 0;
+
+        /// The bytestring is triple-quoted:
+        /// it begins and ends with three consecutive quote characters.
+        const TRIPLE_QUOTED = 1 << 1;
+
+        /// The bytestring has an `r` or `R` prefix, meaning it is a raw bytestring.
+        const R_PREFIX = 1 << 3;
+    }
+}
+
+/// Flags that can be queried to obtain information
+/// regarding the prefixes and quotes used for a bytes literal.
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct BytesLiteralFlags(BytesLiteralFlagsInner);
+
+impl BytesLiteralFlags {
+    #[must_use]
+    pub fn with_double_quotes(mut self) -> Self {
+        self.0 |= BytesLiteralFlagsInner::DOUBLE;
+        self
+    }
+
+    #[must_use]
+    pub fn with_triple_quotes(mut self) -> Self {
+        self.0 |= BytesLiteralFlagsInner::TRIPLE_QUOTED;
+        self
+    }
+
+    #[must_use]
+    pub fn with_r_prefix(mut self) -> Self {
+        self.0 |= BytesLiteralFlagsInner::R_PREFIX;
+        self
+    }
+
+    /// Does the bytestring have an `r` or `R` prefix?
+    pub const fn is_raw(self) -> bool {
+        self.0.contains(BytesLiteralFlagsInner::R_PREFIX)
+    }
+
+    /// Is the bytestring triple-quoted, i.e.,
+    /// does it begin and end with three consecutive quote characters?
+    pub const fn is_triple_quoted(self) -> bool {
+        self.0.contains(BytesLiteralFlagsInner::TRIPLE_QUOTED)
+    }
+
+    /// Does the bytestring use single or double quotes in its opener and closer?
+    pub const fn quote_style(self) -> QuoteStyle {
+        if self.0.contains(BytesLiteralFlagsInner::DOUBLE) {
+            QuoteStyle::Double
+        } else {
+            QuoteStyle::Single
+        }
+    }
+}
+
+impl fmt::Debug for BytesLiteralFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BytesLiteralFlags")
+            .field("quote_style", &self.quote_style())
+            .field("raw", &self.is_raw())
+            .field("triple_quoted", &self.is_triple_quoted())
+            .finish()
+    }
+}
+
 /// An AST node that represents a single bytes literal which is part of an
 /// [`ExprBytesLiteral`].
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct BytesLiteral {
     pub range: TextRange,
     pub value: Box<[u8]>,
+    pub flags: BytesLiteralFlags,
 }
 
 impl Ranged for BytesLiteral {

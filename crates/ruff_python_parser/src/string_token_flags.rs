@@ -289,7 +289,7 @@ impl fmt::Debug for StringKind {
 }
 
 impl From<StringKind> for ruff_python_ast::StringLiteralFlags {
-    fn from(value: StringKind) -> Self {
+    fn from(value: StringKind) -> ruff_python_ast::StringLiteralFlags {
         debug_assert!(!value.is_f_string());
         debug_assert!(!value.is_byte_string());
 
@@ -310,5 +310,25 @@ impl From<StringKind> for ruff_python_ast::StringLiteralFlags {
                 StringLiteralPrefix::None
             }
         })
+    }
+}
+
+impl From<StringKind> for ruff_python_ast::BytesLiteralFlags {
+    fn from(value: StringKind) -> ruff_python_ast::BytesLiteralFlags {
+        debug_assert!(value.is_byte_string());
+        debug_assert!(!value.is_f_string());
+        debug_assert!(!value.is_u_string());
+
+        let mut new = ruff_python_ast::BytesLiteralFlags::default();
+        if value.quote_style().is_double() {
+            new = new.with_double_quotes();
+        }
+        if value.is_triple_quoted() {
+            new = new.with_triple_quotes();
+        }
+        if value.is_raw_string() {
+            new = new.with_r_prefix();
+        }
+        new
     }
 }

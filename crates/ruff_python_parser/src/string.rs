@@ -308,6 +308,7 @@ impl StringParser {
             return Ok(StringType::Bytes(ast::BytesLiteral {
                 value: self.source.into_boxed_bytes(),
                 range: self.range,
+                flags: self.kind.into(),
             }));
         }
 
@@ -316,6 +317,7 @@ impl StringParser {
             return Ok(StringType::Bytes(ast::BytesLiteral {
                 value: self.source.into_boxed_bytes(),
                 range: self.range,
+                flags: self.kind.into(),
             }));
         };
 
@@ -352,6 +354,7 @@ impl StringParser {
         Ok(StringType::Bytes(ast::BytesLiteral {
             value: value.into_boxed_slice(),
             range: self.range,
+            flags: self.kind.into(),
         }))
     }
 
