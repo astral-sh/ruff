@@ -2,7 +2,7 @@ use std::fmt;
 
 use bitflags::bitflags;
 
-use ruff_python_ast::{str::Quote, FStringPrefix, StringLiteralPrefix};
+use ruff_python_ast::{str::Quote, ByteStringPrefix, FStringPrefix, StringLiteralPrefix};
 use ruff_text_size::{TextLen, TextSize};
 
 bitflags! {
@@ -383,10 +383,6 @@ impl From<StringKind> for ruff_python_ast::StringLiteralFlags {
 
 impl From<StringKind> for ruff_python_ast::BytesLiteralFlags {
     fn from(value: StringKind) -> ruff_python_ast::BytesLiteralFlags {
-        debug_assert!(value.is_byte_string());
-        debug_assert!(!value.is_f_string());
-        debug_assert!(!value.is_u_string());
-
         let mut new = ruff_python_ast::BytesLiteralFlags::default();
         if value.quote_style().is_double() {
             new = new.with_double_quotes();
@@ -394,10 +390,16 @@ impl From<StringKind> for ruff_python_ast::BytesLiteralFlags {
         if value.is_triple_quoted() {
             new = new.with_triple_quotes();
         }
-        if value.is_raw_string() {
-            new = new.with_r_prefix();
-        }
-        new
+        new.with_prefix(match value.prefix() {
+            Some(StringPrefix::Bytes) => ByteStringPrefix::Regular,
+            Some(StringPrefix::RawBytes { uppercase_r: true }) => {
+                ByteStringPrefix::Raw { uppercase_r: true }
+            }
+            Some(StringPrefix::RawBytes { uppercase_r: false }) => {
+                ByteStringPrefix::Raw { uppercase_r: false }
+            }
+            _ => panic!("Attempting to convert a non-bytestring into a bytestring!"),
+        })
     }
 }
 

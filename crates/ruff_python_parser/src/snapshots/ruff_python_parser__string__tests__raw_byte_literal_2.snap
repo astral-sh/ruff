@@ -19,7 +19,7 @@ expression: parse_ast
                                 ],
                                 flags: BytesLiteralFlags {
                                     quote_style: Single,
-                                    raw: true,
+                                    prefix: "Rb",
                                     triple_quoted: false,
                                 },
                             },

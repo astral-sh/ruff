@@ -1920,16 +1920,57 @@ impl Default for BytesLiteralValueInner {
 bitflags! {
     #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
     struct BytesLiteralFlagsInner: u8 {
-        /// The bytestring uses double quotes (`"`).
-        /// If this flag is not set, the bytestring uses single quotes (`'`).
+        /// The bytestring uses double quotes (e.g. `b"foo"`).
+        /// If this flag is not set, the bytestring uses single quotes (e.g. `b'foo'`).
         const DOUBLE = 1 << 0;
 
-        /// The bytestring is triple-quoted:
+        /// The bytestring is triple-quoted (e.g. `b"""foo"""`):
         /// it begins and ends with three consecutive quote characters.
         const TRIPLE_QUOTED = 1 << 1;
 
-        /// The bytestring has an `r` or `R` prefix, meaning it is a raw bytestring.
-        const R_PREFIX = 1 << 3;
+        /// The bytestring has an `r` prefix (e.g. `rb"foo"`),
+        /// meaning it is a raw bytestring with a lowercase 'r'.
+        const R_PREFIX_LOWER = 1 << 2;
+
+        /// The bytestring has an `R` prefix (e.g. `Rb"foo"`),
+        /// meaning it is a raw bytestring with an uppercase 'R'.
+        /// See https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
+        /// for why we track the casing of the `r` prefix, but not for any other prefix
+        const R_PREFIX_UPPER = 1 << 3;
+    }
+}
+
+/// Enumeration of the valid prefixes a bytestring literal can have.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum ByteStringPrefix {
+    /// Just a regular bytestring with no other prefixes, e.g. `b"foo"`
+    Regular,
+
+    /// A "raw" bytestring, that has an `r` or `R` prefix,
+    /// e.g. `Rb"foo"` or `rb"foo"`
+    Raw { uppercase_r: bool },
+}
+
+impl ByteStringPrefix {
+    /// Return a `str` representation of the prefix
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Regular => "b",
+            Self::Raw { uppercase_r: true } => "Rb",
+            Self::Raw { uppercase_r: false } => "rb",
+        }
+    }
+
+    /// Return true if this prefix indicates a "raw bytestring",
+    /// e.g. `rb"foo"` or `Rb"foo"`
+    pub const fn is_raw(self) -> bool {
+        matches!(self, Self::Raw { .. })
+    }
+}
+
+impl fmt::Display for ByteStringPrefix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -1952,23 +1993,41 @@ impl BytesLiteralFlags {
     }
 
     #[must_use]
-    pub fn with_r_prefix(mut self) -> Self {
-        self.0 |= BytesLiteralFlagsInner::R_PREFIX;
+    pub fn with_prefix(mut self, prefix: ByteStringPrefix) -> Self {
+        match prefix {
+            ByteStringPrefix::Regular => {}
+            ByteStringPrefix::Raw { uppercase_r: true } => {
+                self.0 |= BytesLiteralFlagsInner::R_PREFIX_UPPER;
+            }
+            ByteStringPrefix::Raw { uppercase_r: false } => {
+                self.0 |= BytesLiteralFlagsInner::R_PREFIX_LOWER;
+            }
+        }
         self
     }
 
-    /// Does the bytestring have an `r` or `R` prefix?
-    pub const fn is_raw(self) -> bool {
-        self.0.contains(BytesLiteralFlagsInner::R_PREFIX)
+    pub const fn prefix(self) -> ByteStringPrefix {
+        if self.0.contains(BytesLiteralFlagsInner::R_PREFIX_LOWER) {
+            debug_assert!(!self.0.contains(BytesLiteralFlagsInner::R_PREFIX_UPPER));
+            ByteStringPrefix::Raw { uppercase_r: false }
+        } else if self.0.contains(BytesLiteralFlagsInner::R_PREFIX_UPPER) {
+            ByteStringPrefix::Raw { uppercase_r: true }
+        } else {
+            ByteStringPrefix::Regular
+        }
     }
 
-    /// Is the bytestring triple-quoted, i.e.,
-    /// does it begin and end with three consecutive quote characters?
+    /// Return `true` if the bytestring is triple-quoted, i.e.,
+    /// it begins and ends with three consecutive quote characters.
+    /// For example: `b"""{bar}"""`
     pub const fn is_triple_quoted(self) -> bool {
         self.0.contains(BytesLiteralFlagsInner::TRIPLE_QUOTED)
     }
 
-    /// Does the bytestring use single or double quotes in its opener and closer?
+    /// Return the quoting style (single or double quotes)
+    /// used by the bytestring's opener and closer:
+    /// - `b"a"` -> `QuoteStyle::Double`
+    /// - `b'a'` -> `QuoteStyle::Single`
     pub const fn quote_style(self) -> Quote {
         if self.0.contains(BytesLiteralFlagsInner::DOUBLE) {
             Quote::Double
@@ -1982,7 +2041,7 @@ impl fmt::Debug for BytesLiteralFlags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BytesLiteralFlags")
             .field("quote_style", &self.quote_style())
-            .field("raw", &self.is_raw())
+            .field("prefix", &self.prefix().as_str())
             .field("triple_quoted", &self.is_triple_quoted())
             .finish()
     }
