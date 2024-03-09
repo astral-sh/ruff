@@ -48,14 +48,15 @@ use super::super::helpers::string_literal;
 /// - [Common Weakness Enumeration: CWE-916](https://cwe.mitre.org/data/definitions/916.html)
 #[violation]
 pub struct HashlibInsecureHashFunction {
+    library: String,
     string: String,
 }
 
 impl Violation for HashlibInsecureHashFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let HashlibInsecureHashFunction { string } = self;
-        format!("Probable use of insecure hash functions in `hashlib`: `{string}`")
+        let HashlibInsecureHashFunction { library, string } = self;
+        format!("Probable use of insecure hash functions in `{library}`: `{string}`")
     }
 }
 
@@ -73,37 +74,48 @@ pub(crate) fn hashlib_insecure_hash_functions(checker: &mut Checker, call: &ast:
             _ => None,
         })
     {
-        if !is_used_for_security(&call.arguments) {
-            return;
-        }
-        match hashlib_call {
-            HashlibCall::New => {
-                if let Some(name_arg) = call.arguments.find_argument("name", 0) {
-                    if let Some(hash_func_name) = string_literal(name_arg) {
-                        // `hashlib.new` accepts both lowercase and uppercase names for hash
-                        // functions.
-                        if matches!(
-                            hash_func_name,
-                            "md4" | "md5" | "sha" | "sha1" | "MD4" | "MD5" | "SHA" | "SHA1"
-                        ) {
-                            checker.diagnostics.push(Diagnostic::new(
-                                HashlibInsecureHashFunction {
-                                    string: hash_func_name.to_string(),
-                                },
-                                name_arg.range(),
-                            ));
-                        }
+        detect_insecure_hashlib_calls(checker, call, &hashlib_call);
+    }
+}
+
+fn detect_insecure_hashlib_calls(
+    checker: &mut Checker,
+    call: &ast::ExprCall,
+    hashlib_call: &HashlibCall,
+) {
+    if !is_used_for_security(&call.arguments) {
+        return;
+    }
+
+    match hashlib_call {
+        HashlibCall::New => {
+            if let Some(name_arg) = call.arguments.find_argument("name", 0) {
+                if let Some(hash_func_name) = string_literal(name_arg) {
+                    // `hashlib.new` accepts both lowercase and uppercase names for hash
+                    // functions.
+                    if matches!(
+                        hash_func_name,
+                        "md4" | "md5" | "sha" | "sha1" | "MD4" | "MD5" | "SHA" | "SHA1"
+                    ) {
+                        checker.diagnostics.push(Diagnostic::new(
+                            HashlibInsecureHashFunction {
+                                library: "hashlib".to_string(),
+                                string: hash_func_name.to_string(),
+                            },
+                            name_arg.range(),
+                        ));
                     }
                 }
             }
-            HashlibCall::WeakHash(func_name) => {
-                checker.diagnostics.push(Diagnostic::new(
-                    HashlibInsecureHashFunction {
-                        string: (*func_name).to_string(),
-                    },
-                    call.func.range(),
-                ));
-            }
+        }
+        HashlibCall::WeakHash(func_name) => {
+            checker.diagnostics.push(Diagnostic::new(
+                HashlibInsecureHashFunction {
+                    library: "hashlib".to_string(),
+                    string: (*func_name).to_string(),
+                },
+                call.func.range(),
+            ));
         }
     }
 }
