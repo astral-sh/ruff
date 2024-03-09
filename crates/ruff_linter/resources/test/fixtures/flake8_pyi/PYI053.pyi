@@ -64,3 +64,5 @@ def not_warnings_dot_deprecated(
     "Not warnings.deprecated, so this one *should* lead to PYI053 in a stub!"  # Error: PYI053
 )
 def not_a_deprecated_function() -> None: ...
+
+fbaz: str = f"51 character {foo} stringggggggggggggggggggggggggggggggg"  # Error: PYI053

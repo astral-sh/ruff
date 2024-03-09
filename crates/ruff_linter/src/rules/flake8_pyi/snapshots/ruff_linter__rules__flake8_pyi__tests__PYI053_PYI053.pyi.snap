@@ -105,12 +105,12 @@ PYI053.pyi:34:14: PYI053 [*] String and bytes literals longer than 50 characters
 36 36 | ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
 37 37 | 
 
-PYI053.pyi:38:15: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+PYI053.pyi:38:13: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
    |
 36 | ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
 37 | 
 38 | fbar: str = f"51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053
-   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
 39 | 
 40 | class Demo:
    |
@@ -121,7 +121,7 @@ PYI053.pyi:38:15: PYI053 [*] String and bytes literals longer than 50 characters
 36 36 | ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
 37 37 | 
 38    |-fbar: str = f"51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053
-   38 |+fbar: str = f"..."  # Error: PYI053
+   38 |+fbar: str = ...  # Error: PYI053
 39 39 | 
 40 40 | class Demo:
 41 41 |     """Docstrings are excluded from this rule. Some padding."""  # OK
@@ -144,5 +144,20 @@ PYI053.pyi:64:5: PYI053 [*] String and bytes literals longer than 50 characters 
    64 |+    ...  # Error: PYI053
 65 65 | )
 66 66 | def not_a_deprecated_function() -> None: ...
+67 67 | 
 
+PYI053.pyi:68:13: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+   |
+66 | def not_a_deprecated_function() -> None: ...
+67 | 
+68 | fbaz: str = f"51 character {foo} stringggggggggggggggggggggggggggggggg"  # Error: PYI053
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
+   |
+   = help: Replace with `...`
 
+ℹ Safe fix
+65 65 | )
+66 66 | def not_a_deprecated_function() -> None: ...
+67 67 | 
+68    |-fbaz: str = f"51 character {foo} stringggggggggggggggggggggggggggggggg"  # Error: PYI053
+   68 |+fbaz: str = ...  # Error: PYI053
