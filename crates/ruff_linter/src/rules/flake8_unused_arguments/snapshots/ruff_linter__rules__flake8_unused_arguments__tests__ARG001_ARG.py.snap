@@ -69,7 +69,7 @@ ARG.py:21:12: ARG001 Unused function argument: `x`
    |
    = help: Remove argument: `x`
 
-ARG.py:223:26: ARG001 Unused function argument: `a2`
+ARG.py:223:26: ARG001 [*] Unused function argument: `a2`
     |
 221 | ###
 222 | 
@@ -79,13 +79,33 @@ ARG.py:223:26: ARG001 Unused function argument: `a2`
     |
     = help: Remove argument: `a2`
 
-ARG.py:227:18: ARG001 Unused function argument: `a`
+ℹ Unsafe fix
+220 220 | # Test with the different combinations of arguments
+221 221 | ###
+222 222 | 
+223     |-def multiple_posonly(a1, a2, /, b, *, d, **e):
+    223 |+def multiple_posonly(a1, /, b, *, d, **e):
+224 224 |     print(a1, b, d, e)
+225 225 | 
+226 226 | 
+
+ARG.py:227:18: ARG001 [*] Unused function argument: `a`
     |
 227 | def last_posonly(a, /, b, * , d, **e):
     |                  ^ ARG001
 228 |     print(b, d, e)
     |
     = help: Remove argument: `a`
+
+ℹ Unsafe fix
+224 224 |     print(a1, b, d, e)
+225 225 | 
+226 226 | 
+227     |-def last_posonly(a, /, b, * , d, **e):
+    227 |+def last_posonly(b, * , d, **e):
+228 228 |     print(b, d, e)
+229 229 | 
+230 230 | 
 
 ARG.py:231:30: ARG001 Unused function argument: `c`
     |
@@ -151,13 +171,23 @@ ARG.py:259:29: ARG001 Unused function argument: `e`
     |
     = help: Remove argument: `e`
 
-ARG.py:263:18: ARG001 Unused function argument: `a`
+ARG.py:263:18: ARG001 [*] Unused function argument: `a`
     |
 263 | def only_posonly(a, /):
     |                  ^ ARG001
 264 |     ...
     |
     = help: Remove argument: `a`
+
+ℹ Unsafe fix
+260 260 |     print(a, b, d)
+261 261 | 
+262 262 | 
+263     |-def only_posonly(a, /):
+    263 |+def only_posonly():
+264 264 |     ...
+265 265 | 
+266 266 | 
 
 ARG.py:267:14: ARG001 Unused function argument: `b`
     |

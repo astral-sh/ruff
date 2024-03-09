@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Stmt};
+use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Parameters, Stmt};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -128,6 +128,47 @@ pub(crate) enum Parentheses {
     Remove,
     /// Preserve parentheses, even if the removed argument is the only argument
     Preserve,
+}
+
+/// Generic function to remove parameters in function or method definitions.
+pub(crate) fn remove_parameter(
+    parameter: impl Ranged,
+    parameters: &Parameters,
+    source: &str,
+) -> Result<Edit> {
+    /* TODO
+    Edge cases:
+       - last posonly arg => remove /
+       - vararg and kwonly arg => leave *
+       - last kwonly arg and no vararg => remove *
+    */
+    if let Some(posonlyarg) = parameters
+        .posonlyargs
+        .iter()
+        .find(|param| param.range() == parameter.range())
+    {
+        let mut tokenizer = SimpleTokenizer::starts_at(posonlyarg.end(), source);
+
+        // The positional only slash must be removed if this is the last posonly parameter.
+        if parameters.posonlyargs.len() == 1 {
+            tokenizer
+                .find(|token| token.kind == SimpleTokenKind::Slash)
+                .context("Unable to find trailing slash for positional only parameter")?;
+        }
+
+        // Find the next non-whitespace an non-comma token.
+        let next = tokenizer
+            .find(|token| {
+                token.kind != SimpleTokenKind::Whitespace
+                    && token.kind != SimpleTokenKind::Newline
+                    && token.kind != SimpleTokenKind::Comma
+            })
+            .context("Unable to find next token")?;
+
+        return Ok(Edit::deletion(posonlyarg.start(), next.start()));
+    }
+
+    anyhow::bail!("todo")
 }
 
 /// Generic function to remove arguments or keyword arguments in function

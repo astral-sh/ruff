@@ -2,13 +2,14 @@ use regex::Regex;
 use ruff_python_ast as ast;
 use ruff_python_ast::Parameters;
 
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, FixAvailability, Violation};
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::remove_parameter;
 use crate::registry::Rule;
 use crate::rules::flake8_unused_arguments::helpers;
 
@@ -256,6 +257,7 @@ impl Argumentable {
 fn check(
     argumentable: Argumentable,
     parameters: &Parameters,
+    checker: &Checker,
     scope: &Scope,
     semantic: &SemanticModel,
     dummy_variable_rgx: &Regex,
@@ -292,10 +294,15 @@ fn check(
             && !binding.is_used()
             && !dummy_variable_rgx.is_match(arg.name.as_str())
         {
-            Some(Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 argumentable.check_for(arg.name.to_string()),
                 binding.range(),
-            ))
+            );
+            diagnostic.try_set_fix(|| {
+                remove_parameter(binding, parameters, checker.locator().contents())
+                    .map(Fix::unsafe_edit)
+            });
+            Some(diagnostic)
         } else {
             None
         }
@@ -339,6 +346,7 @@ pub(crate) fn unused_arguments(
                         check(
                             Argumentable::Function,
                             parameters,
+                            checker,
                             scope,
                             checker.semantic(),
                             &checker.settings.dummy_variable_rgx,
@@ -364,6 +372,7 @@ pub(crate) fn unused_arguments(
                         check(
                             Argumentable::Method,
                             parameters,
+                            checker,
                             scope,
                             checker.semantic(),
                             &checker.settings.dummy_variable_rgx,
@@ -389,6 +398,7 @@ pub(crate) fn unused_arguments(
                         check(
                             Argumentable::ClassMethod,
                             parameters,
+                            checker,
                             scope,
                             checker.semantic(),
                             &checker.settings.dummy_variable_rgx,
@@ -414,6 +424,7 @@ pub(crate) fn unused_arguments(
                         check(
                             Argumentable::StaticMethod,
                             parameters,
+                            checker,
                             scope,
                             checker.semantic(),
                             &checker.settings.dummy_variable_rgx,
@@ -433,6 +444,7 @@ pub(crate) fn unused_arguments(
                     check(
                         Argumentable::Lambda,
                         parameters,
+                        checker,
                         scope,
                         checker.semantic(),
                         &checker.settings.dummy_variable_rgx,
