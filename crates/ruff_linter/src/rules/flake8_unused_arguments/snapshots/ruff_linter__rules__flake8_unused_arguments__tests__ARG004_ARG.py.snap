@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
 ---
-ARG.py:51:11: ARG004 Unused static method argument: `cls`
+ARG.py:51:11: ARG004 [*] Unused static method argument: `cls`
    |
 50 |     @staticmethod
 51 |     def f(cls, x):
@@ -10,7 +10,17 @@ ARG.py:51:11: ARG004 Unused static method argument: `cls`
    |
    = help: Remove argument: `cls`
 
-ARG.py:51:16: ARG004 Unused static method argument: `x`
+ℹ Unsafe fix
+48 48 |         print("Hello, world!")
+49 49 | 
+50 50 |     @staticmethod
+51    |-    def f(cls, x):
+   51 |+    def f(x):
+52 52 |         print("Hello, world!")
+53 53 | 
+54 54 |     @staticmethod
+
+ARG.py:51:16: ARG004 [*] Unused static method argument: `x`
    |
 50 |     @staticmethod
 51 |     def f(cls, x):
@@ -19,7 +29,17 @@ ARG.py:51:16: ARG004 Unused static method argument: `x`
    |
    = help: Remove argument: `x`
 
-ARG.py:55:11: ARG004 Unused static method argument: `x`
+ℹ Unsafe fix
+48 48 |         print("Hello, world!")
+49 49 | 
+50 50 |     @staticmethod
+51    |-    def f(cls, x):
+   51 |+    def f(cls):
+52 52 |         print("Hello, world!")
+53 53 | 
+54 54 |     @staticmethod
+
+ARG.py:55:11: ARG004 [*] Unused static method argument: `x`
    |
 54 |     @staticmethod
 55 |     def f(x):
@@ -27,3 +47,13 @@ ARG.py:55:11: ARG004 Unused static method argument: `x`
 56 |         print("Hello, world!")
    |
    = help: Remove argument: `x`
+
+ℹ Unsafe fix
+52 52 |         print("Hello, world!")
+53 53 | 
+54 54 |     @staticmethod
+55    |-    def f(x):
+   55 |+    def f():
+56 56 |         print("Hello, world!")
+57 57 | 
+58 58 |     ###

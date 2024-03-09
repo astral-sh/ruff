@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
 ---
-ARG.py:28:8: ARG005 Unused lambda argument: `x`
+ARG.py:28:8: ARG005 [*] Unused lambda argument: `x`
    |
 26 | # Unused arguments on lambdas.
 27 | ###
@@ -11,3 +11,13 @@ ARG.py:28:8: ARG005 Unused lambda argument: `x`
 30 | lambda: print("Hello, world!")
    |
    = help: Remove argument: `x`
+
+ℹ Unsafe fix
+25 25 | ###
+26 26 | # Unused arguments on lambdas.
+27 27 | ###
+28    |-lambda x: print("Hello, world!")
+   28 |+lambda : print("Hello, world!")
+29 29 | 
+30 30 | lambda: print("Hello, world!")
+31 31 |

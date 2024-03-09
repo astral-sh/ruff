@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
 ---
-ARG.py:37:17: ARG002 Unused method argument: `x`
+ARG.py:37:17: ARG002 [*] Unused method argument: `x`
    |
 35 |     # Unused arguments.
 36 |     ###
@@ -11,7 +11,17 @@ ARG.py:37:17: ARG002 Unused method argument: `x`
    |
    = help: Remove argument: `x`
 
-ARG.py:40:20: ARG002 Unused method argument: `x`
+ℹ Unsafe fix
+34 34 |     ###
+35 35 |     # Unused arguments.
+36 36 |     ###
+37    |-    def f(self, x):
+   37 |+    def f(self):
+38 38 |         print("Hello, world!")
+39 39 | 
+40 40 |     def f(self, /, x):
+
+ARG.py:40:20: ARG002 [*] Unused method argument: `x`
    |
 38 |         print("Hello, world!")
 39 | 
@@ -21,7 +31,17 @@ ARG.py:40:20: ARG002 Unused method argument: `x`
    |
    = help: Remove argument: `x`
 
-ARG.py:43:16: ARG002 Unused method argument: `x`
+ℹ Unsafe fix
+37 37 |     def f(self, x):
+38 38 |         print("Hello, world!")
+39 39 | 
+40    |-    def f(self, /, x):
+   40 |+    def f(self, /):
+41 41 |         print("Hello, world!")
+42 42 | 
+43 43 |     def f(cls, x):
+
+ARG.py:43:16: ARG002 [*] Unused method argument: `x`
    |
 41 |         print("Hello, world!")
 42 | 
@@ -31,7 +51,17 @@ ARG.py:43:16: ARG002 Unused method argument: `x`
    |
    = help: Remove argument: `x`
 
-ARG.py:192:24: ARG002 Unused method argument: `x`
+ℹ Unsafe fix
+40 40 |     def f(self, /, x):
+41 41 |         print("Hello, world!")
+42 42 | 
+43    |-    def f(cls, x):
+   43 |+    def f(cls):
+44 44 |         print("Hello, world!")
+45 45 | 
+46 46 |     @classmethod
+
+ARG.py:192:24: ARG002 [*] Unused method argument: `x`
     |
 190 | ###
 191 | class C:
@@ -40,3 +70,13 @@ ARG.py:192:24: ARG002 Unused method argument: `x`
 193 |         print("Hello, world!")
     |
     = help: Remove argument: `x`
+
+ℹ Unsafe fix
+189 189 | # Unused arguments on magic methods.
+190 190 | ###
+191 191 | class C:
+192     |-    def __init__(self, x) -> None:
+    192 |+    def __init__(self) -> None:
+193 193 |         print("Hello, world!")
+194 194 | 
+195 195 |     def __str__(self) -> str:

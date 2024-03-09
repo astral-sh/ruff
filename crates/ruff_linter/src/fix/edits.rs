@@ -10,8 +10,8 @@ use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::textwrap::dedent_to;
 use ruff_python_trivia::{
-    has_leading_content, is_python_whitespace, CommentRanges, PythonWhitespace, SimpleTokenKind,
-    SimpleTokenizer,
+    has_leading_content, is_python_whitespace, BackwardsTokenizer, CommentRanges, PythonWhitespace,
+    SimpleTokenKind, SimpleTokenizer,
 };
 use ruff_source_file::{Locator, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -130,10 +130,13 @@ pub(crate) enum Parentheses {
     Preserve,
 }
 
-/// Generic function to remove parameters in function or method definitions.
+/// Generic function to remove parameters in functions, methods or lambdas definitions.
+///
+/// Supports the removal of parentheses when this is the only parameter left.
 pub(crate) fn remove_parameter(
     parameter: impl Ranged,
     parameters: &Parameters,
+    parentheses: Parentheses,
     source: &str,
 ) -> Result<Edit> {
     /* TODO
@@ -191,7 +194,53 @@ pub(crate) fn remove_parameter(
         return Ok(Edit::deletion(vararg.start(), next.start()));
     }
 
-    anyhow::bail!("todo")
+    let range_to_remove = ParameterRangeToRemove::find_ranges(&parameter.range(), parameters)?;
+
+    // If this is the last kwonlyarg with no vararg, the preceding star must be removed
+    if range_to_remove.parameter_kind.is_keyword_only()
+        && parameters.kwonlyargs.len() == 1
+        && parameters.vararg.is_none()
+    {
+        anyhow::bail!("todo")
+    }
+
+    if !range_to_remove.after.is_empty() {
+        // Case 1: parameter is _not_ the last node, so delete from the start of the
+        // parameter to the end of the subsequent comma.
+        let mut tokenizer = SimpleTokenizer::starts_at(range_to_remove.end(), source);
+
+        // Find the trailing comma.
+        tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Comma)
+            .context("Unable to find trailing comma")?;
+
+        // Find the next non-whitespace token.
+        let next = tokenizer
+            .find(|token| {
+                token.kind != SimpleTokenKind::Whitespace && token.kind != SimpleTokenKind::Newline
+            })
+            .context("Unable to find next token")?;
+
+        Ok(Edit::deletion(range_to_remove.start(), next.start()))
+    } else if !range_to_remove.before.is_empty() {
+        // Case 2: parameter is the last node, so delete from the start of the
+        // previous comma to the end of the argument.
+        let mut tokenizer = BackwardsTokenizer::up_to(range_to_remove.start(), source, &[]);
+
+        // Find the trailing comma.
+        let comma = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Comma)
+            .context("Unable to previous trailing comma")?;
+
+        Ok(Edit::deletion(comma.start(), range_to_remove.end()))
+    } else {
+        // Case 3: parameter is the only node, so delete the parameters (but preserve
+        // parentheses, if needed).
+        Ok(match parentheses {
+            Parentheses::Remove => Edit::range_deletion(parameters.range()),
+            Parentheses::Preserve => Edit::range_replacement("()".to_string(), parameters.range()),
+        })
+    }
 }
 
 fn range_match_parameter(range: TextRange, parameter: &Parameter) -> bool {
@@ -212,6 +261,12 @@ enum ParameterKind {
     KeywordOnly,
     VariadicPositional,
     VariadicKeyword,
+}
+
+impl Ranged for ParameterRangeToRemove {
+    fn range(&self) -> TextRange {
+        self.range
+    }
 }
 
 impl ParameterRangeToRemove {
@@ -286,7 +341,6 @@ impl ParameterRangeToRemove {
 /// `bases`)
 ///
 /// Supports the removal of parentheses when this is the only (kw)arg left.
-/// For this behavior, set `remove_parentheses` to `true`.
 pub(crate) fn remove_argument<T: Ranged>(
     argument: &T,
     arguments: &Arguments,

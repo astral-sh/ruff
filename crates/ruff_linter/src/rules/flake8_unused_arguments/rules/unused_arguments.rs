@@ -9,7 +9,7 @@ use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::remove_parameter;
+use crate::fix::edits::{remove_parameter, Parentheses};
 use crate::registry::Rule;
 use crate::rules::flake8_unused_arguments::helpers;
 
@@ -251,6 +251,16 @@ impl Argumentable {
             Argumentable::Method | Argumentable::ClassMethod => 1,
         }
     }
+
+    const fn parentheses(self) -> Parentheses {
+        match self {
+            Argumentable::Function
+            | Argumentable::Method
+            | Argumentable::ClassMethod
+            | Argumentable::StaticMethod => Parentheses::Preserve,
+            Argumentable::Lambda => Parentheses::Remove,
+        }
+    }
 }
 
 /// Check a function or method for unused arguments.
@@ -299,8 +309,13 @@ fn check(
                 binding.range(),
             );
             diagnostic.try_set_fix(|| {
-                remove_parameter(binding, parameters, checker.locator().contents())
-                    .map(Fix::unsafe_edit)
+                remove_parameter(
+                    binding,
+                    parameters,
+                    argumentable.parentheses(),
+                    checker.locator().contents(),
+                )
+                .map(Fix::unsafe_edit)
             });
             Some(diagnostic)
         } else {
