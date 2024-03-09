@@ -198,6 +198,89 @@ fn range_match_parameter(range: TextRange, parameter: &Parameter) -> bool {
     parameter.range == range || parameter.name.range() == range
 }
 
+struct ParameterRangeToRemove {
+    range: TextRange,
+    parameter_kind: ParameterKind,
+    before: Vec<TextRange>,
+    after: Vec<TextRange>,
+}
+
+#[derive(is_macro::Is)]
+enum ParameterKind {
+    PositionalOnly,
+    Positional,
+    KeywordOnly,
+    VariadicPositional,
+    VariadicKeyword,
+}
+
+impl ParameterRangeToRemove {
+    fn find_ranges(parameter: &TextRange, parameters: &Parameters) -> Result<Self> {
+        let mut before = Vec::new();
+        let mut parameter_range: Option<TextRange> = None;
+        let mut parameter_kind: Option<ParameterKind> = None;
+        let mut after = Vec::new();
+
+        for range in parameters.posonlyargs.iter().map(Ranged::range) {
+            if range.end() <= parameter.start() {
+                before.push(range);
+            } else if range.end() <= parameter.end() {
+                parameter_range = Some(range);
+                parameter_kind = Some(ParameterKind::PositionalOnly)
+            } else {
+                after.push(range)
+            }
+        }
+        for range in parameters.args.iter().map(Ranged::range) {
+            if range.end() <= parameter.start() {
+                before.push(range);
+            } else if range.end() <= parameter.end() {
+                parameter_range = Some(range);
+                parameter_kind = Some(ParameterKind::Positional)
+            } else {
+                after.push(range)
+            }
+        }
+        for range in parameters.kwonlyargs.iter().map(Ranged::range) {
+            if range.end() <= parameter.start() {
+                before.push(range);
+            } else if range.end() <= parameter.end() {
+                parameter_range = Some(range);
+                parameter_kind = Some(ParameterKind::KeywordOnly)
+            } else {
+                after.push(range)
+            }
+        }
+        if let Some(range) = parameters.vararg.as_deref().map(Ranged::range) {
+            if range.end() <= parameter.start() {
+                before.push(range);
+            } else if range.end() <= parameter.end() {
+                parameter_range = Some(range);
+                parameter_kind = Some(ParameterKind::VariadicPositional);
+            } else {
+                after.push(range)
+            }
+        }
+        if let Some(range) = parameters.kwarg.as_deref().map(Ranged::range) {
+            if range.end() <= parameter.start() {
+                before.push(range);
+            } else if range.end() <= parameter.end() {
+                parameter_range = Some(range);
+                parameter_kind = Some(ParameterKind::VariadicKeyword);
+            } else {
+                after.push(range)
+            }
+        }
+
+        Ok(Self {
+            range: parameter_range.context("Unable to find parameter to delete")?,
+            parameter_kind: parameter_kind.context("Unable to find parameter to delete")?,
+            before,
+            after,
+        })
+    }
+}
+
 /// Generic function to remove arguments or keyword arguments in function
 /// calls and class definitions. (For classes `args` should be considered
 /// `bases`)
