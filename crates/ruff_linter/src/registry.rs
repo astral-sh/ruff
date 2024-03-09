@@ -118,6 +118,9 @@ pub enum Linter {
     /// [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
     #[prefix = "G"]
     Flake8LoggingFormat,
+    /// [flake8-noqa](https://pypi.org/project/flake8-noqa/)
+    #[prefix = "NQA"]
+    Flake8NOQA,
     /// [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/)
     #[prefix = "INP"]
     Flake8NoPep420,
@@ -291,6 +294,10 @@ impl Rule {
             | Rule::MultiLineImplicitStringConcatenation
             | Rule::MultipleStatementsOnOneLineColon
             | Rule::MultipleStatementsOnOneLineSemicolon
+            | Rule::NOQADuplicateCodes
+            | Rule::NOQAMissingColon
+            | Rule::NOQAMultipleSpacesBeforeCode
+            | Rule::NOQASpaceBeforeColon
             | Rule::ProhibitedTrailingComma
             | Rule::ShebangLeadingWhitespace
             | Rule::ShebangMissingExecutableFile
