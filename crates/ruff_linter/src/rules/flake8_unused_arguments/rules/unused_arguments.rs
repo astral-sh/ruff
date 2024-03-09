@@ -1,8 +1,6 @@
-use std::iter;
-
 use regex::Regex;
 use ruff_python_ast as ast;
-use ruff_python_ast::{Parameter, Parameters};
+use ruff_python_ast::Parameters;
 
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -211,10 +209,17 @@ impl Argumentable {
             Self::Lambda => Rule::UnusedLambdaArgument,
         }
     }
+
+    const fn skip_first_argument(self) -> usize {
+        match self {
+            Argumentable::Function | Argumentable::StaticMethod | Argumentable::Lambda => 0,
+            Argumentable::Method | Argumentable::ClassMethod => 1,
+        }
+    }
 }
 
-/// Check a plain function for unused arguments.
-fn function(
+/// Check a function or method for unused arguments.
+fn check(
     argumentable: Argumentable,
     parameters: &Parameters,
     scope: &Scope,
@@ -228,73 +233,24 @@ fn function(
         .iter()
         .chain(&parameters.args)
         .chain(&parameters.kwonlyargs)
+        .skip(argumentable.skip_first_argument())
         .map(|parameter_with_default| &parameter_with_default.parameter)
         .chain(
-            iter::once::<Option<&Parameter>>(parameters.vararg.as_deref())
-                .flatten()
+            parameters
+                .vararg
+                .as_deref()
+                .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         )
         .chain(
-            iter::once::<Option<&Parameter>>(parameters.kwarg.as_deref())
-                .flatten()
+            parameters
+                .kwarg
+                .as_deref()
+                .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         );
-    call(
-        argumentable,
-        args,
-        scope,
-        semantic,
-        dummy_variable_rgx,
-        diagnostics,
-    );
-}
 
-/// Check a method for unused arguments.
-fn method(
-    argumentable: Argumentable,
-    parameters: &Parameters,
-    scope: &Scope,
-    semantic: &SemanticModel,
-    dummy_variable_rgx: &Regex,
-    ignore_variadic_names: bool,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    let args = parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
-        .skip(1)
-        .map(|parameter_with_default| &parameter_with_default.parameter)
-        .chain(
-            iter::once::<Option<&Parameter>>(parameters.vararg.as_deref())
-                .flatten()
-                .skip(usize::from(ignore_variadic_names)),
-        )
-        .chain(
-            iter::once::<Option<&Parameter>>(parameters.kwarg.as_deref())
-                .flatten()
-                .skip(usize::from(ignore_variadic_names)),
-        );
-    call(
-        argumentable,
-        args,
-        scope,
-        semantic,
-        dummy_variable_rgx,
-        diagnostics,
-    );
-}
-
-fn call<'a>(
-    argumentable: Argumentable,
-    parameters: impl Iterator<Item = &'a Parameter>,
-    scope: &Scope,
-    semantic: &SemanticModel,
-    dummy_variable_rgx: &Regex,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    diagnostics.extend(parameters.filter_map(|arg| {
+    diagnostics.extend(args.filter_map(|arg| {
         let binding = scope
             .get(arg.name.as_str())
             .map(|binding_id| semantic.binding(binding_id))?;
@@ -346,7 +302,7 @@ pub(crate) fn unused_arguments(
                     if checker.enabled(Argumentable::Function.rule_code())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        function(
+                        check(
                             Argumentable::Function,
                             parameters,
                             scope,
@@ -371,7 +327,7 @@ pub(crate) fn unused_arguments(
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        method(
+                        check(
                             Argumentable::Method,
                             parameters,
                             scope,
@@ -396,7 +352,7 @@ pub(crate) fn unused_arguments(
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        method(
+                        check(
                             Argumentable::ClassMethod,
                             parameters,
                             scope,
@@ -421,7 +377,7 @@ pub(crate) fn unused_arguments(
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        function(
+                        check(
                             Argumentable::StaticMethod,
                             parameters,
                             scope,
@@ -440,7 +396,7 @@ pub(crate) fn unused_arguments(
         ScopeKind::Lambda(ast::ExprLambda { parameters, .. }) => {
             if let Some(parameters) = parameters {
                 if checker.enabled(Argumentable::Lambda.rule_code()) {
-                    function(
+                    check(
                         Argumentable::Lambda,
                         parameters,
                         scope,
