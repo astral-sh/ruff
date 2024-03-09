@@ -7,6 +7,7 @@ ignore_variadic_names.py:1:7: ARG001 Unused function argument: `a`
   |       ^ ARG001
 2 |     print("Hello, world!")
   |
+  = help: Remove argument: `a`
 
 ignore_variadic_names.py:1:10: ARG001 Unused function argument: `b`
   |
@@ -14,6 +15,7 @@ ignore_variadic_names.py:1:10: ARG001 Unused function argument: `b`
   |          ^ ARG001
 2 |     print("Hello, world!")
   |
+  = help: Remove argument: `b`
 
 ignore_variadic_names.py:5:7: ARG001 Unused function argument: `a`
   |
@@ -21,6 +23,7 @@ ignore_variadic_names.py:5:7: ARG001 Unused function argument: `a`
   |       ^ ARG001
 6 |     print("Hello, world!")
   |
+  = help: Remove argument: `a`
 
 ignore_variadic_names.py:5:10: ARG001 Unused function argument: `b`
   |
@@ -28,6 +31,7 @@ ignore_variadic_names.py:5:10: ARG001 Unused function argument: `b`
   |          ^ ARG001
 6 |     print("Hello, world!")
   |
+  = help: Remove argument: `b`
 
 ignore_variadic_names.py:10:17: ARG002 Unused method argument: `a`
    |
@@ -36,6 +40,7 @@ ignore_variadic_names.py:10:17: ARG002 Unused method argument: `a`
    |                 ^ ARG002
 11 |         print("Hello, world!")
    |
+   = help: Remove argument: `a`
 
 ignore_variadic_names.py:10:20: ARG002 Unused method argument: `b`
    |
@@ -44,6 +49,7 @@ ignore_variadic_names.py:10:20: ARG002 Unused method argument: `b`
    |                    ^ ARG002
 11 |         print("Hello, world!")
    |
+   = help: Remove argument: `b`
 
 ignore_variadic_names.py:13:17: ARG002 Unused method argument: `a`
    |
@@ -53,6 +59,7 @@ ignore_variadic_names.py:13:17: ARG002 Unused method argument: `a`
    |                 ^ ARG002
 14 |         print("Hello, world!")
    |
+   = help: Remove argument: `a`
 
 ignore_variadic_names.py:13:20: ARG002 Unused method argument: `b`
    |
@@ -62,5 +69,4 @@ ignore_variadic_names.py:13:20: ARG002 Unused method argument: `b`
    |                    ^ ARG002
 14 |         print("Hello, world!")
    |
-
-
+   = help: Remove argument: `b`

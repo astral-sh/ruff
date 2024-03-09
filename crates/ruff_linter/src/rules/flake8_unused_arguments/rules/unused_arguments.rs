@@ -2,8 +2,7 @@ use regex::Regex;
 use ruff_python_ast as ast;
 use ruff_python_ast::Parameters;
 
-use ruff_diagnostics::DiagnosticKind;
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
@@ -37,10 +36,17 @@ pub struct UnusedFunctionArgument {
 }
 
 impl Violation for UnusedFunctionArgument {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedFunctionArgument { name } = self;
         format!("Unused function argument: `{name}`")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let Self { name } = self;
+        Some(format!("Remove argument: `{name}`"))
     }
 }
 
@@ -70,10 +76,17 @@ pub struct UnusedMethodArgument {
 }
 
 impl Violation for UnusedMethodArgument {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedMethodArgument { name } = self;
         format!("Unused method argument: `{name}`")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let Self { name } = self;
+        Some(format!("Remove argument: `{name}`"))
     }
 }
 
@@ -105,10 +118,17 @@ pub struct UnusedClassMethodArgument {
 }
 
 impl Violation for UnusedClassMethodArgument {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedClassMethodArgument { name } = self;
         format!("Unused class method argument: `{name}`")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let Self { name } = self;
+        Some(format!("Remove argument: `{name}`"))
     }
 }
 
@@ -140,10 +160,17 @@ pub struct UnusedStaticMethodArgument {
 }
 
 impl Violation for UnusedStaticMethodArgument {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedStaticMethodArgument { name } = self;
         format!("Unused static method argument: `{name}`")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let Self { name } = self;
+        Some(format!("Remove argument: `{name}`"))
     }
 }
 
@@ -172,10 +199,17 @@ pub struct UnusedLambdaArgument {
 }
 
 impl Violation for UnusedLambdaArgument {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedLambdaArgument { name } = self;
         format!("Unused lambda argument: `{name}`")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let Self { name } = self;
+        Some(format!("Remove argument: `{name}`"))
     }
 }
 

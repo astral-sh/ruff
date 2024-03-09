@@ -8,6 +8,7 @@ ARG.py:51:11: ARG004 Unused static method argument: `cls`
    |           ^^^ ARG004
 52 |         print("Hello, world!")
    |
+   = help: Remove argument: `cls`
 
 ARG.py:51:16: ARG004 Unused static method argument: `x`
    |
@@ -16,6 +17,7 @@ ARG.py:51:16: ARG004 Unused static method argument: `x`
    |                ^ ARG004
 52 |         print("Hello, world!")
    |
+   = help: Remove argument: `x`
 
 ARG.py:55:11: ARG004 Unused static method argument: `x`
    |
@@ -24,5 +26,4 @@ ARG.py:55:11: ARG004 Unused static method argument: `x`
    |           ^ ARG004
 56 |         print("Hello, world!")
    |
-
-
+   = help: Remove argument: `x`

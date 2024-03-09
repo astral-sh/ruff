@@ -9,6 +9,7 @@ ARG.py:37:17: ARG002 Unused method argument: `x`
    |                 ^ ARG002
 38 |         print("Hello, world!")
    |
+   = help: Remove argument: `x`
 
 ARG.py:40:20: ARG002 Unused method argument: `x`
    |
@@ -18,6 +19,7 @@ ARG.py:40:20: ARG002 Unused method argument: `x`
    |                    ^ ARG002
 41 |         print("Hello, world!")
    |
+   = help: Remove argument: `x`
 
 ARG.py:43:16: ARG002 Unused method argument: `x`
    |
@@ -27,6 +29,7 @@ ARG.py:43:16: ARG002 Unused method argument: `x`
    |                ^ ARG002
 44 |         print("Hello, world!")
    |
+   = help: Remove argument: `x`
 
 ARG.py:192:24: ARG002 Unused method argument: `x`
     |
@@ -36,5 +39,4 @@ ARG.py:192:24: ARG002 Unused method argument: `x`
     |                        ^ ARG002
 193 |         print("Hello, world!")
     |
-
-
+    = help: Remove argument: `x`
