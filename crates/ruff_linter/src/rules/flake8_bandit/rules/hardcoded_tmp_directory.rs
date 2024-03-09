@@ -54,10 +54,10 @@ impl Violation for HardcodedTempFile {
 /// S108
 pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, string: StringLike) {
     match string {
-        StringLike::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+        StringLike::String(ast::ExprStringLiteral { value, .. }) => {
             check(checker, value.to_str(), string.range());
         }
-        StringLike::FStringLiteral(ast::ExprFString { value, .. }) => {
+        StringLike::FString(ast::ExprFString { value, .. }) => {
             for part in value {
                 match part {
                     ast::FStringPart::Literal(literal) => {
@@ -71,7 +71,7 @@ pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, string: StringLike)
                 }
             }
         }
-        StringLike::BytesLiteral(_) => (),
+        StringLike::Bytes(_) => (),
     }
 }
 

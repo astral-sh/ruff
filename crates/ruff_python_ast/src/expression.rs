@@ -399,35 +399,35 @@ impl LiteralExpressionRef<'_> {
 /// f-strings.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum StringLike<'a> {
-    StringLiteral(&'a ast::ExprStringLiteral),
-    BytesLiteral(&'a ast::ExprBytesLiteral),
-    FStringLiteral(&'a ast::ExprFString),
+    String(&'a ast::ExprStringLiteral),
+    Bytes(&'a ast::ExprBytesLiteral),
+    FString(&'a ast::ExprFString),
 }
 
 impl<'a> From<&'a ast::ExprStringLiteral> for StringLike<'a> {
     fn from(value: &'a ast::ExprStringLiteral) -> Self {
-        StringLike::StringLiteral(value)
+        StringLike::String(value)
     }
 }
 
 impl<'a> From<&'a ast::ExprBytesLiteral> for StringLike<'a> {
     fn from(value: &'a ast::ExprBytesLiteral) -> Self {
-        StringLike::BytesLiteral(value)
+        StringLike::Bytes(value)
     }
 }
 
 impl<'a> From<&'a ast::ExprFString> for StringLike<'a> {
     fn from(value: &'a ast::ExprFString) -> Self {
-        StringLike::FStringLiteral(value)
+        StringLike::FString(value)
     }
 }
 
 impl Ranged for StringLike<'_> {
     fn range(&self) -> TextRange {
         match self {
-            StringLike::StringLiteral(literal) => literal.range(),
-            StringLike::BytesLiteral(literal) => literal.range(),
-            StringLike::FStringLiteral(literal) => literal.range(),
+            StringLike::String(literal) => literal.range(),
+            StringLike::Bytes(literal) => literal.range(),
+            StringLike::FString(literal) => literal.range(),
         }
     }
 }

@@ -193,7 +193,7 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &mut Checker, string_l
     };
 
     match string_like {
-        StringLike::StringLiteral(node) => {
+        StringLike::String(node) => {
             for literal in &node.value {
                 let text = checker.locator().slice(literal);
                 ambiguous_unicode_character(
@@ -205,7 +205,7 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &mut Checker, string_l
                 );
             }
         }
-        StringLike::FStringLiteral(node) => {
+        StringLike::FString(node) => {
             for part in &node.value {
                 match part {
                     ast::FStringPart::Literal(literal) => {
@@ -233,7 +233,7 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &mut Checker, string_l
                 }
             }
         }
-        StringLike::BytesLiteral(_) => (),
+        StringLike::Bytes(_) => (),
     }
 }
 
