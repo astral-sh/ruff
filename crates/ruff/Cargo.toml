@@ -20,6 +20,7 @@ ruff_macros = { path = "../ruff_macros" }
 ruff_notebook = { path = "../ruff_notebook" }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
+ruff_server = { path = "../ruff_server" }
 ruff_source_file = { path = "../ruff_source_file" }
 ruff_text_size = { path = "../ruff_text_size" }
 ruff_workspace = { path = "../ruff_workspace" }
@@ -52,6 +53,8 @@ tempfile = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true, features = ["log"] }
+tracing-subscriber = { workspace = true, features = ["registry"]}
+tracing-tree = { workspace = true }
 walkdir = { workspace = true }
 wild = { workspace = true }
 

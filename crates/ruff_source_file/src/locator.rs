@@ -23,6 +23,13 @@ impl<'a> Locator<'a> {
         }
     }
 
+    pub const fn with_index(contents: &'a str, index: LineIndex) -> Self {
+        Self {
+            contents,
+            index: OnceCell::with_value(index),
+        }
+    }
+
     #[deprecated(
         note = "This is expensive, avoid using outside of the diagnostic phase. Prefer the other `Locator` methods instead."
     )]
