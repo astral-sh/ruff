@@ -355,9 +355,6 @@ impl fmt::Debug for StringKind {
 
 impl From<StringKind> for ruff_python_ast::StringLiteralFlags {
     fn from(value: StringKind) -> ruff_python_ast::StringLiteralFlags {
-        debug_assert!(!value.is_f_string());
-        debug_assert!(!value.is_byte_string());
-
         let mut new = ruff_python_ast::StringLiteralFlags::default();
         if value.quote_style().is_double() {
             new = new.with_double_quotes();
@@ -365,14 +362,20 @@ impl From<StringKind> for ruff_python_ast::StringLiteralFlags {
         if value.is_triple_quoted() {
             new = new.with_triple_quotes();
         }
-        new.with_prefix({
-            if value.is_u_string() {
-                debug_assert!(!value.is_raw_string());
-                StringLiteralPrefix::UString
-            } else if value.is_raw_string() {
-                StringLiteralPrefix::RString
-            } else {
-                StringLiteralPrefix::None
+        new.with_prefix(match value.prefix() {
+            None => StringLiteralPrefix::Empty,
+            Some(StringPrefix::Unicode) => StringLiteralPrefix::Unicode,
+            Some(StringPrefix::Raw { uppercase: true }) => {
+                StringLiteralPrefix::Raw { uppercase: true }
+            }
+            Some(StringPrefix::Raw { uppercase: false }) => {
+                StringLiteralPrefix::Raw { uppercase: false }
+            }
+            Some(StringPrefix::Bytes | StringPrefix::RawBytes { .. }) => {
+                panic!("Attempting to convert a bytestring into a non-bytestring!")
+            }
+            Some(StringPrefix::Format | StringPrefix::RawFormat { .. }) => {
+                panic!("Attempting to convert an f-string into a non-fstring!")
             }
         })
     }

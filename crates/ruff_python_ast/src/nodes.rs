@@ -1428,7 +1428,7 @@ impl StringLiteralValue {
     pub fn is_unicode(&self) -> bool {
         self.iter()
             .next()
-            .map_or(false, |part| part.flags.is_u_string())
+            .map_or(false, |part| part.flags.prefix().is_unicode())
     }
 
     /// Returns a slice of all the [`StringLiteral`] parts contained in this value.
@@ -1544,24 +1544,32 @@ impl Default for StringLiteralValueInner {
 bitflags! {
     #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
     struct StringLiteralFlagsInner: u8 {
-        /// The string uses double quotes (`"`).
-        /// If this flag is not set, the string uses single quotes (`'`).
+        /// The string uses double quotes (e.g. `"foo"`).
+        /// If this flag is not set, the string uses single quotes (`'foo'`).
         const DOUBLE = 1 << 0;
 
-        /// The string is triple-quoted:
+        /// The string is triple-quoted (`"""foo"""`):
         /// it begins and ends with three consecutive quote characters.
         const TRIPLE_QUOTED = 1 << 1;
 
-        /// The string has a `u` or `U` prefix.
+        /// The string has a `u` or `U` prefix, e.g. `u"foo"`.
         /// While this prefix is a no-op at runtime,
         /// strings with this prefix can have no other prefixes set;
         /// it is therefore invalid for this flag to be set
         /// if `R_PREFIX` is also set.
         const U_PREFIX = 1 << 2;
 
-        /// The string has an `r` or `R` prefix, meaning it is a raw string.
+        /// The string has an `r` prefix, meaning it is a raw string
+        /// with a lowercase 'r' (e.g. `r"foo\."`).
         /// It is invalid to set this flag if `U_PREFIX` is also set.
-        const R_PREFIX = 1 << 3;
+        const R_PREFIX_LOWER = 1 << 3;
+
+        /// The string has an `R` prefix, meaning it is a raw string
+        /// with an uppercase 'R' (e.g. `R'foo\d'`).
+        /// See https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
+        /// for why we track the casing of the `r` prefix,
+        /// but not for any other prefix
+        const R_PREFIX_UPPER = 1 << 4;
     }
 }
 
@@ -1586,25 +1594,39 @@ impl StringLiteralFlags {
     #[must_use]
     pub fn with_prefix(mut self, prefix: StringLiteralPrefix) -> Self {
         match prefix {
-            StringLiteralPrefix::None => {}
-            StringLiteralPrefix::RString => self.0 |= StringLiteralFlagsInner::R_PREFIX,
-            StringLiteralPrefix::UString => self.0 |= StringLiteralFlagsInner::U_PREFIX,
+            StringLiteralPrefix::Empty => {}
+            StringLiteralPrefix::Raw { uppercase: false } => {
+                self.0 |= StringLiteralFlagsInner::R_PREFIX_LOWER;
+            }
+            StringLiteralPrefix::Raw { uppercase: true } => {
+                self.0 |= StringLiteralFlagsInner::R_PREFIX_UPPER;
+            }
+            StringLiteralPrefix::Unicode => self.0 |= StringLiteralFlagsInner::U_PREFIX,
         };
         self
     }
 
-    pub const fn prefix(self) -> &'static str {
+    pub const fn prefix(self) -> StringLiteralPrefix {
         if self.0.contains(StringLiteralFlagsInner::U_PREFIX) {
-            debug_assert!(!self.0.contains(StringLiteralFlagsInner::R_PREFIX));
-            "u"
-        } else if self.0.contains(StringLiteralFlagsInner::R_PREFIX) {
-            "r"
+            debug_assert!(!self.0.intersects(
+                StringLiteralFlagsInner::R_PREFIX_LOWER
+                    .union(StringLiteralFlagsInner::R_PREFIX_UPPER)
+            ));
+            StringLiteralPrefix::Unicode
+        } else if self.0.contains(StringLiteralFlagsInner::R_PREFIX_LOWER) {
+            debug_assert!(!self.0.contains(StringLiteralFlagsInner::R_PREFIX_UPPER));
+            StringLiteralPrefix::Raw { uppercase: false }
+        } else if self.0.contains(StringLiteralFlagsInner::R_PREFIX_UPPER) {
+            StringLiteralPrefix::Raw { uppercase: true }
         } else {
-            ""
+            StringLiteralPrefix::Empty
         }
     }
 
-    /// Does the string use single or double quotes in its opener and closer?
+    /// Return the quoting style (single or double quotes)
+    /// used by the string's opener and closer:
+    /// - `"a"` -> `QuoteStyle::Double`
+    /// - `'a'` -> `QuoteStyle::Single`
     pub const fn quote_style(self) -> Quote {
         if self.0.contains(StringLiteralFlagsInner::DOUBLE) {
             Quote::Double
@@ -1613,20 +1635,11 @@ impl StringLiteralFlags {
         }
     }
 
-    /// Is the string triple-quoted, i.e.,
-    /// does it begin and end with three consecutive quote characters?
+    /// Return `true` if the string is triple-quoted, i.e.,
+    /// it begins and ends with three consecutive quote characters.
+    /// For example: `"""bar"""`
     pub const fn is_triple_quoted(self) -> bool {
         self.0.contains(StringLiteralFlagsInner::TRIPLE_QUOTED)
-    }
-
-    /// Does the string have a `u` or `U` prefix?
-    pub const fn is_u_string(&self) -> bool {
-        self.0.contains(StringLiteralFlagsInner::U_PREFIX)
-    }
-
-    /// Does the string have an `r` or `R` prefix?
-    pub const fn is_r_string(&self) -> bool {
-        self.0.contains(StringLiteralFlagsInner::R_PREFIX)
     }
 }
 
@@ -1634,7 +1647,7 @@ impl fmt::Debug for StringLiteralFlags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("StringLiteralFlags")
             .field("quote_style", &self.quote_style())
-            .field("prefix", &self.prefix())
+            .field("prefix", &self.prefix().as_str())
             .field("triple_quoted", &self.is_triple_quoted())
             .finish()
     }
@@ -1644,19 +1657,41 @@ impl fmt::Debug for StringLiteralFlags {
 ///
 /// Bytestrings and f-strings are excluded from this enumeration,
 /// as they are represented by different AST nodes.
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, is_macro::Is)]
 pub enum StringLiteralPrefix {
     /// Just a regular string with no prefixes
-    #[default]
-    None,
+    Empty,
 
-    /// A string with a `u` or `U` prefix.
-    /// This is a no-op at runtime,
-    /// but is mutually exclusive with a string having an `r` prefix.
-    UString,
+    /// A string with a `u` or `U` prefix, e.g. `u"foo"`.
+    /// Note that, despite this variant's name,
+    /// it is in fact a no-op at runtime to use the `u` or `U` prefix
+    /// in Python. All Python-3 strings are unicode strings;
+    /// this prefix is only allowed in Python 3 for backwards compatibility
+    /// with Python 2. However, using this prefix in a Python string
+    /// is mutually exclusive with an `r` or `R` prefix.
+    Unicode,
 
-    /// A "raw" string, that has an `r` or `R` prefix
-    RString,
+    /// A "raw" string, that has an `r` or `R` prefix,
+    /// e.g. `r"foo\."` or `R'bar\d'`.
+    Raw { uppercase: bool },
+}
+
+impl StringLiteralPrefix {
+    /// Return a `str` representation of the prefix
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Empty => "",
+            Self::Unicode => "u",
+            Self::Raw { uppercase: true } => "R",
+            Self::Raw { uppercase: false } => "r",
+        }
+    }
+}
+
+impl fmt::Display for StringLiteralPrefix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
 }
 
 /// An AST node that represents a single string literal which is part of an

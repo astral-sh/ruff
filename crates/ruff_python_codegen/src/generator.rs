@@ -1268,10 +1268,11 @@ impl<'a> Generator<'a> {
     }
 
     fn unparse_string_literal(&mut self, string_literal: &ast::StringLiteral) {
-        if string_literal.flags.is_u_string() {
+        let ast::StringLiteral { value, flags, .. } = string_literal;
+        if flags.prefix().is_unicode() {
             self.p("u");
         }
-        self.p_str_repr(&string_literal.value);
+        self.p_str_repr(value);
     }
 
     fn unparse_string_literal_value(&mut self, value: &ast::StringLiteralValue) {
