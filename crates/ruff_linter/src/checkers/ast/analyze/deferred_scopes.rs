@@ -43,6 +43,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::UnusedStaticMethodArgument,
         Rule::UnusedVariable,
         Rule::SingledispatchMethod,
+        Rule::MethodCacheMaxSizeNone,
     ]) {
         return;
     }
@@ -395,6 +396,10 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
             if checker.enabled(Rule::SingledispatchMethod) {
                 pylint::rules::singledispatch_method(checker, scope, &mut diagnostics);
+            }
+
+            if checker.enabled(Rule::MethodCacheMaxSizeNone) {
+                pylint::rules::method_cache_size_none(checker, scope, &mut diagnostics);
             }
 
             if checker.any_enabled(&[

@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+method_cache_max_size_none.py:8:5: PLW1518 Method decorated with `@lru_cache(maxsize=None)` or `@cache` is never garbage collected.
+   |
+ 6 |         self.result = []
+ 7 | 
+ 8 |     @functools.lru_cache(maxsize=None)  # [method-cache-max-size-none]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW1518
+ 9 |     def fibonacci(self, n):
+10 |         if n in {0, 1}:
+   |
+
+method_cache_max_size_none.py:17:5: PLW1518 Method decorated with `@lru_cache(maxsize=None)` or `@cache` is never garbage collected.
+   |
+15 |         return next
+16 | 
+17 |     @functools.cache  # [method-cache-max-size-none]
+   |     ^^^^^^^^^^^^^^^^ PLW1518
+18 |     def fibonacci2(self, n):
+19 |         if n in {0, 1}:
+   |
