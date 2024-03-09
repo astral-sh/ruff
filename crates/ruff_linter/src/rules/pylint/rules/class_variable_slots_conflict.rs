@@ -95,7 +95,7 @@ fn get_slots_from_expr(expr: &Expr) -> Option<FxHashMap<&str, &TextRange>> {
                 None
             } else {
                 if let [Expr::Starred(ExprStarred { value, .. })] = &elts[..] {
-                    get_slots_from_expr(&**value)
+                    get_slots_from_expr(value)
                 } else {
                     Some(
                         elts.iter()
@@ -123,7 +123,7 @@ fn get_slots(body: &[Stmt]) -> Option<FxHashMap<&str, &TextRange>> {
         if let Stmt::Assign(StmtAssign { targets, value, .. }) = stmt {
             if let [Expr::Name(ExprName { id, .. }), ..] = &targets[..] {
                 if id == "__slots__" {
-                    return get_slots_from_expr(&**value);
+                    return get_slots_from_expr(value);
                 }
             } else if let [Expr::Tuple(ExprTuple { elts, .. })] = &targets[..] {
                 if let Some(index) = elts.iter().enumerate().find_map(|item| {
@@ -202,6 +202,6 @@ pub(crate) fn class_variable_slots_conflict(
 ) {
     if let Some(slots) = get_slots(body) {
         let diagnostics = traverse_class_body(body, &slots);
-        checker.diagnostics.extend(diagnostics)
+        checker.diagnostics.extend(diagnostics);
     }
 }
