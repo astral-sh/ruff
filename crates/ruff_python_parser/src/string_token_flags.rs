@@ -41,11 +41,18 @@ bitflags! {
         /// but can have no other prefixes.
         const F_PREFIX = 1 << 4;
 
-        /// The string has an `r` or `R` prefix, meaning it is a raw string.
+        /// The string has an `r` prefix, meaning it is a raw string.
         /// F-strings and byte-strings can be raw,
         /// as can strings with no other prefixes.
         /// U-strings cannot be raw.
-        const R_PREFIX = 1 << 5;
+        const R_PREFIX_LOWER = 1 << 5;
+
+        /// The string has an `R` prefix, meaning it is a raw string.
+        /// The casing of the `r`/`R` has no semantic significance at runtime;
+        /// see https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
+        /// for why we track the casing of the `r` prefix,
+        /// but not for any other prefix
+        const R_PREFIX_UPPER = 1 << 6;
     }
 }
 
@@ -71,7 +78,7 @@ pub(crate) enum StringPrefix {
     /// F-strings and byte-strings can be raw,
     /// as can strings with no other prefixes.
     /// U-strings cannot be raw.
-    Raw,
+    Raw { uppercase: bool },
 
     /// The string has a `f` or `F` prefix, meaning it is an f-string.
     /// F-strings can also be raw strings,
@@ -89,13 +96,13 @@ pub(crate) enum StringPrefix {
     /// `{"rf", "rF", "Rf", "RF", "fr", "fR", "Fr", "FR"}`
     /// Semantically, these all have the same meaning:
     /// the string is both an f-string and a raw-string
-    RawFormat,
+    RawFormat { uppercase_r: bool },
 
     /// A string that has has any one of the prefixes
     /// `{"rb", "rB", "Rb", "RB", "br", "bR", "Br", "BR"}`
     /// Semantically, these all have the same meaning:
     /// the string is both an bytestring and a raw-string
-    RawBytes,
+    RawBytes { uppercase_r: bool },
 }
 
 impl TryFrom<char> for StringPrefix {
@@ -103,7 +110,8 @@ impl TryFrom<char> for StringPrefix {
 
     fn try_from(value: char) -> Result<Self, String> {
         let result = match value {
-            'r' | 'R' => Self::Raw,
+            'r' => Self::Raw { uppercase: false },
+            'R' => Self::Raw { uppercase: true },
             'u' | 'U' => Self::Unicode,
             'b' | 'B' => Self::Bytes,
             'f' | 'F' => Self::Format,
@@ -117,11 +125,14 @@ impl TryFrom<[char; 2]> for StringPrefix {
     type Error = String;
 
     fn try_from(value: [char; 2]) -> Result<Self, String> {
-        match value {
-            ['r' | 'R', 'f' | 'F'] | ['f' | 'F', 'r' | 'R'] => Ok(Self::RawFormat),
-            ['r' | 'R', 'b' | 'B'] | ['b' | 'B', 'r' | 'R'] => Ok(Self::RawBytes),
-            _ => Err(format!("Unexpected prefix '{}{}'", value[0], value[1])),
-        }
+        let result = match value {
+            ['r', 'f' | 'F'] | ['f' | 'F', 'r'] => Self::RawFormat { uppercase_r: false },
+            ['R', 'f' | 'F'] | ['f' | 'F', 'R'] => Self::RawFormat { uppercase_r: true },
+            ['r', 'b' | 'B'] | ['b' | 'B', 'r'] => Self::RawBytes { uppercase_r: false },
+            ['R', 'b' | 'B'] | ['b' | 'B', 'R'] => Self::RawBytes { uppercase_r: true },
+            _ => return Err(format!("Unexpected prefix '{}{}'", value[0], value[1])),
+        };
+        Ok(result)
     }
 }
 
@@ -130,9 +141,20 @@ impl StringPrefix {
         match self {
             Self::Bytes => StringFlags::B_PREFIX,
             Self::Format => StringFlags::F_PREFIX,
-            Self::Raw => StringFlags::R_PREFIX,
-            Self::RawBytes => StringFlags::R_PREFIX.union(StringFlags::B_PREFIX),
-            Self::RawFormat => StringFlags::R_PREFIX.union(StringFlags::F_PREFIX),
+            Self::Raw { uppercase: true } => StringFlags::R_PREFIX_UPPER,
+            Self::Raw { uppercase: false } => StringFlags::R_PREFIX_LOWER,
+            Self::RawBytes { uppercase_r: true } => {
+                StringFlags::R_PREFIX_UPPER.union(StringFlags::B_PREFIX)
+            }
+            Self::RawBytes { uppercase_r: false } => {
+                StringFlags::R_PREFIX_LOWER.union(StringFlags::B_PREFIX)
+            }
+            Self::RawFormat { uppercase_r: true } => {
+                StringFlags::R_PREFIX_UPPER.union(StringFlags::F_PREFIX)
+            }
+            Self::RawFormat { uppercase_r: false } => {
+                StringFlags::R_PREFIX_LOWER.union(StringFlags::F_PREFIX)
+            }
             Self::Unicode => StringFlags::U_PREFIX,
         }
     }
@@ -157,7 +179,8 @@ impl StringKind {
 
     /// Does the string have an `r` or `R` prefix?
     pub const fn is_raw_string(self) -> bool {
-        self.0.contains(StringFlags::R_PREFIX)
+        self.0
+            .intersects(StringFlags::R_PREFIX_LOWER.union(StringFlags::R_PREFIX_UPPER))
     }
 
     /// Does the string have an `f` or `F` prefix?
@@ -205,19 +228,28 @@ impl StringKind {
     /// in the string's opener.
     pub const fn prefix_str(self) -> &'static str {
         if self.0.contains(StringFlags::F_PREFIX) {
-            if self.0.contains(StringFlags::R_PREFIX) {
+            if self.0.contains(StringFlags::R_PREFIX_LOWER) {
                 return "rf";
+            }
+            if self.0.contains(StringFlags::R_PREFIX_UPPER) {
+                return "Rf";
             }
             return "f";
         }
         if self.0.contains(StringFlags::B_PREFIX) {
-            if self.0.contains(StringFlags::R_PREFIX) {
+            if self.0.contains(StringFlags::R_PREFIX_LOWER) {
                 return "rb";
+            }
+            if self.0.contains(StringFlags::R_PREFIX_LOWER) {
+                return "Rb";
             }
             return "b";
         }
-        if self.0.contains(StringFlags::R_PREFIX) {
+        if self.0.contains(StringFlags::R_PREFIX_LOWER) {
             return "r";
+        }
+        if self.0.contains(StringFlags::R_PREFIX_UPPER) {
+            return "R";
         }
         if self.0.contains(StringFlags::U_PREFIX) {
             return "u";

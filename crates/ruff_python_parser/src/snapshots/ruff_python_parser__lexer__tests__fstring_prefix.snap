@@ -62,7 +62,7 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "rf",
+                prefix: "Rf",
                 triple_quoted: false,
                 quote_style: Double,
             },
@@ -76,7 +76,7 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "rf",
+                prefix: "Rf",
                 triple_quoted: false,
                 quote_style: Double,
             },
@@ -118,7 +118,7 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "rf",
+                prefix: "Rf",
                 triple_quoted: false,
                 quote_style: Double,
             },
@@ -132,7 +132,7 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "rf",
+                prefix: "Rf",
                 triple_quoted: false,
                 quote_style: Double,
             },

@@ -174,12 +174,21 @@ impl<'source> Lexer<'source> {
         match (first, self.cursor.first()) {
             ('f' | 'F', quote @ ('\'' | '"')) => {
                 self.cursor.bump();
-                return Ok(self.lex_fstring_start(quote, false));
+                return Ok(self.lex_fstring_start(quote, StringPrefix::Format));
             }
-            ('r' | 'R', 'f' | 'F') | ('f' | 'F', 'r' | 'R') if is_quote(self.cursor.second()) => {
+            ('r', 'f' | 'F') | ('f' | 'F', 'r') if is_quote(self.cursor.second()) => {
                 self.cursor.bump();
                 let quote = self.cursor.bump().unwrap();
-                return Ok(self.lex_fstring_start(quote, true));
+                return Ok(
+                    self.lex_fstring_start(quote, StringPrefix::RawFormat { uppercase_r: false })
+                );
+            }
+            ('R', 'f' | 'F') | ('f' | 'F', 'R') if is_quote(self.cursor.second()) => {
+                self.cursor.bump();
+                let quote = self.cursor.bump().unwrap();
+                return Ok(
+                    self.lex_fstring_start(quote, StringPrefix::RawFormat { uppercase_r: true })
+                );
             }
             (_, quote @ ('\'' | '"')) => {
                 if let Ok(prefix) = StringPrefix::try_from(first) {
@@ -535,15 +544,11 @@ impl<'source> Lexer<'source> {
     }
 
     /// Lex a f-string start token.
-    fn lex_fstring_start(&mut self, quote: char, is_raw_string: bool) -> Tok {
+    fn lex_fstring_start(&mut self, quote: char, prefix: StringPrefix) -> Tok {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), quote);
 
-        let mut kind = StringKind::from_prefix(Some(if is_raw_string {
-            StringPrefix::RawFormat
-        } else {
-            StringPrefix::Format
-        }));
+        let mut kind = StringKind::from_prefix(Some(prefix));
 
         if quote == '"' {
             kind = kind.with_double_quotes();
