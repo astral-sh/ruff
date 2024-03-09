@@ -13,7 +13,7 @@ class Ok:  # OK
         print("c")
 
 
-class B:
+class B:  # Not OK
     __slots__ = ("a", "b", "c")
     b = None
 
@@ -29,19 +29,19 @@ class B:
         print("c") 
         
         
-class CheckList:  # Not ok
+class CheckList:  # Not OK
     __slots__ = ["a", "b", "c"]
     a = None
     b, c = 1, 2  # these aren't detected properly
 
 
-class CheckSet:
+class CheckSet:  # Not OK
     __slots__ = {"a", "b", "c"}
     a = None
     b, c = 1, 2    
     
     
-class CheckDict:
+class CheckDict:  # Not OK
     __slots__ = {"a": 0, "b": 1, "c": 2}
     a = None
     b, c = None, None
@@ -55,23 +55,30 @@ class NotOk:
     a = None
 
 
-class CheckSomethingElse:
-    __slots__ = (*["a"],)
-    age = None
+class CheckUnpackList:  # Not OK
+    __slots__ = (*["a", "b"],)
+    a = None
 
 
-class CheckIf:
+class CheckUnpackTuple: # Not OK
+    __slots__ = (*("a", "b"),)
+    a = None
+
+
+class CheckIf:  # Not OK
     __slots__ = ["a"] if True else []
     a = None
 
 
-class CheckStaticMethod:
-    __slots__ = ("a")
-    
-    @staticmethod
-    def a():  # OK
-        pass
+class CheckTupleWithOneElement:
+    __slots__ = "a",
+    a = None
 
 
-class CheckOtherUnpack:
-    __slots__, age = (("a",), 0)  # TODO
+class CheckOtherUnpack:  # Not OK
+    __slots__, a = (("a",), 0)
+
+
+class ShouldNotBeOk:  # OK as slots is a string
+    __slots__ = "a"
+    a = None

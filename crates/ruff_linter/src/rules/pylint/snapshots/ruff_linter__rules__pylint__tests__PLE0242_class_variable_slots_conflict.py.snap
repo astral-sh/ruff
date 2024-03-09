@@ -1,0 +1,111 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+class_variable_slots_conflict.py:17:18: PLE0242 Value `a` in slots conflicts with class variable
+   |
+16 | class B:  # Not OK
+17 |     __slots__ = ("a", "b", "c")
+   |                  ^^^ PLE0242
+18 |     b = None
+   |
+
+class_variable_slots_conflict.py:17:23: PLE0242 Value `b` in slots conflicts with class variable
+   |
+16 | class B:  # Not OK
+17 |     __slots__ = ("a", "b", "c")
+   |                       ^^^ PLE0242
+18 |     b = None
+   |
+
+class_variable_slots_conflict.py:17:28: PLE0242 Value `c` in slots conflicts with class variable
+   |
+16 | class B:  # Not OK
+17 |     __slots__ = ("a", "b", "c")
+   |                            ^^^ PLE0242
+18 |     b = None
+   |
+
+class_variable_slots_conflict.py:33:18: PLE0242 Value `a` in slots conflicts with class variable
+   |
+32 | class CheckList:  # Not OK
+33 |     __slots__ = ["a", "b", "c"]
+   |                  ^^^ PLE0242
+34 |     a = None
+35 |     b, c = 1, 2  # these aren't detected properly
+   |
+
+class_variable_slots_conflict.py:33:23: PLE0242 Value `b` in slots conflicts with class variable
+   |
+32 | class CheckList:  # Not OK
+33 |     __slots__ = ["a", "b", "c"]
+   |                       ^^^ PLE0242
+34 |     a = None
+35 |     b, c = 1, 2  # these aren't detected properly
+   |
+
+class_variable_slots_conflict.py:39:18: PLE0242 Value `a` in slots conflicts with class variable
+   |
+38 | class CheckSet:  # Not OK
+39 |     __slots__ = {"a", "b", "c"}
+   |                  ^^^ PLE0242
+40 |     a = None
+41 |     b, c = 1, 2    
+   |
+
+class_variable_slots_conflict.py:39:23: PLE0242 Value `b` in slots conflicts with class variable
+   |
+38 | class CheckSet:  # Not OK
+39 |     __slots__ = {"a", "b", "c"}
+   |                       ^^^ PLE0242
+40 |     a = None
+41 |     b, c = 1, 2    
+   |
+
+class_variable_slots_conflict.py:45:18: PLE0242 Value `a` in slots conflicts with class variable
+   |
+44 | class CheckDict:  # Not OK
+45 |     __slots__ = {"a": 0, "b": 1, "c": 2}
+   |                  ^^^ PLE0242
+46 |     a = None
+47 |     b, c = None, None
+   |
+
+class_variable_slots_conflict.py:45:26: PLE0242 Value `b` in slots conflicts with class variable
+   |
+44 | class CheckDict:  # Not OK
+45 |     __slots__ = {"a": 0, "b": 1, "c": 2}
+   |                          ^^^ PLE0242
+46 |     a = None
+47 |     b, c = None, None
+   |
+
+class_variable_slots_conflict.py:59:20: PLE0242 Value `a` in slots conflicts with class variable
+   |
+58 | class CheckUnpackList:  # Not OK
+59 |     __slots__ = (*["a", "b"],)
+   |                    ^^^ PLE0242
+60 |     a = None
+   |
+
+class_variable_slots_conflict.py:64:20: PLE0242 Value `a` in slots conflicts with class variable
+   |
+63 | class CheckUnpackTuple: # Not OK
+64 |     __slots__ = (*("a", "b"),)
+   |                    ^^^ PLE0242
+65 |     a = None
+   |
+
+class_variable_slots_conflict.py:74:17: PLE0242 Value `a` in slots conflicts with class variable
+   |
+73 | class CheckTupleWithOneElement:
+74 |     __slots__ = "a",
+   |                 ^^^ PLE0242
+75 |     a = None
+   |
+
+class_variable_slots_conflict.py:79:22: PLE0242 Value `a` in slots conflicts with class variable
+   |
+78 | class CheckOtherUnpack:  # Not OK
+79 |     __slots__, a = (("a",), 0)
+   |                      ^^^ PLE0242
+   |

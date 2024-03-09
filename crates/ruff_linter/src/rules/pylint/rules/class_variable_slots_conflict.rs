@@ -1,8 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
-    Decorator, Expr, ExprDict, ExprList, ExprName, ExprSet, ExprStarred, ExprStringLiteral,
-    ExprTuple, Stmt, StmtAssign, StmtClassDef, StmtFunctionDef,
+    Expr, ExprDict, ExprList, ExprName, ExprSet, ExprStarred, ExprStringLiteral, ExprTuple, Stmt,
+    StmtAssign, StmtClassDef, StmtFunctionDef,
 };
 use ruff_text_size::TextRange;
 
@@ -94,24 +94,30 @@ fn get_slots_from_expr(expr: &Expr) -> Option<FxHashMap<&str, &TextRange>> {
             if elts.is_empty() {
                 None
             } else {
-                Some(
-                    elts.iter()
-                        .filter_map(|item| {
-                            if let Expr::StringLiteral(ExprStringLiteral { range, value }) = item {
-                                Some((value.to_str(), range))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<FxHashMap<_, _>>(),
-                )
+                if let [Expr::Starred(ExprStarred { value, .. })] = &elts[..] {
+                    get_slots_from_expr(&**value)
+                } else {
+                    Some(
+                        elts.iter()
+                            .filter_map(|item| {
+                                if let Expr::StringLiteral(ExprStringLiteral { range, value }) =
+                                    item
+                                {
+                                    Some((value.to_str(), range))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<FxHashMap<_, _>>(),
+                    )
+                }
             }
         }
-        Expr::Starred(ExprStarred { value, .. }) => get_slots_from_expr(&**value),
         _ => None,
     }
 }
 
+// Takes the body of the class and finds if `__slots__` is in there
 fn get_slots(body: &[Stmt]) -> Option<FxHashMap<&str, &TextRange>> {
     for stmt in body {
         if let Stmt::Assign(StmtAssign { targets, value, .. }) = stmt {
@@ -119,28 +125,29 @@ fn get_slots(body: &[Stmt]) -> Option<FxHashMap<&str, &TextRange>> {
                 if id == "__slots__" {
                     return get_slots_from_expr(&**value);
                 }
+            } else if let [Expr::Tuple(ExprTuple { elts, .. })] = &targets[..] {
+                if let Some(index) = elts.iter().enumerate().find_map(|item| {
+                    if let (tuple_idx, Expr::Name(ExprName { id, .. })) = item {
+                        if id == "__slots__" {
+                            return Some(tuple_idx);
+                        }
+                    }
+                    None
+                }) {
+                    // Some, find the element in the next tuple
+                    if let Expr::Tuple(ExprTuple { elts, .. }) = &**value {
+                        if index < elts.len() {
+                            return get_slots_from_expr(&elts[index]);
+                        }
+                    }
+                }
             }
         }
     }
     None
 }
 
-fn is_static_method(decorator_list: &[Decorator]) -> bool {
-    decorator_list
-        .iter()
-        .find(|decorator| {
-            if let Expr::Name(ExprName { id, .. }) = &decorator.expression {
-                if id == "staticmethod" {
-                    return true;
-                }
-            }
-            false
-        })
-        .is_some()
-}
-
 fn traverse_class_body(body: &[Stmt], slots: &FxHashMap<&str, &TextRange>) -> Vec<Diagnostic> {
-    // let mut out = vec![];
     body.iter()
         .filter_map(|stmt| {
             match stmt {
@@ -158,11 +165,11 @@ fn traverse_class_body(body: &[Stmt], slots: &FxHashMap<&str, &TextRange>) -> Ve
                         }
                     } else if let [Expr::Tuple(ExprTuple { elts, .. })] = &targets[..] {
                         for expr in elts {
-                            if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = expr {
-                                if let Some(range) = slots.get(&value.to_str()) {
+                            if let Expr::Name(ExprName { id, .. }) = expr {
+                                if let Some(range) = slots.get(id.as_str()) {
                                     return Some(Diagnostic::new(
                                         ClassVariableSlotsConflict {
-                                            slot_conflict: value.to_string(),
+                                            slot_conflict: id.to_owned(),
                                         },
                                         *range.to_owned(),
                                     ));
@@ -171,20 +178,14 @@ fn traverse_class_body(body: &[Stmt], slots: &FxHashMap<&str, &TextRange>) -> Ve
                         }
                     }
                 }
-                Stmt::FunctionDef(StmtFunctionDef {
-                    decorator_list,
-                    name,
-                    ..
-                }) => {
-                    if !is_static_method(decorator_list) {
-                        if let Some(range) = slots.get(&name.as_str()) {
-                            return Some(Diagnostic::new(
-                                ClassVariableSlotsConflict {
-                                    slot_conflict: name.to_string(),
-                                },
-                                *range.to_owned(),
-                            ));
-                        }
+                Stmt::FunctionDef(StmtFunctionDef { name, .. }) => {
+                    if let Some(range) = slots.get(&name.as_str()) {
+                        return Some(Diagnostic::new(
+                            ClassVariableSlotsConflict {
+                                slot_conflict: name.to_string(),
+                            },
+                            *range.to_owned(),
+                        ));
                     }
                 }
                 _ => (),
@@ -193,57 +194,6 @@ fn traverse_class_body(body: &[Stmt], slots: &FxHashMap<&str, &TextRange>) -> Ve
         })
         .collect::<Vec<_>>()
 }
-
-// fn traverse_class_body(body: &[Stmt], slots: &FxHashMap<&str, &TextRange>) -> Vec<Diagnostic> {
-//     let mut out = vec![];
-//     for stmt in body {
-//         // match on Assign, match on FunctionDef,
-//         // match stmt {
-
-//         // }
-//         match stmt {
-//             Stmt::Assign(StmtAssign { targets, value, .. }) => {
-//                 if let [Expr::Name(ExprName { id, .. })] = &targets[..] {
-//                     if let Some(range) = slots.get(&id.as_str()) {
-//                         out.push(Diagnostic::new(
-//                             ClassVariableSlotsConflict {
-//                                 slot_conflict: id.to_owned(),
-//                             },
-//                             *range.to_owned(),
-//                         ))
-//                     }
-//                 } else if let [Expr::Tuple(ExprTuple { elts, .. })] = &targets[..] {
-//                     for expr in elts {
-//                         if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = expr {
-//                             if let Some(range) = slots.get(&value.to_str()) {
-//                                 out.push(Diagnostic::new(
-//                                     ClassVariableSlotsConflict {
-//                                         slot_conflict: value.to_string(),
-//                                     },
-//                                     *range.to_owned(),
-//                                 ))
-//                             }
-//                         }
-//                     }
-//                 }
-//             }
-//             Stmt::FunctionDef(StmtFunctionDef { decorator_list, name, .. }) => {
-//                 if !is_static_method(decorator_list) {
-//                     if let Some(range) = slots.get(&name.as_str()) {
-//                         out.push(Diagnostic::new(
-//                             ClassVariableSlotsConflict {
-//                                 slot_conflict: name.to_string(),
-//                             },
-//                             *range.to_owned(),
-//                         ));
-//                     }
-//                 }
-//             }
-//             _ => (),
-//         }
-//     }
-//     out
-// }
 
 /// PLE0242
 pub(crate) fn class_variable_slots_conflict(
