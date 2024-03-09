@@ -17,7 +17,7 @@ expression: "parse_suite(r#\"f\"\"\"#).unwrap()"
                                     elements: [],
                                     flags: FStringFlags {
                                         quote_style: Double,
-                                        raw: false,
+                                        prefix: "f",
                                         triple_quoted: false,
                                     },
                                 },

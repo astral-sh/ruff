@@ -2,7 +2,7 @@ use std::fmt;
 
 use bitflags::bitflags;
 
-use ruff_python_ast::{str::Quote, StringLiteralPrefix};
+use ruff_python_ast::{str::Quote, FStringPrefix, StringLiteralPrefix};
 use ruff_text_size::{TextLen, TextSize};
 
 bitflags! {
@@ -158,6 +158,20 @@ impl StringPrefix {
             Self::Unicode => StringFlags::U_PREFIX,
         }
     }
+
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Bytes => "b",
+            Self::Format => "f",
+            Self::Unicode => "u",
+            Self::Raw { uppercase: true } => "R",
+            Self::Raw { uppercase: false } => "r",
+            Self::RawBytes { uppercase_r: true } => "Rb",
+            Self::RawBytes { uppercase_r: false } => "rb",
+            Self::RawFormat { uppercase_r: true } => "Rf",
+            Self::RawFormat { uppercase_r: false } => "rf",
+        }
+    }
 }
 
 #[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -224,37 +238,56 @@ impl StringKind {
         }
     }
 
-    /// A `str` representation of the prefixes used (if any)
-    /// in the string's opener.
-    pub const fn prefix_str(self) -> &'static str {
+    const fn prefix(self) -> Option<StringPrefix> {
         if self.0.contains(StringFlags::F_PREFIX) {
             if self.0.contains(StringFlags::R_PREFIX_LOWER) {
-                return "rf";
+                return Some(StringPrefix::RawFormat { uppercase_r: false });
             }
             if self.0.contains(StringFlags::R_PREFIX_UPPER) {
-                return "Rf";
+                return Some(StringPrefix::RawFormat { uppercase_r: true });
             }
-            return "f";
+            return Some(StringPrefix::Format);
         }
         if self.0.contains(StringFlags::B_PREFIX) {
             if self.0.contains(StringFlags::R_PREFIX_LOWER) {
-                return "rb";
+                return Some(StringPrefix::RawBytes { uppercase_r: true });
             }
             if self.0.contains(StringFlags::R_PREFIX_LOWER) {
-                return "Rb";
+                return Some(StringPrefix::RawBytes { uppercase_r: false });
             }
-            return "b";
+            return Some(StringPrefix::Bytes);
         }
         if self.0.contains(StringFlags::R_PREFIX_LOWER) {
-            return "r";
+            return Some(StringPrefix::Raw { uppercase: false });
         }
         if self.0.contains(StringFlags::R_PREFIX_UPPER) {
-            return "R";
+            return Some(StringPrefix::Raw { uppercase: true });
         }
         if self.0.contains(StringFlags::U_PREFIX) {
-            return "u";
+            return Some(StringPrefix::Unicode);
         }
-        ""
+        None
+    }
+
+    /// A `str` representation of the prefixes used (if any)
+    /// in the string's opener. The order of the prefixes is normalized,
+    /// and all casing is normalized to lowercase except for `r` prefixes.
+    ///
+    /// See <https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings>
+    /// for why we track the casing of the `r` prefix,
+    /// but not for any other prefix.
+    ///
+    /// Examples:
+    /// - `"foo"`       -> `""`
+    /// - `B'foo'`      -> `"b"`
+    /// - `"rf"{bar}"`  -> `"rf"`
+    /// - `BR'{foo}'`   -> `"Rb"`
+    pub const fn prefix_str(self) -> &'static str {
+        if let Some(prefix) = self.prefix() {
+            prefix.as_str()
+        } else {
+            ""
+        }
     }
 
     /// The length of the prefixes used (if any) in the string's opener.
@@ -367,10 +400,6 @@ impl From<StringKind> for ruff_python_ast::BytesLiteralFlags {
 
 impl From<StringKind> for ruff_python_ast::FStringFlags {
     fn from(value: StringKind) -> ruff_python_ast::FStringFlags {
-        debug_assert!(value.is_f_string());
-        debug_assert!(!value.is_byte_string());
-        debug_assert!(!value.is_u_string());
-
         let mut new = ruff_python_ast::FStringFlags::default();
         if value.quote_style().is_double() {
             new = new.with_double_quotes();
@@ -378,9 +407,15 @@ impl From<StringKind> for ruff_python_ast::FStringFlags {
         if value.is_triple_quoted() {
             new = new.with_triple_quotes();
         }
-        if value.is_raw_string() {
-            new = new.with_r_prefix();
-        }
-        new
+        new.with_prefix(match value.prefix() {
+            Some(StringPrefix::Format) => FStringPrefix::Regular,
+            Some(StringPrefix::RawFormat { uppercase_r: false }) => {
+                FStringPrefix::Raw { uppercase_r: false }
+            }
+            Some(StringPrefix::RawFormat { uppercase_r: true }) => {
+                FStringPrefix::Raw { uppercase_r: true }
+            }
+            _ => panic!("Attempting to convert a non-f-string into an f-string!"),
+        })
     }
 }

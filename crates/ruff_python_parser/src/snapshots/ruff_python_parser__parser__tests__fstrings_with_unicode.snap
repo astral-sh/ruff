@@ -45,7 +45,7 @@ expression: parse_ast
                                         ],
                                         flags: FStringFlags {
                                             quote_style: Double,
-                                            raw: false,
+                                            prefix: "f",
                                             triple_quoted: false,
                                         },
                                     },
@@ -121,7 +121,7 @@ expression: parse_ast
                                         ],
                                         flags: FStringFlags {
                                             quote_style: Double,
-                                            raw: false,
+                                            prefix: "f",
                                             triple_quoted: false,
                                         },
                                     },
@@ -197,7 +197,7 @@ expression: parse_ast
                                         ],
                                         flags: FStringFlags {
                                             quote_style: Double,
-                                            raw: false,
+                                            prefix: "f",
                                             triple_quoted: false,
                                         },
                                     },
@@ -285,7 +285,7 @@ expression: parse_ast
                                         ],
                                         flags: FStringFlags {
                                             quote_style: Double,
-                                            raw: false,
+                                            prefix: "f",
                                             triple_quoted: false,
                                         },
                                     },

@@ -1187,10 +1187,53 @@ bitflags! {
 
         /// The f-string is triple-quoted:
         /// it begins and ends with three consecutive quote characters.
+        /// For example: `f"""{bar}"""`.
         const TRIPLE_QUOTED = 1 << 1;
 
-        /// The f-string has an `r` or `R` prefix, meaning it is a raw f-string.
-        const R_PREFIX = 1 << 3;
+        /// The f-string has an `r` prefix, meaning it is a raw f-string
+        /// with a lowercase 'r'. For example: `rf"{bar}"`
+        const R_PREFIX_LOWER = 1 << 2;
+
+        /// The f-string has an `R` prefix, meaning it is a raw f-string
+        /// with an uppercase 'r'. For example: `Rf"{bar}"`.
+        /// See https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
+        /// for why we track the casing of the `r` prefix,
+        /// but not for any other prefix
+        const R_PREFIX_UPPER = 1 << 3;
+    }
+}
+
+/// Enumeration of the valid prefixes an f-string literal can have.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum FStringPrefix {
+    /// Just a regular f-string with no other prefixes, e.g. f"{bar}"
+    Regular,
+
+    /// A "raw" format-string, that has an `r` or `R` prefix,
+    /// e.g. `rf"{bar}"` or `Rf"{bar}"`
+    Raw { uppercase_r: bool },
+}
+
+impl FStringPrefix {
+    /// Return a `str` representation of the prefix
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Regular => "f",
+            Self::Raw { uppercase_r: true } => "Rf",
+            Self::Raw { uppercase_r: false } => "rf",
+        }
+    }
+
+    /// Return true if this prefix indicates a "raw f-string",
+    /// e.g. `rf"{bar}"` or `Rf"{bar}"`
+    pub const fn is_raw(self) -> bool {
+        matches!(self, Self::Raw { .. })
+    }
+}
+
+impl fmt::Display for FStringPrefix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -1213,23 +1256,41 @@ impl FStringFlags {
     }
 
     #[must_use]
-    pub fn with_r_prefix(mut self) -> Self {
-        self.0 |= FStringFlagsInner::R_PREFIX;
+    pub fn with_prefix(mut self, prefix: FStringPrefix) -> Self {
+        match prefix {
+            FStringPrefix::Regular => {}
+            FStringPrefix::Raw { uppercase_r: true } => {
+                self.0 |= FStringFlagsInner::R_PREFIX_UPPER;
+            }
+            FStringPrefix::Raw { uppercase_r: false } => {
+                self.0 |= FStringFlagsInner::R_PREFIX_LOWER;
+            }
+        }
         self
     }
 
-    /// Does the f-string have an `r` or `R` prefix?
-    pub const fn is_raw(self) -> bool {
-        self.0.contains(FStringFlagsInner::R_PREFIX)
+    pub const fn prefix(self) -> FStringPrefix {
+        if self.0.contains(FStringFlagsInner::R_PREFIX_LOWER) {
+            debug_assert!(!self.0.contains(FStringFlagsInner::R_PREFIX_UPPER));
+            FStringPrefix::Raw { uppercase_r: false }
+        } else if self.0.contains(FStringFlagsInner::R_PREFIX_UPPER) {
+            FStringPrefix::Raw { uppercase_r: true }
+        } else {
+            FStringPrefix::Regular
+        }
     }
 
-    /// Is the f-string triple-quoted, i.e.,
-    /// does it begin and end with three consecutive quote characters?
+    /// Return `true` if the f-string is triple-quoted, i.e.,
+    /// it begins and ends with three consecutive quote characters.
+    /// For example: `f"""{bar}"""`
     pub const fn is_triple_quoted(self) -> bool {
         self.0.contains(FStringFlagsInner::TRIPLE_QUOTED)
     }
 
-    /// Does the f-string use single or double quotes in its opener and closer?
+    /// Return the quoting style (single or double quotes)
+    /// used by the f-string's opener and closer:
+    /// - `f"{"a"}"` -> `QuoteStyle::Double`
+    /// - `f'{"a"}'` -> `QuoteStyle::Single`
     pub const fn quote_style(self) -> Quote {
         if self.0.contains(FStringFlagsInner::DOUBLE) {
             Quote::Double
@@ -1243,7 +1304,7 @@ impl fmt::Debug for FStringFlags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FStringFlags")
             .field("quote_style", &self.quote_style())
-            .field("raw", &self.is_raw())
+            .field("prefix", &self.prefix().as_str())
             .field("triple_quoted", &self.is_triple_quoted())
             .finish()
     }
