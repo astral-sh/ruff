@@ -68,3 +68,125 @@ ARG.py:21:12: ARG001 Unused function argument: `x`
 22 |     ...
    |
    = help: Remove argument: `x`
+
+ARG.py:223:26: ARG001 Unused function argument: `a2`
+    |
+221 | ###
+222 | 
+223 | def multiple_posonly(a1, a2, /, b, *, d, **e):
+    |                          ^^ ARG001
+224 |     print(a1, b, d, e)
+    |
+    = help: Remove argument: `a2`
+
+ARG.py:227:18: ARG001 Unused function argument: `a`
+    |
+227 | def last_posonly(a, /, b, * , d, **e):
+    |                  ^ ARG001
+228 |     print(b, d, e)
+    |
+    = help: Remove argument: `a`
+
+ARG.py:231:30: ARG001 Unused function argument: `c`
+    |
+231 | def last_after_posonly(a, /, c):
+    |                              ^ ARG001
+232 |     print(a)
+    |
+    = help: Remove argument: `c`
+
+ARG.py:235:15: ARG001 Unused function argument: `b`
+    |
+235 | def arg(a, /, b, *, d, **e):
+    |               ^ ARG001
+236 |     print(a, d, e)
+    |
+    = help: Remove argument: `b`
+
+ARG.py:239:33: ARG001 Unused function argument: `c`
+    |
+239 | def vararg_and_kwonly(a, /, b, *c, d, **e):
+    |                                 ^ ARG001
+240 |     print(a, b, d, e)
+    |
+    = help: Remove argument: `c`
+
+ARG.py:243:33: ARG001 Unused function argument: `c`
+    |
+243 | def vararg_and_kwargs(a, /, b, *c, **e):
+    |                                 ^ ARG001
+244 |     print(a, b, e)
+    |
+    = help: Remove argument: `c`
+
+ARG.py:247:37: ARG001 Unused function argument: `d2`
+    |
+247 | def multiple_kwonly(a, /, b, *, d1, d2, **e):
+    |                                     ^^ ARG001
+248 |     print(a, b, d1, e)
+    |
+    = help: Remove argument: `d2`
+
+ARG.py:251:42: ARG001 Unused function argument: `d`
+    |
+251 | def last_kwonly_with_vararg(a, /, b, *c, d, **e):
+    |                                          ^ ARG001
+252 |     print(a, b, c, e)
+    |
+    = help: Remove argument: `d`
+
+ARG.py:255:44: ARG001 Unused function argument: `d`
+    |
+255 | def last_kwonly_without_vararg(a, /, b, *, d, **e):
+    |                                            ^ ARG001
+256 |     print(a, b, e)
+    |
+    = help: Remove argument: `d`
+
+ARG.py:259:29: ARG001 Unused function argument: `e`
+    |
+259 | def kwargs(a, /, b, *, d, **e):
+    |                             ^ ARG001
+260 |     print(a, b, d)
+    |
+    = help: Remove argument: `e`
+
+ARG.py:263:18: ARG001 Unused function argument: `a`
+    |
+263 | def only_posonly(a, /):
+    |                  ^ ARG001
+264 |     ...
+    |
+    = help: Remove argument: `a`
+
+ARG.py:267:14: ARG001 Unused function argument: `b`
+    |
+267 | def only_arg(b):
+    |              ^ ARG001
+268 |     ...
+    |
+    = help: Remove argument: `b`
+
+ARG.py:271:18: ARG001 Unused function argument: `c`
+    |
+271 | def only_vararg(*c):
+    |                  ^ ARG001
+272 |     ...
+    |
+    = help: Remove argument: `c`
+
+ARG.py:275:20: ARG001 Unused function argument: `d`
+    |
+275 | def only_kwonly(*, d):
+    |                    ^ ARG001
+276 |     ...
+    |
+    = help: Remove argument: `d`
+
+ARG.py:279:19: ARG001 Unused function argument: `e`
+    |
+279 | def only_kwargs(**e):
+    |                   ^ ARG001
+280 |     ...
+    |
+    = help: Remove argument: `e`

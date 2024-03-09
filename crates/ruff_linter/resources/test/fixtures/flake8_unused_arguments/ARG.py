@@ -215,3 +215,66 @@ def f(bar: str):
 class C:
     def __init__(self, x) -> None:
         print(locals())
+
+###
+# Test with the different combinations of arguments
+###
+
+def multiple_posonly(a1, a2, /, b, *, d, **e):
+    print(a1, b, d, e)
+
+
+def last_posonly(a, /, b, * , d, **e):
+    print(b, d, e)
+
+
+def last_after_posonly(a, /, c):
+    print(a)
+
+
+def arg(a, /, b, *, d, **e):
+    print(a, d, e)
+
+
+def vararg_and_kwonly(a, /, b, *c, d, **e):
+    print(a, b, d, e)
+
+
+def vararg_and_kwargs(a, /, b, *c, **e):
+    print(a, b, e)
+
+
+def multiple_kwonly(a, /, b, *, d1, d2, **e):
+    print(a, b, d1, e)
+
+
+def last_kwonly_with_vararg(a, /, b, *c, d, **e):
+    print(a, b, c, e)
+
+
+def last_kwonly_without_vararg(a, /, b, *, d, **e):
+    print(a, b, e)
+
+
+def kwargs(a, /, b, *, d, **e):
+    print(a, b, d)
+
+
+def only_posonly(a, /):
+    ...
+
+
+def only_arg(b):
+    ...
+
+
+def only_vararg(*c):
+    ...
+
+
+def only_kwonly(*, d):
+    ...
+
+
+def only_kwargs(**e):
+    ...
