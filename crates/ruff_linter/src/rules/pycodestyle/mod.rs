@@ -148,6 +148,23 @@ mod tests {
         Ok(())
     }
 
+    /// Tests the compatibility of E202, E225 and E275.
+    #[test]
+    fn white_space_syntax_error_compatibility() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pycodestyle").join("E20_syntax_error.py"),
+            &settings::LinterSettings {
+                ..settings::LinterSettings::for_rules([
+                    Rule::MissingWhitespaceAroundOperator,
+                    Rule::MissingWhitespaceAfterKeyword,
+                    Rule::WhitespaceBeforeCloseBracket,
+                ])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::BlankLineBetweenMethods, Path::new("E30.py"))]
     #[test_case(Rule::BlankLinesTopLevel, Path::new("E30.py"))]
     #[test_case(Rule::TooManyBlankLines, Path::new("E30.py"))]
