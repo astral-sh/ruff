@@ -38,17 +38,37 @@ impl Violation for HardcodedBindAllInterfaces {
 
 /// S104
 pub(crate) fn hardcoded_bind_all_interfaces(checker: &mut Checker, string: StringLike) {
-    let is_bind_all_interface = match string {
-        StringLike::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "0.0.0.0",
-        StringLike::FStringLiteral(ast::FStringLiteralElement { value, .. }) => {
-            &**value == "0.0.0.0"
+    match string {
+        StringLike::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+            if value == "0.0.0.0" {
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(HardcodedBindAllInterfaces, string.range()));
+            }
         }
-        StringLike::BytesLiteral(_) => return,
+        StringLike::FStringLiteral(ast::ExprFString { value, .. }) => {
+            for part in value {
+                match part {
+                    ast::FStringPart::Literal(literal) => {
+                        if &**literal == "0.0.0.0" {
+                            checker
+                                .diagnostics
+                                .push(Diagnostic::new(HardcodedBindAllInterfaces, literal.range()));
+                        }
+                    }
+                    ast::FStringPart::FString(f_string) => {
+                        for literal in f_string.literals() {
+                            if &**literal == "0.0.0.0" {
+                                checker.diagnostics.push(Diagnostic::new(
+                                    HardcodedBindAllInterfaces,
+                                    literal.range(),
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        StringLike::BytesLiteral(_) => (),
     };
-
-    if is_bind_all_interface {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(HardcodedBindAllInterfaces, string.range()));
-    }
 }

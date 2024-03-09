@@ -401,7 +401,7 @@ impl LiteralExpressionRef<'_> {
 pub enum StringLike<'a> {
     StringLiteral(&'a ast::ExprStringLiteral),
     BytesLiteral(&'a ast::ExprBytesLiteral),
-    FStringLiteral(&'a ast::FStringLiteralElement),
+    FStringLiteral(&'a ast::ExprFString),
 }
 
 impl<'a> From<&'a ast::ExprStringLiteral> for StringLike<'a> {
@@ -416,8 +416,8 @@ impl<'a> From<&'a ast::ExprBytesLiteral> for StringLike<'a> {
     }
 }
 
-impl<'a> From<&'a ast::FStringLiteralElement> for StringLike<'a> {
-    fn from(value: &'a ast::FStringLiteralElement) -> Self {
+impl<'a> From<&'a ast::ExprFString> for StringLike<'a> {
+    fn from(value: &'a ast::ExprFString) -> Self {
         StringLike::FStringLiteral(value)
     }
 }

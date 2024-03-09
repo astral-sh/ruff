@@ -59,9 +59,7 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike
     let length = match string {
         StringLike::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.chars().count(),
         StringLike::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.len(),
-        StringLike::FStringLiteral(ast::FStringLiteralElement { value, .. }) => {
-            value.chars().count()
-        }
+        StringLike::FStringLiteral(node) => count_f_string_chars(node),
     };
     if length <= 50 {
         return;
@@ -73,6 +71,33 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike
         string.range(),
     )));
     checker.diagnostics.push(diagnostic);
+}
+
+/// Count the number of characters in an f-string. This accounts for implicitly concatenated
+/// f-strings as well. For example, the following f-string has 12 characters as highlighted
+/// by the caret symbols:
+///
+/// ```python
+/// x = "one" f"one{expr}one" f"one" f"{expr}"
+/// #    ^^^    ^^^      ^^^    ^^^
+/// ````
+fn count_f_string_chars(f_string: &ast::ExprFString) -> usize {
+    f_string
+        .value
+        .iter()
+        .map(|part| match part {
+            ast::FStringPart::Literal(string) => string.chars().count(),
+            ast::FStringPart::FString(f_string) => f_string
+                .elements
+                .iter()
+                .map(|element| {
+                    element
+                        .as_literal()
+                        .map_or(0, |literal| literal.chars().count())
+                })
+                .sum(),
+        })
+        .sum()
 }
 
 fn is_warnings_dot_deprecated(expr: Option<&ast::Expr>, semantic: &SemanticModel) -> bool {
