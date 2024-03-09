@@ -15,7 +15,7 @@ use types::TextDocumentSyncOptions;
 use types::WorkDoneProgressOptions;
 use types::WorkspaceFoldersServerCapabilities;
 
-use self::schedule::main_loop_thread;
+use self::schedule::event_loop_thread;
 use crate::session::Session;
 use crate::PositionEncoding;
 
@@ -68,12 +68,12 @@ impl Server {
     }
 
     pub fn run(self) -> crate::Result<()> {
-        let result = main_loop_thread(move || Self::main_loop(&self.conn, self.session))?.join();
+        let result = event_loop_thread(move || Self::event_loop(&self.conn, self.session))?.join();
         self.threads.join()?;
         result
     }
 
-    fn main_loop(connection: &Connection, session: Session) -> crate::Result<()> {
+    fn event_loop(connection: &Connection, session: Session) -> crate::Result<()> {
         // TODO(jane): Make thread count configurable
         let mut scheduler = schedule::Scheduler::new(session, 4, &connection.sender);
         for msg in &connection.receiver {
@@ -105,7 +105,6 @@ impl Server {
             .and_then(|encodings| {
                 encodings
                     .iter()
-                    .cloned()
                     .filter_map(|encoding| PositionEncoding::try_from(encoding).ok())
                     .max() // this selects the highest priority position encoding
             })

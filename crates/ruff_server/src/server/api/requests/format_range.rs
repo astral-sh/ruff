@@ -6,11 +6,11 @@ use lsp_types::{self as types, request as req};
 
 pub(crate) struct FormatRange;
 
-impl super::Request for FormatRange {
+impl super::RequestHandler for FormatRange {
     type RequestType = req::RangeFormatting;
 }
 
-impl super::BackgroundDocumentRequest for FormatRange {
+impl super::BackgroundDocumentRequestHandler for FormatRange {
     super::define_document_url!(params: &types::DocumentRangeFormattingParams);
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,

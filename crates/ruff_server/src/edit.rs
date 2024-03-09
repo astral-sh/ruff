@@ -33,15 +33,15 @@ impl From<PositionEncoding> for lsp_types::PositionEncodingKind {
     }
 }
 
-impl TryFrom<lsp_types::PositionEncodingKind> for PositionEncoding {
+impl TryFrom<&lsp_types::PositionEncodingKind> for PositionEncoding {
     type Error = ();
 
-    fn try_from(value: PositionEncodingKind) -> Result<Self, Self::Error> {
-        Ok(if value == PositionEncodingKind::UTF8 {
+    fn try_from(value: &PositionEncodingKind) -> Result<Self, Self::Error> {
+        Ok(if value == &PositionEncodingKind::UTF8 {
             PositionEncoding::UTF8
-        } else if value == PositionEncodingKind::UTF16 {
+        } else if value == &PositionEncodingKind::UTF16 {
             PositionEncoding::UTF16
-        } else if value == PositionEncodingKind::UTF32 {
+        } else if value == &PositionEncodingKind::UTF32 {
             PositionEncoding::UTF32
         } else {
             return Err(());

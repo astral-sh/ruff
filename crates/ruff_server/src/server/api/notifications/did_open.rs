@@ -6,11 +6,11 @@ use lsp_types::notification as notif;
 
 pub(crate) struct DidOpen;
 
-impl super::Notification for DidOpen {
+impl super::NotificationHandler for DidOpen {
     type NotificationType = notif::DidOpenTextDocument;
 }
 
-impl super::SyncNotification for DidOpen {
+impl super::SyncNotificationHandler for DidOpen {
     #[tracing::instrument(skip_all, fields(file=%url))]
     fn run(
         session: &mut Session,

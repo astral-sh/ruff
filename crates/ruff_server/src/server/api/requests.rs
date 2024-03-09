@@ -5,7 +5,7 @@ mod format_range;
 
 use super::{
     define_document_url,
-    traits::{BackgroundDocumentRequest, Request},
+    traits::{BackgroundDocumentRequestHandler, RequestHandler},
 };
 pub(super) use code_action::CodeAction;
 pub(super) use diagnostic::DocumentDiagnostic;

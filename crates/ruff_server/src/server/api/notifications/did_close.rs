@@ -7,11 +7,11 @@ use lsp_types::notification as notif;
 
 pub(crate) struct DidClose;
 
-impl super::Notification for DidClose {
+impl super::NotificationHandler for DidClose {
     type NotificationType = notif::DidCloseTextDocument;
 }
 
-impl super::SyncNotification for DidClose {
+impl super::SyncNotificationHandler for DidClose {
     #[tracing::instrument(skip_all, fields(file=%uri))]
     fn run(
         session: &mut Session,

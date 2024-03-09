@@ -9,11 +9,11 @@ use types::TextEdit;
 
 pub(crate) struct Format;
 
-impl super::Request for Format {
+impl super::RequestHandler for Format {
     type RequestType = req::Formatting;
 }
 
-impl super::BackgroundDocumentRequest for Format {
+impl super::BackgroundDocumentRequestHandler for Format {
     super::define_document_url!(params: &types::DocumentFormattingParams);
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
@@ -21,82 +21,85 @@ impl super::BackgroundDocumentRequest for Format {
         _params: types::DocumentFormattingParams,
     ) -> Result<super::FormatResponse> {
         let doc = snapshot.document();
+        let source = doc.contents();
         let formatted = crate::format::format(doc, &snapshot.configuration().formatter)
             .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+        // fast path - if the code is the same, return early
+        if formatted == source {
+            return Ok(None);
+        }
         let formatted_index: LineIndex = LineIndex::from_source_text(&formatted);
 
-        let unformatted = doc.contents();
         let unformatted_index = doc.index();
 
         let Replacement {
-            replace_range,
-            replacement_text_range,
-        } = find_replacement_range(
-            unformatted,
+            source_range: replace_range,
+            formatted_range: replacement_text_range,
+        } = Replacement::between(
+            source,
             unformatted_index.line_starts(),
             &formatted,
             formatted_index.line_starts(),
         );
 
         Ok(Some(vec![TextEdit {
-            range: replace_range.to_range(unformatted, unformatted_index, snapshot.encoding()),
+            range: replace_range.to_range(source, unformatted_index, snapshot.encoding()),
             new_text: formatted[replacement_text_range].to_owned(),
         }]))
     }
 }
 
 struct Replacement {
-    replace_range: TextRange,
-    replacement_text_range: TextRange,
+    source_range: TextRange,
+    formatted_range: TextRange,
 }
 
-/// Returns a [`Replacement`] that describes the `replace_range` of `old_text` to replace
-/// with `new_text` sliced by `replacement_text_range`.
-fn find_replacement_range(
-    old_text: &str,
-    old_text_line_starts: &[TextSize],
-    new_text: &str,
-    new_text_line_starts: &[TextSize],
-) -> Replacement {
-    let mut old_start = TextSize::default();
-    let mut new_start = TextSize::default();
-    let mut old_end = old_text.text_len();
-    let mut new_end = new_text.text_len();
-    for (old_line_start, new_line_start) in old_text_line_starts
-        .iter()
-        .copied()
-        .zip(new_text_line_starts.iter().copied())
-    {
-        if old_line_start != new_line_start
-            || old_text[TextRange::new(old_start, old_line_start)]
-                != new_text[TextRange::new(new_start, new_line_start)]
-        {
-            break;
+impl Replacement {
+    /// Creates a [`Replacement`] that describes the `replace_range` of `old_text` to replace
+    /// with `new_text` sliced by `replacement_text_range`.
+    fn between(
+        source: &str,
+        source_line_starts: &[TextSize],
+        formatted: &str,
+        formatted_line_starts: &[TextSize],
+    ) -> Self {
+        let mut source_start = TextSize::default();
+        let mut formatted_start = TextSize::default();
+        let mut source_end = source.text_len();
+        let mut formatted_end = formatted.text_len();
+        let mut line_iter = source_line_starts
+            .iter()
+            .copied()
+            .zip(formatted_line_starts.iter().copied());
+        for (source_line_start, formatted_line_start) in line_iter.by_ref() {
+            if source_line_start != formatted_line_start
+                || source[TextRange::new(source_start, source_line_start)]
+                    != formatted[TextRange::new(formatted_start, formatted_line_start)]
+            {
+                break;
+            }
+            source_start = source_line_start;
+            formatted_start = formatted_line_start;
         }
-        old_start = old_line_start;
-        new_start = new_line_start;
-    }
 
-    for (old_line_start, new_line_start) in old_text_line_starts
-        .iter()
-        .rev()
-        .copied()
-        .zip(new_text_line_starts.iter().rev().copied())
-    {
-        if old_line_start <= old_start
-            || new_line_start <= new_start
-            || old_text[TextRange::new(old_line_start, old_end)]
-                != new_text[TextRange::new(new_line_start, new_end)]
-        {
-            break;
+        let mut line_iter = line_iter.rev();
+
+        for (old_line_start, new_line_start) in line_iter.by_ref() {
+            if old_line_start <= source_start
+                || new_line_start <= formatted_start
+                || source[TextRange::new(old_line_start, source_end)]
+                    != formatted[TextRange::new(new_line_start, formatted_end)]
+            {
+                break;
+            }
+            source_end = old_line_start;
+            formatted_end = new_line_start;
         }
-        old_end = old_line_start;
-        new_end = new_line_start;
-    }
 
-    Replacement {
-        replace_range: TextRange::new(old_start, old_end),
-        replacement_text_range: TextRange::new(new_start, new_end),
+        Replacement {
+            source_range: TextRange::new(source_start, source_end),
+            formatted_range: TextRange::new(formatted_start, formatted_end),
+        }
     }
 }
 
@@ -104,30 +107,30 @@ fn find_replacement_range(
 mod tests {
     use ruff_source_file::LineIndex;
 
-    use crate::server::api::requests::format::find_replacement_range;
+    use crate::server::api::requests::format::Replacement;
 
     #[test]
     fn find_replacement_range_works() {
         let original = r#"
-        aaaa
-        bbbb
-        cccc
-        dddd
-        eeee
-        "#;
+         aaaa
+         bbbb
+         cccc
+         dddd
+         eeee
+         "#;
         let original_index = LineIndex::from_source_text(original);
         let new = r#"
-        bb
-        cccc
-        dd
-        "#;
+         bb
+         cccc
+         dd
+         "#;
         let new_index = LineIndex::from_source_text(new);
         let expected = r#"
-        bb
-        cccc
-        dd
-        "#;
-        let replacement = find_replacement_range(
+         bb
+         cccc
+         dd
+         "#;
+        let replacement = Replacement::between(
             original,
             original_index.line_starts(),
             new,
@@ -135,10 +138,10 @@ mod tests {
         );
         let mut test = original.to_string();
         test.replace_range(
-            replacement.replace_range.start().to_usize()
-                ..replacement.replace_range.end().to_usize(),
-            &new[replacement.replacement_text_range],
+            replacement.source_range.start().to_usize()..replacement.source_range.end().to_usize(),
+            &new[replacement.formatted_range],
         );
+
         assert_eq!(expected, &test);
     }
 }

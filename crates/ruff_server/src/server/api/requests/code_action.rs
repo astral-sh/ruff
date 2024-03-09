@@ -8,11 +8,11 @@ use ruff_text_size::Ranged;
 
 pub(crate) struct CodeAction;
 
-impl super::Request for CodeAction {
+impl super::RequestHandler for CodeAction {
     type RequestType = req::CodeActionRequest;
 }
 
-impl super::BackgroundDocumentRequest for CodeAction {
+impl super::BackgroundDocumentRequestHandler for CodeAction {
     super::define_document_url!(params: &types::CodeActionParams);
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,

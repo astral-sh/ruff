@@ -7,11 +7,11 @@ use lsp_types::notification as notif;
 
 pub(crate) struct DidChange;
 
-impl super::Notification for DidChange {
+impl super::NotificationHandler for DidChange {
     type NotificationType = notif::DidChangeTextDocument;
 }
 
-impl super::SyncNotification for DidChange {
+impl super::SyncNotificationHandler for DidChange {
     #[tracing::instrument(skip_all, fields(file=%uri))]
     fn run(
         session: &mut Session,
@@ -31,11 +31,13 @@ impl super::SyncNotification for DidChange {
             .with_failure_code(lsp_server::ErrorCode::InvalidParams)?;
 
         if content_changes.is_empty() {
-            document.update_version(new_version);
+            document.make_mut().update_version(new_version);
             return Ok(());
         }
 
-        document.apply_changes(content_changes, new_version, encoding);
+        document
+            .make_mut()
+            .apply_changes(content_changes, new_version, encoding);
 
         Ok(())
     }

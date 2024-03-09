@@ -14,11 +14,11 @@ use self::{
 
 use super::client::Client;
 
-/// The main loop thread is actually a secondary thread that we spawn from the
+/// The event loop thread is actually a secondary thread that we spawn from the
 /// _actual_ main thread. This secondary thread has a larger stack size
 /// than some OS defaults (Windows, for example) and is also designated as
 /// high-priority.
-pub(crate) fn main_loop_thread(
+pub(crate) fn event_loop_thread(
     func: impl FnOnce() -> crate::Result<()> + Send + 'static,
 ) -> crate::Result<thread::JoinHandle<crate::Result<()>>> {
     // Override OS defaults to avoid stack overflows on platforms with low stack size defaults.

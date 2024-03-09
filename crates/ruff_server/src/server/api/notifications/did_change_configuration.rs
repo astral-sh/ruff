@@ -6,11 +6,11 @@ use lsp_types::notification as notif;
 
 pub(crate) struct DidChangeConfiguration;
 
-impl super::Notification for DidChangeConfiguration {
+impl super::NotificationHandler for DidChangeConfiguration {
     type NotificationType = notif::DidChangeConfiguration;
 }
 
-impl super::SyncNotification for DidChangeConfiguration {
+impl super::SyncNotificationHandler for DidChangeConfiguration {
     fn run(
         _session: &mut Session,
         _notifier: Notifier,

@@ -3,7 +3,6 @@
 mod types;
 
 use std::collections::BTreeMap;
-use std::ops::DerefMut;
 use std::path::{Path, PathBuf};
 use std::{ops::Deref, sync::Arc};
 
@@ -77,13 +76,14 @@ impl Session {
         Ok(Self {
             position_encoding: server_capabilities
                 .position_encoding
-                .clone()
+                .as_ref()
                 .and_then(|encoding| encoding.try_into().ok())
                 .unwrap_or_default(),
             lsp_settings: types::ExtensionSettings,
             workspaces: Workspaces::new(workspaces)?,
         })
     }
+
     pub(crate) fn take_snapshot(&self, url: &Url) -> Option<DocumentSnapshot> {
         Some(DocumentSnapshot {
             configuration: self.workspaces.configuration(url)?.clone(),
@@ -130,9 +130,11 @@ impl OpenDocuments {
     fn snapshot(&self, url: &Url) -> Option<DocumentRef> {
         Some(self.documents.get(url)?.make_ref())
     }
+
     fn controller(&mut self, url: &Url) -> Option<&mut DocumentController> {
         self.documents.get_mut(url)
     }
+
     fn open(&mut self, url: &Url, contents: String, version: DocumentVersion) {
         if self
             .documents
@@ -142,6 +144,7 @@ impl OpenDocuments {
             tracing::warn!("Opening document `{url}` that is already open!");
         }
     }
+
     fn close(&mut self, url: &Url) -> crate::Result<()> {
         let Some(_) = self.documents.remove(url) else {
             return Err(anyhow!(
@@ -158,10 +161,15 @@ impl DocumentController {
             document: Arc::new(Document::new(contents, version)),
         }
     }
-    fn make_ref(&self) -> DocumentRef {
+
+    pub(crate) fn make_ref(&self) -> DocumentRef {
         DocumentRef {
             document: self.document.clone(),
         }
+    }
+
+    pub(crate) fn make_mut(&mut self) -> &mut Document {
+        Arc::make_mut(&mut self.document)
     }
 }
 
@@ -169,12 +177,6 @@ impl Deref for DocumentController {
     type Target = Document;
     fn deref(&self) -> &Self::Target {
         &self.document
-    }
-}
-
-impl DerefMut for DocumentController {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        Arc::make_mut(&mut self.document)
     }
 }
 

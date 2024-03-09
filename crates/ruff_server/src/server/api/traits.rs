@@ -4,73 +4,73 @@ use crate::server::client::Notifier;
 use crate::session::{DocumentSnapshot, Session};
 
 use lsp_types::notification::Notification as LSPNotification;
-use lsp_types::request::Request as LSPRequest;
+use lsp_types::request::Request;
 
 /// A supertrait for any server request handler.
-pub(super) trait Request {
-    type RequestType: LSPRequest;
-    const METHOD: &'static str = <<Self as Request>::RequestType as LSPRequest>::METHOD;
+pub(super) trait RequestHandler {
+    type RequestType: Request;
+    const METHOD: &'static str = <<Self as RequestHandler>::RequestType as Request>::METHOD;
 }
 
 /// A request handler that needs mutable access to the session.
 /// This will block the main message receiver loop, meaning that no
 /// incoming requests or notifications will be handled while `run` is
 /// executing. Try to avoid doing any I/O or long-running computations.
-pub(super) trait SyncRequest: Request {
+pub(super) trait SyncRequestHandler: RequestHandler {
     fn run(
         session: &mut Session,
         notifier: Notifier,
-        params: <<Self as Request>::RequestType as LSPRequest>::Params,
-    ) -> super::Result<<<Self as Request>::RequestType as LSPRequest>::Result>;
+        params: <<Self as RequestHandler>::RequestType as Request>::Params,
+    ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
 }
 
 /// A request handler that can be run on a background thread.
-pub(super) trait BackgroundDocumentRequest: Request {
+pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
     /// `document_url` can be implemented automatically with
     /// `define_document_url!(params: &<YourParameterType>)` in the trait
     /// implementation.
     fn document_url(
-        params: &<<Self as Request>::RequestType as LSPRequest>::Params,
+        params: &<<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> &lsp_types::Url;
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
         notifier: Notifier,
-        params: <<Self as Request>::RequestType as LSPRequest>::Params,
-    ) -> super::Result<<<Self as Request>::RequestType as LSPRequest>::Result>;
+        params: <<Self as RequestHandler>::RequestType as Request>::Params,
+    ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
 }
 
 /// A supertrait for any server notification handler.
-pub(super) trait Notification {
+pub(super) trait NotificationHandler {
     type NotificationType: LSPNotification;
     const METHOD: &'static str =
-        <<Self as Notification>::NotificationType as LSPNotification>::METHOD;
+        <<Self as NotificationHandler>::NotificationType as LSPNotification>::METHOD;
 }
 
 /// A notification handler that needs mutable access to the session.
 /// This will block the main message receiver loop, meaning that no
 /// incoming requests or notifications will be handled while `run` is
 /// executing. Try to avoid doing any I/O or long-running computations.
-pub(super) trait SyncNotification: Notification {
+pub(super) trait SyncNotificationHandler: NotificationHandler {
     fn run(
         session: &mut Session,
         notifier: Notifier,
-        params: <<Self as Notification>::NotificationType as LSPNotification>::Params,
+        params: <<Self as NotificationHandler>::NotificationType as LSPNotification>::Params,
     ) -> super::Result<()>;
 }
 
 /// A notification handler that can be run on a background thread.
-pub(super) trait BackgroundDocumentNotification: Notification {
+pub(super) trait BackgroundDocumentNotificationHandler: NotificationHandler {
     /// `document_url` can be implemented automatically with
     /// `define_document_url!(params: &<YourParameterType>)` in the trait
     /// implementation.
     fn document_url(
-        params: &<<Self as Notification>::NotificationType as LSPNotification>::Params,
+        params: &<<Self as NotificationHandler>::NotificationType as LSPNotification>::Params,
     ) -> &lsp_types::Url;
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
         notifier: Notifier,
-        params: <<Self as Notification>::NotificationType as LSPNotification>::Params,
+        params: <<Self as NotificationHandler>::NotificationType as LSPNotification>::Params,
     ) -> super::Result<()>;
 }

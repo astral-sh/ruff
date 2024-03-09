@@ -8,11 +8,11 @@ use types::{
 
 pub(crate) struct DocumentDiagnostic;
 
-impl super::Request for DocumentDiagnostic {
+impl super::RequestHandler for DocumentDiagnostic {
     type RequestType = req::DocumentDiagnosticRequest;
 }
 
-impl super::BackgroundDocumentRequest for DocumentDiagnostic {
+impl super::BackgroundDocumentRequestHandler for DocumentDiagnostic {
     super::define_document_url!(params: &types::DocumentDiagnosticParams);
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,

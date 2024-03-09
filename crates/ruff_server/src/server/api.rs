@@ -8,7 +8,7 @@ mod traits;
 use notifications as notification;
 use requests as request;
 
-use self::traits::{Notification, Request};
+use self::traits::{NotificationHandler, RequestHandler};
 
 use super::{client::Responder, schedule::BackgroundSchedule, Result};
 
@@ -82,7 +82,9 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
 }
 
 #[allow(dead_code)]
-fn local_request_task<'a, R: traits::SyncRequest>(req: server::Request) -> super::Result<Task<'a>> {
+fn local_request_task<'a, R: traits::SyncRequestHandler>(
+    req: server::Request,
+) -> super::Result<Task<'a>> {
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::local(|session, notifier, responder| {
         let result = R::run(session, notifier, params);
@@ -90,7 +92,7 @@ fn local_request_task<'a, R: traits::SyncRequest>(req: server::Request) -> super
     }))
 }
 
-fn background_request_task<'a, R: traits::BackgroundDocumentRequest>(
+fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
     req: server::Request,
     schedule: BackgroundSchedule,
 ) -> super::Result<Task<'a>> {
@@ -107,7 +109,7 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequest>(
     }))
 }
 
-fn local_notification_task<'a, N: traits::SyncNotification>(
+fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
     notif: server::Notification,
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_notification::<N>(notif)?;
@@ -119,7 +121,7 @@ fn local_notification_task<'a, N: traits::SyncNotification>(
 }
 
 #[allow(dead_code)]
-fn background_notification_thread<'a, N: traits::BackgroundDocumentNotification>(
+fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationHandler>(
     req: server::Notification,
     schedule: BackgroundSchedule,
 ) -> super::Result<Task<'a>> {
@@ -145,10 +147,10 @@ fn cast_request<Req>(
     request: server::Request,
 ) -> super::Result<(
     server::RequestId,
-    <<Req as Request>::RequestType as lsp_types::request::Request>::Params,
+    <<Req as RequestHandler>::RequestType as lsp_types::request::Request>::Params,
 )>
 where
-    Req: traits::Request,
+    Req: traits::RequestHandler,
 {
     request
         .extract(Req::METHOD)
@@ -168,11 +170,11 @@ where
 fn respond<Req>(
     id: server::RequestId,
     result: crate::server::Result<
-        <<Req as traits::Request>::RequestType as lsp_types::request::Request>::Result,
+        <<Req as traits::RequestHandler>::RequestType as lsp_types::request::Request>::Result,
     >,
     responder: &Responder,
 ) where
-    Req: traits::Request,
+    Req: traits::RequestHandler,
 {
     if let Err(err) = responder.respond(id, result) {
         tracing::error!("Failed to send response: {err}");
@@ -186,8 +188,8 @@ fn cast_notification<N>(
 ) -> super::Result<
     (
         &'static str,
-        <<N as traits::Notification>::NotificationType as lsp_types::notification::Notification>::Params,
-)> where N: traits::Notification{
+        <<N as traits::NotificationHandler>::NotificationType as lsp_types::notification::Notification>::Params,
+)> where N: traits::NotificationHandler{
     Ok((
         N::METHOD,
         notification

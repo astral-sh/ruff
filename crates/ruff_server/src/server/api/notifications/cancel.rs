@@ -6,11 +6,11 @@ use lsp_types::notification as notif;
 
 pub(crate) struct Cancel;
 
-impl super::Notification for Cancel {
+impl super::NotificationHandler for Cancel {
     type NotificationType = notif::Cancel;
 }
 
-impl super::SyncNotification for Cancel {
+impl super::SyncNotificationHandler for Cancel {
     #[tracing::instrument(skip_all)]
     fn run(
         _session: &mut Session,

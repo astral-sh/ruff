@@ -7,11 +7,11 @@ use lsp_types::notification as notif;
 
 pub(crate) struct DidChangeWorkspace;
 
-impl super::Notification for DidChangeWorkspace {
+impl super::NotificationHandler for DidChangeWorkspace {
     type NotificationType = notif::DidChangeWorkspaceFolders;
 }
 
-impl super::SyncNotification for DidChangeWorkspace {
+impl super::SyncNotificationHandler for DidChangeWorkspace {
     fn run(
         session: &mut Session,
         _notifier: Notifier,
