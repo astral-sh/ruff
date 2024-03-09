@@ -141,36 +141,9 @@ pub(crate) fn remove_parameter(
 ) -> Result<Edit> {
     /* TODO
     Edge cases:
-       - last posonly arg => remove /
        - vararg and kwonly arg => leave *
        - last kwonly arg and no vararg => remove *
     */
-    if let Some(posonlyarg) = parameters
-        .posonlyargs
-        .iter()
-        .find(|param| param.range() == parameter.range())
-    {
-        let mut tokenizer = SimpleTokenizer::starts_at(posonlyarg.end(), source);
-
-        // The positional only slash must be removed if this is the last posonly parameter.
-        if parameters.posonlyargs.len() == 1 {
-            tokenizer
-                .find(|token| token.kind == SimpleTokenKind::Slash)
-                .context("Unable to find trailing slash for positional only parameter")?;
-        }
-
-        // Find the next non-whitespace an non-comma token.
-        let next = tokenizer
-            .find(|token| {
-                token.kind != SimpleTokenKind::Whitespace
-                    && token.kind != SimpleTokenKind::Newline
-                    && token.kind != SimpleTokenKind::Comma
-            })
-            .context("Unable to find next token")?;
-
-        return Ok(Edit::deletion(posonlyarg.start(), next.start()));
-    }
-
     if let Some(vararg) = parameters
         .vararg
         .as_deref()
@@ -208,6 +181,14 @@ pub(crate) fn remove_parameter(
         // Case 1: parameter is _not_ the last node, so delete from the start of the
         // parameter to the end of the subsequent comma.
         let mut tokenizer = SimpleTokenizer::starts_at(range_to_remove.end(), source);
+
+        // The positional only slash must be removed if this is the last posonly parameter.
+        if range_to_remove.parameter_kind.is_positional_only() && parameters.posonlyargs.len() == 1
+        {
+            tokenizer
+                .find(|token| token.kind == SimpleTokenKind::Slash)
+                .context("Unable to find trailing slash for positional only parameter")?;
+        }
 
         // Find the trailing comma.
         tokenizer
