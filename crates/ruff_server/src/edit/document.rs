@@ -64,7 +64,7 @@ impl Document {
 
         let old_contents = self.contents().to_string();
         let mut new_contents = self.contents().to_string();
-        let mut active_index = std::borrow::Cow::Borrowed(self.index());
+        let mut active_index = self.index().clone();
 
         for TextDocumentContentChangeEvent {
             range,
@@ -84,13 +84,13 @@ impl Document {
             }
 
             if new_contents != old_contents {
-                active_index = std::borrow::Cow::Owned(LineIndex::from_source_text(&new_contents));
+                active_index = LineIndex::from_source_text(&new_contents);
             }
         }
 
         self.modify_with_manual_index(|contents, version, index| {
             if contents != &new_contents {
-                *index = LineIndex::from_source_text(&new_contents);
+                *index = active_index;
             }
             *contents = new_contents;
             *version = new_version;
