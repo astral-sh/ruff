@@ -68,6 +68,7 @@ mod tests {
     #[test_case(Rule::UnixCommandWildcardInjection, Path::new("S609.py"))]
     #[test_case(Rule::UnsafeYAMLLoad, Path::new("S506.py"))]
     #[test_case(Rule::WeakCryptographicKey, Path::new("S505.py"))]
+    #[test_case(Rule::DjangoExtra, Path::new("S610.py"))]
     #[test_case(Rule::DjangoRawSql, Path::new("S611.py"))]
     #[test_case(Rule::TarfileUnsafeMembers, Path::new("S202.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
