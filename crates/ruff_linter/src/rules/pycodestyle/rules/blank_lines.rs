@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use ruff_notebook::CellOffsets;
 use std::cmp::Ordering;
+use std::iter::Peekable;
 use std::num::NonZeroU32;
 use std::slice::Iter;
 
@@ -384,7 +385,7 @@ struct LinePreprocessor<'a> {
     /// One of its main uses is to allow a comment to directly precede a class/function definition.
     max_preceding_blank_lines: BlankLines,
     /// The cell offsets of the notebook (if running on a notebook).
-    cell_offsets: Option<&'a CellOffsets>,
+    cell_offsets: Option<Peekable<Iter<'a, TextSize>>>,
     /// If running on a notebook, whether the line is the first logical line (or a comment preceding it) of its cell.
     is_beginning_of_cell: bool,
 }
@@ -403,7 +404,7 @@ impl<'a> LinePreprocessor<'a> {
             max_preceding_blank_lines: BlankLines::Zero,
             indent_width,
             is_beginning_of_cell: cell_offsets.is_some(),
-            cell_offsets,
+            cell_offsets: cell_offsets.map(|cell_offsets| cell_offsets[1..].iter().peekable()),
         }
     }
 }
@@ -517,13 +518,16 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     // Set the start for the next logical line.
                     self.line_start = range.end();
 
-                    if self
-                        .cell_offsets
-                        .is_some_and(|cell_offsets| cell_offsets.contains(&self.line_start))
-                    {
-                        self.is_beginning_of_cell = true;
-                    } else if !line_is_comment_only {
-                        self.is_beginning_of_cell = false;
+                    if let Some(ref mut cell_offsets) = self.cell_offsets {
+                        if cell_offsets
+                            .peek()
+                            .is_some_and(|offset| offset == &&self.line_start)
+                        {
+                            self.is_beginning_of_cell = true;
+                            cell_offsets.next();
+                        } else if !line_is_comment_only {
+                            self.is_beginning_of_cell = false;
+                        }
                     }
 
                     return Some(logical_line);
