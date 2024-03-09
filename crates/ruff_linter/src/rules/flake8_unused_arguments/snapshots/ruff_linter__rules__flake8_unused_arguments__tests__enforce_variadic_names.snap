@@ -33,13 +33,23 @@ ignore_variadic_names.py:5:10: ARG001 Unused function argument: `b`
   |
   = help: Remove argument: `b`
 
-ignore_variadic_names.py:5:14: ARG001 Unused function argument: `args`
+ignore_variadic_names.py:5:14: ARG001 [*] Unused function argument: `args`
   |
 5 | def f(a, b, *args, **kwargs):
   |              ^^^^ ARG001
 6 |     print("Hello, world!")
   |
   = help: Remove argument: `args`
+
+ℹ Unsafe fix
+2 2 |     print("Hello, world!")
+3 3 | 
+4 4 | 
+5   |-def f(a, b, *args, **kwargs):
+  5 |+def f(a, b, **kwargs):
+6 6 |     print("Hello, world!")
+7 7 | 
+8 8 | 
 
 ignore_variadic_names.py:5:22: ARG001 Unused function argument: `kwargs`
   |
@@ -87,7 +97,7 @@ ignore_variadic_names.py:13:20: ARG002 Unused method argument: `b`
    |
    = help: Remove argument: `b`
 
-ignore_variadic_names.py:13:24: ARG002 Unused method argument: `args`
+ignore_variadic_names.py:13:24: ARG002 [*] Unused method argument: `args`
    |
 11 |         print("Hello, world!")
 12 | 
@@ -96,6 +106,14 @@ ignore_variadic_names.py:13:24: ARG002 Unused method argument: `args`
 14 |         print("Hello, world!")
    |
    = help: Remove argument: `args`
+
+ℹ Unsafe fix
+10 10 |     def f(self, a, b):
+11 11 |         print("Hello, world!")
+12 12 | 
+13    |-    def f(self, a, b, *args, **kwargs):
+   13 |+    def f(self, a, b, **kwargs):
+14 14 |         print("Hello, world!")
 
 ignore_variadic_names.py:13:32: ARG002 Unused method argument: `kwargs`
    |

@@ -1,10 +1,10 @@
 //! Interface for generating fix edits from higher-level actions (e.g., "remove an argument").
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Ok, Result};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Parameters, Stmt};
+use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Parameter, Parameters, Stmt};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -168,7 +168,34 @@ pub(crate) fn remove_parameter(
         return Ok(Edit::deletion(posonlyarg.start(), next.start()));
     }
 
+    if let Some(vararg) = parameters
+        .vararg
+        .as_deref()
+        .filter(|vararg| range_match_parameter(parameter.range(), vararg))
+    {
+        // The star is left in place if there are kwonlyargs
+        if !parameters.kwonlyargs.is_empty() {
+            return Ok(Edit::range_deletion(vararg.name.range()));
+        }
+        let mut tokenizer = SimpleTokenizer::starts_at(vararg.end(), source);
+
+        // Find the next non-whitespace an non-comma token.
+        let next = tokenizer
+            .find(|token| {
+                token.kind != SimpleTokenKind::Whitespace
+                    && token.kind != SimpleTokenKind::Newline
+                    && token.kind != SimpleTokenKind::Comma
+            })
+            .context("Unable to find next token")?;
+
+        return Ok(Edit::deletion(vararg.start(), next.start()));
+    }
+
     anyhow::bail!("todo")
+}
+
+fn range_match_parameter(range: TextRange, parameter: &Parameter) -> bool {
+    parameter.range == range || parameter.name.range() == range
 }
 
 /// Generic function to remove arguments or keyword arguments in function

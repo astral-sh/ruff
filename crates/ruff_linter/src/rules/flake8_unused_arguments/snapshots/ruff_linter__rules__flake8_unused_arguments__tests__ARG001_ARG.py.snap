@@ -123,7 +123,7 @@ ARG.py:235:15: ARG001 Unused function argument: `b`
     |
     = help: Remove argument: `b`
 
-ARG.py:239:33: ARG001 Unused function argument: `c`
+ARG.py:239:33: ARG001 [*] Unused function argument: `c`
     |
 239 | def vararg_and_kwonly(a, /, b, *c, d, **e):
     |                                 ^ ARG001
@@ -131,13 +131,33 @@ ARG.py:239:33: ARG001 Unused function argument: `c`
     |
     = help: Remove argument: `c`
 
-ARG.py:243:33: ARG001 Unused function argument: `c`
+ℹ Unsafe fix
+236 236 |     print(a, d, e)
+237 237 | 
+238 238 | 
+239     |-def vararg_and_kwonly(a, /, b, *c, d, **e):
+    239 |+def vararg_and_kwonly(a, /, b, *, d, **e):
+240 240 |     print(a, b, d, e)
+241 241 | 
+242 242 | 
+
+ARG.py:243:33: ARG001 [*] Unused function argument: `c`
     |
 243 | def vararg_and_kwargs(a, /, b, *c, **e):
     |                                 ^ ARG001
 244 |     print(a, b, e)
     |
     = help: Remove argument: `c`
+
+ℹ Unsafe fix
+240 240 |     print(a, b, d, e)
+241 241 | 
+242 242 | 
+243     |-def vararg_and_kwargs(a, /, b, *c, **e):
+    243 |+def vararg_and_kwargs(a, /, b, **e):
+244 244 |     print(a, b, e)
+245 245 | 
+246 246 | 
 
 ARG.py:247:37: ARG001 Unused function argument: `d2`
     |
@@ -197,13 +217,23 @@ ARG.py:267:14: ARG001 Unused function argument: `b`
     |
     = help: Remove argument: `b`
 
-ARG.py:271:18: ARG001 Unused function argument: `c`
+ARG.py:271:18: ARG001 [*] Unused function argument: `c`
     |
 271 | def only_vararg(*c):
     |                  ^ ARG001
 272 |     ...
     |
     = help: Remove argument: `c`
+
+ℹ Unsafe fix
+268 268 |     ...
+269 269 | 
+270 270 | 
+271     |-def only_vararg(*c):
+    271 |+def only_vararg():
+272 272 |     ...
+273 273 | 
+274 274 | 
 
 ARG.py:275:20: ARG001 Unused function argument: `d`
     |
