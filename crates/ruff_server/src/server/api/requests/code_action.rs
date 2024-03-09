@@ -2,7 +2,6 @@ use crate::edit::ToRangeExt;
 use crate::server::api::LSPResult;
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
-use anyhow::Context;
 use lsp_types::{self as types, request as req};
 use ruff_text_size::Ranged;
 
@@ -28,14 +27,12 @@ impl super::BackgroundDocumentRequestHandler for CodeAction {
             .diagnostics
             .into_iter()
             .map(|diagnostic| {
-                let diagnostic_fix: crate::lint::DiagnosticFix = serde_json::from_value(
-                    diagnostic
-                        .data
-                        .context("Diagnostic did not have any associated data")
-                        .with_failure_code(lsp_server::ErrorCode::InternalError)?,
-                )
-                .map_err(|err| anyhow::anyhow!("failed to deserialize diagnostic data: {err}"))
-                .with_failure_code(lsp_server::ErrorCode::ParseError)?;
+                let Some(data) = diagnostic.data else {
+                    return Ok(None);
+                };
+                let diagnostic_fix: crate::lint::DiagnosticFix = serde_json::from_value(data)
+                    .map_err(|err| anyhow::anyhow!("failed to deserialize diagnostic data: {err}"))
+                    .with_failure_code(lsp_server::ErrorCode::ParseError)?;
                 let edits = diagnostic_fix
                     .fix
                     .edits()
@@ -61,7 +58,7 @@ impl super::BackgroundDocumentRequestHandler for CodeAction {
                     .kind
                     .suggestion
                     .unwrap_or(diagnostic_fix.kind.name);
-                Ok(types::CodeAction {
+                Ok(Some(types::CodeAction {
                     title,
                     kind: Some(types::CodeActionKind::QUICKFIX),
                     edit: Some(types::WorkspaceEdit {
@@ -69,13 +66,14 @@ impl super::BackgroundDocumentRequestHandler for CodeAction {
                         ..Default::default()
                     }),
                     ..Default::default()
-                })
+                }))
             })
             .collect();
 
         Ok(Some(
             actions?
                 .into_iter()
+                .flatten()
                 .map(types::CodeActionOrCommand::CodeAction)
                 .collect(),
         ))
