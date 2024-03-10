@@ -82,6 +82,7 @@ impl<'a> Directive<'a> {
 
                     // Extract the comma-separated list of codes.
                     let mut codes = vec![];
+                    let mut code_ranges_full = vec![];
                     let mut codes_end = codes_start;
                     let mut leading_space = 0;
                     while let Some(code) = Self::lex_code(&text[codes_end + leading_space..]) {
@@ -147,7 +148,7 @@ impl<'a> Directive<'a> {
 
     /// Lex an individual rule code (e.g., `F401`).
     #[inline]
-    fn lex_code(line: &str) -> Option<&str> {
+    pub(crate) fn lex_code(line: &str) -> Option<&str> {
         // Extract, e.g., the `F` in `F401`.
         let prefix = line.chars().take_while(char::is_ascii_uppercase).count();
         // Extract, e.g., the `401` in `F401`.
