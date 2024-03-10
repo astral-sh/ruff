@@ -33,7 +33,7 @@ use std::{char, cmp::Ordering, str::FromStr};
 
 use unicode_ident::{is_xid_continue, is_xid_start};
 
-use ruff_python_ast::{Int, IpyEscapeKind};
+use ruff_python_ast::{FStringPrefix, Int, IpyEscapeKind};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::lexer::cursor::{Cursor, EOF_CHAR};
@@ -174,33 +174,29 @@ impl<'source> Lexer<'source> {
         match (first, self.cursor.first()) {
             ('f' | 'F', quote @ ('\'' | '"')) => {
                 self.cursor.bump();
-                return Ok(self.lex_fstring_start(quote, StringPrefix::Format));
+                return Ok(self.lex_fstring_start(quote, FStringPrefix::Regular));
             }
             ('r', 'f' | 'F') | ('f' | 'F', 'r') if is_quote(self.cursor.second()) => {
                 self.cursor.bump();
                 let quote = self.cursor.bump().unwrap();
-                return Ok(
-                    self.lex_fstring_start(quote, StringPrefix::RawFormat { uppercase_r: false })
-                );
+                return Ok(self.lex_fstring_start(quote, FStringPrefix::Raw { uppercase_r: false }));
             }
             ('R', 'f' | 'F') | ('f' | 'F', 'R') if is_quote(self.cursor.second()) => {
                 self.cursor.bump();
                 let quote = self.cursor.bump().unwrap();
-                return Ok(
-                    self.lex_fstring_start(quote, StringPrefix::RawFormat { uppercase_r: true })
-                );
+                return Ok(self.lex_fstring_start(quote, FStringPrefix::Raw { uppercase_r: true }));
             }
             (_, quote @ ('\'' | '"')) => {
                 if let Ok(prefix) = StringPrefix::try_from(first) {
                     self.cursor.bump();
-                    return self.lex_string(Some(prefix), quote);
+                    return self.lex_string(prefix, quote);
                 }
             }
             (_, second @ ('r' | 'R' | 'b' | 'B')) if is_quote(self.cursor.second()) => {
                 self.cursor.bump();
                 if let Ok(prefix) = StringPrefix::try_from([first, second]) {
                     let quote = self.cursor.bump().unwrap();
-                    return self.lex_string(Some(prefix), quote);
+                    return self.lex_string(prefix, quote);
                 }
             }
             _ => {}
@@ -544,11 +540,11 @@ impl<'source> Lexer<'source> {
     }
 
     /// Lex a f-string start token.
-    fn lex_fstring_start(&mut self, quote: char, prefix: StringPrefix) -> Tok {
+    fn lex_fstring_start(&mut self, quote: char, prefix: FStringPrefix) -> Tok {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), quote);
 
-        let mut kind = StringKind::from_prefix(Some(prefix));
+        let mut kind = StringKind::from_prefix(StringPrefix::Format(prefix));
 
         if quote == '"' {
             kind = kind.with_double_quotes();
@@ -696,11 +692,7 @@ impl<'source> Lexer<'source> {
     }
 
     /// Lex a string literal.
-    fn lex_string(
-        &mut self,
-        prefix: Option<StringPrefix>,
-        quote: char,
-    ) -> Result<Tok, LexicalError> {
+    fn lex_string(&mut self, prefix: StringPrefix, quote: char) -> Result<Tok, LexicalError> {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), quote);
 
@@ -1074,7 +1066,7 @@ impl<'source> Lexer<'source> {
             c if is_ascii_identifier_start(c) => self.lex_identifier(c)?,
             '0'..='9' => self.lex_number(c)?,
             '#' => return Ok((self.lex_comment(), self.token_range())),
-            '\'' | '"' => self.lex_string(None, c)?,
+            '\'' | '"' => self.lex_string(StringPrefix::default(), c)?,
             '=' => {
                 if self.cursor.eat_char('=') {
                     Tok::EqEqual
