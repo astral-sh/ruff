@@ -1,14 +1,13 @@
-use ruff_diagnostics::AlwaysFixableViolation;
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Edit;
-use ruff_diagnostics::Fix;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_index::Indexer;
 use ruff_python_parser::TokenKind;
+use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 
-use super::{LogicalLine, LogicalLineToken};
+use super::LogicalLine;
 
 /// ## What it does
 /// Checks for redundant backslashes between brackets.
@@ -43,74 +42,51 @@ impl AlwaysFixableViolation for RedundantBackslash {
     }
 }
 
-fn neuter_strings(text: &str, tokens: &[LogicalLineToken]) -> String {
-    let offset = tokens.first().unwrap().start().to_usize();
-    let mut new_text = String::with_capacity(text.len());
-    let mut last_end = 0;
-
-    for token in tokens {
-        if matches!(token.kind(), TokenKind::String | TokenKind::FStringMiddle) {
-            new_text.push_str(&text[last_end..token.start().to_usize() - offset]);
-            let token_text =
-                &text[token.start().to_usize() - offset..token.end().to_usize() - offset];
-            new_text.push_str(&token_text.replace('\\', " "));
-            last_end = token.end().to_usize() - offset;
-        }
-    }
-
-    new_text.push_str(&text[last_end..]);
-    new_text
-}
-
 /// E502
-pub(crate) fn redundant_backslash(line: &LogicalLine, context: &mut LogicalLinesContext) {
-    let mut text = line.text().to_string();
-    let mut cursor = line.tokens().first().unwrap().start().to_usize();
-    let mut start = 0;
+pub(crate) fn redundant_backslash(
+    line: &LogicalLine,
+    locator: &Locator,
+    indexer: &Indexer,
+    context: &mut LogicalLinesContext,
+) {
     let mut parens = 0;
-    let mut comment = false;
-    let mut backslash = false;
+    let continuation_lines = indexer.continuation_line_starts();
+    let mut start_index = 0;
 
-    text = neuter_strings(&text, line.tokens());
-
-    for c in text.chars() {
-        match c {
-            '#' => {
-                backslash = false;
-                comment = true;
-            }
-            '\r' | '\n' => {
-                if !comment && backslash && parens > 0 {
-                    let start_s = TextSize::new(u32::try_from(start).unwrap());
-                    let end_s = TextSize::new(u32::try_from(cursor).unwrap());
-                    let mut diagnostic =
-                        Diagnostic::new(RedundantBackslash, TextRange::new(start_s, end_s));
-                    diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start_s, end_s)));
-                    context.push_diagnostic(diagnostic);
+    for token in line.tokens() {
+        match token.kind() {
+            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Lbrace => {
+                if parens == 0 {
+                    let start = locator.line_start(token.start());
+                    start_index = continuation_lines
+                        .binary_search(&start)
+                        .map_or_else(|err_index| err_index, |ok_index| ok_index);
                 }
-                backslash = false;
-                comment = false;
+                parens += 1;
             }
-            '(' | '[' | '{' => {
-                backslash = false;
-                if !comment {
-                    parens += 1;
+            TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace => {
+                parens -= 1;
+                if parens == 0 {
+                    let end = locator.line_start(token.start());
+                    let end_index = continuation_lines
+                        .binary_search(&end)
+                        .map_or_else(|err_index| err_index, |ok_index| ok_index);
+                    for continuation_line in &continuation_lines[start_index..end_index] {
+                        let backslash_end = locator.line_end(*continuation_line);
+                        let backslash_start = backslash_end - TextSize::new(1);
+                        let mut diagnostic = Diagnostic::new(
+                            RedundantBackslash,
+                            TextRange::new(backslash_start, backslash_end),
+                        );
+                        diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                            backslash_start,
+                            backslash_end,
+                        )));
+                        context.push_diagnostic(diagnostic);
+                    }
                 }
             }
-            ')' | ']' | '}' => {
-                backslash = false;
-                if !comment {
-                    parens -= 1;
-                }
-            }
-            '\\' => {
-                start = cursor;
-                backslash = true;
-            }
-            _ => {
-                backslash = false;
-            }
+            _ => continue,
         }
-        cursor += c.len_utf8();
     }
 }

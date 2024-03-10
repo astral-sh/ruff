@@ -1,6 +1,7 @@
 use crate::line_width::IndentWidth;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
+use ruff_python_index::Indexer;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::TokenKind;
 use ruff_source_file::Locator;
@@ -35,6 +36,7 @@ pub(crate) fn expand_indent(line: &str, indent_width: IndentWidth) -> usize {
 pub(crate) fn check_logical_lines(
     tokens: &[LexResult],
     locator: &Locator,
+    indexer: &Indexer,
     stylist: &Stylist,
     settings: &LinterSettings,
 ) -> Vec<Diagnostic> {
@@ -73,7 +75,7 @@ pub(crate) fn check_logical_lines(
 
         if line.flags().contains(TokenFlags::BRACKET) {
             whitespace_before_parameters(&line, &mut context);
-            redundant_backslash(&line, &mut context);
+            redundant_backslash(&line, locator, indexer, &mut context);
         }
 
         // Extract the indentation level.
