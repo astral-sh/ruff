@@ -139,7 +139,7 @@ pub(crate) fn remove_parameter(
     parentheses: Parentheses,
     source: &str,
 ) -> Result<Edit> {
-    let mut range_to_remove = ParameterRangeToRemove::find_ranges(&parameter.range(), parameters)?;
+    let mut range_to_remove = ParameterRangeToRemove::find_range(parameter.range(), parameters)?;
 
     // If this is the last kwonlyarg with no vararg, the preceding star must be removed
     if range_to_remove.parameter_kind.is_keyword_only()
@@ -165,7 +165,7 @@ pub(crate) fn remove_parameter(
         }
     }
 
-    if !range_to_remove.after.is_empty() {
+    if range_to_remove.after {
         // Case 1: parameter is _not_ the last node, so delete from the start of the
         // parameter to the end of the subsequent comma.
         let mut tokenizer = SimpleTokenizer::starts_at(range_to_remove.end(), source);
@@ -191,7 +191,7 @@ pub(crate) fn remove_parameter(
             .context("Unable to find next token")?;
 
         Ok(Edit::deletion(range_to_remove.start(), next.start()))
-    } else if !range_to_remove.before.is_empty() {
+    } else if range_to_remove.before {
         // Case 2: parameter is the last node, so delete from the start of the
         // previous comma to the end of the argument.
         let mut tokenizer = BackwardsTokenizer::up_to(range_to_remove.start(), source, &[]);
@@ -215,8 +215,8 @@ pub(crate) fn remove_parameter(
 struct ParameterRangeToRemove {
     range: TextRange,
     parameter_kind: ParameterKind,
-    before: Vec<TextRange>,
-    after: Vec<TextRange>,
+    before: bool,
+    after: bool,
 }
 
 #[derive(is_macro::Is)]
@@ -235,66 +235,64 @@ impl Ranged for ParameterRangeToRemove {
 }
 
 impl ParameterRangeToRemove {
-    fn find_ranges(parameter: &TextRange, parameters: &Parameters) -> Result<Self> {
-        let mut before = Vec::new();
-        let mut parameter_range: Option<TextRange> = None;
-        let mut parameter_kind: Option<ParameterKind> = None;
-        let mut after = Vec::new();
+    fn find_range(parameter: TextRange, parameters: &Parameters) -> Result<Self> {
+        let (parameter_range, parameter_kind) = if let Some(range) = parameters
+            .posonlyargs
+            .iter()
+            .map(Ranged::range)
+            .find(|range| range.contains_range(parameter))
+        {
+            (range, ParameterKind::PositionalOnly)
+        } else if let Some(range) = parameters
+            .args
+            .iter()
+            .map(Ranged::range)
+            .find(|range| range.contains_range(parameter))
+        {
+            (range, ParameterKind::Positional)
+        } else if let Some(range) = parameters
+            .kwonlyargs
+            .iter()
+            .map(Ranged::range)
+            .find(|range| range.contains_range(parameter))
+        {
+            (range, ParameterKind::KeywordOnly)
+        } else if let Some(range) = parameters
+            .vararg
+            .as_deref()
+            .map(Ranged::range)
+            .filter(|range| range.contains_range(parameter))
+        {
+            (range, ParameterKind::VariadicPositional)
+        } else if let Some(range) = parameters
+            .kwarg
+            .as_deref()
+            .map(Ranged::range)
+            .filter(|range| range.contains_range(parameter))
+        {
+            (range, ParameterKind::VariadicKeyword)
+        } else {
+            anyhow::bail!("Unable to find parameter to delete");
+        };
 
-        for range in parameters.posonlyargs.iter().map(Ranged::range) {
-            if range.end() <= parameter.start() {
-                before.push(range);
-            } else if range.end() <= parameter.end() {
-                parameter_range = Some(range);
-                parameter_kind = Some(ParameterKind::PositionalOnly)
-            } else {
-                after.push(range)
-            }
-        }
-        for range in parameters.args.iter().map(Ranged::range) {
-            if range.end() <= parameter.start() {
-                before.push(range);
-            } else if range.end() <= parameter.end() {
-                parameter_range = Some(range);
-                parameter_kind = Some(ParameterKind::Positional)
-            } else {
-                after.push(range)
-            }
-        }
-        for range in parameters.kwonlyargs.iter().map(Ranged::range) {
-            if range.end() <= parameter.start() {
-                before.push(range);
-            } else if range.end() <= parameter.end() {
-                parameter_range = Some(range);
-                parameter_kind = Some(ParameterKind::KeywordOnly)
-            } else {
-                after.push(range)
-            }
-        }
-        if let Some(range) = parameters.vararg.as_deref().map(Ranged::range) {
-            if range.end() <= parameter.start() {
-                before.push(range);
-            } else if range.end() <= parameter.end() {
-                parameter_range = Some(range);
-                parameter_kind = Some(ParameterKind::VariadicPositional);
-            } else {
-                after.push(range)
-            }
-        }
-        if let Some(range) = parameters.kwarg.as_deref().map(Ranged::range) {
-            if range.end() <= parameter.start() {
-                before.push(range);
-            } else if range.end() <= parameter.end() {
-                parameter_range = Some(range);
-                parameter_kind = Some(ParameterKind::VariadicKeyword);
-            } else {
-                after.push(range)
-            }
-        }
+        let all_ranges = parameters
+            .posonlyargs
+            .iter()
+            .chain(&parameters.args)
+            .chain(&parameters.kwonlyargs)
+            .map(Ranged::range)
+            .chain(parameters.vararg.as_deref().into_iter().map(Ranged::range))
+            .chain(parameters.kwarg.as_deref().into_iter().map(Ranged::range))
+            .filter(|range| *range != parameter_range);
+
+        let before = all_ranges
+            .clone()
+            .any(|r| r.start() <= parameter_range.start());
+        let after = all_ranges.clone().any(|r| r.end() >= parameter_range.end());
 
         Ok(Self {
-            range: parameter_range.context("Unable to find parameter to delete")?,
-            parameter_kind: parameter_kind.context("Unable to find parameter to delete")?,
+            range: parameter_range,
+            parameter_kind,
             before,
             after,
         })
