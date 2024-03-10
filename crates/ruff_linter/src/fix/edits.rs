@@ -160,9 +160,14 @@ pub(crate) fn remove_parameter(
     // The varargs star is left in place if there are keyword only parameters
     if range_to_remove.parameter_kind.is_variadic_positional() && !parameters.kwonlyargs.is_empty()
     {
-        if let Some(vararg) = parameters.vararg.as_deref() {
-            return Ok(Edit::range_deletion(vararg.name.range()));
-        }
+        let star = SimpleTokenizer::starts_at(range_to_remove.start(), source)
+            .find(|token| token.kind == SimpleTokenKind::Star)
+            .context("unable to find leading star")?;
+        // As there are keyword only args, there is a comma after the vararg
+        let comma = SimpleTokenizer::starts_at(range_to_remove.end(), source)
+            .find(|token| token.kind == SimpleTokenKind::Comma)
+            .context("Unable to find trailing comma")?;
+        return Ok(Edit::deletion(star.end(), comma.start()));
     }
 
     if range_to_remove.after {

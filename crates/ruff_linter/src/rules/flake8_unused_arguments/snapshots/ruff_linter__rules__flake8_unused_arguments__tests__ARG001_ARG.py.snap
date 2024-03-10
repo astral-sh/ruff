@@ -153,7 +153,7 @@ ARG.py:223:26: ARG001 [*] Unused function argument: `a2`
     |
 221 | ###
 222 | 
-223 | def multiple_posonly(a1, a2, /, b, *, d, **e):
+223 | def multiple_posonly(a1, a2: int = 1, /, b: int = 1, *, d: int, **e: int):
     |                          ^^ ARG001
 224 |     print(a1, b, d, e)
     |
@@ -163,15 +163,15 @@ ARG.py:223:26: ARG001 [*] Unused function argument: `a2`
 220 220 | # Test with the different combinations of arguments
 221 221 | ###
 222 222 | 
-223     |-def multiple_posonly(a1, a2, /, b, *, d, **e):
-    223 |+def multiple_posonly(a1, /, b, *, d, **e):
+223     |-def multiple_posonly(a1, a2: int = 1, /, b: int = 1, *, d: int, **e: int):
+    223 |+def multiple_posonly(a1, /, b: int = 1, *, d: int, **e: int):
 224 224 |     print(a1, b, d, e)
 225 225 | 
 226 226 | 
 
 ARG.py:227:18: ARG001 [*] Unused function argument: `a`
     |
-227 | def last_posonly(a, /, b, * , d, **e):
+227 | def last_posonly(a: int = 1, /, b: int = 1, *, d: int, **e: int):
     |                  ^ ARG001
 228 |     print(b, d, e)
     |
@@ -181,16 +181,16 @@ ARG.py:227:18: ARG001 [*] Unused function argument: `a`
 224 224 |     print(a1, b, d, e)
 225 225 | 
 226 226 | 
-227     |-def last_posonly(a, /, b, * , d, **e):
-    227 |+def last_posonly(b, * , d, **e):
+227     |-def last_posonly(a: int = 1, /, b: int = 1, *, d: int, **e: int):
+    227 |+def last_posonly(b: int = 1, *, d: int, **e: int):
 228 228 |     print(b, d, e)
 229 229 | 
 230 230 | 
 
-ARG.py:231:30: ARG001 [*] Unused function argument: `c`
+ARG.py:231:39: ARG001 [*] Unused function argument: `c`
     |
-231 | def last_after_posonly(a, /, c):
-    |                              ^ ARG001
+231 | def last_after_posonly(a: int = 1, /, c: int = 1):
+    |                                       ^ ARG001
 232 |     print(a)
     |
     = help: Remove argument: `c`
@@ -199,16 +199,16 @@ ARG.py:231:30: ARG001 [*] Unused function argument: `c`
 228 228 |     print(b, d, e)
 229 229 | 
 230 230 | 
-231     |-def last_after_posonly(a, /, c):
-    231 |+def last_after_posonly(a, /):
+231     |-def last_after_posonly(a: int = 1, /, c: int = 1):
+    231 |+def last_after_posonly(a: int = 1, /):
 232 232 |     print(a)
 233 233 | 
 234 234 | 
 
-ARG.py:235:15: ARG001 [*] Unused function argument: `b`
+ARG.py:235:24: ARG001 [*] Unused function argument: `b`
     |
-235 | def arg(a, /, b, *, d, **e):
-    |               ^ ARG001
+235 | def arg(a: int = 1, /, b: int = 1, *, d: int = 1, **e: int):
+    |                        ^ ARG001
 236 |     print(a, d, e)
     |
     = help: Remove argument: `b`
@@ -217,16 +217,16 @@ ARG.py:235:15: ARG001 [*] Unused function argument: `b`
 232 232 |     print(a)
 233 233 | 
 234 234 | 
-235     |-def arg(a, /, b, *, d, **e):
-    235 |+def arg(a, /, *, d, **e):
+235     |-def arg(a: int = 1, /, b: int = 1, *, d: int = 1, **e: int):
+    235 |+def arg(a: int = 1, /, *, d: int = 1, **e: int):
 236 236 |     print(a, d, e)
 237 237 | 
 238 238 | 
 
-ARG.py:239:33: ARG001 [*] Unused function argument: `c`
+ARG.py:239:51: ARG001 [*] Unused function argument: `c`
     |
-239 | def vararg_and_kwonly(a, /, b, *c, d, **e):
-    |                                 ^ ARG001
+239 | def vararg_and_kwonly(a: int = 1, /, b: int = 1, *c: int, d: int = 1, **e: int):
+    |                                                   ^ ARG001
 240 |     print(a, b, d, e)
     |
     = help: Remove argument: `c`
@@ -235,16 +235,16 @@ ARG.py:239:33: ARG001 [*] Unused function argument: `c`
 236 236 |     print(a, d, e)
 237 237 | 
 238 238 | 
-239     |-def vararg_and_kwonly(a, /, b, *c, d, **e):
-    239 |+def vararg_and_kwonly(a, /, b, *, d, **e):
+239     |-def vararg_and_kwonly(a: int = 1, /, b: int = 1, *c: int, d: int = 1, **e: int):
+    239 |+def vararg_and_kwonly(a: int = 1, /, b: int = 1, *, d: int = 1, **e: int):
 240 240 |     print(a, b, d, e)
 241 241 | 
 242 242 | 
 
-ARG.py:243:33: ARG001 [*] Unused function argument: `c`
+ARG.py:243:51: ARG001 [*] Unused function argument: `c`
     |
-243 | def vararg_and_kwargs(a, /, b, *c, **e):
-    |                                 ^ ARG001
+243 | def vararg_and_kwargs(a: int = 1, /, b: int = 1, *c: int, **e: int):
+    |                                                   ^ ARG001
 244 |     print(a, b, e)
     |
     = help: Remove argument: `c`
@@ -253,16 +253,16 @@ ARG.py:243:33: ARG001 [*] Unused function argument: `c`
 240 240 |     print(a, b, d, e)
 241 241 | 
 242 242 | 
-243     |-def vararg_and_kwargs(a, /, b, *c, **e):
-    243 |+def vararg_and_kwargs(a, /, b, **e):
+243     |-def vararg_and_kwargs(a: int = 1, /, b: int = 1, *c: int, **e: int):
+    243 |+def vararg_and_kwargs(a: int = 1, /, b: int = 1, **e: int):
 244 244 |     print(a, b, e)
 245 245 | 
 246 246 | 
 
-ARG.py:247:37: ARG001 [*] Unused function argument: `d2`
+ARG.py:247:64: ARG001 [*] Unused function argument: `d2`
     |
-247 | def multiple_kwonly(a, /, b, *, d1, d2, **e):
-    |                                     ^^ ARG001
+247 | def multiple_kwonly(a: int = 1, /, b: int = 1, *, d1: int = 1, d2: int = 1, **e: int):
+    |                                                                ^^ ARG001
 248 |     print(a, b, d1, e)
     |
     = help: Remove argument: `d2`
@@ -271,16 +271,16 @@ ARG.py:247:37: ARG001 [*] Unused function argument: `d2`
 244 244 |     print(a, b, e)
 245 245 | 
 246 246 | 
-247     |-def multiple_kwonly(a, /, b, *, d1, d2, **e):
-    247 |+def multiple_kwonly(a, /, b, *, d1, **e):
+247     |-def multiple_kwonly(a: int = 1, /, b: int = 1, *, d1: int = 1, d2: int = 1, **e: int):
+    247 |+def multiple_kwonly(a: int = 1, /, b: int = 1, *, d1: int = 1, **e: int):
 248 248 |     print(a, b, d1, e)
 249 249 | 
 250 250 | 
 
-ARG.py:251:42: ARG001 [*] Unused function argument: `d`
+ARG.py:251:65: ARG001 [*] Unused function argument: `d`
     |
-251 | def last_kwonly_with_vararg(a, /, b, *c, d, **e):
-    |                                          ^ ARG001
+251 | def last_kwonly_with_vararg(a: int = 1, /, b: int = 1, *c: int, d: int = 1, **e: int):
+    |                                                                 ^ ARG001
 252 |     print(a, b, c, e)
     |
     = help: Remove argument: `d`
@@ -289,16 +289,16 @@ ARG.py:251:42: ARG001 [*] Unused function argument: `d`
 248 248 |     print(a, b, d1, e)
 249 249 | 
 250 250 | 
-251     |-def last_kwonly_with_vararg(a, /, b, *c, d, **e):
-    251 |+def last_kwonly_with_vararg(a, /, b, *c, **e):
+251     |-def last_kwonly_with_vararg(a: int = 1, /, b: int = 1, *c: int, d: int = 1, **e: int):
+    251 |+def last_kwonly_with_vararg(a: int = 1, /, b: int = 1, *c: int, **e: int):
 252 252 |     print(a, b, c, e)
 253 253 | 
 254 254 | 
 
-ARG.py:255:44: ARG001 [*] Unused function argument: `d`
+ARG.py:255:62: ARG001 [*] Unused function argument: `d`
     |
-255 | def last_kwonly_without_vararg(a, /, b, *, d, **e):
-    |                                            ^ ARG001
+255 | def last_kwonly_without_vararg(a: int = 1, /, b: int = 1, *, d: int = 1, **e: int):
+    |                                                              ^ ARG001
 256 |     print(a, b, e)
     |
     = help: Remove argument: `d`
@@ -307,16 +307,16 @@ ARG.py:255:44: ARG001 [*] Unused function argument: `d`
 252 252 |     print(a, b, c, e)
 253 253 | 
 254 254 | 
-255     |-def last_kwonly_without_vararg(a, /, b, *, d, **e):
-    255 |+def last_kwonly_without_vararg(a, /, b, **e):
+255     |-def last_kwonly_without_vararg(a: int = 1, /, b: int = 1, *, d: int = 1, **e: int):
+    255 |+def last_kwonly_without_vararg(a: int = 1, /, b: int = 1, **e: int):
 256 256 |     print(a, b, e)
 257 257 | 
 258 258 | 
 
-ARG.py:259:29: ARG001 [*] Unused function argument: `e`
+ARG.py:259:56: ARG001 [*] Unused function argument: `e`
     |
-259 | def kwargs(a, /, b, *, d, **e):
-    |                             ^ ARG001
+259 | def kwargs(a: int = 1, /, b: int = 1, *, d: int = 1, **e: int):
+    |                                                        ^ ARG001
 260 |     print(a, b, d)
     |
     = help: Remove argument: `e`
@@ -325,8 +325,8 @@ ARG.py:259:29: ARG001 [*] Unused function argument: `e`
 256 256 |     print(a, b, e)
 257 257 | 
 258 258 | 
-259     |-def kwargs(a, /, b, *, d, **e):
-    259 |+def kwargs(a, /, b, *, d):
+259     |-def kwargs(a: int = 1, /, b: int = 1, *, d: int = 1, **e: int):
+    259 |+def kwargs(a: int = 1, /, b: int = 1, *, d: int = 1):
 260 260 |     print(a, b, d)
 261 261 | 
 262 262 | 

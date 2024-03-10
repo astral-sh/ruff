@@ -220,43 +220,43 @@ class C:
 # Test with the different combinations of arguments
 ###
 
-def multiple_posonly(a1, a2, /, b, *, d, **e):
+def multiple_posonly(a1, a2: int = 1, /, b: int = 1, *, d: int, **e: int):
     print(a1, b, d, e)
 
 
-def last_posonly(a, /, b, * , d, **e):
+def last_posonly(a: int = 1, /, b: int = 1, *, d: int, **e: int):
     print(b, d, e)
 
 
-def last_after_posonly(a, /, c):
+def last_after_posonly(a: int = 1, /, c: int = 1):
     print(a)
 
 
-def arg(a, /, b, *, d, **e):
+def arg(a: int = 1, /, b: int = 1, *, d: int = 1, **e: int):
     print(a, d, e)
 
 
-def vararg_and_kwonly(a, /, b, *c, d, **e):
+def vararg_and_kwonly(a: int = 1, /, b: int = 1, *c: int, d: int = 1, **e: int):
     print(a, b, d, e)
 
 
-def vararg_and_kwargs(a, /, b, *c, **e):
+def vararg_and_kwargs(a: int = 1, /, b: int = 1, *c: int, **e: int):
     print(a, b, e)
 
 
-def multiple_kwonly(a, /, b, *, d1, d2, **e):
+def multiple_kwonly(a: int = 1, /, b: int = 1, *, d1: int = 1, d2: int = 1, **e: int):
     print(a, b, d1, e)
 
 
-def last_kwonly_with_vararg(a, /, b, *c, d, **e):
+def last_kwonly_with_vararg(a: int = 1, /, b: int = 1, *c: int, d: int = 1, **e: int):
     print(a, b, c, e)
 
 
-def last_kwonly_without_vararg(a, /, b, *, d, **e):
+def last_kwonly_without_vararg(a: int = 1, /, b: int = 1, *, d: int = 1, **e: int):
     print(a, b, e)
 
 
-def kwargs(a, /, b, *, d, **e):
+def kwargs(a: int = 1, /, b: int = 1, *, d: int = 1, **e: int):
     print(a, b, d)
 
 
