@@ -432,6 +432,16 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
 
 /// Generate `flake8-quote` diagnostics from a token stream.
 pub(crate) fn check_string_quotes(checker: &mut Checker, string_like: StringLike) {
+    // If the string is part of a f-string, ignore it.
+    if checker
+        .indexer()
+        .fstring_ranges()
+        .outermost(string_like.start())
+        .is_some_and(|outer_range| outer_range != string_like.range())
+    {
+        return;
+    }
+
     let ranges: Vec<TextRange> = match string_like {
         StringLike::String(node) => node.value.iter().map(Ranged::range).collect(),
         StringLike::Bytes(node) => node.value.iter().map(Ranged::range).collect(),
