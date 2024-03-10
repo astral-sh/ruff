@@ -1,11 +1,10 @@
-use regex::Regex;
 use ruff_python_ast as ast;
 use ruff_python_ast::Parameters;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::{function_type, visibility};
-use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
+use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -269,11 +268,12 @@ fn check(
     parameters: &Parameters,
     checker: &Checker,
     scope: &Scope,
-    semantic: &SemanticModel,
-    dummy_variable_rgx: &Regex,
-    ignore_variadic_names: bool,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
+    let ignore_variadic_names = checker
+        .settings
+        .flake8_unused_arguments
+        .ignore_variadic_names;
     let args = parameters
         .posonlyargs
         .iter()
@@ -296,10 +296,11 @@ fn check(
                 .skip(usize::from(ignore_variadic_names)),
         );
 
+    let dummy_variable_rgx = &checker.settings.dummy_variable_rgx;
     diagnostics.extend(args.filter_map(|arg| {
         let binding = scope
             .get(arg.name.as_str())
-            .map(|binding_id| semantic.binding(binding_id))?;
+            .map(|binding_id| checker.semantic().binding(binding_id))?;
         if binding.kind.is_argument()
             && !binding.is_used()
             && !dummy_variable_rgx.is_match(arg.name.as_str())
@@ -363,12 +364,6 @@ pub(crate) fn unused_arguments(
                             parameters,
                             checker,
                             scope,
-                            checker.semantic(),
-                            &checker.settings.dummy_variable_rgx,
-                            checker
-                                .settings
-                                .flake8_unused_arguments
-                                .ignore_variadic_names,
                             diagnostics,
                         );
                     }
@@ -389,12 +384,6 @@ pub(crate) fn unused_arguments(
                             parameters,
                             checker,
                             scope,
-                            checker.semantic(),
-                            &checker.settings.dummy_variable_rgx,
-                            checker
-                                .settings
-                                .flake8_unused_arguments
-                                .ignore_variadic_names,
                             diagnostics,
                         );
                     }
@@ -415,12 +404,6 @@ pub(crate) fn unused_arguments(
                             parameters,
                             checker,
                             scope,
-                            checker.semantic(),
-                            &checker.settings.dummy_variable_rgx,
-                            checker
-                                .settings
-                                .flake8_unused_arguments
-                                .ignore_variadic_names,
                             diagnostics,
                         );
                     }
@@ -441,12 +424,6 @@ pub(crate) fn unused_arguments(
                             parameters,
                             checker,
                             scope,
-                            checker.semantic(),
-                            &checker.settings.dummy_variable_rgx,
-                            checker
-                                .settings
-                                .flake8_unused_arguments
-                                .ignore_variadic_names,
                             diagnostics,
                         );
                     }
@@ -461,12 +438,6 @@ pub(crate) fn unused_arguments(
                         parameters,
                         checker,
                         scope,
-                        checker.semantic(),
-                        &checker.settings.dummy_variable_rgx,
-                        checker
-                            .settings
-                            .flake8_unused_arguments
-                            .ignore_variadic_names,
                         diagnostics,
                     );
                 }
