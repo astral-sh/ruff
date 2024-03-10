@@ -6,7 +6,7 @@ Ok(
     [
         FunctionDef(
             StmtFunctionDef {
-                range: 0..26,
+                range: 0..29,
                 is_async: false,
                 decorator_list: [],
                 name: Identifier {
@@ -15,9 +15,8 @@ Ok(
                 },
                 type_params: None,
                 parameters: Parameters {
-                    range: 5..20,
-                    posonlyargs: [],
-                    args: [
+                    range: 5..23,
+                    posonlyargs: [
                         ParameterWithDefault {
                             range: 6..7,
                             parameter: Parameter {
@@ -51,20 +50,22 @@ Ok(
                                 ),
                             ),
                         },
+                    ],
+                    args: [
                         ParameterWithDefault {
-                            range: 15..19,
+                            range: 18..22,
                             parameter: Parameter {
-                                range: 15..16,
+                                range: 18..19,
                                 name: Identifier {
                                     id: "c",
-                                    range: 15..16,
+                                    range: 18..19,
                                 },
                                 annotation: None,
                             },
                             default: Some(
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 17..19,
+                                        range: 20..22,
                                         value: Int(
                                             30,
                                         ),
@@ -81,7 +82,7 @@ Ok(
                 body: [
                     Pass(
                         StmtPass {
-                            range: 22..26,
+                            range: 25..29,
                         },
                     ),
                 ],

@@ -110,7 +110,7 @@ pub(crate) fn implicit(
     {
         let (a_range, b_range) = match (a_tok, b_tok) {
             (Tok::String { .. }, Tok::String { .. }) => (*a_range, *b_range),
-            (Tok::String { .. }, Tok::FStringStart) => {
+            (Tok::String { .. }, Tok::FStringStart(_)) => {
                 match indexer.fstring_ranges().innermost(b_range.start()) {
                     Some(b_range) => (*a_range, b_range),
                     None => continue,
@@ -122,7 +122,7 @@ pub(crate) fn implicit(
                     None => continue,
                 }
             }
-            (Tok::FStringEnd, Tok::FStringStart) => {
+            (Tok::FStringEnd, Tok::FStringStart(_)) => {
                 match (
                     indexer.fstring_ranges().innermost(a_range.start()),
                     indexer.fstring_ranges().innermost(b_range.start()),

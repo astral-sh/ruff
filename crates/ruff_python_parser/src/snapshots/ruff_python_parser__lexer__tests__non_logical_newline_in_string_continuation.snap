@@ -14,8 +14,11 @@ expression: lex_source(source)
     (
         String {
             value: "a",
-            kind: String,
-            triple_quoted: false,
+            kind: StringKind {
+                prefix: "",
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         6..9,
     ),
@@ -26,8 +29,11 @@ expression: lex_source(source)
     (
         String {
             value: "b",
-            kind: String,
-            triple_quoted: false,
+            kind: StringKind {
+                prefix: "",
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         14..17,
     ),
@@ -42,16 +48,22 @@ expression: lex_source(source)
     (
         String {
             value: "c",
-            kind: String,
-            triple_quoted: false,
+            kind: StringKind {
+                prefix: "",
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         23..26,
     ),
     (
         String {
             value: "d",
-            kind: String,
-            triple_quoted: false,
+            kind: StringKind {
+                prefix: "",
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         33..36,
     ),

@@ -153,3 +153,9 @@ ham[lower +1 :, "columnname"]
 
 #: E203:1:13
 ham[lower + 1  :, "columnname"]
+
+#: Okay
+f"{ham[lower +1 :, "columnname"]}"
+
+#: E203:1:13
+f"{ham[lower + 1  :, "columnname"]}"

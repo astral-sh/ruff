@@ -278,6 +278,13 @@ def f42(
 ):
     pass
 
+# Regression test for https://github.com/astral-sh/ruff/issues/10281
+def f43(
+    __bar: str,
+    /,
+    **specifiers: typing.Any,  # noqa: ANN401
+) -> int:
+    return len(specifiers)
 
 # Check trailing commas are permitted in funcdef argument list.
 def f(a, ): pass

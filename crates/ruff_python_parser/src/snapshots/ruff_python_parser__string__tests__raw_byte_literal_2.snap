@@ -17,6 +17,11 @@ expression: parse_ast
                                     92,
                                     92,
                                 ],
+                                flags: BytesLiteralFlags {
+                                    quote_style: Single,
+                                    raw: true,
+                                    triple_quoted: false,
+                                },
                             },
                         ),
                     },

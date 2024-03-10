@@ -86,7 +86,11 @@ expression: parse_suite(source).unwrap()
                                     StringLiteral {
                                         range: 48..61,
                                         value: "ForwardRefY",
-                                        unicode: false,
+                                        flags: StringLiteralFlags {
+                                            quote_style: Double,
+                                            prefix: "",
+                                            triple_quoted: false,
+                                        },
                                     },
                                 ),
                             },

@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F401_23.py:4:16: F401 [*] `re.RegexFlag` imported but unused
+  |
+3 | from pathlib import Path
+4 | from re import RegexFlag
+  |                ^^^^^^^^^ F401
+5 | from typing import Annotated
+  |
+  = help: Remove unused import: `re.RegexFlag`
+
+ℹ Safe fix
+1 1 | """Test: ensure that we treat strings in `typing.Annotation` as type definitions."""
+2 2 | 
+3 3 | from pathlib import Path
+4   |-from re import RegexFlag
+5 4 | from typing import Annotated
+6 5 | 
+7 6 | p: Annotated["Path", int] = 1

@@ -6,7 +6,7 @@ Ok(
     [
         FunctionDef(
             StmtFunctionDef {
-                range: 0..38,
+                range: 0..41,
                 is_async: false,
                 decorator_list: [],
                 name: Identifier {
@@ -15,9 +15,8 @@ Ok(
                 },
                 type_params: None,
                 parameters: Parameters {
-                    range: 5..32,
-                    posonlyargs: [],
-                    args: [
+                    range: 5..35,
+                    posonlyargs: [
                         ParameterWithDefault {
                             range: 6..7,
                             parameter: Parameter {
@@ -42,13 +41,15 @@ Ok(
                             },
                             default: None,
                         },
+                    ],
+                    args: [
                         ParameterWithDefault {
-                            range: 12..13,
+                            range: 15..16,
                             parameter: Parameter {
-                                range: 12..13,
+                                range: 15..16,
                                 name: Identifier {
                                     id: "c",
-                                    range: 12..13,
+                                    range: 15..16,
                                 },
                                 annotation: None,
                             },
@@ -58,31 +59,31 @@ Ok(
                     vararg: None,
                     kwonlyargs: [
                         ParameterWithDefault {
-                            range: 18..19,
+                            range: 21..22,
                             parameter: Parameter {
-                                range: 18..19,
+                                range: 21..22,
                                 name: Identifier {
                                     id: "d",
-                                    range: 18..19,
+                                    range: 21..22,
                                 },
                                 annotation: None,
                             },
                             default: None,
                         },
                         ParameterWithDefault {
-                            range: 21..25,
+                            range: 24..28,
                             parameter: Parameter {
-                                range: 21..22,
+                                range: 24..25,
                                 name: Identifier {
                                     id: "e",
-                                    range: 21..22,
+                                    range: 24..25,
                                 },
                                 annotation: None,
                             },
                             default: Some(
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 23..25,
+                                        range: 26..28,
                                         value: Int(
                                             20,
                                         ),
@@ -91,19 +92,19 @@ Ok(
                             ),
                         },
                         ParameterWithDefault {
-                            range: 27..31,
+                            range: 30..34,
                             parameter: Parameter {
-                                range: 27..28,
+                                range: 30..31,
                                 name: Identifier {
                                     id: "f",
-                                    range: 27..28,
+                                    range: 30..31,
                                 },
                                 annotation: None,
                             },
                             default: Some(
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 29..31,
+                                        range: 32..34,
                                         value: Int(
                                             30,
                                         ),
@@ -118,7 +119,7 @@ Ok(
                 body: [
                     Pass(
                         StmtPass {
-                            range: 34..38,
+                            range: 37..41,
                         },
                     ),
                 ],

@@ -1267,7 +1267,7 @@ impl<'a> Generator<'a> {
     }
 
     fn unparse_string_literal(&mut self, string_literal: &ast::StringLiteral) {
-        if string_literal.unicode {
+        if string_literal.flags.is_u_string() {
             self.p("u");
         }
         self.p_str_repr(&string_literal.value);

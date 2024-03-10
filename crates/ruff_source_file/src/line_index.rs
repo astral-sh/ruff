@@ -129,6 +129,11 @@ impl LineIndex {
         self.line_starts().len()
     }
 
+    /// Returns `true` if the text only consists of ASCII characters
+    pub fn is_ascii(&self) -> bool {
+        self.kind().is_ascii()
+    }
+
     /// Returns the row number for a given offset.
     ///
     /// ## Examples

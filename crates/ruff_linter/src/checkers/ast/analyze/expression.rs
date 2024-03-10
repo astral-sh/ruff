@@ -427,7 +427,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                         pyupgrade::rules::format_literals(checker, call, &summary);
                                     }
                                     if checker.enabled(Rule::FString) {
-                                        pyupgrade::rules::f_strings(checker, call, &summary, value);
+                                        pyupgrade::rules::f_strings(checker, call, &summary);
                                     }
                                 }
                             }

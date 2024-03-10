@@ -6,8 +6,11 @@ expression: triple_quoted_eol(WINDOWS_EOL)
     (
         String {
             value: "\r\n test string\r\n ",
-            kind: String,
-            triple_quoted: true,
+            kind: StringKind {
+                prefix: "",
+                triple_quoted: true,
+                quote_style: Double,
+            },
         },
         0..23,
     ),

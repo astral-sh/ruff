@@ -18,3 +18,7 @@ pub(crate) const fn is_hug_parens_with_braces_and_square_brackets_enabled(
 pub(crate) fn is_f_string_formatting_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }
+
+pub(crate) fn is_with_single_item_pre_39_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}

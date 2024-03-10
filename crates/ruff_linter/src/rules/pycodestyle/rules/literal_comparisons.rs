@@ -9,6 +9,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
+use crate::fix::snippet::SourceCodeSnippet;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum EqCmpOp {
@@ -102,39 +103,52 @@ impl AlwaysFixableViolation for NoneComparison {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 #[violation]
-pub struct TrueFalseComparison(bool, EqCmpOp);
+pub struct TrueFalseComparison {
+    value: bool,
+    op: EqCmpOp,
+    cond: Option<SourceCodeSnippet>,
+}
 
 impl AlwaysFixableViolation for TrueFalseComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TrueFalseComparison(value, op) = self;
+        let TrueFalseComparison { value, op, cond } = self;
+        let Some(cond) = cond else {
+            return "Avoid equality comparisons to `True` or `False`".to_string();
+        };
+        let cond = cond.truncated_display();
         match (value, op) {
             (true, EqCmpOp::Eq) => {
-                format!("Avoid equality comparisons to `True`; use `if cond:` for truth checks")
+                format!("Avoid equality comparisons to `True`; use `if {cond}:` for truth checks")
             }
             (true, EqCmpOp::NotEq) => {
                 format!(
-                    "Avoid inequality comparisons to `True`; use `if not cond:` for false checks"
+                    "Avoid inequality comparisons to `True`; use `if not {cond}:` for false checks"
                 )
             }
             (false, EqCmpOp::Eq) => {
                 format!(
-                    "Avoid equality comparisons to `False`; use `if not cond:` for false checks"
+                    "Avoid equality comparisons to `False`; use `if not {cond}:` for false checks"
                 )
             }
             (false, EqCmpOp::NotEq) => {
-                format!("Avoid inequality comparisons to `False`; use `if cond:` for truth checks")
+                format!(
+                    "Avoid inequality comparisons to `False`; use `if {cond}:` for truth checks"
+                )
             }
         }
     }
 
     fn fix_title(&self) -> String {
-        let TrueFalseComparison(value, op) = self;
+        let TrueFalseComparison { value, op, cond } = self;
+        let Some(cond) = cond.as_ref().and_then(|cond| cond.full_display()) else {
+            return "Replace comparison".to_string();
+        };
         match (value, op) {
-            (true, EqCmpOp::Eq) => "Replace with `cond`".to_string(),
-            (true, EqCmpOp::NotEq) => "Replace with `not cond`".to_string(),
-            (false, EqCmpOp::Eq) => "Replace with `not cond`".to_string(),
-            (false, EqCmpOp::NotEq) => "Replace with `cond`".to_string(),
+            (true, EqCmpOp::Eq) => format!("Replace with `{cond}`"),
+            (true, EqCmpOp::NotEq) => format!("Replace with `not {cond}`"),
+            (false, EqCmpOp::Eq) => format!("Replace with `not {cond}`"),
+            (false, EqCmpOp::NotEq) => format!("Replace with `{cond}`"),
         }
     }
 }
@@ -178,17 +192,35 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                 if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = comparator {
                     match op {
                         EqCmpOp::Eq => {
+                            let cond = if compare.ops.len() == 1 {
+                                Some(SourceCodeSnippet::from_str(checker.locator().slice(next)))
+                            } else {
+                                None
+                            };
                             let diagnostic = Diagnostic::new(
-                                TrueFalseComparison(*value, op),
-                                comparator.range(),
+                                TrueFalseComparison {
+                                    value: *value,
+                                    op,
+                                    cond,
+                                },
+                                compare.range(),
                             );
                             bad_ops.insert(0, CmpOp::Is);
                             diagnostics.push(diagnostic);
                         }
                         EqCmpOp::NotEq => {
+                            let cond = if compare.ops.len() == 1 {
+                                Some(SourceCodeSnippet::from_str(checker.locator().slice(next)))
+                            } else {
+                                None
+                            };
                             let diagnostic = Diagnostic::new(
-                                TrueFalseComparison(*value, op),
-                                comparator.range(),
+                                TrueFalseComparison {
+                                    value: *value,
+                                    op,
+                                    cond,
+                                },
+                                compare.range(),
                             );
                             bad_ops.insert(0, CmpOp::IsNot);
                             diagnostics.push(diagnostic);
@@ -231,14 +263,40 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
                 if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = next {
                     match op {
                         EqCmpOp::Eq => {
-                            let diagnostic =
-                                Diagnostic::new(TrueFalseComparison(*value, op), next.range());
+                            let cond = if compare.ops.len() == 1 {
+                                Some(SourceCodeSnippet::from_str(
+                                    checker.locator().slice(comparator),
+                                ))
+                            } else {
+                                None
+                            };
+                            let diagnostic = Diagnostic::new(
+                                TrueFalseComparison {
+                                    value: *value,
+                                    op,
+                                    cond,
+                                },
+                                compare.range(),
+                            );
                             bad_ops.insert(index, CmpOp::Is);
                             diagnostics.push(diagnostic);
                         }
                         EqCmpOp::NotEq => {
-                            let diagnostic =
-                                Diagnostic::new(TrueFalseComparison(*value, op), next.range());
+                            let cond = if compare.ops.len() == 1 {
+                                Some(SourceCodeSnippet::from_str(
+                                    checker.locator().slice(comparator),
+                                ))
+                            } else {
+                                None
+                            };
+                            let diagnostic = Diagnostic::new(
+                                TrueFalseComparison {
+                                    value: *value,
+                                    op,
+                                    cond,
+                                },
+                                compare.range(),
+                            );
                             bad_ops.insert(index, CmpOp::IsNot);
                             diagnostics.push(diagnostic);
                         }

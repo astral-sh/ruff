@@ -7,7 +7,7 @@ use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
 use anyhow::Result;
-use args::GlobalConfigArgs;
+use args::{GlobalConfigArgs, ServerCommand};
 use clap::CommandFactory;
 use colored::Colorize;
 use log::warn;
@@ -190,6 +190,7 @@ pub fn run(
         }
         Command::Check(args) => check(args, global_options),
         Command::Format(args) => format(args, global_options),
+        Command::Server(args) => server(args, global_options.log_level()),
     }
 }
 
@@ -201,6 +202,12 @@ fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitS
     } else {
         commands::format::format(cli, &config_arguments)
     }
+}
+
+#[allow(clippy::needless_pass_by_value)] // TODO: remove once we start taking arguments from here
+fn server(args: ServerCommand, log_level: LogLevel) -> Result<ExitStatus> {
+    let ServerCommand {} = args;
+    commands::server::run_server(log_level)
 }
 
 pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {

@@ -16,7 +16,6 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::fits_or_shrinks;
 
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::{curly_escape, curly_unescape};
@@ -392,12 +391,7 @@ impl FStringConversion {
 }
 
 /// UP032
-pub(crate) fn f_strings(
-    checker: &mut Checker,
-    call: &ast::ExprCall,
-    summary: &FormatSummary,
-    template: &Expr,
-) {
+pub(crate) fn f_strings(checker: &mut Checker, call: &ast::ExprCall, summary: &FormatSummary) {
     if summary.has_nested_parts {
         return;
     }
@@ -520,15 +514,6 @@ pub(crate) fn f_strings(
 
     let mut diagnostic = Diagnostic::new(FString, call.range());
 
-    // Avoid refactors that exceed the line length limit or make it exceed by more.
-    let f_string_fits_or_shrinks = fits_or_shrinks(
-        &contents,
-        template.into(),
-        checker.locator(),
-        checker.settings.pycodestyle.max_line_length,
-        checker.settings.tab_size,
-    );
-
     // Avoid fix if there are comments within the call:
     // ```
     // "{}".format(
@@ -540,7 +525,7 @@ pub(crate) fn f_strings(
         .comment_ranges()
         .intersects(call.arguments.range());
 
-    if f_string_fits_or_shrinks && !has_comments {
+    if !has_comments {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             contents,
             call.range(),
