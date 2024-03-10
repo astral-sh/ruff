@@ -1,7 +1,7 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::Parameters;
 
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, DiagnosticKind, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Scope, ScopeKind};
@@ -39,18 +39,16 @@ pub struct UnusedFunctionArgument {
     name: String,
 }
 
-impl Violation for UnusedFunctionArgument {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for UnusedFunctionArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedFunctionArgument { name } = self;
         format!("Unused function argument: `{name}`")
     }
 
-    fn fix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> String {
         let Self { name } = self;
-        Some(format!("Remove argument: `{name}`"))
+        format!("Remove argument: `{name}`")
     }
 }
 
@@ -83,18 +81,16 @@ pub struct UnusedMethodArgument {
     name: String,
 }
 
-impl Violation for UnusedMethodArgument {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for UnusedMethodArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedMethodArgument { name } = self;
         format!("Unused method argument: `{name}`")
     }
 
-    fn fix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> String {
         let Self { name } = self;
-        Some(format!("Remove argument: `{name}`"))
+        format!("Remove argument: `{name}`")
     }
 }
 
@@ -129,18 +125,16 @@ pub struct UnusedClassMethodArgument {
     name: String,
 }
 
-impl Violation for UnusedClassMethodArgument {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for UnusedClassMethodArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedClassMethodArgument { name } = self;
         format!("Unused class method argument: `{name}`")
     }
 
-    fn fix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> String {
         let Self { name } = self;
-        Some(format!("Remove argument: `{name}`"))
+        format!("Remove argument: `{name}`")
     }
 }
 
@@ -175,18 +169,16 @@ pub struct UnusedStaticMethodArgument {
     name: String,
 }
 
-impl Violation for UnusedStaticMethodArgument {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for UnusedStaticMethodArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedStaticMethodArgument { name } = self;
         format!("Unused static method argument: `{name}`")
     }
 
-    fn fix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> String {
         let Self { name } = self;
-        Some(format!("Remove argument: `{name}`"))
+        format!("Remove argument: `{name}`")
     }
 }
 
@@ -218,18 +210,16 @@ pub struct UnusedLambdaArgument {
     name: String,
 }
 
-impl Violation for UnusedLambdaArgument {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for UnusedLambdaArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedLambdaArgument { name } = self;
         format!("Unused lambda argument: `{name}`")
     }
 
-    fn fix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> String {
         let Self { name } = self;
-        Some(format!("Remove argument: `{name}`"))
+        format!("Remove argument: `{name}`")
     }
 }
 
