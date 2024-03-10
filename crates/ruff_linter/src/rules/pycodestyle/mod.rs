@@ -148,11 +148,11 @@ mod tests {
         Ok(())
     }
 
-    /// Tests the compatibility of E202, E225 and E275.
+    /// Tests the compatibility of E2 rules (E202, E225 and E275) on syntactically incorrect code.
     #[test]
     fn white_space_syntax_error_compatibility() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("pycodestyle").join("E20_syntax_error.py"),
+            Path::new("pycodestyle").join("E2_syntax_error.py"),
             &settings::LinterSettings {
                 ..settings::LinterSettings::for_rules([
                     Rule::MissingWhitespaceAroundOperator,
