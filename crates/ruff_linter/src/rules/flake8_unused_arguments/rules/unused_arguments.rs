@@ -30,6 +30,10 @@ use crate::rules::flake8_unused_arguments::helpers;
 /// def foo(bar):
 ///     return bar * 2
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as removing a function parameter
+/// can change the behavior of the program.
 #[violation]
 pub struct UnusedFunctionArgument {
     name: String,
@@ -70,6 +74,10 @@ impl Violation for UnusedFunctionArgument {
 ///     def foo(self, arg1):
 ///         print(arg1)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as removing a method parameter
+/// can change the behavior of the program.
 #[violation]
 pub struct UnusedMethodArgument {
     name: String,
@@ -112,6 +120,10 @@ impl Violation for UnusedMethodArgument {
 ///     def foo(cls, arg1):
 ///         print(arg1)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as removing a method parameter
+/// can change the behavior of the program.
 #[violation]
 pub struct UnusedClassMethodArgument {
     name: String,
@@ -154,6 +166,10 @@ impl Violation for UnusedClassMethodArgument {
 ///     def foo(arg1):
 ///         print(arg1)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as removing a method parameter
+/// can change the behavior of the program.
 #[violation]
 pub struct UnusedStaticMethodArgument {
     name: String,
@@ -193,6 +209,10 @@ impl Violation for UnusedStaticMethodArgument {
 /// my_list = [1, 2, 3, 4, 5]
 /// squares = map(lambda x: x**2, my_list)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as removing a lambda parameter
+/// can change the behavior of the program.
 #[violation]
 pub struct UnusedLambdaArgument {
     name: String,
