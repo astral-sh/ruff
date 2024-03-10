@@ -159,13 +159,7 @@ pub(crate) fn missing_whitespace_around_operator(
     while let Some(token) = tokens.next() {
         let kind = token.kind();
 
-        // There should not be a ")" directly after a token, as it is a syntax error. However if that happens,
-        // allow it in order to prevent entering a loop where E225 adds a space only for E202 to remove it.
-        if kind.is_trivia()
-            || tokens
-                .peek()
-                .is_some_and(|token| token.kind() == TokenKind::Rpar)
-        {
+        if kind.is_trivia() {
             continue;
         }
 
@@ -217,6 +211,13 @@ pub(crate) fn missing_whitespace_around_operator(
             } else {
                 NeedsSpace::No
             }
+        } else if tokens
+            .peek()
+            .is_some_and(|token| token.kind() == TokenKind::Rpar)
+        {
+            // There should not be a ")" directly after a token, as it is a syntax error. However if that happens,
+            // allow it in order to prevent entering a loop where E225 adds a space only for E202 to remove it.
+            NeedsSpace::No
         } else if is_whitespace_needed(kind) {
             NeedsSpace::Yes
         } else {
