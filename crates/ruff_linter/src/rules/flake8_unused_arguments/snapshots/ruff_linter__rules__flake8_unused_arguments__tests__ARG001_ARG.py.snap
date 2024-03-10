@@ -295,13 +295,23 @@ ARG.py:251:42: ARG001 [*] Unused function argument: `d`
 253 253 | 
 254 254 | 
 
-ARG.py:255:44: ARG001 Unused function argument: `d`
+ARG.py:255:44: ARG001 [*] Unused function argument: `d`
     |
 255 | def last_kwonly_without_vararg(a, /, b, *, d, **e):
     |                                            ^ ARG001
 256 |     print(a, b, e)
     |
     = help: Remove argument: `d`
+
+ℹ Unsafe fix
+252 252 |     print(a, b, c, e)
+253 253 | 
+254 254 | 
+255     |-def last_kwonly_without_vararg(a, /, b, *, d, **e):
+    255 |+def last_kwonly_without_vararg(a, /, b, **e):
+256 256 |     print(a, b, e)
+257 257 | 
+258 258 | 
 
 ARG.py:259:29: ARG001 [*] Unused function argument: `e`
     |
@@ -375,13 +385,23 @@ ARG.py:271:18: ARG001 [*] Unused function argument: `c`
 273 273 | 
 274 274 | 
 
-ARG.py:275:20: ARG001 Unused function argument: `d`
+ARG.py:275:20: ARG001 [*] Unused function argument: `d`
     |
 275 | def only_kwonly(*, d):
     |                    ^ ARG001
 276 |     ...
     |
     = help: Remove argument: `d`
+
+ℹ Unsafe fix
+272 272 |     ...
+273 273 | 
+274 274 | 
+275     |-def only_kwonly(*, d):
+    275 |+def only_kwonly():
+276 276 |     ...
+277 277 | 
+278 278 | 
 
 ARG.py:279:19: ARG001 [*] Unused function argument: `e`
     |

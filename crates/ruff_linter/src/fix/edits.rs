@@ -139,15 +139,23 @@ pub(crate) fn remove_parameter(
     parentheses: Parentheses,
     source: &str,
 ) -> Result<Edit> {
-    let range_to_remove = ParameterRangeToRemove::find_ranges(&parameter.range(), parameters)?;
+    let mut range_to_remove = ParameterRangeToRemove::find_ranges(&parameter.range(), parameters)?;
 
     // If this is the last kwonlyarg with no vararg, the preceding star must be removed
     if range_to_remove.parameter_kind.is_keyword_only()
         && parameters.kwonlyargs.len() == 1
         && parameters.vararg.is_none()
     {
-        anyhow::bail!("todo")
+        let mut tokenizer = BackwardsTokenizer::up_to(range_to_remove.start(), source, &[]);
+
+        let star = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Star)
+            .context("Unable to find previous star")?;
+
+        // The range to remove is expanded to include the previous star
+        range_to_remove.range = TextRange::new(star.start(), range_to_remove.range.end());
     }
+    let range_to_remove = range_to_remove;
 
     // The varargs star is left in place if there are keyword only parameters
     if range_to_remove.parameter_kind.is_variadic_positional() && !parameters.kwonlyargs.is_empty()
