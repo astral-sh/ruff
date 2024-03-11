@@ -8,6 +8,22 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::noqa::Directive;
 
+/// ## What it does
+/// Checks for noqa directives with codes but no colon.
+///
+/// ## Why is this bad?
+/// noqa directives without a colon will ignore all rules which is likely a
+/// mistake if error codes are present.
+///
+/// ## Example
+/// ```python
+/// x = 2  # noqa X100
+/// ```
+///
+/// Use instead:
+/// x = 2  # noqa: X100
+/// ```
+///
 #[violation]
 pub struct NOQAMissingColon;
 
@@ -22,6 +38,22 @@ impl AlwaysFixableViolation for NOQAMissingColon {
     }
 }
 
+/// ## What it does
+/// Checks for noqa directives with a space before a colon.
+///
+/// ## Why is this bad?
+/// noqa directives with a space before the colon will ignore all rules,
+/// which is likely a mistake if error codes are present.
+///
+/// ## Example
+/// ```python
+/// x = 2  # noqa  : X400
+/// ```
+///
+/// Use instead:
+/// x = 2  # noqa: X400
+/// ```
+///
 #[violation]
 pub struct NOQASpaceBeforeColon;
 
@@ -36,6 +68,21 @@ impl AlwaysFixableViolation for NOQASpaceBeforeColon {
     }
 }
 
+/// ## What it does
+/// Checks for noqa directives with multiple spaces before the colon and the codes.
+///
+/// ## Why is this bad?
+/// Multiple spaces between the colon and the codes are redundant and lead to longer lines.
+///
+/// ## Example
+/// ```python
+/// x = 2  # noqa:  X600
+/// ```
+///
+/// Use instead:
+/// x = 2  # noqa: X600
+/// ```
+///
 #[violation]
 pub struct NOQAMultipleSpacesBeforeCode;
 
@@ -50,6 +97,21 @@ impl AlwaysFixableViolation for NOQAMultipleSpacesBeforeCode {
     }
 }
 
+/// ## What it does
+/// Checks for noqa directives with duplicated codes.
+///
+/// ## Why is this bad?
+/// Duplicated codes are redundant and can lead to confusion.
+///
+/// ## Example
+/// ```python
+/// x = 2  # noqa: X100, X200, X100, X200, X300
+/// ```
+///
+/// Use instead:
+/// x = 2  # noqa: X100, X200, X300
+/// ```
+///
 #[violation]
 pub struct NOQADuplicateCodes;
 
