@@ -89,7 +89,7 @@ pub(crate) fn hashlib_insecure_hash_functions(checker: &mut Checker, call: &ast:
     {
         match weak_hash_call {
             WeakHashCall::Hashlib { call: hashlib_call } => {
-                detect_insecure_hashlib_calls(checker, call, &hashlib_call);
+                detect_insecure_hashlib_calls(checker, call, hashlib_call);
             }
             WeakHashCall::Crypt => detect_insecure_crypt_calls(checker, call),
         }
@@ -99,7 +99,7 @@ pub(crate) fn hashlib_insecure_hash_functions(checker: &mut Checker, call: &ast:
 fn detect_insecure_hashlib_calls(
     checker: &mut Checker,
     call: &ast::ExprCall,
-    hashlib_call: &HashlibCall,
+    hashlib_call: HashlibCall,
 ) {
     if !is_used_for_security(&call.arguments) {
         return;
@@ -181,12 +181,13 @@ fn is_used_for_security(arguments: &Arguments) -> bool {
         .map_or(true, |keyword| !is_const_false(&keyword.value))
 }
 
+#[derive(Debug, Copy, Clone)]
 enum WeakHashCall {
     Hashlib { call: HashlibCall },
     Crypt,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum HashlibCall {
     New,
     WeakHash(&'static str),
