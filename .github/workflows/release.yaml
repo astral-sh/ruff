@@ -28,7 +28,6 @@ env:
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
-  MATURIN_VERSION: "1.4.0"
 
 jobs:
   sdist:
@@ -45,7 +44,6 @@ jobs:
       - name: "Build sdist"
         uses: PyO3/maturin-action@v1
         with:
-          maturin-version: ${{ env.MATURIN_VERSION }}
           command: sdist
           args: --out dist
       - name: "Test sdist"
@@ -74,7 +72,6 @@ jobs:
       - name: "Build wheels - x86_64"
         uses: PyO3/maturin-action@v1
         with:
-          maturin-version: ${{ env.MATURIN_VERSION }}
           target: x86_64
           args: --release --locked --out dist
       - name: "Test wheel - x86_64"
@@ -115,7 +112,6 @@ jobs:
       - name: "Build wheels - universal2"
         uses: PyO3/maturin-action@v1
         with:
-          maturin-version: ${{ env.MATURIN_VERSION }}
           args: --release --locked --target universal2-apple-darwin --out dist
       - name: "Test wheel - universal2"
         run: |
@@ -164,7 +160,6 @@ jobs:
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1
         with:
-          maturin-version: ${{ env.MATURIN_VERSION }}
           target: ${{ matrix.platform.target }}
           args: --release --locked --out dist
       - name: "Test wheel"
@@ -213,7 +208,6 @@ jobs:
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1
         with:
-          maturin-version: ${{ env.MATURIN_VERSION }}
           target: ${{ matrix.target }}
           manylinux: auto
           args: --release --locked --out dist
@@ -276,7 +270,6 @@ jobs:
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1
         with:
-          maturin-version: ${{ env.MATURIN_VERSION }}
           target: ${{ matrix.platform.target }}
           manylinux: auto
           docker-options: ${{ matrix.platform.maturin_docker_options }}
@@ -333,7 +326,6 @@ jobs:
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1
         with:
-          maturin-version: ${{ env.MATURIN_VERSION }}
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
           args: --release --locked --out dist
@@ -389,7 +381,6 @@ jobs:
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1
         with:
-          maturin-version: ${{ env.MATURIN_VERSION }}
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
           args: --release --locked --out dist

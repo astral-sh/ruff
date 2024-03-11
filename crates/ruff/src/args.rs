@@ -126,6 +126,8 @@ pub enum Command {
     GenerateShellCompletion { shell: clap_complete_command::Shell },
     /// Run the Ruff formatter on the given files or directories.
     Format(FormatCommand),
+    /// Run the language server.
+    Server(ServerCommand),
     /// Display Ruff's version
     Version {
         #[arg(long, value_enum, default_value = "text")]
@@ -493,6 +495,9 @@ pub struct FormatCommand {
     #[clap(long, help_heading = "Editor options", verbatim_doc_comment)]
     pub range: Option<FormatRange>,
 }
+
+#[derive(Clone, Debug, clap::Parser)]
+pub struct ServerCommand;
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 pub enum HelpFormat {
