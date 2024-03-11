@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
@@ -82,7 +84,6 @@ pub(crate) fn noqa_formatting(
                     if matches!(line[cursor..].chars().next(), Some(':')) {
                         let start = offset + all.range().end();
                         let end = offset + TextSize::new(u32::try_from(cursor).unwrap());
-                        println!("{} {}", start.to_usize(), end.to_usize());
                         let mut diagnostic =
                             Diagnostic::new(NOQASpaceBeforeColon, TextRange::new(start, end));
                         diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
@@ -92,31 +93,37 @@ pub(crate) fn noqa_formatting(
                     else if let Some(_) = Directive::lex_code(&line[cursor..]) {
                         let start = offset + all.range().end();
                         let end = start + TextSize::new(1);
-                        println!("{} {}", start.to_usize(), end.to_usize());
                         let mut diagnostic =
                             Diagnostic::new(NOQAMissingColon, TextRange::new(start, end));
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(':'.to_string(), start)));
                         diagnostics.push(diagnostic);
                     }
-                    println!("{}", &line[cursor..]);
                 }
                 Directive::Codes(codes) => {
                     let mut cursor = codes.range().start().to_usize();
                     cursor += find_noqa_end(line).unwrap();
-                    let post_noqa_start = cursor;
                     let num_spaces = leading_whitespace_len(&line[cursor..]);
 
                     // NQA004
                     if num_spaces > 1 {
                         let start = offset + TextSize::new(u32::try_from(cursor + 1).unwrap());
                         let end = start + TextSize::new(u32::try_from(num_spaces - 1).unwrap());
-                        println!("{} {}", start.to_usize(), end.to_usize());
                         let mut diagnostic =
                             Diagnostic::new(NOQAMultipleSpacesBeforeCode, TextRange::new(start, end));
                         diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
                         diagnostics.push(diagnostic);
                     }
-                    println!("{}", &line[cursor..]);
+
+                    let mut seen = HashSet::new();
+                    for (code, code_range) in codes.codes().iter().zip(codes.code_ranges_full().iter()) {
+                        if !seen.insert(code) {
+                            let start = offset + code_range.start();
+                            let end = offset + code_range.end();
+                            let mut diagnostic = Diagnostic::new(NOQADuplicateCodes, TextRange::new(start, end));
+                            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
+                            diagnostics.push(diagnostic);
+                        }
+                    }
                 }
             }
         }
