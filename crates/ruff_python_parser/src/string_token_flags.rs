@@ -341,8 +341,8 @@ impl From<StringKind> for ruff_python_ast::StringLiteralFlags {
             new = new.with_triple_quotes();
         }
         let StringPrefix::Regular(prefix) = value.prefix() else {
-            panic!(
-                "Attempting to convert {} into a regular string",
+            unreachable!(
+                "Should never attempt to convert {} into a regular string",
                 value.prefix()
             )
         };
@@ -360,7 +360,10 @@ impl From<StringKind> for ruff_python_ast::BytesLiteralFlags {
             new = new.with_triple_quotes();
         }
         let StringPrefix::Bytes(bytestring_prefix) = value.prefix() else {
-            panic!("Attempting to convert {} into a bytestring", value.prefix())
+            unreachable!(
+                "Should never attempt to convert {} into a bytestring",
+                value.prefix()
+            )
         };
         new.with_prefix(bytestring_prefix)
     }
@@ -376,7 +379,10 @@ impl From<StringKind> for ruff_python_ast::FStringFlags {
             new = new.with_triple_quotes();
         }
         let StringPrefix::Format(fstring_prefix) = value.prefix() else {
-            panic!("Attempting to convert {} into an f-string", value.prefix())
+            unreachable!(
+                "Should never attempt to convert {} into an f-string",
+                value.prefix()
+            )
         };
         new.with_prefix(fstring_prefix)
     }
