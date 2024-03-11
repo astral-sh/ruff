@@ -3051,22 +3051,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "time"
-version = "0.3.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd0cbfecb4d19b5ea75bb31ad904eb5b9fa13f21079c3b92017ebdf4999a5890"
-dependencies = [
- "serde",
- "time-core",
-]
-
-[[package]]
-name = "time-core"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e153e1f1acaef8acc537e68b44906d2db6436e2b35ac2c6b42640fff91f00fd"
-
-[[package]]
 name = "tiny-keccak"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3314,9 +3298,9 @@ checksum = "f962df74c8c05a667b5ee8bcf162993134c104e96440b663c8daa176dc772d8c"
 
 [[package]]
 name = "unicode_names2"
-version = "1.2.1"
+version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac64ef2f016dc69dfa8283394a70b057066eb054d5fcb6b9eb17bd2ec5097211"
+checksum = "addeebf294df7922a1164f729fb27ebbbcea99cc32b3bf08afab62757f707677"
 dependencies = [
  "phf",
  "unicode_names2_generator",
@@ -3324,15 +3308,14 @@ dependencies = [
 
 [[package]]
 name = "unicode_names2_generator"
-version = "1.2.1"
+version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "013f6a731e80f3930de580e55ba41dfa846de4e0fdee4a701f97989cb1597d6a"
+checksum = "f444b8bba042fe3c1251ffaca35c603f2dc2ccc08d595c65a8c4f76f3e8426c0"
 dependencies = [
  "getopts",
  "log",
  "phf_codegen",
  "rand",
- "time",
 ]
 
 [[package]]
