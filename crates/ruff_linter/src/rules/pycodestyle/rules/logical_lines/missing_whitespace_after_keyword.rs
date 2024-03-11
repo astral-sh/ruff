@@ -62,7 +62,10 @@ pub(crate) fn missing_whitespace_after_keyword(
                     TokenKind::Colon
                         | TokenKind::Newline
                         | TokenKind::NonLogicalNewline
-                        | TokenKind::Rpar // In case of a syntax error, do not attempt to add a whitespace.
+                        // In the event of a syntax error, do not attempt to add a whitespace.
+                        | TokenKind::Rpar
+                        | TokenKind::Rsqb
+                        | TokenKind::Rbrace
                 ))
             && tok0.end() == tok1.start()
         {

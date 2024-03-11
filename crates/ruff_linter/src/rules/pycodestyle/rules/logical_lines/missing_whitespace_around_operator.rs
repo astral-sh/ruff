@@ -211,12 +211,20 @@ pub(crate) fn missing_whitespace_around_operator(
             } else {
                 NeedsSpace::No
             }
-        } else if tokens
-            .peek()
-            .is_some_and(|token| token.kind() == TokenKind::Rpar)
-        {
-            // There should not be a ")" directly after a token, as it is a syntax error. However if that happens,
-            // allow it in order to prevent entering a loop where E225 adds a space only for E202 to remove it.
+        } else if tokens.peek().is_some_and(|token| {
+            matches!(
+                token.kind(),
+                TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
+            )
+        }) {
+            // There should not be a closing bracket directly after a token, as it is a syntax
+            // error. For example:
+            // ```
+            // 1+)
+            // ```
+            //
+            // However, allow it in order to prevent entering an infinite loop in which E225 adds a
+            // space only for E202 to remove it.
             NeedsSpace::No
         } else if is_whitespace_needed(kind) {
             NeedsSpace::Yes
