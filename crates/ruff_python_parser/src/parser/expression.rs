@@ -385,8 +385,7 @@ impl<'src> Parser<'src> {
 
                 Expr::IpyEscapeCommand(command)
             }
-            TokenKind::String => self.parse_string_expression(),
-            TokenKind::FStringStart => self.parse_fstring_expression(),
+            TokenKind::String | TokenKind::FStringStart => self.parse_strings(),
             TokenKind::Lpar => {
                 return self.parse_parenthesized_expression();
             }
@@ -778,160 +777,105 @@ impl<'src> Parser<'src> {
         }
     }
 
-    pub(super) fn parse_string_expression(&mut self) -> Expr {
+    /// Parses all kinds of strings and implicitly concatenated strings.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `String` or `FStringStart` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/grammar.html> (Search "strings:")
+    pub(super) fn parse_strings(&mut self) -> Expr {
         let start = self.node_start();
         let mut strings = vec![];
-        let mut progress = ParserProgress::default();
 
-        while self.at(TokenKind::String) {
-            progress.assert_progressing(self);
-            let (
-                Tok::String {
-                    value,
-                    kind,
-                    triple_quoted,
-                },
-                tok_range,
-            ) = self.bump(TokenKind::String)
-            else {
-                unreachable!()
+        self.parse_list(RecoveryContextKind::Strings, |parser| {
+            let string = match parser.current_token_kind() {
+                TokenKind::String => parser.parse_string(),
+                TokenKind::FStringStart => StringType::FString(parser.parse_fstring()),
+                _ => unreachable!(),
             };
-
-            match parse_string_literal(value, kind, triple_quoted, tok_range) {
-                Ok(string) => {
-                    strings.push(string);
-                }
-                Err(error) => {
-                    strings.push(StringType::Invalid(ast::StringLiteral {
-                        value: self.src_text(tok_range).to_string().into_boxed_str(),
-                        range: tok_range,
-                        unicode: kind.is_unicode(),
-                    }));
-                    let location = error.location();
-                    self.add_error(ParseErrorType::Lexical(error.into_error()), location);
-                }
-            }
-        }
-
-        // This handles the case where the string is implicit concatenated with
-        // a fstring, e.g., `"hello " f"{x}"`.
-        if self.at(TokenKind::FStringStart) {
-            self.handle_implicit_concatenated_strings(&mut strings);
-        }
+            strings.push(string);
+        });
 
         let range = self.node_range(start);
 
-        if strings.len() == 1 {
-            return match strings.pop().unwrap() {
+        match strings.len() {
+            // This is not possible as the function was called by matching against a
+            // `String` or `FStringStart` token.
+            0 => unreachable!("Expected to parse at least one string"),
+            // We need a owned value, hence the `pop` here.
+            1 => match strings.pop().unwrap() {
                 StringType::Str(string) => Expr::StringLiteral(ast::ExprStringLiteral {
                     value: ast::StringLiteralValue::single(string),
                     range,
                 }),
-                StringType::Bytes(bytes) => {
-                    // TODO(micha): Is this valid? I thought string and byte literals can't be concatenated? Maybe not a syntax error?
-                    Expr::BytesLiteral(ast::ExprBytesLiteral {
-                        value: ast::BytesLiteralValue::single(bytes),
-                        range,
-                    })
-                }
+                StringType::Bytes(bytes) => Expr::BytesLiteral(ast::ExprBytesLiteral {
+                    value: ast::BytesLiteralValue::single(bytes),
+                    range,
+                }),
+                StringType::FString(fstring) => Expr::FString(ast::ExprFString {
+                    value: ast::FStringValue::single(fstring),
+                    range,
+                }),
                 #[allow(deprecated)]
                 StringType::Invalid(invalid) => Expr::Invalid(ast::ExprInvalid {
                     value: invalid.value.to_string(),
                     range,
                 }),
-                StringType::FString(_) => unreachable!(),
-            };
-        }
+            },
+            _ => concatenated_strings(strings, range).unwrap_or_else(|error| {
+                let location = error.location();
+                self.add_error(ParseErrorType::Lexical(error.into_error()), location);
 
-        concatenated_strings(strings, range).unwrap_or_else(|error| {
-            let location = error.location();
-            self.add_error(ParseErrorType::Lexical(error.into_error()), location);
-            #[allow(deprecated)]
-            Expr::Invalid(ast::ExprInvalid {
-                value: self.src_text(location).into(),
-                range: location,
-            })
-        })
+                #[allow(deprecated)]
+                Expr::Invalid(ast::ExprInvalid {
+                    value: self.src_text(location).into(),
+                    range: location,
+                })
+            }),
+        }
     }
 
-    /// Handles implicit concatenated f-strings, e.g. `f"{x}" f"hello"`, and
-    /// implicit concatenated f-strings with strings, e.g. `f"{x}" "xyz" f"{x}"`.
-    fn handle_implicit_concatenated_strings(&mut self, strings: &mut Vec<StringType>) {
-        let mut progress = ParserProgress::default();
+    /// Parses a single string literal.
+    ///
+    /// This does not handle implicitly concatenated strings.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `String` token.
+    fn parse_string(&mut self) -> StringType {
+        let (
+            Tok::String {
+                value,
+                kind,
+                triple_quoted,
+            },
+            tok_range,
+        ) = self.bump(TokenKind::String)
+        else {
+            unreachable!()
+        };
 
-        loop {
-            progress.assert_progressing(self);
-            let start = self.node_start();
-
-            if self.at(TokenKind::FStringStart) {
-                strings.push(StringType::FString(self.parse_fstring()));
-            } else if self.at(TokenKind::String) {
-                let (
-                    Tok::String {
-                        value,
-                        kind,
-                        triple_quoted,
-                    },
-                    _,
-                ) = self.next_token()
-                else {
-                    unreachable!()
-                };
-
-                let range = self.node_range(start);
-
-                match parse_string_literal(value, kind, triple_quoted, range) {
-                    Ok(string) => {
-                        strings.push(string);
-                    }
-                    Err(error) => {
-                        strings.push(StringType::Invalid(ast::StringLiteral {
-                            value: self.src_text(error.location()).to_string().into_boxed_str(),
-                            range,
-                            unicode: kind.is_unicode(),
-                        }));
-                        let location = error.location();
-                        self.add_error(ParseErrorType::Lexical(error.into_error()), location);
-                    }
-                }
-            } else {
-                break;
+        match parse_string_literal(value, kind, triple_quoted, tok_range) {
+            Ok(string) => string,
+            Err(error) => {
+                let string = StringType::Invalid(ast::StringLiteral {
+                    // TODO(dhruvmanila): Do we need to get the source text? In the future, we
+                    // can just set a flag and the linter can query the source code if needed.
+                    value: self.src_text(tok_range).to_string().into_boxed_str(),
+                    range: tok_range,
+                    unicode: kind.is_unicode(),
+                });
+                let location = error.location();
+                self.add_error(ParseErrorType::Lexical(error.into_error()), location);
+                string
             }
         }
     }
 
-    /// Parses a f-string expression.
-    fn parse_fstring_expression(&mut self) -> Expr {
-        const FSTRING_SET: TokenSet = TokenSet::new([TokenKind::FStringStart, TokenKind::String]);
-
-        let start = self.node_start();
-        let fstring = self.parse_fstring();
-
-        if !self.at_ts(FSTRING_SET) {
-            return Expr::FString(ast::ExprFString {
-                value: ast::FStringValue::single(fstring),
-                range: self.node_range(start),
-            });
-        }
-
-        let mut strings = vec![StringType::FString(fstring)];
-        self.handle_implicit_concatenated_strings(&mut strings);
-
-        let range = self.node_range(start);
-
-        concatenated_strings(strings, range).unwrap_or_else(|error| {
-            let location = error.location();
-            self.add_error(ParseErrorType::Lexical(error.into_error()), location);
-
-            #[allow(deprecated)]
-            Expr::Invalid(ast::ExprInvalid {
-                value: self.src_text(location).into(),
-                range: location,
-            })
-        })
-    }
-
     /// Parses a f-string.
+    ///
+    /// This does not handle implicitly concatenated strings.
     ///
     /// # Panics
     ///
@@ -953,6 +897,10 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses a list of f-string elements.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `{` or `FStringMiddle` token.
     fn parse_fstring_elements(&mut self) -> Vec<FStringElement> {
         let mut elements = vec![];
 
