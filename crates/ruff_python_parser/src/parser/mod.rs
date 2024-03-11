@@ -79,6 +79,7 @@ impl Program {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct Parser<'src> {
     source: &'src str,
     tokens: TokenSource,
@@ -785,6 +786,8 @@ enum RecoveryContextKind {
 
     /// When parsing a list of items in a `with` statement
     WithItems(WithItemKind),
+
+    FStringElements,
 }
 
 impl RecoveryContextKind {
@@ -864,6 +867,27 @@ impl RecoveryContextKind {
             RecoveryContextKind::WithItems(with_item_kind) => {
                 p.at(with_item_kind.list_terminator())
             }
+            RecoveryContextKind::FStringElements => {
+                p.at_ts(TokenSet::new([
+                    TokenKind::FStringEnd,
+                    // For better error recovery
+                    //
+                    // ```python
+                    // # List terminates with a newline
+                    // f"hello
+                    //
+                    // x = 1
+                    // ```
+                    TokenKind::Newline,
+                    // ```python
+                    // # List terminates with a `}`
+                    // f"hello {x}
+                    //
+                    // x = 1
+                    // ```
+                    TokenKind::Rbrace,
+                ]))
+            }
         }
     }
 
@@ -895,6 +919,13 @@ impl RecoveryContextKind {
                 TokenKind::Name | TokenKind::Star | TokenKind::DoubleStar | TokenKind::Slash
             ),
             RecoveryContextKind::WithItems(_) => p.at_expr(),
+            RecoveryContextKind::FStringElements => matches!(
+                p.current_token_kind(),
+                // Literal element
+                TokenKind::FStringMiddle
+                // Expression element
+                | TokenKind::Lbrace
+            ),
         }
     }
 
@@ -978,6 +1009,9 @@ impl RecoveryContextKind {
                     "Expected an expression or the end of the with item list".to_string(),
                 ),
             },
+            RecoveryContextKind::FStringElements => ParseErrorType::OtherError(
+                "Expected an f-string element or the end of the f-string".to_string(),
+            ),
         }
     }
 }
@@ -1014,6 +1048,7 @@ bitflags! {
         const WITH_ITEMS_PARENTHESIZED = 1 << 24;
         const WITH_ITEMS_PARENTHESIZED_EXPRESSION = 1 << 25;
         const WITH_ITEMS_UNPARENTHESIZED = 1 << 26;
+        const F_STRING_ELEMENTS = 1 << 27;
     }
 }
 
@@ -1063,6 +1098,7 @@ impl RecoveryContext {
                 }
                 WithItemKind::Unparenthesized => RecoveryContext::WITH_ITEMS_UNPARENTHESIZED,
             },
+            RecoveryContextKind::FStringElements => RecoveryContext::F_STRING_ELEMENTS,
         }
     }
 
@@ -1124,6 +1160,7 @@ impl RecoveryContext {
             RecoveryContext::WITH_ITEMS_UNPARENTHESIZED => {
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized)
             }
+            RecoveryContext::F_STRING_ELEMENTS => RecoveryContextKind::FStringElements,
             _ => return None,
         })
     }

@@ -1640,7 +1640,7 @@ FStringMiddlePattern: ast::FStringElement = {
     FStringReplacementField,
     <location:@L> <fstring_middle:fstring_middle> <end_location:@R> =>? {
         let (source, is_raw, _) = fstring_middle;
-        Ok(parse_fstring_literal_element(source, is_raw, (location..end_location).into())?)
+        Ok(ast::FStringElement::Literal(parse_fstring_literal_element(source, is_raw, (location..end_location).into())?))
     }
 };
 
