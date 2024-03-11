@@ -517,7 +517,7 @@ jobs:
           path: binaries
           merge-multiple: true
       - name: "Publish to GitHub"
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           draft: true
           files: binaries/*
