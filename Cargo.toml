@@ -22,7 +22,7 @@ bitflags = { version = "2.4.1" }
 bstr = { version = "1.9.1" }
 cachedir = { version = "0.3.1" }
 chrono = { version = "0.4.34", default-features = false, features = ["clock"] }
-clap = { version = "4.5.1", features = ["derive"] }
+clap = { version = "4.5.2", features = ["derive"] }
 clap_complete_command = { version = "0.5.1" }
 clearscreen = { version = "2.0.0" }
 codspeed-criterion-compat = { version = "2.4.0", default-features = false }
