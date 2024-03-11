@@ -1443,6 +1443,8 @@ pub enum LexicalErrorType {
     UnrecognizedToken { tok: char },
     /// An f-string error containing the [`FStringErrorType`].
     FStringError(FStringErrorType),
+    /// Invalid character encountered in a byte literal.
+    InvalidByteLiteral,
     /// An unexpected character was encountered after a line continuation.
     LineContinuationError,
     /// An unexpected end of file was encountered.
@@ -1460,6 +1462,9 @@ impl std::fmt::Display for LexicalErrorType {
         match self {
             LexicalErrorType::StringError => write!(f, "Got unexpected string"),
             LexicalErrorType::FStringError(error) => write!(f, "f-string: {error}"),
+            LexicalErrorType::InvalidByteLiteral => {
+                write!(f, "bytes can only contain ASCII literal characters")
+            }
             LexicalErrorType::UnicodeError => write!(f, "Got unexpected unicode"),
             LexicalErrorType::NestingError => write!(f, "Got unexpected nesting"),
             LexicalErrorType::IndentationError => {
