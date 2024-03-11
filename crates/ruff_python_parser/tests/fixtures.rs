@@ -107,6 +107,44 @@ fn valid_syntax() {
     insta::glob!("../resources", "valid/**/*.{py,pyi}", test_file);
 }
 
+// Test that is intentionally ignored by default.
+// Use it for quickly debugging a parser issue.
+#[test]
+#[ignore]
+#[allow(clippy::print_stdout)]
+fn parser_quick_test() {
+    let source = "\
+var: tuple[int] | int = 1,
+";
+
+    let program = Program::parse_str(source, Mode::Module);
+
+    if !program.is_valid() {
+        println!("Errors:\n-------");
+
+        let line_index = LineIndex::from_source_text(source);
+        let source_code = SourceCode::new(source, &line_index);
+
+        for error in program.errors() {
+            // Sometimes the code frame doesn't show the error message, so we print
+            // the message as well.
+            println!("Syntax Error: {error}");
+            println!(
+                "{}\n",
+                CodeFrame {
+                    range: error.location,
+                    error,
+                    source_code: &source_code,
+                }
+            );
+        }
+
+        println!();
+    }
+
+    println!("AST:\n----\n{:#?}", program.ast());
+}
+
 struct CodeFrame<'a> {
     range: TextRange,
     error: &'a ParseErrorType,
