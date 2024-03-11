@@ -1,2 +1,29 @@
 //! Rules from [flake8-noqa](https://pypi.org/project/flake8-noqa/).
 pub(crate) mod rules;
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use anyhow::Result;
+    use test_case::test_case;
+
+    use crate::assert_messages;
+    use crate::registry::Rule;
+    use crate::settings;
+    use crate::test::test_path;
+
+    #[test_case(Rule::NOQAMissingColon, Path::new("noqa.py"))]
+    #[test_case(Rule::NOQASpaceBeforeColon, Path::new("noqa.py"))]
+    #[test_case(Rule::NOQAMultipleSpacesBeforeCode, Path::new("noqa.py"))]
+    #[test_case(Rule::NOQADuplicateCodes, Path::new("noqa.py"))]
+    fn rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_noqa").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+}

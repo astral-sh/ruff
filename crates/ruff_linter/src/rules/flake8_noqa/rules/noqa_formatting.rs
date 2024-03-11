@@ -90,7 +90,7 @@ pub(crate) fn noqa_formatting(
                         diagnostics.push(diagnostic);
                     }
                     // NQA002
-                    else if let Some(_) = Directive::lex_code(&line[cursor..]) {
+                    else if Directive::lex_code(&line[cursor..]).is_some() {
                         let start = offset + all.range().end();
                         let end = start + TextSize::new(1);
                         let mut diagnostic =
@@ -137,7 +137,7 @@ pub(crate) fn noqa_formatting(
 }
 
 fn leading_whitespace_len(text: &str) -> usize {
-    return text.find(|c: char| !c.is_whitespace()).unwrap_or(0);
+    text.find(|c: char| !c.is_whitespace()).unwrap_or(0)
 }
 
 fn find_noqa_end(text: &str) -> Option<usize> {

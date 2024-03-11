@@ -184,6 +184,7 @@ impl Ranged for All {
 #[derive(Debug)]
 pub(crate) struct Codes<'a> {
     range: TextRange,
+    #[allow(clippy::struct_field_names)]
     codes: Vec<&'a str>,
     code_ranges_full: Vec<TextRange>,
 }
