@@ -1,7 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprDict, ExprList};
-use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -29,16 +28,12 @@ pub struct DjangoExtra;
 impl Violation for DjangoExtra {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of `extra` can lead to SQL injection vulnerabilities")
+        format!("Use of Django `extra` can lead to SQL injection vulnerabilities")
     }
 }
 
 /// S610
 pub(crate) fn django_extra(checker: &mut Checker, call: &ast::ExprCall) {
-    if !checker.semantic().seen_module(Modules::DJANGO) {
-        return;
-    }
-
     let Expr::Attribute(ExprAttribute { attr, .. }) = call.func.as_ref() else {
         return;
     };
