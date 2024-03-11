@@ -1839,11 +1839,13 @@ impl<'a> Checker<'a> {
             flags.insert(BindingFlags::UNPACKED_ASSIGNMENT);
         }
 
-        // Match the left-hand side of an annotated assignment, like `x` in `x: int`.
+        // Match the left-hand side of an annotated assignment without a value,
+        // like `x` in `x: int`. N.B. In stub files, these should be viewed
+        // as assignments on par with statements such as `x: int = 5`.
         if matches!(
             parent,
             Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
-        ) && !self.semantic.in_annotation()
+        ) && !(self.semantic.in_annotation() || self.source_type.is_stub())
         {
             self.add_binding(id, expr.range(), BindingKind::Annotation, flags);
             return;
