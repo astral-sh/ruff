@@ -977,12 +977,6 @@ impl<'src> Parser<'src> {
                         });
                     fstring_literal
                 }
-                // `Invalid` tokens are created when there's a lexical error, so
-                // we ignore it here to avoid creating unexpected token errors
-                TokenKind::Unknown => {
-                    self.next_token();
-                    continue;
-                }
                 // Handle an unexpected token
                 _ => {
                     let (tok, range) = self.next_token();

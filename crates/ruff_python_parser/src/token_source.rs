@@ -100,9 +100,7 @@ impl Iterator for TokenSource {
                 }
 
                 Err(error) => {
-                    let location = error.location();
                     self.errors.push(error);
-                    break Some((Tok::Unknown, location));
                 }
             }
         }
