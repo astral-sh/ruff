@@ -95,7 +95,8 @@ pub(crate) fn noqa_formatting(
                         let end = start + TextSize::new(1);
                         let mut diagnostic =
                             Diagnostic::new(NOQAMissingColon, TextRange::new(start, end));
-                        diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(':'.to_string(), start)));
+                        diagnostic
+                            .set_fix(Fix::unsafe_edit(Edit::insertion(':'.to_string(), start)));
                         diagnostics.push(diagnostic);
                     }
                 }
@@ -108,18 +109,23 @@ pub(crate) fn noqa_formatting(
                     if num_spaces > 1 {
                         let start = offset + TextSize::new(u32::try_from(cursor + 1).unwrap());
                         let end = start + TextSize::new(u32::try_from(num_spaces - 1).unwrap());
-                        let mut diagnostic =
-                            Diagnostic::new(NOQAMultipleSpacesBeforeCode, TextRange::new(start, end));
+                        let mut diagnostic = Diagnostic::new(
+                            NOQAMultipleSpacesBeforeCode,
+                            TextRange::new(start, end),
+                        );
                         diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
                         diagnostics.push(diagnostic);
                     }
 
                     let mut seen = HashSet::new();
-                    for (code, code_range) in codes.codes().iter().zip(codes.code_ranges_full().iter()) {
+                    for (code, code_range) in
+                        codes.codes().iter().zip(codes.code_ranges_full().iter())
+                    {
                         if !seen.insert(code) {
                             let start = offset + code_range.start();
                             let end = offset + code_range.end();
-                            let mut diagnostic = Diagnostic::new(NOQADuplicateCodes, TextRange::new(start, end));
+                            let mut diagnostic =
+                                Diagnostic::new(NOQADuplicateCodes, TextRange::new(start, end));
                             diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
                             diagnostics.push(diagnostic);
                         }
