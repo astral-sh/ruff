@@ -14,6 +14,8 @@ use crate::parser::{
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, Tok, TokenKind};
 
+use super::TupleParenthesized;
+
 /// Tokens that can appear after an expression.
 /// Tokens that represent compound statements.
 const COMPOUND_STMT_SET: TokenSet = TokenSet::new([
@@ -1199,7 +1201,7 @@ impl<'src> Parser<'src> {
             let tuple = self.parse_tuple_expression(
                 subject.expr,
                 subject_start,
-                false,
+                TupleParenthesized::No,
                 Parser::parse_named_expression_or_higher,
             );
 

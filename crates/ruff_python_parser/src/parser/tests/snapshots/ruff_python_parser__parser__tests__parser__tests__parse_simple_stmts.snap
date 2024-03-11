@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
-expression: "parse(\"\nif x: ...\nif True: pass\n1; 2; pass\n1; ...; a if b else c\n\ncontinue\n\nbreak\n\ndel a\ndel a, b, 1, 1 + 2,\ndel a, (b, c), d\n\nassert 1 < 2\nassert f()\nassert a and b\nassert x, 'error'\n\nglobal a\nglobal a, b, c\n\nreturn\nreturn a and b\nreturn 1 < 2\nreturn None\nreturn 1, 2,\nreturn x\nreturn f()\nreturn a.f()\n\nnonlocal a\nnonlocal a, b, c\n\nraise\nraise a\nraise 1 < 2\nraise a and b\nraise a from b\n\nimport a\nimport a.b.c\nimport a.b.c as d\nimport a, b, c\nimport foo.bar as a, a.b.c.d as abcd\n\nfrom a import b # comment\nfrom . import a\nfrom foo.bar import baz as b, FooBar as fb\nfrom .a import b\nfrom ... import c\nfrom .......................... import d\nfrom ..........................a.b.c import d\nfrom module import (a, b as B, c,)\nfrom a import *\n\nif c: B; del A\nelse: C\nif x: yield x;\n\")"
+expression: "parse(\"\nif x: ...\nif True: pass\n1; 2; pass\n1; ...; a if b else c\n\ncontinue\n\nbreak\n\ndel a\ndel a, b,\ndel a, (b, c), d\n\nassert 1 < 2\nassert f()\nassert a and b\nassert x, 'error'\n\nglobal a\nglobal a, b, c\n\nreturn\nreturn a and b\nreturn 1 < 2\nreturn None\nreturn 1, 2,\nreturn x\nreturn f()\nreturn a.f()\n\nnonlocal a\nnonlocal a, b, c\n\nraise\nraise a\nraise 1 < 2\nraise a and b\nraise a from b\n\nimport a\nimport a.b.c\nimport a.b.c as d\nimport a, b, c\nimport foo.bar as a, a.b.c.d as abcd\n\nfrom a import b # comment\nfrom . import a\nfrom foo.bar import baz as b, FooBar as fb\nfrom .a import b\nfrom ... import c\nfrom .......................... import d\nfrom ..........................a.b.c import d\nfrom module import (a, b as B, c,)\nfrom a import *\n\nif c: B; del A\nelse: C\nif x: yield x;\n\")"
 ---
 Program {
     ast: Module(
         ModModule {
-            range: 0..772,
+            range: 0..762,
             body: [
                 If(
                     StmtIf {
@@ -162,7 +162,7 @@ Program {
                 ),
                 Delete(
                     StmtDelete {
-                        range: 82..101,
+                        range: 82..91,
                         targets: [
                             Name(
                                 ExprName {
@@ -178,64 +178,34 @@ Program {
                                     ctx: Del,
                                 },
                             ),
-                            NumberLiteral(
-                                ExprNumberLiteral {
-                                    range: 92..93,
-                                    value: Int(
-                                        1,
-                                    ),
-                                },
-                            ),
-                            BinOp(
-                                ExprBinOp {
-                                    range: 95..100,
-                                    left: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            range: 95..96,
-                                            value: Int(
-                                                1,
-                                            ),
-                                        },
-                                    ),
-                                    op: Add,
-                                    right: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            range: 99..100,
-                                            value: Int(
-                                                2,
-                                            ),
-                                        },
-                                    ),
-                                },
-                            ),
                         ],
                     },
                 ),
                 Delete(
                     StmtDelete {
-                        range: 102..118,
+                        range: 92..108,
                         targets: [
                             Name(
                                 ExprName {
-                                    range: 106..107,
+                                    range: 96..97,
                                     id: "a",
                                     ctx: Del,
                                 },
                             ),
                             Tuple(
                                 ExprTuple {
-                                    range: 109..115,
+                                    range: 99..105,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                range: 110..111,
+                                                range: 100..101,
                                                 id: "b",
                                                 ctx: Del,
                                             },
                                         ),
                                         Name(
                                             ExprName {
-                                                range: 113..114,
+                                                range: 103..104,
                                                 id: "c",
                                                 ctx: Del,
                                             },
@@ -247,7 +217,7 @@ Program {
                             ),
                             Name(
                                 ExprName {
-                                    range: 117..118,
+                                    range: 107..108,
                                     id: "d",
                                     ctx: Del,
                                 },
@@ -257,13 +227,13 @@ Program {
                 ),
                 Assert(
                     StmtAssert {
-                        range: 120..132,
+                        range: 110..122,
                         test: Compare(
                             ExprCompare {
-                                range: 127..132,
+                                range: 117..122,
                                 left: NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 127..128,
+                                        range: 117..118,
                                         value: Int(
                                             1,
                                         ),
@@ -275,7 +245,7 @@ Program {
                                 comparators: [
                                     NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 131..132,
+                                            range: 121..122,
                                             value: Int(
                                                 2,
                                             ),
@@ -289,19 +259,19 @@ Program {
                 ),
                 Assert(
                     StmtAssert {
-                        range: 133..143,
+                        range: 123..133,
                         test: Call(
                             ExprCall {
-                                range: 140..143,
+                                range: 130..133,
                                 func: Name(
                                     ExprName {
-                                        range: 140..141,
+                                        range: 130..131,
                                         id: "f",
                                         ctx: Load,
                                     },
                                 ),
                                 arguments: Arguments {
-                                    range: 141..143,
+                                    range: 131..133,
                                     args: [],
                                     keywords: [],
                                 },
@@ -312,22 +282,22 @@ Program {
                 ),
                 Assert(
                     StmtAssert {
-                        range: 144..158,
+                        range: 134..148,
                         test: BoolOp(
                             ExprBoolOp {
-                                range: 151..158,
+                                range: 141..148,
                                 op: And,
                                 values: [
                                     Name(
                                         ExprName {
-                                            range: 151..152,
+                                            range: 141..142,
                                             id: "a",
                                             ctx: Load,
                                         },
                                     ),
                                     Name(
                                         ExprName {
-                                            range: 157..158,
+                                            range: 147..148,
                                             id: "b",
                                             ctx: Load,
                                         },
@@ -340,10 +310,10 @@ Program {
                 ),
                 Assert(
                     StmtAssert {
-                        range: 159..176,
+                        range: 149..166,
                         test: Name(
                             ExprName {
-                                range: 166..167,
+                                range: 156..157,
                                 id: "x",
                                 ctx: Load,
                             },
@@ -351,11 +321,11 @@ Program {
                         msg: Some(
                             StringLiteral(
                                 ExprStringLiteral {
-                                    range: 169..176,
+                                    range: 159..166,
                                     value: StringLiteralValue {
                                         inner: Single(
                                             StringLiteral {
-                                                range: 169..176,
+                                                range: 159..166,
                                                 value: "error",
                                                 unicode: false,
                                             },
@@ -368,59 +338,59 @@ Program {
                 ),
                 Global(
                     StmtGlobal {
-                        range: 178..186,
+                        range: 168..176,
                         names: [
                             Identifier {
                                 id: "a",
-                                range: 185..186,
+                                range: 175..176,
                             },
                         ],
                     },
                 ),
                 Global(
                     StmtGlobal {
-                        range: 187..201,
+                        range: 177..191,
                         names: [
                             Identifier {
                                 id: "a",
-                                range: 194..195,
+                                range: 184..185,
                             },
                             Identifier {
                                 id: "b",
-                                range: 197..198,
+                                range: 187..188,
                             },
                             Identifier {
                                 id: "c",
-                                range: 200..201,
+                                range: 190..191,
                             },
                         ],
                     },
                 ),
                 Return(
                     StmtReturn {
-                        range: 203..209,
+                        range: 193..199,
                         value: None,
                     },
                 ),
                 Return(
                     StmtReturn {
-                        range: 210..224,
+                        range: 200..214,
                         value: Some(
                             BoolOp(
                                 ExprBoolOp {
-                                    range: 217..224,
+                                    range: 207..214,
                                     op: And,
                                     values: [
                                         Name(
                                             ExprName {
-                                                range: 217..218,
+                                                range: 207..208,
                                                 id: "a",
                                                 ctx: Load,
                                             },
                                         ),
                                         Name(
                                             ExprName {
-                                                range: 223..224,
+                                                range: 213..214,
                                                 id: "b",
                                                 ctx: Load,
                                             },
@@ -433,14 +403,14 @@ Program {
                 ),
                 Return(
                     StmtReturn {
-                        range: 225..237,
+                        range: 215..227,
                         value: Some(
                             Compare(
                                 ExprCompare {
-                                    range: 232..237,
+                                    range: 222..227,
                                     left: NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 232..233,
+                                            range: 222..223,
                                             value: Int(
                                                 1,
                                             ),
@@ -452,7 +422,7 @@ Program {
                                     comparators: [
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                range: 236..237,
+                                                range: 226..227,
                                                 value: Int(
                                                     2,
                                                 ),
@@ -466,11 +436,11 @@ Program {
                 ),
                 Return(
                     StmtReturn {
-                        range: 238..249,
+                        range: 228..239,
                         value: Some(
                             NoneLiteral(
                                 ExprNoneLiteral {
-                                    range: 245..249,
+                                    range: 235..239,
                                 },
                             ),
                         ),
@@ -478,15 +448,15 @@ Program {
                 ),
                 Return(
                     StmtReturn {
-                        range: 250..262,
+                        range: 240..252,
                         value: Some(
                             Tuple(
                                 ExprTuple {
-                                    range: 257..262,
+                                    range: 247..252,
                                     elts: [
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                range: 257..258,
+                                                range: 247..248,
                                                 value: Int(
                                                     1,
                                                 ),
@@ -494,7 +464,7 @@ Program {
                                         ),
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                range: 260..261,
+                                                range: 250..251,
                                                 value: Int(
                                                     2,
                                                 ),
@@ -510,11 +480,11 @@ Program {
                 ),
                 Return(
                     StmtReturn {
-                        range: 263..271,
+                        range: 253..261,
                         value: Some(
                             Name(
                                 ExprName {
-                                    range: 270..271,
+                                    range: 260..261,
                                     id: "x",
                                     ctx: Load,
                                 },
@@ -524,20 +494,20 @@ Program {
                 ),
                 Return(
                     StmtReturn {
-                        range: 272..282,
+                        range: 262..272,
                         value: Some(
                             Call(
                                 ExprCall {
-                                    range: 279..282,
+                                    range: 269..272,
                                     func: Name(
                                         ExprName {
-                                            range: 279..280,
+                                            range: 269..270,
                                             id: "f",
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: Arguments {
-                                        range: 280..282,
+                                        range: 270..272,
                                         args: [],
                                         keywords: [],
                                     },
@@ -548,30 +518,30 @@ Program {
                 ),
                 Return(
                     StmtReturn {
-                        range: 283..295,
+                        range: 273..285,
                         value: Some(
                             Call(
                                 ExprCall {
-                                    range: 290..295,
+                                    range: 280..285,
                                     func: Attribute(
                                         ExprAttribute {
-                                            range: 290..293,
+                                            range: 280..283,
                                             value: Name(
                                                 ExprName {
-                                                    range: 290..291,
+                                                    range: 280..281,
                                                     id: "a",
                                                     ctx: Load,
                                                 },
                                             ),
                                             attr: Identifier {
                                                 id: "f",
-                                                range: 292..293,
+                                                range: 282..283,
                                             },
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: Arguments {
-                                        range: 293..295,
+                                        range: 283..285,
                                         args: [],
                                         keywords: [],
                                     },
@@ -582,48 +552,48 @@ Program {
                 ),
                 Nonlocal(
                     StmtNonlocal {
-                        range: 297..307,
+                        range: 287..297,
                         names: [
                             Identifier {
                                 id: "a",
-                                range: 306..307,
+                                range: 296..297,
                             },
                         ],
                     },
                 ),
                 Nonlocal(
                     StmtNonlocal {
-                        range: 308..324,
+                        range: 298..314,
                         names: [
                             Identifier {
                                 id: "a",
-                                range: 317..318,
+                                range: 307..308,
                             },
                             Identifier {
                                 id: "b",
-                                range: 320..321,
+                                range: 310..311,
                             },
                             Identifier {
                                 id: "c",
-                                range: 323..324,
+                                range: 313..314,
                             },
                         ],
                     },
                 ),
                 Raise(
                     StmtRaise {
-                        range: 326..331,
+                        range: 316..321,
                         exc: None,
                         cause: None,
                     },
                 ),
                 Raise(
                     StmtRaise {
-                        range: 332..339,
+                        range: 322..329,
                         exc: Some(
                             Name(
                                 ExprName {
-                                    range: 338..339,
+                                    range: 328..329,
                                     id: "a",
                                     ctx: Load,
                                 },
@@ -634,14 +604,14 @@ Program {
                 ),
                 Raise(
                     StmtRaise {
-                        range: 340..351,
+                        range: 330..341,
                         exc: Some(
                             Compare(
                                 ExprCompare {
-                                    range: 346..351,
+                                    range: 336..341,
                                     left: NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 346..347,
+                                            range: 336..337,
                                             value: Int(
                                                 1,
                                             ),
@@ -653,7 +623,7 @@ Program {
                                     comparators: [
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                range: 350..351,
+                                                range: 340..341,
                                                 value: Int(
                                                     2,
                                                 ),
@@ -668,23 +638,23 @@ Program {
                 ),
                 Raise(
                     StmtRaise {
-                        range: 352..365,
+                        range: 342..355,
                         exc: Some(
                             BoolOp(
                                 ExprBoolOp {
-                                    range: 358..365,
+                                    range: 348..355,
                                     op: And,
                                     values: [
                                         Name(
                                             ExprName {
-                                                range: 358..359,
+                                                range: 348..349,
                                                 id: "a",
                                                 ctx: Load,
                                             },
                                         ),
                                         Name(
                                             ExprName {
-                                                range: 364..365,
+                                                range: 354..355,
                                                 id: "b",
                                                 ctx: Load,
                                             },
@@ -698,11 +668,11 @@ Program {
                 ),
                 Raise(
                     StmtRaise {
-                        range: 366..380,
+                        range: 356..370,
                         exc: Some(
                             Name(
                                 ExprName {
-                                    range: 372..373,
+                                    range: 362..363,
                                     id: "a",
                                     ctx: Load,
                                 },
@@ -711,7 +681,7 @@ Program {
                         cause: Some(
                             Name(
                                 ExprName {
-                                    range: 379..380,
+                                    range: 369..370,
                                     id: "b",
                                     ctx: Load,
                                 },
@@ -721,13 +691,13 @@ Program {
                 ),
                 Import(
                     StmtImport {
-                        range: 382..390,
+                        range: 372..380,
                         names: [
                             Alias {
-                                range: 389..390,
+                                range: 379..380,
                                 name: Identifier {
                                     id: "a",
-                                    range: 389..390,
+                                    range: 379..380,
                                 },
                                 asname: None,
                             },
@@ -736,13 +706,13 @@ Program {
                 ),
                 Import(
                     StmtImport {
-                        range: 391..403,
+                        range: 381..393,
                         names: [
                             Alias {
-                                range: 398..403,
+                                range: 388..393,
                                 name: Identifier {
                                     id: "a.b.c",
-                                    range: 398..403,
+                                    range: 388..393,
                                 },
                                 asname: None,
                             },
@@ -751,18 +721,18 @@ Program {
                 ),
                 Import(
                     StmtImport {
-                        range: 404..421,
+                        range: 394..411,
                         names: [
                             Alias {
-                                range: 411..421,
+                                range: 401..411,
                                 name: Identifier {
                                     id: "a.b.c",
-                                    range: 411..416,
+                                    range: 401..406,
                                 },
                                 asname: Some(
                                     Identifier {
                                         id: "d",
-                                        range: 420..421,
+                                        range: 410..411,
                                     },
                                 ),
                             },
@@ -771,29 +741,29 @@ Program {
                 ),
                 Import(
                     StmtImport {
-                        range: 422..436,
+                        range: 412..426,
                         names: [
                             Alias {
-                                range: 429..430,
+                                range: 419..420,
                                 name: Identifier {
                                     id: "a",
-                                    range: 429..430,
+                                    range: 419..420,
                                 },
                                 asname: None,
                             },
                             Alias {
-                                range: 432..433,
+                                range: 422..423,
                                 name: Identifier {
                                     id: "b",
-                                    range: 432..433,
+                                    range: 422..423,
                                 },
                                 asname: None,
                             },
                             Alias {
-                                range: 435..436,
+                                range: 425..426,
                                 name: Identifier {
                                     id: "c",
-                                    range: 435..436,
+                                    range: 425..426,
                                 },
                                 asname: None,
                             },
@@ -802,31 +772,31 @@ Program {
                 ),
                 Import(
                     StmtImport {
-                        range: 437..473,
+                        range: 427..463,
                         names: [
                             Alias {
-                                range: 444..456,
+                                range: 434..446,
                                 name: Identifier {
                                     id: "foo.bar",
-                                    range: 444..451,
+                                    range: 434..441,
                                 },
                                 asname: Some(
                                     Identifier {
                                         id: "a",
-                                        range: 455..456,
+                                        range: 445..446,
                                     },
                                 ),
                             },
                             Alias {
-                                range: 458..473,
+                                range: 448..463,
                                 name: Identifier {
                                     id: "a.b.c.d",
-                                    range: 458..465,
+                                    range: 448..455,
                                 },
                                 asname: Some(
                                     Identifier {
                                         id: "abcd",
-                                        range: 469..473,
+                                        range: 459..463,
                                     },
                                 ),
                             },
@@ -835,19 +805,19 @@ Program {
                 ),
                 ImportFrom(
                     StmtImportFrom {
-                        range: 475..490,
+                        range: 465..480,
                         module: Some(
                             Identifier {
                                 id: "a",
-                                range: 480..481,
+                                range: 470..471,
                             },
                         ),
                         names: [
                             Alias {
-                                range: 489..490,
+                                range: 479..480,
                                 name: Identifier {
                                     id: "b",
-                                    range: 489..490,
+                                    range: 479..480,
                                 },
                                 asname: None,
                             },
@@ -859,14 +829,14 @@ Program {
                 ),
                 ImportFrom(
                     StmtImportFrom {
-                        range: 501..516,
+                        range: 491..506,
                         module: None,
                         names: [
                             Alias {
-                                range: 515..516,
+                                range: 505..506,
                                 name: Identifier {
                                     id: "a",
-                                    range: 515..516,
+                                    range: 505..506,
                                 },
                                 asname: None,
                             },
@@ -878,37 +848,37 @@ Program {
                 ),
                 ImportFrom(
                     StmtImportFrom {
-                        range: 517..559,
+                        range: 507..549,
                         module: Some(
                             Identifier {
                                 id: "foo.bar",
-                                range: 522..529,
+                                range: 512..519,
                             },
                         ),
                         names: [
                             Alias {
-                                range: 537..545,
+                                range: 527..535,
                                 name: Identifier {
                                     id: "baz",
-                                    range: 537..540,
+                                    range: 527..530,
                                 },
                                 asname: Some(
                                     Identifier {
                                         id: "b",
-                                        range: 544..545,
+                                        range: 534..535,
                                     },
                                 ),
                             },
                             Alias {
-                                range: 547..559,
+                                range: 537..549,
                                 name: Identifier {
                                     id: "FooBar",
-                                    range: 547..553,
+                                    range: 537..543,
                                 },
                                 asname: Some(
                                     Identifier {
                                         id: "fb",
-                                        range: 557..559,
+                                        range: 547..549,
                                     },
                                 ),
                             },
@@ -920,19 +890,19 @@ Program {
                 ),
                 ImportFrom(
                     StmtImportFrom {
-                        range: 560..576,
+                        range: 550..566,
                         module: Some(
                             Identifier {
                                 id: "a",
-                                range: 566..567,
+                                range: 556..557,
                             },
                         ),
                         names: [
                             Alias {
-                                range: 575..576,
+                                range: 565..566,
                                 name: Identifier {
                                     id: "b",
-                                    range: 575..576,
+                                    range: 565..566,
                                 },
                                 asname: None,
                             },
@@ -944,14 +914,14 @@ Program {
                 ),
                 ImportFrom(
                     StmtImportFrom {
-                        range: 577..594,
+                        range: 567..584,
                         module: None,
                         names: [
                             Alias {
-                                range: 593..594,
+                                range: 583..584,
                                 name: Identifier {
                                     id: "c",
-                                    range: 593..594,
+                                    range: 583..584,
                                 },
                                 asname: None,
                             },
@@ -963,14 +933,14 @@ Program {
                 ),
                 ImportFrom(
                     StmtImportFrom {
-                        range: 595..635,
+                        range: 585..625,
                         module: None,
                         names: [
                             Alias {
-                                range: 634..635,
+                                range: 624..625,
                                 name: Identifier {
                                     id: "d",
-                                    range: 634..635,
+                                    range: 624..625,
                                 },
                                 asname: None,
                             },
@@ -982,19 +952,19 @@ Program {
                 ),
                 ImportFrom(
                     StmtImportFrom {
-                        range: 636..681,
+                        range: 626..671,
                         module: Some(
                             Identifier {
                                 id: "a.b.c",
-                                range: 667..672,
+                                range: 657..662,
                             },
                         ),
                         names: [
                             Alias {
-                                range: 680..681,
+                                range: 670..671,
                                 name: Identifier {
                                     id: "d",
-                                    range: 680..681,
+                                    range: 670..671,
                                 },
                                 asname: None,
                             },
@@ -1006,40 +976,40 @@ Program {
                 ),
                 ImportFrom(
                     StmtImportFrom {
-                        range: 682..716,
+                        range: 672..706,
                         module: Some(
                             Identifier {
                                 id: "module",
-                                range: 687..693,
+                                range: 677..683,
                             },
                         ),
                         names: [
                             Alias {
-                                range: 702..703,
+                                range: 692..693,
                                 name: Identifier {
                                     id: "a",
-                                    range: 702..703,
+                                    range: 692..693,
                                 },
                                 asname: None,
                             },
                             Alias {
-                                range: 705..711,
+                                range: 695..701,
                                 name: Identifier {
                                     id: "b",
-                                    range: 705..706,
+                                    range: 695..696,
                                 },
                                 asname: Some(
                                     Identifier {
                                         id: "B",
-                                        range: 710..711,
+                                        range: 700..701,
                                     },
                                 ),
                             },
                             Alias {
-                                range: 713..714,
+                                range: 703..704,
                                 name: Identifier {
                                     id: "c",
-                                    range: 713..714,
+                                    range: 703..704,
                                 },
                                 asname: None,
                             },
@@ -1051,19 +1021,19 @@ Program {
                 ),
                 ImportFrom(
                     StmtImportFrom {
-                        range: 717..732,
+                        range: 707..722,
                         module: Some(
                             Identifier {
                                 id: "a",
-                                range: 722..723,
+                                range: 712..713,
                             },
                         ),
                         names: [
                             Alias {
-                                range: 731..732,
+                                range: 721..722,
                                 name: Identifier {
                                     id: "*",
-                                    range: 731..732,
+                                    range: 721..722,
                                 },
                                 asname: None,
                             },
@@ -1075,10 +1045,10 @@ Program {
                 ),
                 If(
                     StmtIf {
-                        range: 734..756,
+                        range: 724..746,
                         test: Name(
                             ExprName {
-                                range: 737..738,
+                                range: 727..728,
                                 id: "c",
                                 ctx: Load,
                             },
@@ -1086,10 +1056,10 @@ Program {
                         body: [
                             Expr(
                                 StmtExpr {
-                                    range: 740..741,
+                                    range: 730..731,
                                     value: Name(
                                         ExprName {
-                                            range: 740..741,
+                                            range: 730..731,
                                             id: "B",
                                             ctx: Load,
                                         },
@@ -1098,11 +1068,11 @@ Program {
                             ),
                             Delete(
                                 StmtDelete {
-                                    range: 743..748,
+                                    range: 733..738,
                                     targets: [
                                         Name(
                                             ExprName {
-                                                range: 747..748,
+                                                range: 737..738,
                                                 id: "A",
                                                 ctx: Del,
                                             },
@@ -1113,15 +1083,15 @@ Program {
                         ],
                         elif_else_clauses: [
                             ElifElseClause {
-                                range: 749..756,
+                                range: 739..746,
                                 test: None,
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 755..756,
+                                            range: 745..746,
                                             value: Name(
                                                 ExprName {
-                                                    range: 755..756,
+                                                    range: 745..746,
                                                     id: "C",
                                                     ctx: Load,
                                                 },
@@ -1135,10 +1105,10 @@ Program {
                 ),
                 If(
                     StmtIf {
-                        range: 757..770,
+                        range: 747..760,
                         test: Name(
                             ExprName {
-                                range: 760..761,
+                                range: 750..751,
                                 id: "x",
                                 ctx: Load,
                             },
@@ -1146,14 +1116,14 @@ Program {
                         body: [
                             Expr(
                                 StmtExpr {
-                                    range: 763..770,
+                                    range: 753..760,
                                     value: Yield(
                                         ExprYield {
-                                            range: 763..770,
+                                            range: 753..760,
                                             value: Some(
                                                 Name(
                                                     ExprName {
-                                                        range: 769..770,
+                                                        range: 759..760,
                                                         id: "x",
                                                         ctx: Load,
                                                     },
