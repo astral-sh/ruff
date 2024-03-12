@@ -155,7 +155,10 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
   hooks:
     # Run the linter.
     - id: ruff
-      args: [ --fix ]
+      entry: ruff check
+      args:
+        - --force-exclude
+        - --fix
     # Run the formatter.
     - id: ruff-format
 ```
