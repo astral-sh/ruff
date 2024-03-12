@@ -217,11 +217,7 @@ impl StringParser {
             _ => {
                 if self.kind.is_any_bytes() && !first_char.is_ascii() {
                     return Err(LexicalError::new(
-                        LexicalErrorType::OtherError(
-                            "bytes can only contain ASCII literal characters"
-                                .to_string()
-                                .into_boxed_str(),
-                        ),
+                        LexicalErrorType::InvalidByteLiteral,
                         self.range(self.get_pos()),
                     ));
                 }
@@ -295,11 +291,7 @@ impl StringParser {
                 ch => {
                     if !ch.is_ascii() {
                         return Err(LexicalError::new(
-                            LexicalErrorType::OtherError(
-                                "bytes can only contain ASCII literal characters"
-                                    .to_string()
-                                    .into_boxed_str(),
-                            ),
+                            LexicalErrorType::InvalidByteLiteral,
                             self.range(self.get_pos()),
                         ));
                     }
@@ -328,11 +320,7 @@ impl StringParser {
     fn parse_bytes(mut self) -> Result<StringType, LexicalError> {
         if let Some(index) = self.source.as_bytes().find_non_ascii_byte() {
             return Err(LexicalError::new(
-                LexicalErrorType::OtherError(
-                    "bytes can only contain ASCII literal characters"
-                        .to_string()
-                        .into_boxed_str(),
-                ),
+                LexicalErrorType::InvalidByteLiteral,
                 self.range(TextSize::try_from(index).unwrap()),
             ));
         }
