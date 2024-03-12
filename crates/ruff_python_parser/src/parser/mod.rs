@@ -787,6 +787,8 @@ enum RecoveryContextKind {
     /// When parsing a list of items in a `with` statement
     WithItems(WithItemKind),
 
+    /// When parsing a list of f-string elements which are either literal elements
+    /// or expressions.
     FStringElements,
 }
 
