@@ -514,7 +514,6 @@ impl<'a> From<&'a ast::ExceptHandler> for ComparableExceptHandler<'a> {
 pub enum ComparableFStringElement<'a> {
     Literal(&'a str),
     FStringExpressionElement(FStringExpressionElement<'a>),
-    Invalid,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -542,8 +541,6 @@ impl<'a> From<&'a ast::FStringElement> for ComparableFStringElement<'a> {
                         .map(|spec| spec.elements.iter().map(Into::into).collect()),
                 })
             }
-            #[allow(deprecated)]
-            ast::FStringElement::Invalid(_) => Self::Invalid,
         }
     }
 }
