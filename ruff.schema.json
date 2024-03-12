@@ -755,6 +755,12 @@
       },
       "additionalProperties": false
     },
+    "BannedAliases": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "ConstantType": {
       "type": "string",
       "enum": [
@@ -1036,10 +1042,7 @@
             "null"
           ],
           "additionalProperties": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "$ref": "#/definitions/BannedAliases"
           }
         },
         "banned-from": {
