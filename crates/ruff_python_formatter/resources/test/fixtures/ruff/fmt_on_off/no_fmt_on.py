@@ -5,5 +5,5 @@ def test():
     if unformatted +  a:
         pass
 
-# Get's formatted again
+# Gets formatted again
 a   + b
