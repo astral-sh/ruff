@@ -791,6 +791,8 @@ enum RecoveryContextKind {
     /// or expressions.
     FStringElements,
 
+    /// When parsing a single string or a list of strings that are implicitly
+    /// concatenated e.g., `"foo"`, `b"foo"`, `f"foo"`, `"foo" "bar"`.
     Strings,
 }
 
