@@ -154,8 +154,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         }
     }
 
-    let in_init =
-        checker.settings.ignore_init_module_imports && checker.path().ends_with("__init__.py");
+    let in_init = checker.path().ends_with("__init__.py");
+    let fix_init = in_init && !checker.settings.ignore_init_module_imports;
 
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
@@ -164,7 +164,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             exceptions.intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
         let multiple = imports.len() > 1;
 
-        let fix = if !in_init && !in_except_handler {
+        let fix = if !fix_init && !in_except_handler {
             fix_imports(checker, node_id, &imports).ok()
         } else {
             None
