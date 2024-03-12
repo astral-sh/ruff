@@ -8,7 +8,8 @@ use ruff_python_ast::{self as ast, Int, IpyEscapeKind, AnyStringKind};
 use super::{
   function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
   context::set_context,
-  ParenthesizedExpr
+  ParenthesizedExpr,
+  invalid,
 };
 use crate::{
     FStringErrorType,
@@ -16,7 +17,6 @@ use crate::{
     lexer::{LexicalError, LexicalErrorType},
     string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
     token,
-    invalid,
 };
 use lalrpop_util::ParseError;
 

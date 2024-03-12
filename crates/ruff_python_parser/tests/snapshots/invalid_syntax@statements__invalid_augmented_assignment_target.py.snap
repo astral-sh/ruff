@@ -246,7 +246,11 @@ Module(
                                                     StringLiteral {
                                                         range: 187..190,
                                                         value: "a",
-                                                        unicode: false,
+                                                        flags: StringLiteralFlags {
+                                                            quote_style: Double,
+                                                            prefix: "",
+                                                            triple_quoted: false,
+                                                        },
                                                     },
                                                 ),
                                             },
@@ -700,6 +704,11 @@ Module(
                                                     },
                                                 ),
                                             ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                raw: false,
+                                                triple_quoted: false,
+                                            },
                                         },
                                     ),
                                 ),
@@ -766,6 +775,11 @@ Module(
                                                     },
                                                 ),
                                             ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                raw: false,
+                                                triple_quoted: false,
+                                            },
                                         },
                                     ),
                                 ),
@@ -794,7 +808,11 @@ Module(
                                     StringLiteral {
                                         range: 429..434,
                                         value: "foo",
-                                        unicode: false,
+                                        flags: StringLiteralFlags {
+                                            quote_style: Double,
+                                            prefix: "",
+                                            triple_quoted: false,
+                                        },
                                     },
                                 ),
                             },
@@ -826,6 +844,11 @@ Module(
                                             111,
                                             111,
                                         ],
+                                        flags: BytesLiteralFlags {
+                                            quote_style: Double,
+                                            raw: false,
+                                            triple_quoted: false,
+                                        },
                                     },
                                 ),
                             },
