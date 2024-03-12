@@ -554,14 +554,14 @@ impl<'src> Parser<'src> {
         cls: Pattern,
         start: TextSize,
     ) -> ast::PatternMatchClass {
+        let arguments_start = self.node_start();
+
         self.bump(TokenKind::Lpar);
 
         let mut patterns = vec![];
         let mut keywords = vec![];
         let mut has_seen_pattern = false;
         let mut has_seen_keyword_pattern = false;
-
-        let arguments_start = self.node_start();
 
         self.parse_comma_separated_list(
             RecoveryContextKind::MatchPatternClassArguments,
