@@ -3097,7 +3097,7 @@ pub struct FormatOptions {
     ///     pass
     /// ```
     ///
-    /// If a code snippt in a docstring contains invalid Python code or if the
+    /// If a code snippet in a docstring contains invalid Python code or if the
     /// formatter would otherwise write invalid Python code, then the code
     /// example is ignored by the formatter and kept as-is.
     ///
