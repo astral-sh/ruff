@@ -1,26 +1,36 @@
 ---
-source: crates/ruff_python_parser/src/context.rs
+source: crates/ruff_python_parser/src/lalrpop/context.rs
 expression: parse_ast
 ---
 [
-    For(
-        StmtFor {
-            range: 0..24,
-            is_async: false,
-            target: Name(
-                ExprName {
-                    range: 4..5,
-                    id: "x",
+    AugAssign(
+        StmtAugAssign {
+            range: 0..16,
+            target: Attribute(
+                ExprAttribute {
+                    range: 0..3,
+                    value: Name(
+                        ExprName {
+                            range: 0..1,
+                            id: "x",
+                            ctx: Load,
+                        },
+                    ),
+                    attr: Identifier {
+                        id: "y",
+                        range: 2..3,
+                    },
                     ctx: Store,
                 },
             ),
-            iter: Tuple(
+            op: Add,
+            value: Tuple(
                 ExprTuple {
-                    range: 9..18,
+                    range: 7..16,
                     elts: [
                         NumberLiteral(
                             ExprNumberLiteral {
-                                range: 10..11,
+                                range: 8..9,
                                 value: Int(
                                     1,
                                 ),
@@ -28,7 +38,7 @@ expression: parse_ast
                         ),
                         NumberLiteral(
                             ExprNumberLiteral {
-                                range: 13..14,
+                                range: 11..12,
                                 value: Int(
                                     2,
                                 ),
@@ -36,7 +46,7 @@ expression: parse_ast
                         ),
                         NumberLiteral(
                             ExprNumberLiteral {
-                                range: 16..17,
+                                range: 14..15,
                                 value: Int(
                                     3,
                                 ),
@@ -47,14 +57,6 @@ expression: parse_ast
                     parenthesized: true,
                 },
             ),
-            body: [
-                Pass(
-                    StmtPass {
-                        range: 20..24,
-                    },
-                ),
-            ],
-            orelse: [],
         },
     ),
 ]

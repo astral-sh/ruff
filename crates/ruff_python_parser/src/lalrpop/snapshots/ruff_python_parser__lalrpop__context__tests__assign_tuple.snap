@@ -1,15 +1,15 @@
 ---
-source: crates/ruff_python_parser/src/context.rs
+source: crates/ruff_python_parser/src/lalrpop/context.rs
 expression: parse_ast
 ---
 [
     Assign(
         StmtAssign {
-            range: 0..19,
+            range: 0..18,
             targets: [
                 Tuple(
                     ExprTuple {
-                        range: 0..7,
+                        range: 0..6,
                         elts: [
                             Name(
                                 ExprName {
@@ -18,16 +18,10 @@ expression: parse_ast
                                     ctx: Store,
                                 },
                             ),
-                            Starred(
-                                ExprStarred {
-                                    range: 4..6,
-                                    value: Name(
-                                        ExprName {
-                                            range: 5..6,
-                                            id: "y",
-                                            ctx: Store,
-                                        },
-                                    ),
+                            Name(
+                                ExprName {
+                                    range: 4..5,
+                                    id: "y",
                                     ctx: Store,
                                 },
                             ),
@@ -39,11 +33,11 @@ expression: parse_ast
             ],
             value: Tuple(
                 ExprTuple {
-                    range: 10..19,
+                    range: 9..18,
                     elts: [
                         NumberLiteral(
                             ExprNumberLiteral {
-                                range: 11..12,
+                                range: 10..11,
                                 value: Int(
                                     1,
                                 ),
@@ -51,7 +45,7 @@ expression: parse_ast
                         ),
                         NumberLiteral(
                             ExprNumberLiteral {
-                                range: 14..15,
+                                range: 13..14,
                                 value: Int(
                                     2,
                                 ),
@@ -59,7 +53,7 @@ expression: parse_ast
                         ),
                         NumberLiteral(
                             ExprNumberLiteral {
-                                range: 17..18,
+                                range: 16..17,
                                 value: Int(
                                     3,
                                 ),
