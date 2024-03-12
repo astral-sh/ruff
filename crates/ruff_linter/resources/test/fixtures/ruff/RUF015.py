@@ -57,6 +57,16 @@ revision_heads_map_ast = [
 list(zip(x, y))[0]
 [*zip(x, y)][0]
 
+# RUF015 (pop)
+list(x).pop(0)
+[i for i in x].pop(0)
+list(i for i in x).pop(0)
+
+# OK
+list(x).pop(1)
+list(x).remove(0)
+list(x).remove(1)
+
 
 def test():
     zip = list  # Overwrite the builtin zip

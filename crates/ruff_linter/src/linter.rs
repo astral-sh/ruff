@@ -132,7 +132,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
         diagnostics.extend(crate::checkers::logical_lines::check_logical_lines(
-            &tokens, locator, stylist, settings,
+            &tokens, locator, indexer, stylist, settings,
         ));
     }
 
@@ -407,6 +407,7 @@ pub fn add_noqa_to_path(
         &diagnostics.0,
         &locator,
         indexer.comment_ranges(),
+        &settings.external,
         &directives.noqa_line_for,
         stylist.line_ending(),
     )

@@ -163,13 +163,13 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
 /// An enum for a node that can be considered a candidate for replacement with `starmap`.
 #[derive(Debug)]
 pub(crate) enum StarmapCandidate<'a> {
-    Generator(&'a ast::ExprGeneratorExp),
+    Generator(&'a ast::ExprGenerator),
     ListComp(&'a ast::ExprListComp),
     SetComp(&'a ast::ExprSetComp),
 }
 
-impl<'a> From<&'a ast::ExprGeneratorExp> for StarmapCandidate<'a> {
-    fn from(generator: &'a ast::ExprGeneratorExp) -> Self {
+impl<'a> From<&'a ast::ExprGenerator> for StarmapCandidate<'a> {
+    fn from(generator: &'a ast::ExprGenerator) -> Self {
         Self::Generator(generator)
     }
 }

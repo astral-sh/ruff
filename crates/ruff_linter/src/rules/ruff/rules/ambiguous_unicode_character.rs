@@ -83,7 +83,7 @@ impl Violation for AmbiguousUnicodeCharacterString {
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
 /// You can omit characters from being flagged as ambiguous via the
-/// [`allowed-confusables`] setting.
+/// [`lint.allowed-confusables`] setting.
 ///
 /// ## Example
 /// ```python
@@ -136,7 +136,7 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
 /// You can omit characters from being flagged as ambiguous via the
-/// [`allowed-confusables`] setting.
+/// [`lint.allowed-confusables`] setting.
 ///
 /// ## Example
 /// ```python

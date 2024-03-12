@@ -56,7 +56,7 @@ pub(crate) fn unnecessary_generator_list(checker: &mut Checker, call: &ast::Expr
     if !checker.semantic().is_builtin("list") {
         return;
     }
-    if argument.is_generator_exp_expr() {
+    if argument.is_generator_expr() {
         let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorList, call.range());
 
         // Convert `list(x for x in y)` to `[x for x in y]`.

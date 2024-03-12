@@ -111,7 +111,7 @@ fn nonexistent_config_file() {
            option
 
     It looks like you were trying to pass a path to a configuration file.
-    The path `foo.toml` does not exist
+    The path `foo.toml` does not point to a configuration file
 
     For more information, try '--help'.
     "###);
@@ -358,58 +358,52 @@ def f(x):
     '''
     pass
 "#), @r###"
-success: true
-exit_code: 0
------ stdout -----
-def f(x):
-    """
-    Something about `f`. And an example:
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    def f(x):
+        """
+        Something about `f`. And an example:
 
-    .. code-block:: python
+        .. code-block:: python
 
-        (
-            foo,
-            bar,
-            quux,
-        ) = this_is_a_long_line(
-            lion,
-            hippo,
-            lemur,
-            bear,
+            foo, bar, quux = (
+                this_is_a_long_line(
+                    lion,
+                    hippo,
+                    lemur,
+                    bear,
+                )
+            )
+
+        Another example:
+
+        ```py
+        foo, bar, quux = (
+            this_is_a_long_line(
+                lion,
+                hippo,
+                lemur,
+                bear,
+            )
         )
+        ```
 
-    Another example:
+        And another:
 
-    ```py
-    (
-        foo,
-        bar,
-        quux,
-    ) = this_is_a_long_line(
-        lion,
-        hippo,
-        lemur,
-        bear,
-    )
-    ```
+        >>> foo, bar, quux = (
+        ...     this_is_a_long_line(
+        ...         lion,
+        ...         hippo,
+        ...         lemur,
+        ...         bear,
+        ...     )
+        ... )
+        """
+        pass
 
-    And another:
-
-    >>> (
-    ...     foo,
-    ...     bar,
-    ...     quux,
-    ... ) = this_is_a_long_line(
-    ...     lion,
-    ...     hippo,
-    ...     lemur,
-    ...     bear,
-    ... )
-    """
-    pass
-
------ stderr -----
-"###);
+    ----- stderr -----
+    "###);
     Ok(())
 }
 

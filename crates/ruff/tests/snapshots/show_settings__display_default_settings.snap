@@ -44,7 +44,6 @@ file_resolver.exclude = [
 	"__pypackages__",
 	"_build",
 	"buck-out",
-	"build",
 	"dist",
 	"node_modules",
 	"site-packages",
@@ -312,6 +311,7 @@ linter.isort.section_order = [
 	known { type = first_party },
 	known { type = local_folder },
 ]
+linter.isort.default_section = known { type = third_party }
 linter.isort.no_sections = false
 linter.isort.from_first = false
 linter.isort.length_sort = false
@@ -366,4 +366,3 @@ formatter.docstring_code_format = disabled
 formatter.docstring_code_line_width = dynamic
 
 ----- stderr -----
-

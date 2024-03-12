@@ -3,8 +3,8 @@ use std::fmt;
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::Decorator;
@@ -621,11 +621,8 @@ struct SkipFunctionsVisitor<'a> {
     addfinalizer_call: Option<&'a Expr>,
 }
 
-impl<'a, 'b> Visitor<'b> for SkipFunctionsVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> Visitor<'a> for SkipFunctionsVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Return(ast::StmtReturn { value, range: _ }) => {
                 if value.is_some() {
@@ -637,7 +634,7 @@ where
         }
     }
 
-    fn visit_expr(&mut self, expr: &'b Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::YieldFrom(_) => {
                 self.has_yield_from = true;
@@ -649,9 +646,9 @@ where
                 }
             }
             Expr::Call(ast::ExprCall { func, .. }) => {
-                if collect_call_path(func).is_some_and(|call_path| {
-                    matches!(call_path.as_slice(), ["request", "addfinalizer"])
-                }) {
+                if UnqualifiedName::from_expr(func)
+                    .is_some_and(|name| matches!(name.segments(), ["request", "addfinalizer"]))
+                {
                     self.addfinalizer_call = Some(expr);
                 };
                 visitor::walk_expr(self, expr);

@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821_27.py:30:11: F821 Undefined name `foo`
+   |
+28 | class MyClass:
+29 |     foo: int
+30 |     bar = foo  # Still invalid even when `__future__.annotations` are enabled
+   |           ^^^ F821
+31 |     bar = "foo"  # always okay
+   |
+
+F821_27.py:34:8: F821 Undefined name `baz`
+   |
+33 | baz: MyClass
+34 | eggs = baz  # Still invalid even when `__future__.annotations` are enabled
+   |        ^^^ F821
+35 | eggs = "baz"  # always okay
+   |

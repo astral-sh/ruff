@@ -140,8 +140,8 @@ pub(crate) fn blind_except(
                     Expr::Name(ast::ExprName { .. }) => {
                         if checker
                             .semantic()
-                            .resolve_call_path(func.as_ref())
-                            .is_some_and(|call_path| match call_path.as_slice() {
+                            .resolve_qualified_name(func.as_ref())
+                            .is_some_and(|qualified_name| match qualified_name.segments() {
                                 ["logging", "exception"] => true,
                                 ["logging", "error"] => {
                                     if let Some(keyword) = arguments.find_keyword("exc_info") {

@@ -7,8 +7,8 @@ Ok(
         Expr(
             StmtExpr {
                 range: 0..8,
-                value: NamedExpr(
-                    ExprNamedExpr {
+                value: Named(
+                    ExprNamed {
                         range: 1..7,
                         target: Name(
                             ExprName {

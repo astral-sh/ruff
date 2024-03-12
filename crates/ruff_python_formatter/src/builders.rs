@@ -219,7 +219,6 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
             if let Some(last_end) = self.entries.position() {
                 let magic_trailing_comma = has_magic_trailing_comma(
                     TextRange::new(last_end, self.sequence_end),
-                    self.fmt.options(),
                     self.fmt.context(),
                 );
 

@@ -108,7 +108,17 @@ pub(crate) fn format_imports(
         output.push_str(block_output.as_str());
     }
 
-    let lines_after_imports = settings.lines_after_imports;
+    let lines_after_imports = if source_type.is_stub() {
+        // Limit the number of lines after imports in stub files to at most 1 to be compatible with the formatter.
+        // `isort` does the same when using the profile `isort`
+        match settings.lines_after_imports {
+            0 => 0,
+            _ => 1,
+        }
+    } else {
+        settings.lines_after_imports
+    };
+
     match trailer {
         None => {}
         Some(Trailer::Sibling) => {
@@ -163,6 +173,8 @@ fn format_import_block(
         &settings.known_modules,
         target_version,
         settings.no_sections,
+        &settings.section_order,
+        &settings.default_section,
     );
 
     let mut output = String::new();
@@ -924,6 +936,65 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Path::new("default_section_user_defined.py"))]
+    fn default_section_can_map_to_user_defined_section(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "default_section_can_map_to_user_defined_section_{}",
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(
+                        vec![],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::from_iter([("django".to_string(), vec![pattern("django")])]),
+                    ),
+                    section_order: vec![
+                        ImportSection::Known(ImportType::Future),
+                        ImportSection::UserDefined("django".to_string()),
+                        ImportSection::Known(ImportType::FirstParty),
+                        ImportSection::Known(ImportType::LocalFolder),
+                    ],
+                    force_sort_within_sections: true,
+                    default_section: ImportSection::UserDefined("django".to_string()),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("no_standard_library.py"))]
+    fn no_standard_library(path: &Path) -> Result<()> {
+        let snapshot = format!("no_standard_library_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    section_order: vec![
+                        ImportSection::Known(ImportType::Future),
+                        ImportSection::Known(ImportType::ThirdParty),
+                        ImportSection::Known(ImportType::FirstParty),
+                        ImportSection::Known(ImportType::LocalFolder),
+                    ],
+                    force_sort_within_sections: true,
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Path::new("no_lines_before.py"))]
     fn no_lines_before(path: &Path) -> Result<()> {
         let snapshot = format!("no_lines_before.py_{}", path.to_string_lossy());
@@ -975,6 +1046,7 @@ mod tests {
     }
 
     #[test_case(Path::new("lines_after_imports_nothing_after.py"))]
+    #[test_case(Path::new("lines_after_imports.pyi"))]
     #[test_case(Path::new("lines_after_imports_func_after.py"))]
     #[test_case(Path::new("lines_after_imports_class_after.py"))]
     fn lines_after_imports(path: &Path) -> Result<()> {
@@ -992,6 +1064,27 @@ mod tests {
         )?;
         diagnostics.sort_by_key(Ranged::start);
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("lines_after_imports.pyi"))]
+    #[test_case(Path::new("lines_after_imports_func_after.py"))]
+    #[test_case(Path::new("lines_after_imports_class_after.py"))]
+    fn lines_after_imports_default_settings(path: &Path) -> Result<()> {
+        let snapshot = path.to_string_lossy();
+        let mut diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    lines_after_imports: -1,
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        diagnostics.sort_by_key(Ranged::start);
+        assert_messages!(*snapshot, diagnostics);
         Ok(())
     }
 

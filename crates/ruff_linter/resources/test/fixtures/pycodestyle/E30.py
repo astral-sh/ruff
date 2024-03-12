@@ -466,6 +466,29 @@ class Class:
 # end
 
 
+# E301
+class Class:
+    """Class for minimal repo."""
+
+    columns = []
+    @classmethod
+    def cls_method(cls) -> None:
+        pass
+# end
+
+
+# E301
+class Class:
+    """Class for minimal repo."""
+
+    def method(cls) -> None:
+        pass
+    @classmethod
+    def cls_method(cls) -> None:
+        pass
+# end
+
+
 # E302
 """Main module."""
 def fn():

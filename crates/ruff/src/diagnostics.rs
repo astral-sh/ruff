@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::fs::File;
 use std::io;
+use std::io::Write;
 use std::ops::{Add, AddAssign};
 use std::path::Path;
 
@@ -289,10 +290,10 @@ pub(crate) fn lint_path(
                 match fix_mode {
                     flags::FixMode::Apply => transformed.write(&mut File::create(path)?)?,
                     flags::FixMode::Diff => {
-                        source_kind.diff(
-                            transformed.as_ref(),
-                            Some(path),
+                        write!(
                             &mut io::stdout().lock(),
+                            "{}",
+                            source_kind.diff(&transformed, Some(path)).unwrap()
                         )?;
                     }
                     flags::FixMode::Generate => {}
@@ -442,7 +443,11 @@ pub(crate) fn lint_stdin(
                 flags::FixMode::Diff => {
                     // But only write a diff if it's non-empty.
                     if !fixed.is_empty() {
-                        source_kind.diff(transformed.as_ref(), path, &mut io::stdout().lock())?;
+                        write!(
+                            &mut io::stdout().lock(),
+                            "{}",
+                            source_kind.diff(&transformed, path).unwrap()
+                        )?;
                     }
                 }
                 flags::FixMode::Generate => {}

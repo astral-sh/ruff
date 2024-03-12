@@ -623,10 +623,10 @@
       ]
     },
     "required-version": {
-      "description": "Require a specific version of Ruff to be running (useful for unifying results across many environments, e.g., with a `pyproject.toml` file).",
+      "description": "Enforce a requirement on the version of Ruff, to enforce at runtime. If the version of Ruff does not meet the requirement, Ruff will exit with an error.\n\nUseful for unifying results across many environments, e.g., with a `pyproject.toml` file.\n\nAccepts a PEP 440 specifier, like `==0.3.1` or `>=0.3.1`.",
       "anyOf": [
         {
-          "$ref": "#/definitions/Version"
+          "$ref": "#/definitions/RequiredVersion"
         },
         {
           "type": "null"
@@ -1474,6 +1474,17 @@
             "type": "string"
           }
         },
+        "default-section": {
+          "description": "Define a default section for any imports that don't fit into the specified `section-order`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ImportSection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "detect-same-package": {
           "description": "Whether to automatically mark imports from within the same package as first-party. For example, when `detect-same-package = true`, then when analyzing files within the `foo` package, any imports from within the `foo` package will be considered first-party.\n\nThis heuristic is often unnecessary when `src` is configured to detect all first-party sources; however, if `src` is _not_ configured, this heuristic can be useful to detect first-party imports from _within_ (but not _across_) first-party packages.",
           "type": [
@@ -1584,7 +1595,7 @@
           ]
         },
         "lines-after-imports": {
-          "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.\n\nWhen using the formatter, only the values `-1`, `1`, and `2` are compatible because it enforces at least one empty and at most two empty lines after imports.",
+          "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.\n\nRuff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)).\n\nWhen using the formatter, only the values `-1`, `1`, and `2` are compatible because it enforces at least one empty and at most two empty lines after imports.",
           "type": [
             "integer",
             "null"
@@ -2579,6 +2590,9 @@
         }
       ]
     },
+    "RequiredVersion": {
+      "type": "string"
+    },
     "RuleSelector": {
       "type": "string",
       "enum": [
@@ -2853,6 +2867,7 @@
         "E5",
         "E50",
         "E501",
+        "E502",
         "E7",
         "E70",
         "E701",
@@ -3231,6 +3246,8 @@
         "PLE15",
         "PLE150",
         "PLE1507",
+        "PLE151",
+        "PLE1519",
         "PLE17",
         "PLE170",
         "PLE1700",
@@ -3312,6 +3329,7 @@
         "PLW0129",
         "PLW013",
         "PLW0131",
+        "PLW0133",
         "PLW02",
         "PLW024",
         "PLW0245",
@@ -3531,6 +3549,7 @@
         "RUF025",
         "RUF026",
         "RUF027",
+        "RUF028",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -3594,7 +3613,6 @@
         "S408",
         "S409",
         "S41",
-        "S410",
         "S411",
         "S412",
         "S413",
@@ -3622,6 +3640,7 @@
         "S608",
         "S609",
         "S61",
+        "S610",
         "S611",
         "S612",
         "S7",
@@ -3859,9 +3878,6 @@
           ]
         }
       ]
-    },
-    "Version": {
-      "type": "string"
     }
   }
 }

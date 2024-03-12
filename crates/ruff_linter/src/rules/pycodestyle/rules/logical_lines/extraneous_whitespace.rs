@@ -137,16 +137,16 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
         match kind {
             TokenKind::FStringStart => fstrings += 1,
             TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
-            TokenKind::Lsqb if fstrings == 0 => {
+            TokenKind::Lsqb => {
                 brackets.push(kind);
             }
-            TokenKind::Rsqb if fstrings == 0 => {
+            TokenKind::Rsqb => {
                 brackets.pop();
             }
-            TokenKind::Lbrace if fstrings == 0 => {
+            TokenKind::Lbrace => {
                 brackets.push(kind);
             }
-            TokenKind::Rbrace if fstrings == 0 => {
+            TokenKind::Rbrace => {
                 brackets.pop();
             }
             _ => {}

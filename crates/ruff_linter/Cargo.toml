@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.2.2"
+version = "0.3.2"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -60,7 +60,6 @@ regex = { workspace = true }
 result-like = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
-semver = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 similar = { workspace = true }
