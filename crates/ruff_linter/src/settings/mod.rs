@@ -155,6 +155,38 @@ macro_rules! display_settings {
             }
         }
     };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | map) => {
+        {
+            use itertools::Itertools;
+
+            write!($fmt, "{}{} = ", $prefix, stringify!($field))?;
+            if $settings.$field.is_empty() {
+                writeln!($fmt, "{{}}")?;
+            } else {
+                writeln!($fmt, "{{")?;
+                for (key, value) in $settings.$field.iter().sorted_by(|(left, _), (right, _)| left.cmp(right)) {
+                    writeln!($fmt, "\t{key} = {value},")?;
+                }
+                writeln!($fmt, "}}")?;
+            }
+        }
+    };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | set) => {
+        {
+            use itertools::Itertools;
+
+            write!($fmt, "{}{} = ", $prefix, stringify!($field))?;
+            if $settings.$field.is_empty() {
+                writeln!($fmt, "[]")?;
+            } else {
+                writeln!($fmt, "[")?;
+                for elem in $settings.$field.iter().sorted_by(|left, right| left.cmp(right)) {
+                    writeln!($fmt, "\t{elem},")?;
+                }
+                writeln!($fmt, "]")?;
+            }
+        }
+    };
     (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | paths) => {
         {
             write!($fmt, "{}{} = ", $prefix, stringify!($field))?;
