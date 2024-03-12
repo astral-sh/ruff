@@ -867,7 +867,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
             ["urllib", "request", "URLopener" | "FancyURLopener"] |
             ["six", "moves", "urllib", "request", "URLopener" | "FancyURLopener"] => Some(SuspiciousURLOpenUsage.into()),
             // NonCryptographicRandom
-            ["random", "random" | "randrange" | "randint" | "choice" | "choices" | "uniform" | "triangular"] => Some(SuspiciousNonCryptographicRandomUsage.into()),
+            ["random", "Random" | "random" | "randrange" | "randint" | "choice" | "choices" | "uniform" | "triangular" | "randbytes"] => Some(SuspiciousNonCryptographicRandomUsage.into()),
             // UnverifiedContext
             ["ssl", "_create_unverified_context"] => Some(SuspiciousUnverifiedContextUsage.into()),
             // XMLCElementTree

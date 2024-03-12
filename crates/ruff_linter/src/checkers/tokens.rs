@@ -204,6 +204,10 @@ pub(crate) fn check_tokens(
         flake8_fixme::rules::todos(&mut diagnostics, &todo_comments);
     }
 
+    if settings.rules.enabled(Rule::TooManyNewlinesAtEndOfFile) {
+        pycodestyle::rules::too_many_newlines_at_end_of_file(&mut diagnostics, tokens);
+    }
+
     if settings.rules.any_enabled(&[
         Rule::NOQAMissingColon,
         Rule::NOQASpaceBeforeColon,

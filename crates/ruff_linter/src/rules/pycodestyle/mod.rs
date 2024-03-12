@@ -71,6 +71,12 @@ mod tests {
     #[test_case(Rule::IsLiteral, Path::new("constant_literals.py"))]
     #[test_case(Rule::TypeComparison, Path::new("E721.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_2.py"))]
+    #[test_case(Rule::RedundantBackslash, Path::new("E502.py"))]
+    #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_0.py"))]
+    #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_1.py"))]
+    #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_2.py"))]
+    #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_3.py"))]
+    #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_4.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
@@ -145,6 +151,23 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    /// Tests the compatibility of E2 rules (E202, E225 and E275) on syntactically incorrect code.
+    #[test]
+    fn white_space_syntax_error_compatibility() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pycodestyle").join("E2_syntax_error.py"),
+            &settings::LinterSettings {
+                ..settings::LinterSettings::for_rules([
+                    Rule::MissingWhitespaceAroundOperator,
+                    Rule::MissingWhitespaceAfterKeyword,
+                    Rule::WhitespaceBeforeCloseBracket,
+                ])
+            },
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 
