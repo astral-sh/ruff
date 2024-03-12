@@ -121,7 +121,6 @@ pub use token::{StringKind, Tok, TokenKind};
 use crate::lexer::LexResult;
 
 mod error;
-mod invalid;
 mod lalrpop;
 pub mod lexer;
 mod parser;
