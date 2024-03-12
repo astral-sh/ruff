@@ -790,6 +790,10 @@ enum RecoveryContextKind {
     /// When parsing a list of f-string elements which are either literal elements
     /// or expressions.
     FStringElements,
+
+    /// When parsing a single string or a list of strings that are implicitly
+    /// concatenated e.g., `"foo"`, `b"foo"`, `f"foo"`, `"foo" "bar"`.
+    Strings,
 }
 
 impl RecoveryContextKind {
@@ -890,6 +894,14 @@ impl RecoveryContextKind {
                     TokenKind::Rbrace,
                 ]))
             }
+            RecoveryContextKind::Strings => {
+                // This is basically a negation of the FIRST set as there can be
+                // any token after a string depending on the context.
+                !matches!(
+                    p.current_token_kind(),
+                    TokenKind::String | TokenKind::FStringStart
+                )
+            }
         }
     }
 
@@ -927,6 +939,11 @@ impl RecoveryContextKind {
                 TokenKind::FStringMiddle
                 // Expression element
                 | TokenKind::Lbrace
+            ),
+            RecoveryContextKind::Strings => matches!(
+                p.current_token_kind(),
+                // "foo" f"bar"
+                TokenKind::String | TokenKind::FStringStart
             ),
         }
     }
@@ -1014,6 +1031,10 @@ impl RecoveryContextKind {
             RecoveryContextKind::FStringElements => ParseErrorType::OtherError(
                 "Expected an f-string element or the end of the f-string".to_string(),
             ),
+            RecoveryContextKind::Strings => ParseErrorType::OtherError(
+                "Expected a string or byte literal, f-string or the end of the string list"
+                    .to_string(),
+            ),
         }
     }
 }
@@ -1051,6 +1072,7 @@ bitflags! {
         const WITH_ITEMS_PARENTHESIZED_EXPRESSION = 1 << 25;
         const WITH_ITEMS_UNPARENTHESIZED = 1 << 26;
         const F_STRING_ELEMENTS = 1 << 27;
+        const STRINGS = 1 << 28;
     }
 }
 
@@ -1101,6 +1123,7 @@ impl RecoveryContext {
                 WithItemKind::Unparenthesized => RecoveryContext::WITH_ITEMS_UNPARENTHESIZED,
             },
             RecoveryContextKind::FStringElements => RecoveryContext::F_STRING_ELEMENTS,
+            RecoveryContextKind::Strings => RecoveryContext::STRINGS,
         }
     }
 
@@ -1163,6 +1186,7 @@ impl RecoveryContext {
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized)
             }
             RecoveryContext::F_STRING_ELEMENTS => RecoveryContextKind::FStringElements,
+            RecoveryContext::STRINGS => RecoveryContextKind::Strings,
             _ => return None,
         })
     }
