@@ -95,7 +95,7 @@ impl Violation for UnusedImport {
             }
             Some(UnusedImportContext::Init) => {
                 format!(
-                    "`{name}` imported but unused; consider adding to `__all__` or using a redundant alias"
+                    "`{name}` imported but unused; consider removing, adding to `__all__`, or using a redundant alias"
                 )
             }
             None => format!("`{name}` imported but unused"),
