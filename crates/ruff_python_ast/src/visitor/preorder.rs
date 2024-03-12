@@ -528,8 +528,6 @@ pub fn walk_f_string_element<'a, V: PreorderVisitor<'a> + ?Sized>(
         match f_string_element {
             FStringElement::Expression(element) => element.visit_preorder(visitor),
             FStringElement::Literal(element) => element.visit_preorder(visitor),
-            #[allow(deprecated)]
-            FStringElement::Invalid(_) => {}
         }
     }
     visitor.leave_node(node);
