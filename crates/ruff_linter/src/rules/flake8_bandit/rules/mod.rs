@@ -1,5 +1,6 @@
 pub(crate) use assert_used::*;
 pub(crate) use bad_file_permissions::*;
+pub(crate) use django_extra::*;
 pub(crate) use django_raw_sql::*;
 pub(crate) use exec_used::*;
 pub(crate) use flask_debug_true::*;
@@ -33,6 +34,7 @@ pub(crate) use weak_cryptographic_key::*;
 
 mod assert_used;
 mod bad_file_permissions;
+mod django_extra;
 mod django_raw_sql;
 mod exec_used;
 mod flask_debug_true;
