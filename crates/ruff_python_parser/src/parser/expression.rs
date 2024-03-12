@@ -15,7 +15,7 @@ use crate::string::{
 use crate::token_set::TokenSet;
 use crate::{FStringErrorType, Mode, ParseErrorType, Tok, TokenKind};
 
-use super::RecoveryContextKind;
+use super::{RecoveryContextKind, TupleParenthesized};
 
 /// Tokens that can appear after an expression.
 /// FIXME: this isn't exhaustive.
@@ -59,6 +59,7 @@ impl<'src> Parser<'src> {
         self.at_ts(EXPR_SET)
     }
 
+    #[allow(dead_code)]
     pub(super) fn at_expr_end(&self) -> bool {
         self.at_ts(END_EXPR_SET)
     }
@@ -77,7 +78,7 @@ impl<'src> Parser<'src> {
             Expr::Tuple(self.parse_tuple_expression(
                 parsed_expr.expr,
                 start,
-                false,
+                TupleParenthesized::No,
                 Parser::parse_conditional_expression_or_higher,
             ))
             .into()
@@ -1189,7 +1190,7 @@ impl<'src> Parser<'src> {
                 let tuple = self.parse_tuple_expression(
                     parsed_expr.expr,
                     start,
-                    true,
+                    TupleParenthesized::Yes,
                     Parser::parse_named_expression_or_higher,
                 );
 
@@ -1226,7 +1227,7 @@ impl<'src> Parser<'src> {
         &mut self,
         first_element: Expr,
         start: TextSize,
-        parenthesized: bool,
+        parenthesized: TupleParenthesized,
         // TODO: I would have expected that `parse_func` is the same depending on whether `parenthesized` is true or not, but that's not the case
         // verify precedence.
         mut parse_func: impl FnMut(&mut Parser<'src>) -> ParsedExpr,
@@ -1240,12 +1241,12 @@ impl<'src> Parser<'src> {
         let mut elts = vec![first_element];
 
         self.parse_comma_separated_list(
-            RecoveryContextKind::TupleElements,
+            RecoveryContextKind::TupleElements(parenthesized),
             |p| elts.push(parse_func(p).expr),
             true,
         );
 
-        if parenthesized {
+        if parenthesized.is_yes() {
             self.expect(TokenKind::Rpar);
         }
 
@@ -1253,7 +1254,7 @@ impl<'src> Parser<'src> {
             elts,
             ctx: ExprContext::Load,
             range: self.node_range(start),
-            parenthesized,
+            parenthesized: parenthesized.is_yes(),
         }
     }
 
