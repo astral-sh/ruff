@@ -211,7 +211,7 @@ impl StringParser {
 
     fn parse_fstring_middle(mut self) -> Result<ast::FStringElement, LexicalError> {
         // Fast-path: if the f-string doesn't contain any escape sequences, return the literal.
-        let Some(mut index) = memchr::memchr3(b'{', b'}', b'\\', self.source.as_bytes()) else {
+        let Some(mut index) = memchr::memchr(b'\\', self.source.as_bytes()) else {
             return Ok(ast::FStringElement::Literal(ast::FStringLiteralElement {
                 value: self.source,
                 range: self.range,
@@ -227,17 +227,6 @@ impl StringParser {
 
             // Add the escaped character to the string.
             match &self.source.as_bytes()[self.cursor - 1] {
-                // If there are any curly braces inside a `FStringMiddle` token,
-                // then they were escaped (i.e. `{{` or `}}`). This means that
-                // we need increase the location by 2 instead of 1.
-                b'{' => {
-                    self.offset += TextSize::from(1);
-                    value.push('{');
-                }
-                b'}' => {
-                    self.offset += TextSize::from(1);
-                    value.push('}');
-                }
                 // We can encounter a `\` as the last character in a `FStringMiddle`
                 // token which is valid in this context. For example,
                 //
@@ -273,8 +262,7 @@ impl StringParser {
                 }
             }
 
-            let Some(next_index) =
-                memchr::memchr3(b'{', b'}', b'\\', self.source[self.cursor..].as_bytes())
+            let Some(next_index) = memchr::memchr(b'\\', self.source[self.cursor..].as_bytes())
             else {
                 // Add the rest of the string to the value.
                 let rest = &self.source[self.cursor..];
