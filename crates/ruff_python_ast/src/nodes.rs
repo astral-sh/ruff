@@ -971,10 +971,17 @@ impl Ranged for FStringExpressionElement {
     }
 }
 
+/// A `FStringLiteralElement` with an empty `value` is an invalid f-string element.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FStringLiteralElement {
     pub range: TextRange,
     pub value: Box<str>,
+}
+
+impl FStringLiteralElement {
+    pub fn is_valid(&self) -> bool {
+        !self.value.is_empty()
+    }
 }
 
 impl Ranged for FStringLiteralElement {
@@ -1516,6 +1523,9 @@ bitflags! {
         /// The string has an `r` or `R` prefix, meaning it is a raw string.
         /// It is invalid to set this flag if `U_PREFIX` is also set.
         const R_PREFIX = 1 << 3;
+
+        /// The string is invalid.
+        const INVALID = 1 << 4;
     }
 }
 
@@ -1544,6 +1554,12 @@ impl StringLiteralFlags {
             StringLiteralPrefix::RString => self.0 |= StringLiteralFlagsInner::R_PREFIX,
             StringLiteralPrefix::UString => self.0 |= StringLiteralFlagsInner::U_PREFIX,
         };
+        self
+    }
+
+    #[must_use]
+    pub fn with_invalid(mut self) -> Self {
+        self.0 |= StringLiteralFlagsInner::INVALID;
         self
     }
 
@@ -1849,6 +1865,9 @@ bitflags! {
 
         /// The bytestring has an `r` or `R` prefix, meaning it is a raw bytestring.
         const R_PREFIX = 1 << 3;
+
+        /// The bytestring is invalid.
+        const INVALID = 1 << 4;
     }
 }
 
@@ -1873,6 +1892,12 @@ impl BytesLiteralFlags {
     #[must_use]
     pub fn with_r_prefix(mut self) -> Self {
         self.0 |= BytesLiteralFlagsInner::R_PREFIX;
+        self
+    }
+
+    #[must_use]
+    pub fn with_invalid(mut self) -> Self {
+        self.0 |= BytesLiteralFlagsInner::INVALID;
         self
     }
 

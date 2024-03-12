@@ -792,7 +792,7 @@ impl<'src> Parser<'src> {
             let string = match parser.current_token_kind() {
                 TokenKind::String => parser.parse_string(),
                 TokenKind::FStringStart => StringType::FString(parser.parse_fstring()),
-                _ => unreachable!(),
+                _ => unreachable!("Expected `String` or `FStringStart` token"),
             };
             strings.push(string);
         });
@@ -817,11 +817,6 @@ impl<'src> Parser<'src> {
                     value: ast::FStringValue::single(fstring),
                     range,
                 }),
-                #[allow(deprecated)]
-                StringType::Invalid(invalid) => Expr::Invalid(ast::ExprInvalid {
-                    value: invalid.value.to_string(),
-                    range,
-                }),
             },
             _ => concatenated_strings(strings, range).unwrap_or_else(|error| {
                 let location = error.location();
@@ -844,23 +839,33 @@ impl<'src> Parser<'src> {
     ///
     /// If the parser isn't positioned at a `String` token.
     fn parse_string(&mut self) -> StringType {
-        let (Tok::String { value, kind }, tok_range) = self.bump(TokenKind::String) else {
+        let (Tok::String { value, kind }, range) = self.bump(TokenKind::String) else {
             unreachable!()
         };
 
-        match parse_string_literal(value, kind, tok_range) {
+        match parse_string_literal(value, kind, range) {
             Ok(string) => string,
             Err(error) => {
-                let string = StringType::Invalid(ast::StringLiteral {
-                    // TODO(dhruvmanila): Do we need to get the source text? In the future, we
-                    // can just set a flag and the linter can query the source code if needed.
-                    value: self.src_text(tok_range).to_string().into_boxed_str(),
-                    range: tok_range,
-                    flags: kind.into(),
-                });
                 let location = error.location();
                 self.add_error(ParseErrorType::Lexical(error.into_error()), location);
-                string
+
+                if kind.is_byte_string() {
+                    StringType::Bytes(ast::BytesLiteral {
+                        value: self
+                            .src_text(range)
+                            .to_string()
+                            .into_boxed_str()
+                            .into_boxed_bytes(),
+                        range,
+                        flags: ast::BytesLiteralFlags::from(kind).with_invalid(),
+                    })
+                } else {
+                    StringType::Str(ast::StringLiteral {
+                        value: self.src_text(range).to_string().into_boxed_str(),
+                        range,
+                        flags: ast::StringLiteralFlags::from(kind).with_invalid(),
+                    })
+                }
             }
         }
     }
@@ -918,8 +923,8 @@ impl<'src> Parser<'src> {
                                     location,
                                 );
                                 ast::FStringLiteralElement {
-                                    value: "".into(),
-                                    range: parser.missing_node_range(),
+                                    value: parser.src_text(range).to_string().into_boxed_str(),
+                                    range,
                                 }
                             },
                         ),
