@@ -42,7 +42,7 @@ pub(crate) fn no_newline_at_end_of_file(
 ) -> Option<Diagnostic> {
     let source = locator.contents();
 
-    // Ignore empty and BOM only files
+    // Ignore empty and BOM only files.
     if source.is_empty() || source == "\u{feff}" {
         return None;
     }

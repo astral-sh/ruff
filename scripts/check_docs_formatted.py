@@ -105,6 +105,7 @@ KNOWN_PARSE_ERRORS = [
     "tab-after-operator",
     "tab-before-keyword",
     "tab-before-operator",
+    "too-many-newlines-at-end-of-file",
     "trailing-whitespace",
     "unexpected-indentation",
 ]

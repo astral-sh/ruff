@@ -72,6 +72,11 @@ mod tests {
     #[test_case(Rule::TypeComparison, Path::new("E721.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_2.py"))]
     #[test_case(Rule::RedundantBackslash, Path::new("E502.py"))]
+    #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_0.py"))]
+    #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_1.py"))]
+    #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_2.py"))]
+    #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_3.py"))]
+    #[test_case(Rule::TooManyNewlinesAtEndOfFile, Path::new("W391_4.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

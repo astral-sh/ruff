@@ -300,6 +300,7 @@ impl Rule {
             | Rule::SingleLineImplicitStringConcatenation
             | Rule::TabIndentation
             | Rule::TooManyBlankLines
+            | Rule::TooManyNewlinesAtEndOfFile
             | Rule::TrailingCommaOnBareTuple
             | Rule::TypeCommentInStub
             | Rule::UselessSemicolon

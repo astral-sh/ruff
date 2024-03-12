@@ -168,6 +168,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pycodestyle, "W291") => (RuleGroup::Stable, rules::pycodestyle::rules::TrailingWhitespace),
         (Pycodestyle, "W292") => (RuleGroup::Stable, rules::pycodestyle::rules::MissingNewlineAtEndOfFile),
         (Pycodestyle, "W293") => (RuleGroup::Stable, rules::pycodestyle::rules::BlankLineWithWhitespace),
+        (Pycodestyle, "W391") => (RuleGroup::Preview, rules::pycodestyle::rules::TooManyNewlinesAtEndOfFile),
         (Pycodestyle, "W505") => (RuleGroup::Stable, rules::pycodestyle::rules::DocLineTooLong),
         (Pycodestyle, "W605") => (RuleGroup::Stable, rules::pycodestyle::rules::InvalidEscapeSequence),
 
