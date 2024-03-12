@@ -14,6 +14,8 @@ use crate::parser::{
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, Tok, TokenKind};
 
+use super::TupleParenthesized;
+
 /// Tokens that can appear after an expression.
 /// Tokens that represent compound statements.
 const COMPOUND_STMT_SET: TokenSet = TokenSet::new([
@@ -80,6 +82,15 @@ impl<'src> Parser<'src> {
 
     pub(super) fn at_stmt(&self) -> bool {
         self.at_ts(STMTS_SET)
+    }
+
+    /// Checks if the parser is currently positioned at the start of a type parameter.
+    pub(super) fn at_type_param(&self) -> bool {
+        let token = self.current_token_kind();
+        matches!(
+            token,
+            TokenKind::Star | TokenKind::DoubleStar | TokenKind::Name
+        ) || token.is_keyword()
     }
 
     /// Parses a compound or a simple statement.
@@ -1199,7 +1210,7 @@ impl<'src> Parser<'src> {
             let tuple = self.parse_tuple_expression(
                 subject.expr,
                 subject_start,
-                false,
+                TupleParenthesized::No,
                 Parser::parse_named_expression_or_higher,
             );
 
@@ -1541,14 +1552,6 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             type_params,
         }
-    }
-
-    /// Checks if the parser is currently positioned at the start of a type parameter.
-    pub(super) fn at_type_param(&self) -> bool {
-        matches!(
-            self.current_token_kind(),
-            TokenKind::Star | TokenKind::DoubleStar | TokenKind::Name
-        ) || self.current_token_kind().is_keyword()
     }
 
     /// Parses a type parameter.
