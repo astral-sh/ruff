@@ -701,6 +701,21 @@ impl WithItemKind {
     }
 }
 
+#[derive(Debug, PartialEq, Copy, Clone)]
+enum TupleParenthesized {
+    /// The tuple is parenthesized, e.g., `(a, b)`.
+    Yes,
+    /// The tuple is not parenthesized, e.g., `a, b`.
+    No,
+}
+
+impl TupleParenthesized {
+    /// Returns `true` if the tuple is parenthesized.
+    const fn is_yes(self) -> bool {
+        matches!(self, TupleParenthesized::Yes)
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 enum RecoveryContextKind {
     /// When parsing a list of statements at the module level i.e., at the top level of a file.
@@ -743,7 +758,7 @@ enum RecoveryContextKind {
     DictElements,
 
     /// When parsing a list of elements in a tuple expression e.g., `(1, 2)`
-    TupleElements,
+    TupleElements(TupleParenthesized),
 
     /// When parsing a list of patterns in a match statement with an optional
     /// parentheses, e.g., `case a, b: ...`, `case (a, b): ...`, `case [a, b]: ...`
@@ -821,7 +836,14 @@ impl RecoveryContextKind {
             RecoveryContextKind::SetElements | RecoveryContextKind::DictElements => {
                 p.at(TokenKind::Rbrace)
             }
-            RecoveryContextKind::TupleElements => p.at(TokenKind::Rpar),
+            RecoveryContextKind::TupleElements(parenthesized) => {
+                if parenthesized.is_yes() {
+                    // TODO(dhruvmanila): Confirm if this is ok
+                    p.at(TokenKind::Rpar)
+                } else {
+                    p.at_sequence_end()
+                }
+            }
             RecoveryContextKind::SequenceMatchPattern(parentheses) => p.at(parentheses.map_or(
                 TokenKind::Colon,
                 SequenceMatchPatternParentheses::closing_kind,
@@ -857,10 +879,10 @@ impl RecoveryContextKind {
             RecoveryContextKind::ImportFromAsNames => {
                 matches!(p.current_token_kind(), TokenKind::Star | TokenKind::Name)
             }
-            RecoveryContextKind::Slices
-            | RecoveryContextKind::ListElements
+            RecoveryContextKind::Slices => p.at(TokenKind::Colon) || p.at_expr(),
+            RecoveryContextKind::ListElements
             | RecoveryContextKind::SetElements
-            | RecoveryContextKind::TupleElements => p.at_expr(),
+            | RecoveryContextKind::TupleElements(_) => p.at_expr(),
             RecoveryContextKind::DictElements => p.at(TokenKind::DoubleStar) || p.at_expr(),
             RecoveryContextKind::SequenceMatchPattern(_) => p.at_pattern_start(),
             RecoveryContextKind::MatchPatternMapping => p.at_mapping_pattern_start(),
@@ -870,7 +892,7 @@ impl RecoveryContextKind {
             RecoveryContextKind::Identifiers => p.at(TokenKind::Name),
             RecoveryContextKind::Parameters(_) => matches!(
                 p.current_token_kind(),
-                TokenKind::Name | TokenKind::Star | TokenKind::DoubleStar
+                TokenKind::Name | TokenKind::Star | TokenKind::DoubleStar | TokenKind::Slash
             ),
             RecoveryContextKind::WithItems(_) => p.at_expr(),
         }
@@ -920,8 +942,12 @@ impl RecoveryContextKind {
             RecoveryContextKind::SetElements | RecoveryContextKind::DictElements => {
                 ParseErrorType::OtherError("Expected an expression or a '}'".to_string())
             }
-            RecoveryContextKind::TupleElements => {
-                ParseErrorType::OtherError("Expected an expression or a ')'".to_string())
+            RecoveryContextKind::TupleElements(parenthesized) => {
+                if parenthesized.is_yes() {
+                    ParseErrorType::OtherError("Expected an expression or a ')'".to_string())
+                } else {
+                    ParseErrorType::OtherError("Expected an expression".to_string())
+                }
             }
             RecoveryContextKind::SequenceMatchPattern(_) => ParseErrorType::OtherError(
                 "Expected a pattern or the end of the sequence pattern".to_string(),
@@ -973,20 +999,21 @@ bitflags! {
         const LIST_ELEMENTS = 1 << 9;
         const SET_ELEMENTS = 1 << 10;
         const DICT_ELEMENTS = 1 << 11;
-        const TUPLE_ELEMENTS = 1 << 12;
-        const SEQUENCE_MATCH_PATTERN = 1 << 13;
-        const SEQUENCE_MATCH_PATTERN_LIST = 1 << 14;
-        const SEQUENCE_MATCH_PATTERN_TUPLE = 1 << 15;
-        const MATCH_PATTERN_MAPPING = 1 << 16;
-        const MATCH_PATTERN_CLASS_ARGUMENTS = 1 << 17;
-        const ARGUMENTS = 1 << 18;
-        const DELETE = 1 << 19;
-        const IDENTIFIERS = 1 << 20;
-        const FUNCTION_PARAMETERS = 1 << 21;
-        const LAMBDA_PARAMETERS = 1 << 22;
-        const WITH_ITEMS_PARENTHESIZED = 1 << 23;
-        const WITH_ITEMS_PARENTHESIZED_EXPRESSION = 1 << 24;
-        const WITH_ITEMS_UNPARENTHESIZED = 1 << 25;
+        const TUPLE_ELEMENTS_PARENTHESIZED = 1 << 12;
+        const TUPLE_ELEMENTS_UNPARENTHESIZED = 1 << 13;
+        const SEQUENCE_MATCH_PATTERN = 1 << 14;
+        const SEQUENCE_MATCH_PATTERN_LIST = 1 << 15;
+        const SEQUENCE_MATCH_PATTERN_TUPLE = 1 << 16;
+        const MATCH_PATTERN_MAPPING = 1 << 17;
+        const MATCH_PATTERN_CLASS_ARGUMENTS = 1 << 18;
+        const ARGUMENTS = 1 << 19;
+        const DELETE = 1 << 20;
+        const IDENTIFIERS = 1 << 21;
+        const FUNCTION_PARAMETERS = 1 << 22;
+        const LAMBDA_PARAMETERS = 1 << 23;
+        const WITH_ITEMS_PARENTHESIZED = 1 << 24;
+        const WITH_ITEMS_PARENTHESIZED_EXPRESSION = 1 << 25;
+        const WITH_ITEMS_UNPARENTHESIZED = 1 << 26;
     }
 }
 
@@ -1005,7 +1032,10 @@ impl RecoveryContext {
             RecoveryContextKind::ListElements => RecoveryContext::LIST_ELEMENTS,
             RecoveryContextKind::SetElements => RecoveryContext::SET_ELEMENTS,
             RecoveryContextKind::DictElements => RecoveryContext::DICT_ELEMENTS,
-            RecoveryContextKind::TupleElements => RecoveryContext::TUPLE_ELEMENTS,
+            RecoveryContextKind::TupleElements(parenthesized) => match parenthesized {
+                TupleParenthesized::Yes => RecoveryContext::TUPLE_ELEMENTS_PARENTHESIZED,
+                TupleParenthesized::No => RecoveryContext::TUPLE_ELEMENTS_UNPARENTHESIZED,
+            },
             RecoveryContextKind::SequenceMatchPattern(parentheses) => match parentheses {
                 None => RecoveryContext::SEQUENCE_MATCH_PATTERN,
                 Some(SequenceMatchPatternParentheses::List) => {
@@ -1053,7 +1083,12 @@ impl RecoveryContext {
             RecoveryContext::LIST_ELEMENTS => RecoveryContextKind::ListElements,
             RecoveryContext::SET_ELEMENTS => RecoveryContextKind::SetElements,
             RecoveryContext::DICT_ELEMENTS => RecoveryContextKind::DictElements,
-            RecoveryContext::TUPLE_ELEMENTS => RecoveryContextKind::TupleElements,
+            RecoveryContext::TUPLE_ELEMENTS_PARENTHESIZED => {
+                RecoveryContextKind::TupleElements(TupleParenthesized::Yes)
+            }
+            RecoveryContext::TUPLE_ELEMENTS_UNPARENTHESIZED => {
+                RecoveryContextKind::TupleElements(TupleParenthesized::No)
+            }
             RecoveryContext::SEQUENCE_MATCH_PATTERN => {
                 RecoveryContextKind::SequenceMatchPattern(None)
             }

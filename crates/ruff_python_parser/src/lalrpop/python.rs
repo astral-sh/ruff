@@ -1,11 +1,12 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 49703ff6478e4042b6724dfb18ace218d6fa6a037fed551dad1059ea823dc77d
+// sha3: 157f36168f828b11f641bf793584a1635a981d0dd093480c90604cc66951934f
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use super::{
   function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
   context::set_context,
-  ParenthesizedExpr
+  ParenthesizedExpr,
+  invalid,
 };
 use crate::{
     FStringErrorType,
@@ -14,7 +15,6 @@ use crate::{
     string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
     string_token_flags::StringKind,
     token,
-    invalid,
 };
 use lalrpop_util::ParseError;
 #[allow(unused_extern_crates)]
@@ -33,7 +33,8 @@ mod __parse__Top {
     use super::super::{
   function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
   context::set_context,
-  ParenthesizedExpr
+  ParenthesizedExpr,
+  invalid,
 };
     use crate::{
     FStringErrorType,
@@ -42,7 +43,6 @@ mod __parse__Top {
     string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
     string_token_flags::StringKind,
     token,
-    invalid,
 };
     use lalrpop_util::ParseError;
     #[allow(unused_extern_crates)]
