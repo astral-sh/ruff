@@ -84,6 +84,15 @@ impl<'src> Parser<'src> {
         self.at_ts(STMTS_SET)
     }
 
+    /// Checks if the parser is currently positioned at the start of a type parameter.
+    pub(super) fn at_type_param(&self) -> bool {
+        let token = self.current_token_kind();
+        matches!(
+            token,
+            TokenKind::Star | TokenKind::DoubleStar | TokenKind::Name
+        ) || token.is_keyword()
+    }
+
     /// Parses a compound or a simple statement.
     pub(super) fn parse_statement(&mut self) -> Stmt {
         let start_offset = self.node_start();
@@ -1543,14 +1552,6 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             type_params,
         }
-    }
-
-    /// Checks if the parser is currently positioned at the start of a type parameter.
-    pub(super) fn at_type_param(&self) -> bool {
-        matches!(
-            self.current_token_kind(),
-            TokenKind::Star | TokenKind::DoubleStar | TokenKind::Name
-        ) || self.current_token_kind().is_keyword()
     }
 
     /// Parses a type parameter.
