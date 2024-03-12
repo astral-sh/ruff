@@ -2,15 +2,15 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
-use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
 /// ## What it does
-/// Checks for files with too many new lines at the end of the file.
+/// Checks for files with multiple trailing blank lines.
 ///
 /// ## Why is this bad?
-/// Trailing blank lines are superfluous.
-/// However the last line should end with a new line.
+/// Trailing blank lines in a file are superfluous.
+///
+/// However, the last line of the file should end with a newline.
 ///
 /// ## Example
 /// ```python
@@ -22,16 +22,35 @@ use ruff_text_size::{TextRange, TextSize};
 /// spam(1)\n
 /// ```
 #[violation]
-pub struct TooManyNewlinesAtEndOfFile;
+pub struct TooManyNewlinesAtEndOfFile {
+    num_trailing_newlines: u32,
+}
 
 impl AlwaysFixableViolation for TooManyNewlinesAtEndOfFile {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Too many newlines at the end of file")
+        let TooManyNewlinesAtEndOfFile {
+            num_trailing_newlines,
+        } = self;
+
+        // We expect a single trailing newline; so two trailing newlines is one too many, three
+        // trailing newlines is two too many, etc.
+        if *num_trailing_newlines > 2 {
+            format!("Too many newlines at end of file")
+        } else {
+            format!("Extra newline at end of file")
+        }
     }
 
     fn fix_title(&self) -> String {
-        "Remove extraneous trailing newlines".to_string()
+        let TooManyNewlinesAtEndOfFile {
+            num_trailing_newlines,
+        } = self;
+        if *num_trailing_newlines > 2 {
+            "Remove trailing newlines".to_string()
+        } else {
+            "Remove trailing newline".to_string()
+        }
     }
 }
 
@@ -39,27 +58,20 @@ impl AlwaysFixableViolation for TooManyNewlinesAtEndOfFile {
 pub(crate) fn too_many_newlines_at_end_of_file(
     diagnostics: &mut Vec<Diagnostic>,
     lxr: &[LexResult],
-    locator: &Locator,
 ) {
-    let source = locator.contents();
+    let mut num_trailing_newlines = 0u32;
+    let mut start: Option<TextSize> = None;
+    let mut end: Option<TextSize> = None;
 
-    // Ignore empty and BOM only files
-    if source.is_empty() || source == "\u{feff}" {
-        return;
-    }
-
-    let mut count = 0;
-    let mut start_pos: Option<TextSize> = None;
-    let mut end_pos: Option<TextSize> = None;
-
-    for &(ref tok, range) in lxr.iter().rev().flatten() {
+    // Count the number of trailing newlines.
+    for (tok, range) in lxr.iter().rev().flatten() {
         match tok {
             Tok::NonLogicalNewline | Tok::Newline => {
-                if count == 0 {
-                    end_pos = Some(range.end());
+                if num_trailing_newlines == 0 {
+                    end = Some(range.end());
                 }
-                start_pos = Some(range.end());
-                count += 1;
+                start = Some(range.end());
+                num_trailing_newlines += 1;
             }
             Tok::Dedent => continue,
             _ => {
@@ -68,12 +80,20 @@ pub(crate) fn too_many_newlines_at_end_of_file(
         }
     }
 
-    if count > 1 {
-        let start = start_pos.unwrap();
-        let end = end_pos.unwrap();
-        let range = TextRange::new(start, end);
-        let mut diagnostic = Diagnostic::new(TooManyNewlinesAtEndOfFile, range);
-        diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
-        diagnostics.push(diagnostic);
+    if num_trailing_newlines == 0 || num_trailing_newlines == 1 {
+        return;
     }
+
+    let range = match (start, end) {
+        (Some(start), Some(end)) => TextRange::new(start, end),
+        _ => return,
+    };
+    let mut diagnostic = Diagnostic::new(
+        TooManyNewlinesAtEndOfFile {
+            num_trailing_newlines,
+        },
+        range,
+    );
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
+    diagnostics.push(diagnostic);
 }
