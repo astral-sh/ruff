@@ -17,6 +17,7 @@ use crate::{Mode, ParseError, ParseErrorType, Tok};
 
 mod context;
 mod function;
+mod invalid;
 
 #[rustfmt::skip]
 #[allow(unreachable_pub)]
