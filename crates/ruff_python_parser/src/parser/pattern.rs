@@ -407,8 +407,8 @@ impl<'src> Parser<'src> {
                     range: self.node_range(start),
                 })
             }
-            TokenKind::String => {
-                let str = self.parse_string_expression();
+            TokenKind::String | TokenKind::FStringStart => {
+                let str = self.parse_strings();
 
                 Pattern::MatchValue(ast::PatternMatchValue {
                     value: Box::new(str),
