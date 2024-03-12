@@ -707,8 +707,7 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
-            | AnyNodeRef::BytesLiteral(_)
-            | AnyNodeRef::FStringInvalidElement(_) => {
+            | AnyNodeRef::BytesLiteral(_) => {
                 panic!("Range formatting only supports formatting logical lines")
             }
         }
