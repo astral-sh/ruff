@@ -900,6 +900,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a f-string expression.
     fn parse_fstring_expression(&mut self) -> Expr {
         const FSTRING_SET: TokenSet = TokenSet::new([TokenKind::FStringStart, TokenKind::String]);
 
@@ -930,6 +931,13 @@ impl<'src> Parser<'src> {
         })
     }
 
+    /// Parses a f-string.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `FStringStart` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/grammar.html> (Search "fstring:")
     fn parse_fstring(&mut self) -> ast::FString {
         let start = self.node_start();
 
@@ -944,79 +952,78 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a list of f-string elements.
     fn parse_fstring_elements(&mut self) -> Vec<FStringElement> {
-        const FSTRING_END_SET: TokenSet =
-            TokenSet::new([TokenKind::FStringEnd, TokenKind::Rbrace]).union(NEWLINE_EOF_SET);
         let mut elements = vec![];
 
-        let mut progress = ParserProgress::default();
-
-        while !self.at_ts(FSTRING_END_SET) {
-            progress.assert_progressing(self);
-
-            let element = match self.current_token_kind() {
+        self.parse_list(RecoveryContextKind::FStringElements, |parser| {
+            let element = match parser.current_token_kind() {
                 TokenKind::Lbrace => {
-                    FStringElement::Expression(self.parse_fstring_expression_element())
+                    FStringElement::Expression(parser.parse_fstring_expression_element())
                 }
                 TokenKind::FStringMiddle => {
-                    let (Tok::FStringMiddle { value, is_raw, .. }, range) = self.next_token()
+                    let (Tok::FStringMiddle { value, is_raw, .. }, range) = parser.next_token()
                     else {
                         unreachable!()
                     };
-                    let fstring_literal = parse_fstring_literal_element(value, is_raw, range)
-                        .unwrap_or_else(|lex_error| {
-                            let location = lex_error.location();
-                            self.add_error(
-                                ParseErrorType::Lexical(lex_error.into_error()),
-                                location,
-                            );
-                            #[allow(deprecated)]
-                            ast::FStringElement::Invalid(ast::FStringInvalidElement {
-                                value: self.src_text(location).into(),
-                                range: location,
-                            })
-                        });
-                    fstring_literal
+                    FStringElement::Literal(
+                        parse_fstring_literal_element(value, is_raw, range).unwrap_or_else(
+                            |lex_error| {
+                                let location = lex_error.location();
+                                parser.add_error(
+                                    ParseErrorType::Lexical(lex_error.into_error()),
+                                    location,
+                                );
+                                ast::FStringLiteralElement {
+                                    value: "".into(),
+                                    range: parser.missing_node_range(),
+                                }
+                            },
+                        ),
+                    )
                 }
                 // `Invalid` tokens are created when there's a lexical error, so
                 // we ignore it here to avoid creating unexpected token errors
                 TokenKind::Unknown => {
-                    self.next_token();
-                    continue;
+                    parser.next_token();
+                    return;
                 }
-                // Handle an unexpected token
-                _ => {
-                    let (tok, range) = self.next_token();
-                    self.add_error(
-                        ParseErrorType::OtherError(format!("f-string: unexpected token `{tok:?}`")),
-                        range,
+                tok => {
+                    // This should never happen because the list parsing will only
+                    // call this closure for the above token kinds which are the same
+                    // as in the FIRST set.
+                    unreachable!(
+                        "f-string: unexpected token `{tok:?}` at {:?}",
+                        parser.current_token_range()
                     );
-                    continue;
                 }
             };
             elements.push(element);
-        }
+        });
 
         elements
     }
 
+    /// Parses a f-string expression element.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `{` token.
     fn parse_fstring_expression_element(&mut self) -> ast::FStringExpressionElement {
-        let range = self.current_token_range();
+        let start = self.node_start();
 
-        let has_open_brace = self.eat(TokenKind::Lbrace);
+        self.bump(TokenKind::Lbrace);
+
         let value = self.parse_expression();
-        if !value.is_parenthesized && matches!(value.expr, Expr::Lambda(_)) {
+        if !value.is_parenthesized && value.expr.is_lambda_expr() {
             self.add_error(
                 ParseErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
                 value.range(),
             );
         }
         let debug_text = if self.eat(TokenKind::Equal) {
-            let leading_range = range
-                .add_start("{".text_len())
-                .cover_offset(value.range().start());
-            let trailing_range =
-                TextRange::new(value.range().end(), self.current_token_range().start());
+            let leading_range = TextRange::new(start + "{".text_len(), value.start());
+            let trailing_range = TextRange::new(value.end(), self.current_token_range().start());
             Some(ast::DebugText {
                 leading: self.src_text(leading_range).to_string(),
                 trailing: self.src_text(trailing_range).to_string(),
@@ -1026,18 +1033,26 @@ impl<'src> Parser<'src> {
         };
 
         let conversion = if self.eat(TokenKind::Exclamation) {
-            let (_, range) = self.next_token();
-            match self.src_text(range) {
-                "s" => ConversionFlag::Str,
-                "r" => ConversionFlag::Repr,
-                "a" => ConversionFlag::Ascii,
-                _ => {
-                    self.add_error(
-                        ParseErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
-                        range,
-                    );
-                    ConversionFlag::None
+            let conversion_flag_range = self.current_token_range();
+            if let Tok::Name { name } = self.next_token().0 {
+                match &*name {
+                    "s" => ConversionFlag::Str,
+                    "r" => ConversionFlag::Repr,
+                    "a" => ConversionFlag::Ascii,
+                    _ => {
+                        self.add_error(
+                            ParseErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
+                            conversion_flag_range,
+                        );
+                        ConversionFlag::None
+                    }
                 }
+            } else {
+                self.add_error(
+                    ParseErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
+                    conversion_flag_range,
+                );
+                ConversionFlag::None
             }
         } else {
             ConversionFlag::None
@@ -1054,11 +1069,11 @@ impl<'src> Parser<'src> {
             None
         };
 
-        let close_brace_range = self.current_token_range();
-        if has_open_brace && !self.eat(TokenKind::Rbrace) {
+        // We're using `eat` here instead of `expect` to use the f-string specific error type.
+        if !self.eat(TokenKind::Rbrace) {
             self.add_error(
                 ParseErrorType::FStringError(FStringErrorType::UnclosedLbrace),
-                close_brace_range,
+                self.current_token_range(),
             );
         }
 
@@ -1067,7 +1082,7 @@ impl<'src> Parser<'src> {
             debug_text,
             conversion,
             format_spec,
-            range: range.cover(close_brace_range),
+            range: self.node_range(start),
         }
     }
 
