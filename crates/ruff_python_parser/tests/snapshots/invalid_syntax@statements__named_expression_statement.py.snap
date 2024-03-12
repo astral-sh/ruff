@@ -45,5 +45,5 @@ Module(
 1 | # This test previously passed before the assignment operator checking
 2 | # above, but we include it here for good measure.
 3 | (5 := 3)
-  |  ^ Syntax Error: invalid assignment target
+  |  ^ Syntax Error: invalid named assignment target
   |

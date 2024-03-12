@@ -499,7 +499,7 @@ continue
 break
 
 del a
-del a, b, 1, 1 + 2,
+del a, b,
 del a, (b, c), d
 
 assert 1 < 2

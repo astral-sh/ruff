@@ -336,7 +336,7 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 992..1039,
+                    range: 992..1031,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -361,7 +361,7 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 1028..1034,
+                        range: 1028..1028,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -372,15 +372,38 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 1036..1039,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        range: 1036..1039,
+                                range: 1028..1031,
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 1028..1031,
+                                        value: Int(
+                                            100,
+                                        ),
                                     },
                                 ),
                             },
                         ),
                     ],
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 1032..1039,
+                    target: Tuple(
+                        ExprTuple {
+                            range: 1032..1034,
+                            elts: [],
+                            ctx: Store,
+                            parenthesized: true,
+                        },
+                    ),
+                    annotation: EllipsisLiteral(
+                        ExprEllipsisLiteral {
+                            range: 1036..1039,
+                        },
+                    ),
+                    value: None,
+                    simple: false,
                 },
             ),
         ],
@@ -517,8 +540,21 @@ Module(
 22 | def multiple_trailing_commas[A,,](): ...
 23 | 
 24 | def multiple_commas_and_recovery[A,,100](): ...
-   |                                                 Syntax Error: unexpected EOF while parsing
+   |                                        ^ Syntax Error: Expected a statement
    |
 
 
+   |
+22 | def multiple_trailing_commas[A,,](): ...
+23 | 
+24 | def multiple_commas_and_recovery[A,,100](): ...
+   |                                         ^^ Syntax Error: only single target (not tuple) can be annotated
+   |
 
+
+   |
+22 | def multiple_trailing_commas[A,,](): ...
+23 | 
+24 | def multiple_commas_and_recovery[A,,100](): ...
+   |                                                 Syntax Error: unexpected EOF while parsing
+   |
