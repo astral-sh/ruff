@@ -77,8 +77,6 @@ fn is_empty_or_null_fstring_element(element: &ast::FStringElement) -> bool {
         ast::FStringElement::Expression(ast::FStringExpressionElement { expression, .. }) => {
             is_empty_or_null_string(expression)
         }
-        #[allow(deprecated)]
-        ast::FStringElement::Invalid(_) => false,
     }
 }
 

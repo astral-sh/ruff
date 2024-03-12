@@ -233,13 +233,13 @@ impl StringParser {
         Ok(Some(EscapedChar::Literal(new_char)))
     }
 
-    fn parse_fstring_middle(mut self) -> Result<ast::FStringElement, LexicalError> {
+    fn parse_fstring_middle(mut self) -> Result<ast::FStringLiteralElement, LexicalError> {
         // Fast-path: if the f-string doesn't contain any escape sequences, return the literal.
         let Some(mut index) = memchr::memchr3(b'{', b'}', b'\\', self.source.as_bytes()) else {
-            return Ok(ast::FStringElement::Literal(ast::FStringLiteralElement {
+            return Ok(ast::FStringLiteralElement {
                 value: self.source,
                 range: self.range,
-            }));
+            });
         };
 
         let mut value = String::with_capacity(self.source.len());
@@ -319,10 +319,10 @@ impl StringParser {
             index = next_index;
         }
 
-        Ok(ast::FStringElement::Literal(ast::FStringLiteralElement {
+        Ok(ast::FStringLiteralElement {
             value: value.into_boxed_str(),
             range: self.range,
-        }))
+        })
     }
 
     fn parse_bytes(mut self) -> Result<StringType, LexicalError> {
@@ -465,11 +465,12 @@ pub(crate) fn parse_string_literal(
     StringParser::new(source, kind, range.start() + kind.opener_len(), range).parse()
 }
 
+// TODO(dhruvmanila): Move this to the new parser
 pub(crate) fn parse_fstring_literal_element(
     source: Box<str>,
     kind: StringKind,
     range: TextRange,
-) -> Result<ast::FStringElement, LexicalError> {
+) -> Result<ast::FStringLiteralElement, LexicalError> {
     StringParser::new(source, kind, range.start(), range).parse_fstring_middle()
 }
 
