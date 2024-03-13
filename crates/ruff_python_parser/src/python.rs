@@ -1,4 +1,4 @@
-// auto-generated: "lalrpop 0.20.2"
+// auto-generated: "lalrpop 0.20.0"
 // sha3: c98876ae871e13c1a0cabf962138ded61584185a0c3144b626dac60f707ea396
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
@@ -22,7 +22,7 @@ extern crate core;
 extern crate alloc;
 
 #[rustfmt::skip]
-#[allow(non_snake_case, non_camel_case_types, unused_mut, unused_variables, unused_imports, unused_parens, clippy::needless_lifetimes, clippy::type_complexity, clippy::needless_return, clippy::too_many_arguments, clippy::never_loop, clippy::match_single_binding, clippy::needless_raw_string_hashes)]
+#[allow(non_snake_case, non_camel_case_types, unused_mut, unused_variables, unused_imports, unused_parens, clippy::all)]
 mod __parse__Top {
 
     use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -5879,7 +5879,7 @@ mod __parse__Top {
             }
         }).collect()
     }
-    struct __StateMachine<'__0>
+    pub(crate) struct __StateMachine<'__0>
     where 
     {
         source_code: &'__0 str,
@@ -6100,7 +6100,7 @@ mod __parse__Top {
         _: core::marker::PhantomData<()>,
     ) -> __Symbol<>
     {
-        #[allow(clippy::manual_range_patterns)]match __token_index {
+        match __token_index {
             0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38 | 39 | 40 | 41 | 42 | 43 | 44 | 45 | 46 | 47 | 48 | 49 | 50 | 51 | 52 | 53 | 54 | 55 | 56 | 57 | 58 | 59 | 60 | 61 | 62 | 63 | 64 | 65 | 66 | 67 | 68 | 69 | 70 | 71 | 72 | 73 | 74 | 75 | 76 | 77 | 78 | 79 | 80 | 81 | 82 | 83 | 84 | 85 | 86 | 87 | 88 | 89 | 90 | 91 | 92 => __Symbol::Variant0(__token),
             93 => match __token {
                 token::Tok::Complex { real: __tok0, imag: __tok1 } if true => __Symbol::Variant1((__tok0, __tok1)),
@@ -11861,7 +11861,6 @@ mod __parse__Top {
         _priv: (),
     }
 
-    impl Default for TopParser { fn default() -> Self { Self::new() } }
     impl TopParser {
         pub(crate) fn new() -> TopParser {
             TopParser {
@@ -11925,7 +11924,7 @@ mod __parse__Top {
             __states.push(__next_state);
         }
     }
-    fn __reduce<
+    pub(crate) fn __reduce<
     >(
         source_code: &str,
         mode: Mode,
@@ -19350,7 +19349,7 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __reduce0<
+    pub(crate) fn __reduce0<
     >(
         source_code: &str,
         mode: Mode,
@@ -19367,7 +19366,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant8(__nt), __end));
         (1, 0)
     }
-    fn __reduce1<
+    pub(crate) fn __reduce1<
     >(
         source_code: &str,
         mode: Mode,
@@ -19377,13 +19376,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ","? =  => ActionFn(382);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action382::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant8(__nt), __end));
         (0, 0)
     }
-    fn __reduce2<
+    pub(crate) fn __reduce2<
     >(
         source_code: &str,
         mode: Mode,
@@ -19400,7 +19399,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant8(__nt), __end));
         (1, 1)
     }
-    fn __reduce3<
+    pub(crate) fn __reduce3<
     >(
         source_code: &str,
         mode: Mode,
@@ -19410,13 +19409,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ";"? =  => ActionFn(406);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action406::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant8(__nt), __end));
         (0, 1)
     }
-    fn __reduce4<
+    pub(crate) fn __reduce4<
     >(
         source_code: &str,
         mode: Mode,
@@ -19433,7 +19432,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant8(__nt), __end));
         (1, 2)
     }
-    fn __reduce5<
+    pub(crate) fn __reduce5<
     >(
         source_code: &str,
         mode: Mode,
@@ -19443,13 +19442,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // "="? =  => ActionFn(273);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action273::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant8(__nt), __end));
         (0, 2)
     }
-    fn __reduce6<
+    pub(crate) fn __reduce6<
     >(
         source_code: &str,
         mode: Mode,
@@ -19466,7 +19465,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant8(__nt), __end));
         (1, 3)
     }
-    fn __reduce7<
+    pub(crate) fn __reduce7<
     >(
         source_code: &str,
         mode: Mode,
@@ -19476,13 +19475,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // "async"? =  => ActionFn(335);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action335::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant8(__nt), __end));
         (0, 3)
     }
-    fn __reduce8<
+    pub(crate) fn __reduce8<
     >(
         source_code: &str,
         mode: Mode,
@@ -19501,7 +19500,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant9(__nt), __end));
         (2, 4)
     }
-    fn __reduce9<
+    pub(crate) fn __reduce9<
     >(
         source_code: &str,
         mode: Mode,
@@ -19520,7 +19519,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant10(__nt), __end));
         (2, 5)
     }
-    fn __reduce10<
+    pub(crate) fn __reduce10<
     >(
         source_code: &str,
         mode: Mode,
@@ -19530,13 +19529,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ("," <DoubleStarTypedParameter>)? =  => ActionFn(491);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action491::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant10(__nt), __end));
         (0, 5)
     }
-    fn __reduce11<
+    pub(crate) fn __reduce11<
     >(
         source_code: &str,
         mode: Mode,
@@ -19555,7 +19554,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant9(__nt), __end));
         (2, 6)
     }
-    fn __reduce12<
+    pub(crate) fn __reduce12<
     >(
         source_code: &str,
         mode: Mode,
@@ -19574,7 +19573,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant10(__nt), __end));
         (2, 7)
     }
-    fn __reduce13<
+    pub(crate) fn __reduce13<
     >(
         source_code: &str,
         mode: Mode,
@@ -19584,13 +19583,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ("," <DoubleStarUntypedParameter>)? =  => ActionFn(480);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action480::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant10(__nt), __end));
         (0, 7)
     }
-    fn __reduce14<
+    pub(crate) fn __reduce14<
     >(
         source_code: &str,
         mode: Mode,
@@ -19609,7 +19608,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant11(__nt), __end));
         (2, 8)
     }
-    fn __reduce15<
+    pub(crate) fn __reduce15<
     >(
         source_code: &str,
         mode: Mode,
@@ -19619,13 +19618,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ("," <ParameterDef<TypedParameter>>)* =  => ActionFn(493);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action493::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant12(__nt), __end));
         (0, 9)
     }
-    fn __reduce16<
+    pub(crate) fn __reduce16<
     >(
         source_code: &str,
         mode: Mode,
@@ -19642,7 +19641,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant12(__nt), __end));
         (1, 9)
     }
-    fn __reduce17<
+    pub(crate) fn __reduce17<
     >(
         source_code: &str,
         mode: Mode,
@@ -19661,7 +19660,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant12(__nt), __end));
         (2, 10)
     }
-    fn __reduce18<
+    pub(crate) fn __reduce18<
     >(
         source_code: &str,
         mode: Mode,
@@ -19681,7 +19680,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant12(__nt), __end));
         (3, 10)
     }
-    fn __reduce19<
+    pub(crate) fn __reduce19<
     >(
         source_code: &str,
         mode: Mode,
@@ -19700,7 +19699,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant11(__nt), __end));
         (2, 11)
     }
-    fn __reduce20<
+    pub(crate) fn __reduce20<
     >(
         source_code: &str,
         mode: Mode,
@@ -19710,13 +19709,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ("," <ParameterDef<UntypedParameter>>)* =  => ActionFn(482);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action482::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant12(__nt), __end));
         (0, 12)
     }
-    fn __reduce21<
+    pub(crate) fn __reduce21<
     >(
         source_code: &str,
         mode: Mode,
@@ -19733,7 +19732,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant12(__nt), __end));
         (1, 12)
     }
-    fn __reduce22<
+    pub(crate) fn __reduce22<
     >(
         source_code: &str,
         mode: Mode,
@@ -19752,7 +19751,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant12(__nt), __end));
         (2, 13)
     }
-    fn __reduce23<
+    pub(crate) fn __reduce23<
     >(
         source_code: &str,
         mode: Mode,
@@ -19772,7 +19771,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant12(__nt), __end));
         (3, 13)
     }
-    fn __reduce42<
+    pub(crate) fn __reduce42<
     >(
         source_code: &str,
         mode: Mode,
@@ -19782,13 +19781,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ("," <ParameterListStarArgs<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>>)? =  => ActionFn(438);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action438::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant14(__nt), __end));
         (0, 15)
     }
-    fn __reduce61<
+    pub(crate) fn __reduce61<
     >(
         source_code: &str,
         mode: Mode,
@@ -19798,13 +19797,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ("," <ParameterListStarArgs<UntypedParameter, StarUntypedParameter, DoubleStarUntypedParameter>>)? =  => ActionFn(446);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action446::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant14(__nt), __end));
         (0, 17)
     }
-    fn __reduce62<
+    pub(crate) fn __reduce62<
     >(
         source_code: &str,
         mode: Mode,
@@ -19823,7 +19822,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 18)
     }
-    fn __reduce63<
+    pub(crate) fn __reduce63<
     >(
         source_code: &str,
         mode: Mode,
@@ -19842,7 +19841,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (2, 19)
     }
-    fn __reduce64<
+    pub(crate) fn __reduce64<
     >(
         source_code: &str,
         mode: Mode,
@@ -19852,13 +19851,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ("," <Test<"all">>)? =  => ActionFn(374);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action374::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (0, 19)
     }
-    fn __reduce65<
+    pub(crate) fn __reduce65<
     >(
         source_code: &str,
         mode: Mode,
@@ -19877,7 +19876,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 20)
     }
-    fn __reduce66<
+    pub(crate) fn __reduce66<
     >(
         source_code: &str,
         mode: Mode,
@@ -19887,13 +19886,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ("," <TestOrStarNamedExpr>)* =  => ActionFn(564);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action564::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (0, 21)
     }
-    fn __reduce67<
+    pub(crate) fn __reduce67<
     >(
         source_code: &str,
         mode: Mode,
@@ -19910,7 +19909,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (1, 21)
     }
-    fn __reduce68<
+    pub(crate) fn __reduce68<
     >(
         source_code: &str,
         mode: Mode,
@@ -19929,7 +19928,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (2, 22)
     }
-    fn __reduce69<
+    pub(crate) fn __reduce69<
     >(
         source_code: &str,
         mode: Mode,
@@ -19949,7 +19948,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (3, 22)
     }
-    fn __reduce70<
+    pub(crate) fn __reduce70<
     >(
         source_code: &str,
         mode: Mode,
@@ -19968,7 +19967,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant18(__nt), __end));
         (2, 23)
     }
-    fn __reduce71<
+    pub(crate) fn __reduce71<
     >(
         source_code: &str,
         mode: Mode,
@@ -19978,13 +19977,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ("," <WithItem<"all">>)* =  => ActionFn(316);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action316::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant19(__nt), __end));
         (0, 24)
     }
-    fn __reduce72<
+    pub(crate) fn __reduce72<
     >(
         source_code: &str,
         mode: Mode,
@@ -20001,7 +20000,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant19(__nt), __end));
         (1, 24)
     }
-    fn __reduce73<
+    pub(crate) fn __reduce73<
     >(
         source_code: &str,
         mode: Mode,
@@ -20020,7 +20019,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant19(__nt), __end));
         (2, 25)
     }
-    fn __reduce74<
+    pub(crate) fn __reduce74<
     >(
         source_code: &str,
         mode: Mode,
@@ -20040,7 +20039,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant19(__nt), __end));
         (3, 25)
     }
-    fn __reduce75<
+    pub(crate) fn __reduce75<
     >(
         source_code: &str,
         mode: Mode,
@@ -20059,7 +20058,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 26)
     }
-    fn __reduce76<
+    pub(crate) fn __reduce76<
     >(
         source_code: &str,
         mode: Mode,
@@ -20078,7 +20077,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (2, 27)
     }
-    fn __reduce77<
+    pub(crate) fn __reduce77<
     >(
         source_code: &str,
         mode: Mode,
@@ -20088,13 +20087,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ("->" <Test<"all">>)? =  => ActionFn(304);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action304::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (0, 27)
     }
-    fn __reduce78<
+    pub(crate) fn __reduce78<
     >(
         source_code: &str,
         mode: Mode,
@@ -20113,7 +20112,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant20(__nt), __end));
         (2, 28)
     }
-    fn __reduce79<
+    pub(crate) fn __reduce79<
     >(
         source_code: &str,
         mode: Mode,
@@ -20132,7 +20131,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant21(__nt), __end));
         (2, 29)
     }
-    fn __reduce80<
+    pub(crate) fn __reduce80<
     >(
         source_code: &str,
         mode: Mode,
@@ -20152,7 +20151,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant21(__nt), __end));
         (3, 29)
     }
-    fn __reduce81<
+    pub(crate) fn __reduce81<
     >(
         source_code: &str,
         mode: Mode,
@@ -20171,7 +20170,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 30)
     }
-    fn __reduce82<
+    pub(crate) fn __reduce82<
     >(
         source_code: &str,
         mode: Mode,
@@ -20190,7 +20189,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (2, 31)
     }
-    fn __reduce83<
+    pub(crate) fn __reduce83<
     >(
         source_code: &str,
         mode: Mode,
@@ -20200,13 +20199,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // (":" <Test<"all">>)? =  => ActionFn(296);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action296::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (0, 31)
     }
-    fn __reduce84<
+    pub(crate) fn __reduce84<
     >(
         source_code: &str,
         mode: Mode,
@@ -20225,7 +20224,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 32)
     }
-    fn __reduce85<
+    pub(crate) fn __reduce85<
     >(
         source_code: &str,
         mode: Mode,
@@ -20244,7 +20243,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (2, 33)
     }
-    fn __reduce86<
+    pub(crate) fn __reduce86<
     >(
         source_code: &str,
         mode: Mode,
@@ -20254,13 +20253,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // (":" <TestOrStarExpr>)? =  => ActionFn(293);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action293::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (0, 33)
     }
-    fn __reduce87<
+    pub(crate) fn __reduce87<
     >(
         source_code: &str,
         mode: Mode,
@@ -20277,7 +20276,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant0(__nt), __end));
         (1, 34)
     }
-    fn __reduce88<
+    pub(crate) fn __reduce88<
     >(
         source_code: &str,
         mode: Mode,
@@ -20294,7 +20293,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant22(__nt), __end));
         (1, 35)
     }
-    fn __reduce89<
+    pub(crate) fn __reduce89<
     >(
         source_code: &str,
         mode: Mode,
@@ -20313,7 +20312,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant22(__nt), __end));
         (2, 35)
     }
-    fn __reduce90<
+    pub(crate) fn __reduce90<
     >(
         source_code: &str,
         mode: Mode,
@@ -20330,7 +20329,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant0(__nt), __end));
         (1, 36)
     }
-    fn __reduce91<
+    pub(crate) fn __reduce91<
     >(
         source_code: &str,
         mode: Mode,
@@ -20340,13 +20339,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ("\n")* =  => ActionFn(410);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action410::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant22(__nt), __end));
         (0, 37)
     }
-    fn __reduce92<
+    pub(crate) fn __reduce92<
     >(
         source_code: &str,
         mode: Mode,
@@ -20363,7 +20362,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant22(__nt), __end));
         (1, 37)
     }
-    fn __reduce93<
+    pub(crate) fn __reduce93<
     >(
         source_code: &str,
         mode: Mode,
@@ -20380,7 +20379,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant22(__nt), __end));
         (1, 38)
     }
-    fn __reduce94<
+    pub(crate) fn __reduce94<
     >(
         source_code: &str,
         mode: Mode,
@@ -20399,7 +20398,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant22(__nt), __end));
         (2, 38)
     }
-    fn __reduce95<
+    pub(crate) fn __reduce95<
     >(
         source_code: &str,
         mode: Mode,
@@ -20418,7 +20417,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant23(__nt), __end));
         (2, 39)
     }
-    fn __reduce96<
+    pub(crate) fn __reduce96<
     >(
         source_code: &str,
         mode: Mode,
@@ -20437,7 +20436,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant24(__nt), __end));
         (2, 40)
     }
-    fn __reduce97<
+    pub(crate) fn __reduce97<
     >(
         source_code: &str,
         mode: Mode,
@@ -20447,13 +20446,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ("as" <Identifier>)? =  => ActionFn(422);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action422::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant24(__nt), __end));
         (0, 40)
     }
-    fn __reduce98<
+    pub(crate) fn __reduce98<
     >(
         source_code: &str,
         mode: Mode,
@@ -20473,7 +20472,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (3, 41)
     }
-    fn __reduce99<
+    pub(crate) fn __reduce99<
     >(
         source_code: &str,
         mode: Mode,
@@ -20493,7 +20492,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant26(__nt), __end));
         (3, 42)
     }
-    fn __reduce100<
+    pub(crate) fn __reduce100<
     >(
         source_code: &str,
         mode: Mode,
@@ -20503,13 +20502,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ("else" ":" <Suite>)? =  => ActionFn(337);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action337::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant26(__nt), __end));
         (0, 42)
     }
-    fn __reduce101<
+    pub(crate) fn __reduce101<
     >(
         source_code: &str,
         mode: Mode,
@@ -20529,7 +20528,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (3, 43)
     }
-    fn __reduce102<
+    pub(crate) fn __reduce102<
     >(
         source_code: &str,
         mode: Mode,
@@ -20549,7 +20548,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant26(__nt), __end));
         (3, 44)
     }
-    fn __reduce103<
+    pub(crate) fn __reduce103<
     >(
         source_code: &str,
         mode: Mode,
@@ -20559,13 +20558,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ("finally" ":" <Suite>)? =  => ActionFn(330);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action330::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant26(__nt), __end));
         (0, 44)
     }
-    fn __reduce104<
+    pub(crate) fn __reduce104<
     >(
         source_code: &str,
         mode: Mode,
@@ -20584,7 +20583,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 45)
     }
-    fn __reduce105<
+    pub(crate) fn __reduce105<
     >(
         source_code: &str,
         mode: Mode,
@@ -20603,7 +20602,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (2, 46)
     }
-    fn __reduce106<
+    pub(crate) fn __reduce106<
     >(
         source_code: &str,
         mode: Mode,
@@ -20613,13 +20612,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ("from" <Test<"all">>)? =  => ActionFn(394);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action394::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (0, 46)
     }
-    fn __reduce107<
+    pub(crate) fn __reduce107<
     >(
         source_code: &str,
         mode: Mode,
@@ -20640,7 +20639,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant27(__nt), __end));
         (4, 47)
     }
-    fn __reduce108<
+    pub(crate) fn __reduce108<
     >(
         source_code: &str,
         mode: Mode,
@@ -20650,13 +20649,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // (<@L> "elif" <NamedExpressionTest> ":" <Suite>)* =  => ActionFn(342);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action342::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant28(__nt), __end));
         (0, 48)
     }
-    fn __reduce109<
+    pub(crate) fn __reduce109<
     >(
         source_code: &str,
         mode: Mode,
@@ -20673,7 +20672,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant28(__nt), __end));
         (1, 48)
     }
-    fn __reduce110<
+    pub(crate) fn __reduce110<
     >(
         source_code: &str,
         mode: Mode,
@@ -20694,7 +20693,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant28(__nt), __end));
         (4, 49)
     }
-    fn __reduce111<
+    pub(crate) fn __reduce111<
     >(
         source_code: &str,
         mode: Mode,
@@ -20716,7 +20715,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant28(__nt), __end));
         (5, 49)
     }
-    fn __reduce112<
+    pub(crate) fn __reduce112<
     >(
         source_code: &str,
         mode: Mode,
@@ -20736,7 +20735,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant29(__nt), __end));
         (3, 50)
     }
-    fn __reduce113<
+    pub(crate) fn __reduce113<
     >(
         source_code: &str,
         mode: Mode,
@@ -20756,7 +20755,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant30(__nt), __end));
         (3, 51)
     }
-    fn __reduce114<
+    pub(crate) fn __reduce114<
     >(
         source_code: &str,
         mode: Mode,
@@ -20766,13 +20765,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // (<@L> "else" ":" <Suite>)? =  => ActionFn(340);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action340::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant30(__nt), __end));
         (0, 51)
     }
-    fn __reduce115<
+    pub(crate) fn __reduce115<
     >(
         source_code: &str,
         mode: Mode,
@@ -20791,7 +20790,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 52)
     }
-    fn __reduce116<
+    pub(crate) fn __reduce116<
     >(
         source_code: &str,
         mode: Mode,
@@ -20810,7 +20809,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (2, 53)
     }
-    fn __reduce117<
+    pub(crate) fn __reduce117<
     >(
         source_code: &str,
         mode: Mode,
@@ -20830,7 +20829,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (3, 53)
     }
-    fn __reduce118<
+    pub(crate) fn __reduce118<
     >(
         source_code: &str,
         mode: Mode,
@@ -20847,7 +20846,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant9(__nt), __end));
         (1, 54)
     }
-    fn __reduce119<
+    pub(crate) fn __reduce119<
     >(
         source_code: &str,
         mode: Mode,
@@ -20864,7 +20863,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant9(__nt), __end));
         (1, 55)
     }
-    fn __reduce120<
+    pub(crate) fn __reduce120<
     >(
         source_code: &str,
         mode: Mode,
@@ -20883,7 +20882,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant31(__nt), __end));
         (2, 56)
     }
-    fn __reduce121<
+    pub(crate) fn __reduce121<
     >(
         source_code: &str,
         mode: Mode,
@@ -20893,13 +20892,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // (<FunctionArgument> ",")* =  => ActionFn(466);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action466::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant32(__nt), __end));
         (0, 57)
     }
-    fn __reduce122<
+    pub(crate) fn __reduce122<
     >(
         source_code: &str,
         mode: Mode,
@@ -20916,7 +20915,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant32(__nt), __end));
         (1, 57)
     }
-    fn __reduce123<
+    pub(crate) fn __reduce123<
     >(
         source_code: &str,
         mode: Mode,
@@ -20935,7 +20934,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant32(__nt), __end));
         (2, 58)
     }
-    fn __reduce124<
+    pub(crate) fn __reduce124<
     >(
         source_code: &str,
         mode: Mode,
@@ -20955,7 +20954,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant32(__nt), __end));
         (3, 58)
     }
-    fn __reduce125<
+    pub(crate) fn __reduce125<
     >(
         source_code: &str,
         mode: Mode,
@@ -20974,7 +20973,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 59)
     }
-    fn __reduce126<
+    pub(crate) fn __reduce126<
     >(
         source_code: &str,
         mode: Mode,
@@ -20993,7 +20992,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (2, 60)
     }
-    fn __reduce127<
+    pub(crate) fn __reduce127<
     >(
         source_code: &str,
         mode: Mode,
@@ -21013,7 +21012,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (3, 60)
     }
-    fn __reduce128<
+    pub(crate) fn __reduce128<
     >(
         source_code: &str,
         mode: Mode,
@@ -21032,7 +21031,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (2, 61)
     }
-    fn __reduce129<
+    pub(crate) fn __reduce129<
     >(
         source_code: &str,
         mode: Mode,
@@ -21051,7 +21050,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant34(__nt), __end));
         (2, 62)
     }
-    fn __reduce130<
+    pub(crate) fn __reduce130<
     >(
         source_code: &str,
         mode: Mode,
@@ -21061,13 +21060,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // (<OneOrMore<Test<"all">>> ",")? =  => ActionFn(568);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action568::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant34(__nt), __end));
         (0, 62)
     }
-    fn __reduce131<
+    pub(crate) fn __reduce131<
     >(
         source_code: &str,
         mode: Mode,
@@ -21086,7 +21085,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 63)
     }
-    fn __reduce132<
+    pub(crate) fn __reduce132<
     >(
         source_code: &str,
         mode: Mode,
@@ -21096,13 +21095,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // (<Pattern> ",")* =  => ActionFn(428);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action428::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant36(__nt), __end));
         (0, 64)
     }
-    fn __reduce133<
+    pub(crate) fn __reduce133<
     >(
         source_code: &str,
         mode: Mode,
@@ -21119,7 +21118,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant36(__nt), __end));
         (1, 64)
     }
-    fn __reduce134<
+    pub(crate) fn __reduce134<
     >(
         source_code: &str,
         mode: Mode,
@@ -21138,7 +21137,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant36(__nt), __end));
         (2, 65)
     }
-    fn __reduce135<
+    pub(crate) fn __reduce135<
     >(
         source_code: &str,
         mode: Mode,
@@ -21158,7 +21157,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant36(__nt), __end));
         (3, 65)
     }
-    fn __reduce136<
+    pub(crate) fn __reduce136<
     >(
         source_code: &str,
         mode: Mode,
@@ -21177,7 +21176,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (2, 66)
     }
-    fn __reduce137<
+    pub(crate) fn __reduce137<
     >(
         source_code: &str,
         mode: Mode,
@@ -21187,13 +21186,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // (<SmallStatement> ";")* =  => ActionFn(407);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action407::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant38(__nt), __end));
         (0, 67)
     }
-    fn __reduce138<
+    pub(crate) fn __reduce138<
     >(
         source_code: &str,
         mode: Mode,
@@ -21210,7 +21209,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant38(__nt), __end));
         (1, 67)
     }
-    fn __reduce139<
+    pub(crate) fn __reduce139<
     >(
         source_code: &str,
         mode: Mode,
@@ -21229,7 +21228,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant38(__nt), __end));
         (2, 68)
     }
-    fn __reduce140<
+    pub(crate) fn __reduce140<
     >(
         source_code: &str,
         mode: Mode,
@@ -21249,7 +21248,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant38(__nt), __end));
         (3, 68)
     }
-    fn __reduce141<
+    pub(crate) fn __reduce141<
     >(
         source_code: &str,
         mode: Mode,
@@ -21269,7 +21268,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant39(__nt), __end));
         (3, 69)
     }
-    fn __reduce142<
+    pub(crate) fn __reduce142<
     >(
         source_code: &str,
         mode: Mode,
@@ -21288,7 +21287,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant40(__nt), __end));
         (2, 70)
     }
-    fn __reduce143<
+    pub(crate) fn __reduce143<
     >(
         source_code: &str,
         mode: Mode,
@@ -21307,7 +21306,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant41(__nt), __end));
         (2, 71)
     }
-    fn __reduce144<
+    pub(crate) fn __reduce144<
     >(
         source_code: &str,
         mode: Mode,
@@ -21317,13 +21316,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // (<WithItemsNoAs> ",")? =  => ActionFn(322);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action322::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant41(__nt), __end));
         (0, 71)
     }
-    fn __reduce145<
+    pub(crate) fn __reduce145<
     >(
         source_code: &str,
         mode: Mode,
@@ -21342,7 +21341,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant42(__nt), __end));
         (2, 72)
     }
-    fn __reduce146<
+    pub(crate) fn __reduce146<
     >(
         source_code: &str,
         mode: Mode,
@@ -21361,7 +21360,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant43(__nt), __end));
         (2, 73)
     }
-    fn __reduce147<
+    pub(crate) fn __reduce147<
     >(
         source_code: &str,
         mode: Mode,
@@ -21381,7 +21380,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant43(__nt), __end));
         (3, 73)
     }
-    fn __reduce148<
+    pub(crate) fn __reduce148<
     >(
         source_code: &str,
         mode: Mode,
@@ -21398,7 +21397,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 74)
     }
-    fn __reduce149<
+    pub(crate) fn __reduce149<
     >(
         source_code: &str,
         mode: Mode,
@@ -21415,7 +21414,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant45(__nt), __end));
         (1, 75)
     }
-    fn __reduce150<
+    pub(crate) fn __reduce150<
     >(
         source_code: &str,
         mode: Mode,
@@ -21425,13 +21424,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // (Guard)? =  => ActionFn(362);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action362::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant45(__nt), __end));
         (0, 75)
     }
-    fn __reduce151<
+    pub(crate) fn __reduce151<
     >(
         source_code: &str,
         mode: Mode,
@@ -21448,7 +21447,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant46(__nt), __end));
         (1, 76)
     }
-    fn __reduce152<
+    pub(crate) fn __reduce152<
     >(
         source_code: &str,
         mode: Mode,
@@ -21465,7 +21464,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant47(__nt), __end));
         (1, 77)
     }
-    fn __reduce153<
+    pub(crate) fn __reduce153<
     >(
         source_code: &str,
         mode: Mode,
@@ -21475,13 +21474,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // (ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter>)? =  => ActionFn(299);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action299::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant47(__nt), __end));
         (0, 77)
     }
-    fn __reduce154<
+    pub(crate) fn __reduce154<
     >(
         source_code: &str,
         mode: Mode,
@@ -21491,13 +21490,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // @L =  => ActionFn(414);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action414::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant48(__nt), __end));
         (0, 78)
     }
-    fn __reduce155<
+    pub(crate) fn __reduce155<
     >(
         source_code: &str,
         mode: Mode,
@@ -21507,13 +21506,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // @R =  => ActionFn(413);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action413::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant48(__nt), __end));
         (0, 79)
     }
-    fn __reduce156<
+    pub(crate) fn __reduce156<
     >(
         source_code: &str,
         mode: Mode,
@@ -21530,7 +21529,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 80)
     }
-    fn __reduce157<
+    pub(crate) fn __reduce157<
     >(
         source_code: &str,
         mode: Mode,
@@ -21547,7 +21546,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 80)
     }
-    fn __reduce158<
+    pub(crate) fn __reduce158<
     >(
         source_code: &str,
         mode: Mode,
@@ -21567,7 +21566,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 81)
     }
-    fn __reduce159<
+    pub(crate) fn __reduce159<
     >(
         source_code: &str,
         mode: Mode,
@@ -21587,7 +21586,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 82)
     }
-    fn __reduce160<
+    pub(crate) fn __reduce160<
     >(
         source_code: &str,
         mode: Mode,
@@ -21604,7 +21603,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 82)
     }
-    fn __reduce161<
+    pub(crate) fn __reduce161<
     >(
         source_code: &str,
         mode: Mode,
@@ -21624,7 +21623,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 83)
     }
-    fn __reduce162<
+    pub(crate) fn __reduce162<
     >(
         source_code: &str,
         mode: Mode,
@@ -21641,7 +21640,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 83)
     }
-    fn __reduce163<
+    pub(crate) fn __reduce163<
     >(
         source_code: &str,
         mode: Mode,
@@ -21660,7 +21659,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 84)
     }
-    fn __reduce164<
+    pub(crate) fn __reduce164<
     >(
         source_code: &str,
         mode: Mode,
@@ -21677,7 +21676,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 84)
     }
-    fn __reduce165<
+    pub(crate) fn __reduce165<
     >(
         source_code: &str,
         mode: Mode,
@@ -21696,7 +21695,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 85)
     }
-    fn __reduce166<
+    pub(crate) fn __reduce166<
     >(
         source_code: &str,
         mode: Mode,
@@ -21713,7 +21712,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 85)
     }
-    fn __reduce171<
+    pub(crate) fn __reduce171<
     >(
         source_code: &str,
         mode: Mode,
@@ -21730,7 +21729,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant51(__nt), __end));
         (1, 87)
     }
-    fn __reduce172<
+    pub(crate) fn __reduce172<
     >(
         source_code: &str,
         mode: Mode,
@@ -21740,13 +21739,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // Arguments? =  => ActionFn(291);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action291::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant51(__nt), __end));
         (0, 87)
     }
-    fn __reduce173<
+    pub(crate) fn __reduce173<
     >(
         source_code: &str,
         mode: Mode,
@@ -21766,7 +21765,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 88)
     }
-    fn __reduce174<
+    pub(crate) fn __reduce174<
     >(
         source_code: &str,
         mode: Mode,
@@ -21783,7 +21782,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 88)
     }
-    fn __reduce175<
+    pub(crate) fn __reduce175<
     >(
         source_code: &str,
         mode: Mode,
@@ -21803,7 +21802,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 89)
     }
-    fn __reduce176<
+    pub(crate) fn __reduce176<
     >(
         source_code: &str,
         mode: Mode,
@@ -21820,7 +21819,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 89)
     }
-    fn __reduce178<
+    pub(crate) fn __reduce178<
     >(
         source_code: &str,
         mode: Mode,
@@ -21841,7 +21840,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (4, 91)
     }
-    fn __reduce179<
+    pub(crate) fn __reduce179<
     >(
         source_code: &str,
         mode: Mode,
@@ -21860,7 +21859,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (2, 91)
     }
-    fn __reduce180<
+    pub(crate) fn __reduce180<
     >(
         source_code: &str,
         mode: Mode,
@@ -21879,7 +21878,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 92)
     }
-    fn __reduce181<
+    pub(crate) fn __reduce181<
     >(
         source_code: &str,
         mode: Mode,
@@ -21898,7 +21897,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 92)
     }
-    fn __reduce182<
+    pub(crate) fn __reduce182<
     >(
         source_code: &str,
         mode: Mode,
@@ -21908,13 +21907,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // AssignSuffix* =  => ActionFn(403);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action403::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (0, 93)
     }
-    fn __reduce183<
+    pub(crate) fn __reduce183<
     >(
         source_code: &str,
         mode: Mode,
@@ -21931,7 +21930,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (1, 93)
     }
-    fn __reduce184<
+    pub(crate) fn __reduce184<
     >(
         source_code: &str,
         mode: Mode,
@@ -21948,7 +21947,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (1, 94)
     }
-    fn __reduce185<
+    pub(crate) fn __reduce185<
     >(
         source_code: &str,
         mode: Mode,
@@ -21967,7 +21966,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (2, 94)
     }
-    fn __reduce186<
+    pub(crate) fn __reduce186<
     >(
         source_code: &str,
         mode: Mode,
@@ -21984,7 +21983,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (1, 95)
     }
-    fn __reduce187<
+    pub(crate) fn __reduce187<
     >(
         source_code: &str,
         mode: Mode,
@@ -21994,13 +21993,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // AssignSuffix? =  => ActionFn(399);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action399::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (0, 95)
     }
-    fn __reduce188<
+    pub(crate) fn __reduce188<
     >(
         source_code: &str,
         mode: Mode,
@@ -22017,7 +22016,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 96)
     }
-    fn __reduce189<
+    pub(crate) fn __reduce189<
     >(
         source_code: &str,
         mode: Mode,
@@ -22034,7 +22033,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 96)
     }
-    fn __reduce190<
+    pub(crate) fn __reduce190<
     >(
         source_code: &str,
         mode: Mode,
@@ -22051,7 +22050,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 96)
     }
-    fn __reduce191<
+    pub(crate) fn __reduce191<
     >(
         source_code: &str,
         mode: Mode,
@@ -22071,7 +22070,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 96)
     }
-    fn __reduce192<
+    pub(crate) fn __reduce192<
     >(
         source_code: &str,
         mode: Mode,
@@ -22090,7 +22089,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 96)
     }
-    fn __reduce193<
+    pub(crate) fn __reduce193<
     >(
         source_code: &str,
         mode: Mode,
@@ -22111,7 +22110,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 96)
     }
-    fn __reduce194<
+    pub(crate) fn __reduce194<
     >(
         source_code: &str,
         mode: Mode,
@@ -22132,7 +22131,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 96)
     }
-    fn __reduce195<
+    pub(crate) fn __reduce195<
     >(
         source_code: &str,
         mode: Mode,
@@ -22152,7 +22151,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 96)
     }
-    fn __reduce204<
+    pub(crate) fn __reduce204<
     >(
         source_code: &str,
         mode: Mode,
@@ -22171,7 +22170,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 96)
     }
-    fn __reduce205<
+    pub(crate) fn __reduce205<
     >(
         source_code: &str,
         mode: Mode,
@@ -22191,7 +22190,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 96)
     }
-    fn __reduce206<
+    pub(crate) fn __reduce206<
     >(
         source_code: &str,
         mode: Mode,
@@ -22212,7 +22211,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 96)
     }
-    fn __reduce208<
+    pub(crate) fn __reduce208<
     >(
         source_code: &str,
         mode: Mode,
@@ -22232,7 +22231,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 96)
     }
-    fn __reduce209<
+    pub(crate) fn __reduce209<
     >(
         source_code: &str,
         mode: Mode,
@@ -22251,7 +22250,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 96)
     }
-    fn __reduce210<
+    pub(crate) fn __reduce210<
     >(
         source_code: &str,
         mode: Mode,
@@ -22272,7 +22271,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 96)
     }
-    fn __reduce211<
+    pub(crate) fn __reduce211<
     >(
         source_code: &str,
         mode: Mode,
@@ -22292,7 +22291,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 96)
     }
-    fn __reduce212<
+    pub(crate) fn __reduce212<
     >(
         source_code: &str,
         mode: Mode,
@@ -22313,7 +22312,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 96)
     }
-    fn __reduce213<
+    pub(crate) fn __reduce213<
     >(
         source_code: &str,
         mode: Mode,
@@ -22330,7 +22329,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 96)
     }
-    fn __reduce214<
+    pub(crate) fn __reduce214<
     >(
         source_code: &str,
         mode: Mode,
@@ -22347,7 +22346,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 96)
     }
-    fn __reduce215<
+    pub(crate) fn __reduce215<
     >(
         source_code: &str,
         mode: Mode,
@@ -22364,7 +22363,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 96)
     }
-    fn __reduce216<
+    pub(crate) fn __reduce216<
     >(
         source_code: &str,
         mode: Mode,
@@ -22381,7 +22380,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 96)
     }
-    fn __reduce217<
+    pub(crate) fn __reduce217<
     >(
         source_code: &str,
         mode: Mode,
@@ -22398,7 +22397,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 97)
     }
-    fn __reduce218<
+    pub(crate) fn __reduce218<
     >(
         source_code: &str,
         mode: Mode,
@@ -22415,7 +22414,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 97)
     }
-    fn __reduce219<
+    pub(crate) fn __reduce219<
     >(
         source_code: &str,
         mode: Mode,
@@ -22432,7 +22431,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 97)
     }
-    fn __reduce220<
+    pub(crate) fn __reduce220<
     >(
         source_code: &str,
         mode: Mode,
@@ -22452,7 +22451,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 97)
     }
-    fn __reduce221<
+    pub(crate) fn __reduce221<
     >(
         source_code: &str,
         mode: Mode,
@@ -22471,7 +22470,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 97)
     }
-    fn __reduce222<
+    pub(crate) fn __reduce222<
     >(
         source_code: &str,
         mode: Mode,
@@ -22492,7 +22491,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 97)
     }
-    fn __reduce231<
+    pub(crate) fn __reduce231<
     >(
         source_code: &str,
         mode: Mode,
@@ -22511,7 +22510,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 97)
     }
-    fn __reduce232<
+    pub(crate) fn __reduce232<
     >(
         source_code: &str,
         mode: Mode,
@@ -22531,7 +22530,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 97)
     }
-    fn __reduce233<
+    pub(crate) fn __reduce233<
     >(
         source_code: &str,
         mode: Mode,
@@ -22552,7 +22551,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 97)
     }
-    fn __reduce235<
+    pub(crate) fn __reduce235<
     >(
         source_code: &str,
         mode: Mode,
@@ -22572,7 +22571,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 97)
     }
-    fn __reduce236<
+    pub(crate) fn __reduce236<
     >(
         source_code: &str,
         mode: Mode,
@@ -22591,7 +22590,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 97)
     }
-    fn __reduce237<
+    pub(crate) fn __reduce237<
     >(
         source_code: &str,
         mode: Mode,
@@ -22612,7 +22611,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 97)
     }
-    fn __reduce238<
+    pub(crate) fn __reduce238<
     >(
         source_code: &str,
         mode: Mode,
@@ -22632,7 +22631,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 97)
     }
-    fn __reduce239<
+    pub(crate) fn __reduce239<
     >(
         source_code: &str,
         mode: Mode,
@@ -22653,7 +22652,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 97)
     }
-    fn __reduce240<
+    pub(crate) fn __reduce240<
     >(
         source_code: &str,
         mode: Mode,
@@ -22670,7 +22669,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 97)
     }
-    fn __reduce241<
+    pub(crate) fn __reduce241<
     >(
         source_code: &str,
         mode: Mode,
@@ -22687,7 +22686,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 97)
     }
-    fn __reduce242<
+    pub(crate) fn __reduce242<
     >(
         source_code: &str,
         mode: Mode,
@@ -22704,7 +22703,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 97)
     }
-    fn __reduce243<
+    pub(crate) fn __reduce243<
     >(
         source_code: &str,
         mode: Mode,
@@ -22721,7 +22720,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 97)
     }
-    fn __reduce244<
+    pub(crate) fn __reduce244<
     >(
         source_code: &str,
         mode: Mode,
@@ -22738,7 +22737,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 98)
     }
-    fn __reduce245<
+    pub(crate) fn __reduce245<
     >(
         source_code: &str,
         mode: Mode,
@@ -22757,7 +22756,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 98)
     }
-    fn __reduce246<
+    pub(crate) fn __reduce246<
     >(
         source_code: &str,
         mode: Mode,
@@ -22778,7 +22777,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 98)
     }
-    fn __reduce247<
+    pub(crate) fn __reduce247<
     >(
         source_code: &str,
         mode: Mode,
@@ -22798,7 +22797,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 98)
     }
-    fn __reduce248<
+    pub(crate) fn __reduce248<
     >(
         source_code: &str,
         mode: Mode,
@@ -22815,7 +22814,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 99)
     }
-    fn __reduce249<
+    pub(crate) fn __reduce249<
     >(
         source_code: &str,
         mode: Mode,
@@ -22834,7 +22833,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 99)
     }
-    fn __reduce250<
+    pub(crate) fn __reduce250<
     >(
         source_code: &str,
         mode: Mode,
@@ -22855,7 +22854,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 99)
     }
-    fn __reduce251<
+    pub(crate) fn __reduce251<
     >(
         source_code: &str,
         mode: Mode,
@@ -22875,7 +22874,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 99)
     }
-    fn __reduce252<
+    pub(crate) fn __reduce252<
     >(
         source_code: &str,
         mode: Mode,
@@ -22894,7 +22893,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 100)
     }
-    fn __reduce253<
+    pub(crate) fn __reduce253<
     >(
         source_code: &str,
         mode: Mode,
@@ -22911,7 +22910,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 100)
     }
-    fn __reduce254<
+    pub(crate) fn __reduce254<
     >(
         source_code: &str,
         mode: Mode,
@@ -22930,7 +22929,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 101)
     }
-    fn __reduce255<
+    pub(crate) fn __reduce255<
     >(
         source_code: &str,
         mode: Mode,
@@ -22947,7 +22946,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 101)
     }
-    fn __reduce256<
+    pub(crate) fn __reduce256<
     >(
         source_code: &str,
         mode: Mode,
@@ -22964,7 +22963,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 102)
     }
-    fn __reduce257<
+    pub(crate) fn __reduce257<
     >(
         source_code: &str,
         mode: Mode,
@@ -22981,7 +22980,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 102)
     }
-    fn __reduce258<
+    pub(crate) fn __reduce258<
     >(
         source_code: &str,
         mode: Mode,
@@ -22998,7 +22997,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 102)
     }
-    fn __reduce259<
+    pub(crate) fn __reduce259<
     >(
         source_code: &str,
         mode: Mode,
@@ -23015,7 +23014,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 102)
     }
-    fn __reduce260<
+    pub(crate) fn __reduce260<
     >(
         source_code: &str,
         mode: Mode,
@@ -23032,7 +23031,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 102)
     }
-    fn __reduce261<
+    pub(crate) fn __reduce261<
     >(
         source_code: &str,
         mode: Mode,
@@ -23049,7 +23048,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 102)
     }
-    fn __reduce262<
+    pub(crate) fn __reduce262<
     >(
         source_code: &str,
         mode: Mode,
@@ -23066,7 +23065,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 102)
     }
-    fn __reduce263<
+    pub(crate) fn __reduce263<
     >(
         source_code: &str,
         mode: Mode,
@@ -23083,7 +23082,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 102)
     }
-    fn __reduce264<
+    pub(crate) fn __reduce264<
     >(
         source_code: &str,
         mode: Mode,
@@ -23100,7 +23099,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 102)
     }
-    fn __reduce265<
+    pub(crate) fn __reduce265<
     >(
         source_code: &str,
         mode: Mode,
@@ -23117,7 +23116,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 102)
     }
-    fn __reduce266<
+    pub(crate) fn __reduce266<
     >(
         source_code: &str,
         mode: Mode,
@@ -23134,7 +23133,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 102)
     }
-    fn __reduce267<
+    pub(crate) fn __reduce267<
     >(
         source_code: &str,
         mode: Mode,
@@ -23151,7 +23150,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 102)
     }
-    fn __reduce268<
+    pub(crate) fn __reduce268<
     >(
         source_code: &str,
         mode: Mode,
@@ -23168,7 +23167,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 102)
     }
-    fn __reduce269<
+    pub(crate) fn __reduce269<
     >(
         source_code: &str,
         mode: Mode,
@@ -23185,7 +23184,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 103)
     }
-    fn __reduce270<
+    pub(crate) fn __reduce270<
     >(
         source_code: &str,
         mode: Mode,
@@ -23208,7 +23207,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (6, 104)
     }
-    fn __reduce271<
+    pub(crate) fn __reduce271<
     >(
         source_code: &str,
         mode: Mode,
@@ -23230,7 +23229,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (5, 104)
     }
-    fn __reduce272<
+    pub(crate) fn __reduce272<
     >(
         source_code: &str,
         mode: Mode,
@@ -23254,7 +23253,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 104)
     }
-    fn __reduce273<
+    pub(crate) fn __reduce273<
     >(
         source_code: &str,
         mode: Mode,
@@ -23277,7 +23276,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (6, 104)
     }
-    fn __reduce274<
+    pub(crate) fn __reduce274<
     >(
         source_code: &str,
         mode: Mode,
@@ -23299,7 +23298,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (5, 104)
     }
-    fn __reduce275<
+    pub(crate) fn __reduce275<
     >(
         source_code: &str,
         mode: Mode,
@@ -23320,7 +23319,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (4, 104)
     }
-    fn __reduce276<
+    pub(crate) fn __reduce276<
     >(
         source_code: &str,
         mode: Mode,
@@ -23343,7 +23342,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (6, 104)
     }
-    fn __reduce277<
+    pub(crate) fn __reduce277<
     >(
         source_code: &str,
         mode: Mode,
@@ -23365,7 +23364,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (5, 104)
     }
-    fn __reduce278<
+    pub(crate) fn __reduce278<
     >(
         source_code: &str,
         mode: Mode,
@@ -23384,7 +23383,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 105)
     }
-    fn __reduce279<
+    pub(crate) fn __reduce279<
     >(
         source_code: &str,
         mode: Mode,
@@ -23403,7 +23402,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 105)
     }
-    fn __reduce280<
+    pub(crate) fn __reduce280<
     >(
         source_code: &str,
         mode: Mode,
@@ -23420,7 +23419,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 106)
     }
-    fn __reduce281<
+    pub(crate) fn __reduce281<
     >(
         source_code: &str,
         mode: Mode,
@@ -23437,7 +23436,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 106)
     }
-    fn __reduce282<
+    pub(crate) fn __reduce282<
     >(
         source_code: &str,
         mode: Mode,
@@ -23454,7 +23453,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 106)
     }
-    fn __reduce283<
+    pub(crate) fn __reduce283<
     >(
         source_code: &str,
         mode: Mode,
@@ -23471,7 +23470,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 106)
     }
-    fn __reduce284<
+    pub(crate) fn __reduce284<
     >(
         source_code: &str,
         mode: Mode,
@@ -23488,7 +23487,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 106)
     }
-    fn __reduce285<
+    pub(crate) fn __reduce285<
     >(
         source_code: &str,
         mode: Mode,
@@ -23505,7 +23504,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 106)
     }
-    fn __reduce286<
+    pub(crate) fn __reduce286<
     >(
         source_code: &str,
         mode: Mode,
@@ -23522,7 +23521,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 106)
     }
-    fn __reduce287<
+    pub(crate) fn __reduce287<
     >(
         source_code: &str,
         mode: Mode,
@@ -23539,7 +23538,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant52(__nt), __end));
         (1, 107)
     }
-    fn __reduce288<
+    pub(crate) fn __reduce288<
     >(
         source_code: &str,
         mode: Mode,
@@ -23549,13 +23548,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // Comma<FunctionArgument> =  => ActionFn(1529);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action1529::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant52(__nt), __end));
         (0, 107)
     }
-    fn __reduce289<
+    pub(crate) fn __reduce289<
     >(
         source_code: &str,
         mode: Mode,
@@ -23574,7 +23573,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant52(__nt), __end));
         (2, 107)
     }
-    fn __reduce290<
+    pub(crate) fn __reduce290<
     >(
         source_code: &str,
         mode: Mode,
@@ -23591,7 +23590,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant52(__nt), __end));
         (1, 107)
     }
-    fn __reduce291<
+    pub(crate) fn __reduce291<
     >(
         source_code: &str,
         mode: Mode,
@@ -23608,7 +23607,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant53(__nt), __end));
         (1, 108)
     }
-    fn __reduce292<
+    pub(crate) fn __reduce292<
     >(
         source_code: &str,
         mode: Mode,
@@ -23618,13 +23617,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // Comma<Pattern> =  => ActionFn(1537);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action1537::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant53(__nt), __end));
         (0, 108)
     }
-    fn __reduce293<
+    pub(crate) fn __reduce293<
     >(
         source_code: &str,
         mode: Mode,
@@ -23643,7 +23642,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant53(__nt), __end));
         (2, 108)
     }
-    fn __reduce294<
+    pub(crate) fn __reduce294<
     >(
         source_code: &str,
         mode: Mode,
@@ -23660,7 +23659,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant53(__nt), __end));
         (1, 108)
     }
-    fn __reduce295<
+    pub(crate) fn __reduce295<
     >(
         source_code: &str,
         mode: Mode,
@@ -23677,7 +23676,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant54(__nt), __end));
         (1, 109)
     }
-    fn __reduce296<
+    pub(crate) fn __reduce296<
     >(
         source_code: &str,
         mode: Mode,
@@ -23694,7 +23693,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant55(__nt), __end));
         (1, 110)
     }
-    fn __reduce297<
+    pub(crate) fn __reduce297<
     >(
         source_code: &str,
         mode: Mode,
@@ -23704,13 +23703,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // CompFor? =  => ActionFn(252);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action252::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant55(__nt), __end));
         (0, 110)
     }
-    fn __reduce298<
+    pub(crate) fn __reduce298<
     >(
         source_code: &str,
         mode: Mode,
@@ -23727,7 +23726,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant56(__nt), __end));
         (1, 111)
     }
-    fn __reduce299<
+    pub(crate) fn __reduce299<
     >(
         source_code: &str,
         mode: Mode,
@@ -23744,7 +23743,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant56(__nt), __end));
         (1, 111)
     }
-    fn __reduce300<
+    pub(crate) fn __reduce300<
     >(
         source_code: &str,
         mode: Mode,
@@ -23761,7 +23760,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant56(__nt), __end));
         (1, 111)
     }
-    fn __reduce301<
+    pub(crate) fn __reduce301<
     >(
         source_code: &str,
         mode: Mode,
@@ -23778,7 +23777,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant56(__nt), __end));
         (1, 111)
     }
-    fn __reduce302<
+    pub(crate) fn __reduce302<
     >(
         source_code: &str,
         mode: Mode,
@@ -23795,7 +23794,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant56(__nt), __end));
         (1, 111)
     }
-    fn __reduce303<
+    pub(crate) fn __reduce303<
     >(
         source_code: &str,
         mode: Mode,
@@ -23812,7 +23811,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant56(__nt), __end));
         (1, 111)
     }
-    fn __reduce304<
+    pub(crate) fn __reduce304<
     >(
         source_code: &str,
         mode: Mode,
@@ -23829,7 +23828,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant56(__nt), __end));
         (1, 111)
     }
-    fn __reduce305<
+    pub(crate) fn __reduce305<
     >(
         source_code: &str,
         mode: Mode,
@@ -23848,7 +23847,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant56(__nt), __end));
         (2, 111)
     }
-    fn __reduce306<
+    pub(crate) fn __reduce306<
     >(
         source_code: &str,
         mode: Mode,
@@ -23865,7 +23864,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant56(__nt), __end));
         (1, 111)
     }
-    fn __reduce307<
+    pub(crate) fn __reduce307<
     >(
         source_code: &str,
         mode: Mode,
@@ -23884,7 +23883,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant56(__nt), __end));
         (2, 111)
     }
-    fn __reduce308<
+    pub(crate) fn __reduce308<
     >(
         source_code: &str,
         mode: Mode,
@@ -23903,7 +23902,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 112)
     }
-    fn __reduce309<
+    pub(crate) fn __reduce309<
     >(
         source_code: &str,
         mode: Mode,
@@ -23920,7 +23919,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 112)
     }
-    fn __reduce310<
+    pub(crate) fn __reduce310<
     >(
         source_code: &str,
         mode: Mode,
@@ -23939,7 +23938,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 113)
     }
-    fn __reduce311<
+    pub(crate) fn __reduce311<
     >(
         source_code: &str,
         mode: Mode,
@@ -23956,7 +23955,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 113)
     }
-    fn __reduce312<
+    pub(crate) fn __reduce312<
     >(
         source_code: &str,
         mode: Mode,
@@ -23973,7 +23972,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 114)
     }
-    fn __reduce313<
+    pub(crate) fn __reduce313<
     >(
         source_code: &str,
         mode: Mode,
@@ -23990,7 +23989,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 114)
     }
-    fn __reduce314<
+    pub(crate) fn __reduce314<
     >(
         source_code: &str,
         mode: Mode,
@@ -24007,7 +24006,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 114)
     }
-    fn __reduce315<
+    pub(crate) fn __reduce315<
     >(
         source_code: &str,
         mode: Mode,
@@ -24024,7 +24023,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 114)
     }
-    fn __reduce316<
+    pub(crate) fn __reduce316<
     >(
         source_code: &str,
         mode: Mode,
@@ -24041,7 +24040,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 114)
     }
-    fn __reduce317<
+    pub(crate) fn __reduce317<
     >(
         source_code: &str,
         mode: Mode,
@@ -24058,7 +24057,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 114)
     }
-    fn __reduce318<
+    pub(crate) fn __reduce318<
     >(
         source_code: &str,
         mode: Mode,
@@ -24075,7 +24074,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 114)
     }
-    fn __reduce319<
+    pub(crate) fn __reduce319<
     >(
         source_code: &str,
         mode: Mode,
@@ -24092,7 +24091,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 114)
     }
-    fn __reduce320<
+    pub(crate) fn __reduce320<
     >(
         source_code: &str,
         mode: Mode,
@@ -24111,7 +24110,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 115)
     }
-    fn __reduce321<
+    pub(crate) fn __reduce321<
     >(
         source_code: &str,
         mode: Mode,
@@ -24121,13 +24120,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ComprehensionIf* =  => ActionFn(254);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action254::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (0, 116)
     }
-    fn __reduce322<
+    pub(crate) fn __reduce322<
     >(
         source_code: &str,
         mode: Mode,
@@ -24144,7 +24143,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (1, 116)
     }
-    fn __reduce323<
+    pub(crate) fn __reduce323<
     >(
         source_code: &str,
         mode: Mode,
@@ -24161,7 +24160,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (1, 117)
     }
-    fn __reduce324<
+    pub(crate) fn __reduce324<
     >(
         source_code: &str,
         mode: Mode,
@@ -24180,7 +24179,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant17(__nt), __end));
         (2, 117)
     }
-    fn __reduce325<
+    pub(crate) fn __reduce325<
     >(
         source_code: &str,
         mode: Mode,
@@ -24200,7 +24199,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant57(__nt), __end));
         (3, 118)
     }
-    fn __reduce326<
+    pub(crate) fn __reduce326<
     >(
         source_code: &str,
         mode: Mode,
@@ -24210,13 +24209,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // Decorator* =  => ActionFn(308);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action308::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant58(__nt), __end));
         (0, 119)
     }
-    fn __reduce327<
+    pub(crate) fn __reduce327<
     >(
         source_code: &str,
         mode: Mode,
@@ -24233,7 +24232,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant58(__nt), __end));
         (1, 119)
     }
-    fn __reduce328<
+    pub(crate) fn __reduce328<
     >(
         source_code: &str,
         mode: Mode,
@@ -24250,7 +24249,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant58(__nt), __end));
         (1, 120)
     }
-    fn __reduce329<
+    pub(crate) fn __reduce329<
     >(
         source_code: &str,
         mode: Mode,
@@ -24269,7 +24268,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant58(__nt), __end));
         (2, 120)
     }
-    fn __reduce330<
+    pub(crate) fn __reduce330<
     >(
         source_code: &str,
         mode: Mode,
@@ -24288,7 +24287,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (2, 121)
     }
-    fn __reduce331<
+    pub(crate) fn __reduce331<
     >(
         source_code: &str,
         mode: Mode,
@@ -24305,7 +24304,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant59(__nt), __end));
         (1, 122)
     }
-    fn __reduce332<
+    pub(crate) fn __reduce332<
     >(
         source_code: &str,
         mode: Mode,
@@ -24324,7 +24323,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant59(__nt), __end));
         (2, 122)
     }
-    fn __reduce333<
+    pub(crate) fn __reduce333<
     >(
         source_code: &str,
         mode: Mode,
@@ -24344,7 +24343,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant60(__nt), __end));
         (3, 123)
     }
-    fn __reduce334<
+    pub(crate) fn __reduce334<
     >(
         source_code: &str,
         mode: Mode,
@@ -24363,7 +24362,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant61(__nt), __end));
         (2, 124)
     }
-    fn __reduce335<
+    pub(crate) fn __reduce335<
     >(
         source_code: &str,
         mode: Mode,
@@ -24380,7 +24379,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant61(__nt), __end));
         (1, 124)
     }
-    fn __reduce336<
+    pub(crate) fn __reduce336<
     >(
         source_code: &str,
         mode: Mode,
@@ -24397,7 +24396,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant62(__nt), __end));
         (1, 125)
     }
-    fn __reduce337<
+    pub(crate) fn __reduce337<
     >(
         source_code: &str,
         mode: Mode,
@@ -24407,13 +24406,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // DictLiteralValues? =  => ActionFn(563);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action563::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant62(__nt), __end));
         (0, 125)
     }
-    fn __reduce338<
+    pub(crate) fn __reduce338<
     >(
         source_code: &str,
         mode: Mode,
@@ -24430,7 +24429,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant23(__nt), __end));
         (1, 126)
     }
-    fn __reduce339<
+    pub(crate) fn __reduce339<
     >(
         source_code: &str,
         mode: Mode,
@@ -24449,7 +24448,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant23(__nt), __end));
         (2, 126)
     }
-    fn __reduce340<
+    pub(crate) fn __reduce340<
     >(
         source_code: &str,
         mode: Mode,
@@ -24470,7 +24469,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant9(__nt), __end));
         (4, 127)
     }
-    fn __reduce341<
+    pub(crate) fn __reduce341<
     >(
         source_code: &str,
         mode: Mode,
@@ -24489,7 +24488,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant9(__nt), __end));
         (2, 127)
     }
-    fn __reduce342<
+    pub(crate) fn __reduce342<
     >(
         source_code: &str,
         mode: Mode,
@@ -24508,7 +24507,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant9(__nt), __end));
         (2, 128)
     }
-    fn __reduce343<
+    pub(crate) fn __reduce343<
     >(
         source_code: &str,
         mode: Mode,
@@ -24529,7 +24528,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant63(__nt), __end));
         (4, 129)
     }
-    fn __reduce344<
+    pub(crate) fn __reduce344<
     >(
         source_code: &str,
         mode: Mode,
@@ -24549,7 +24548,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant63(__nt), __end));
         (3, 129)
     }
-    fn __reduce345<
+    pub(crate) fn __reduce345<
     >(
         source_code: &str,
         mode: Mode,
@@ -24572,7 +24571,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant63(__nt), __end));
         (6, 129)
     }
-    fn __reduce346<
+    pub(crate) fn __reduce346<
     >(
         source_code: &str,
         mode: Mode,
@@ -24589,7 +24588,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant64(__nt), __end));
         (1, 130)
     }
-    fn __reduce347<
+    pub(crate) fn __reduce347<
     >(
         source_code: &str,
         mode: Mode,
@@ -24608,7 +24607,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant64(__nt), __end));
         (2, 130)
     }
-    fn __reduce348<
+    pub(crate) fn __reduce348<
     >(
         source_code: &str,
         mode: Mode,
@@ -24630,7 +24629,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant63(__nt), __end));
         (5, 131)
     }
-    fn __reduce349<
+    pub(crate) fn __reduce349<
     >(
         source_code: &str,
         mode: Mode,
@@ -24654,7 +24653,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant63(__nt), __end));
         (7, 131)
     }
-    fn __reduce350<
+    pub(crate) fn __reduce350<
     >(
         source_code: &str,
         mode: Mode,
@@ -24671,7 +24670,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant64(__nt), __end));
         (1, 132)
     }
-    fn __reduce351<
+    pub(crate) fn __reduce351<
     >(
         source_code: &str,
         mode: Mode,
@@ -24690,7 +24689,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant64(__nt), __end));
         (2, 132)
     }
-    fn __reduce352<
+    pub(crate) fn __reduce352<
     >(
         source_code: &str,
         mode: Mode,
@@ -24710,7 +24709,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 133)
     }
-    fn __reduce353<
+    pub(crate) fn __reduce353<
     >(
         source_code: &str,
         mode: Mode,
@@ -24727,7 +24726,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 133)
     }
-    fn __reduce354<
+    pub(crate) fn __reduce354<
     >(
         source_code: &str,
         mode: Mode,
@@ -24747,7 +24746,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 134)
     }
-    fn __reduce355<
+    pub(crate) fn __reduce355<
     >(
         source_code: &str,
         mode: Mode,
@@ -24764,7 +24763,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 134)
     }
-    fn __reduce356<
+    pub(crate) fn __reduce356<
     >(
         source_code: &str,
         mode: Mode,
@@ -24781,7 +24780,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 135)
     }
-    fn __reduce357<
+    pub(crate) fn __reduce357<
     >(
         source_code: &str,
         mode: Mode,
@@ -24800,7 +24799,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (2, 136)
     }
-    fn __reduce358<
+    pub(crate) fn __reduce358<
     >(
         source_code: &str,
         mode: Mode,
@@ -24817,7 +24816,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (1, 136)
     }
-    fn __reduce359<
+    pub(crate) fn __reduce359<
     >(
         source_code: &str,
         mode: Mode,
@@ -24834,7 +24833,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 137)
     }
-    fn __reduce360<
+    pub(crate) fn __reduce360<
     >(
         source_code: &str,
         mode: Mode,
@@ -24851,7 +24850,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 138)
     }
-    fn __reduce361<
+    pub(crate) fn __reduce361<
     >(
         source_code: &str,
         mode: Mode,
@@ -24868,7 +24867,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 138)
     }
-    fn __reduce368<
+    pub(crate) fn __reduce368<
     >(
         source_code: &str,
         mode: Mode,
@@ -24885,7 +24884,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant66(__nt), __end));
         (1, 141)
     }
-    fn __reduce369<
+    pub(crate) fn __reduce369<
     >(
         source_code: &str,
         mode: Mode,
@@ -24895,13 +24894,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // FStringConversion? =  => ActionFn(271);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action271::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant66(__nt), __end));
         (0, 141)
     }
-    fn __reduce370<
+    pub(crate) fn __reduce370<
     >(
         source_code: &str,
         mode: Mode,
@@ -24920,7 +24919,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant67(__nt), __end));
         (2, 142)
     }
-    fn __reduce371<
+    pub(crate) fn __reduce371<
     >(
         source_code: &str,
         mode: Mode,
@@ -24940,7 +24939,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant67(__nt), __end));
         (3, 142)
     }
-    fn __reduce372<
+    pub(crate) fn __reduce372<
     >(
         source_code: &str,
         mode: Mode,
@@ -24950,13 +24949,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // FStringFormatSpec =  => ActionFn(1580);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action1580::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant68(__nt), __end));
         (0, 143)
     }
-    fn __reduce373<
+    pub(crate) fn __reduce373<
     >(
         source_code: &str,
         mode: Mode,
@@ -24973,7 +24972,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant68(__nt), __end));
         (1, 143)
     }
-    fn __reduce374<
+    pub(crate) fn __reduce374<
     >(
         source_code: &str,
         mode: Mode,
@@ -24992,7 +24991,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant68(__nt), __end));
         (2, 144)
     }
-    fn __reduce375<
+    pub(crate) fn __reduce375<
     >(
         source_code: &str,
         mode: Mode,
@@ -25009,7 +25008,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant69(__nt), __end));
         (1, 145)
     }
-    fn __reduce376<
+    pub(crate) fn __reduce376<
     >(
         source_code: &str,
         mode: Mode,
@@ -25019,13 +25018,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // FStringFormatSpecSuffix? =  => ActionFn(269);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action269::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant69(__nt), __end));
         (0, 145)
     }
-    fn __reduce377<
+    pub(crate) fn __reduce377<
     >(
         source_code: &str,
         mode: Mode,
@@ -25042,7 +25041,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant70(__nt), __end));
         (1, 146)
     }
-    fn __reduce379<
+    pub(crate) fn __reduce379<
     >(
         source_code: &str,
         mode: Mode,
@@ -25052,13 +25051,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // FStringMiddlePattern* =  => ActionFn(274);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action274::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant71(__nt), __end));
         (0, 147)
     }
-    fn __reduce380<
+    pub(crate) fn __reduce380<
     >(
         source_code: &str,
         mode: Mode,
@@ -25075,7 +25074,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant71(__nt), __end));
         (1, 147)
     }
-    fn __reduce381<
+    pub(crate) fn __reduce381<
     >(
         source_code: &str,
         mode: Mode,
@@ -25092,7 +25091,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant71(__nt), __end));
         (1, 148)
     }
-    fn __reduce382<
+    pub(crate) fn __reduce382<
     >(
         source_code: &str,
         mode: Mode,
@@ -25111,7 +25110,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant71(__nt), __end));
         (2, 148)
     }
-    fn __reduce391<
+    pub(crate) fn __reduce391<
     >(
         source_code: &str,
         mode: Mode,
@@ -25130,7 +25129,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 150)
     }
-    fn __reduce392<
+    pub(crate) fn __reduce392<
     >(
         source_code: &str,
         mode: Mode,
@@ -25147,7 +25146,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 150)
     }
-    fn __reduce393<
+    pub(crate) fn __reduce393<
     >(
         source_code: &str,
         mode: Mode,
@@ -25166,7 +25165,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 151)
     }
-    fn __reduce394<
+    pub(crate) fn __reduce394<
     >(
         source_code: &str,
         mode: Mode,
@@ -25183,7 +25182,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 151)
     }
-    fn __reduce395<
+    pub(crate) fn __reduce395<
     >(
         source_code: &str,
         mode: Mode,
@@ -25200,7 +25199,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 152)
     }
-    fn __reduce396<
+    pub(crate) fn __reduce396<
     >(
         source_code: &str,
         mode: Mode,
@@ -25217,7 +25216,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 152)
     }
-    fn __reduce397<
+    pub(crate) fn __reduce397<
     >(
         source_code: &str,
         mode: Mode,
@@ -25236,7 +25235,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (2, 152)
     }
-    fn __reduce398<
+    pub(crate) fn __reduce398<
     >(
         source_code: &str,
         mode: Mode,
@@ -25253,7 +25252,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 152)
     }
-    fn __reduce399<
+    pub(crate) fn __reduce399<
     >(
         source_code: &str,
         mode: Mode,
@@ -25270,7 +25269,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 152)
     }
-    fn __reduce400<
+    pub(crate) fn __reduce400<
     >(
         source_code: &str,
         mode: Mode,
@@ -25287,7 +25286,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 152)
     }
-    fn __reduce401<
+    pub(crate) fn __reduce401<
     >(
         source_code: &str,
         mode: Mode,
@@ -25314,7 +25313,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (10, 153)
     }
-    fn __reduce402<
+    pub(crate) fn __reduce402<
     >(
         source_code: &str,
         mode: Mode,
@@ -25338,7 +25337,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 153)
     }
-    fn __reduce403<
+    pub(crate) fn __reduce403<
     >(
         source_code: &str,
         mode: Mode,
@@ -25364,7 +25363,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (9, 153)
     }
-    fn __reduce404<
+    pub(crate) fn __reduce404<
     >(
         source_code: &str,
         mode: Mode,
@@ -25387,7 +25386,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (6, 153)
     }
-    fn __reduce405<
+    pub(crate) fn __reduce405<
     >(
         source_code: &str,
         mode: Mode,
@@ -25413,7 +25412,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (9, 154)
     }
-    fn __reduce406<
+    pub(crate) fn __reduce406<
     >(
         source_code: &str,
         mode: Mode,
@@ -25438,7 +25437,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (8, 154)
     }
-    fn __reduce407<
+    pub(crate) fn __reduce407<
     >(
         source_code: &str,
         mode: Mode,
@@ -25465,7 +25464,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (10, 154)
     }
-    fn __reduce408<
+    pub(crate) fn __reduce408<
     >(
         source_code: &str,
         mode: Mode,
@@ -25491,7 +25490,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (9, 154)
     }
-    fn __reduce409<
+    pub(crate) fn __reduce409<
     >(
         source_code: &str,
         mode: Mode,
@@ -25515,7 +25514,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 154)
     }
-    fn __reduce410<
+    pub(crate) fn __reduce410<
     >(
         source_code: &str,
         mode: Mode,
@@ -25538,7 +25537,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (6, 154)
     }
-    fn __reduce411<
+    pub(crate) fn __reduce411<
     >(
         source_code: &str,
         mode: Mode,
@@ -25563,7 +25562,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (8, 154)
     }
-    fn __reduce412<
+    pub(crate) fn __reduce412<
     >(
         source_code: &str,
         mode: Mode,
@@ -25587,7 +25586,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 154)
     }
-    fn __reduce413<
+    pub(crate) fn __reduce413<
     >(
         source_code: &str,
         mode: Mode,
@@ -25612,7 +25611,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (8, 154)
     }
-    fn __reduce414<
+    pub(crate) fn __reduce414<
     >(
         source_code: &str,
         mode: Mode,
@@ -25636,7 +25635,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 154)
     }
-    fn __reduce415<
+    pub(crate) fn __reduce415<
     >(
         source_code: &str,
         mode: Mode,
@@ -25662,7 +25661,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (9, 154)
     }
-    fn __reduce416<
+    pub(crate) fn __reduce416<
     >(
         source_code: &str,
         mode: Mode,
@@ -25687,7 +25686,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (8, 154)
     }
-    fn __reduce417<
+    pub(crate) fn __reduce417<
     >(
         source_code: &str,
         mode: Mode,
@@ -25710,7 +25709,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (6, 154)
     }
-    fn __reduce418<
+    pub(crate) fn __reduce418<
     >(
         source_code: &str,
         mode: Mode,
@@ -25732,7 +25731,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (5, 154)
     }
-    fn __reduce419<
+    pub(crate) fn __reduce419<
     >(
         source_code: &str,
         mode: Mode,
@@ -25756,7 +25755,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 154)
     }
-    fn __reduce420<
+    pub(crate) fn __reduce420<
     >(
         source_code: &str,
         mode: Mode,
@@ -25779,7 +25778,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (6, 154)
     }
-    fn __reduce421<
+    pub(crate) fn __reduce421<
     >(
         source_code: &str,
         mode: Mode,
@@ -25798,7 +25797,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant31(__nt), __end));
         (2, 155)
     }
-    fn __reduce422<
+    pub(crate) fn __reduce422<
     >(
         source_code: &str,
         mode: Mode,
@@ -25815,7 +25814,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant31(__nt), __end));
         (1, 155)
     }
-    fn __reduce423<
+    pub(crate) fn __reduce423<
     >(
         source_code: &str,
         mode: Mode,
@@ -25835,7 +25834,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant31(__nt), __end));
         (3, 155)
     }
-    fn __reduce424<
+    pub(crate) fn __reduce424<
     >(
         source_code: &str,
         mode: Mode,
@@ -25854,7 +25853,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant31(__nt), __end));
         (2, 155)
     }
-    fn __reduce425<
+    pub(crate) fn __reduce425<
     >(
         source_code: &str,
         mode: Mode,
@@ -25873,7 +25872,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant31(__nt), __end));
         (2, 155)
     }
-    fn __reduce426<
+    pub(crate) fn __reduce426<
     >(
         source_code: &str,
         mode: Mode,
@@ -25890,7 +25889,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant72(__nt), __end));
         (1, 156)
     }
-    fn __reduce427<
+    pub(crate) fn __reduce427<
     >(
         source_code: &str,
         mode: Mode,
@@ -25900,13 +25899,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // FunctionArgument? =  => ActionFn(465);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action465::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant72(__nt), __end));
         (0, 156)
     }
-    fn __reduce428<
+    pub(crate) fn __reduce428<
     >(
         source_code: &str,
         mode: Mode,
@@ -25925,7 +25924,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 157)
     }
-    fn __reduce429<
+    pub(crate) fn __reduce429<
     >(
         source_code: &str,
         mode: Mode,
@@ -25942,7 +25941,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 157)
     }
-    fn __reduce430<
+    pub(crate) fn __reduce430<
     >(
         source_code: &str,
         mode: Mode,
@@ -25961,7 +25960,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 158)
     }
-    fn __reduce431<
+    pub(crate) fn __reduce431<
     >(
         source_code: &str,
         mode: Mode,
@@ -25978,7 +25977,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 158)
     }
-    fn __reduce432<
+    pub(crate) fn __reduce432<
     >(
         source_code: &str,
         mode: Mode,
@@ -25997,7 +25996,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (2, 159)
     }
-    fn __reduce433<
+    pub(crate) fn __reduce433<
     >(
         source_code: &str,
         mode: Mode,
@@ -26016,7 +26015,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (2, 160)
     }
-    fn __reduce434<
+    pub(crate) fn __reduce434<
     >(
         source_code: &str,
         mode: Mode,
@@ -26033,7 +26032,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant23(__nt), __end));
         (1, 161)
     }
-    fn __reduce435<
+    pub(crate) fn __reduce435<
     >(
         source_code: &str,
         mode: Mode,
@@ -26057,7 +26056,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 162)
     }
-    fn __reduce436<
+    pub(crate) fn __reduce436<
     >(
         source_code: &str,
         mode: Mode,
@@ -26078,7 +26077,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (4, 162)
     }
-    fn __reduce437<
+    pub(crate) fn __reduce437<
     >(
         source_code: &str,
         mode: Mode,
@@ -26103,7 +26102,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (8, 162)
     }
-    fn __reduce438<
+    pub(crate) fn __reduce438<
     >(
         source_code: &str,
         mode: Mode,
@@ -26125,7 +26124,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (5, 162)
     }
-    fn __reduce439<
+    pub(crate) fn __reduce439<
     >(
         source_code: &str,
         mode: Mode,
@@ -26145,7 +26144,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant73(__nt), __end));
         (3, 163)
     }
-    fn __reduce440<
+    pub(crate) fn __reduce440<
     >(
         source_code: &str,
         mode: Mode,
@@ -26162,7 +26161,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant73(__nt), __end));
         (1, 163)
     }
-    fn __reduce441<
+    pub(crate) fn __reduce441<
     >(
         source_code: &str,
         mode: Mode,
@@ -26182,7 +26181,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant73(__nt), __end));
         (3, 164)
     }
-    fn __reduce442<
+    pub(crate) fn __reduce442<
     >(
         source_code: &str,
         mode: Mode,
@@ -26199,7 +26198,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant73(__nt), __end));
         (1, 164)
     }
-    fn __reduce443<
+    pub(crate) fn __reduce443<
     >(
         source_code: &str,
         mode: Mode,
@@ -26216,7 +26215,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (1, 165)
     }
-    fn __reduce444<
+    pub(crate) fn __reduce444<
     >(
         source_code: &str,
         mode: Mode,
@@ -26237,7 +26236,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (4, 165)
     }
-    fn __reduce445<
+    pub(crate) fn __reduce445<
     >(
         source_code: &str,
         mode: Mode,
@@ -26257,7 +26256,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (3, 165)
     }
-    fn __reduce446<
+    pub(crate) fn __reduce446<
     >(
         source_code: &str,
         mode: Mode,
@@ -26274,7 +26273,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (1, 165)
     }
-    fn __reduce447<
+    pub(crate) fn __reduce447<
     >(
         source_code: &str,
         mode: Mode,
@@ -26291,7 +26290,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (1, 166)
     }
-    fn __reduce448<
+    pub(crate) fn __reduce448<
     >(
         source_code: &str,
         mode: Mode,
@@ -26308,7 +26307,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (1, 166)
     }
-    fn __reduce449<
+    pub(crate) fn __reduce449<
     >(
         source_code: &str,
         mode: Mode,
@@ -26318,13 +26317,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ImportDots* =  => ActionFn(388);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action388::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (0, 167)
     }
-    fn __reduce450<
+    pub(crate) fn __reduce450<
     >(
         source_code: &str,
         mode: Mode,
@@ -26341,7 +26340,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (1, 167)
     }
-    fn __reduce451<
+    pub(crate) fn __reduce451<
     >(
         source_code: &str,
         mode: Mode,
@@ -26358,7 +26357,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (1, 168)
     }
-    fn __reduce452<
+    pub(crate) fn __reduce452<
     >(
         source_code: &str,
         mode: Mode,
@@ -26377,7 +26376,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (2, 168)
     }
-    fn __reduce453<
+    pub(crate) fn __reduce453<
     >(
         source_code: &str,
         mode: Mode,
@@ -26394,7 +26393,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant77(__nt), __end));
         (1, 169)
     }
-    fn __reduce454<
+    pub(crate) fn __reduce454<
     >(
         source_code: &str,
         mode: Mode,
@@ -26413,7 +26412,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant77(__nt), __end));
         (2, 169)
     }
-    fn __reduce455<
+    pub(crate) fn __reduce455<
     >(
         source_code: &str,
         mode: Mode,
@@ -26430,7 +26429,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant77(__nt), __end));
         (1, 169)
     }
-    fn __reduce456<
+    pub(crate) fn __reduce456<
     >(
         source_code: &str,
         mode: Mode,
@@ -26449,7 +26448,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (2, 170)
     }
-    fn __reduce457<
+    pub(crate) fn __reduce457<
     >(
         source_code: &str,
         mode: Mode,
@@ -26470,7 +26469,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (4, 170)
     }
-    fn __reduce465<
+    pub(crate) fn __reduce465<
     >(
         source_code: &str,
         mode: Mode,
@@ -26489,7 +26488,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (2, 175)
     }
-    fn __reduce466<
+    pub(crate) fn __reduce466<
     >(
         source_code: &str,
         mode: Mode,
@@ -26506,7 +26505,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (1, 175)
     }
-    fn __reduce467<
+    pub(crate) fn __reduce467<
     >(
         source_code: &str,
         mode: Mode,
@@ -26523,7 +26522,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant34(__nt), __end));
         (1, 176)
     }
-    fn __reduce468<
+    pub(crate) fn __reduce468<
     >(
         source_code: &str,
         mode: Mode,
@@ -26533,13 +26532,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ListLiteralValues? =  => ActionFn(571);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action571::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant34(__nt), __end));
         (0, 176)
     }
-    fn __reduce469<
+    pub(crate) fn __reduce469<
     >(
         source_code: &str,
         mode: Mode,
@@ -26556,7 +26555,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 177)
     }
-    fn __reduce470<
+    pub(crate) fn __reduce470<
     >(
         source_code: &str,
         mode: Mode,
@@ -26573,7 +26572,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 177)
     }
-    fn __reduce471<
+    pub(crate) fn __reduce471<
     >(
         source_code: &str,
         mode: Mode,
@@ -26590,7 +26589,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 177)
     }
-    fn __reduce472<
+    pub(crate) fn __reduce472<
     >(
         source_code: &str,
         mode: Mode,
@@ -26607,7 +26606,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 177)
     }
-    fn __reduce473<
+    pub(crate) fn __reduce473<
     >(
         source_code: &str,
         mode: Mode,
@@ -26624,7 +26623,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 177)
     }
-    fn __reduce474<
+    pub(crate) fn __reduce474<
     >(
         source_code: &str,
         mode: Mode,
@@ -26641,7 +26640,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 177)
     }
-    fn __reduce476<
+    pub(crate) fn __reduce476<
     >(
         source_code: &str,
         mode: Mode,
@@ -26658,7 +26657,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 178)
     }
-    fn __reduce477<
+    pub(crate) fn __reduce477<
     >(
         source_code: &str,
         mode: Mode,
@@ -26675,7 +26674,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 178)
     }
-    fn __reduce478<
+    pub(crate) fn __reduce478<
     >(
         source_code: &str,
         mode: Mode,
@@ -26692,7 +26691,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 178)
     }
-    fn __reduce479<
+    pub(crate) fn __reduce479<
     >(
         source_code: &str,
         mode: Mode,
@@ -26709,7 +26708,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 178)
     }
-    fn __reduce480<
+    pub(crate) fn __reduce480<
     >(
         source_code: &str,
         mode: Mode,
@@ -26726,7 +26725,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 178)
     }
-    fn __reduce481<
+    pub(crate) fn __reduce481<
     >(
         source_code: &str,
         mode: Mode,
@@ -26743,7 +26742,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 178)
     }
-    fn __reduce482<
+    pub(crate) fn __reduce482<
     >(
         source_code: &str,
         mode: Mode,
@@ -26760,7 +26759,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 178)
     }
-    fn __reduce483<
+    pub(crate) fn __reduce483<
     >(
         source_code: &str,
         mode: Mode,
@@ -26779,7 +26778,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 179)
     }
-    fn __reduce484<
+    pub(crate) fn __reduce484<
     >(
         source_code: &str,
         mode: Mode,
@@ -26800,7 +26799,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 179)
     }
-    fn __reduce485<
+    pub(crate) fn __reduce485<
     >(
         source_code: &str,
         mode: Mode,
@@ -26820,7 +26819,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (3, 179)
     }
-    fn __reduce486<
+    pub(crate) fn __reduce486<
     >(
         source_code: &str,
         mode: Mode,
@@ -26842,7 +26841,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (5, 179)
     }
-    fn __reduce487<
+    pub(crate) fn __reduce487<
     >(
         source_code: &str,
         mode: Mode,
@@ -26863,7 +26862,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 179)
     }
-    fn __reduce488<
+    pub(crate) fn __reduce488<
     >(
         source_code: &str,
         mode: Mode,
@@ -26887,7 +26886,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (7, 179)
     }
-    fn __reduce489<
+    pub(crate) fn __reduce489<
     >(
         source_code: &str,
         mode: Mode,
@@ -26910,7 +26909,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (6, 179)
     }
-    fn __reduce490<
+    pub(crate) fn __reduce490<
     >(
         source_code: &str,
         mode: Mode,
@@ -26932,7 +26931,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant78(__nt), __end));
         (5, 180)
     }
-    fn __reduce491<
+    pub(crate) fn __reduce491<
     >(
         source_code: &str,
         mode: Mode,
@@ -26953,7 +26952,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant78(__nt), __end));
         (4, 180)
     }
-    fn __reduce492<
+    pub(crate) fn __reduce492<
     >(
         source_code: &str,
         mode: Mode,
@@ -26970,7 +26969,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant79(__nt), __end));
         (1, 181)
     }
-    fn __reduce493<
+    pub(crate) fn __reduce493<
     >(
         source_code: &str,
         mode: Mode,
@@ -26989,7 +26988,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant79(__nt), __end));
         (2, 181)
     }
-    fn __reduce494<
+    pub(crate) fn __reduce494<
     >(
         source_code: &str,
         mode: Mode,
@@ -27009,7 +27008,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant80(__nt), __end));
         (3, 182)
     }
-    fn __reduce495<
+    pub(crate) fn __reduce495<
     >(
         source_code: &str,
         mode: Mode,
@@ -27029,7 +27028,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant81(__nt), __end));
         (3, 183)
     }
-    fn __reduce496<
+    pub(crate) fn __reduce496<
     >(
         source_code: &str,
         mode: Mode,
@@ -27046,7 +27045,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 184)
     }
-    fn __reduce497<
+    pub(crate) fn __reduce497<
     >(
         source_code: &str,
         mode: Mode,
@@ -27066,7 +27065,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (3, 185)
     }
-    fn __reduce498<
+    pub(crate) fn __reduce498<
     >(
         source_code: &str,
         mode: Mode,
@@ -27086,7 +27085,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (3, 185)
     }
-    fn __reduce499<
+    pub(crate) fn __reduce499<
     >(
         source_code: &str,
         mode: Mode,
@@ -27110,7 +27109,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 186)
     }
-    fn __reduce500<
+    pub(crate) fn __reduce500<
     >(
         source_code: &str,
         mode: Mode,
@@ -27135,7 +27134,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (8, 186)
     }
-    fn __reduce501<
+    pub(crate) fn __reduce501<
     >(
         source_code: &str,
         mode: Mode,
@@ -27160,7 +27159,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (8, 186)
     }
-    fn __reduce502<
+    pub(crate) fn __reduce502<
     >(
         source_code: &str,
         mode: Mode,
@@ -27184,7 +27183,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 186)
     }
-    fn __reduce503<
+    pub(crate) fn __reduce503<
     >(
         source_code: &str,
         mode: Mode,
@@ -27201,7 +27200,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 187)
     }
-    fn __reduce504<
+    pub(crate) fn __reduce504<
     >(
         source_code: &str,
         mode: Mode,
@@ -27218,7 +27217,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 187)
     }
-    fn __reduce505<
+    pub(crate) fn __reduce505<
     >(
         source_code: &str,
         mode: Mode,
@@ -27235,7 +27234,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 187)
     }
-    fn __reduce506<
+    pub(crate) fn __reduce506<
     >(
         source_code: &str,
         mode: Mode,
@@ -27252,7 +27251,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 187)
     }
-    fn __reduce507<
+    pub(crate) fn __reduce507<
     >(
         source_code: &str,
         mode: Mode,
@@ -27269,7 +27268,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 187)
     }
-    fn __reduce508<
+    pub(crate) fn __reduce508<
     >(
         source_code: &str,
         mode: Mode,
@@ -27289,7 +27288,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 188)
     }
-    fn __reduce509<
+    pub(crate) fn __reduce509<
     >(
         source_code: &str,
         mode: Mode,
@@ -27306,7 +27305,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 189)
     }
-    fn __reduce510<
+    pub(crate) fn __reduce510<
     >(
         source_code: &str,
         mode: Mode,
@@ -27323,7 +27322,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 190)
     }
-    fn __reduce511<
+    pub(crate) fn __reduce511<
     >(
         source_code: &str,
         mode: Mode,
@@ -27340,7 +27339,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 190)
     }
-    fn __reduce512<
+    pub(crate) fn __reduce512<
     >(
         source_code: &str,
         mode: Mode,
@@ -27357,7 +27356,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 191)
     }
-    fn __reduce513<
+    pub(crate) fn __reduce513<
     >(
         source_code: &str,
         mode: Mode,
@@ -27374,7 +27373,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 191)
     }
-    fn __reduce514<
+    pub(crate) fn __reduce514<
     >(
         source_code: &str,
         mode: Mode,
@@ -27393,7 +27392,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (2, 192)
     }
-    fn __reduce515<
+    pub(crate) fn __reduce515<
     >(
         source_code: &str,
         mode: Mode,
@@ -27412,7 +27411,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 193)
     }
-    fn __reduce516<
+    pub(crate) fn __reduce516<
     >(
         source_code: &str,
         mode: Mode,
@@ -27429,7 +27428,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 193)
     }
-    fn __reduce517<
+    pub(crate) fn __reduce517<
     >(
         source_code: &str,
         mode: Mode,
@@ -27448,7 +27447,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 194)
     }
-    fn __reduce518<
+    pub(crate) fn __reduce518<
     >(
         source_code: &str,
         mode: Mode,
@@ -27465,7 +27464,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 194)
     }
-    fn __reduce519<
+    pub(crate) fn __reduce519<
     >(
         source_code: &str,
         mode: Mode,
@@ -27482,7 +27481,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant82(__nt), __end));
         (1, 195)
     }
-    fn __reduce520<
+    pub(crate) fn __reduce520<
     >(
         source_code: &str,
         mode: Mode,
@@ -27499,7 +27498,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant82(__nt), __end));
         (1, 195)
     }
-    fn __reduce521<
+    pub(crate) fn __reduce521<
     >(
         source_code: &str,
         mode: Mode,
@@ -27516,7 +27515,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant82(__nt), __end));
         (1, 195)
     }
-    fn __reduce522<
+    pub(crate) fn __reduce522<
     >(
         source_code: &str,
         mode: Mode,
@@ -27533,7 +27532,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 196)
     }
-    fn __reduce523<
+    pub(crate) fn __reduce523<
     >(
         source_code: &str,
         mode: Mode,
@@ -27550,7 +27549,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 197)
     }
-    fn __reduce524<
+    pub(crate) fn __reduce524<
     >(
         source_code: &str,
         mode: Mode,
@@ -27569,7 +27568,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 197)
     }
-    fn __reduce525<
+    pub(crate) fn __reduce525<
     >(
         source_code: &str,
         mode: Mode,
@@ -27586,7 +27585,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant61(__nt), __end));
         (1, 198)
     }
-    fn __reduce526<
+    pub(crate) fn __reduce526<
     >(
         source_code: &str,
         mode: Mode,
@@ -27606,7 +27605,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant61(__nt), __end));
         (3, 198)
     }
-    fn __reduce527<
+    pub(crate) fn __reduce527<
     >(
         source_code: &str,
         mode: Mode,
@@ -27623,7 +27622,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (1, 199)
     }
-    fn __reduce528<
+    pub(crate) fn __reduce528<
     >(
         source_code: &str,
         mode: Mode,
@@ -27643,7 +27642,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (3, 199)
     }
-    fn __reduce529<
+    pub(crate) fn __reduce529<
     >(
         source_code: &str,
         mode: Mode,
@@ -27660,7 +27659,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant83(__nt), __end));
         (1, 200)
     }
-    fn __reduce530<
+    pub(crate) fn __reduce530<
     >(
         source_code: &str,
         mode: Mode,
@@ -27680,7 +27679,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant83(__nt), __end));
         (3, 200)
     }
-    fn __reduce531<
+    pub(crate) fn __reduce531<
     >(
         source_code: &str,
         mode: Mode,
@@ -27700,7 +27699,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (3, 201)
     }
-    fn __reduce532<
+    pub(crate) fn __reduce532<
     >(
         source_code: &str,
         mode: Mode,
@@ -27717,7 +27716,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (1, 201)
     }
-    fn __reduce533<
+    pub(crate) fn __reduce533<
     >(
         source_code: &str,
         mode: Mode,
@@ -27739,7 +27738,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (5, 201)
     }
-    fn __reduce534<
+    pub(crate) fn __reduce534<
     >(
         source_code: &str,
         mode: Mode,
@@ -27759,7 +27758,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (3, 201)
     }
-    fn __reduce535<
+    pub(crate) fn __reduce535<
     >(
         source_code: &str,
         mode: Mode,
@@ -27779,7 +27778,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (3, 202)
     }
-    fn __reduce536<
+    pub(crate) fn __reduce536<
     >(
         source_code: &str,
         mode: Mode,
@@ -27796,7 +27795,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (1, 202)
     }
-    fn __reduce537<
+    pub(crate) fn __reduce537<
     >(
         source_code: &str,
         mode: Mode,
@@ -27818,7 +27817,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (5, 202)
     }
-    fn __reduce538<
+    pub(crate) fn __reduce538<
     >(
         source_code: &str,
         mode: Mode,
@@ -27838,7 +27837,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (3, 202)
     }
-    fn __reduce539<
+    pub(crate) fn __reduce539<
     >(
         source_code: &str,
         mode: Mode,
@@ -27855,7 +27854,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant84(__nt), __end));
         (1, 203)
     }
-    fn __reduce540<
+    pub(crate) fn __reduce540<
     >(
         source_code: &str,
         mode: Mode,
@@ -27875,7 +27874,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant84(__nt), __end));
         (3, 203)
     }
-    fn __reduce541<
+    pub(crate) fn __reduce541<
     >(
         source_code: &str,
         mode: Mode,
@@ -27892,7 +27891,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant85(__nt), __end));
         (1, 204)
     }
-    fn __reduce542<
+    pub(crate) fn __reduce542<
     >(
         source_code: &str,
         mode: Mode,
@@ -27912,7 +27911,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant85(__nt), __end));
         (3, 204)
     }
-    fn __reduce543<
+    pub(crate) fn __reduce543<
     >(
         source_code: &str,
         mode: Mode,
@@ -27929,7 +27928,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant86(__nt), __end));
         (1, 205)
     }
-    fn __reduce544<
+    pub(crate) fn __reduce544<
     >(
         source_code: &str,
         mode: Mode,
@@ -27949,7 +27948,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant86(__nt), __end));
         (3, 205)
     }
-    fn __reduce545<
+    pub(crate) fn __reduce545<
     >(
         source_code: &str,
         mode: Mode,
@@ -27966,7 +27965,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant86(__nt), __end));
         (1, 206)
     }
-    fn __reduce546<
+    pub(crate) fn __reduce546<
     >(
         source_code: &str,
         mode: Mode,
@@ -27986,7 +27985,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant86(__nt), __end));
         (3, 206)
     }
-    fn __reduce547<
+    pub(crate) fn __reduce547<
     >(
         source_code: &str,
         mode: Mode,
@@ -28003,7 +28002,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant53(__nt), __end));
         (1, 207)
     }
-    fn __reduce548<
+    pub(crate) fn __reduce548<
     >(
         source_code: &str,
         mode: Mode,
@@ -28023,7 +28022,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant53(__nt), __end));
         (3, 207)
     }
-    fn __reduce549<
+    pub(crate) fn __reduce549<
     >(
         source_code: &str,
         mode: Mode,
@@ -28040,7 +28039,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (1, 208)
     }
-    fn __reduce550<
+    pub(crate) fn __reduce550<
     >(
         source_code: &str,
         mode: Mode,
@@ -28060,7 +28059,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (3, 208)
     }
-    fn __reduce551<
+    pub(crate) fn __reduce551<
     >(
         source_code: &str,
         mode: Mode,
@@ -28077,7 +28076,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (1, 209)
     }
-    fn __reduce552<
+    pub(crate) fn __reduce552<
     >(
         source_code: &str,
         mode: Mode,
@@ -28097,7 +28096,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (3, 209)
     }
-    fn __reduce553<
+    pub(crate) fn __reduce553<
     >(
         source_code: &str,
         mode: Mode,
@@ -28114,7 +28113,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (1, 210)
     }
-    fn __reduce554<
+    pub(crate) fn __reduce554<
     >(
         source_code: &str,
         mode: Mode,
@@ -28134,7 +28133,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (3, 210)
     }
-    fn __reduce555<
+    pub(crate) fn __reduce555<
     >(
         source_code: &str,
         mode: Mode,
@@ -28151,7 +28150,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant87(__nt), __end));
         (1, 211)
     }
-    fn __reduce556<
+    pub(crate) fn __reduce556<
     >(
         source_code: &str,
         mode: Mode,
@@ -28171,7 +28170,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant87(__nt), __end));
         (3, 211)
     }
-    fn __reduce557<
+    pub(crate) fn __reduce557<
     >(
         source_code: &str,
         mode: Mode,
@@ -28188,7 +28187,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 212)
     }
-    fn __reduce558<
+    pub(crate) fn __reduce558<
     >(
         source_code: &str,
         mode: Mode,
@@ -28205,7 +28204,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 212)
     }
-    fn __reduce559<
+    pub(crate) fn __reduce559<
     >(
         source_code: &str,
         mode: Mode,
@@ -28224,7 +28223,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 213)
     }
-    fn __reduce560<
+    pub(crate) fn __reduce560<
     >(
         source_code: &str,
         mode: Mode,
@@ -28241,7 +28240,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 213)
     }
-    fn __reduce561<
+    pub(crate) fn __reduce561<
     >(
         source_code: &str,
         mode: Mode,
@@ -28260,7 +28259,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 214)
     }
-    fn __reduce562<
+    pub(crate) fn __reduce562<
     >(
         source_code: &str,
         mode: Mode,
@@ -28277,7 +28276,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 214)
     }
-    fn __reduce563<
+    pub(crate) fn __reduce563<
     >(
         source_code: &str,
         mode: Mode,
@@ -28294,7 +28293,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant11(__nt), __end));
         (1, 215)
     }
-    fn __reduce564<
+    pub(crate) fn __reduce564<
     >(
         source_code: &str,
         mode: Mode,
@@ -28314,7 +28313,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant11(__nt), __end));
         (3, 215)
     }
-    fn __reduce565<
+    pub(crate) fn __reduce565<
     >(
         source_code: &str,
         mode: Mode,
@@ -28331,7 +28330,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant11(__nt), __end));
         (1, 216)
     }
-    fn __reduce566<
+    pub(crate) fn __reduce566<
     >(
         source_code: &str,
         mode: Mode,
@@ -28351,7 +28350,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant11(__nt), __end));
         (3, 216)
     }
-    fn __reduce567<
+    pub(crate) fn __reduce567<
     >(
         source_code: &str,
         mode: Mode,
@@ -28368,7 +28367,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant88(__nt), __end));
         (1, 217)
     }
-    fn __reduce568<
+    pub(crate) fn __reduce568<
     >(
         source_code: &str,
         mode: Mode,
@@ -28388,7 +28387,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant88(__nt), __end));
         (3, 217)
     }
-    fn __reduce569<
+    pub(crate) fn __reduce569<
     >(
         source_code: &str,
         mode: Mode,
@@ -28409,7 +28408,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant88(__nt), __end));
         (4, 217)
     }
-    fn __reduce570<
+    pub(crate) fn __reduce570<
     >(
         source_code: &str,
         mode: Mode,
@@ -28426,7 +28425,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant88(__nt), __end));
         (1, 218)
     }
-    fn __reduce571<
+    pub(crate) fn __reduce571<
     >(
         source_code: &str,
         mode: Mode,
@@ -28446,7 +28445,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant88(__nt), __end));
         (3, 218)
     }
-    fn __reduce572<
+    pub(crate) fn __reduce572<
     >(
         source_code: &str,
         mode: Mode,
@@ -28467,7 +28466,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant88(__nt), __end));
         (4, 218)
     }
-    fn __reduce729<
+    pub(crate) fn __reduce729<
     >(
         source_code: &str,
         mode: Mode,
@@ -28484,7 +28483,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant47(__nt), __end));
         (1, 221)
     }
-    fn __reduce730<
+    pub(crate) fn __reduce730<
     >(
         source_code: &str,
         mode: Mode,
@@ -28494,13 +28493,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ParameterList<UntypedParameter, StarUntypedParameter, DoubleStarUntypedParameter>? =  => ActionFn(285);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action285::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant47(__nt), __end));
         (0, 221)
     }
-    fn __reduce751<
+    pub(crate) fn __reduce751<
     >(
         source_code: &str,
         mode: Mode,
@@ -28517,7 +28516,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 225)
     }
-    fn __reduce752<
+    pub(crate) fn __reduce752<
     >(
         source_code: &str,
         mode: Mode,
@@ -28534,7 +28533,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 226)
     }
-    fn __reduce753<
+    pub(crate) fn __reduce753<
     >(
         source_code: &str,
         mode: Mode,
@@ -28551,7 +28550,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 226)
     }
-    fn __reduce754<
+    pub(crate) fn __reduce754<
     >(
         source_code: &str,
         mode: Mode,
@@ -28568,7 +28567,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant89(__nt), __end));
         (1, 227)
     }
-    fn __reduce755<
+    pub(crate) fn __reduce755<
     >(
         source_code: &str,
         mode: Mode,
@@ -28578,13 +28577,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // Pattern? =  => ActionFn(427);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action427::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant89(__nt), __end));
         (0, 227)
     }
-    fn __reduce756<
+    pub(crate) fn __reduce756<
     >(
         source_code: &str,
         mode: Mode,
@@ -28607,7 +28606,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (6, 228)
     }
-    fn __reduce757<
+    pub(crate) fn __reduce757<
     >(
         source_code: &str,
         mode: Mode,
@@ -28629,7 +28628,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (5, 228)
     }
-    fn __reduce758<
+    pub(crate) fn __reduce758<
     >(
         source_code: &str,
         mode: Mode,
@@ -28650,7 +28649,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (4, 228)
     }
-    fn __reduce759<
+    pub(crate) fn __reduce759<
     >(
         source_code: &str,
         mode: Mode,
@@ -28670,7 +28669,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (3, 228)
     }
-    fn __reduce760<
+    pub(crate) fn __reduce760<
     >(
         source_code: &str,
         mode: Mode,
@@ -28691,7 +28690,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (4, 228)
     }
-    fn __reduce761<
+    pub(crate) fn __reduce761<
     >(
         source_code: &str,
         mode: Mode,
@@ -28711,7 +28710,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (3, 228)
     }
-    fn __reduce762<
+    pub(crate) fn __reduce762<
     >(
         source_code: &str,
         mode: Mode,
@@ -28730,7 +28729,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (2, 228)
     }
-    fn __reduce763<
+    pub(crate) fn __reduce763<
     >(
         source_code: &str,
         mode: Mode,
@@ -28749,7 +28748,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 229)
     }
-    fn __reduce764<
+    pub(crate) fn __reduce764<
     >(
         source_code: &str,
         mode: Mode,
@@ -28768,7 +28767,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 229)
     }
-    fn __reduce765<
+    pub(crate) fn __reduce765<
     >(
         source_code: &str,
         mode: Mode,
@@ -28785,7 +28784,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 229)
     }
-    fn __reduce766<
+    pub(crate) fn __reduce766<
     >(
         source_code: &str,
         mode: Mode,
@@ -28802,7 +28801,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 229)
     }
-    fn __reduce767<
+    pub(crate) fn __reduce767<
     >(
         source_code: &str,
         mode: Mode,
@@ -28822,7 +28821,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 230)
     }
-    fn __reduce768<
+    pub(crate) fn __reduce768<
     >(
         source_code: &str,
         mode: Mode,
@@ -28839,7 +28838,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 230)
     }
-    fn __reduce769<
+    pub(crate) fn __reduce769<
     >(
         source_code: &str,
         mode: Mode,
@@ -28859,7 +28858,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 231)
     }
-    fn __reduce770<
+    pub(crate) fn __reduce770<
     >(
         source_code: &str,
         mode: Mode,
@@ -28876,7 +28875,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 231)
     }
-    fn __reduce771<
+    pub(crate) fn __reduce771<
     >(
         source_code: &str,
         mode: Mode,
@@ -28886,13 +28885,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // Program =  => ActionFn(3);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action3::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (0, 232)
     }
-    fn __reduce772<
+    pub(crate) fn __reduce772<
     >(
         source_code: &str,
         mode: Mode,
@@ -28911,7 +28910,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (2, 232)
     }
-    fn __reduce773<
+    pub(crate) fn __reduce773<
     >(
         source_code: &str,
         mode: Mode,
@@ -28932,7 +28931,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (4, 232)
     }
-    fn __reduce774<
+    pub(crate) fn __reduce774<
     >(
         source_code: &str,
         mode: Mode,
@@ -28954,7 +28953,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (5, 232)
     }
-    fn __reduce775<
+    pub(crate) fn __reduce775<
     >(
         source_code: &str,
         mode: Mode,
@@ -28974,7 +28973,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (3, 232)
     }
-    fn __reduce776<
+    pub(crate) fn __reduce776<
     >(
         source_code: &str,
         mode: Mode,
@@ -28995,7 +28994,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (4, 232)
     }
-    fn __reduce777<
+    pub(crate) fn __reduce777<
     >(
         source_code: &str,
         mode: Mode,
@@ -29014,7 +29013,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (2, 232)
     }
-    fn __reduce778<
+    pub(crate) fn __reduce778<
     >(
         source_code: &str,
         mode: Mode,
@@ -29031,7 +29030,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 233)
     }
-    fn __reduce779<
+    pub(crate) fn __reduce779<
     >(
         source_code: &str,
         mode: Mode,
@@ -29052,7 +29051,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (4, 233)
     }
-    fn __reduce780<
+    pub(crate) fn __reduce780<
     >(
         source_code: &str,
         mode: Mode,
@@ -29071,7 +29070,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (2, 233)
     }
-    fn __reduce781<
+    pub(crate) fn __reduce781<
     >(
         source_code: &str,
         mode: Mode,
@@ -29091,7 +29090,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (3, 234)
     }
-    fn __reduce782<
+    pub(crate) fn __reduce782<
     >(
         source_code: &str,
         mode: Mode,
@@ -29110,7 +29109,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 234)
     }
-    fn __reduce783<
+    pub(crate) fn __reduce783<
     >(
         source_code: &str,
         mode: Mode,
@@ -29131,7 +29130,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 234)
     }
-    fn __reduce784<
+    pub(crate) fn __reduce784<
     >(
         source_code: &str,
         mode: Mode,
@@ -29153,7 +29152,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (5, 234)
     }
-    fn __reduce785<
+    pub(crate) fn __reduce785<
     >(
         source_code: &str,
         mode: Mode,
@@ -29174,7 +29173,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 234)
     }
-    fn __reduce786<
+    pub(crate) fn __reduce786<
     >(
         source_code: &str,
         mode: Mode,
@@ -29194,7 +29193,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (3, 234)
     }
-    fn __reduce787<
+    pub(crate) fn __reduce787<
     >(
         source_code: &str,
         mode: Mode,
@@ -29213,7 +29212,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 234)
     }
-    fn __reduce788<
+    pub(crate) fn __reduce788<
     >(
         source_code: &str,
         mode: Mode,
@@ -29234,7 +29233,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (4, 234)
     }
-    fn __reduce789<
+    pub(crate) fn __reduce789<
     >(
         source_code: &str,
         mode: Mode,
@@ -29254,7 +29253,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (3, 234)
     }
-    fn __reduce790<
+    pub(crate) fn __reduce790<
     >(
         source_code: &str,
         mode: Mode,
@@ -29273,7 +29272,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (2, 235)
     }
-    fn __reduce791<
+    pub(crate) fn __reduce791<
     >(
         source_code: &str,
         mode: Mode,
@@ -29290,7 +29289,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (1, 235)
     }
-    fn __reduce792<
+    pub(crate) fn __reduce792<
     >(
         source_code: &str,
         mode: Mode,
@@ -29310,7 +29309,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 236)
     }
-    fn __reduce793<
+    pub(crate) fn __reduce793<
     >(
         source_code: &str,
         mode: Mode,
@@ -29327,7 +29326,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 236)
     }
-    fn __reduce794<
+    pub(crate) fn __reduce794<
     >(
         source_code: &str,
         mode: Mode,
@@ -29347,7 +29346,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 237)
     }
-    fn __reduce795<
+    pub(crate) fn __reduce795<
     >(
         source_code: &str,
         mode: Mode,
@@ -29364,7 +29363,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 237)
     }
-    fn __reduce796<
+    pub(crate) fn __reduce796<
     >(
         source_code: &str,
         mode: Mode,
@@ -29381,7 +29380,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 238)
     }
-    fn __reduce797<
+    pub(crate) fn __reduce797<
     >(
         source_code: &str,
         mode: Mode,
@@ -29398,7 +29397,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant49(__nt), __end));
         (1, 238)
     }
-    fn __reduce798<
+    pub(crate) fn __reduce798<
     >(
         source_code: &str,
         mode: Mode,
@@ -29420,7 +29419,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant91(__nt), __end));
         (5, 239)
     }
-    fn __reduce799<
+    pub(crate) fn __reduce799<
     >(
         source_code: &str,
         mode: Mode,
@@ -29443,7 +29442,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant91(__nt), __end));
         (6, 239)
     }
-    fn __reduce800<
+    pub(crate) fn __reduce800<
     >(
         source_code: &str,
         mode: Mode,
@@ -29464,7 +29463,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant91(__nt), __end));
         (4, 239)
     }
-    fn __reduce801<
+    pub(crate) fn __reduce801<
     >(
         source_code: &str,
         mode: Mode,
@@ -29486,7 +29485,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant91(__nt), __end));
         (5, 239)
     }
-    fn __reduce802<
+    pub(crate) fn __reduce802<
     >(
         source_code: &str,
         mode: Mode,
@@ -29503,7 +29502,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant92(__nt), __end));
         (1, 240)
     }
-    fn __reduce803<
+    pub(crate) fn __reduce803<
     >(
         source_code: &str,
         mode: Mode,
@@ -29522,7 +29521,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant92(__nt), __end));
         (2, 240)
     }
-    fn __reduce804<
+    pub(crate) fn __reduce804<
     >(
         source_code: &str,
         mode: Mode,
@@ -29541,7 +29540,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant93(__nt), __end));
         (2, 241)
     }
-    fn __reduce805<
+    pub(crate) fn __reduce805<
     >(
         source_code: &str,
         mode: Mode,
@@ -29558,7 +29557,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant93(__nt), __end));
         (1, 241)
     }
-    fn __reduce806<
+    pub(crate) fn __reduce806<
     >(
         source_code: &str,
         mode: Mode,
@@ -29575,7 +29574,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant94(__nt), __end));
         (1, 242)
     }
-    fn __reduce807<
+    pub(crate) fn __reduce807<
     >(
         source_code: &str,
         mode: Mode,
@@ -29585,13 +29584,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // SliceOp? =  => ActionFn(279);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action279::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant94(__nt), __end));
         (0, 242)
     }
-    fn __reduce808<
+    pub(crate) fn __reduce808<
     >(
         source_code: &str,
         mode: Mode,
@@ -29608,7 +29607,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 243)
     }
-    fn __reduce809<
+    pub(crate) fn __reduce809<
     >(
         source_code: &str,
         mode: Mode,
@@ -29625,7 +29624,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 243)
     }
-    fn __reduce810<
+    pub(crate) fn __reduce810<
     >(
         source_code: &str,
         mode: Mode,
@@ -29642,7 +29641,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 243)
     }
-    fn __reduce811<
+    pub(crate) fn __reduce811<
     >(
         source_code: &str,
         mode: Mode,
@@ -29659,7 +29658,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 243)
     }
-    fn __reduce812<
+    pub(crate) fn __reduce812<
     >(
         source_code: &str,
         mode: Mode,
@@ -29676,7 +29675,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 243)
     }
-    fn __reduce813<
+    pub(crate) fn __reduce813<
     >(
         source_code: &str,
         mode: Mode,
@@ -29693,7 +29692,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 243)
     }
-    fn __reduce814<
+    pub(crate) fn __reduce814<
     >(
         source_code: &str,
         mode: Mode,
@@ -29710,7 +29709,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 243)
     }
-    fn __reduce815<
+    pub(crate) fn __reduce815<
     >(
         source_code: &str,
         mode: Mode,
@@ -29727,7 +29726,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 243)
     }
-    fn __reduce816<
+    pub(crate) fn __reduce816<
     >(
         source_code: &str,
         mode: Mode,
@@ -29744,7 +29743,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 243)
     }
-    fn __reduce817<
+    pub(crate) fn __reduce817<
     >(
         source_code: &str,
         mode: Mode,
@@ -29761,7 +29760,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 243)
     }
-    fn __reduce818<
+    pub(crate) fn __reduce818<
     >(
         source_code: &str,
         mode: Mode,
@@ -29778,7 +29777,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (1, 243)
     }
-    fn __reduce819<
+    pub(crate) fn __reduce819<
     >(
         source_code: &str,
         mode: Mode,
@@ -29797,7 +29796,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 244)
     }
-    fn __reduce820<
+    pub(crate) fn __reduce820<
     >(
         source_code: &str,
         mode: Mode,
@@ -29816,7 +29815,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (2, 245)
     }
-    fn __reduce821<
+    pub(crate) fn __reduce821<
     >(
         source_code: &str,
         mode: Mode,
@@ -29837,7 +29836,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant9(__nt), __end));
         (4, 246)
     }
-    fn __reduce822<
+    pub(crate) fn __reduce822<
     >(
         source_code: &str,
         mode: Mode,
@@ -29856,7 +29855,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant9(__nt), __end));
         (2, 246)
     }
-    fn __reduce823<
+    pub(crate) fn __reduce823<
     >(
         source_code: &str,
         mode: Mode,
@@ -29875,7 +29874,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant9(__nt), __end));
         (2, 247)
     }
-    fn __reduce824<
+    pub(crate) fn __reduce824<
     >(
         source_code: &str,
         mode: Mode,
@@ -29895,7 +29894,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (3, 248)
     }
-    fn __reduce825<
+    pub(crate) fn __reduce825<
     >(
         source_code: &str,
         mode: Mode,
@@ -29916,7 +29915,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (4, 248)
     }
-    fn __reduce826<
+    pub(crate) fn __reduce826<
     >(
         source_code: &str,
         mode: Mode,
@@ -29935,7 +29934,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (2, 248)
     }
-    fn __reduce827<
+    pub(crate) fn __reduce827<
     >(
         source_code: &str,
         mode: Mode,
@@ -29955,7 +29954,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (3, 248)
     }
-    fn __reduce828<
+    pub(crate) fn __reduce828<
     >(
         source_code: &str,
         mode: Mode,
@@ -29972,7 +29971,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (1, 248)
     }
-    fn __reduce829<
+    pub(crate) fn __reduce829<
     >(
         source_code: &str,
         mode: Mode,
@@ -29991,7 +29990,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (2, 248)
     }
-    fn __reduce830<
+    pub(crate) fn __reduce830<
     >(
         source_code: &str,
         mode: Mode,
@@ -30012,7 +30011,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (4, 248)
     }
-    fn __reduce831<
+    pub(crate) fn __reduce831<
     >(
         source_code: &str,
         mode: Mode,
@@ -30034,7 +30033,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (5, 248)
     }
-    fn __reduce832<
+    pub(crate) fn __reduce832<
     >(
         source_code: &str,
         mode: Mode,
@@ -30054,7 +30053,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (3, 248)
     }
-    fn __reduce833<
+    pub(crate) fn __reduce833<
     >(
         source_code: &str,
         mode: Mode,
@@ -30075,7 +30074,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (4, 248)
     }
-    fn __reduce834<
+    pub(crate) fn __reduce834<
     >(
         source_code: &str,
         mode: Mode,
@@ -30092,7 +30091,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 249)
     }
-    fn __reduce837<
+    pub(crate) fn __reduce837<
     >(
         source_code: &str,
         mode: Mode,
@@ -30109,7 +30108,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant67(__nt), __end));
         (1, 251)
     }
-    fn __reduce838<
+    pub(crate) fn __reduce838<
     >(
         source_code: &str,
         mode: Mode,
@@ -30126,7 +30125,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant67(__nt), __end));
         (1, 251)
     }
-    fn __reduce839<
+    pub(crate) fn __reduce839<
     >(
         source_code: &str,
         mode: Mode,
@@ -30143,7 +30142,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 252)
     }
-    fn __reduce840<
+    pub(crate) fn __reduce840<
     >(
         source_code: &str,
         mode: Mode,
@@ -30164,7 +30163,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (4, 252)
     }
-    fn __reduce841<
+    pub(crate) fn __reduce841<
     >(
         source_code: &str,
         mode: Mode,
@@ -30184,7 +30183,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 252)
     }
-    fn __reduce842<
+    pub(crate) fn __reduce842<
     >(
         source_code: &str,
         mode: Mode,
@@ -30204,7 +30203,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 252)
     }
-    fn __reduce843<
+    pub(crate) fn __reduce843<
     >(
         source_code: &str,
         mode: Mode,
@@ -30223,7 +30222,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 252)
     }
-    fn __reduce844<
+    pub(crate) fn __reduce844<
     >(
         source_code: &str,
         mode: Mode,
@@ -30243,7 +30242,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 252)
     }
-    fn __reduce845<
+    pub(crate) fn __reduce845<
     >(
         source_code: &str,
         mode: Mode,
@@ -30262,7 +30261,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 252)
     }
-    fn __reduce846<
+    pub(crate) fn __reduce846<
     >(
         source_code: &str,
         mode: Mode,
@@ -30281,7 +30280,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 252)
     }
-    fn __reduce847<
+    pub(crate) fn __reduce847<
     >(
         source_code: &str,
         mode: Mode,
@@ -30298,7 +30297,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 252)
     }
-    fn __reduce848<
+    pub(crate) fn __reduce848<
     >(
         source_code: &str,
         mode: Mode,
@@ -30315,7 +30314,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 253)
     }
-    fn __reduce849<
+    pub(crate) fn __reduce849<
     >(
         source_code: &str,
         mode: Mode,
@@ -30334,7 +30333,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 253)
     }
-    fn __reduce850<
+    pub(crate) fn __reduce850<
     >(
         source_code: &str,
         mode: Mode,
@@ -30353,7 +30352,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 253)
     }
-    fn __reduce851<
+    pub(crate) fn __reduce851<
     >(
         source_code: &str,
         mode: Mode,
@@ -30370,7 +30369,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 253)
     }
-    fn __reduce852<
+    pub(crate) fn __reduce852<
     >(
         source_code: &str,
         mode: Mode,
@@ -30390,7 +30389,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (3, 254)
     }
-    fn __reduce853<
+    pub(crate) fn __reduce853<
     >(
         source_code: &str,
         mode: Mode,
@@ -30411,7 +30410,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (4, 254)
     }
-    fn __reduce854<
+    pub(crate) fn __reduce854<
     >(
         source_code: &str,
         mode: Mode,
@@ -30430,7 +30429,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (2, 254)
     }
-    fn __reduce855<
+    pub(crate) fn __reduce855<
     >(
         source_code: &str,
         mode: Mode,
@@ -30450,7 +30449,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (3, 254)
     }
-    fn __reduce856<
+    pub(crate) fn __reduce856<
     >(
         source_code: &str,
         mode: Mode,
@@ -30471,7 +30470,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant25(__nt), __end));
         (4, 254)
     }
-    fn __reduce857<
+    pub(crate) fn __reduce857<
     >(
         source_code: &str,
         mode: Mode,
@@ -30491,7 +30490,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 255)
     }
-    fn __reduce858<
+    pub(crate) fn __reduce858<
     >(
         source_code: &str,
         mode: Mode,
@@ -30508,7 +30507,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 255)
     }
-    fn __reduce859<
+    pub(crate) fn __reduce859<
     >(
         source_code: &str,
         mode: Mode,
@@ -30528,7 +30527,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 256)
     }
-    fn __reduce860<
+    pub(crate) fn __reduce860<
     >(
         source_code: &str,
         mode: Mode,
@@ -30545,7 +30544,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 256)
     }
-    fn __reduce861<
+    pub(crate) fn __reduce861<
     >(
         source_code: &str,
         mode: Mode,
@@ -30567,7 +30566,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (5, 257)
     }
-    fn __reduce862<
+    pub(crate) fn __reduce862<
     >(
         source_code: &str,
         mode: Mode,
@@ -30584,7 +30583,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 257)
     }
-    fn __reduce863<
+    pub(crate) fn __reduce863<
     >(
         source_code: &str,
         mode: Mode,
@@ -30601,7 +30600,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 257)
     }
-    fn __reduce864<
+    pub(crate) fn __reduce864<
     >(
         source_code: &str,
         mode: Mode,
@@ -30618,7 +30617,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (1, 258)
     }
-    fn __reduce865<
+    pub(crate) fn __reduce865<
     >(
         source_code: &str,
         mode: Mode,
@@ -30628,13 +30627,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // Test<"all">? =  => ActionFn(325);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action325::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (0, 258)
     }
-    fn __reduce866<
+    pub(crate) fn __reduce866<
     >(
         source_code: &str,
         mode: Mode,
@@ -30656,7 +30655,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (5, 259)
     }
-    fn __reduce867<
+    pub(crate) fn __reduce867<
     >(
         source_code: &str,
         mode: Mode,
@@ -30673,7 +30672,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 259)
     }
-    fn __reduce868<
+    pub(crate) fn __reduce868<
     >(
         source_code: &str,
         mode: Mode,
@@ -30690,7 +30689,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 259)
     }
-    fn __reduce869<
+    pub(crate) fn __reduce869<
     >(
         source_code: &str,
         mode: Mode,
@@ -30707,7 +30706,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 260)
     }
-    fn __reduce870<
+    pub(crate) fn __reduce870<
     >(
         source_code: &str,
         mode: Mode,
@@ -30724,7 +30723,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (1, 261)
     }
-    fn __reduce871<
+    pub(crate) fn __reduce871<
     >(
         source_code: &str,
         mode: Mode,
@@ -30734,13 +30733,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // TestList? =  => ActionFn(397);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action397::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant16(__nt), __end));
         (0, 261)
     }
-    fn __reduce872<
+    pub(crate) fn __reduce872<
     >(
         source_code: &str,
         mode: Mode,
@@ -30757,7 +30756,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 262)
     }
-    fn __reduce873<
+    pub(crate) fn __reduce873<
     >(
         source_code: &str,
         mode: Mode,
@@ -30774,7 +30773,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 262)
     }
-    fn __reduce874<
+    pub(crate) fn __reduce874<
     >(
         source_code: &str,
         mode: Mode,
@@ -30791,7 +30790,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 263)
     }
-    fn __reduce875<
+    pub(crate) fn __reduce875<
     >(
         source_code: &str,
         mode: Mode,
@@ -30808,7 +30807,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 263)
     }
-    fn __reduce876<
+    pub(crate) fn __reduce876<
     >(
         source_code: &str,
         mode: Mode,
@@ -30825,7 +30824,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 264)
     }
-    fn __reduce877<
+    pub(crate) fn __reduce877<
     >(
         source_code: &str,
         mode: Mode,
@@ -30842,7 +30841,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 265)
     }
-    fn __reduce878<
+    pub(crate) fn __reduce878<
     >(
         source_code: &str,
         mode: Mode,
@@ -30859,7 +30858,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 265)
     }
-    fn __reduce879<
+    pub(crate) fn __reduce879<
     >(
         source_code: &str,
         mode: Mode,
@@ -30878,7 +30877,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant96(__nt), __end));
         (2, 266)
     }
-    fn __reduce880<
+    pub(crate) fn __reduce880<
     >(
         source_code: &str,
         mode: Mode,
@@ -30897,7 +30896,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant96(__nt), __end));
         (2, 266)
     }
-    fn __reduce881<
+    pub(crate) fn __reduce881<
     >(
         source_code: &str,
         mode: Mode,
@@ -30917,7 +30916,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant96(__nt), __end));
         (3, 266)
     }
-    fn __reduce882<
+    pub(crate) fn __reduce882<
     >(
         source_code: &str,
         mode: Mode,
@@ -30944,7 +30943,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (10, 267)
     }
-    fn __reduce883<
+    pub(crate) fn __reduce883<
     >(
         source_code: &str,
         mode: Mode,
@@ -30968,7 +30967,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 267)
     }
-    fn __reduce884<
+    pub(crate) fn __reduce884<
     >(
         source_code: &str,
         mode: Mode,
@@ -30992,7 +30991,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 267)
     }
-    fn __reduce885<
+    pub(crate) fn __reduce885<
     >(
         source_code: &str,
         mode: Mode,
@@ -31013,7 +31012,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (4, 267)
     }
-    fn __reduce886<
+    pub(crate) fn __reduce886<
     >(
         source_code: &str,
         mode: Mode,
@@ -31040,7 +31039,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (10, 267)
     }
-    fn __reduce887<
+    pub(crate) fn __reduce887<
     >(
         source_code: &str,
         mode: Mode,
@@ -31064,7 +31063,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 267)
     }
-    fn __reduce888<
+    pub(crate) fn __reduce888<
     >(
         source_code: &str,
         mode: Mode,
@@ -31088,7 +31087,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 267)
     }
-    fn __reduce889<
+    pub(crate) fn __reduce889<
     >(
         source_code: &str,
         mode: Mode,
@@ -31109,7 +31108,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (4, 267)
     }
-    fn __reduce890<
+    pub(crate) fn __reduce890<
     >(
         source_code: &str,
         mode: Mode,
@@ -31132,7 +31131,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (6, 267)
     }
-    fn __reduce891<
+    pub(crate) fn __reduce891<
     >(
         source_code: &str,
         mode: Mode,
@@ -31151,7 +31150,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant97(__nt), __end));
         (2, 268)
     }
-    fn __reduce892<
+    pub(crate) fn __reduce892<
     >(
         source_code: &str,
         mode: Mode,
@@ -31170,7 +31169,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant97(__nt), __end));
         (2, 268)
     }
-    fn __reduce893<
+    pub(crate) fn __reduce893<
     >(
         source_code: &str,
         mode: Mode,
@@ -31189,7 +31188,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant97(__nt), __end));
         (2, 269)
     }
-    fn __reduce894<
+    pub(crate) fn __reduce894<
     >(
         source_code: &str,
         mode: Mode,
@@ -31208,7 +31207,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant97(__nt), __end));
         (2, 269)
     }
-    fn __reduce895<
+    pub(crate) fn __reduce895<
     >(
         source_code: &str,
         mode: Mode,
@@ -31228,7 +31227,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant53(__nt), __end));
         (3, 270)
     }
-    fn __reduce896<
+    pub(crate) fn __reduce896<
     >(
         source_code: &str,
         mode: Mode,
@@ -31248,7 +31247,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant53(__nt), __end));
         (3, 270)
     }
-    fn __reduce897<
+    pub(crate) fn __reduce897<
     >(
         source_code: &str,
         mode: Mode,
@@ -31268,7 +31267,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant53(__nt), __end));
         (3, 271)
     }
-    fn __reduce898<
+    pub(crate) fn __reduce898<
     >(
         source_code: &str,
         mode: Mode,
@@ -31288,7 +31287,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant53(__nt), __end));
         (3, 271)
     }
-    fn __reduce899<
+    pub(crate) fn __reduce899<
     >(
         source_code: &str,
         mode: Mode,
@@ -31308,7 +31307,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (3, 272)
     }
-    fn __reduce900<
+    pub(crate) fn __reduce900<
     >(
         source_code: &str,
         mode: Mode,
@@ -31328,7 +31327,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (3, 272)
     }
-    fn __reduce901<
+    pub(crate) fn __reduce901<
     >(
         source_code: &str,
         mode: Mode,
@@ -31348,7 +31347,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (3, 273)
     }
-    fn __reduce902<
+    pub(crate) fn __reduce902<
     >(
         source_code: &str,
         mode: Mode,
@@ -31368,7 +31367,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant33(__nt), __end));
         (3, 273)
     }
-    fn __reduce903<
+    pub(crate) fn __reduce903<
     >(
         source_code: &str,
         mode: Mode,
@@ -31385,7 +31384,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant44(__nt), __end));
         (1, 274)
     }
-    fn __reduce904<
+    pub(crate) fn __reduce904<
     >(
         source_code: &str,
         mode: Mode,
@@ -31407,7 +31406,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (5, 275)
     }
-    fn __reduce905<
+    pub(crate) fn __reduce905<
     >(
         source_code: &str,
         mode: Mode,
@@ -31428,7 +31427,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (4, 275)
     }
-    fn __reduce906<
+    pub(crate) fn __reduce906<
     >(
         source_code: &str,
         mode: Mode,
@@ -31448,7 +31447,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant98(__nt), __end));
         (3, 276)
     }
-    fn __reduce907<
+    pub(crate) fn __reduce907<
     >(
         source_code: &str,
         mode: Mode,
@@ -31465,7 +31464,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant98(__nt), __end));
         (1, 276)
     }
-    fn __reduce908<
+    pub(crate) fn __reduce908<
     >(
         source_code: &str,
         mode: Mode,
@@ -31484,7 +31483,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant98(__nt), __end));
         (2, 276)
     }
-    fn __reduce909<
+    pub(crate) fn __reduce909<
     >(
         source_code: &str,
         mode: Mode,
@@ -31503,7 +31502,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant98(__nt), __end));
         (2, 276)
     }
-    fn __reduce910<
+    pub(crate) fn __reduce910<
     >(
         source_code: &str,
         mode: Mode,
@@ -31524,7 +31523,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant99(__nt), __end));
         (4, 277)
     }
-    fn __reduce911<
+    pub(crate) fn __reduce911<
     >(
         source_code: &str,
         mode: Mode,
@@ -31544,7 +31543,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant99(__nt), __end));
         (3, 277)
     }
-    fn __reduce912<
+    pub(crate) fn __reduce912<
     >(
         source_code: &str,
         mode: Mode,
@@ -31561,7 +31560,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant100(__nt), __end));
         (1, 278)
     }
-    fn __reduce913<
+    pub(crate) fn __reduce913<
     >(
         source_code: &str,
         mode: Mode,
@@ -31571,13 +31570,13 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // TypeParams? =  => ActionFn(307);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action307::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant100(__nt), __end));
         (0, 278)
     }
-    fn __reduce914<
+    pub(crate) fn __reduce914<
     >(
         source_code: &str,
         mode: Mode,
@@ -31597,7 +31596,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant11(__nt), __end));
         (3, 279)
     }
-    fn __reduce915<
+    pub(crate) fn __reduce915<
     >(
         source_code: &str,
         mode: Mode,
@@ -31614,7 +31613,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant11(__nt), __end));
         (1, 279)
     }
-    fn __reduce916<
+    pub(crate) fn __reduce916<
     >(
         source_code: &str,
         mode: Mode,
@@ -31631,7 +31630,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant101(__nt), __end));
         (1, 280)
     }
-    fn __reduce917<
+    pub(crate) fn __reduce917<
     >(
         source_code: &str,
         mode: Mode,
@@ -31648,7 +31647,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant101(__nt), __end));
         (1, 280)
     }
-    fn __reduce918<
+    pub(crate) fn __reduce918<
     >(
         source_code: &str,
         mode: Mode,
@@ -31665,7 +31664,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant101(__nt), __end));
         (1, 280)
     }
-    fn __reduce919<
+    pub(crate) fn __reduce919<
     >(
         source_code: &str,
         mode: Mode,
@@ -31682,7 +31681,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant11(__nt), __end));
         (1, 281)
     }
-    fn __reduce920<
+    pub(crate) fn __reduce920<
     >(
         source_code: &str,
         mode: Mode,
@@ -31699,7 +31698,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant35(__nt), __end));
         (1, 282)
     }
-    fn __reduce921<
+    pub(crate) fn __reduce921<
     >(
         source_code: &str,
         mode: Mode,
@@ -31723,7 +31722,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (7, 283)
     }
-    fn __reduce922<
+    pub(crate) fn __reduce922<
     >(
         source_code: &str,
         mode: Mode,
@@ -31744,7 +31743,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (4, 283)
     }
-    fn __reduce923<
+    pub(crate) fn __reduce923<
     >(
         source_code: &str,
         mode: Mode,
@@ -31761,7 +31760,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant18(__nt), __end));
         (1, 284)
     }
-    fn __reduce924<
+    pub(crate) fn __reduce924<
     >(
         source_code: &str,
         mode: Mode,
@@ -31778,7 +31777,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant18(__nt), __end));
         (1, 284)
     }
-    fn __reduce925<
+    pub(crate) fn __reduce925<
     >(
         source_code: &str,
         mode: Mode,
@@ -31795,7 +31794,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant18(__nt), __end));
         (1, 285)
     }
-    fn __reduce926<
+    pub(crate) fn __reduce926<
     >(
         source_code: &str,
         mode: Mode,
@@ -31812,7 +31811,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant18(__nt), __end));
         (1, 285)
     }
-    fn __reduce927<
+    pub(crate) fn __reduce927<
     >(
         source_code: &str,
         mode: Mode,
@@ -31832,7 +31831,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant18(__nt), __end));
         (3, 286)
     }
-    fn __reduce928<
+    pub(crate) fn __reduce928<
     >(
         source_code: &str,
         mode: Mode,
@@ -31853,7 +31852,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant40(__nt), __end));
         (4, 287)
     }
-    fn __reduce929<
+    pub(crate) fn __reduce929<
     >(
         source_code: &str,
         mode: Mode,
@@ -31873,7 +31872,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant40(__nt), __end));
         (3, 287)
     }
-    fn __reduce930<
+    pub(crate) fn __reduce930<
     >(
         source_code: &str,
         mode: Mode,
@@ -31896,7 +31895,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant40(__nt), __end));
         (6, 287)
     }
-    fn __reduce931<
+    pub(crate) fn __reduce931<
     >(
         source_code: &str,
         mode: Mode,
@@ -31917,7 +31916,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant40(__nt), __end));
         (4, 287)
     }
-    fn __reduce932<
+    pub(crate) fn __reduce932<
     >(
         source_code: &str,
         mode: Mode,
@@ -31941,7 +31940,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant40(__nt), __end));
         (7, 287)
     }
-    fn __reduce933<
+    pub(crate) fn __reduce933<
     >(
         source_code: &str,
         mode: Mode,
@@ -31963,7 +31962,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant40(__nt), __end));
         (5, 287)
     }
-    fn __reduce934<
+    pub(crate) fn __reduce934<
     >(
         source_code: &str,
         mode: Mode,
@@ -31985,7 +31984,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant40(__nt), __end));
         (5, 287)
     }
-    fn __reduce935<
+    pub(crate) fn __reduce935<
     >(
         source_code: &str,
         mode: Mode,
@@ -32005,7 +32004,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant40(__nt), __end));
         (3, 287)
     }
-    fn __reduce936<
+    pub(crate) fn __reduce936<
     >(
         source_code: &str,
         mode: Mode,
@@ -32028,7 +32027,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant40(__nt), __end));
         (6, 287)
     }
-    fn __reduce937<
+    pub(crate) fn __reduce937<
     >(
         source_code: &str,
         mode: Mode,
@@ -32049,7 +32048,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant40(__nt), __end));
         (4, 287)
     }
-    fn __reduce938<
+    pub(crate) fn __reduce938<
     >(
         source_code: &str,
         mode: Mode,
@@ -32066,7 +32065,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant40(__nt), __end));
         (1, 287)
     }
-    fn __reduce939<
+    pub(crate) fn __reduce939<
     >(
         source_code: &str,
         mode: Mode,
@@ -32085,7 +32084,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant40(__nt), __end));
         (2, 287)
     }
-    fn __reduce940<
+    pub(crate) fn __reduce940<
     >(
         source_code: &str,
         mode: Mode,
@@ -32102,7 +32101,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant40(__nt), __end));
         (1, 288)
     }
-    fn __reduce941<
+    pub(crate) fn __reduce941<
     >(
         source_code: &str,
         mode: Mode,
@@ -32124,7 +32123,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (5, 289)
     }
-    fn __reduce942<
+    pub(crate) fn __reduce942<
     >(
         source_code: &str,
         mode: Mode,
@@ -32145,7 +32144,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant37(__nt), __end));
         (4, 289)
     }
-    fn __reduce943<
+    pub(crate) fn __reduce943<
     >(
         source_code: &str,
         mode: Mode,
@@ -32165,7 +32164,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 290)
     }
-    fn __reduce944<
+    pub(crate) fn __reduce944<
     >(
         source_code: &str,
         mode: Mode,
@@ -32182,7 +32181,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 290)
     }
-    fn __reduce945<
+    pub(crate) fn __reduce945<
     >(
         source_code: &str,
         mode: Mode,
@@ -32202,7 +32201,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 291)
     }
-    fn __reduce946<
+    pub(crate) fn __reduce946<
     >(
         source_code: &str,
         mode: Mode,
@@ -32219,7 +32218,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 291)
     }
-    fn __reduce947<
+    pub(crate) fn __reduce947<
     >(
         source_code: &str,
         mode: Mode,
@@ -32238,7 +32237,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (2, 292)
     }
-    fn __reduce948<
+    pub(crate) fn __reduce948<
     >(
         source_code: &str,
         mode: Mode,
@@ -32255,7 +32254,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 292)
     }
-    fn __reduce949<
+    pub(crate) fn __reduce949<
     >(
         source_code: &str,
         mode: Mode,
@@ -32275,7 +32274,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (3, 292)
     }
-    fn __reduce951<
+    pub(crate) fn __reduce951<
     >(
         source_code: &str,
         mode: Mode,
@@ -32292,7 +32291,7 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant102(__nt), __end));
         (1, 294)
     }
-    fn __reduce952<
+    pub(crate) fn __reduce952<
     >(
         source_code: &str,
         mode: Mode,
@@ -32302,18 +32301,17 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // fstring_middle? =  => ActionFn(283);
-        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2)).unwrap_or_default();
-        let __end = __start;
+        let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
+        let __end = __start.clone();
         let __nt = super::__action283::<>(source_code, mode, &__start, &__end);
         __symbols.push((__start, __Symbol::Variant102(__nt), __end));
         (0, 294)
     }
 }
-#[allow(unused_imports)]
 pub(crate) use self::__parse__Top::TopParser;
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action0<
 >(
     source_code: &str,
@@ -32325,7 +32323,7 @@ fn __action0<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1<
 >(
     source_code: &str,
@@ -32340,7 +32338,7 @@ fn __action1<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action2<
 >(
     source_code: &str,
@@ -32356,7 +32354,7 @@ fn __action2<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action3<
 >(
     source_code: &str,
@@ -32369,7 +32367,7 @@ fn __action3<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action4<
 >(
     source_code: &str,
@@ -32385,7 +32383,7 @@ fn __action4<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action5<
 >(
     source_code: &str,
@@ -32405,7 +32403,7 @@ fn __action5<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action6<
 >(
     source_code: &str,
@@ -32418,7 +32416,7 @@ fn __action6<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action7<
 >(
     source_code: &str,
@@ -32436,7 +32434,7 @@ fn __action7<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action8<
 >(
     source_code: &str,
@@ -32451,7 +32449,7 @@ fn __action8<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action9<
 >(
     source_code: &str,
@@ -32469,7 +32467,7 @@ fn __action9<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action10<
 >(
     source_code: &str,
@@ -32481,7 +32479,7 @@ fn __action10<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action11<
 >(
     source_code: &str,
@@ -32497,7 +32495,7 @@ fn __action11<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action12<
 >(
     source_code: &str,
@@ -32517,7 +32515,7 @@ fn __action12<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action13<
 >(
     source_code: &str,
@@ -32529,7 +32527,7 @@ fn __action13<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action14<
 >(
     source_code: &str,
@@ -32541,7 +32539,7 @@ fn __action14<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action15<
 >(
     source_code: &str,
@@ -32553,7 +32551,7 @@ fn __action15<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action16<
 >(
     source_code: &str,
@@ -32565,7 +32563,7 @@ fn __action16<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action17<
 >(
     source_code: &str,
@@ -32577,7 +32575,7 @@ fn __action17<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action18<
 >(
     source_code: &str,
@@ -32589,7 +32587,7 @@ fn __action18<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action19<
 >(
     source_code: &str,
@@ -32601,7 +32599,7 @@ fn __action19<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action20<
 >(
     source_code: &str,
@@ -32613,7 +32611,7 @@ fn __action20<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action21<
 >(
     source_code: &str,
@@ -32625,7 +32623,7 @@ fn __action21<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action22<
 >(
     source_code: &str,
@@ -32637,7 +32635,7 @@ fn __action22<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action23<
 >(
     source_code: &str,
@@ -32649,7 +32647,7 @@ fn __action23<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action24<
 >(
     source_code: &str,
@@ -32665,7 +32663,7 @@ fn __action24<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action25<
 >(
     source_code: &str,
@@ -32684,7 +32682,7 @@ fn __action25<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action26<
 >(
     source_code: &str,
@@ -32719,7 +32717,7 @@ fn __action26<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action27<
 >(
     source_code: &str,
@@ -32745,7 +32743,7 @@ fn __action27<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action28<
 >(
     source_code: &str,
@@ -32774,7 +32772,7 @@ fn __action28<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action29<
 >(
     source_code: &str,
@@ -32787,7 +32785,7 @@ fn __action29<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action30<
 >(
     source_code: &str,
@@ -32800,7 +32798,7 @@ fn __action30<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action31<
 >(
     source_code: &str,
@@ -32812,7 +32810,7 @@ fn __action31<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action32<
 >(
     source_code: &str,
@@ -32824,7 +32822,7 @@ fn __action32<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action33<
 >(
     source_code: &str,
@@ -32836,7 +32834,7 @@ fn __action33<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action34<
 >(
     source_code: &str,
@@ -32848,7 +32846,7 @@ fn __action34<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action35<
 >(
     source_code: &str,
@@ -32860,7 +32858,7 @@ fn __action35<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action36<
 >(
     source_code: &str,
@@ -32872,7 +32870,7 @@ fn __action36<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action37<
 >(
     source_code: &str,
@@ -32884,7 +32882,7 @@ fn __action37<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action38<
 >(
     source_code: &str,
@@ -32896,7 +32894,7 @@ fn __action38<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action39<
 >(
     source_code: &str,
@@ -32908,7 +32906,7 @@ fn __action39<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action40<
 >(
     source_code: &str,
@@ -32920,7 +32918,7 @@ fn __action40<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action41<
 >(
     source_code: &str,
@@ -32932,7 +32930,7 @@ fn __action41<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action42<
 >(
     source_code: &str,
@@ -32944,7 +32942,7 @@ fn __action42<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action43<
 >(
     source_code: &str,
@@ -32956,7 +32954,7 @@ fn __action43<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action44<
 >(
     source_code: &str,
@@ -32968,7 +32966,7 @@ fn __action44<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action45<
 >(
     source_code: &str,
@@ -32980,7 +32978,7 @@ fn __action45<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action46<
 >(
     source_code: &str,
@@ -32992,7 +32990,7 @@ fn __action46<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action47<
 >(
     source_code: &str,
@@ -33004,7 +33002,7 @@ fn __action47<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action48<
 >(
     source_code: &str,
@@ -33016,7 +33014,7 @@ fn __action48<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action49<
 >(
     source_code: &str,
@@ -33028,7 +33026,7 @@ fn __action49<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action50<
 >(
     source_code: &str,
@@ -33040,7 +33038,7 @@ fn __action50<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action51<
 >(
     source_code: &str,
@@ -33052,7 +33050,7 @@ fn __action51<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action52<
 >(
     source_code: &str,
@@ -33064,7 +33062,7 @@ fn __action52<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action53<
 >(
     source_code: &str,
@@ -33081,7 +33079,7 @@ fn __action53<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action54<
 >(
     source_code: &str,
@@ -33097,7 +33095,7 @@ fn __action54<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action55<
 >(
     source_code: &str,
@@ -33116,7 +33114,7 @@ fn __action55<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action56<
 >(
     source_code: &str,
@@ -33134,7 +33132,7 @@ fn __action56<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action57<
 >(
     source_code: &str,
@@ -33146,7 +33144,7 @@ fn __action57<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action58<
 >(
     source_code: &str,
@@ -33164,7 +33162,7 @@ fn __action58<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action59<
 >(
     source_code: &str,
@@ -33184,7 +33182,7 @@ fn __action59<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action60<
 >(
     source_code: &str,
@@ -33203,7 +33201,7 @@ fn __action60<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action61<
 >(
     source_code: &str,
@@ -33230,7 +33228,7 @@ fn __action61<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action62<
 >(
     source_code: &str,
@@ -33245,7 +33243,7 @@ fn __action62<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action63<
 >(
     source_code: &str,
@@ -33259,7 +33257,7 @@ fn __action63<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action64<
 >(
     source_code: &str,
@@ -33271,7 +33269,7 @@ fn __action64<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action65<
 >(
     source_code: &str,
@@ -33283,7 +33281,7 @@ fn __action65<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action66<
 >(
     source_code: &str,
@@ -33297,7 +33295,7 @@ fn __action66<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action67<
 >(
     source_code: &str,
@@ -33314,7 +33312,7 @@ fn __action67<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action68<
 >(
     source_code: &str,
@@ -33331,7 +33329,7 @@ fn __action68<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action69<
 >(
     source_code: &str,
@@ -33345,7 +33343,7 @@ fn __action69<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action70<
 >(
     source_code: &str,
@@ -33367,7 +33365,7 @@ fn __action70<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action71<
 >(
     source_code: &str,
@@ -33386,7 +33384,7 @@ fn __action71<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action72<
 >(
     source_code: &str,
@@ -33405,7 +33403,7 @@ fn __action72<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action73<
 >(
     source_code: &str,
@@ -33429,7 +33427,7 @@ fn __action73<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action74<
 >(
     source_code: &str,
@@ -33458,7 +33456,7 @@ fn __action74<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action75<
 >(
     source_code: &str,
@@ -33492,7 +33490,7 @@ fn __action75<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action76<
 >(
     source_code: &str,
@@ -33572,7 +33570,7 @@ fn __action76<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action77<
 >(
     source_code: &str,
@@ -33584,7 +33582,7 @@ fn __action77<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action78<
 >(
     source_code: &str,
@@ -33596,7 +33594,7 @@ fn __action78<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action79<
 >(
     source_code: &str,
@@ -33608,7 +33606,7 @@ fn __action79<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action80<
 >(
     source_code: &str,
@@ -33620,7 +33618,7 @@ fn __action80<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action81<
 >(
     source_code: &str,
@@ -33632,7 +33630,7 @@ fn __action81<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action82<
 >(
     source_code: &str,
@@ -33644,7 +33642,7 @@ fn __action82<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action83<
 >(
     source_code: &str,
@@ -33656,7 +33654,7 @@ fn __action83<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action84<
 >(
     source_code: &str,
@@ -33668,7 +33666,7 @@ fn __action84<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action85<
 >(
     source_code: &str,
@@ -33702,7 +33700,7 @@ fn __action85<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action86<
 >(
     source_code: &str,
@@ -33746,7 +33744,7 @@ fn __action86<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action87<
 >(
     source_code: &str,
@@ -33791,7 +33789,7 @@ fn __action87<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action88<
 >(
     source_code: &str,
@@ -33817,7 +33815,7 @@ fn __action88<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action89<
 >(
     source_code: &str,
@@ -33832,7 +33830,7 @@ fn __action89<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action90<
 >(
     source_code: &str,
@@ -33852,7 +33850,7 @@ fn __action90<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action91<
 >(
     source_code: &str,
@@ -33874,7 +33872,7 @@ fn __action91<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action92<
 >(
     source_code: &str,
@@ -33886,7 +33884,7 @@ fn __action92<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action93<
 >(
     source_code: &str,
@@ -33898,7 +33896,7 @@ fn __action93<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action94<
 >(
     source_code: &str,
@@ -33910,7 +33908,7 @@ fn __action94<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action95<
 >(
     source_code: &str,
@@ -33941,7 +33939,7 @@ fn __action95<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action96<
 >(
     source_code: &str,
@@ -33953,7 +33951,7 @@ fn __action96<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action97<
 >(
     source_code: &str,
@@ -33971,7 +33969,7 @@ fn __action97<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action98<
 >(
     source_code: &str,
@@ -33983,7 +33981,7 @@ fn __action98<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action99<
 >(
     source_code: &str,
@@ -33995,7 +33993,7 @@ fn __action99<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action100<
 >(
     source_code: &str,
@@ -34007,7 +34005,7 @@ fn __action100<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action101<
 >(
     source_code: &str,
@@ -34019,7 +34017,7 @@ fn __action101<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action102<
 >(
     source_code: &str,
@@ -34031,7 +34029,7 @@ fn __action102<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action103<
 >(
     source_code: &str,
@@ -34043,7 +34041,7 @@ fn __action103<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action104<
 >(
     source_code: &str,
@@ -34055,7 +34053,7 @@ fn __action104<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action105<
 >(
     source_code: &str,
@@ -34071,7 +34069,7 @@ fn __action105<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action106<
 >(
     source_code: &str,
@@ -34089,7 +34087,7 @@ fn __action106<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action107<
 >(
     source_code: &str,
@@ -34111,7 +34109,7 @@ fn __action107<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action108<
 >(
     source_code: &str,
@@ -34136,7 +34134,7 @@ fn __action108<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action109<
 >(
     source_code: &str,
@@ -34155,7 +34153,7 @@ fn __action109<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action110<
 >(
     source_code: &str,
@@ -34173,7 +34171,7 @@ fn __action110<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action111<
 >(
     source_code: &str,
@@ -34189,7 +34187,7 @@ fn __action111<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action112<
 >(
     source_code: &str,
@@ -34201,7 +34199,7 @@ fn __action112<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action113<
 >(
     source_code: &str,
@@ -34222,7 +34220,7 @@ fn __action113<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action114<
 >(
     source_code: &str,
@@ -34243,7 +34241,7 @@ fn __action114<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action115<
 >(
     source_code: &str,
@@ -34260,7 +34258,7 @@ fn __action115<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action116<
 >(
     source_code: &str,
@@ -34277,7 +34275,7 @@ fn __action116<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action117<
 >(
     source_code: &str,
@@ -34294,7 +34292,7 @@ fn __action117<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action118<
 >(
     source_code: &str,
@@ -34311,7 +34309,7 @@ fn __action118<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action119<
 >(
     source_code: &str,
@@ -34328,7 +34326,7 @@ fn __action119<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action120<
 >(
     source_code: &str,
@@ -34345,7 +34343,7 @@ fn __action120<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action121<
 >(
     source_code: &str,
@@ -34362,7 +34360,7 @@ fn __action121<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action122<
 >(
     source_code: &str,
@@ -34380,7 +34378,7 @@ fn __action122<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action123<
 >(
     source_code: &str,
@@ -34396,7 +34394,7 @@ fn __action123<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action124<
 >(
     source_code: &str,
@@ -34417,7 +34415,7 @@ fn __action124<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action125<
 >(
     source_code: &str,
@@ -34438,7 +34436,7 @@ fn __action125<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action126<
 >(
     source_code: &str,
@@ -34455,7 +34453,7 @@ fn __action126<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action127<
 >(
     source_code: &str,
@@ -34467,7 +34465,7 @@ fn __action127<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action128<
 >(
     source_code: &str,
@@ -34479,7 +34477,7 @@ fn __action128<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action129<
 >(
     source_code: &str,
@@ -34491,7 +34489,7 @@ fn __action129<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action130<
 >(
     source_code: &str,
@@ -34503,7 +34501,7 @@ fn __action130<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action131<
 >(
     source_code: &str,
@@ -34519,7 +34517,7 @@ fn __action131<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action132<
 >(
     source_code: &str,
@@ -34536,7 +34534,7 @@ fn __action132<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action133<
 >(
     source_code: &str,
@@ -34553,7 +34551,7 @@ fn __action133<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action134<
 >(
     source_code: &str,
@@ -34567,7 +34565,7 @@ fn __action134<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action135<
 >(
     source_code: &str,
@@ -34589,7 +34587,7 @@ fn __action135<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action136<
 >(
     source_code: &str,
@@ -34616,7 +34614,7 @@ fn __action136<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action137<
 >(
     source_code: &str,
@@ -34641,7 +34639,7 @@ fn __action137<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action138<
 >(
     source_code: &str,
@@ -34671,7 +34669,7 @@ fn __action138<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action139<
 >(
     source_code: &str,
@@ -34691,7 +34689,7 @@ fn __action139<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action140<
 >(
     source_code: &str,
@@ -34712,7 +34710,7 @@ fn __action140<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action141<
 >(
     source_code: &str,
@@ -34733,7 +34731,7 @@ fn __action141<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action142<
 >(
     source_code: &str,
@@ -34758,7 +34756,7 @@ fn __action142<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action143<
 >(
     source_code: &str,
@@ -34781,7 +34779,7 @@ fn __action143<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action144<
 >(
     source_code: &str,
@@ -34804,7 +34802,7 @@ fn __action144<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action145<
 >(
     source_code: &str,
@@ -34825,7 +34823,7 @@ fn __action145<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action146<
 >(
     source_code: &str,
@@ -34861,7 +34859,7 @@ fn __action146<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action147<
 >(
     source_code: &str,
@@ -34893,7 +34891,7 @@ fn __action147<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action148<
 >(
     source_code: &str,
@@ -34923,7 +34921,7 @@ fn __action148<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action149<
 >(
     source_code: &str,
@@ -34961,7 +34959,7 @@ fn __action149<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action150<
 >(
     source_code: &str,
@@ -34999,7 +34997,7 @@ fn __action150<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action151<
 >(
     source_code: &str,
@@ -35029,7 +35027,7 @@ fn __action151<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action152<
 >(
     source_code: &str,
@@ -35056,7 +35054,7 @@ fn __action152<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action153<
 >(
     source_code: &str,
@@ -35083,7 +35081,7 @@ fn __action153<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action154<
 >(
     source_code: &str,
@@ -35109,7 +35107,7 @@ fn __action154<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action155<
 >(
     source_code: &str,
@@ -35135,7 +35133,7 @@ fn __action155<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action156<
 >(
     source_code: &str,
@@ -35155,7 +35153,7 @@ fn __action156<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action157<
 >(
     source_code: &str,
@@ -35170,7 +35168,7 @@ fn __action157<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action158<
 >(
     source_code: &str,
@@ -35189,7 +35187,7 @@ fn __action158<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action159<
 >(
     source_code: &str,
@@ -35219,7 +35217,7 @@ fn __action159<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action160<
 >(
     source_code: &str,
@@ -35234,7 +35232,7 @@ fn __action160<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action161<
 >(
     source_code: &str,
@@ -35252,7 +35250,7 @@ fn __action161<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action162<
 >(
     source_code: &str,
@@ -35275,7 +35273,7 @@ fn __action162<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action163<
 >(
     source_code: &str,
@@ -35310,7 +35308,7 @@ fn __action163<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action164<
 >(
     source_code: &str,
@@ -35328,7 +35326,7 @@ fn __action164<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action165<
 >(
     source_code: &str,
@@ -35355,7 +35353,7 @@ fn __action165<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action166<
 >(
     source_code: &str,
@@ -35382,7 +35380,7 @@ fn __action166<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action167<
 >(
     source_code: &str,
@@ -35399,7 +35397,7 @@ fn __action167<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action168<
 >(
     source_code: &str,
@@ -35414,7 +35412,7 @@ fn __action168<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action169<
 >(
     source_code: &str,
@@ -35429,7 +35427,7 @@ fn __action169<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action170<
 >(
     source_code: &str,
@@ -35448,7 +35446,7 @@ fn __action170<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action171<
 >(
     source_code: &str,
@@ -35467,7 +35465,7 @@ fn __action171<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action172<
 >(
     source_code: &str,
@@ -35486,7 +35484,7 @@ fn __action172<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action173<
 >(
     source_code: &str,
@@ -35517,7 +35515,7 @@ fn __action173<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action174<
 >(
     source_code: &str,
@@ -35539,7 +35537,7 @@ fn __action174<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action175<
 >(
     source_code: &str,
@@ -35558,7 +35556,7 @@ fn __action175<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action176<
 >(
     source_code: &str,
@@ -35577,7 +35575,7 @@ fn __action176<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action177<
 >(
     source_code: &str,
@@ -35596,7 +35594,7 @@ fn __action177<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action178<
 >(
     source_code: &str,
@@ -35614,7 +35612,7 @@ fn __action178<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action179<
 >(
     source_code: &str,
@@ -35632,7 +35630,7 @@ fn __action179<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action180<
 >(
     source_code: &str,
@@ -35651,7 +35649,7 @@ fn __action180<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action181<
 >(
     source_code: &str,
@@ -35663,7 +35661,7 @@ fn __action181<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action182<
 >(
     source_code: &str,
@@ -35675,7 +35673,7 @@ fn __action182<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action183<
 >(
     source_code: &str,
@@ -35693,7 +35691,7 @@ fn __action183<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action184<
 >(
     source_code: &str,
@@ -35715,7 +35713,7 @@ fn __action184<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action185<
 >(
     source_code: &str,
@@ -35749,7 +35747,7 @@ fn __action185<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action186<
 >(
     source_code: &str,
@@ -35761,7 +35759,7 @@ fn __action186<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action187<
 >(
     source_code: &str,
@@ -35773,7 +35771,7 @@ fn __action187<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action188<
 >(
     source_code: &str,
@@ -35785,7 +35783,7 @@ fn __action188<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action189<
 >(
     source_code: &str,
@@ -35797,7 +35795,7 @@ fn __action189<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action190<
 >(
     source_code: &str,
@@ -35809,7 +35807,7 @@ fn __action190<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action191<
 >(
     source_code: &str,
@@ -35821,7 +35819,7 @@ fn __action191<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action192<
 >(
     source_code: &str,
@@ -35833,7 +35831,7 @@ fn __action192<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action193<
 >(
     source_code: &str,
@@ -35846,7 +35844,7 @@ fn __action193<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action194<
 >(
     source_code: &str,
@@ -35858,7 +35856,7 @@ fn __action194<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action195<
 >(
     source_code: &str,
@@ -35871,7 +35869,7 @@ fn __action195<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action196<
 >(
     source_code: &str,
@@ -35883,7 +35881,7 @@ fn __action196<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action197<
 >(
     source_code: &str,
@@ -35895,7 +35893,7 @@ fn __action197<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action198<
 >(
     source_code: &str,
@@ -35907,7 +35905,7 @@ fn __action198<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action199<
 >(
     source_code: &str,
@@ -35919,7 +35917,7 @@ fn __action199<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action200<
 >(
     source_code: &str,
@@ -35931,7 +35929,7 @@ fn __action200<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action201<
 >(
     source_code: &str,
@@ -35943,7 +35941,7 @@ fn __action201<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action202<
 >(
     source_code: &str,
@@ -35955,7 +35953,7 @@ fn __action202<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action203<
 >(
     source_code: &str,
@@ -35967,7 +35965,7 @@ fn __action203<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action204<
 >(
     source_code: &str,
@@ -35979,7 +35977,7 @@ fn __action204<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action205<
 >(
     source_code: &str,
@@ -35991,7 +35989,7 @@ fn __action205<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action206<
 >(
     source_code: &str,
@@ -36003,7 +36001,7 @@ fn __action206<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action207<
 >(
     source_code: &str,
@@ -36015,7 +36013,7 @@ fn __action207<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action208<
 >(
     source_code: &str,
@@ -36027,7 +36025,7 @@ fn __action208<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action209<
 >(
     source_code: &str,
@@ -36049,7 +36047,7 @@ fn __action209<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action210<
 >(
     source_code: &str,
@@ -36072,7 +36070,7 @@ fn __action210<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action211<
 >(
     source_code: &str,
@@ -36084,7 +36082,7 @@ fn __action211<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action212<
 >(
     source_code: &str,
@@ -36108,7 +36106,7 @@ fn __action212<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action213<
 >(
     source_code: &str,
@@ -36122,7 +36120,7 @@ fn __action213<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action214<
 >(
     source_code: &str,
@@ -36135,7 +36133,7 @@ fn __action214<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action215<
 >(
     source_code: &str,
@@ -36151,7 +36149,7 @@ fn __action215<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action216<
 >(
     source_code: &str,
@@ -36163,7 +36161,7 @@ fn __action216<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action217<
 >(
     source_code: &str,
@@ -36175,7 +36173,7 @@ fn __action217<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action218<
 >(
     source_code: &str,
@@ -36192,7 +36190,7 @@ fn __action218<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action219<
 >(
     source_code: &str,
@@ -36214,7 +36212,7 @@ fn __action219<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action220<
 >(
     source_code: &str,
@@ -36226,7 +36224,7 @@ fn __action220<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action221<
 >(
     source_code: &str,
@@ -36243,7 +36241,7 @@ fn __action221<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action222<
 >(
     source_code: &str,
@@ -36295,7 +36293,7 @@ fn __action222<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action223<
 >(
     source_code: &str,
@@ -36308,7 +36306,7 @@ fn __action223<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action224<
 >(
     source_code: &str,
@@ -36325,7 +36323,7 @@ fn __action224<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action225<
 >(
     source_code: &str,
@@ -36351,7 +36349,7 @@ fn __action225<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action226<
 >(
     source_code: &str,
@@ -36364,7 +36362,7 @@ fn __action226<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action227<
 >(
     source_code: &str,
@@ -36377,7 +36375,7 @@ fn __action227<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action228<
 >(
     source_code: &str,
@@ -36391,7 +36389,7 @@ fn __action228<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action229<
 >(
     source_code: &str,
@@ -36403,7 +36401,7 @@ fn __action229<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action230<
 >(
     source_code: &str,
@@ -36416,7 +36414,7 @@ fn __action230<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action231<
 >(
     source_code: &str,
@@ -36429,7 +36427,7 @@ fn __action231<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action232<
 >(
     source_code: &str,
@@ -36441,7 +36439,7 @@ fn __action232<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action233<
 >(
     source_code: &str,
@@ -36453,7 +36451,7 @@ fn __action233<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action234<
 >(
     source_code: &str,
@@ -36465,7 +36463,7 @@ fn __action234<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action235<
 >(
     source_code: &str,
@@ -36478,7 +36476,7 @@ fn __action235<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action236<
 >(
     source_code: &str,
@@ -36490,7 +36488,7 @@ fn __action236<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action237<
 >(
     source_code: &str,
@@ -36509,7 +36507,7 @@ fn __action237<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action238<
 >(
     source_code: &str,
@@ -36521,7 +36519,7 @@ fn __action238<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action239<
 >(
     source_code: &str,
@@ -36550,7 +36548,7 @@ fn __action239<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action240<
 >(
     source_code: &str,
@@ -36562,7 +36560,7 @@ fn __action240<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action241<
 >(
     source_code: &str,
@@ -36575,7 +36573,7 @@ fn __action241<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action242<
 >(
     source_code: &str,
@@ -36598,7 +36596,7 @@ fn __action242<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action243<
 >(
     source_code: &str,
@@ -36626,7 +36624,7 @@ fn __action243<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action244<
 >(
     source_code: &str,
@@ -36642,7 +36640,7 @@ fn __action244<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action245<
 >(
     source_code: &str,
@@ -36662,7 +36660,7 @@ fn __action245<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action246<
 >(
     source_code: &str,
@@ -36677,7 +36675,7 @@ fn __action246<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action247<
 >(
     source_code: &str,
@@ -36689,7 +36687,7 @@ fn __action247<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action248<
 >(
     source_code: &str,
@@ -36701,7 +36699,7 @@ fn __action248<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action249<
 >(
     source_code: &str,
@@ -36713,7 +36711,7 @@ fn __action249<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action250<
 >(
     source_code: &str,
@@ -36727,7 +36725,7 @@ fn __action250<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action251<
 >(
     source_code: &str,
@@ -36739,7 +36737,7 @@ fn __action251<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action252<
 >(
     source_code: &str,
@@ -36752,7 +36750,7 @@ fn __action252<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action253<
 >(
     source_code: &str,
@@ -36770,7 +36768,7 @@ fn __action253<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action254<
 >(
     source_code: &str,
@@ -36783,7 +36781,7 @@ fn __action254<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action255<
 >(
     source_code: &str,
@@ -36795,7 +36793,7 @@ fn __action255<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action256<
 >(
     source_code: &str,
@@ -36813,7 +36811,7 @@ fn __action256<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action257<
 >(
     source_code: &str,
@@ -36825,7 +36823,7 @@ fn __action257<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action258<
 >(
     source_code: &str,
@@ -36837,7 +36835,7 @@ fn __action258<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action259<
 >(
     source_code: &str,
@@ -36850,7 +36848,7 @@ fn __action259<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action260<
 >(
     source_code: &str,
@@ -36880,7 +36878,7 @@ fn __action260<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action261<
 >(
     source_code: &str,
@@ -36892,7 +36890,7 @@ fn __action261<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action262<
 >(
     source_code: &str,
@@ -36909,7 +36907,7 @@ fn __action262<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action263<
 >(
     source_code: &str,
@@ -36939,7 +36937,7 @@ fn __action263<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action264<
 >(
     source_code: &str,
@@ -36951,7 +36949,7 @@ fn __action264<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action265<
 >(
     source_code: &str,
@@ -36968,7 +36966,7 @@ fn __action265<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action266<
 >(
     source_code: &str,
@@ -36980,7 +36978,7 @@ fn __action266<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action267<
 >(
     source_code: &str,
@@ -36997,7 +36995,7 @@ fn __action267<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action268<
 >(
     source_code: &str,
@@ -37009,7 +37007,7 @@ fn __action268<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action269<
 >(
     source_code: &str,
@@ -37022,7 +37020,7 @@ fn __action269<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action270<
 >(
     source_code: &str,
@@ -37034,7 +37032,7 @@ fn __action270<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action271<
 >(
     source_code: &str,
@@ -37047,7 +37045,7 @@ fn __action271<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action272<
 >(
     source_code: &str,
@@ -37059,7 +37057,7 @@ fn __action272<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action273<
 >(
     source_code: &str,
@@ -37072,7 +37070,7 @@ fn __action273<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action274<
 >(
     source_code: &str,
@@ -37085,7 +37083,7 @@ fn __action274<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action275<
 >(
     source_code: &str,
@@ -37097,7 +37095,7 @@ fn __action275<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action276<
 >(
     source_code: &str,
@@ -37110,7 +37108,7 @@ fn __action276<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action277<
 >(
     source_code: &str,
@@ -37126,7 +37124,7 @@ fn __action277<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action278<
 >(
     source_code: &str,
@@ -37138,7 +37136,7 @@ fn __action278<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action279<
 >(
     source_code: &str,
@@ -37151,7 +37149,7 @@ fn __action279<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action280<
 >(
     source_code: &str,
@@ -37165,7 +37163,7 @@ fn __action280<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action281<
 >(
     source_code: &str,
@@ -37182,7 +37180,7 @@ fn __action281<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action282<
 >(
     source_code: &str,
@@ -37194,7 +37192,7 @@ fn __action282<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action283<
 >(
     source_code: &str,
@@ -37207,7 +37205,7 @@ fn __action283<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action284<
 >(
     source_code: &str,
@@ -37219,7 +37217,7 @@ fn __action284<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action285<
 >(
     source_code: &str,
@@ -37232,7 +37230,7 @@ fn __action285<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action286<
 >(
     source_code: &str,
@@ -37263,7 +37261,7 @@ fn __action286<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action287<
 >(
     source_code: &str,
@@ -37288,7 +37286,7 @@ fn __action287<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action288<
 >(
     source_code: &str,
@@ -37300,7 +37298,7 @@ fn __action288<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action289<
 >(
     source_code: &str,
@@ -37317,7 +37315,7 @@ fn __action289<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action290<
 >(
     source_code: &str,
@@ -37329,7 +37327,7 @@ fn __action290<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action291<
 >(
     source_code: &str,
@@ -37342,7 +37340,7 @@ fn __action291<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action292<
 >(
     source_code: &str,
@@ -37354,7 +37352,7 @@ fn __action292<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action293<
 >(
     source_code: &str,
@@ -37367,7 +37365,7 @@ fn __action293<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action294<
 >(
     source_code: &str,
@@ -37380,7 +37378,7 @@ fn __action294<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action295<
 >(
     source_code: &str,
@@ -37392,7 +37390,7 @@ fn __action295<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action296<
 >(
     source_code: &str,
@@ -37405,7 +37403,7 @@ fn __action296<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action297<
 >(
     source_code: &str,
@@ -37418,7 +37416,7 @@ fn __action297<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action298<
 >(
     source_code: &str,
@@ -37430,7 +37428,7 @@ fn __action298<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action299<
 >(
     source_code: &str,
@@ -37443,7 +37441,7 @@ fn __action299<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action300<
 >(
     source_code: &str,
@@ -37455,7 +37453,7 @@ fn __action300<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action301<
 >(
     source_code: &str,
@@ -37486,7 +37484,7 @@ fn __action301<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action302<
 >(
     source_code: &str,
@@ -37511,7 +37509,7 @@ fn __action302<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action303<
 >(
     source_code: &str,
@@ -37523,7 +37521,7 @@ fn __action303<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action304<
 >(
     source_code: &str,
@@ -37536,7 +37534,7 @@ fn __action304<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action305<
 >(
     source_code: &str,
@@ -37549,7 +37547,7 @@ fn __action305<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action306<
 >(
     source_code: &str,
@@ -37561,7 +37559,7 @@ fn __action306<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action307<
 >(
     source_code: &str,
@@ -37574,7 +37572,7 @@ fn __action307<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action308<
 >(
     source_code: &str,
@@ -37587,7 +37585,7 @@ fn __action308<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action309<
 >(
     source_code: &str,
@@ -37599,7 +37597,7 @@ fn __action309<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action310<
 >(
     source_code: &str,
@@ -37611,7 +37609,7 @@ fn __action310<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action311<
 >(
     source_code: &str,
@@ -37628,7 +37626,7 @@ fn __action311<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action312<
 >(
     source_code: &str,
@@ -37640,7 +37638,7 @@ fn __action312<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action313<
 >(
     source_code: &str,
@@ -37653,7 +37651,7 @@ fn __action313<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action314<
 >(
     source_code: &str,
@@ -37671,7 +37669,7 @@ fn __action314<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action315<
 >(
     source_code: &str,
@@ -37683,7 +37681,7 @@ fn __action315<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action316<
 >(
     source_code: &str,
@@ -37696,7 +37694,7 @@ fn __action316<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action317<
 >(
     source_code: &str,
@@ -37708,7 +37706,7 @@ fn __action317<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action318<
 >(
     source_code: &str,
@@ -37721,7 +37719,7 @@ fn __action318<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action319<
 >(
     source_code: &str,
@@ -37739,7 +37737,7 @@ fn __action319<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action320<
 >(
     source_code: &str,
@@ -37751,7 +37749,7 @@ fn __action320<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action321<
 >(
     source_code: &str,
@@ -37763,7 +37761,7 @@ fn __action321<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action322<
 >(
     source_code: &str,
@@ -37776,7 +37774,7 @@ fn __action322<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action323<
 >(
     source_code: &str,
@@ -37789,7 +37787,7 @@ fn __action323<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action324<
 >(
     source_code: &str,
@@ -37801,7 +37799,7 @@ fn __action324<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action325<
 >(
     source_code: &str,
@@ -37814,7 +37812,7 @@ fn __action325<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action326<
 >(
     source_code: &str,
@@ -37828,7 +37826,7 @@ fn __action326<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action327<
 >(
     source_code: &str,
@@ -37840,7 +37838,7 @@ fn __action327<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action328<
 >(
     source_code: &str,
@@ -37853,7 +37851,7 @@ fn __action328<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action329<
 >(
     source_code: &str,
@@ -37865,7 +37863,7 @@ fn __action329<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action330<
 >(
     source_code: &str,
@@ -37878,7 +37876,7 @@ fn __action330<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action331<
 >(
     source_code: &str,
@@ -37892,7 +37890,7 @@ fn __action331<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action332<
 >(
     source_code: &str,
@@ -37904,7 +37902,7 @@ fn __action332<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action333<
 >(
     source_code: &str,
@@ -37917,7 +37915,7 @@ fn __action333<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action334<
 >(
     source_code: &str,
@@ -37929,7 +37927,7 @@ fn __action334<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action335<
 >(
     source_code: &str,
@@ -37942,7 +37940,7 @@ fn __action335<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action336<
 >(
     source_code: &str,
@@ -37954,7 +37952,7 @@ fn __action336<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action337<
 >(
     source_code: &str,
@@ -37967,7 +37965,7 @@ fn __action337<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action338<
 >(
     source_code: &str,
@@ -37981,7 +37979,7 @@ fn __action338<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action339<
 >(
     source_code: &str,
@@ -37993,7 +37991,7 @@ fn __action339<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action340<
 >(
     source_code: &str,
@@ -38006,7 +38004,7 @@ fn __action340<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action341<
 >(
     source_code: &str,
@@ -38021,7 +38019,7 @@ fn __action341<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action342<
 >(
     source_code: &str,
@@ -38034,7 +38032,7 @@ fn __action342<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action343<
 >(
     source_code: &str,
@@ -38046,7 +38044,7 @@ fn __action343<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action344<
 >(
     source_code: &str,
@@ -38062,7 +38060,7 @@ fn __action344<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action345<
 >(
     source_code: &str,
@@ -38074,7 +38072,7 @@ fn __action345<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action346<
 >(
     source_code: &str,
@@ -38091,7 +38089,7 @@ fn __action346<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action347<
 >(
     source_code: &str,
@@ -38103,7 +38101,7 @@ fn __action347<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action348<
 >(
     source_code: &str,
@@ -38120,7 +38118,7 @@ fn __action348<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action349<
 >(
     source_code: &str,
@@ -38132,7 +38130,7 @@ fn __action349<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action350<
 >(
     source_code: &str,
@@ -38149,7 +38147,7 @@ fn __action350<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action351<
 >(
     source_code: &str,
@@ -38162,7 +38160,7 @@ fn __action351<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action352<
 >(
     source_code: &str,
@@ -38178,7 +38176,7 @@ fn __action352<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action353<
 >(
     source_code: &str,
@@ -38196,7 +38194,7 @@ fn __action353<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action354<
 >(
     source_code: &str,
@@ -38208,7 +38206,7 @@ fn __action354<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action355<
 >(
     source_code: &str,
@@ -38221,7 +38219,7 @@ fn __action355<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action356<
 >(
     source_code: &str,
@@ -38234,7 +38232,7 @@ fn __action356<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action357<
 >(
     source_code: &str,
@@ -38248,7 +38246,7 @@ fn __action357<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action358<
 >(
     source_code: &str,
@@ -38265,7 +38263,7 @@ fn __action358<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action359<
 >(
     source_code: &str,
@@ -38279,7 +38277,7 @@ fn __action359<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action360<
 >(
     source_code: &str,
@@ -38296,7 +38294,7 @@ fn __action360<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action361<
 >(
     source_code: &str,
@@ -38308,7 +38306,7 @@ fn __action361<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action362<
 >(
     source_code: &str,
@@ -38321,7 +38319,7 @@ fn __action362<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action363<
 >(
     source_code: &str,
@@ -38333,7 +38331,7 @@ fn __action363<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action364<
 >(
     source_code: &str,
@@ -38347,7 +38345,7 @@ fn __action364<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action365<
 >(
     source_code: &str,
@@ -38364,7 +38362,7 @@ fn __action365<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action366<
 >(
     source_code: &str,
@@ -38376,7 +38374,7 @@ fn __action366<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action367<
 >(
     source_code: &str,
@@ -38389,7 +38387,7 @@ fn __action367<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action368<
 >(
     source_code: &str,
@@ -38401,7 +38399,7 @@ fn __action368<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action369<
 >(
     source_code: &str,
@@ -38414,7 +38412,7 @@ fn __action369<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action370<
 >(
     source_code: &str,
@@ -38426,7 +38424,7 @@ fn __action370<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action371<
 >(
     source_code: &str,
@@ -38447,7 +38445,7 @@ fn __action371<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action372<
 >(
     source_code: &str,
@@ -38459,7 +38457,7 @@ fn __action372<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action373<
 >(
     source_code: &str,
@@ -38471,7 +38469,7 @@ fn __action373<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action374<
 >(
     source_code: &str,
@@ -38484,7 +38482,7 @@ fn __action374<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action375<
 >(
     source_code: &str,
@@ -38497,7 +38495,7 @@ fn __action375<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action376<
 >(
     source_code: &str,
@@ -38509,7 +38507,7 @@ fn __action376<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action377<
 >(
     source_code: &str,
@@ -38526,7 +38524,7 @@ fn __action377<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action378<
 >(
     source_code: &str,
@@ -38538,7 +38536,7 @@ fn __action378<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action379<
 >(
     source_code: &str,
@@ -38551,7 +38549,7 @@ fn __action379<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action380<
 >(
     source_code: &str,
@@ -38564,7 +38562,7 @@ fn __action380<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action381<
 >(
     source_code: &str,
@@ -38576,7 +38574,7 @@ fn __action381<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action382<
 >(
     source_code: &str,
@@ -38589,7 +38587,7 @@ fn __action382<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action383<
 >(
     source_code: &str,
@@ -38601,7 +38599,7 @@ fn __action383<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action384<
 >(
     source_code: &str,
@@ -38618,7 +38616,7 @@ fn __action384<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action385<
 >(
     source_code: &str,
@@ -38633,7 +38631,7 @@ fn __action385<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action386<
 >(
     source_code: &str,
@@ -38645,7 +38643,7 @@ fn __action386<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action387<
 >(
     source_code: &str,
@@ -38658,7 +38656,7 @@ fn __action387<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action388<
 >(
     source_code: &str,
@@ -38671,7 +38669,7 @@ fn __action388<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action389<
 >(
     source_code: &str,
@@ -38683,7 +38681,7 @@ fn __action389<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action390<
 >(
     source_code: &str,
@@ -38695,7 +38693,7 @@ fn __action390<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action391<
 >(
     source_code: &str,
@@ -38712,7 +38710,7 @@ fn __action391<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action392<
 >(
     source_code: &str,
@@ -38727,7 +38725,7 @@ fn __action392<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action393<
 >(
     source_code: &str,
@@ -38739,7 +38737,7 @@ fn __action393<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action394<
 >(
     source_code: &str,
@@ -38752,7 +38750,7 @@ fn __action394<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action395<
 >(
     source_code: &str,
@@ -38765,7 +38763,7 @@ fn __action395<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action396<
 >(
     source_code: &str,
@@ -38777,7 +38775,7 @@ fn __action396<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action397<
 >(
     source_code: &str,
@@ -38790,7 +38788,7 @@ fn __action397<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action398<
 >(
     source_code: &str,
@@ -38802,7 +38800,7 @@ fn __action398<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action399<
 >(
     source_code: &str,
@@ -38815,7 +38813,7 @@ fn __action399<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action400<
 >(
     source_code: &str,
@@ -38838,7 +38836,7 @@ fn __action400<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action401<
 >(
     source_code: &str,
@@ -38850,7 +38848,7 @@ fn __action401<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action402<
 >(
     source_code: &str,
@@ -38862,7 +38860,7 @@ fn __action402<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action403<
 >(
     source_code: &str,
@@ -38875,7 +38873,7 @@ fn __action403<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action404<
 >(
     source_code: &str,
@@ -38887,7 +38885,7 @@ fn __action404<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action405<
 >(
     source_code: &str,
@@ -38899,7 +38897,7 @@ fn __action405<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action406<
 >(
     source_code: &str,
@@ -38912,7 +38910,7 @@ fn __action406<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action407<
 >(
     source_code: &str,
@@ -38925,7 +38923,7 @@ fn __action407<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action408<
 >(
     source_code: &str,
@@ -38937,7 +38935,7 @@ fn __action408<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action409<
 >(
     source_code: &str,
@@ -38950,7 +38948,7 @@ fn __action409<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action410<
 >(
     source_code: &str,
@@ -38963,7 +38961,7 @@ fn __action410<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action411<
 >(
     source_code: &str,
@@ -38975,7 +38973,7 @@ fn __action411<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action412<
 >(
     source_code: &str,
@@ -39011,7 +39009,7 @@ fn __action414<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action415<
 >(
     source_code: &str,
@@ -39023,7 +39021,7 @@ fn __action415<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action416<
 >(
     source_code: &str,
@@ -39036,7 +39034,7 @@ fn __action416<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action417<
 >(
     source_code: &str,
@@ -39048,7 +39046,7 @@ fn __action417<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action418<
 >(
     source_code: &str,
@@ -39061,7 +39059,7 @@ fn __action418<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action419<
 >(
     source_code: &str,
@@ -39073,7 +39071,7 @@ fn __action419<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action420<
 >(
     source_code: &str,
@@ -39086,7 +39084,7 @@ fn __action420<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action421<
 >(
     source_code: &str,
@@ -39098,7 +39096,7 @@ fn __action421<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action422<
 >(
     source_code: &str,
@@ -39111,7 +39109,7 @@ fn __action422<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action423<
 >(
     source_code: &str,
@@ -39124,7 +39122,7 @@ fn __action423<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action424<
 >(
     source_code: &str,
@@ -39145,7 +39143,7 @@ fn __action424<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action425<
 >(
     source_code: &str,
@@ -39157,7 +39155,7 @@ fn __action425<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action426<
 >(
     source_code: &str,
@@ -39169,7 +39167,7 @@ fn __action426<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action427<
 >(
     source_code: &str,
@@ -39182,7 +39180,7 @@ fn __action427<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action428<
 >(
     source_code: &str,
@@ -39195,7 +39193,7 @@ fn __action428<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action429<
 >(
     source_code: &str,
@@ -39207,7 +39205,7 @@ fn __action429<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action430<
 >(
     source_code: &str,
@@ -39219,7 +39217,7 @@ fn __action430<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action431<
 >(
     source_code: &str,
@@ -39232,7 +39230,7 @@ fn __action431<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action432<
 >(
     source_code: &str,
@@ -39255,7 +39253,7 @@ fn __action432<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action433<
 >(
     source_code: &str,
@@ -39267,7 +39265,7 @@ fn __action433<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action434<
 >(
     source_code: &str,
@@ -39279,7 +39277,7 @@ fn __action434<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action435<
 >(
     source_code: &str,
@@ -39291,7 +39289,7 @@ fn __action435<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action436<
 >(
     source_code: &str,
@@ -39304,7 +39302,7 @@ fn __action436<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action437<
 >(
     source_code: &str,
@@ -39316,7 +39314,7 @@ fn __action437<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action438<
 >(
     source_code: &str,
@@ -39329,7 +39327,7 @@ fn __action438<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action439<
 >(
     source_code: &str,
@@ -39342,7 +39340,7 @@ fn __action439<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action440<
 >(
     source_code: &str,
@@ -39362,7 +39360,7 @@ fn __action440<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action441<
 >(
     source_code: &str,
@@ -39388,7 +39386,7 @@ fn __action441<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action442<
 >(
     source_code: &str,
@@ -39405,7 +39403,7 @@ fn __action442<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action443<
 >(
     source_code: &str,
@@ -39419,7 +39417,7 @@ fn __action443<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action444<
 >(
     source_code: &str,
@@ -39436,7 +39434,7 @@ fn __action444<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action445<
 >(
     source_code: &str,
@@ -39448,7 +39446,7 @@ fn __action445<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action446<
 >(
     source_code: &str,
@@ -39461,7 +39459,7 @@ fn __action446<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action447<
 >(
     source_code: &str,
@@ -39474,7 +39472,7 @@ fn __action447<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action448<
 >(
     source_code: &str,
@@ -39494,7 +39492,7 @@ fn __action448<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action449<
 >(
     source_code: &str,
@@ -39520,7 +39518,7 @@ fn __action449<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action450<
 >(
     source_code: &str,
@@ -39537,7 +39535,7 @@ fn __action450<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action451<
 >(
     source_code: &str,
@@ -39551,7 +39549,7 @@ fn __action451<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action452<
 >(
     source_code: &str,
@@ -39568,7 +39566,7 @@ fn __action452<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action453<
 >(
     source_code: &str,
@@ -39580,7 +39578,7 @@ fn __action453<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action454<
 >(
     source_code: &str,
@@ -39593,7 +39591,7 @@ fn __action454<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action455<
 >(
     source_code: &str,
@@ -39605,7 +39603,7 @@ fn __action455<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action456<
 >(
     source_code: &str,
@@ -39622,7 +39620,7 @@ fn __action456<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action457<
 >(
     source_code: &str,
@@ -39634,7 +39632,7 @@ fn __action457<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action458<
 >(
     source_code: &str,
@@ -39647,7 +39645,7 @@ fn __action458<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action459<
 >(
     source_code: &str,
@@ -39660,7 +39658,7 @@ fn __action459<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action460<
 >(
     source_code: &str,
@@ -39678,7 +39676,7 @@ fn __action460<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action461<
 >(
     source_code: &str,
@@ -39690,7 +39688,7 @@ fn __action461<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action462<
 >(
     source_code: &str,
@@ -39702,7 +39700,7 @@ fn __action462<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action463<
 >(
     source_code: &str,
@@ -39715,7 +39713,7 @@ fn __action463<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action464<
 >(
     source_code: &str,
@@ -39727,7 +39725,7 @@ fn __action464<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action465<
 >(
     source_code: &str,
@@ -39740,7 +39738,7 @@ fn __action465<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action466<
 >(
     source_code: &str,
@@ -39753,7 +39751,7 @@ fn __action466<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action467<
 >(
     source_code: &str,
@@ -39765,7 +39763,7 @@ fn __action467<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action468<
 >(
     source_code: &str,
@@ -39778,7 +39776,7 @@ fn __action468<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action469<
 >(
     source_code: &str,
@@ -39790,7 +39788,7 @@ fn __action469<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action470<
 >(
     source_code: &str,
@@ -39803,7 +39801,7 @@ fn __action470<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action471<
 >(
     source_code: &str,
@@ -39815,7 +39813,7 @@ fn __action471<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action472<
 >(
     source_code: &str,
@@ -39828,7 +39826,7 @@ fn __action472<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action473<
 >(
     source_code: &str,
@@ -39841,7 +39839,7 @@ fn __action473<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action474<
 >(
     source_code: &str,
@@ -39860,7 +39858,7 @@ fn __action474<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action475<
 >(
     source_code: &str,
@@ -39872,7 +39870,7 @@ fn __action475<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action476<
 >(
     source_code: &str,
@@ -39884,7 +39882,7 @@ fn __action476<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action477<
 >(
     source_code: &str,
@@ -39901,7 +39899,7 @@ fn __action477<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action478<
 >(
     source_code: &str,
@@ -39913,7 +39911,7 @@ fn __action478<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action479<
 >(
     source_code: &str,
@@ -39925,7 +39923,7 @@ fn __action479<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action480<
 >(
     source_code: &str,
@@ -39938,7 +39936,7 @@ fn __action480<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action481<
 >(
     source_code: &str,
@@ -39951,7 +39949,7 @@ fn __action481<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action482<
 >(
     source_code: &str,
@@ -39964,7 +39962,7 @@ fn __action482<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action483<
 >(
     source_code: &str,
@@ -39976,7 +39974,7 @@ fn __action483<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action484<
 >(
     source_code: &str,
@@ -39989,7 +39987,7 @@ fn __action484<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action485<
 >(
     source_code: &str,
@@ -40001,7 +39999,7 @@ fn __action485<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action486<
 >(
     source_code: &str,
@@ -40020,7 +40018,7 @@ fn __action486<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action487<
 >(
     source_code: &str,
@@ -40032,7 +40030,7 @@ fn __action487<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action488<
 >(
     source_code: &str,
@@ -40049,7 +40047,7 @@ fn __action488<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action489<
 >(
     source_code: &str,
@@ -40061,7 +40059,7 @@ fn __action489<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action490<
 >(
     source_code: &str,
@@ -40073,7 +40071,7 @@ fn __action490<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action491<
 >(
     source_code: &str,
@@ -40086,7 +40084,7 @@ fn __action491<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action492<
 >(
     source_code: &str,
@@ -40099,7 +40097,7 @@ fn __action492<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action493<
 >(
     source_code: &str,
@@ -40112,7 +40110,7 @@ fn __action493<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action494<
 >(
     source_code: &str,
@@ -40124,7 +40122,7 @@ fn __action494<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action495<
 >(
     source_code: &str,
@@ -40137,7 +40135,7 @@ fn __action495<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action496<
 >(
     source_code: &str,
@@ -40149,7 +40147,7 @@ fn __action496<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action497<
 >(
     source_code: &str,
@@ -40168,7 +40166,7 @@ fn __action497<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action498<
 >(
     source_code: &str,
@@ -40186,7 +40184,7 @@ fn __action498<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action499<
 >(
     source_code: &str,
@@ -40198,7 +40196,7 @@ fn __action499<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action500<
 >(
     source_code: &str,
@@ -40219,7 +40217,7 @@ fn __action500<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action501<
 >(
     source_code: &str,
@@ -40231,7 +40229,7 @@ fn __action501<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action502<
 >(
     source_code: &str,
@@ -40252,7 +40250,7 @@ fn __action502<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action503<
 >(
     source_code: &str,
@@ -40264,7 +40262,7 @@ fn __action503<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action504<
 >(
     source_code: &str,
@@ -40282,7 +40280,7 @@ fn __action504<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action505<
 >(
     source_code: &str,
@@ -40294,7 +40292,7 @@ fn __action505<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action506<
 >(
     source_code: &str,
@@ -40306,7 +40304,7 @@ fn __action506<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action507<
 >(
     source_code: &str,
@@ -40319,7 +40317,7 @@ fn __action507<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action508<
 >(
     source_code: &str,
@@ -40331,7 +40329,7 @@ fn __action508<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action509<
 >(
     source_code: &str,
@@ -40344,7 +40342,7 @@ fn __action509<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action510<
 >(
     source_code: &str,
@@ -40372,7 +40370,7 @@ fn __action510<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action511<
 >(
     source_code: &str,
@@ -40384,7 +40382,7 @@ fn __action511<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action512<
 >(
     source_code: &str,
@@ -40396,7 +40394,7 @@ fn __action512<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action513<
 >(
     source_code: &str,
@@ -40409,7 +40407,7 @@ fn __action513<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action514<
 >(
     source_code: &str,
@@ -40422,7 +40420,7 @@ fn __action514<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action515<
 >(
     source_code: &str,
@@ -40441,7 +40439,7 @@ fn __action515<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action516<
 >(
     source_code: &str,
@@ -40453,7 +40451,7 @@ fn __action516<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action517<
 >(
     source_code: &str,
@@ -40474,7 +40472,7 @@ fn __action517<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action518<
 >(
     source_code: &str,
@@ -40486,7 +40484,7 @@ fn __action518<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action519<
 >(
     source_code: &str,
@@ -40507,7 +40505,7 @@ fn __action519<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action520<
 >(
     source_code: &str,
@@ -40519,7 +40517,7 @@ fn __action520<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action521<
 >(
     source_code: &str,
@@ -40547,7 +40545,7 @@ fn __action521<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action522<
 >(
     source_code: &str,
@@ -40559,7 +40557,7 @@ fn __action522<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action523<
 >(
     source_code: &str,
@@ -40580,7 +40578,7 @@ fn __action523<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action524<
 >(
     source_code: &str,
@@ -40592,7 +40590,7 @@ fn __action524<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action525<
 >(
     source_code: &str,
@@ -40611,7 +40609,7 @@ fn __action525<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action526<
 >(
     source_code: &str,
@@ -40623,7 +40621,7 @@ fn __action526<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action527<
 >(
     source_code: &str,
@@ -40644,7 +40642,7 @@ fn __action527<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action528<
 >(
     source_code: &str,
@@ -40656,7 +40654,7 @@ fn __action528<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action529<
 >(
     source_code: &str,
@@ -40677,7 +40675,7 @@ fn __action529<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action530<
 >(
     source_code: &str,
@@ -40689,7 +40687,7 @@ fn __action530<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action531<
 >(
     source_code: &str,
@@ -40710,7 +40708,7 @@ fn __action531<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action532<
 >(
     source_code: &str,
@@ -40722,7 +40720,7 @@ fn __action532<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action533<
 >(
     source_code: &str,
@@ -40739,7 +40737,7 @@ fn __action533<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action534<
 >(
     source_code: &str,
@@ -40751,7 +40749,7 @@ fn __action534<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action535<
 >(
     source_code: &str,
@@ -40763,7 +40761,7 @@ fn __action535<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action536<
 >(
     source_code: &str,
@@ -40782,7 +40780,7 @@ fn __action536<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action537<
 >(
     source_code: &str,
@@ -40804,7 +40802,7 @@ fn __action537<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action538<
 >(
     source_code: &str,
@@ -40825,7 +40823,7 @@ fn __action538<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action539<
 >(
     source_code: &str,
@@ -40846,7 +40844,7 @@ fn __action539<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action540<
 >(
     source_code: &str,
@@ -40858,7 +40856,7 @@ fn __action540<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action541<
 >(
     source_code: &str,
@@ -40879,7 +40877,7 @@ fn __action541<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action542<
 >(
     source_code: &str,
@@ -40891,7 +40889,7 @@ fn __action542<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action543<
 >(
     source_code: &str,
@@ -40903,7 +40901,7 @@ fn __action543<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action544<
 >(
     source_code: &str,
@@ -40920,7 +40918,7 @@ fn __action544<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action545<
 >(
     source_code: &str,
@@ -40938,7 +40936,7 @@ fn __action545<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action546<
 >(
     source_code: &str,
@@ -40957,7 +40955,7 @@ fn __action546<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action547<
 >(
     source_code: &str,
@@ -40976,7 +40974,7 @@ fn __action547<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action548<
 >(
     source_code: &str,
@@ -41008,7 +41006,7 @@ fn __action548<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action549<
 >(
     source_code: &str,
@@ -41048,7 +41046,7 @@ fn __action549<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action550<
 >(
     source_code: &str,
@@ -41068,7 +41066,7 @@ fn __action550<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action551<
 >(
     source_code: &str,
@@ -41087,7 +41085,7 @@ fn __action551<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action552<
 >(
     source_code: &str,
@@ -41109,7 +41107,7 @@ fn __action552<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action553<
 >(
     source_code: &str,
@@ -41131,7 +41129,7 @@ fn __action553<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action554<
 >(
     source_code: &str,
@@ -41154,7 +41152,7 @@ fn __action554<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action555<
 >(
     source_code: &str,
@@ -41178,7 +41176,7 @@ fn __action555<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action556<
 >(
     source_code: &str,
@@ -41200,7 +41198,7 @@ fn __action556<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action557<
 >(
     source_code: &str,
@@ -41221,7 +41219,7 @@ fn __action557<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action558<
 >(
     source_code: &str,
@@ -41235,7 +41233,7 @@ fn __action558<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action559<
 >(
     source_code: &str,
@@ -41249,7 +41247,7 @@ fn __action559<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action560<
 >(
     source_code: &str,
@@ -41263,7 +41261,7 @@ fn __action560<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action561<
 >(
     source_code: &str,
@@ -41277,7 +41275,7 @@ fn __action561<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action562<
 >(
     source_code: &str,
@@ -41289,7 +41287,7 @@ fn __action562<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action563<
 >(
     source_code: &str,
@@ -41302,7 +41300,7 @@ fn __action563<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action564<
 >(
     source_code: &str,
@@ -41315,7 +41313,7 @@ fn __action564<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action565<
 >(
     source_code: &str,
@@ -41327,7 +41325,7 @@ fn __action565<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action566<
 >(
     source_code: &str,
@@ -41340,7 +41338,7 @@ fn __action566<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action567<
 >(
     source_code: &str,
@@ -41352,7 +41350,7 @@ fn __action567<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action568<
 >(
     source_code: &str,
@@ -41365,7 +41363,7 @@ fn __action568<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action569<
 >(
     source_code: &str,
@@ -41378,7 +41376,7 @@ fn __action569<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action570<
 >(
     source_code: &str,
@@ -41390,7 +41388,7 @@ fn __action570<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action571<
 >(
     source_code: &str,
@@ -41403,7 +41401,7 @@ fn __action571<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action572<
 >(
     source_code: &str,
@@ -41424,7 +41422,7 @@ fn __action572<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action573<
 >(
     source_code: &str,
@@ -41436,7 +41434,7 @@ fn __action573<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action574<
 >(
     source_code: &str,
@@ -41455,7 +41453,7 @@ fn __action574<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action575<
 >(
     source_code: &str,
@@ -41467,7 +41465,7 @@ fn __action575<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action576<
 >(
     source_code: &str,
@@ -41479,7 +41477,7 @@ fn __action576<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action577<
 >(
     source_code: &str,
@@ -41492,7 +41490,7 @@ fn __action577<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action578<
 >(
     source_code: &str,
@@ -41513,7 +41511,7 @@ fn __action578<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action579<
 >(
     source_code: &str,
@@ -41525,7 +41523,7 @@ fn __action579<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action580<
 >(
     source_code: &str,
@@ -41542,7 +41540,7 @@ fn __action580<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action581<
 >(
     source_code: &str,
@@ -41554,7 +41552,7 @@ fn __action581<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action582<
 >(
     source_code: &str,
@@ -41566,7 +41564,7 @@ fn __action582<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action583<
 >(
     source_code: &str,
@@ -41585,7 +41583,7 @@ fn __action583<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action584<
 >(
     source_code: &str,
@@ -41607,7 +41605,7 @@ fn __action584<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action585<
 >(
     source_code: &str,
@@ -41628,7 +41626,7 @@ fn __action585<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action586<
 >(
     source_code: &str,
@@ -41640,7 +41638,7 @@ fn __action586<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action587<
 >(
     source_code: &str,
@@ -41657,7 +41655,7 @@ fn __action587<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action588<
 >(
     source_code: &str,
@@ -41675,7 +41673,7 @@ fn __action588<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action589<
 >(
     source_code: &str,
@@ -41694,7 +41692,7 @@ fn __action589<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action590<
 >(
     source_code: &str,
@@ -41713,7 +41711,7 @@ fn __action590<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action591<
 >(
     source_code: &str,
@@ -41753,7 +41751,7 @@ fn __action591<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action592<
 >(
     source_code: &str,
@@ -41773,7 +41771,7 @@ fn __action592<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action593<
 >(
     source_code: &str,
@@ -41792,7 +41790,7 @@ fn __action593<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action594<
 >(
     source_code: &str,
@@ -41814,7 +41812,7 @@ fn __action594<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action595<
 >(
     source_code: &str,
@@ -41836,7 +41834,7 @@ fn __action595<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action596<
 >(
     source_code: &str,
@@ -41859,7 +41857,7 @@ fn __action596<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action597<
 >(
     source_code: &str,
@@ -41883,7 +41881,7 @@ fn __action597<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action598<
 >(
     source_code: &str,
@@ -41905,7 +41903,7 @@ fn __action598<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action599<
 >(
     source_code: &str,
@@ -41926,7 +41924,7 @@ fn __action599<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action600<
 >(
     source_code: &str,
@@ -41940,7 +41938,7 @@ fn __action600<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action601<
 >(
     source_code: &str,
@@ -41954,7 +41952,7 @@ fn __action601<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action602<
 >(
     source_code: &str,
@@ -41968,7 +41966,7 @@ fn __action602<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes, clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action603<
 >(
     source_code: &str,
@@ -41982,8 +41980,7 @@ fn __action603<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action604<
 >(
     source_code: &str,
@@ -42017,8 +42014,7 @@ fn __action604<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action605<
 >(
     source_code: &str,
@@ -42052,8 +42048,7 @@ fn __action605<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action606<
 >(
     source_code: &str,
@@ -42091,8 +42086,7 @@ fn __action606<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action607<
 >(
     source_code: &str,
@@ -42130,8 +42124,7 @@ fn __action607<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action608<
 >(
     source_code: &str,
@@ -42169,8 +42162,7 @@ fn __action608<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action609<
 >(
     source_code: &str,
@@ -42208,8 +42200,7 @@ fn __action609<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action610<
 >(
     source_code: &str,
@@ -42235,8 +42226,7 @@ fn __action610<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action611<
 >(
     source_code: &str,
@@ -42262,8 +42252,7 @@ fn __action611<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action612<
 >(
     source_code: &str,
@@ -42289,8 +42278,7 @@ fn __action612<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action613<
 >(
     source_code: &str,
@@ -42316,8 +42304,7 @@ fn __action613<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action614<
 >(
     source_code: &str,
@@ -42347,8 +42334,7 @@ fn __action614<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action615<
 >(
     source_code: &str,
@@ -42378,8 +42364,7 @@ fn __action615<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action616<
 >(
     source_code: &str,
@@ -42409,8 +42394,7 @@ fn __action616<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action617<
 >(
     source_code: &str,
@@ -42440,8 +42424,7 @@ fn __action617<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action618<
 >(
     source_code: &str,
@@ -42475,8 +42458,7 @@ fn __action618<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action619<
 >(
     source_code: &str,
@@ -42510,8 +42492,7 @@ fn __action619<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action620<
 >(
     source_code: &str,
@@ -42537,8 +42518,7 @@ fn __action620<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action621<
 >(
     source_code: &str,
@@ -42564,8 +42544,7 @@ fn __action621<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action622<
 >(
     source_code: &str,
@@ -42599,8 +42578,7 @@ fn __action622<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action623<
 >(
     source_code: &str,
@@ -42634,8 +42612,7 @@ fn __action623<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action624<
 >(
     source_code: &str,
@@ -42671,8 +42648,7 @@ fn __action624<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action625<
 >(
     source_code: &str,
@@ -42708,8 +42684,7 @@ fn __action625<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action626<
 >(
     source_code: &str,
@@ -42749,8 +42724,7 @@ fn __action626<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action627<
 >(
     source_code: &str,
@@ -42790,8 +42764,7 @@ fn __action627<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action628<
 >(
     source_code: &str,
@@ -42835,8 +42808,7 @@ fn __action628<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action629<
 >(
     source_code: &str,
@@ -42880,8 +42852,7 @@ fn __action629<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action630<
 >(
     source_code: &str,
@@ -42913,8 +42884,7 @@ fn __action630<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action631<
 >(
     source_code: &str,
@@ -42946,8 +42916,7 @@ fn __action631<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action632<
 >(
     source_code: &str,
@@ -42977,8 +42946,7 @@ fn __action632<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action633<
 >(
     source_code: &str,
@@ -43008,8 +42976,7 @@ fn __action633<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action634<
 >(
     source_code: &str,
@@ -43041,8 +43008,7 @@ fn __action634<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action635<
 >(
     source_code: &str,
@@ -43074,8 +43040,7 @@ fn __action635<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action636<
 >(
     source_code: &str,
@@ -43105,8 +43070,7 @@ fn __action636<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action637<
 >(
     source_code: &str,
@@ -43136,8 +43100,7 @@ fn __action637<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action638<
 >(
     source_code: &str,
@@ -43175,8 +43138,7 @@ fn __action638<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action639<
 >(
     source_code: &str,
@@ -43214,8 +43176,7 @@ fn __action639<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action640<
 >(
     source_code: &str,
@@ -43249,8 +43210,7 @@ fn __action640<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action641<
 >(
     source_code: &str,
@@ -43284,8 +43244,7 @@ fn __action641<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action642<
 >(
     source_code: &str,
@@ -43319,8 +43278,7 @@ fn __action642<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action643<
 >(
     source_code: &str,
@@ -43354,8 +43312,7 @@ fn __action643<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action644<
 >(
     source_code: &str,
@@ -43385,8 +43342,7 @@ fn __action644<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action645<
 >(
     source_code: &str,
@@ -43416,8 +43372,7 @@ fn __action645<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action646<
 >(
     source_code: &str,
@@ -43453,8 +43408,7 @@ fn __action646<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action647<
 >(
     source_code: &str,
@@ -43490,8 +43444,7 @@ fn __action647<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action648<
 >(
     source_code: &str,
@@ -43517,8 +43470,7 @@ fn __action648<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action649<
 >(
     source_code: &str,
@@ -43544,8 +43496,7 @@ fn __action649<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action650<
 >(
     source_code: &str,
@@ -43575,8 +43526,7 @@ fn __action650<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action651<
 >(
     source_code: &str,
@@ -43606,8 +43556,7 @@ fn __action651<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action652<
 >(
     source_code: &str,
@@ -43641,8 +43590,7 @@ fn __action652<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action653<
 >(
     source_code: &str,
@@ -43676,8 +43624,7 @@ fn __action653<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action654<
 >(
     source_code: &str,
@@ -43707,8 +43654,7 @@ fn __action654<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action655<
 >(
     source_code: &str,
@@ -43738,8 +43684,7 @@ fn __action655<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action656<
 >(
     source_code: &str,
@@ -43773,8 +43718,7 @@ fn __action656<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action657<
 >(
     source_code: &str,
@@ -43808,8 +43752,7 @@ fn __action657<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action658<
 >(
     source_code: &str,
@@ -43841,8 +43784,7 @@ fn __action658<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action659<
 >(
     source_code: &str,
@@ -43874,8 +43816,7 @@ fn __action659<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action660<
 >(
     source_code: &str,
@@ -43905,8 +43846,7 @@ fn __action660<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action661<
 >(
     source_code: &str,
@@ -43936,8 +43876,7 @@ fn __action661<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action662<
 >(
     source_code: &str,
@@ -43969,8 +43908,7 @@ fn __action662<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action663<
 >(
     source_code: &str,
@@ -44002,8 +43940,7 @@ fn __action663<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action664<
 >(
     source_code: &str,
@@ -44033,8 +43970,7 @@ fn __action664<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action665<
 >(
     source_code: &str,
@@ -44064,8 +44000,7 @@ fn __action665<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action666<
 >(
     source_code: &str,
@@ -44103,8 +44038,7 @@ fn __action666<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action667<
 >(
     source_code: &str,
@@ -44142,8 +44076,7 @@ fn __action667<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action668<
 >(
     source_code: &str,
@@ -44183,8 +44116,7 @@ fn __action668<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action669<
 >(
     source_code: &str,
@@ -44224,8 +44156,7 @@ fn __action669<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action670<
 >(
     source_code: &str,
@@ -44267,8 +44198,7 @@ fn __action670<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action671<
 >(
     source_code: &str,
@@ -44310,8 +44240,7 @@ fn __action671<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action672<
 >(
     source_code: &str,
@@ -44349,8 +44278,7 @@ fn __action672<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action673<
 >(
     source_code: &str,
@@ -44388,8 +44316,7 @@ fn __action673<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action674<
 >(
     source_code: &str,
@@ -44423,8 +44350,7 @@ fn __action674<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action675<
 >(
     source_code: &str,
@@ -44458,8 +44384,7 @@ fn __action675<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action676<
 >(
     source_code: &str,
@@ -44485,8 +44410,7 @@ fn __action676<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action677<
 >(
     source_code: &str,
@@ -44518,8 +44442,7 @@ fn __action677<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action678<
 >(
     source_code: &str,
@@ -44549,8 +44472,7 @@ fn __action678<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action679<
 >(
     source_code: &str,
@@ -44582,8 +44504,7 @@ fn __action679<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action680<
 >(
     source_code: &str,
@@ -44613,8 +44534,7 @@ fn __action680<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action681<
 >(
     source_code: &str,
@@ -44640,8 +44560,7 @@ fn __action681<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action682<
 >(
     source_code: &str,
@@ -44673,8 +44592,7 @@ fn __action682<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action683<
 >(
     source_code: &str,
@@ -44704,8 +44622,7 @@ fn __action683<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action684<
 >(
     source_code: &str,
@@ -44737,8 +44654,7 @@ fn __action684<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action685<
 >(
     source_code: &str,
@@ -44768,8 +44684,7 @@ fn __action685<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action686<
 >(
     source_code: &str,
@@ -44795,8 +44710,7 @@ fn __action686<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action687<
 >(
     source_code: &str,
@@ -44824,8 +44738,7 @@ fn __action687<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action688<
 >(
     source_code: &str,
@@ -44855,8 +44768,7 @@ fn __action688<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action689<
 >(
     source_code: &str,
@@ -44886,8 +44798,7 @@ fn __action689<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action690<
 >(
     source_code: &str,
@@ -44919,8 +44830,7 @@ fn __action690<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action691<
 >(
     source_code: &str,
@@ -44952,8 +44862,7 @@ fn __action691<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action692<
 >(
     source_code: &str,
@@ -44981,8 +44890,7 @@ fn __action692<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action693<
 >(
     source_code: &str,
@@ -45010,8 +44918,7 @@ fn __action693<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action694<
 >(
     source_code: &str,
@@ -45043,8 +44950,7 @@ fn __action694<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action695<
 >(
     source_code: &str,
@@ -45076,8 +44982,7 @@ fn __action695<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action696<
 >(
     source_code: &str,
@@ -45105,8 +45010,7 @@ fn __action696<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action697<
 >(
     source_code: &str,
@@ -45134,8 +45038,7 @@ fn __action697<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action698<
 >(
     source_code: &str,
@@ -45161,8 +45064,7 @@ fn __action698<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action699<
 >(
     source_code: &str,
@@ -45190,8 +45092,7 @@ fn __action699<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action700<
 >(
     source_code: &str,
@@ -45221,8 +45122,7 @@ fn __action700<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action701<
 >(
     source_code: &str,
@@ -45252,8 +45152,7 @@ fn __action701<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action702<
 >(
     source_code: &str,
@@ -45285,8 +45184,7 @@ fn __action702<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action703<
 >(
     source_code: &str,
@@ -45318,8 +45216,7 @@ fn __action703<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action704<
 >(
     source_code: &str,
@@ -45347,8 +45244,7 @@ fn __action704<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action705<
 >(
     source_code: &str,
@@ -45376,8 +45272,7 @@ fn __action705<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action706<
 >(
     source_code: &str,
@@ -45409,8 +45304,7 @@ fn __action706<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action707<
 >(
     source_code: &str,
@@ -45442,8 +45336,7 @@ fn __action707<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action708<
 >(
     source_code: &str,
@@ -45471,8 +45364,7 @@ fn __action708<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action709<
 >(
     source_code: &str,
@@ -45500,8 +45392,7 @@ fn __action709<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action710<
 >(
     source_code: &str,
@@ -45527,8 +45418,7 @@ fn __action710<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action711<
 >(
     source_code: &str,
@@ -45560,8 +45450,7 @@ fn __action711<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action712<
 >(
     source_code: &str,
@@ -45591,8 +45480,7 @@ fn __action712<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action713<
 >(
     source_code: &str,
@@ -45624,8 +45512,7 @@ fn __action713<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action714<
 >(
     source_code: &str,
@@ -45657,8 +45544,7 @@ fn __action714<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action715<
 >(
     source_code: &str,
@@ -45690,8 +45576,7 @@ fn __action715<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action716<
 >(
     source_code: &str,
@@ -45721,8 +45606,7 @@ fn __action716<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action717<
 >(
     source_code: &str,
@@ -45752,8 +45636,7 @@ fn __action717<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action718<
 >(
     source_code: &str,
@@ -45785,8 +45668,7 @@ fn __action718<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action719<
 >(
     source_code: &str,
@@ -45818,8 +45700,7 @@ fn __action719<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action720<
 >(
     source_code: &str,
@@ -45851,8 +45732,7 @@ fn __action720<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action721<
 >(
     source_code: &str,
@@ -45884,8 +45764,7 @@ fn __action721<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action722<
 >(
     source_code: &str,
@@ -45917,8 +45796,7 @@ fn __action722<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action723<
 >(
     source_code: &str,
@@ -45946,8 +45824,7 @@ fn __action723<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action724<
 >(
     source_code: &str,
@@ -45975,8 +45852,7 @@ fn __action724<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action725<
 >(
     source_code: &str,
@@ -46008,8 +45884,7 @@ fn __action725<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action726<
 >(
     source_code: &str,
@@ -46043,8 +45918,7 @@ fn __action726<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action727<
 >(
     source_code: &str,
@@ -46078,8 +45952,7 @@ fn __action727<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action728<
 >(
     source_code: &str,
@@ -46111,8 +45984,7 @@ fn __action728<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action729<
 >(
     source_code: &str,
@@ -46150,8 +46022,7 @@ fn __action729<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action730<
 >(
     source_code: &str,
@@ -46187,8 +46058,7 @@ fn __action730<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action731<
 >(
     source_code: &str,
@@ -46218,8 +46088,7 @@ fn __action731<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action732<
 >(
     source_code: &str,
@@ -46251,8 +46120,7 @@ fn __action732<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action733<
 >(
     source_code: &str,
@@ -46286,8 +46154,7 @@ fn __action733<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action734<
 >(
     source_code: &str,
@@ -46321,8 +46188,7 @@ fn __action734<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action735<
 >(
     source_code: &str,
@@ -46354,8 +46220,7 @@ fn __action735<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action736<
 >(
     source_code: &str,
@@ -46389,8 +46254,7 @@ fn __action736<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action737<
 >(
     source_code: &str,
@@ -46422,8 +46286,7 @@ fn __action737<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action738<
 >(
     source_code: &str,
@@ -46457,8 +46320,7 @@ fn __action738<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action739<
 >(
     source_code: &str,
@@ -46486,8 +46348,7 @@ fn __action739<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action740<
 >(
     source_code: &str,
@@ -46515,8 +46376,7 @@ fn __action740<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action741<
 >(
     source_code: &str,
@@ -46544,8 +46404,7 @@ fn __action741<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action742<
 >(
     source_code: &str,
@@ -46573,8 +46432,7 @@ fn __action742<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action743<
 >(
     source_code: &str,
@@ -46602,8 +46460,7 @@ fn __action743<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action744<
 >(
     source_code: &str,
@@ -46631,8 +46488,7 @@ fn __action744<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action745<
 >(
     source_code: &str,
@@ -46664,8 +46520,7 @@ fn __action745<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action746<
 >(
     source_code: &str,
@@ -46699,8 +46554,7 @@ fn __action746<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action747<
 >(
     source_code: &str,
@@ -46738,8 +46592,7 @@ fn __action747<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action748<
 >(
     source_code: &str,
@@ -46775,8 +46628,7 @@ fn __action748<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action749<
 >(
     source_code: &str,
@@ -46806,8 +46658,7 @@ fn __action749<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action750<
 >(
     source_code: &str,
@@ -46839,8 +46690,7 @@ fn __action750<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action751<
 >(
     source_code: &str,
@@ -46874,8 +46724,7 @@ fn __action751<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action752<
 >(
     source_code: &str,
@@ -46909,8 +46758,7 @@ fn __action752<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action753<
 >(
     source_code: &str,
@@ -46942,8 +46790,7 @@ fn __action753<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action754<
 >(
     source_code: &str,
@@ -46977,8 +46824,7 @@ fn __action754<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action755<
 >(
     source_code: &str,
@@ -47010,8 +46856,7 @@ fn __action755<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action756<
 >(
     source_code: &str,
@@ -47045,8 +46890,7 @@ fn __action756<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action757<
 >(
     source_code: &str,
@@ -47074,8 +46918,7 @@ fn __action757<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action758<
 >(
     source_code: &str,
@@ -47103,8 +46946,7 @@ fn __action758<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action759<
 >(
     source_code: &str,
@@ -47132,8 +46974,7 @@ fn __action759<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action760<
 >(
     source_code: &str,
@@ -47161,8 +47002,7 @@ fn __action760<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action761<
 >(
     source_code: &str,
@@ -47192,8 +47032,7 @@ fn __action761<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action762<
 >(
     source_code: &str,
@@ -47227,8 +47066,7 @@ fn __action762<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action763<
 >(
     source_code: &str,
@@ -47260,8 +47098,7 @@ fn __action763<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action764<
 >(
     source_code: &str,
@@ -47291,8 +47128,7 @@ fn __action764<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action765<
 >(
     source_code: &str,
@@ -47326,8 +47162,7 @@ fn __action765<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action766<
 >(
     source_code: &str,
@@ -47359,8 +47194,7 @@ fn __action766<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action767<
 >(
     source_code: &str,
@@ -47390,8 +47224,7 @@ fn __action767<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action768<
 >(
     source_code: &str,
@@ -47421,8 +47254,7 @@ fn __action768<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action769<
 >(
     source_code: &str,
@@ -47450,8 +47282,7 @@ fn __action769<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action770<
 >(
     source_code: &str,
@@ -47489,8 +47320,7 @@ fn __action770<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action771<
 >(
     source_code: &str,
@@ -47520,8 +47350,7 @@ fn __action771<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action772<
 >(
     source_code: &str,
@@ -47551,8 +47380,7 @@ fn __action772<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action773<
 >(
     source_code: &str,
@@ -47582,8 +47410,7 @@ fn __action773<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action774<
 >(
     source_code: &str,
@@ -47613,8 +47440,7 @@ fn __action774<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action775<
 >(
     source_code: &str,
@@ -47646,8 +47472,7 @@ fn __action775<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action776<
 >(
     source_code: &str,
@@ -47677,8 +47502,7 @@ fn __action776<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action777<
 >(
     source_code: &str,
@@ -47706,8 +47530,7 @@ fn __action777<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action778<
 >(
     source_code: &str,
@@ -47737,8 +47560,7 @@ fn __action778<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action779<
 >(
     source_code: &str,
@@ -47770,8 +47592,7 @@ fn __action779<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action780<
 >(
     source_code: &str,
@@ -47801,8 +47622,7 @@ fn __action780<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action781<
 >(
     source_code: &str,
@@ -47834,8 +47654,7 @@ fn __action781<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action782<
 >(
     source_code: &str,
@@ -47867,8 +47686,7 @@ fn __action782<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action783<
 >(
     source_code: &str,
@@ -47902,8 +47720,7 @@ fn __action783<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action784<
 >(
     source_code: &str,
@@ -47937,8 +47754,7 @@ fn __action784<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action785<
 >(
     source_code: &str,
@@ -47970,8 +47786,7 @@ fn __action785<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action786<
 >(
     source_code: &str,
@@ -48003,8 +47818,7 @@ fn __action786<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action787<
 >(
     source_code: &str,
@@ -48034,8 +47848,7 @@ fn __action787<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action788<
 >(
     source_code: &str,
@@ -48067,8 +47880,7 @@ fn __action788<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action789<
 >(
     source_code: &str,
@@ -48102,8 +47914,7 @@ fn __action789<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action790<
 >(
     source_code: &str,
@@ -48141,8 +47952,7 @@ fn __action790<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action791<
 >(
     source_code: &str,
@@ -48174,8 +47984,7 @@ fn __action791<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action792<
 >(
     source_code: &str,
@@ -48203,8 +48012,7 @@ fn __action792<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action793<
 >(
     source_code: &str,
@@ -48232,8 +48040,7 @@ fn __action793<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action794<
 >(
     source_code: &str,
@@ -48271,8 +48078,7 @@ fn __action794<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action795<
 >(
     source_code: &str,
@@ -48308,8 +48114,7 @@ fn __action795<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action796<
 >(
     source_code: &str,
@@ -48339,8 +48144,7 @@ fn __action796<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action797<
 >(
     source_code: &str,
@@ -48370,8 +48174,7 @@ fn __action797<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action798<
 >(
     source_code: &str,
@@ -48399,8 +48202,7 @@ fn __action798<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action799<
 >(
     source_code: &str,
@@ -48428,8 +48230,7 @@ fn __action799<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action800<
 >(
     source_code: &str,
@@ -48459,8 +48260,7 @@ fn __action800<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action801<
 >(
     source_code: &str,
@@ -48488,8 +48288,7 @@ fn __action801<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action802<
 >(
     source_code: &str,
@@ -48529,8 +48328,7 @@ fn __action802<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action803<
 >(
     source_code: &str,
@@ -48568,8 +48366,7 @@ fn __action803<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action804<
 >(
     source_code: &str,
@@ -48611,8 +48408,7 @@ fn __action804<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action805<
 >(
     source_code: &str,
@@ -48652,8 +48448,7 @@ fn __action805<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action806<
 >(
     source_code: &str,
@@ -48683,8 +48478,7 @@ fn __action806<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action807<
 >(
     source_code: &str,
@@ -48716,8 +48510,7 @@ fn __action807<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action808<
 >(
     source_code: &str,
@@ -48747,8 +48540,7 @@ fn __action808<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action809<
 >(
     source_code: &str,
@@ -48778,8 +48570,7 @@ fn __action809<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action810<
 >(
     source_code: &str,
@@ -48809,8 +48600,7 @@ fn __action810<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action811<
 >(
     source_code: &str,
@@ -48838,8 +48628,7 @@ fn __action811<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action812<
 >(
     source_code: &str,
@@ -48869,8 +48658,7 @@ fn __action812<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action813<
 >(
     source_code: &str,
@@ -48898,8 +48686,7 @@ fn __action813<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action814<
 >(
     source_code: &str,
@@ -48929,8 +48716,7 @@ fn __action814<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action815<
 >(
     source_code: &str,
@@ -48958,8 +48744,7 @@ fn __action815<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action816<
 >(
     source_code: &str,
@@ -48995,8 +48780,7 @@ fn __action816<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action817<
 >(
     source_code: &str,
@@ -49026,8 +48810,7 @@ fn __action817<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action818<
 >(
     source_code: &str,
@@ -49057,8 +48840,7 @@ fn __action818<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action819<
 >(
     source_code: &str,
@@ -49086,8 +48868,7 @@ fn __action819<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action820<
 >(
     source_code: &str,
@@ -49121,8 +48902,7 @@ fn __action820<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action821<
 >(
     source_code: &str,
@@ -49154,8 +48934,7 @@ fn __action821<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action822<
 >(
     source_code: &str,
@@ -49183,8 +48962,7 @@ fn __action822<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action823<
 >(
     source_code: &str,
@@ -49214,8 +48992,7 @@ fn __action823<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action824<
 >(
     source_code: &str,
@@ -49249,8 +49026,7 @@ fn __action824<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action825<
 >(
     source_code: &str,
@@ -49278,8 +49054,7 @@ fn __action825<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action826<
 >(
     source_code: &str,
@@ -49307,8 +49082,7 @@ fn __action826<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action827<
 >(
     source_code: &str,
@@ -49338,8 +49112,7 @@ fn __action827<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action828<
 >(
     source_code: &str,
@@ -49387,8 +49160,7 @@ fn __action828<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action829<
 >(
     source_code: &str,
@@ -49416,8 +49188,7 @@ fn __action829<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action830<
 >(
     source_code: &str,
@@ -49445,8 +49216,7 @@ fn __action830<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action831<
 >(
     source_code: &str,
@@ -49474,8 +49244,7 @@ fn __action831<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action832<
 >(
     source_code: &str,
@@ -49503,8 +49272,7 @@ fn __action832<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action833<
 >(
     source_code: &str,
@@ -49532,8 +49300,7 @@ fn __action833<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action834<
 >(
     source_code: &str,
@@ -49561,8 +49328,7 @@ fn __action834<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action835<
 >(
     source_code: &str,
@@ -49590,8 +49356,7 @@ fn __action835<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action836<
 >(
     source_code: &str,
@@ -49619,8 +49384,7 @@ fn __action836<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action837<
 >(
     source_code: &str,
@@ -49648,8 +49412,7 @@ fn __action837<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action838<
 >(
     source_code: &str,
@@ -49677,8 +49440,7 @@ fn __action838<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action839<
 >(
     source_code: &str,
@@ -49708,8 +49470,7 @@ fn __action839<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action840<
 >(
     source_code: &str,
@@ -49743,8 +49504,7 @@ fn __action840<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action841<
 >(
     source_code: &str,
@@ -49776,8 +49536,7 @@ fn __action841<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action842<
 >(
     source_code: &str,
@@ -49813,8 +49572,7 @@ fn __action842<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action843<
 >(
     source_code: &str,
@@ -49848,8 +49606,7 @@ fn __action843<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action844<
 >(
     source_code: &str,
@@ -49889,8 +49646,7 @@ fn __action844<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action845<
 >(
     source_code: &str,
@@ -49928,8 +49684,7 @@ fn __action845<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action846<
 >(
     source_code: &str,
@@ -49963,8 +49718,7 @@ fn __action846<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action847<
 >(
     source_code: &str,
@@ -49996,8 +49750,7 @@ fn __action847<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action848<
 >(
     source_code: &str,
@@ -50025,8 +49778,7 @@ fn __action848<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action849<
 >(
     source_code: &str,
@@ -50058,8 +49810,7 @@ fn __action849<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action850<
 >(
     source_code: &str,
@@ -50091,8 +49842,7 @@ fn __action850<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action851<
 >(
     source_code: &str,
@@ -50130,8 +49880,7 @@ fn __action851<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action852<
 >(
     source_code: &str,
@@ -50183,8 +49932,7 @@ fn __action852<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action853<
 >(
     source_code: &str,
@@ -50236,8 +49984,7 @@ fn __action853<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action854<
 >(
     source_code: &str,
@@ -50287,8 +50034,7 @@ fn __action854<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action855<
 >(
     source_code: &str,
@@ -50320,8 +50066,7 @@ fn __action855<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action856<
 >(
     source_code: &str,
@@ -50349,8 +50094,7 @@ fn __action856<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action857<
 >(
     source_code: &str,
@@ -50380,8 +50124,7 @@ fn __action857<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action858<
 >(
     source_code: &str,
@@ -50411,8 +50154,7 @@ fn __action858<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action859<
 >(
     source_code: &str,
@@ -50442,8 +50184,7 @@ fn __action859<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action860<
 >(
     source_code: &str,
@@ -50471,8 +50212,7 @@ fn __action860<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action861<
 >(
     source_code: &str,
@@ -50502,8 +50242,7 @@ fn __action861<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action862<
 >(
     source_code: &str,
@@ -50531,8 +50270,7 @@ fn __action862<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action863<
 >(
     source_code: &str,
@@ -50562,8 +50300,7 @@ fn __action863<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action864<
 >(
     source_code: &str,
@@ -50593,8 +50330,7 @@ fn __action864<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action865<
 >(
     source_code: &str,
@@ -50626,8 +50362,7 @@ fn __action865<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action866<
 >(
     source_code: &str,
@@ -50657,8 +50392,7 @@ fn __action866<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action867<
 >(
     source_code: &str,
@@ -50688,8 +50422,7 @@ fn __action867<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action868<
 >(
     source_code: &str,
@@ -50717,8 +50450,7 @@ fn __action868<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action869<
 >(
     source_code: &str,
@@ -50750,8 +50482,7 @@ fn __action869<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action870<
 >(
     source_code: &str,
@@ -50781,8 +50512,7 @@ fn __action870<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action871<
 >(
     source_code: &str,
@@ -50812,8 +50542,7 @@ fn __action871<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action872<
 >(
     source_code: &str,
@@ -50841,8 +50570,7 @@ fn __action872<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action873<
 >(
     source_code: &str,
@@ -50872,8 +50600,7 @@ fn __action873<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action874<
 >(
     source_code: &str,
@@ -50905,8 +50632,7 @@ fn __action874<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action875<
 >(
     source_code: &str,
@@ -50932,8 +50658,7 @@ fn __action875<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action876<
 >(
     source_code: &str,
@@ -50961,8 +50686,7 @@ fn __action876<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action877<
 >(
     source_code: &str,
@@ -50992,8 +50716,7 @@ fn __action877<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action878<
 >(
     source_code: &str,
@@ -51025,8 +50748,7 @@ fn __action878<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action879<
 >(
     source_code: &str,
@@ -51052,8 +50774,7 @@ fn __action879<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action880<
 >(
     source_code: &str,
@@ -51081,8 +50802,7 @@ fn __action880<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action881<
 >(
     source_code: &str,
@@ -51108,8 +50828,7 @@ fn __action881<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action882<
 >(
     source_code: &str,
@@ -51139,8 +50858,7 @@ fn __action882<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action883<
 >(
     source_code: &str,
@@ -51172,8 +50890,7 @@ fn __action883<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action884<
 >(
     source_code: &str,
@@ -51199,8 +50916,7 @@ fn __action884<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action885<
 >(
     source_code: &str,
@@ -51228,8 +50944,7 @@ fn __action885<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action886<
 >(
     source_code: &str,
@@ -51259,8 +50974,7 @@ fn __action886<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action887<
 >(
     source_code: &str,
@@ -51292,8 +51006,7 @@ fn __action887<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action888<
 >(
     source_code: &str,
@@ -51319,8 +51032,7 @@ fn __action888<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action889<
 >(
     source_code: &str,
@@ -51348,8 +51060,7 @@ fn __action889<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action890<
 >(
     source_code: &str,
@@ -51375,8 +51086,7 @@ fn __action890<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action891<
 >(
     source_code: &str,
@@ -51408,8 +51118,7 @@ fn __action891<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action892<
 >(
     source_code: &str,
@@ -51437,8 +51146,7 @@ fn __action892<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action893<
 >(
     source_code: &str,
@@ -51476,8 +51184,7 @@ fn __action893<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action894<
 >(
     source_code: &str,
@@ -51513,8 +51220,7 @@ fn __action894<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action895<
 >(
     source_code: &str,
@@ -51548,8 +51254,7 @@ fn __action895<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action896<
 >(
     source_code: &str,
@@ -51581,8 +51286,7 @@ fn __action896<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action897<
 >(
     source_code: &str,
@@ -51616,8 +51320,7 @@ fn __action897<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action898<
 >(
     source_code: &str,
@@ -51649,8 +51352,7 @@ fn __action898<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action899<
 >(
     source_code: &str,
@@ -51680,8 +51382,7 @@ fn __action899<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action900<
 >(
     source_code: &str,
@@ -51711,8 +51412,7 @@ fn __action900<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action901<
 >(
     source_code: &str,
@@ -51742,8 +51442,7 @@ fn __action901<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action902<
 >(
     source_code: &str,
@@ -51771,8 +51470,7 @@ fn __action902<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action903<
 >(
     source_code: &str,
@@ -51804,8 +51502,7 @@ fn __action903<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action904<
 >(
     source_code: &str,
@@ -51837,8 +51534,7 @@ fn __action904<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action905<
 >(
     source_code: &str,
@@ -51866,8 +51562,7 @@ fn __action905<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action906<
 >(
     source_code: &str,
@@ -51899,8 +51594,7 @@ fn __action906<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action907<
 >(
     source_code: &str,
@@ -51932,8 +51626,7 @@ fn __action907<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action908<
 >(
     source_code: &str,
@@ -51963,8 +51656,7 @@ fn __action908<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action909<
 >(
     source_code: &str,
@@ -51998,8 +51690,7 @@ fn __action909<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action910<
 >(
     source_code: &str,
@@ -52035,8 +51726,7 @@ fn __action910<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action911<
 >(
     source_code: &str,
@@ -52070,8 +51760,7 @@ fn __action911<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action912<
 >(
     source_code: &str,
@@ -52103,8 +51792,7 @@ fn __action912<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action913<
 >(
     source_code: &str,
@@ -52136,8 +51824,7 @@ fn __action913<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action914<
 >(
     source_code: &str,
@@ -52169,8 +51856,7 @@ fn __action914<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action915<
 >(
     source_code: &str,
@@ -52208,8 +51894,7 @@ fn __action915<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action916<
 >(
     source_code: &str,
@@ -52245,8 +51930,7 @@ fn __action916<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action917<
 >(
     source_code: &str,
@@ -52274,8 +51958,7 @@ fn __action917<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action918<
 >(
     source_code: &str,
@@ -52305,8 +51988,7 @@ fn __action918<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action919<
 >(
     source_code: &str,
@@ -52336,8 +52018,7 @@ fn __action919<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action920<
 >(
     source_code: &str,
@@ -52369,8 +52050,7 @@ fn __action920<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action921<
 >(
     source_code: &str,
@@ -52400,8 +52080,7 @@ fn __action921<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action922<
 >(
     source_code: &str,
@@ -52427,8 +52106,7 @@ fn __action922<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action923<
 >(
     source_code: &str,
@@ -52456,8 +52134,7 @@ fn __action923<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action924<
 >(
     source_code: &str,
@@ -52485,8 +52162,7 @@ fn __action924<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action925<
 >(
     source_code: &str,
@@ -52520,8 +52196,7 @@ fn __action925<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action926<
 >(
     source_code: &str,
@@ -52551,8 +52226,7 @@ fn __action926<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action927<
 >(
     source_code: &str,
@@ -52582,8 +52256,7 @@ fn __action927<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action928<
 >(
     source_code: &str,
@@ -52611,8 +52284,7 @@ fn __action928<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action929<
 >(
     source_code: &str,
@@ -52644,8 +52316,7 @@ fn __action929<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action930<
 >(
     source_code: &str,
@@ -52677,8 +52348,7 @@ fn __action930<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action931<
 >(
     source_code: &str,
@@ -52714,8 +52384,7 @@ fn __action931<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action932<
 >(
     source_code: &str,
@@ -52751,8 +52420,7 @@ fn __action932<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action933<
 >(
     source_code: &str,
@@ -52782,8 +52450,7 @@ fn __action933<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action934<
 >(
     source_code: &str,
@@ -52815,8 +52482,7 @@ fn __action934<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action935<
 >(
     source_code: &str,
@@ -52854,8 +52520,7 @@ fn __action935<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action936<
 >(
     source_code: &str,
@@ -52893,8 +52558,7 @@ fn __action936<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action937<
 >(
     source_code: &str,
@@ -52926,8 +52590,7 @@ fn __action937<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action938<
 >(
     source_code: &str,
@@ -52955,8 +52618,7 @@ fn __action938<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action939<
 >(
     source_code: &str,
@@ -52992,8 +52654,7 @@ fn __action939<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action940<
 >(
     source_code: &str,
@@ -53023,8 +52684,7 @@ fn __action940<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action941<
 >(
     source_code: &str,
@@ -53054,8 +52714,7 @@ fn __action941<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action942<
 >(
     source_code: &str,
@@ -53085,8 +52744,7 @@ fn __action942<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action943<
 >(
     source_code: &str,
@@ -53120,8 +52778,7 @@ fn __action943<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action944<
 >(
     source_code: &str,
@@ -53153,8 +52810,7 @@ fn __action944<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action945<
 >(
     source_code: &str,
@@ -53184,8 +52840,7 @@ fn __action945<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action946<
 >(
     source_code: &str,
@@ -53213,8 +52868,7 @@ fn __action946<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action947<
 >(
     source_code: &str,
@@ -53242,8 +52896,7 @@ fn __action947<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action948<
 >(
     source_code: &str,
@@ -53277,8 +52930,7 @@ fn __action948<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action949<
 >(
     source_code: &str,
@@ -53310,8 +52962,7 @@ fn __action949<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action950<
 >(
     source_code: &str,
@@ -53345,8 +52996,7 @@ fn __action950<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action951<
 >(
     source_code: &str,
@@ -53378,8 +53028,7 @@ fn __action951<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action952<
 >(
     source_code: &str,
@@ -53411,8 +53060,7 @@ fn __action952<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action953<
 >(
     source_code: &str,
@@ -53444,8 +53092,7 @@ fn __action953<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action954<
 >(
     source_code: &str,
@@ -53475,8 +53122,7 @@ fn __action954<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action955<
 >(
     source_code: &str,
@@ -53508,8 +53154,7 @@ fn __action955<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action956<
 >(
     source_code: &str,
@@ -53539,8 +53184,7 @@ fn __action956<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action957<
 >(
     source_code: &str,
@@ -53572,8 +53216,7 @@ fn __action957<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action958<
 >(
     source_code: &str,
@@ -53599,8 +53242,7 @@ fn __action958<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action959<
 >(
     source_code: &str,
@@ -53628,8 +53270,7 @@ fn __action959<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action960<
 >(
     source_code: &str,
@@ -53659,8 +53300,7 @@ fn __action960<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action961<
 >(
     source_code: &str,
@@ -53692,8 +53332,7 @@ fn __action961<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action962<
 >(
     source_code: &str,
@@ -53719,8 +53358,7 @@ fn __action962<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action963<
 >(
     source_code: &str,
@@ -53748,8 +53386,7 @@ fn __action963<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action964<
 >(
     source_code: &str,
@@ -53775,8 +53412,7 @@ fn __action964<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action965<
 >(
     source_code: &str,
@@ -53808,8 +53444,7 @@ fn __action965<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action966<
 >(
     source_code: &str,
@@ -53843,8 +53478,7 @@ fn __action966<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action967<
 >(
     source_code: &str,
@@ -53872,8 +53506,7 @@ fn __action967<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action968<
 >(
     source_code: &str,
@@ -53903,8 +53536,7 @@ fn __action968<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action969<
 >(
     source_code: &str,
@@ -53936,8 +53568,7 @@ fn __action969<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action970<
 >(
     source_code: &str,
@@ -53971,8 +53602,7 @@ fn __action970<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action971<
 >(
     source_code: &str,
@@ -54000,8 +53630,7 @@ fn __action971<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action972<
 >(
     source_code: &str,
@@ -54031,8 +53660,7 @@ fn __action972<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action973<
 >(
     source_code: &str,
@@ -54060,8 +53688,7 @@ fn __action973<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action974<
 >(
     source_code: &str,
@@ -54091,8 +53718,7 @@ fn __action974<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action975<
 >(
     source_code: &str,
@@ -54124,8 +53750,7 @@ fn __action975<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action976<
 >(
     source_code: &str,
@@ -54151,8 +53776,7 @@ fn __action976<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action977<
 >(
     source_code: &str,
@@ -54180,8 +53804,7 @@ fn __action977<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action978<
 >(
     source_code: &str,
@@ -54211,8 +53834,7 @@ fn __action978<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action979<
 >(
     source_code: &str,
@@ -54244,8 +53866,7 @@ fn __action979<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action980<
 >(
     source_code: &str,
@@ -54271,8 +53892,7 @@ fn __action980<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action981<
 >(
     source_code: &str,
@@ -54300,8 +53920,7 @@ fn __action981<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action982<
 >(
     source_code: &str,
@@ -54327,8 +53946,7 @@ fn __action982<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action983<
 >(
     source_code: &str,
@@ -54358,8 +53976,7 @@ fn __action983<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action984<
 >(
     source_code: &str,
@@ -54391,8 +54008,7 @@ fn __action984<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action985<
 >(
     source_code: &str,
@@ -54418,8 +54034,7 @@ fn __action985<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action986<
 >(
     source_code: &str,
@@ -54447,8 +54062,7 @@ fn __action986<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action987<
 >(
     source_code: &str,
@@ -54478,8 +54092,7 @@ fn __action987<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action988<
 >(
     source_code: &str,
@@ -54511,8 +54124,7 @@ fn __action988<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action989<
 >(
     source_code: &str,
@@ -54538,8 +54150,7 @@ fn __action989<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action990<
 >(
     source_code: &str,
@@ -54567,8 +54178,7 @@ fn __action990<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action991<
 >(
     source_code: &str,
@@ -54594,8 +54204,7 @@ fn __action991<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action992<
 >(
     source_code: &str,
@@ -54631,8 +54240,7 @@ fn __action992<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action993<
 >(
     source_code: &str,
@@ -54670,8 +54278,7 @@ fn __action993<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action994<
 >(
     source_code: &str,
@@ -54703,8 +54310,7 @@ fn __action994<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action995<
 >(
     source_code: &str,
@@ -54738,8 +54344,7 @@ fn __action995<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action996<
 >(
     source_code: &str,
@@ -54775,8 +54380,7 @@ fn __action996<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action997<
 >(
     source_code: &str,
@@ -54814,8 +54418,7 @@ fn __action997<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action998<
 >(
     source_code: &str,
@@ -54847,8 +54450,7 @@ fn __action998<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action999<
 >(
     source_code: &str,
@@ -54882,8 +54484,7 @@ fn __action999<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1000<
 >(
     source_code: &str,
@@ -54915,8 +54516,7 @@ fn __action1000<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1001<
 >(
     source_code: &str,
@@ -54946,8 +54546,7 @@ fn __action1001<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1002<
 >(
     source_code: &str,
@@ -54981,8 +54580,7 @@ fn __action1002<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1003<
 >(
     source_code: &str,
@@ -55018,8 +54616,7 @@ fn __action1003<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1004<
 >(
     source_code: &str,
@@ -55049,8 +54646,7 @@ fn __action1004<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1005<
 >(
     source_code: &str,
@@ -55082,8 +54678,7 @@ fn __action1005<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1006<
 >(
     source_code: &str,
@@ -55117,8 +54712,7 @@ fn __action1006<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1007<
 >(
     source_code: &str,
@@ -55154,8 +54748,7 @@ fn __action1007<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1008<
 >(
     source_code: &str,
@@ -55185,8 +54778,7 @@ fn __action1008<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1009<
 >(
     source_code: &str,
@@ -55218,8 +54810,7 @@ fn __action1009<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1010<
 >(
     source_code: &str,
@@ -55249,8 +54840,7 @@ fn __action1010<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1011<
 >(
     source_code: &str,
@@ -55278,8 +54868,7 @@ fn __action1011<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1012<
 >(
     source_code: &str,
@@ -55303,8 +54892,7 @@ fn __action1012<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1013<
 >(
     source_code: &str,
@@ -55334,8 +54922,7 @@ fn __action1013<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1014<
 >(
     source_code: &str,
@@ -55367,8 +54954,7 @@ fn __action1014<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1015<
 >(
     source_code: &str,
@@ -55394,8 +54980,7 @@ fn __action1015<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1016<
 >(
     source_code: &str,
@@ -55423,8 +55008,7 @@ fn __action1016<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1017<
 >(
     source_code: &str,
@@ -55454,8 +55038,7 @@ fn __action1017<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1018<
 >(
     source_code: &str,
@@ -55487,8 +55070,7 @@ fn __action1018<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1019<
 >(
     source_code: &str,
@@ -55514,8 +55096,7 @@ fn __action1019<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1020<
 >(
     source_code: &str,
@@ -55543,8 +55124,7 @@ fn __action1020<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1021<
 >(
     source_code: &str,
@@ -55570,8 +55150,7 @@ fn __action1021<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1022<
 >(
     source_code: &str,
@@ -55603,8 +55182,7 @@ fn __action1022<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1023<
 >(
     source_code: &str,
@@ -55638,8 +55216,7 @@ fn __action1023<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1024<
 >(
     source_code: &str,
@@ -55667,8 +55244,7 @@ fn __action1024<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1025<
 >(
     source_code: &str,
@@ -55698,8 +55274,7 @@ fn __action1025<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1026<
 >(
     source_code: &str,
@@ -55731,8 +55306,7 @@ fn __action1026<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1027<
 >(
     source_code: &str,
@@ -55766,8 +55340,7 @@ fn __action1027<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1028<
 >(
     source_code: &str,
@@ -55795,8 +55368,7 @@ fn __action1028<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1029<
 >(
     source_code: &str,
@@ -55826,8 +55398,7 @@ fn __action1029<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1030<
 >(
     source_code: &str,
@@ -55855,8 +55426,7 @@ fn __action1030<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1031<
 >(
     source_code: &str,
@@ -55886,8 +55456,7 @@ fn __action1031<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1032<
 >(
     source_code: &str,
@@ -55919,8 +55488,7 @@ fn __action1032<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1033<
 >(
     source_code: &str,
@@ -55946,8 +55514,7 @@ fn __action1033<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1034<
 >(
     source_code: &str,
@@ -55975,8 +55542,7 @@ fn __action1034<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1035<
 >(
     source_code: &str,
@@ -56006,8 +55572,7 @@ fn __action1035<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1036<
 >(
     source_code: &str,
@@ -56039,8 +55604,7 @@ fn __action1036<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1037<
 >(
     source_code: &str,
@@ -56066,8 +55630,7 @@ fn __action1037<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1038<
 >(
     source_code: &str,
@@ -56095,8 +55658,7 @@ fn __action1038<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1039<
 >(
     source_code: &str,
@@ -56122,8 +55684,7 @@ fn __action1039<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1040<
 >(
     source_code: &str,
@@ -56153,8 +55714,7 @@ fn __action1040<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1041<
 >(
     source_code: &str,
@@ -56186,8 +55746,7 @@ fn __action1041<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1042<
 >(
     source_code: &str,
@@ -56213,8 +55772,7 @@ fn __action1042<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1043<
 >(
     source_code: &str,
@@ -56242,8 +55800,7 @@ fn __action1043<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1044<
 >(
     source_code: &str,
@@ -56273,8 +55830,7 @@ fn __action1044<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1045<
 >(
     source_code: &str,
@@ -56306,8 +55862,7 @@ fn __action1045<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1046<
 >(
     source_code: &str,
@@ -56333,8 +55888,7 @@ fn __action1046<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1047<
 >(
     source_code: &str,
@@ -56362,8 +55916,7 @@ fn __action1047<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1048<
 >(
     source_code: &str,
@@ -56389,8 +55942,7 @@ fn __action1048<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1049<
 >(
     source_code: &str,
@@ -56426,8 +55978,7 @@ fn __action1049<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1050<
 >(
     source_code: &str,
@@ -56465,8 +56016,7 @@ fn __action1050<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1051<
 >(
     source_code: &str,
@@ -56498,8 +56048,7 @@ fn __action1051<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1052<
 >(
     source_code: &str,
@@ -56533,8 +56082,7 @@ fn __action1052<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1053<
 >(
     source_code: &str,
@@ -56570,8 +56118,7 @@ fn __action1053<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1054<
 >(
     source_code: &str,
@@ -56609,8 +56156,7 @@ fn __action1054<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1055<
 >(
     source_code: &str,
@@ -56642,8 +56188,7 @@ fn __action1055<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1056<
 >(
     source_code: &str,
@@ -56677,8 +56222,7 @@ fn __action1056<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1057<
 >(
     source_code: &str,
@@ -56710,8 +56254,7 @@ fn __action1057<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1058<
 >(
     source_code: &str,
@@ -56741,8 +56284,7 @@ fn __action1058<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1059<
 >(
     source_code: &str,
@@ -56776,8 +56318,7 @@ fn __action1059<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1060<
 >(
     source_code: &str,
@@ -56813,8 +56354,7 @@ fn __action1060<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1061<
 >(
     source_code: &str,
@@ -56844,8 +56384,7 @@ fn __action1061<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1062<
 >(
     source_code: &str,
@@ -56877,8 +56416,7 @@ fn __action1062<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1063<
 >(
     source_code: &str,
@@ -56912,8 +56450,7 @@ fn __action1063<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1064<
 >(
     source_code: &str,
@@ -56949,8 +56486,7 @@ fn __action1064<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1065<
 >(
     source_code: &str,
@@ -56980,8 +56516,7 @@ fn __action1065<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1066<
 >(
     source_code: &str,
@@ -57013,8 +56548,7 @@ fn __action1066<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1067<
 >(
     source_code: &str,
@@ -57044,8 +56578,7 @@ fn __action1067<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1068<
 >(
     source_code: &str,
@@ -57073,8 +56606,7 @@ fn __action1068<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1069<
 >(
     source_code: &str,
@@ -57100,8 +56632,7 @@ fn __action1069<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1070<
 >(
     source_code: &str,
@@ -57133,8 +56664,7 @@ fn __action1070<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1071<
 >(
     source_code: &str,
@@ -57164,8 +56694,7 @@ fn __action1071<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1072<
 >(
     source_code: &str,
@@ -57191,8 +56720,7 @@ fn __action1072<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1073<
 >(
     source_code: &str,
@@ -57220,8 +56748,7 @@ fn __action1073<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1074<
 >(
     source_code: &str,
@@ -57257,8 +56784,7 @@ fn __action1074<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1075<
 >(
     source_code: &str,
@@ -57294,8 +56820,7 @@ fn __action1075<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1076<
 >(
     source_code: &str,
@@ -57329,8 +56854,7 @@ fn __action1076<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1077<
 >(
     source_code: &str,
@@ -57364,8 +56888,7 @@ fn __action1077<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1078<
 >(
     source_code: &str,
@@ -57401,8 +56924,7 @@ fn __action1078<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1079<
 >(
     source_code: &str,
@@ -57438,8 +56960,7 @@ fn __action1079<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1080<
 >(
     source_code: &str,
@@ -57473,8 +56994,7 @@ fn __action1080<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1081<
 >(
     source_code: &str,
@@ -57508,8 +57028,7 @@ fn __action1081<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1082<
 >(
     source_code: &str,
@@ -57535,8 +57054,7 @@ fn __action1082<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1083<
 >(
     source_code: &str,
@@ -57564,8 +57082,7 @@ fn __action1083<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1084<
 >(
     source_code: &str,
@@ -57599,8 +57116,7 @@ fn __action1084<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1085<
 >(
     source_code: &str,
@@ -57634,8 +57150,7 @@ fn __action1085<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1086<
 >(
     source_code: &str,
@@ -57667,8 +57182,7 @@ fn __action1086<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1087<
 >(
     source_code: &str,
@@ -57700,8 +57214,7 @@ fn __action1087<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1088<
 >(
     source_code: &str,
@@ -57727,8 +57240,7 @@ fn __action1088<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1089<
 >(
     source_code: &str,
@@ -57770,8 +57282,7 @@ fn __action1089<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1090<
 >(
     source_code: &str,
@@ -57811,8 +57322,7 @@ fn __action1090<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1091<
 >(
     source_code: &str,
@@ -57852,8 +57362,7 @@ fn __action1091<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1092<
 >(
     source_code: &str,
@@ -57891,8 +57400,7 @@ fn __action1092<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1093<
 >(
     source_code: &str,
@@ -57918,8 +57426,7 @@ fn __action1093<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1094<
 >(
     source_code: &str,
@@ -57947,8 +57454,7 @@ fn __action1094<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1095<
 >(
     source_code: &str,
@@ -57974,8 +57480,7 @@ fn __action1095<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1096<
 >(
     source_code: &str,
@@ -58007,8 +57512,7 @@ fn __action1096<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1097<
 >(
     source_code: &str,
@@ -58038,8 +57542,7 @@ fn __action1097<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1098<
 >(
     source_code: &str,
@@ -58069,8 +57572,7 @@ fn __action1098<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1099<
 >(
     source_code: &str,
@@ -58098,8 +57600,7 @@ fn __action1099<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1100<
 >(
     source_code: &str,
@@ -58129,8 +57630,7 @@ fn __action1100<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1101<
 >(
     source_code: &str,
@@ -58158,8 +57658,7 @@ fn __action1101<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1102<
 >(
     source_code: &str,
@@ -58185,8 +57684,7 @@ fn __action1102<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1103<
 >(
     source_code: &str,
@@ -58218,8 +57716,7 @@ fn __action1103<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1104<
 >(
     source_code: &str,
@@ -58249,8 +57746,7 @@ fn __action1104<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1105<
 >(
     source_code: &str,
@@ -58274,8 +57770,7 @@ fn __action1105<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1106<
 >(
     source_code: &str,
@@ -58301,8 +57796,7 @@ fn __action1106<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1107<
 >(
     source_code: &str,
@@ -58326,8 +57820,7 @@ fn __action1107<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1108<
 >(
     source_code: &str,
@@ -58353,8 +57846,7 @@ fn __action1108<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1109<
 >(
     source_code: &str,
@@ -58384,8 +57876,7 @@ fn __action1109<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1110<
 >(
     source_code: &str,
@@ -58415,8 +57906,7 @@ fn __action1110<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1111<
 >(
     source_code: &str,
@@ -58442,8 +57932,7 @@ fn __action1111<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1112<
 >(
     source_code: &str,
@@ -58473,8 +57962,7 @@ fn __action1112<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1113<
 >(
     source_code: &str,
@@ -58502,8 +57990,7 @@ fn __action1113<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1114<
 >(
     source_code: &str,
@@ -58533,8 +58020,7 @@ fn __action1114<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1115<
 >(
     source_code: &str,
@@ -58562,8 +58048,7 @@ fn __action1115<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1116<
 >(
     source_code: &str,
@@ -58591,8 +58076,7 @@ fn __action1116<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1117<
 >(
     source_code: &str,
@@ -58634,8 +58118,7 @@ fn __action1117<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1118<
 >(
     source_code: &str,
@@ -58673,8 +58156,7 @@ fn __action1118<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1119<
 >(
     source_code: &str,
@@ -58714,8 +58196,7 @@ fn __action1119<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1120<
 >(
     source_code: &str,
@@ -58751,8 +58232,7 @@ fn __action1120<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1121<
 >(
     source_code: &str,
@@ -58792,8 +58272,7 @@ fn __action1121<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1122<
 >(
     source_code: &str,
@@ -58829,8 +58308,7 @@ fn __action1122<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1123<
 >(
     source_code: &str,
@@ -58870,8 +58348,7 @@ fn __action1123<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1124<
 >(
     source_code: &str,
@@ -58907,8 +58384,7 @@ fn __action1124<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1125<
 >(
     source_code: &str,
@@ -58944,8 +58420,7 @@ fn __action1125<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1126<
 >(
     source_code: &str,
@@ -58977,8 +58452,7 @@ fn __action1126<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1127<
 >(
     source_code: &str,
@@ -59006,8 +58480,7 @@ fn __action1127<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1128<
 >(
     source_code: &str,
@@ -59041,8 +58514,7 @@ fn __action1128<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1129<
 >(
     source_code: &str,
@@ -59086,8 +58558,7 @@ fn __action1129<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1130<
 >(
     source_code: &str,
@@ -59127,8 +58598,7 @@ fn __action1130<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1131<
 >(
     source_code: &str,
@@ -59166,8 +58636,7 @@ fn __action1131<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1132<
 >(
     source_code: &str,
@@ -59201,8 +58670,7 @@ fn __action1132<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1133<
 >(
     source_code: &str,
@@ -59246,8 +58714,7 @@ fn __action1133<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1134<
 >(
     source_code: &str,
@@ -59287,8 +58754,7 @@ fn __action1134<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1135<
 >(
     source_code: &str,
@@ -59326,8 +58792,7 @@ fn __action1135<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1136<
 >(
     source_code: &str,
@@ -59361,8 +58826,7 @@ fn __action1136<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1137<
 >(
     source_code: &str,
@@ -59388,8 +58852,7 @@ fn __action1137<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1138<
 >(
     source_code: &str,
@@ -59421,8 +58884,7 @@ fn __action1138<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1139<
 >(
     source_code: &str,
@@ -59452,8 +58914,7 @@ fn __action1139<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1140<
 >(
     source_code: &str,
@@ -59483,8 +58944,7 @@ fn __action1140<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1141<
 >(
     source_code: &str,
@@ -59516,8 +58976,7 @@ fn __action1141<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1142<
 >(
     source_code: &str,
@@ -59551,8 +59010,7 @@ fn __action1142<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1143<
 >(
     source_code: &str,
@@ -59586,8 +59044,7 @@ fn __action1143<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1144<
 >(
     source_code: &str,
@@ -59615,8 +59072,7 @@ fn __action1144<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1145<
 >(
     source_code: &str,
@@ -59652,8 +59108,7 @@ fn __action1145<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1146<
 >(
     source_code: &str,
@@ -59685,8 +59140,7 @@ fn __action1146<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1147<
 >(
     source_code: &str,
@@ -59724,8 +59178,7 @@ fn __action1147<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1148<
 >(
     source_code: &str,
@@ -59759,8 +59212,7 @@ fn __action1148<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1149<
 >(
     source_code: &str,
@@ -59786,8 +59238,7 @@ fn __action1149<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1150<
 >(
     source_code: &str,
@@ -59815,8 +59266,7 @@ fn __action1150<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1151<
 >(
     source_code: &str,
@@ -59842,8 +59292,7 @@ fn __action1151<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1152<
 >(
     source_code: &str,
@@ -59871,8 +59320,7 @@ fn __action1152<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1153<
 >(
     source_code: &str,
@@ -59898,8 +59346,7 @@ fn __action1153<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1154<
 >(
     source_code: &str,
@@ -59925,8 +59372,7 @@ fn __action1154<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1155<
 >(
     source_code: &str,
@@ -59952,8 +59398,7 @@ fn __action1155<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1156<
 >(
     source_code: &str,
@@ -59981,8 +59426,7 @@ fn __action1156<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1157<
 >(
     source_code: &str,
@@ -60008,8 +59452,7 @@ fn __action1157<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1158<
 >(
     source_code: &str,
@@ -60045,8 +59488,7 @@ fn __action1158<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1159<
 >(
     source_code: &str,
@@ -60080,8 +59522,7 @@ fn __action1159<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1160<
 >(
     source_code: &str,
@@ -60119,8 +59560,7 @@ fn __action1160<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1161<
 >(
     source_code: &str,
@@ -60156,8 +59596,7 @@ fn __action1161<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1162<
 >(
     source_code: &str,
@@ -60191,8 +59630,7 @@ fn __action1162<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1163<
 >(
     source_code: &str,
@@ -60224,8 +59662,7 @@ fn __action1163<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1164<
 >(
     source_code: &str,
@@ -60261,8 +59698,7 @@ fn __action1164<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1165<
 >(
     source_code: &str,
@@ -60296,8 +59732,7 @@ fn __action1165<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1166<
 >(
     source_code: &str,
@@ -60333,8 +59768,7 @@ fn __action1166<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1167<
 >(
     source_code: &str,
@@ -60368,8 +59802,7 @@ fn __action1167<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1168<
 >(
     source_code: &str,
@@ -60407,8 +59840,7 @@ fn __action1168<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1169<
 >(
     source_code: &str,
@@ -60444,8 +59876,7 @@ fn __action1169<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1170<
 >(
     source_code: &str,
@@ -60479,8 +59910,7 @@ fn __action1170<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1171<
 >(
     source_code: &str,
@@ -60512,8 +59942,7 @@ fn __action1171<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1172<
 >(
     source_code: &str,
@@ -60549,8 +59978,7 @@ fn __action1172<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1173<
 >(
     source_code: &str,
@@ -60584,8 +60012,7 @@ fn __action1173<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1174<
 >(
     source_code: &str,
@@ -60611,8 +60038,7 @@ fn __action1174<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1175<
 >(
     source_code: &str,
@@ -60640,8 +60066,7 @@ fn __action1175<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1176<
 >(
     source_code: &str,
@@ -60667,8 +60092,7 @@ fn __action1176<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1177<
 >(
     source_code: &str,
@@ -60694,8 +60118,7 @@ fn __action1177<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1178<
 >(
     source_code: &str,
@@ -60721,8 +60144,7 @@ fn __action1178<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1179<
 >(
     source_code: &str,
@@ -60750,8 +60172,7 @@ fn __action1179<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1180<
 >(
     source_code: &str,
@@ -60783,8 +60204,7 @@ fn __action1180<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1181<
 >(
     source_code: &str,
@@ -60816,8 +60236,7 @@ fn __action1181<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1182<
 >(
     source_code: &str,
@@ -60847,8 +60266,7 @@ fn __action1182<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1183<
 >(
     source_code: &str,
@@ -60878,8 +60296,7 @@ fn __action1183<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1184<
 >(
     source_code: &str,
@@ -60909,8 +60326,7 @@ fn __action1184<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1185<
 >(
     source_code: &str,
@@ -60940,8 +60356,7 @@ fn __action1185<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1186<
 >(
     source_code: &str,
@@ -60969,8 +60384,7 @@ fn __action1186<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1187<
 >(
     source_code: &str,
@@ -60998,8 +60412,7 @@ fn __action1187<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1188<
 >(
     source_code: &str,
@@ -61031,8 +60444,7 @@ fn __action1188<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1189<
 >(
     source_code: &str,
@@ -61064,8 +60476,7 @@ fn __action1189<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1190<
 >(
     source_code: &str,
@@ -61095,8 +60506,7 @@ fn __action1190<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1191<
 >(
     source_code: &str,
@@ -61126,8 +60536,7 @@ fn __action1191<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1192<
 >(
     source_code: &str,
@@ -61157,8 +60566,7 @@ fn __action1192<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1193<
 >(
     source_code: &str,
@@ -61188,8 +60596,7 @@ fn __action1193<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1194<
 >(
     source_code: &str,
@@ -61217,8 +60624,7 @@ fn __action1194<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1195<
 >(
     source_code: &str,
@@ -61246,8 +60652,7 @@ fn __action1195<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1196<
 >(
     source_code: &str,
@@ -61281,8 +60686,7 @@ fn __action1196<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1197<
 >(
     source_code: &str,
@@ -61318,8 +60722,7 @@ fn __action1197<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1198<
 >(
     source_code: &str,
@@ -61345,8 +60748,7 @@ fn __action1198<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1199<
 >(
     source_code: &str,
@@ -61376,8 +60778,7 @@ fn __action1199<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1200<
 >(
     source_code: &str,
@@ -61405,8 +60806,7 @@ fn __action1200<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1201<
 >(
     source_code: &str,
@@ -61432,8 +60832,7 @@ fn __action1201<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1202<
 >(
     source_code: &str,
@@ -61467,8 +60866,7 @@ fn __action1202<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1203<
 >(
     source_code: &str,
@@ -61500,8 +60898,7 @@ fn __action1203<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1204<
 >(
     source_code: &str,
@@ -61537,8 +60934,7 @@ fn __action1204<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1205<
 >(
     source_code: &str,
@@ -61572,8 +60968,7 @@ fn __action1205<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1206<
 >(
     source_code: &str,
@@ -61605,8 +61000,7 @@ fn __action1206<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1207<
 >(
     source_code: &str,
@@ -61636,8 +61030,7 @@ fn __action1207<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1208<
 >(
     source_code: &str,
@@ -61671,8 +61064,7 @@ fn __action1208<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1209<
 >(
     source_code: &str,
@@ -61704,8 +61096,7 @@ fn __action1209<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1210<
 >(
     source_code: &str,
@@ -61731,8 +61122,7 @@ fn __action1210<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1211<
 >(
     source_code: &str,
@@ -61760,8 +61150,7 @@ fn __action1211<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1212<
 >(
     source_code: &str,
@@ -61785,8 +61174,7 @@ fn __action1212<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1213<
 >(
     source_code: &str,
@@ -61818,8 +61206,7 @@ fn __action1213<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1214<
 >(
     source_code: &str,
@@ -61851,8 +61238,7 @@ fn __action1214<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1215<
 >(
     source_code: &str,
@@ -61876,8 +61262,7 @@ fn __action1215<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1216<
 >(
     source_code: &str,
@@ -61907,8 +61292,7 @@ fn __action1216<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1217<
 >(
     source_code: &str,
@@ -61938,8 +61322,7 @@ fn __action1217<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1218<
 >(
     source_code: &str,
@@ -61969,8 +61352,7 @@ fn __action1218<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1219<
 >(
     source_code: &str,
@@ -62000,8 +61382,7 @@ fn __action1219<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1220<
 >(
     source_code: &str,
@@ -62031,8 +61412,7 @@ fn __action1220<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1221<
 >(
     source_code: &str,
@@ -62060,8 +61440,7 @@ fn __action1221<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1222<
 >(
     source_code: &str,
@@ -62089,8 +61468,7 @@ fn __action1222<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1223<
 >(
     source_code: &str,
@@ -62120,8 +61498,7 @@ fn __action1223<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1224<
 >(
     source_code: &str,
@@ -62151,8 +61528,7 @@ fn __action1224<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1225<
 >(
     source_code: &str,
@@ -62182,8 +61558,7 @@ fn __action1225<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1226<
 >(
     source_code: &str,
@@ -62213,8 +61588,7 @@ fn __action1226<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1227<
 >(
     source_code: &str,
@@ -62246,8 +61620,7 @@ fn __action1227<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1228<
 >(
     source_code: &str,
@@ -62275,8 +61648,7 @@ fn __action1228<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1229<
 >(
     source_code: &str,
@@ -62302,8 +61674,7 @@ fn __action1229<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1230<
 >(
     source_code: &str,
@@ -62329,8 +61700,7 @@ fn __action1230<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1231<
 >(
     source_code: &str,
@@ -62360,8 +61730,7 @@ fn __action1231<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1232<
 >(
     source_code: &str,
@@ -62393,8 +61762,7 @@ fn __action1232<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1233<
 >(
     source_code: &str,
@@ -62426,8 +61794,7 @@ fn __action1233<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1234<
 >(
     source_code: &str,
@@ -62457,8 +61824,7 @@ fn __action1234<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1235<
 >(
     source_code: &str,
@@ -62494,8 +61860,7 @@ fn __action1235<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1236<
 >(
     source_code: &str,
@@ -62527,8 +61892,7 @@ fn __action1236<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1237<
 >(
     source_code: &str,
@@ -62566,8 +61930,7 @@ fn __action1237<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1238<
 >(
     source_code: &str,
@@ -62601,8 +61964,7 @@ fn __action1238<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1239<
 >(
     source_code: &str,
@@ -62636,8 +61998,7 @@ fn __action1239<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1240<
 >(
     source_code: &str,
@@ -62667,8 +62028,7 @@ fn __action1240<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1241<
 >(
     source_code: &str,
@@ -62704,8 +62064,7 @@ fn __action1241<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1242<
 >(
     source_code: &str,
@@ -62737,8 +62096,7 @@ fn __action1242<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1243<
 >(
     source_code: &str,
@@ -62766,8 +62124,7 @@ fn __action1243<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1244<
 >(
     source_code: &str,
@@ -62797,8 +62154,7 @@ fn __action1244<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1245<
 >(
     source_code: &str,
@@ -62830,8 +62186,7 @@ fn __action1245<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1246<
 >(
     source_code: &str,
@@ -62863,8 +62218,7 @@ fn __action1246<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1247<
 >(
     source_code: &str,
@@ -62894,8 +62248,7 @@ fn __action1247<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1248<
 >(
     source_code: &str,
@@ -62927,8 +62280,7 @@ fn __action1248<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1249<
 >(
     source_code: &str,
@@ -62958,8 +62310,7 @@ fn __action1249<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1250<
 >(
     source_code: &str,
@@ -62991,8 +62342,7 @@ fn __action1250<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1251<
 >(
     source_code: &str,
@@ -63018,8 +62368,7 @@ fn __action1251<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1252<
 >(
     source_code: &str,
@@ -63045,8 +62394,7 @@ fn __action1252<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1253<
 >(
     source_code: &str,
@@ -63072,8 +62420,7 @@ fn __action1253<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1254<
 >(
     source_code: &str,
@@ -63099,8 +62446,7 @@ fn __action1254<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1255<
 >(
     source_code: &str,
@@ -63126,8 +62472,7 @@ fn __action1255<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1256<
 >(
     source_code: &str,
@@ -63153,8 +62498,7 @@ fn __action1256<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1257<
 >(
     source_code: &str,
@@ -63184,8 +62528,7 @@ fn __action1257<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1258<
 >(
     source_code: &str,
@@ -63217,8 +62560,7 @@ fn __action1258<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1259<
 >(
     source_code: &str,
@@ -63254,8 +62596,7 @@ fn __action1259<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1260<
 >(
     source_code: &str,
@@ -63287,8 +62628,7 @@ fn __action1260<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1261<
 >(
     source_code: &str,
@@ -63326,8 +62666,7 @@ fn __action1261<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1262<
 >(
     source_code: &str,
@@ -63361,8 +62700,7 @@ fn __action1262<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1263<
 >(
     source_code: &str,
@@ -63396,8 +62734,7 @@ fn __action1263<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1264<
 >(
     source_code: &str,
@@ -63427,8 +62764,7 @@ fn __action1264<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1265<
 >(
     source_code: &str,
@@ -63464,8 +62800,7 @@ fn __action1265<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1266<
 >(
     source_code: &str,
@@ -63497,8 +62832,7 @@ fn __action1266<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1267<
 >(
     source_code: &str,
@@ -63526,8 +62860,7 @@ fn __action1267<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1268<
 >(
     source_code: &str,
@@ -63557,8 +62890,7 @@ fn __action1268<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1269<
 >(
     source_code: &str,
@@ -63590,8 +62922,7 @@ fn __action1269<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1270<
 >(
     source_code: &str,
@@ -63623,8 +62954,7 @@ fn __action1270<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1271<
 >(
     source_code: &str,
@@ -63654,8 +62984,7 @@ fn __action1271<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1272<
 >(
     source_code: &str,
@@ -63687,8 +63016,7 @@ fn __action1272<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1273<
 >(
     source_code: &str,
@@ -63718,8 +63046,7 @@ fn __action1273<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1274<
 >(
     source_code: &str,
@@ -63751,8 +63078,7 @@ fn __action1274<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1275<
 >(
     source_code: &str,
@@ -63778,8 +63104,7 @@ fn __action1275<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1276<
 >(
     source_code: &str,
@@ -63805,8 +63130,7 @@ fn __action1276<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1277<
 >(
     source_code: &str,
@@ -63832,8 +63156,7 @@ fn __action1277<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1278<
 >(
     source_code: &str,
@@ -63859,8 +63182,7 @@ fn __action1278<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1279<
 >(
     source_code: &str,
@@ -63888,8 +63210,7 @@ fn __action1279<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1280<
 >(
     source_code: &str,
@@ -63921,8 +63242,7 @@ fn __action1280<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1281<
 >(
     source_code: &str,
@@ -63952,8 +63272,7 @@ fn __action1281<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1282<
 >(
     source_code: &str,
@@ -63981,8 +63300,7 @@ fn __action1282<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1283<
 >(
     source_code: &str,
@@ -64014,8 +63332,7 @@ fn __action1283<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1284<
 >(
     source_code: &str,
@@ -64045,8 +63362,7 @@ fn __action1284<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1285<
 >(
     source_code: &str,
@@ -64074,8 +63390,7 @@ fn __action1285<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1286<
 >(
     source_code: &str,
@@ -64103,8 +63418,7 @@ fn __action1286<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1287<
 >(
     source_code: &str,
@@ -64130,8 +63444,7 @@ fn __action1287<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1288<
 >(
     source_code: &str,
@@ -64159,8 +63472,7 @@ fn __action1288<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1289<
 >(
     source_code: &str,
@@ -64188,8 +63500,7 @@ fn __action1289<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1290<
 >(
     source_code: &str,
@@ -64217,8 +63528,7 @@ fn __action1290<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1291<
 >(
     source_code: &str,
@@ -64246,8 +63556,7 @@ fn __action1291<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1292<
 >(
     source_code: &str,
@@ -64277,8 +63586,7 @@ fn __action1292<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1293<
 >(
     source_code: &str,
@@ -64306,8 +63614,7 @@ fn __action1293<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1294<
 >(
     source_code: &str,
@@ -64333,8 +63640,7 @@ fn __action1294<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1295<
 >(
     source_code: &str,
@@ -64362,8 +63668,7 @@ fn __action1295<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1296<
 >(
     source_code: &str,
@@ -64395,8 +63700,7 @@ fn __action1296<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1297<
 >(
     source_code: &str,
@@ -64424,8 +63728,7 @@ fn __action1297<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1298<
 >(
     source_code: &str,
@@ -64453,8 +63756,7 @@ fn __action1298<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1299<
 >(
     source_code: &str,
@@ -64484,8 +63786,7 @@ fn __action1299<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1300<
 >(
     source_code: &str,
@@ -64515,8 +63816,7 @@ fn __action1300<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1301<
 >(
     source_code: &str,
@@ -64544,8 +63844,7 @@ fn __action1301<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1302<
 >(
     source_code: &str,
@@ -64575,8 +63874,7 @@ fn __action1302<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1303<
 >(
     source_code: &str,
@@ -64608,8 +63906,7 @@ fn __action1303<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1304<
 >(
     source_code: &str,
@@ -64639,8 +63936,7 @@ fn __action1304<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1305<
 >(
     source_code: &str,
@@ -64666,8 +63962,7 @@ fn __action1305<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1306<
 >(
     source_code: &str,
@@ -64693,8 +63988,7 @@ fn __action1306<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1307<
 >(
     source_code: &str,
@@ -64730,8 +64024,7 @@ fn __action1307<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1308<
 >(
     source_code: &str,
@@ -64765,8 +64058,7 @@ fn __action1308<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1309<
 >(
     source_code: &str,
@@ -64794,8 +64086,7 @@ fn __action1309<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1310<
 >(
     source_code: &str,
@@ -64823,8 +64114,7 @@ fn __action1310<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1311<
 >(
     source_code: &str,
@@ -64850,8 +64140,7 @@ fn __action1311<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1312<
 >(
     source_code: &str,
@@ -64877,8 +64166,7 @@ fn __action1312<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1313<
 >(
     source_code: &str,
@@ -64906,8 +64194,7 @@ fn __action1313<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1314<
 >(
     source_code: &str,
@@ -64933,8 +64220,7 @@ fn __action1314<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1315<
 >(
     source_code: &str,
@@ -64962,8 +64248,7 @@ fn __action1315<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1316<
 >(
     source_code: &str,
@@ -64993,8 +64278,7 @@ fn __action1316<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1317<
 >(
     source_code: &str,
@@ -65022,8 +64306,7 @@ fn __action1317<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1318<
 >(
     source_code: &str,
@@ -65051,8 +64334,7 @@ fn __action1318<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1319<
 >(
     source_code: &str,
@@ -65080,8 +64362,7 @@ fn __action1319<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1320<
 >(
     source_code: &str,
@@ -65107,8 +64388,7 @@ fn __action1320<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1321<
 >(
     source_code: &str,
@@ -65136,8 +64416,7 @@ fn __action1321<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1322<
 >(
     source_code: &str,
@@ -65163,8 +64442,7 @@ fn __action1322<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1323<
 >(
     source_code: &str,
@@ -65192,8 +64470,7 @@ fn __action1323<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1324<
 >(
     source_code: &str,
@@ -65219,8 +64496,7 @@ fn __action1324<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1325<
 >(
     source_code: &str,
@@ -65250,8 +64526,7 @@ fn __action1325<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1326<
 >(
     source_code: &str,
@@ -65277,8 +64552,7 @@ fn __action1326<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1327<
 >(
     source_code: &str,
@@ -65308,8 +64582,7 @@ fn __action1327<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1328<
 >(
     source_code: &str,
@@ -65335,8 +64608,7 @@ fn __action1328<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1329<
 >(
     source_code: &str,
@@ -65362,8 +64634,7 @@ fn __action1329<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1330<
 >(
     source_code: &str,
@@ -65395,8 +64666,7 @@ fn __action1330<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1331<
 >(
     source_code: &str,
@@ -65426,8 +64696,7 @@ fn __action1331<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1332<
 >(
     source_code: &str,
@@ -65453,8 +64722,7 @@ fn __action1332<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1333<
 >(
     source_code: &str,
@@ -65482,8 +64750,7 @@ fn __action1333<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1334<
 >(
     source_code: &str,
@@ -65515,8 +64782,7 @@ fn __action1334<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1335<
 >(
     source_code: &str,
@@ -65542,8 +64808,7 @@ fn __action1335<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1336<
 >(
     source_code: &str,
@@ -65569,8 +64834,7 @@ fn __action1336<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1337<
 >(
     source_code: &str,
@@ -65598,8 +64862,7 @@ fn __action1337<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1338<
 >(
     source_code: &str,
@@ -65643,8 +64906,7 @@ fn __action1338<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1339<
 >(
     source_code: &str,
@@ -65670,8 +64932,7 @@ fn __action1339<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1340<
 >(
     source_code: &str,
@@ -65697,8 +64958,7 @@ fn __action1340<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1341<
 >(
     source_code: &str,
@@ -65724,8 +64984,7 @@ fn __action1341<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1342<
 >(
     source_code: &str,
@@ -65751,8 +65010,7 @@ fn __action1342<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1343<
 >(
     source_code: &str,
@@ -65778,8 +65036,7 @@ fn __action1343<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1344<
 >(
     source_code: &str,
@@ -65805,8 +65062,7 @@ fn __action1344<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1345<
 >(
     source_code: &str,
@@ -65832,8 +65088,7 @@ fn __action1345<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1346<
 >(
     source_code: &str,
@@ -65859,8 +65114,7 @@ fn __action1346<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1347<
 >(
     source_code: &str,
@@ -65886,8 +65140,7 @@ fn __action1347<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1348<
 >(
     source_code: &str,
@@ -65913,8 +65166,7 @@ fn __action1348<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1349<
 >(
     source_code: &str,
@@ -65942,8 +65194,7 @@ fn __action1349<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1350<
 >(
     source_code: &str,
@@ -65975,8 +65226,7 @@ fn __action1350<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1351<
 >(
     source_code: &str,
@@ -66006,8 +65256,7 @@ fn __action1351<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1352<
 >(
     source_code: &str,
@@ -66041,8 +65290,7 @@ fn __action1352<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1353<
 >(
     source_code: &str,
@@ -66074,8 +65322,7 @@ fn __action1353<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1354<
 >(
     source_code: &str,
@@ -66113,8 +65360,7 @@ fn __action1354<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1355<
 >(
     source_code: &str,
@@ -66150,8 +65396,7 @@ fn __action1355<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1356<
 >(
     source_code: &str,
@@ -66181,8 +65426,7 @@ fn __action1356<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1357<
 >(
     source_code: &str,
@@ -66208,8 +65452,7 @@ fn __action1357<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1358<
 >(
     source_code: &str,
@@ -66239,8 +65482,7 @@ fn __action1358<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1359<
 >(
     source_code: &str,
@@ -66270,8 +65512,7 @@ fn __action1359<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1360<
 >(
     source_code: &str,
@@ -66311,8 +65552,7 @@ fn __action1360<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1361<
 >(
     source_code: &str,
@@ -66352,8 +65592,7 @@ fn __action1361<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1362<
 >(
     source_code: &str,
@@ -66391,8 +65630,7 @@ fn __action1362<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1363<
 >(
     source_code: &str,
@@ -66422,8 +65660,7 @@ fn __action1363<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1364<
 >(
     source_code: &str,
@@ -66449,8 +65686,7 @@ fn __action1364<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1365<
 >(
     source_code: &str,
@@ -66478,8 +65714,7 @@ fn __action1365<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1366<
 >(
     source_code: &str,
@@ -66507,8 +65742,7 @@ fn __action1366<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1367<
 >(
     source_code: &str,
@@ -66536,8 +65770,7 @@ fn __action1367<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1368<
 >(
     source_code: &str,
@@ -66563,8 +65796,7 @@ fn __action1368<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1369<
 >(
     source_code: &str,
@@ -66592,8 +65824,7 @@ fn __action1369<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1370<
 >(
     source_code: &str,
@@ -66619,8 +65850,7 @@ fn __action1370<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1371<
 >(
     source_code: &str,
@@ -66648,8 +65878,7 @@ fn __action1371<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1372<
 >(
     source_code: &str,
@@ -66677,8 +65906,7 @@ fn __action1372<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1373<
 >(
     source_code: &str,
@@ -66708,8 +65936,7 @@ fn __action1373<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1374<
 >(
     source_code: &str,
@@ -66739,8 +65966,7 @@ fn __action1374<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1375<
 >(
     source_code: &str,
@@ -66776,8 +66002,7 @@ fn __action1375<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1376<
 >(
     source_code: &str,
@@ -66815,8 +66040,7 @@ fn __action1376<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1377<
 >(
     source_code: &str,
@@ -66848,8 +66072,7 @@ fn __action1377<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1378<
 >(
     source_code: &str,
@@ -66883,8 +66106,7 @@ fn __action1378<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1379<
 >(
     source_code: &str,
@@ -66920,8 +66142,7 @@ fn __action1379<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1380<
 >(
     source_code: &str,
@@ -66959,8 +66180,7 @@ fn __action1380<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1381<
 >(
     source_code: &str,
@@ -66992,8 +66212,7 @@ fn __action1381<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1382<
 >(
     source_code: &str,
@@ -67027,8 +66246,7 @@ fn __action1382<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1383<
 >(
     source_code: &str,
@@ -67060,8 +66278,7 @@ fn __action1383<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1384<
 >(
     source_code: &str,
@@ -67089,8 +66306,7 @@ fn __action1384<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1385<
 >(
     source_code: &str,
@@ -67124,8 +66340,7 @@ fn __action1385<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1386<
 >(
     source_code: &str,
@@ -67161,8 +66376,7 @@ fn __action1386<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1387<
 >(
     source_code: &str,
@@ -67192,8 +66406,7 @@ fn __action1387<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1388<
 >(
     source_code: &str,
@@ -67225,8 +66438,7 @@ fn __action1388<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1389<
 >(
     source_code: &str,
@@ -67260,8 +66472,7 @@ fn __action1389<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1390<
 >(
     source_code: &str,
@@ -67297,8 +66508,7 @@ fn __action1390<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1391<
 >(
     source_code: &str,
@@ -67328,8 +66538,7 @@ fn __action1391<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1392<
 >(
     source_code: &str,
@@ -67361,8 +66570,7 @@ fn __action1392<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1393<
 >(
     source_code: &str,
@@ -67392,8 +66600,7 @@ fn __action1393<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1394<
 >(
     source_code: &str,
@@ -67419,8 +66626,7 @@ fn __action1394<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1395<
 >(
     source_code: &str,
@@ -67452,8 +66658,7 @@ fn __action1395<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1396<
 >(
     source_code: &str,
@@ -67487,8 +66692,7 @@ fn __action1396<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1397<
 >(
     source_code: &str,
@@ -67516,8 +66720,7 @@ fn __action1397<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1398<
 >(
     source_code: &str,
@@ -67547,8 +66750,7 @@ fn __action1398<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1399<
 >(
     source_code: &str,
@@ -67580,8 +66782,7 @@ fn __action1399<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1400<
 >(
     source_code: &str,
@@ -67615,8 +66816,7 @@ fn __action1400<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1401<
 >(
     source_code: &str,
@@ -67644,8 +66844,7 @@ fn __action1401<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1402<
 >(
     source_code: &str,
@@ -67675,8 +66874,7 @@ fn __action1402<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1403<
 >(
     source_code: &str,
@@ -67704,8 +66902,7 @@ fn __action1403<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1404<
 >(
     source_code: &str,
@@ -67735,8 +66932,7 @@ fn __action1404<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1405<
 >(
     source_code: &str,
@@ -67768,8 +66964,7 @@ fn __action1405<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1406<
 >(
     source_code: &str,
@@ -67795,8 +66990,7 @@ fn __action1406<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1407<
 >(
     source_code: &str,
@@ -67824,8 +67018,7 @@ fn __action1407<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1408<
 >(
     source_code: &str,
@@ -67855,8 +67048,7 @@ fn __action1408<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1409<
 >(
     source_code: &str,
@@ -67888,8 +67080,7 @@ fn __action1409<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1410<
 >(
     source_code: &str,
@@ -67915,8 +67106,7 @@ fn __action1410<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1411<
 >(
     source_code: &str,
@@ -67944,8 +67134,7 @@ fn __action1411<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1412<
 >(
     source_code: &str,
@@ -67971,8 +67160,7 @@ fn __action1412<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1413<
 >(
     source_code: &str,
@@ -68008,8 +67196,7 @@ fn __action1413<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1414<
 >(
     source_code: &str,
@@ -68047,8 +67234,7 @@ fn __action1414<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1415<
 >(
     source_code: &str,
@@ -68080,8 +67266,7 @@ fn __action1415<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1416<
 >(
     source_code: &str,
@@ -68115,8 +67300,7 @@ fn __action1416<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1417<
 >(
     source_code: &str,
@@ -68152,8 +67336,7 @@ fn __action1417<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1418<
 >(
     source_code: &str,
@@ -68191,8 +67374,7 @@ fn __action1418<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1419<
 >(
     source_code: &str,
@@ -68224,8 +67406,7 @@ fn __action1419<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1420<
 >(
     source_code: &str,
@@ -68259,8 +67440,7 @@ fn __action1420<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1421<
 >(
     source_code: &str,
@@ -68292,8 +67472,7 @@ fn __action1421<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1422<
 >(
     source_code: &str,
@@ -68321,8 +67500,7 @@ fn __action1422<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1423<
 >(
     source_code: &str,
@@ -68356,8 +67534,7 @@ fn __action1423<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1424<
 >(
     source_code: &str,
@@ -68393,8 +67570,7 @@ fn __action1424<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1425<
 >(
     source_code: &str,
@@ -68424,8 +67600,7 @@ fn __action1425<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1426<
 >(
     source_code: &str,
@@ -68457,8 +67632,7 @@ fn __action1426<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1427<
 >(
     source_code: &str,
@@ -68492,8 +67666,7 @@ fn __action1427<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1428<
 >(
     source_code: &str,
@@ -68529,8 +67702,7 @@ fn __action1428<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1429<
 >(
     source_code: &str,
@@ -68560,8 +67732,7 @@ fn __action1429<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1430<
 >(
     source_code: &str,
@@ -68593,8 +67764,7 @@ fn __action1430<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1431<
 >(
     source_code: &str,
@@ -68624,8 +67794,7 @@ fn __action1431<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1432<
 >(
     source_code: &str,
@@ -68651,8 +67820,7 @@ fn __action1432<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1433<
 >(
     source_code: &str,
@@ -68684,8 +67852,7 @@ fn __action1433<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1434<
 >(
     source_code: &str,
@@ -68719,8 +67886,7 @@ fn __action1434<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1435<
 >(
     source_code: &str,
@@ -68748,8 +67914,7 @@ fn __action1435<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1436<
 >(
     source_code: &str,
@@ -68779,8 +67944,7 @@ fn __action1436<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1437<
 >(
     source_code: &str,
@@ -68812,8 +67976,7 @@ fn __action1437<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1438<
 >(
     source_code: &str,
@@ -68847,8 +68010,7 @@ fn __action1438<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1439<
 >(
     source_code: &str,
@@ -68876,8 +68038,7 @@ fn __action1439<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1440<
 >(
     source_code: &str,
@@ -68907,8 +68068,7 @@ fn __action1440<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1441<
 >(
     source_code: &str,
@@ -68936,8 +68096,7 @@ fn __action1441<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1442<
 >(
     source_code: &str,
@@ -68967,8 +68126,7 @@ fn __action1442<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1443<
 >(
     source_code: &str,
@@ -69000,8 +68158,7 @@ fn __action1443<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1444<
 >(
     source_code: &str,
@@ -69027,8 +68184,7 @@ fn __action1444<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1445<
 >(
     source_code: &str,
@@ -69056,8 +68212,7 @@ fn __action1445<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1446<
 >(
     source_code: &str,
@@ -69087,8 +68242,7 @@ fn __action1446<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1447<
 >(
     source_code: &str,
@@ -69120,8 +68274,7 @@ fn __action1447<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1448<
 >(
     source_code: &str,
@@ -69147,8 +68300,7 @@ fn __action1448<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1449<
 >(
     source_code: &str,
@@ -69176,8 +68328,7 @@ fn __action1449<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1450<
 >(
     source_code: &str,
@@ -69203,8 +68354,7 @@ fn __action1450<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1451<
 >(
     source_code: &str,
@@ -69234,8 +68384,7 @@ fn __action1451<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1452<
 >(
     source_code: &str,
@@ -69263,8 +68412,7 @@ fn __action1452<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1453<
 >(
     source_code: &str,
@@ -69290,8 +68438,7 @@ fn __action1453<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1454<
 >(
     source_code: &str,
@@ -69327,8 +68474,7 @@ fn __action1454<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1455<
 >(
     source_code: &str,
@@ -69362,8 +68508,7 @@ fn __action1455<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1456<
 >(
     source_code: &str,
@@ -69395,8 +68540,7 @@ fn __action1456<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1457<
 >(
     source_code: &str,
@@ -69426,8 +68570,7 @@ fn __action1457<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1458<
 >(
     source_code: &str,
@@ -69459,8 +68602,7 @@ fn __action1458<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1459<
 >(
     source_code: &str,
@@ -69490,8 +68632,7 @@ fn __action1459<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1460<
 >(
     source_code: &str,
@@ -69519,8 +68660,7 @@ fn __action1460<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1461<
 >(
     source_code: &str,
@@ -69548,8 +68688,7 @@ fn __action1461<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1462<
 >(
     source_code: &str,
@@ -69577,8 +68716,7 @@ fn __action1462<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1463<
 >(
     source_code: &str,
@@ -69604,8 +68742,7 @@ fn __action1463<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1464<
 >(
     source_code: &str,
@@ -69635,8 +68772,7 @@ fn __action1464<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1465<
 >(
     source_code: &str,
@@ -69666,8 +68802,7 @@ fn __action1465<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1466<
 >(
     source_code: &str,
@@ -69693,8 +68828,7 @@ fn __action1466<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1467<
 >(
     source_code: &str,
@@ -69726,8 +68860,7 @@ fn __action1467<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1468<
 >(
     source_code: &str,
@@ -69755,8 +68888,7 @@ fn __action1468<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1469<
 >(
     source_code: &str,
@@ -69786,8 +68918,7 @@ fn __action1469<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1470<
 >(
     source_code: &str,
@@ -69815,8 +68946,7 @@ fn __action1470<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1471<
 >(
     source_code: &str,
@@ -69848,8 +68978,7 @@ fn __action1471<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1472<
 >(
     source_code: &str,
@@ -69883,8 +69012,7 @@ fn __action1472<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1473<
 >(
     source_code: &str,
@@ -69916,8 +69044,7 @@ fn __action1473<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1474<
 >(
     source_code: &str,
@@ -69947,8 +69074,7 @@ fn __action1474<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1475<
 >(
     source_code: &str,
@@ -69978,8 +69104,7 @@ fn __action1475<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1476<
 >(
     source_code: &str,
@@ -70009,8 +69134,7 @@ fn __action1476<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1477<
 >(
     source_code: &str,
@@ -70046,8 +69170,7 @@ fn __action1477<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1478<
 >(
     source_code: &str,
@@ -70081,8 +69204,7 @@ fn __action1478<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1479<
 >(
     source_code: &str,
@@ -70110,8 +69232,7 @@ fn __action1479<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1480<
 >(
     source_code: &str,
@@ -70139,8 +69260,7 @@ fn __action1480<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1481<
 >(
     source_code: &str,
@@ -70172,8 +69292,7 @@ fn __action1481<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1482<
 >(
     source_code: &str,
@@ -70201,8 +69320,7 @@ fn __action1482<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1483<
 >(
     source_code: &str,
@@ -70230,8 +69348,7 @@ fn __action1483<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1484<
 >(
     source_code: &str,
@@ -70257,8 +69374,7 @@ fn __action1484<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1485<
 >(
     source_code: &str,
@@ -70284,8 +69400,7 @@ fn __action1485<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1486<
 >(
     source_code: &str,
@@ -70317,8 +69432,7 @@ fn __action1486<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1487<
 >(
     source_code: &str,
@@ -70346,8 +69460,7 @@ fn __action1487<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1488<
 >(
     source_code: &str,
@@ -70375,8 +69488,7 @@ fn __action1488<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1489<
 >(
     source_code: &str,
@@ -70402,8 +69514,7 @@ fn __action1489<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1490<
 >(
     source_code: &str,
@@ -70433,8 +69544,7 @@ fn __action1490<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1491<
 >(
     source_code: &str,
@@ -70464,8 +69574,7 @@ fn __action1491<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1492<
 >(
     source_code: &str,
@@ -70499,8 +69608,7 @@ fn __action1492<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1493<
 >(
     source_code: &str,
@@ -70534,8 +69642,7 @@ fn __action1493<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1494<
 >(
     source_code: &str,
@@ -70563,8 +69670,7 @@ fn __action1494<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1495<
 >(
     source_code: &str,
@@ -70592,8 +69698,7 @@ fn __action1495<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1496<
 >(
     source_code: &str,
@@ -70623,8 +69728,7 @@ fn __action1496<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1497<
 >(
     source_code: &str,
@@ -70668,8 +69772,7 @@ fn __action1497<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1498<
 >(
     source_code: &str,
@@ -70707,8 +69810,7 @@ fn __action1498<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1499<
 >(
     source_code: &str,
@@ -70746,8 +69848,7 @@ fn __action1499<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1500<
 >(
     source_code: &str,
@@ -70779,8 +69880,7 @@ fn __action1500<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1501<
 >(
     source_code: &str,
@@ -70824,8 +69924,7 @@ fn __action1501<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1502<
 >(
     source_code: &str,
@@ -70863,8 +69962,7 @@ fn __action1502<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1503<
 >(
     source_code: &str,
@@ -70902,8 +70000,7 @@ fn __action1503<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1504<
 >(
     source_code: &str,
@@ -70935,8 +70032,7 @@ fn __action1504<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1505<
 >(
     source_code: &str,
@@ -70962,8 +70058,7 @@ fn __action1505<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1506<
 >(
     source_code: &str,
@@ -70997,8 +70092,7 @@ fn __action1506<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1507<
 >(
     source_code: &str,
@@ -71028,8 +70122,7 @@ fn __action1507<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1508<
 >(
     source_code: &str,
@@ -71055,8 +70148,7 @@ fn __action1508<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1509<
 >(
     source_code: &str,
@@ -71084,8 +70176,7 @@ fn __action1509<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1510<
 >(
     source_code: &str,
@@ -71113,8 +70204,7 @@ fn __action1510<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1511<
 >(
     source_code: &str,
@@ -71146,8 +70236,7 @@ fn __action1511<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1512<
 >(
     source_code: &str,
@@ -71177,8 +70266,7 @@ fn __action1512<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1513<
 >(
     source_code: &str,
@@ -71208,8 +70296,7 @@ fn __action1513<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1514<
 >(
     source_code: &str,
@@ -71235,8 +70322,7 @@ fn __action1514<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1515<
 >(
     source_code: &str,
@@ -71262,8 +70348,7 @@ fn __action1515<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1516<
 >(
     source_code: &str,
@@ -71289,8 +70374,7 @@ fn __action1516<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1517<
 >(
     source_code: &str,
@@ -71320,8 +70404,7 @@ fn __action1517<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1518<
 >(
     source_code: &str,
@@ -71351,8 +70434,7 @@ fn __action1518<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1519<
 >(
     source_code: &str,
@@ -71382,8 +70464,7 @@ fn __action1519<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1520<
 >(
     source_code: &str,
@@ -71411,8 +70492,7 @@ fn __action1520<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1521<
 >(
     source_code: &str,
@@ -71442,8 +70522,7 @@ fn __action1521<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1522<
 >(
     source_code: &str,
@@ -71479,8 +70558,7 @@ fn __action1522<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1523<
 >(
     source_code: &str,
@@ -71516,8 +70594,7 @@ fn __action1523<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1524<
 >(
     source_code: &str,
@@ -71543,8 +70620,7 @@ fn __action1524<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1525<
 >(
     source_code: &str,
@@ -71570,8 +70646,7 @@ fn __action1525<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1526<
 >(
     source_code: &str,
@@ -71601,8 +70676,7 @@ fn __action1526<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1527<
 >(
     source_code: &str,
@@ -71632,8 +70706,7 @@ fn __action1527<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1528<
 >(
     source_code: &str,
@@ -71657,8 +70730,7 @@ fn __action1528<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1529<
 >(
     source_code: &str,
@@ -71684,8 +70756,7 @@ fn __action1529<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1530<
 >(
     source_code: &str,
@@ -71711,8 +70782,7 @@ fn __action1530<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1531<
 >(
     source_code: &str,
@@ -71738,8 +70808,7 @@ fn __action1531<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1532<
 >(
     source_code: &str,
@@ -71767,8 +70836,7 @@ fn __action1532<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1533<
 >(
     source_code: &str,
@@ -71796,8 +70864,7 @@ fn __action1533<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1534<
 >(
     source_code: &str,
@@ -71827,8 +70894,7 @@ fn __action1534<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1535<
 >(
     source_code: &str,
@@ -71856,8 +70922,7 @@ fn __action1535<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1536<
 >(
     source_code: &str,
@@ -71881,8 +70946,7 @@ fn __action1536<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1537<
 >(
     source_code: &str,
@@ -71908,8 +70972,7 @@ fn __action1537<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1538<
 >(
     source_code: &str,
@@ -71935,8 +70998,7 @@ fn __action1538<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1539<
 >(
     source_code: &str,
@@ -71962,8 +71024,7 @@ fn __action1539<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1540<
 >(
     source_code: &str,
@@ -71991,8 +71052,7 @@ fn __action1540<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1541<
 >(
     source_code: &str,
@@ -72020,8 +71080,7 @@ fn __action1541<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1542<
 >(
     source_code: &str,
@@ -72051,8 +71110,7 @@ fn __action1542<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1543<
 >(
     source_code: &str,
@@ -72080,8 +71138,7 @@ fn __action1543<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1544<
 >(
     source_code: &str,
@@ -72107,8 +71164,7 @@ fn __action1544<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1545<
 >(
     source_code: &str,
@@ -72134,8 +71190,7 @@ fn __action1545<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1546<
 >(
     source_code: &str,
@@ -72169,8 +71224,7 @@ fn __action1546<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1547<
 >(
     source_code: &str,
@@ -72204,8 +71258,7 @@ fn __action1547<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1548<
 >(
     source_code: &str,
@@ -72237,8 +71290,7 @@ fn __action1548<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1549<
 >(
     source_code: &str,
@@ -72270,8 +71322,7 @@ fn __action1549<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1550<
 >(
     source_code: &str,
@@ -72307,8 +71358,7 @@ fn __action1550<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1551<
 >(
     source_code: &str,
@@ -72344,8 +71394,7 @@ fn __action1551<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1552<
 >(
     source_code: &str,
@@ -72379,8 +71428,7 @@ fn __action1552<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1553<
 >(
     source_code: &str,
@@ -72414,8 +71462,7 @@ fn __action1553<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1554<
 >(
     source_code: &str,
@@ -72457,8 +71504,7 @@ fn __action1554<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1555<
 >(
     source_code: &str,
@@ -72500,8 +71546,7 @@ fn __action1555<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1556<
 >(
     source_code: &str,
@@ -72539,8 +71584,7 @@ fn __action1556<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1557<
 >(
     source_code: &str,
@@ -72578,8 +71622,7 @@ fn __action1557<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1558<
 >(
     source_code: &str,
@@ -72619,8 +71662,7 @@ fn __action1558<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1559<
 >(
     source_code: &str,
@@ -72660,8 +71702,7 @@ fn __action1559<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1560<
 >(
     source_code: &str,
@@ -72697,8 +71738,7 @@ fn __action1560<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1561<
 >(
     source_code: &str,
@@ -72734,8 +71774,7 @@ fn __action1561<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1562<
 >(
     source_code: &str,
@@ -72763,8 +71802,7 @@ fn __action1562<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1563<
 >(
     source_code: &str,
@@ -72792,8 +71830,7 @@ fn __action1563<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1564<
 >(
     source_code: &str,
@@ -72821,8 +71858,7 @@ fn __action1564<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1565<
 >(
     source_code: &str,
@@ -72850,8 +71886,7 @@ fn __action1565<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1566<
 >(
     source_code: &str,
@@ -72885,8 +71920,7 @@ fn __action1566<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1567<
 >(
     source_code: &str,
@@ -72920,8 +71954,7 @@ fn __action1567<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1568<
 >(
     source_code: &str,
@@ -72953,8 +71986,7 @@ fn __action1568<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1569<
 >(
     source_code: &str,
@@ -72986,8 +72018,7 @@ fn __action1569<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1570<
 >(
     source_code: &str,
@@ -73021,8 +72052,7 @@ fn __action1570<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1571<
 >(
     source_code: &str,
@@ -73056,8 +72086,7 @@ fn __action1571<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1572<
 >(
     source_code: &str,
@@ -73089,8 +72118,7 @@ fn __action1572<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1573<
 >(
     source_code: &str,
@@ -73122,8 +72150,7 @@ fn __action1573<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1574<
 >(
     source_code: &str,
@@ -73155,8 +72182,7 @@ fn __action1574<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1575<
 >(
     source_code: &str,
@@ -73188,8 +72214,7 @@ fn __action1575<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1576<
 >(
     source_code: &str,
@@ -73219,8 +72244,7 @@ fn __action1576<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1577<
 >(
     source_code: &str,
@@ -73250,8 +72274,7 @@ fn __action1577<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1578<
 >(
     source_code: &str,
@@ -73279,8 +72302,7 @@ fn __action1578<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1579<
 >(
     source_code: &str,
@@ -73308,8 +72330,7 @@ fn __action1579<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1580<
 >(
     source_code: &str,
@@ -73335,8 +72356,7 @@ fn __action1580<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1581<
 >(
     source_code: &str,
@@ -73360,8 +72380,7 @@ fn __action1581<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1582<
 >(
     source_code: &str,
@@ -73389,8 +72408,7 @@ fn __action1582<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1583<
 >(
     source_code: &str,
@@ -73414,8 +72432,7 @@ fn __action1583<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1584<
 >(
     source_code: &str,
@@ -73447,8 +72464,7 @@ fn __action1584<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1585<
 >(
     source_code: &str,
@@ -73476,8 +72492,7 @@ fn __action1585<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1586<
 >(
     source_code: &str,
@@ -73505,8 +72520,7 @@ fn __action1586<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1587<
 >(
     source_code: &str,
@@ -73530,8 +72544,7 @@ fn __action1587<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1588<
 >(
     source_code: &str,
@@ -73563,8 +72576,7 @@ fn __action1588<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1589<
 >(
     source_code: &str,
@@ -73592,8 +72604,7 @@ fn __action1589<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1590<
 >(
     source_code: &str,
@@ -73619,8 +72630,7 @@ fn __action1590<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1591<
 >(
     source_code: &str,
@@ -73646,8 +72656,7 @@ fn __action1591<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1592<
 >(
     source_code: &str,
@@ -73675,8 +72684,7 @@ fn __action1592<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1593<
 >(
     source_code: &str,
@@ -73704,8 +72712,7 @@ fn __action1593<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1594<
 >(
     source_code: &str,
@@ -73733,8 +72740,7 @@ fn __action1594<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1595<
 >(
     source_code: &str,
@@ -73762,8 +72768,7 @@ fn __action1595<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1596<
 >(
     source_code: &str,
@@ -73797,8 +72802,7 @@ fn __action1596<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1597<
 >(
     source_code: &str,
@@ -73836,8 +72840,7 @@ fn __action1597<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1598<
 >(
     source_code: &str,
@@ -73877,8 +72880,7 @@ fn __action1598<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1599<
 >(
     source_code: &str,
@@ -73914,8 +72916,7 @@ fn __action1599<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1600<
 >(
     source_code: &str,
@@ -73955,8 +72956,7 @@ fn __action1600<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1601<
 >(
     source_code: &str,
@@ -73998,8 +72998,7 @@ fn __action1601<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1602<
 >(
     source_code: &str,
@@ -74029,8 +73028,7 @@ fn __action1602<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1603<
 >(
     source_code: &str,
@@ -74064,8 +73062,7 @@ fn __action1603<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1604<
 >(
     source_code: &str,
@@ -74101,8 +73098,7 @@ fn __action1604<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1605<
 >(
     source_code: &str,
@@ -74134,8 +73130,7 @@ fn __action1605<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1606<
 >(
     source_code: &str,
@@ -74171,8 +73166,7 @@ fn __action1606<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1607<
 >(
     source_code: &str,
@@ -74210,8 +73204,7 @@ fn __action1607<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1608<
 >(
     source_code: &str,
@@ -74245,8 +73238,7 @@ fn __action1608<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1609<
 >(
     source_code: &str,
@@ -74284,8 +73276,7 @@ fn __action1609<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1610<
 >(
     source_code: &str,
@@ -74325,8 +73316,7 @@ fn __action1610<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1611<
 >(
     source_code: &str,
@@ -74362,8 +73352,7 @@ fn __action1611<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1612<
 >(
     source_code: &str,
@@ -74403,8 +73392,7 @@ fn __action1612<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1613<
 >(
     source_code: &str,
@@ -74446,8 +73434,7 @@ fn __action1613<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1614<
 >(
     source_code: &str,
@@ -74477,8 +73464,7 @@ fn __action1614<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1615<
 >(
     source_code: &str,
@@ -74512,8 +73498,7 @@ fn __action1615<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1616<
 >(
     source_code: &str,
@@ -74549,8 +73534,7 @@ fn __action1616<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1617<
 >(
     source_code: &str,
@@ -74582,8 +73566,7 @@ fn __action1617<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1618<
 >(
     source_code: &str,
@@ -74619,8 +73602,7 @@ fn __action1618<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1619<
 >(
     source_code: &str,
@@ -74658,8 +73640,7 @@ fn __action1619<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1620<
 >(
     source_code: &str,
@@ -74689,8 +73670,7 @@ fn __action1620<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1621<
 >(
     source_code: &str,
@@ -74724,8 +73704,7 @@ fn __action1621<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1622<
 >(
     source_code: &str,
@@ -74761,8 +73740,7 @@ fn __action1622<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1623<
 >(
     source_code: &str,
@@ -74788,8 +73766,7 @@ fn __action1623<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1624<
 >(
     source_code: &str,
@@ -74819,8 +73796,7 @@ fn __action1624<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1625<
 >(
     source_code: &str,
@@ -74852,8 +73828,7 @@ fn __action1625<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1626<
 >(
     source_code: &str,
@@ -74885,8 +73860,7 @@ fn __action1626<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1627<
 >(
     source_code: &str,
@@ -74922,8 +73896,7 @@ fn __action1627<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1628<
 >(
     source_code: &str,
@@ -74961,8 +73934,7 @@ fn __action1628<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1629<
 >(
     source_code: &str,
@@ -74996,8 +73968,7 @@ fn __action1629<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1630<
 >(
     source_code: &str,
@@ -75035,8 +74006,7 @@ fn __action1630<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1631<
 >(
     source_code: &str,
@@ -75076,8 +74046,7 @@ fn __action1631<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1632<
 >(
     source_code: &str,
@@ -75105,8 +74074,7 @@ fn __action1632<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1633<
 >(
     source_code: &str,
@@ -75138,8 +74106,7 @@ fn __action1633<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1634<
 >(
     source_code: &str,
@@ -75173,8 +74140,7 @@ fn __action1634<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1635<
 >(
     source_code: &str,
@@ -75204,8 +74170,7 @@ fn __action1635<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1636<
 >(
     source_code: &str,
@@ -75239,8 +74204,7 @@ fn __action1636<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1637<
 >(
     source_code: &str,
@@ -75276,8 +74240,7 @@ fn __action1637<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1638<
 >(
     source_code: &str,
@@ -75309,8 +74272,7 @@ fn __action1638<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1639<
 >(
     source_code: &str,
@@ -75346,8 +74308,7 @@ fn __action1639<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1640<
 >(
     source_code: &str,
@@ -75385,8 +74346,7 @@ fn __action1640<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1641<
 >(
     source_code: &str,
@@ -75420,8 +74380,7 @@ fn __action1641<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1642<
 >(
     source_code: &str,
@@ -75459,8 +74418,7 @@ fn __action1642<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1643<
 >(
     source_code: &str,
@@ -75500,8 +74458,7 @@ fn __action1643<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1644<
 >(
     source_code: &str,
@@ -75529,8 +74486,7 @@ fn __action1644<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1645<
 >(
     source_code: &str,
@@ -75562,8 +74518,7 @@ fn __action1645<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1646<
 >(
     source_code: &str,
@@ -75597,8 +74552,7 @@ fn __action1646<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1647<
 >(
     source_code: &str,
@@ -75628,8 +74582,7 @@ fn __action1647<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1648<
 >(
     source_code: &str,
@@ -75663,8 +74616,7 @@ fn __action1648<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1649<
 >(
     source_code: &str,
@@ -75700,8 +74652,7 @@ fn __action1649<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1650<
 >(
     source_code: &str,
@@ -75729,8 +74680,7 @@ fn __action1650<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1651<
 >(
     source_code: &str,
@@ -75762,8 +74712,7 @@ fn __action1651<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1652<
 >(
     source_code: &str,
@@ -75797,8 +74746,7 @@ fn __action1652<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1653<
 >(
     source_code: &str,
@@ -75822,8 +74770,7 @@ fn __action1653<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1654<
 >(
     source_code: &str,
@@ -75851,8 +74798,7 @@ fn __action1654<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1655<
 >(
     source_code: &str,
@@ -75882,8 +74828,7 @@ fn __action1655<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1656<
 >(
     source_code: &str,
@@ -75917,8 +74862,7 @@ fn __action1656<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1657<
 >(
     source_code: &str,
@@ -75956,8 +74900,7 @@ fn __action1657<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1658<
 >(
     source_code: &str,
@@ -75997,8 +74940,7 @@ fn __action1658<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1659<
 >(
     source_code: &str,
@@ -76034,8 +74976,7 @@ fn __action1659<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1660<
 >(
     source_code: &str,
@@ -76075,8 +75016,7 @@ fn __action1660<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1661<
 >(
     source_code: &str,
@@ -76118,8 +75058,7 @@ fn __action1661<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1662<
 >(
     source_code: &str,
@@ -76149,8 +75088,7 @@ fn __action1662<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1663<
 >(
     source_code: &str,
@@ -76184,8 +75122,7 @@ fn __action1663<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1664<
 >(
     source_code: &str,
@@ -76221,8 +75158,7 @@ fn __action1664<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1665<
 >(
     source_code: &str,
@@ -76254,8 +75190,7 @@ fn __action1665<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1666<
 >(
     source_code: &str,
@@ -76291,8 +75226,7 @@ fn __action1666<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1667<
 >(
     source_code: &str,
@@ -76330,8 +75264,7 @@ fn __action1667<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1668<
 >(
     source_code: &str,
@@ -76365,8 +75298,7 @@ fn __action1668<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1669<
 >(
     source_code: &str,
@@ -76404,8 +75336,7 @@ fn __action1669<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1670<
 >(
     source_code: &str,
@@ -76445,8 +75376,7 @@ fn __action1670<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1671<
 >(
     source_code: &str,
@@ -76482,8 +75412,7 @@ fn __action1671<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1672<
 >(
     source_code: &str,
@@ -76523,8 +75452,7 @@ fn __action1672<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1673<
 >(
     source_code: &str,
@@ -76566,8 +75494,7 @@ fn __action1673<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1674<
 >(
     source_code: &str,
@@ -76597,8 +75524,7 @@ fn __action1674<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1675<
 >(
     source_code: &str,
@@ -76632,8 +75558,7 @@ fn __action1675<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1676<
 >(
     source_code: &str,
@@ -76669,8 +75594,7 @@ fn __action1676<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1677<
 >(
     source_code: &str,
@@ -76702,8 +75626,7 @@ fn __action1677<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1678<
 >(
     source_code: &str,
@@ -76739,8 +75662,7 @@ fn __action1678<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1679<
 >(
     source_code: &str,
@@ -76778,8 +75700,7 @@ fn __action1679<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1680<
 >(
     source_code: &str,
@@ -76809,8 +75730,7 @@ fn __action1680<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1681<
 >(
     source_code: &str,
@@ -76844,8 +75764,7 @@ fn __action1681<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1682<
 >(
     source_code: &str,
@@ -76881,8 +75800,7 @@ fn __action1682<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1683<
 >(
     source_code: &str,
@@ -76908,8 +75826,7 @@ fn __action1683<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1684<
 >(
     source_code: &str,
@@ -76939,8 +75856,7 @@ fn __action1684<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1685<
 >(
     source_code: &str,
@@ -76972,8 +75888,7 @@ fn __action1685<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1686<
 >(
     source_code: &str,
@@ -77005,8 +75920,7 @@ fn __action1686<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1687<
 >(
     source_code: &str,
@@ -77042,8 +75956,7 @@ fn __action1687<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1688<
 >(
     source_code: &str,
@@ -77081,8 +75994,7 @@ fn __action1688<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1689<
 >(
     source_code: &str,
@@ -77116,8 +76028,7 @@ fn __action1689<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1690<
 >(
     source_code: &str,
@@ -77155,8 +76066,7 @@ fn __action1690<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1691<
 >(
     source_code: &str,
@@ -77196,8 +76106,7 @@ fn __action1691<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1692<
 >(
     source_code: &str,
@@ -77225,8 +76134,7 @@ fn __action1692<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1693<
 >(
     source_code: &str,
@@ -77258,8 +76166,7 @@ fn __action1693<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1694<
 >(
     source_code: &str,
@@ -77293,8 +76200,7 @@ fn __action1694<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1695<
 >(
     source_code: &str,
@@ -77324,8 +76230,7 @@ fn __action1695<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1696<
 >(
     source_code: &str,
@@ -77359,8 +76264,7 @@ fn __action1696<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1697<
 >(
     source_code: &str,
@@ -77396,8 +76300,7 @@ fn __action1697<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1698<
 >(
     source_code: &str,
@@ -77429,8 +76332,7 @@ fn __action1698<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1699<
 >(
     source_code: &str,
@@ -77466,8 +76368,7 @@ fn __action1699<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1700<
 >(
     source_code: &str,
@@ -77505,8 +76406,7 @@ fn __action1700<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1701<
 >(
     source_code: &str,
@@ -77540,8 +76440,7 @@ fn __action1701<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1702<
 >(
     source_code: &str,
@@ -77579,8 +76478,7 @@ fn __action1702<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1703<
 >(
     source_code: &str,
@@ -77620,8 +76518,7 @@ fn __action1703<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1704<
 >(
     source_code: &str,
@@ -77649,8 +76546,7 @@ fn __action1704<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1705<
 >(
     source_code: &str,
@@ -77682,8 +76578,7 @@ fn __action1705<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1706<
 >(
     source_code: &str,
@@ -77717,8 +76612,7 @@ fn __action1706<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1707<
 >(
     source_code: &str,
@@ -77748,8 +76642,7 @@ fn __action1707<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1708<
 >(
     source_code: &str,
@@ -77783,8 +76676,7 @@ fn __action1708<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1709<
 >(
     source_code: &str,
@@ -77820,8 +76712,7 @@ fn __action1709<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1710<
 >(
     source_code: &str,
@@ -77849,8 +76740,7 @@ fn __action1710<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1711<
 >(
     source_code: &str,
@@ -77882,8 +76772,7 @@ fn __action1711<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1712<
 >(
     source_code: &str,
@@ -77917,8 +76806,7 @@ fn __action1712<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1713<
 >(
     source_code: &str,
@@ -77942,8 +76830,7 @@ fn __action1713<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1714<
 >(
     source_code: &str,
@@ -77971,8 +76858,7 @@ fn __action1714<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1715<
 >(
     source_code: &str,
@@ -78002,8 +76888,7 @@ fn __action1715<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1716<
 >(
     source_code: &str,
@@ -78035,8 +76920,7 @@ fn __action1716<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1717<
 >(
     source_code: &str,
@@ -78068,8 +76952,7 @@ fn __action1717<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1718<
 >(
     source_code: &str,
@@ -78099,8 +76982,7 @@ fn __action1718<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1719<
 >(
     source_code: &str,
@@ -78130,8 +77012,7 @@ fn __action1719<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1720<
 >(
     source_code: &str,
@@ -78161,8 +77042,7 @@ fn __action1720<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1721<
 >(
     source_code: &str,
@@ -78192,8 +77072,7 @@ fn __action1721<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1722<
 >(
     source_code: &str,
@@ -78219,8 +77098,7 @@ fn __action1722<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1723<
 >(
     source_code: &str,
@@ -78246,8 +77124,7 @@ fn __action1723<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1724<
 >(
     source_code: &str,
@@ -78285,8 +77162,7 @@ fn __action1724<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1725<
 >(
     source_code: &str,
@@ -78324,8 +77200,7 @@ fn __action1725<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1726<
 >(
     source_code: &str,
@@ -78363,8 +77238,7 @@ fn __action1726<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1727<
 >(
     source_code: &str,
@@ -78402,8 +77276,7 @@ fn __action1727<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1728<
 >(
     source_code: &str,
@@ -78439,8 +77312,7 @@ fn __action1728<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1729<
 >(
     source_code: &str,
@@ -78476,8 +77348,7 @@ fn __action1729<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1730<
 >(
     source_code: &str,
@@ -78513,8 +77384,7 @@ fn __action1730<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1731<
 >(
     source_code: &str,
@@ -78550,8 +77420,7 @@ fn __action1731<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1732<
 >(
     source_code: &str,
@@ -78593,8 +77462,7 @@ fn __action1732<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1733<
 >(
     source_code: &str,
@@ -78630,8 +77498,7 @@ fn __action1733<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1734<
 >(
     source_code: &str,
@@ -78671,8 +77538,7 @@ fn __action1734<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1735<
 >(
     source_code: &str,
@@ -78706,8 +77572,7 @@ fn __action1735<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1736<
 >(
     source_code: &str,
@@ -78731,8 +77596,7 @@ fn __action1736<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1737<
 >(
     source_code: &str,
@@ -78756,8 +77620,7 @@ fn __action1737<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1738<
 >(
     source_code: &str,
@@ -78781,8 +77644,7 @@ fn __action1738<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1739<
 >(
     source_code: &str,
@@ -78808,8 +77670,7 @@ fn __action1739<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1740<
 >(
     source_code: &str,
@@ -78837,8 +77698,7 @@ fn __action1740<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1741<
 >(
     source_code: &str,
@@ -78864,8 +77724,7 @@ fn __action1741<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1742<
 >(
     source_code: &str,
@@ -78891,8 +77750,7 @@ fn __action1742<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1743<
 >(
     source_code: &str,
@@ -78918,8 +77776,7 @@ fn __action1743<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1744<
 >(
     source_code: &str,
@@ -78945,8 +77802,7 @@ fn __action1744<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1745<
 >(
     source_code: &str,
@@ -78970,8 +77826,7 @@ fn __action1745<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1746<
 >(
     source_code: &str,
@@ -78997,8 +77852,7 @@ fn __action1746<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1747<
 >(
     source_code: &str,
@@ -79026,8 +77880,7 @@ fn __action1747<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1748<
 >(
     source_code: &str,
@@ -79061,8 +77914,7 @@ fn __action1748<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1749<
 >(
     source_code: &str,
@@ -79096,8 +77948,7 @@ fn __action1749<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1750<
 >(
     source_code: &str,
@@ -79133,8 +77984,7 @@ fn __action1750<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1751<
 >(
     source_code: &str,
@@ -79170,8 +78020,7 @@ fn __action1751<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1752<
 >(
     source_code: &str,
@@ -79203,8 +78052,7 @@ fn __action1752<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1753<
 >(
     source_code: &str,
@@ -79236,8 +78084,7 @@ fn __action1753<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1754<
 >(
     source_code: &str,
@@ -79271,8 +78118,7 @@ fn __action1754<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1755<
 >(
     source_code: &str,
@@ -79306,8 +78152,7 @@ fn __action1755<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1756<
 >(
     source_code: &str,
@@ -79347,8 +78192,7 @@ fn __action1756<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1757<
 >(
     source_code: &str,
@@ -79388,8 +78232,7 @@ fn __action1757<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1758<
 >(
     source_code: &str,
@@ -79431,8 +78274,7 @@ fn __action1758<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1759<
 >(
     source_code: &str,
@@ -79474,8 +78316,7 @@ fn __action1759<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1760<
 >(
     source_code: &str,
@@ -79511,8 +78352,7 @@ fn __action1760<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1761<
 >(
     source_code: &str,
@@ -79548,8 +78388,7 @@ fn __action1761<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1762<
 >(
     source_code: &str,
@@ -79587,8 +78426,7 @@ fn __action1762<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1763<
 >(
     source_code: &str,
@@ -79626,8 +78464,7 @@ fn __action1763<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1764<
 >(
     source_code: &str,
@@ -79665,8 +78502,7 @@ fn __action1764<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1765<
 >(
     source_code: &str,
@@ -79704,8 +78540,7 @@ fn __action1765<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1766<
 >(
     source_code: &str,
@@ -79745,8 +78580,7 @@ fn __action1766<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1767<
 >(
     source_code: &str,
@@ -79786,8 +78620,7 @@ fn __action1767<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1768<
 >(
     source_code: &str,
@@ -79821,8 +78654,7 @@ fn __action1768<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1769<
 >(
     source_code: &str,
@@ -79856,8 +78688,7 @@ fn __action1769<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1770<
 >(
     source_code: &str,
@@ -79893,8 +78724,7 @@ fn __action1770<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1771<
 >(
     source_code: &str,
@@ -79930,8 +78760,7 @@ fn __action1771<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1772<
 >(
     source_code: &str,
@@ -79963,8 +78792,7 @@ fn __action1772<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1773<
 >(
     source_code: &str,
@@ -79996,8 +78824,7 @@ fn __action1773<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1774<
 >(
     source_code: &str,
@@ -80029,8 +78856,7 @@ fn __action1774<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1775<
 >(
     source_code: &str,
@@ -80062,8 +78888,7 @@ fn __action1775<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1776<
 >(
     source_code: &str,
@@ -80093,8 +78918,7 @@ fn __action1776<
 }
 
 #[allow(unused_variables)]
-#[allow(clippy::too_many_arguments, clippy::needless_lifetimes,
-    clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_arguments)]
 fn __action1777<
 >(
     source_code: &str,
@@ -80122,9 +78946,9 @@ fn __action1777<
         __2,
     )
 }
-#[allow(clippy::type_complexity, dead_code)]
+#[allow(clippy::type_complexity)]
 
-pub(crate)  trait __ToTriple<>
+pub trait __ToTriple<>
 {
     fn to_triple(value: Self) -> Result<(TextSize,token::Tok,TextSize), __lalrpop_util::ParseError<TextSize, token::Tok, LexicalError>>;
 }
