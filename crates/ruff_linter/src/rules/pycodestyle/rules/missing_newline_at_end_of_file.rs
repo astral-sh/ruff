@@ -9,8 +9,9 @@ use ruff_source_file::Locator;
 /// Checks for files missing a new line at the end of the file.
 ///
 /// ## Why is this bad?
-/// Trailing blank lines are superfluous.
-/// However, the last line should end with a new line.
+/// Trailing blank lines in a file are superfluous.
+///
+/// However, the last line of the file should end with a newline.
 ///
 /// ## Example
 /// ```python
