@@ -11,7 +11,7 @@ use itertools::Itertools;
 
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::{int, str::QuoteStyle, LiteralExpressionRef};
+use crate::{int, str::Quote, LiteralExpressionRef};
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -1159,6 +1159,15 @@ pub enum FStringPart {
     FString(FString),
 }
 
+impl FStringPart {
+    pub fn quote_style(&self) -> Quote {
+        match self {
+            Self::Literal(string_literal) => string_literal.flags.quote_style(),
+            Self::FString(f_string) => f_string.flags.quote_style(),
+        }
+    }
+}
+
 impl Ranged for FStringPart {
     fn range(&self) -> TextRange {
         match self {
@@ -1221,11 +1230,11 @@ impl FStringFlags {
     }
 
     /// Does the f-string use single or double quotes in its opener and closer?
-    pub const fn quote_style(self) -> QuoteStyle {
+    pub const fn quote_style(self) -> Quote {
         if self.0.contains(FStringFlagsInner::DOUBLE) {
-            QuoteStyle::Double
+            Quote::Double
         } else {
-            QuoteStyle::Single
+            Quote::Single
         }
     }
 }
@@ -1535,11 +1544,11 @@ impl StringLiteralFlags {
     }
 
     /// Does the string use single or double quotes in its opener and closer?
-    pub const fn quote_style(self) -> QuoteStyle {
+    pub const fn quote_style(self) -> Quote {
         if self.0.contains(StringLiteralFlagsInner::DOUBLE) {
-            QuoteStyle::Double
+            Quote::Double
         } else {
-            QuoteStyle::Single
+            Quote::Single
         }
     }
 
@@ -1864,11 +1873,11 @@ impl BytesLiteralFlags {
     }
 
     /// Does the bytestring use single or double quotes in its opener and closer?
-    pub const fn quote_style(self) -> QuoteStyle {
+    pub const fn quote_style(self) -> Quote {
         if self.0.contains(BytesLiteralFlagsInner::DOUBLE) {
-            QuoteStyle::Double
+            Quote::Double
         } else {
-            QuoteStyle::Single
+            Quote::Single
         }
     }
 }

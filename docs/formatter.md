@@ -11,8 +11,9 @@ The Ruff formatter is available as of Ruff [v0.1.2](https://astral.sh/blog/the-r
 directories, and formats all discovered Python files:
 
 ```shell
-ruff format .                 # Format all files in the current directory.
-ruff format /path/to/file.py  # Format a single file.
+ruff format                   # Format all files in the current directory.
+ruff format path/to/code/     # Lint all files in `path/to/code` (and any subdirectories).
+ruff format path/to/file.py   # Format a single file.
 ```
 
 Similar to Black, running `ruff format /path/to/file.py` will format the given file or directory
@@ -422,8 +423,8 @@ Currently, the Ruff formatter does not sort imports. In order to both sort impor
 call the Ruff linter and then the formatter:
 
 ```shell
-ruff check --select I --fix .
-ruff format .
+ruff check --select I --fix
+ruff format
 ```
 
 A unified command for both linting and formatting is [planned](https://github.com/astral-sh/ruff/issues/8232).

@@ -1,35 +1,4 @@
-#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, is_macro::Is)]
-pub enum Quote {
-    Single,
-    Double,
-}
-
-impl Quote {
-    #[inline]
-    #[must_use]
-    pub const fn swap(self) -> Self {
-        match self {
-            Quote::Single => Quote::Double,
-            Quote::Double => Quote::Single,
-        }
-    }
-
-    #[inline]
-    pub const fn to_byte(&self) -> u8 {
-        match self {
-            Quote::Single => b'\'',
-            Quote::Double => b'"',
-        }
-    }
-
-    #[inline]
-    pub const fn to_char(&self) -> char {
-        match self {
-            Quote::Single => '\'',
-            Quote::Double => '"',
-        }
-    }
-}
+use ruff_python_ast::str::Quote;
 
 pub struct EscapeLayout {
     pub quote: Quote,
@@ -81,7 +50,7 @@ pub(crate) const fn choose_quote(
     // always use primary unless we have primary but no secondary
     let use_secondary = primary_count > 0 && secondary_count == 0;
     if use_secondary {
-        (preferred_quote.swap(), secondary_count)
+        (preferred_quote.opposite(), secondary_count)
     } else {
         (preferred_quote, primary_count)
     }
@@ -254,7 +223,7 @@ impl UnicodeEscape<'_> {
             // unicodedata lookup just for ascii characters
             '\x20'..='\x7e' => {
                 // printable ascii range
-                if ch == quote.to_char() || ch == '\\' {
+                if ch == quote.as_char() || ch == '\\' {
                     formatter.write_char('\\')?;
                 }
                 formatter.write_char(ch)
@@ -439,7 +408,7 @@ impl AsciiEscape<'_> {
             b'\r' => formatter.write_str("\\r"),
             0x20..=0x7e => {
                 // printable ascii range
-                if ch == quote.to_byte() || ch == b'\\' {
+                if ch == quote.as_byte() || ch == b'\\' {
                     formatter.write_char('\\')?;
                 }
                 formatter.write_char(ch as char)
@@ -477,7 +446,7 @@ pub struct BytesRepr<'r, 'a>(&'r AsciiEscape<'a>);
 
 impl BytesRepr<'_, '_> {
     pub fn write(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
-        let quote = self.0.layout().quote.to_char();
+        let quote = self.0.layout().quote.as_char();
         formatter.write_char('b')?;
         formatter.write_char(quote)?;
         self.0.write_body(formatter)?;

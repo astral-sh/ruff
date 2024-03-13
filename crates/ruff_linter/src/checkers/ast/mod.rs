@@ -44,10 +44,10 @@ use ruff_python_ast::helpers::{
 };
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::str::trailing_quote;
+use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{walk_except_handler, walk_f_string_element, walk_pattern, Visitor};
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
-use ruff_python_codegen::{Generator, Quote, Stylist};
+use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_semantic::analyze::{imports, typing, visibility};
@@ -228,16 +228,11 @@ impl<'a> Checker<'a> {
         }
 
         // Find the quote character used to start the containing f-string.
-        let expr = self.semantic.current_expression()?;
-        let string_range = self.indexer.fstring_ranges().innermost(expr.start())?;
-        let trailing_quote = trailing_quote(self.locator.slice(string_range))?;
-
-        // Invert the quote character, if it's a single quote.
-        match trailing_quote {
-            "'" => Some(Quote::Double),
-            "\"" => Some(Quote::Single),
-            _ => None,
-        }
+        let ast::ExprFString { value, .. } = self
+            .semantic
+            .current_expressions()
+            .find_map(|expr| expr.as_f_string_expr())?;
+        Some(value.iter().next()?.quote_style().opposite())
     }
 
     /// Returns the [`SourceRow`] for the given offset.

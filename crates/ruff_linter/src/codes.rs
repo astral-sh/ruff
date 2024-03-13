@@ -240,6 +240,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E0237") => (RuleGroup::Stable, rules::pylint::rules::NonSlotAssignment),
         (Pylint, "E0241") => (RuleGroup::Stable, rules::pylint::rules::DuplicateBases),
         (Pylint, "E0302") => (RuleGroup::Stable, rules::pylint::rules::UnexpectedSpecialMethodSignature),
+        (Pylint, "E0304") => (RuleGroup::Preview, rules::pylint::rules::InvalidBoolReturnType),
         (Pylint, "E0307") => (RuleGroup::Stable, rules::pylint::rules::InvalidStrReturnType),
         (Pylint, "E0604") => (RuleGroup::Stable, rules::pylint::rules::InvalidAllObject),
         (Pylint, "E0605") => (RuleGroup::Stable, rules::pylint::rules::InvalidAllFormat),

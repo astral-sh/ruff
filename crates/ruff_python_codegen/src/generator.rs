@@ -2,7 +2,7 @@
 
 use std::ops::Deref;
 
-use ruff_python_ast::str::{is_triple_quote, leading_quote};
+use ruff_python_ast::str::{is_triple_quote, leading_quote, Quote};
 use ruff_python_ast::{
     self as ast, Alias, ArgOrKeyword, BoolOp, CmpOp, Comprehension, ConversionFlag, DebugText,
     ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters, Pattern,
@@ -13,7 +13,7 @@ use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 use ruff_source_file::{LineEnding, Locator};
 
-use super::stylist::{Indentation, Quote, Stylist};
+use super::stylist::{Indentation, Stylist};
 
 mod precedence {
     pub(crate) const NAMED_EXPR: u8 = 1;
@@ -154,7 +154,7 @@ impl<'a> Generator<'a> {
     }
 
     fn p_bytes_repr(&mut self, s: &[u8]) {
-        let escape = AsciiEscape::with_preferred_quote(s, self.quote.into());
+        let escape = AsciiEscape::with_preferred_quote(s, self.quote);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
@@ -162,7 +162,7 @@ impl<'a> Generator<'a> {
     }
 
     fn p_str_repr(&mut self, s: &str, triple: bool) {
-        let escape = UnicodeEscape::with_preferred_quote(s, self.quote.into(), triple);
+        let escape = UnicodeEscape::with_preferred_quote(s, self.quote, triple);
         if let Some(len) = escape.layout().len {
             self.buffer.reserve(len);
         }
@@ -1387,14 +1387,8 @@ impl<'a> Generator<'a> {
             self.unparse_f_string_body(values);
         } else {
             self.p("f");
-            let mut generator = Generator::new(
-                self.indent,
-                match self.quote {
-                    Quote::Single => Quote::Double,
-                    Quote::Double => Quote::Single,
-                },
-                self.line_ending,
-            );
+            let mut generator =
+                Generator::new(self.indent, self.quote.opposite(), self.line_ending);
             generator.unparse_f_string_body(values);
             let body = &generator.buffer;
             self.p_str_repr(body, false);
@@ -1420,11 +1414,11 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::{Mod, ModModule};
+    use ruff_python_ast::{str::Quote, Mod, ModModule};
     use ruff_python_parser::{self, parse_suite, Mode};
     use ruff_source_file::LineEnding;
 
-    use crate::stylist::{Indentation, Quote};
+    use crate::stylist::Indentation;
 
     use super::Generator;
 
