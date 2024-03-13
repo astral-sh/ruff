@@ -10,6 +10,7 @@ RET508.py:8:9: RET508 Unnecessary `elif` after `break` statement
  9 |             break
 10 |         else:
    |
+   = help: Remove unnecessary `elif`
 
 RET508.py:22:9: RET508 Unnecessary `elif` after `break` statement
    |
@@ -20,6 +21,7 @@ RET508.py:22:9: RET508 Unnecessary `elif` after `break` statement
 23 |             c = 2
 24 |         else:
    |
+   = help: Remove unnecessary `elif`
 
 RET508.py:33:9: RET508 Unnecessary `else` after `break` statement
    |
@@ -29,6 +31,7 @@ RET508.py:33:9: RET508 Unnecessary `else` after `break` statement
    |         ^^^^ RET508
 34 |             a = z
    |
+   = help: Remove unnecessary `else`
 
 RET508.py:44:13: RET508 Unnecessary `else` after `break` statement
    |
@@ -39,6 +42,7 @@ RET508.py:44:13: RET508 Unnecessary `else` after `break` statement
 45 |                 c = 3
 46 |                 break
    |
+   = help: Remove unnecessary `else`
 
 RET508.py:60:9: RET508 Unnecessary `else` after `break` statement
    |
@@ -49,6 +53,7 @@ RET508.py:60:9: RET508 Unnecessary `else` after `break` statement
 61 |             c = 3
 62 |         break
    |
+   = help: Remove unnecessary `else`
 
 RET508.py:71:13: RET508 Unnecessary `else` after `break` statement
    |
@@ -59,6 +64,7 @@ RET508.py:71:13: RET508 Unnecessary `else` after `break` statement
 72 |                 b = 2
 73 |         else:
    |
+   = help: Remove unnecessary `else`
 
 RET508.py:82:9: RET508 Unnecessary `else` after `break` statement
    |
@@ -69,6 +75,7 @@ RET508.py:82:9: RET508 Unnecessary `else` after `break` statement
 83 |             try:
 84 |                 return
    |
+   = help: Remove unnecessary `else`
 
 RET508.py:158:13: RET508 Unnecessary `else` after `break` statement
     |
@@ -78,5 +85,6 @@ RET508.py:158:13: RET508 Unnecessary `else` after `break` statement
     |             ^^^^ RET508
 159 |                 a = z
     |
+    = help: Remove unnecessary `else`
 
 

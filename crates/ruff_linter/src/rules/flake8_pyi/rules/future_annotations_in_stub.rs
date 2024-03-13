@@ -14,7 +14,7 @@ use crate::checkers::ast::Checker;
 /// the `from __future__ import annotations` import statement has no effect
 /// and should be omitted.
 ///
-/// ## Resources
+/// ## References
 /// - [Static Typing with Python: Type Stubs](https://typing.readthedocs.io/en/latest/source/stubs.html)
 #[violation]
 pub struct FutureAnnotationsInStub;

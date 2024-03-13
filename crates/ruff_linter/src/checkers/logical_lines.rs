@@ -1,5 +1,7 @@
-use ruff_diagnostics::{Diagnostic, DiagnosticKind};
+use crate::line_width::IndentWidth;
+use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
+use ruff_python_index::Indexer;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::TokenKind;
 use ruff_source_file::Locator;
@@ -8,20 +10,21 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::logical_lines::{
     extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
-    missing_whitespace_around_operator, space_after_comma, space_around_operator,
-    whitespace_around_keywords, whitespace_around_named_parameter_equals,
+    missing_whitespace_around_operator, redundant_backslash, space_after_comma,
+    space_around_operator, whitespace_around_keywords, whitespace_around_named_parameter_equals,
     whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
 };
 use crate::settings::LinterSettings;
 
-/// Return the amount of indentation, expanding tabs to the next multiple of 8.
-fn expand_indent(line: &str) -> usize {
+/// Return the amount of indentation, expanding tabs to the next multiple of the settings' tab size.
+pub(crate) fn expand_indent(line: &str, indent_width: IndentWidth) -> usize {
     let line = line.trim_end_matches(['\n', '\r']);
 
     let mut indent = 0;
+    let tab_size = indent_width.as_usize();
     for c in line.bytes() {
         match c {
-            b'\t' => indent = (indent / 8) * 8 + 8,
+            b'\t' => indent = (indent / tab_size) * tab_size + tab_size,
             b' ' => indent += 1,
             _ => break,
         }
@@ -33,6 +36,7 @@ fn expand_indent(line: &str) -> usize {
 pub(crate) fn check_logical_lines(
     tokens: &[LexResult],
     locator: &Locator,
+    indexer: &Indexer,
     stylist: &Stylist,
     settings: &LinterSettings,
 ) -> Vec<Diagnostic> {
@@ -71,6 +75,7 @@ pub(crate) fn check_logical_lines(
 
         if line.flags().contains(TokenFlags::BRACKET) {
             whitespace_before_parameters(&line, &mut context);
+            redundant_backslash(&line, locator, indexer, &mut context);
         }
 
         // Extract the indentation level.
@@ -84,7 +89,7 @@ pub(crate) fn check_logical_lines(
             TextRange::new(locator.line_start(first_token.start()), first_token.start())
         };
 
-        let indent_level = expand_indent(locator.slice(range));
+        let indent_level = expand_indent(locator.slice(range), settings.tab_size);
 
         let indent_size = 4;
 
@@ -97,7 +102,7 @@ pub(crate) fn check_logical_lines(
             indent_size,
         ) {
             if settings.rules.enabled(kind.rule()) {
-                context.push(kind, range);
+                context.push_diagnostic(Diagnostic::new(kind, range));
             }
         }
 
@@ -120,18 +125,6 @@ impl<'a> LogicalLinesContext<'a> {
         Self {
             settings,
             diagnostics: Vec::new(),
-        }
-    }
-
-    pub(crate) fn push<K: Into<DiagnosticKind>>(&mut self, kind: K, range: TextRange) {
-        let kind = kind.into();
-        if self.settings.rules.enabled(kind.rule()) {
-            self.diagnostics.push(Diagnostic {
-                kind,
-                range,
-                fix: None,
-                parent: None,
-            });
         }
     }
 

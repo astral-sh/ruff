@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, StringLike};
+use ruff_text_size::Ranged;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -51,13 +52,19 @@ impl Violation for HardcodedTempFile {
 }
 
 /// S108
-pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, string: &ast::ExprStringLiteral) {
+pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, string: StringLike) {
+    let value = match string {
+        StringLike::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.to_str(),
+        StringLike::FStringLiteral(ast::FStringLiteralElement { value, .. }) => value,
+        StringLike::BytesLiteral(_) => return,
+    };
+
     if !checker
         .settings
         .flake8_bandit
         .hardcoded_tmp_directory
         .iter()
-        .any(|prefix| string.value.starts_with(prefix))
+        .any(|prefix| value.starts_with(prefix))
     {
         return;
     }
@@ -67,8 +74,8 @@ pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, string: &ast::ExprS
     {
         if checker
             .semantic()
-            .resolve_call_path(func)
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["tempfile", ..]))
+            .resolve_qualified_name(func)
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["tempfile", ..]))
         {
             return;
         }
@@ -76,8 +83,8 @@ pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, string: &ast::ExprS
 
     checker.diagnostics.push(Diagnostic::new(
         HardcodedTempFile {
-            string: string.value.clone(),
+            string: value.to_string(),
         },
-        string.range,
+        string.range(),
     ));
 }

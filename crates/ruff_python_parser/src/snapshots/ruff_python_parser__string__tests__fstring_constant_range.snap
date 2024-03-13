@@ -9,63 +9,70 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..22,
-                    values: [
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 2..5,
-                                value: "aaa",
-                                unicode: false,
-                                implicit_concatenated: false,
-                            },
-                        ),
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 5..10,
-                                value: Name(
-                                    ExprName {
-                                        range: 6..9,
-                                        id: "bbb",
-                                        ctx: Load,
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 0..22,
+                                    elements: [
+                                        Literal(
+                                            FStringLiteralElement {
+                                                range: 2..5,
+                                                value: "aaa",
+                                            },
+                                        ),
+                                        Expression(
+                                            FStringExpressionElement {
+                                                range: 5..10,
+                                                expression: Name(
+                                                    ExprName {
+                                                        range: 6..9,
+                                                        id: "bbb",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                        Literal(
+                                            FStringLiteralElement {
+                                                range: 10..13,
+                                                value: "ccc",
+                                            },
+                                        ),
+                                        Expression(
+                                            FStringExpressionElement {
+                                                range: 13..18,
+                                                expression: Name(
+                                                    ExprName {
+                                                        range: 14..17,
+                                                        id: "ddd",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                        Literal(
+                                            FStringLiteralElement {
+                                                range: 18..21,
+                                                value: "eee",
+                                            },
+                                        ),
+                                    ],
+                                    flags: FStringFlags {
+                                        quote_style: Double,
+                                        raw: false,
+                                        triple_quoted: false,
                                     },
-                                ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: None,
-                            },
+                                },
+                            ),
                         ),
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 10..13,
-                                value: "ccc",
-                                unicode: false,
-                                implicit_concatenated: false,
-                            },
-                        ),
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 13..18,
-                                value: Name(
-                                    ExprName {
-                                        range: 14..17,
-                                        id: "ddd",
-                                        ctx: Load,
-                                    },
-                                ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: None,
-                            },
-                        ),
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 18..21,
-                                value: "eee",
-                                unicode: false,
-                                implicit_concatenated: false,
-                            },
-                        ),
-                    ],
-                    implicit_concatenated: false,
+                    },
                 },
             ),
         },

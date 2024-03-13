@@ -1,16 +1,18 @@
+use rustc_hash::FxHashSet;
+
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::CallPath;
+use ruff_python_ast::helpers::map_subscript;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{
-    self as ast, Arguments, Expr, Operator, ParameterWithDefault, Parameters, Stmt, UnaryOp,
+    self as ast, Expr, Operator, ParameterWithDefault, Parameters, Stmt, UnaryOp,
 };
-use ruff_python_semantic::{ScopeKind, SemanticModel};
+use ruff_python_semantic::{BindingId, ScopeKind, SemanticModel};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-
 use crate::rules::flake8_pyi::rules::TypingModule;
 use crate::settings::types::PythonVersion;
 
@@ -246,13 +248,16 @@ impl AlwaysFixableViolation for TypeAliasWithoutAnnotation {
     }
 }
 
-fn is_allowed_negated_math_attribute(call_path: &CallPath) -> bool {
-    matches!(call_path.as_slice(), ["math", "inf" | "e" | "pi" | "tau"])
+fn is_allowed_negated_math_attribute(qualified_name: &QualifiedName) -> bool {
+    matches!(
+        qualified_name.segments(),
+        ["math", "inf" | "e" | "pi" | "tau"]
+    )
 }
 
-fn is_allowed_math_attribute(call_path: &CallPath) -> bool {
+fn is_allowed_math_attribute(qualified_name: &QualifiedName) -> bool {
     matches!(
-        call_path.as_slice(),
+        qualified_name.segments(),
         ["math", "inf" | "nan" | "e" | "pi" | "tau"]
             | [
                 "sys",
@@ -322,7 +327,7 @@ fn is_valid_default_value_with_annotation(
                 // Ex) `-math.inf`, `-math.pi`, etc.
                 Expr::Attribute(_) => {
                     if semantic
-                        .resolve_call_path(operand)
+                        .resolve_qualified_name(operand)
                         .as_ref()
                         .is_some_and(is_allowed_negated_math_attribute)
                     {
@@ -371,7 +376,7 @@ fn is_valid_default_value_with_annotation(
         // Ex) `math.inf`, `sys.stdin`, etc.
         Expr::Attribute(_) => {
             if semantic
-                .resolve_call_path(default)
+                .resolve_qualified_name(default)
                 .as_ref()
                 .is_some_and(is_allowed_math_attribute)
             {
@@ -433,15 +438,17 @@ fn is_type_var_like_call(expr: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return false;
     };
-    semantic.resolve_call_path(func).is_some_and(|call_path| {
-        matches!(
-            call_path.as_slice(),
-            [
-                "typing" | "typing_extensions",
-                "TypeVar" | "TypeVarTuple" | "NewType" | "ParamSpec"
-            ]
-        )
-    })
+    semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                [
+                    "typing" | "typing_extensions",
+                    "TypeVar" | "TypeVarTuple" | "NewType" | "ParamSpec"
+                ]
+            )
+        })
 }
 
 /// Returns `true` if this is a "special" assignment which must have a value (e.g., an assignment to
@@ -469,21 +476,50 @@ fn is_final_assignment(annotation: &Expr, value: &Expr, semantic: &SemanticModel
 }
 
 /// Returns `true` if the a class is an enum, based on its base classes.
-fn is_enum(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
-    let Some(Arguments { args: bases, .. }) = arguments else {
-        return false;
-    };
-    return bases.iter().any(|expr| {
-        semantic.resolve_call_path(expr).is_some_and(|call_path| {
-            matches!(
-                call_path.as_slice(),
-                [
-                    "enum",
-                    "Enum" | "Flag" | "IntEnum" | "IntFlag" | "StrEnum" | "ReprEnum"
-                ]
-            )
+fn is_enum(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    fn inner(
+        class_def: &ast::StmtClassDef,
+        semantic: &SemanticModel,
+        seen: &mut FxHashSet<BindingId>,
+    ) -> bool {
+        class_def.bases().iter().any(|expr| {
+            // If the base class is `enum.Enum`, `enum.Flag`, etc., then this is an enum.
+            if semantic
+                .resolve_qualified_name(map_subscript(expr))
+                .is_some_and(|qualified_name| {
+                    matches!(
+                        qualified_name.segments(),
+                        [
+                            "enum",
+                            "Enum" | "Flag" | "IntEnum" | "IntFlag" | "StrEnum" | "ReprEnum"
+                        ]
+                    )
+                })
+            {
+                return true;
+            }
+
+            // If the base class extends `enum.Enum`, `enum.Flag`, etc., then this is an enum.
+            if let Some(id) = semantic.lookup_attribute(map_subscript(expr)) {
+                if seen.insert(id) {
+                    let binding = semantic.binding(id);
+                    if let Some(base_class) = binding
+                        .kind
+                        .as_class_definition()
+                        .map(|id| &semantic.scopes[*id])
+                        .and_then(|scope| scope.kind.as_class())
+                    {
+                        if inner(base_class, semantic, seen) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
         })
-    });
+    }
+
+    inner(class_def, semantic, &mut FxHashSet::default())
 }
 
 /// Returns `true` if an [`Expr`] is a value that should be annotated with `typing.TypeAlias`.
@@ -655,10 +691,8 @@ pub(crate) fn unannotated_assignment_in_stub(
         return;
     }
 
-    if let ScopeKind::Class(ast::StmtClassDef { arguments, .. }) =
-        checker.semantic().current_scope().kind
-    {
-        if is_enum(arguments.as_deref(), checker.semantic()) {
+    if let ScopeKind::Class(class_def) = checker.semantic().current_scope().kind {
+        if is_enum(class_def, checker.semantic()) {
             return;
         }
     }

@@ -1,13 +1,9 @@
-use ruff_python_ast::{self as ast, Expr, ExprCall};
-use ruff_python_semantic::analyze::logging;
-
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_stdlib::logging::LoggingLevel;
-use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
-
+/// ## Removed
+/// This rule is identical to [G010] which should be used instead.
+///
 /// ## What it does
 /// Check for usages of the deprecated `warn` method from the `logging` module.
 ///
@@ -34,47 +30,21 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation: `logger.Logger.warning`](https://docs.python.org/3/library/logging.html#logging.Logger.warning)
+///
+/// [G010]: https://docs.astral.sh/ruff/rules/logging-warn/
 #[violation]
 pub struct DeprecatedLogWarn;
 
+/// PGH002
 impl Violation for DeprecatedLogWarn {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`warn` is deprecated in favor of `warning`")
     }
-}
 
-/// PGH002
-pub(crate) fn deprecated_log_warn(checker: &mut Checker, call: &ExprCall) {
-    match call.func.as_ref() {
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-            if !logging::is_logger_candidate(
-                &call.func,
-                checker.semantic(),
-                &checker.settings.logger_objects,
-            ) {
-                return;
-            }
-            if !matches!(
-                LoggingLevel::from_attribute(attr.as_str()),
-                Some(LoggingLevel::Warn)
-            ) {
-                return;
-            }
-        }
-        Expr::Name(_) => {
-            if !checker
-                .semantic()
-                .resolve_call_path(call.func.as_ref())
-                .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "warn"]))
-            {
-                return;
-            }
-        }
-        _ => return,
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Replace with `warning`"))
     }
-
-    checker
-        .diagnostics
-        .push(Diagnostic::new(DeprecatedLogWarn, call.func.range()));
 }

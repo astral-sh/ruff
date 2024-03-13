@@ -1,0 +1,42 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+too_many_positional.py:1:5: PLR0917 Too many positional arguments (8/5)
+  |
+1 | def f(x, y, z, t, u, v, w, r):  # Too many positional arguments (8/5)
+  |     ^ PLR0917
+2 |     pass
+  |
+
+too_many_positional.py:21:5: PLR0917 Too many positional arguments (6/5)
+   |
+21 | def f(x, y, z, /, u, v, w):  # Too many positional arguments (6/5)
+   |     ^ PLR0917
+22 |     pass
+   |
+
+too_many_positional.py:29:5: PLR0917 Too many positional arguments (6/5)
+   |
+29 | def f(x, y, z, a, b, c, *, u, v, w):  # Too many positional arguments (6/5)
+   |     ^ PLR0917
+30 |     pass
+   |
+
+too_many_positional.py:43:9: PLR0917 Too many positional arguments (6/5)
+   |
+41 |         pass
+42 | 
+43 |     def f(self, a, b, c, d, e, g):  # Too many positional arguments (6/5)
+   |         ^ PLR0917
+44 |         pass
+   |
+
+too_many_positional.py:47:9: PLR0917 Too many positional arguments (6/5)
+   |
+46 |     @staticmethod
+47 |     def f(self, a, b, c, d, e):  # Too many positional arguments (6/5)
+   |         ^ PLR0917
+48 |         pass
+   |
+
+

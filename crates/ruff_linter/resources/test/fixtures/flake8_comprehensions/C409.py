@@ -8,3 +8,11 @@ t4 = tuple([
 t5 = tuple(
     (1, 2)
 )
+
+tuple(  # comment
+    [1, 2]
+)
+
+tuple([  # comment
+    1, 2
+])

@@ -3,19 +3,21 @@
 use std::path::Path;
 
 use itertools::Itertools;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use ruff_text_size::Ranged;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
+use crate::fix::edits::delete_comment;
 use crate::noqa;
 use crate::noqa::{Directive, FileExemption, NoqaDirectives, NoqaMapping};
-use crate::registry::{AsRule, Rule};
+use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_noqa(
     diagnostics: &mut Vec<Diagnostic>,
     path: &Path,
@@ -23,10 +25,17 @@ pub(crate) fn check_noqa(
     comment_ranges: &CommentRanges,
     noqa_line_for: &NoqaMapping,
     analyze_directives: bool,
+    per_file_ignores: &RuleSet,
     settings: &LinterSettings,
 ) -> Vec<usize> {
     // Identify any codes that are globally exempted (within the current file).
-    let exemption = FileExemption::try_extract(locator.contents(), comment_ranges, path, locator);
+    let exemption = FileExemption::try_extract(
+        locator.contents(),
+        comment_ranges,
+        &settings.external,
+        path,
+        locator,
+    );
 
     // Extract all `noqa` directives.
     let mut noqa_directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
@@ -109,7 +118,8 @@ pub(crate) fn check_noqa(
                     if line.matches.is_empty() {
                         let mut diagnostic =
                             Diagnostic::new(UnusedNOQA { codes: None }, directive.range());
-                        diagnostic.set_fix(Fix::safe_edit(delete_noqa(directive.range(), locator)));
+                        diagnostic
+                            .set_fix(Fix::safe_edit(delete_comment(directive.range(), locator)));
 
                         diagnostics.push(diagnostic);
                     }
@@ -119,7 +129,7 @@ pub(crate) fn check_noqa(
                     let mut unknown_codes = vec![];
                     let mut unmatched_codes = vec![];
                     let mut valid_codes = vec![];
-                    let mut self_ignore = false;
+                    let mut self_ignore = per_file_ignores.contains(Rule::UnusedNOQA);
                     for code in directive.codes() {
                         let code = get_redirect_target(code).unwrap_or(code);
                         if Rule::UnusedNOQA.noqa_code() == code {
@@ -175,8 +185,10 @@ pub(crate) fn check_noqa(
                             directive.range(),
                         );
                         if valid_codes.is_empty() {
-                            diagnostic
-                                .set_fix(Fix::safe_edit(delete_noqa(directive.range(), locator)));
+                            diagnostic.set_fix(Fix::safe_edit(delete_comment(
+                                directive.range(),
+                                locator,
+                            )));
                         } else {
                             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                                 format!("# noqa: {}", valid_codes.join(", ")),
@@ -192,55 +204,4 @@ pub(crate) fn check_noqa(
 
     ignored_diagnostics.sort_unstable();
     ignored_diagnostics
-}
-
-/// Generate a [`Edit`] to delete a `noqa` directive.
-fn delete_noqa(range: TextRange, locator: &Locator) -> Edit {
-    let line_range = locator.line_range(range.start());
-
-    // Compute the leading space.
-    let prefix = locator.slice(TextRange::new(line_range.start(), range.start()));
-    let leading_space = prefix
-        .rfind(|c: char| !c.is_whitespace())
-        .map_or(prefix.len(), |i| prefix.len() - i - 1);
-    let leading_space_len = TextSize::try_from(leading_space).unwrap();
-
-    // Compute the trailing space.
-    let suffix = locator.slice(TextRange::new(range.end(), line_range.end()));
-    let trailing_space = suffix
-        .find(|c: char| !c.is_whitespace())
-        .map_or(suffix.len(), |i| i);
-    let trailing_space_len = TextSize::try_from(trailing_space).unwrap();
-
-    // Ex) `# noqa`
-    if line_range
-        == TextRange::new(
-            range.start() - leading_space_len,
-            range.end() + trailing_space_len,
-        )
-    {
-        let full_line_end = locator.full_line_end(line_range.end());
-        Edit::deletion(line_range.start(), full_line_end)
-    }
-    // Ex) `x = 1  # noqa`
-    else if range.end() + trailing_space_len == line_range.end() {
-        Edit::deletion(range.start() - leading_space_len, line_range.end())
-    }
-    // Ex) `x = 1  # noqa  # type: ignore`
-    else if locator
-        .slice(TextRange::new(
-            range.end() + trailing_space_len,
-            line_range.end(),
-        ))
-        .starts_with('#')
-    {
-        Edit::deletion(range.start(), range.end() + trailing_space_len)
-    }
-    // Ex) `x = 1  # noqa here`
-    else {
-        Edit::deletion(
-            range.start() + "# ".text_len(),
-            range.end() + trailing_space_len,
-        )
-    }
 }

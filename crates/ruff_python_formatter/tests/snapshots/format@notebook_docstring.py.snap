@@ -1,0 +1,65 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/notebook_docstring.py
+---
+## Input
+```python
+"""
+    This looks like a docstring but is not in a notebook because notebooks can't be imported as a module.
+    Ruff should leave it as is
+""";
+
+"another normal string"
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
+source_type                = Ipynb
+```
+
+```python
+"""
+    This looks like a docstring but is not in a notebook because notebooks can't be imported as a module.
+    Ruff should leave it as is
+"""
+"another normal string"
+```
+
+
+### Output 2
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
+source_type                = Python
+```
+
+```python
+"""
+This looks like a docstring but is not in a notebook because notebooks can't be imported as a module.
+Ruff should leave it as is
+"""
+
+"another normal string"
+```
+
+
+

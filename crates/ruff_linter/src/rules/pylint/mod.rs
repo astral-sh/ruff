@@ -9,16 +9,18 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
+    use rustc_hash::FxHashSet;
     use test_case::test_case;
 
-    use crate::assert_messages;
     use crate::registry::Rule;
     use crate::rules::pylint;
+
+    use crate::assert_messages;
     use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
-    #[test_case(Rule::AndOrTernary, Path::new("and_or_ternary.py"))]
+    #[test_case(Rule::SingledispatchMethod, Path::new("singledispatch_method.py"))]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
     #[test_case(Rule::BadOpenMode, Path::new("bad_open_mode.py"))]
@@ -39,6 +41,7 @@ mod tests {
     )]
     #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
     #[test_case(Rule::EqWithoutHash, Path::new("eq_without_hash.py"))]
+    #[test_case(Rule::EmptyComment, Path::new("empty_comment.py"))]
     #[test_case(Rule::ManualFromImport, Path::new("import_aliasing.py"))]
     #[test_case(Rule::SingleStringSlots, Path::new("single_string_slots.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_0.py"))]
@@ -61,9 +64,14 @@ mod tests {
         Path::new("global_variable_not_assigned.py")
     )]
     #[test_case(Rule::ImportOutsideTopLevel, Path::new("import_outside_top_level.py"))]
+    #[test_case(
+        Rule::ImportPrivateName,
+        Path::new("import_private_name/submodule/__main__.py")
+    )]
     #[test_case(Rule::ImportSelf, Path::new("import_self/module.py"))]
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"))]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"))]
+    #[test_case(Rule::InvalidBoolReturnType, Path::new("invalid_return_type_bool.py"))]
     #[test_case(Rule::InvalidStrReturnType, Path::new("invalid_return_type_str.py"))]
     #[test_case(Rule::DuplicateBases, Path::new("duplicate_bases.py"))]
     #[test_case(Rule::InvalidCharacterBackspace, Path::new("invalid_characters.py"))]
@@ -85,6 +93,7 @@ mod tests {
         Path::new("named_expr_without_context.py")
     )]
     #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"))]
+    #[test_case(Rule::NonSlotAssignment, Path::new("non_slot_assignment.py"))]
     #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"))]
     #[test_case(
         Rule::RedefinedArgumentFromLocal,
@@ -93,6 +102,7 @@ mod tests {
     #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"))]
     #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"))]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"))]
+    #[test_case(Rule::TooManyPositional, Path::new("too_many_positional.py"))]
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"))]
     #[test_case(
         Rule::TooManyReturnStatements,
@@ -149,11 +159,42 @@ mod tests {
     #[test_case(Rule::UnnecessaryLambda, Path::new("unnecessary_lambda.py"))]
     #[test_case(Rule::NonAsciiImportName, Path::new("non_ascii_module_import.py"))]
     #[test_case(Rule::NonAsciiName, Path::new("non_ascii_name.py"))]
+    #[test_case(
+        Rule::RepeatedKeywordArgument,
+        Path::new("repeated_keyword_argument.py")
+    )]
+    #[test_case(
+        Rule::UnnecessaryListIndexLookup,
+        Path::new("unnecessary_list_index_lookup.py")
+    )]
+    #[test_case(Rule::NoClassmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::UnnecessaryDunderCall, Path::new("unnecessary_dunder_call.py"))]
+    #[test_case(Rule::NoStaticmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::PotentialIndexError, Path::new("potential_index_error.py"))]
+    #[test_case(Rule::SuperWithoutBrackets, Path::new("super_without_brackets.py"))]
+    #[test_case(Rule::TooManyNestedBlocks, Path::new("too_many_nested_blocks.py"))]
+    #[test_case(Rule::DictIterMissingItems, Path::new("dict_iter_missing_items.py"))]
+    #[test_case(
+        Rule::UnnecessaryDictIndexLookup,
+        Path::new("unnecessary_dict_index_lookup.py")
+    )]
+    #[test_case(
+        Rule::UselessExceptionStatement,
+        Path::new("useless_exception_statement.py")
+    )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pylint").join(path).as_path(),
-            &LinterSettings::for_rule(rule_code),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    allow_dunder_method_names: FxHashSet::from_iter([
+                        "__special_custom_magic__".to_string()
+                    ]),
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -220,6 +261,22 @@ mod tests {
             &LinterSettings {
                 dummy_variable_rgx: Regex::new(r"skip_.*").unwrap(),
                 ..LinterSettings::for_rule(Rule::TooManyArguments)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn max_positional_args() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_positional_params.py"),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    max_positional_args: 4,
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::TooManyPositional)
             },
         )?;
         assert_messages!(diagnostics);
@@ -301,6 +358,33 @@ mod tests {
                 },
                 ..LinterSettings::for_rules(vec![Rule::TooManyPublicMethods])
             },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn too_many_locals() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_locals.py"),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    max_locals: 15,
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules(vec![Rule::TooManyLocals])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn unspecified_encoding_python39_or_lower() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/unspecified_encoding.py"),
+            &LinterSettings::for_rule(Rule::UnspecifiedEncoding)
+                .with_target_version(PythonVersion::Py39),
         )?;
         assert_messages!(diagnostics);
         Ok(())

@@ -127,3 +127,21 @@ class MultipleConsecutiveFields(models.Model):
         pass
 
     middle_name = models.CharField(max_length=32)
+
+
+class BaseModel(models.Model):
+    pass
+
+
+class StrBeforeFieldInheritedModel(BaseModel):
+    """Model with `__str__` before fields."""
+
+    class Meta:
+        verbose_name = "test"
+        verbose_name_plural = "tests"
+
+    def __str__(self):
+        return "foobar"
+
+    first_name = models.CharField(max_length=32)
+

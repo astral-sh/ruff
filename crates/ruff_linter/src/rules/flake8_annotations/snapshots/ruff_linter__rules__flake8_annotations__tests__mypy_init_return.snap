@@ -9,7 +9,7 @@ mypy_init_return.py:5:9: ANN204 [*] Missing return type annotation for special m
   |         ^^^^^^^^ ANN204
 6 |         ...
   |
-  = help: Add `None` return type
+  = help: Add return type annotation: `None`
 
 ℹ Unsafe fix
 2 2 | 
@@ -29,7 +29,7 @@ mypy_init_return.py:11:9: ANN204 [*] Missing return type annotation for special 
    |         ^^^^^^^^ ANN204
 12 |         ...
    |
-   = help: Add `None` return type
+   = help: Add return type annotation: `None`
 
 ℹ Unsafe fix
 8  8  | 
@@ -41,13 +41,24 @@ mypy_init_return.py:11:9: ANN204 [*] Missing return type annotation for special 
 13 13 | 
 14 14 | 
 
-mypy_init_return.py:40:5: ANN202 Missing return type annotation for private function `__init__`
+mypy_init_return.py:40:5: ANN202 [*] Missing return type annotation for private function `__init__`
    |
 39 | # Error
 40 | def __init__(self, foo: int):
    |     ^^^^^^^^ ANN202
 41 |     ...
    |
+   = help: Add return type annotation: `None`
+
+ℹ Unsafe fix
+37 37 | 
+38 38 | 
+39 39 | # Error
+40    |-def __init__(self, foo: int):
+   40 |+def __init__(self, foo: int) -> None:
+41 41 |     ...
+42 42 | 
+43 43 | 
 
 mypy_init_return.py:47:9: ANN204 [*] Missing return type annotation for special method `__init__`
    |
@@ -57,7 +68,7 @@ mypy_init_return.py:47:9: ANN204 [*] Missing return type annotation for special 
    |         ^^^^^^^^ ANN204
 48 |         ...
    |
-   = help: Add `None` return type
+   = help: Add return type annotation: `None`
 
 ℹ Unsafe fix
 44 44 | # Error – used to be ok for a moment since the mere presence

@@ -5,12 +5,11 @@ use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_semantic::SemanticModel;
+use ruff_python_ast::str::raw_contents;
+use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-
-use super::super::helpers::string_literal;
 
 static SQL_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?i)\b(select\s.+\sfrom\s|delete\s+from\s|(insert|replace)\s.+\svalues\s|update\s.+\sset\s)")
@@ -46,53 +45,77 @@ impl Violation for HardcodedSQLExpression {
     }
 }
 
-fn has_string_literal(expr: &Expr) -> bool {
-    string_literal(expr).is_some()
-}
-
-fn matches_sql_statement(string: &str) -> bool {
-    SQL_REGEX.is_match(string)
-}
-
-fn matches_string_format_expression(expr: &Expr, semantic: &SemanticModel) -> bool {
-    match expr {
-        // "select * from table where val = " + "str" + ...
-        // "select * from table where val = %s" % ...
-        Expr::BinOp(ast::ExprBinOp {
-            op: Operator::Add | Operator::Mod,
-            ..
-        }) => {
-            // Only evaluate the full BinOp, not the nested components.
-            if semantic
-                .current_expression_parent()
-                .map_or(true, |parent| !parent.is_bin_op_expr())
-            {
-                if any_over_expr(expr, &has_string_literal) {
-                    return true;
-                }
-            }
-            false
-        }
-        Expr::Call(ast::ExprCall { func, .. }) => {
-            let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
-                return false;
-            };
-            // "select * from table where val = {}".format(...)
-            attr == "format" && string_literal(value).is_some()
-        }
-        // f"select * from table where val = {val}"
-        Expr::FString(_) => true,
-        _ => false,
-    }
+/// Concatenates the contents of an f-string, without the prefix and quotes,
+/// and escapes any special characters.
+///
+/// ## Example
+///
+/// ```python
+/// "foo" f"bar {x}" "baz"
+/// ```
+///
+/// becomes `foobar {x}baz`.
+fn concatenated_f_string(expr: &ast::ExprFString, locator: &Locator) -> String {
+    expr.value
+        .iter()
+        .filter_map(|part| {
+            raw_contents(locator.slice(part)).map(|s| s.escape_default().to_string())
+        })
+        .collect()
 }
 
 /// S608
 pub(crate) fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
-    if matches_string_format_expression(expr, checker.semantic()) {
-        if matches_sql_statement(&checker.generator().expr(expr)) {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(HardcodedSQLExpression, expr.range()));
+    let content = match expr {
+        // "select * from table where val = " + "str" + ...
+        Expr::BinOp(ast::ExprBinOp {
+            op: Operator::Add, ..
+        }) => {
+            // Only evaluate the full BinOp, not the nested components.
+            if !checker
+                .semantic()
+                .current_expression_parent()
+                .map_or(true, |parent| !parent.is_bin_op_expr())
+            {
+                return;
+            }
+            if !any_over_expr(expr, &Expr::is_string_literal_expr) {
+                return;
+            }
+            checker.generator().expr(expr)
         }
+        // "select * from table where val = %s" % ...
+        Expr::BinOp(ast::ExprBinOp {
+            left,
+            op: Operator::Mod,
+            ..
+        }) => {
+            let Some(string) = left.as_string_literal_expr() else {
+                return;
+            };
+            string.value.to_str().escape_default().to_string()
+        }
+        Expr::Call(ast::ExprCall { func, .. }) => {
+            let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
+                return;
+            };
+            // "select * from table where val = {}".format(...)
+            if attr != "format" {
+                return;
+            }
+            let Some(string) = value.as_string_literal_expr() else {
+                return;
+            };
+            string.value.to_str().escape_default().to_string()
+        }
+        // f"select * from table where val = {val}"
+        Expr::FString(f_string) => concatenated_f_string(f_string, checker.locator()),
+        _ => return,
+    };
+
+    if SQL_REGEX.is_match(&content) {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(HardcodedSQLExpression, expr.range()));
     }
 }

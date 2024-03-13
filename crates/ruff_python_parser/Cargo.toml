@@ -19,14 +19,15 @@ ruff_text_size = { path = "../ruff_text_size" }
 
 anyhow = { workspace = true }
 bitflags = { workspace = true }
+bstr = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
-lalrpop-util = { version = "0.20.0", default-features = false }
+lalrpop-util = { workspace = true, default-features = false }
 memchr = { workspace = true }
+rustc-hash = { workspace = true }
+static_assertions = { workspace = true }
 unicode-ident = { workspace = true }
 unicode_names2 = { workspace = true }
-rustc-hash = { workspace = true }
-static_assertions = "1.1.0"
 
 [dev-dependencies]
 insta = { workspace = true }
@@ -35,3 +36,6 @@ insta = { workspace = true }
 anyhow = { workspace = true }
 lalrpop = { version = "0.20.0", default-features = false, optional = true }
 tiny-keccak = { version = "2", features = ["sha3"] }
+
+[lints]
+workspace = true

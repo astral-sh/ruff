@@ -19,3 +19,16 @@ pub(super) fn curly_escape(text: &str) -> Cow<'_, str> {
         }
     })
 }
+
+static DOUBLE_CURLY_BRACES: Lazy<Regex> = Lazy::new(|| Regex::new(r"((\{\{)|(\}\}))").unwrap());
+
+pub(super) fn curly_unescape(text: &str) -> Cow<'_, str> {
+    // Match all double curly braces and replace with a single
+    DOUBLE_CURLY_BRACES.replace_all(text, |caps: &Captures| {
+        if &caps[1] == "{{" {
+            "{".to_string()
+        } else {
+            "}".to_string()
+        }
+    })
+}

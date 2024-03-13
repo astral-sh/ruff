@@ -1,9 +1,8 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
-
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
-use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -60,9 +59,11 @@ pub(crate) fn useless_return(
         // Skip empty functions.
         return;
     };
-    if !last_stmt.is_return_stmt() {
+
+    // Verify that the last statement is a return statement.
+    let Stmt::Return(ast::StmtReturn { value, range: _ }) = &last_stmt else {
         return;
-    }
+    };
 
     // Skip functions that consist of a single return statement.
     if body.len() == 1 {
@@ -77,11 +78,6 @@ pub(crate) fn useless_return(
             }
         }
     }
-
-    // Verify that the last statement is a return statement.
-    let Stmt::Return(ast::StmtReturn { value, range: _ }) = &last_stmt else {
-        return;
-    };
 
     // Verify that the return statement is either bare or returns `None`.
     if !value

@@ -23,14 +23,19 @@ jobs:
     name: "Determine changes"
     runs-on: ubuntu-latest
     outputs:
+      # Flag that is raised when any code that affects linter is changed
       linter: ${{ steps.changed.outputs.linter_any_changed }}
+      # Flag that is raised when any code that affects formatter is changed
       formatter: ${{ steps.changed.outputs.formatter_any_changed }}
+      # Flag that is raised when any code is changed
+      # This is superset of the linter and formatter
+      code: ${{ steps.changed.outputs.code_any_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: tj-actions/changed-files@v40
+      - uses: tj-actions/changed-files@v42
         id: changed
         with:
           files_yaml: |
@@ -43,6 +48,7 @@ jobs:
               - "!crates/ruff_dev/**"
               - "!crates/ruff_shrinking/**"
               - scripts/*
+              - python/**
               - .github/workflows/ci.yaml
 
             formatter:
@@ -58,11 +64,19 @@ jobs:
               - crates/ruff_python_parser/**
               - crates/ruff_dev/**
               - scripts/*
+              - python/**
               - .github/workflows/ci.yaml
+
+            code:
+              - "**/*"
+              - "!**/*.md"
+              - "!docs/**"
+              - "!assets/**"
 
   cargo-fmt:
     name: "cargo fmt"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -72,6 +86,9 @@ jobs:
   cargo-clippy:
     name: "cargo clippy"
     runs-on: ubuntu-latest
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -80,41 +97,26 @@ jobs:
           rustup target add wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: "Clippy"
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: "Clippy (wasm)"
-        run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features -- -D warnings
+        run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
 
   cargo-test-linux:
-    runs-on: ubuntu-latest
     name: "cargo test (linux)"
+    runs-on: ubuntu-latest
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: rustup show
-      - name: "Install cargo insta"
+      - name: "Install mold"
+        uses: rui314/setup-mold@v1
+      - name: "Install cargo nextest"
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-insta
-      - uses: Swatinem/rust-cache@v2
-      - name: "Run tests"
-        run: cargo insta test --all --all-features --unreferenced reject
-      # Check for broken links in the documentation.
-      - run: cargo doc --all --no-deps
-        env:
-          # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
-          RUSTDOCFLAGS: "-D warnings"
-      - uses: actions/upload-artifact@v3
-        with:
-          name: ruff
-          path: target/debug/ruff
-
-  cargo-test-windows:
-    runs-on: windows-latest
-    name: "cargo test (windows)"
-    steps:
-      - uses: actions/checkout@v4
-      - name: "Install Rust toolchain"
-        run: rustup show
+          tool: cargo-nextest
       - name: "Install cargo insta"
         uses: taiki-e/install-action@v2
         with:
@@ -122,12 +124,47 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: "Run tests"
         shell: bash
-        # We can't reject unreferenced snapshots on windows because flake8_executable can't run on windows
-        run: cargo insta test --all --all-features
+        env:
+          NEXTEST_PROFILE: "ci"
+        run: cargo insta test --all-features --unreferenced reject --test-runner nextest
+
+      # Check for broken links in the documentation.
+      - run: cargo doc --all --no-deps
+        env:
+          # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
+          RUSTDOCFLAGS: "-D warnings"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ruff
+          path: target/debug/ruff
+
+  cargo-test-windows:
+    name: "cargo test (windows)"
+    runs-on: windows-latest
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Install cargo nextest"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - uses: Swatinem/rust-cache@v2
+      - name: "Run tests"
+        shell: bash
+        run: |
+          cargo nextest run --all-features --profile ci
+          cargo test --all-features --doc
 
   cargo-test-wasm:
-    runs-on: ubuntu-latest
     name: "cargo test (wasm)"
+    runs-on: ubuntu-latest
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -145,8 +182,11 @@ jobs:
           wasm-pack test --node
 
   cargo-fuzz:
-    runs-on: ubuntu-latest
     name: "cargo fuzz"
+    runs-on: ubuntu-latest
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -157,12 +197,15 @@ jobs:
       - name: "Install cargo-fuzz"
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-fuzz@0.11
+          tool: cargo-fuzz@0.11.2
       - run: cargo fuzz build -s none
 
   scripts:
     name: "test scripts"
     runs-on: ubuntu-latest
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -186,27 +229,28 @@ jobs:
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     # Ecosystem check needs linter and/or formatter changes.
     if: github.event_name == 'pull_request' && ${{
-      needs.determine_changes.outputs.linter == 'true' ||
-      needs.determine_changes.outputs.formatter == 'true'
+      needs.determine_changes.outputs.code == 'true'
       }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         name: Download comparison Ruff binary
         id: ruff-target
         with:
           name: ruff
           path: target/debug
 
-      - uses: dawidd6/action-download-artifact@v2
+      - uses: dawidd6/action-download-artifact@v3
         name: Download baseline Ruff binary
         with:
           name: ruff
           branch: ${{ github.event.pull_request.base.ref }}
+          workflow: "ci.yaml"
           check_artifacts: true
 
       - name: Install ruff-ecosystem
@@ -281,13 +325,13 @@ jobs:
         run: |
           echo ${{ github.event.number }} > pr-number
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         name: Upload PR Number
         with:
           name: pr-number
           path: pr-number
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         name: Upload Results
         with:
           name: ecosystem-result
@@ -296,6 +340,9 @@ jobs:
   cargo-udeps:
     name: "cargo udeps"
     runs-on: ubuntu-latest
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: "Install nightly Rust toolchain"
@@ -310,9 +357,10 @@ jobs:
   python-package:
     name: "python package"
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
@@ -334,9 +382,10 @@ jobs:
   pre-commit:
     name: "pre-commit"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Install Rust toolchain"
@@ -345,7 +394,7 @@ jobs:
       - name: "Install pre-commit"
         run: pip install pre-commit
       - name: "Cache pre-commit"
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
@@ -362,14 +411,15 @@ jobs:
   docs:
     name: "mkdocs"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       MKDOCS_INSIDERS_SSH_KEY_EXISTS: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
       - name: "Add SSH key"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
-        uses: webfactory/ssh-agent@v0.8.0
+        uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY }}
       - name: "Install Rust toolchain"
@@ -392,13 +442,14 @@ jobs:
         run: mkdocs build --strict -f mkdocs.insiders.yml
       - name: "Build docs"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
-        run: mkdocs build --strict -f mkdocs.generated.yml
+        run: mkdocs build --strict -f mkdocs.public.yml
 
   check-formatter-instability-and-black-similarity:
     name: "formatter instabilities and black similarity"
     runs-on: ubuntu-latest
     needs: determine_changes
     if: needs.determine_changes.outputs.formatter == 'true' || github.ref == 'refs/heads/main'
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -415,9 +466,13 @@ jobs:
   check-ruff-lsp:
     name: "test ruff-lsp"
     runs-on: ubuntu-latest
-    needs: cargo-test-linux
+    timeout-minutes: 5
+    needs:
+      - cargo-test-linux
+      - determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     steps:
-      - uses: extractions/setup-just@v1
+      - uses: extractions/setup-just@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -426,11 +481,11 @@ jobs:
         with:
           repository: "astral-sh/ruff-lsp"
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         name: Download development ruff binary
         id: ruff-target
         with:
@@ -453,6 +508,9 @@ jobs:
 
   benchmarks:
     runs-on: ubuntu-latest
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 20
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@v4
@@ -471,7 +529,7 @@ jobs:
         run: cargo codspeed build --features codspeed -p ruff_benchmark
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@v1
+        uses: CodSpeedHQ/action@v2
         with:
           run: cargo codspeed run
           token: ${{ secrets.CODSPEED_TOKEN }}

@@ -14,7 +14,7 @@ Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-c
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.5
+  rev: v0.3.2
   hooks:
     # Run the linter.
     - id: ruff
@@ -27,7 +27,7 @@ To enable lint fixes, add the `--fix` argument to the lint hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.5
+  rev: v0.3.2
   hooks:
     # Run the linter.
     - id: ruff
@@ -41,7 +41,7 @@ To run the hooks over Jupyter Notebooks too, add `jupyter` to the list of allowe
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.5
+  rev: v0.3.2
   hooks:
     # Run the linter.
     - id: ruff
@@ -334,7 +334,14 @@ Ruff is available as [`flymake-ruff`](https://melpa.org/#/flymake-ruff) on MELPA
 (add-hook 'python-mode-hook #'flymake-ruff-load)
 ```
 
-Ruff can be used as a formatter in Emacs using the [Apheleia](https://github.com/radian-software/apheleia) formatter library, by setting this configuration:
+Ruff is also available as [`emacs-ruff-format`](https://github.com/scop/emacs-ruff-format):
+
+```elisp
+(require 'ruff-format)
+(add-hook 'python-mode-hook 'ruff-format-on-save-mode)
+```
+
+Alternatively, it can be used via the [Apheleia](https://github.com/radian-software/apheleia) formatter library, by setting this configuration:
 
 ```emacs-lisp
 (add-to-list 'apheleia-mode-alist '(python-mode . ruff))
@@ -345,6 +352,12 @@ Ruff can be used as a formatter in Emacs using the [Apheleia](https://github.com
 
 Ruff is also available via the [`textmate2-ruff-linter`](https://github.com/vigo/textmate2-ruff-linter)
 bundle for TextMate.
+
+## mdformat (Unofficial)
+
+[mdformat](https://mdformat.readthedocs.io/en/stable/users/plugins.html#code-formatter-plugins) is
+capable of formatting code blocks within Markdown. The [`mdformat-ruff`](https://github.com/Freed-Wu/mdformat-ruff)
+plugin enables mdformat to format Python code blocks with Ruff.
 
 ## GitHub Actions
 
@@ -357,9 +370,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - name: Install dependencies
@@ -391,7 +404,7 @@ jobs:
   ruff:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: chartboost/ruff-action@v1
 ```
 
@@ -404,7 +417,7 @@ Alternatively, you can include `ruff-action` as a step in any other workflow fil
 `ruff-action` accepts optional configuration parameters via `with:`, including:
 
 - `version`: The Ruff version to install (default: latest).
-- `options`: The command-line arguments to pass to Ruff (default: `"check"`).
+- `args`: The command-line arguments to pass to Ruff (default: `"check"`).
 - `src`: The source paths to pass to Ruff (default: `"."`).
 
 For example, to run `ruff check --select B ./src` using Ruff version `0.0.259`:
@@ -412,7 +425,7 @@ For example, to run `ruff check --select B ./src` using Ruff version `0.0.259`:
 ```yaml
 - uses: chartboost/ruff-action@v1
   with:
-    src: "./src"
     version: 0.0.259
-    args: --select B
+    args: check --select B
+    src: "./src"
 ```

@@ -1,13 +1,17 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
-use itertools::Itertools;
-
+use std::cell::OnceCell;
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
+use std::slice::{Iter, IterMut};
 
-use crate::{int, LiteralExpressionRef};
+use bitflags::bitflags;
+use itertools::Itertools;
+
 use ruff_text_size::{Ranged, TextRange, TextSize};
+
+use crate::{int, str::Quote, LiteralExpressionRef};
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -156,7 +160,7 @@ pub enum Stmt {
 pub struct StmtIpyEscapeCommand {
     pub range: TextRange,
     pub kind: IpyEscapeKind,
-    pub value: String,
+    pub value: Box<str>,
 }
 
 impl From<StmtIpyEscapeCommand> for Stmt {
@@ -555,16 +559,16 @@ impl From<StmtContinue> for Stmt {
 pub enum Expr {
     #[is(name = "bool_op_expr")]
     BoolOp(ExprBoolOp),
-    #[is(name = "named_expr_expr")]
-    NamedExpr(ExprNamedExpr),
+    #[is(name = "named_expr")]
+    Named(ExprNamed),
     #[is(name = "bin_op_expr")]
     BinOp(ExprBinOp),
     #[is(name = "unary_op_expr")]
     UnaryOp(ExprUnaryOp),
     #[is(name = "lambda_expr")]
     Lambda(ExprLambda),
-    #[is(name = "if_exp_expr")]
-    IfExp(ExprIfExp),
+    #[is(name = "if_expr")]
+    If(ExprIf),
     #[is(name = "dict_expr")]
     Dict(ExprDict),
     #[is(name = "set_expr")]
@@ -575,8 +579,8 @@ pub enum Expr {
     SetComp(ExprSetComp),
     #[is(name = "dict_comp_expr")]
     DictComp(ExprDictComp),
-    #[is(name = "generator_exp_expr")]
-    GeneratorExp(ExprGeneratorExp),
+    #[is(name = "generator_expr")]
+    Generator(ExprGenerator),
     #[is(name = "await_expr")]
     Await(ExprAwait),
     #[is(name = "yield_expr")]
@@ -587,8 +591,6 @@ pub enum Expr {
     Compare(ExprCompare),
     #[is(name = "call_expr")]
     Call(ExprCall),
-    #[is(name = "formatted_value_expr")]
-    FormattedValue(ExprFormattedValue),
     #[is(name = "f_string_expr")]
     FString(ExprFString),
     #[is(name = "string_literal_expr")]
@@ -640,6 +642,7 @@ impl Expr {
         )
     }
 
+    /// Returns [`LiteralExpressionRef`] if the expression is a literal expression.
     pub fn as_literal_expr(&self) -> Option<LiteralExpressionRef<'_>> {
         match self {
             Expr::StringLiteral(expr) => Some(LiteralExpressionRef::StringLiteral(expr)),
@@ -649,24 +652,6 @@ impl Expr {
             Expr::NoneLiteral(expr) => Some(LiteralExpressionRef::NoneLiteral(expr)),
             Expr::EllipsisLiteral(expr) => Some(LiteralExpressionRef::EllipsisLiteral(expr)),
             _ => None,
-        }
-    }
-
-    pub fn is_implicit_concatenated_string(&self) -> bool {
-        match self {
-            Expr::StringLiteral(ExprStringLiteral {
-                implicit_concatenated,
-                ..
-            })
-            | Expr::BytesLiteral(ExprBytesLiteral {
-                implicit_concatenated,
-                ..
-            })
-            | Expr::FString(ExprFString {
-                implicit_concatenated,
-                ..
-            }) => *implicit_concatenated,
-            _ => false,
         }
     }
 }
@@ -686,7 +671,7 @@ impl Expr {
 pub struct ExprIpyEscapeCommand {
     pub range: TextRange,
     pub kind: IpyEscapeKind,
-    pub value: String,
+    pub value: Box<str>,
 }
 
 impl From<ExprIpyEscapeCommand> for Expr {
@@ -711,15 +696,15 @@ impl From<ExprBoolOp> for Expr {
 
 /// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprNamedExpr {
+pub struct ExprNamed {
     pub range: TextRange,
     pub target: Box<Expr>,
     pub value: Box<Expr>,
 }
 
-impl From<ExprNamedExpr> for Expr {
-    fn from(payload: ExprNamedExpr) -> Self {
-        Expr::NamedExpr(payload)
+impl From<ExprNamed> for Expr {
+    fn from(payload: ExprNamed) -> Self {
+        Expr::Named(payload)
     }
 }
 
@@ -768,16 +753,16 @@ impl From<ExprLambda> for Expr {
 
 /// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprIfExp {
+pub struct ExprIf {
     pub range: TextRange,
     pub test: Box<Expr>,
     pub body: Box<Expr>,
     pub orelse: Box<Expr>,
 }
 
-impl From<ExprIfExp> for Expr {
-    fn from(payload: ExprIfExp) -> Self {
-        Expr::IfExp(payload)
+impl From<ExprIf> for Expr {
+    fn from(payload: ExprIf) -> Self {
+        Expr::If(payload)
     }
 }
 
@@ -853,15 +838,16 @@ impl From<ExprDictComp> for Expr {
 
 /// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprGeneratorExp {
+pub struct ExprGenerator {
     pub range: TextRange,
     pub elt: Box<Expr>,
     pub generators: Vec<Comprehension>,
+    pub parenthesized: bool,
 }
 
-impl From<ExprGeneratorExp> for Expr {
-    fn from(payload: ExprGeneratorExp) -> Self {
-        Expr::GeneratorExp(payload)
+impl From<ExprGenerator> for Expr {
+    fn from(payload: ExprGenerator) -> Self {
+        Expr::Generator(payload)
     }
 }
 
@@ -909,8 +895,8 @@ impl From<ExprYieldFrom> for Expr {
 pub struct ExprCompare {
     pub range: TextRange,
     pub left: Box<Expr>,
-    pub ops: Vec<CmpOp>,
-    pub comparators: Vec<Expr>,
+    pub ops: Box<[CmpOp]>,
+    pub comparators: Box<[Expr]>,
 }
 
 impl From<ExprCompare> for Expr {
@@ -933,19 +919,51 @@ impl From<ExprCall> for Expr {
     }
 }
 
-/// See also [FormattedValue](https://docs.python.org/3/library/ast.html#ast.FormattedValue)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprFormattedValue {
+pub struct FStringFormatSpec {
     pub range: TextRange,
-    pub value: Box<Expr>,
-    pub debug_text: Option<DebugText>,
-    pub conversion: ConversionFlag,
-    pub format_spec: Option<Box<Expr>>,
+    pub elements: Vec<FStringElement>,
 }
 
-impl From<ExprFormattedValue> for Expr {
-    fn from(payload: ExprFormattedValue) -> Self {
-        Expr::FormattedValue(payload)
+impl Ranged for FStringFormatSpec {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+/// See also [FormattedValue](https://docs.python.org/3/library/ast.html#ast.FormattedValue)
+#[derive(Clone, Debug, PartialEq)]
+pub struct FStringExpressionElement {
+    pub range: TextRange,
+    pub expression: Box<Expr>,
+    pub debug_text: Option<DebugText>,
+    pub conversion: ConversionFlag,
+    pub format_spec: Option<Box<FStringFormatSpec>>,
+}
+
+impl Ranged for FStringExpressionElement {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FStringLiteralElement {
+    pub range: TextRange,
+    pub value: Box<str>,
+}
+
+impl Ranged for FStringLiteralElement {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+impl Deref for FStringLiteralElement {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
     }
 }
 
@@ -984,13 +1002,17 @@ pub struct DebugText {
     pub trailing: String,
 }
 
-/// See also [JoinedStr](https://docs.python.org/3/library/ast.html#ast.JoinedStr)
+/// An AST node used to represent an f-string.
+///
+/// This type differs from the original Python AST ([JoinedStr]) in that it
+/// doesn't join the implicitly concatenated parts into a single string. Instead,
+/// it keeps them separate and provide various methods to access the parts.
+///
+/// [JoinedStr]: https://docs.python.org/3/library/ast.html#ast.JoinedStr
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprFString {
     pub range: TextRange,
-    pub values: Vec<Expr>,
-    /// Whether the f-string contains multiple string tokens that were implicitly concatenated.
-    pub implicit_concatenated: bool,
+    pub value: FStringValue,
 }
 
 impl From<ExprFString> for Expr {
@@ -999,12 +1021,295 @@ impl From<ExprFString> for Expr {
     }
 }
 
+/// The value representing an [`ExprFString`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct FStringValue {
+    inner: FStringValueInner,
+}
+
+impl FStringValue {
+    /// Creates a new f-string with the given value.
+    pub fn single(value: FString) -> Self {
+        Self {
+            inner: FStringValueInner::Single(FStringPart::FString(value)),
+        }
+    }
+
+    /// Creates a new f-string with the given values that represents an implicitly
+    /// concatenated f-string.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `values` is less than 2. Use [`FStringValue::single`] instead.
+    pub fn concatenated(values: Vec<FStringPart>) -> Self {
+        assert!(values.len() > 1);
+        Self {
+            inner: FStringValueInner::Concatenated(values),
+        }
+    }
+
+    /// Returns `true` if the f-string is implicitly concatenated, `false` otherwise.
+    pub fn is_implicit_concatenated(&self) -> bool {
+        matches!(self.inner, FStringValueInner::Concatenated(_))
+    }
+
+    /// Returns a slice of all the [`FStringPart`]s contained in this value.
+    pub fn as_slice(&self) -> &[FStringPart] {
+        match &self.inner {
+            FStringValueInner::Single(part) => std::slice::from_ref(part),
+            FStringValueInner::Concatenated(parts) => parts,
+        }
+    }
+
+    /// Returns a mutable slice of all the [`FStringPart`]s contained in this value.
+    fn as_mut_slice(&mut self) -> &mut [FStringPart] {
+        match &mut self.inner {
+            FStringValueInner::Single(part) => std::slice::from_mut(part),
+            FStringValueInner::Concatenated(parts) => parts,
+        }
+    }
+
+    /// Returns an iterator over all the [`FStringPart`]s contained in this value.
+    pub fn iter(&self) -> Iter<FStringPart> {
+        self.as_slice().iter()
+    }
+
+    /// Returns an iterator over all the [`FStringPart`]s contained in this value
+    /// that allows modification.
+    pub(crate) fn iter_mut(&mut self) -> IterMut<FStringPart> {
+        self.as_mut_slice().iter_mut()
+    }
+
+    /// Returns an iterator over the [`StringLiteral`] parts contained in this value.
+    ///
+    /// Note that this doesn't nest into the f-string parts. For example,
+    ///
+    /// ```python
+    /// "foo" f"bar {x}" "baz" f"qux"
+    /// ```
+    ///
+    /// Here, the string literal parts returned would be `"foo"` and `"baz"`.
+    pub fn literals(&self) -> impl Iterator<Item = &StringLiteral> {
+        self.iter().filter_map(|part| part.as_literal())
+    }
+
+    /// Returns an iterator over the [`FString`] parts contained in this value.
+    ///
+    /// Note that this doesn't nest into the f-string parts. For example,
+    ///
+    /// ```python
+    /// "foo" f"bar {x}" "baz" f"qux"
+    /// ```
+    ///
+    /// Here, the f-string parts returned would be `f"bar {x}"` and `f"qux"`.
+    pub fn f_strings(&self) -> impl Iterator<Item = &FString> {
+        self.iter().filter_map(|part| part.as_f_string())
+    }
+
+    /// Returns an iterator over all the [`FStringElement`] contained in this value.
+    ///
+    /// An f-string element is what makes up an [`FString`] i.e., it is either a
+    /// string literal or an expression. In the following example,
+    ///
+    /// ```python
+    /// "foo" f"bar {x}" "baz" f"qux"
+    /// ```
+    ///
+    /// The f-string elements returned would be string literal (`"bar "`),
+    /// expression (`x`) and string literal (`"qux"`).
+    pub fn elements(&self) -> impl Iterator<Item = &FStringElement> {
+        self.f_strings().flat_map(|fstring| fstring.elements.iter())
+    }
+}
+
+impl<'a> IntoIterator for &'a FStringValue {
+    type Item = &'a FStringPart;
+    type IntoIter = Iter<'a, FStringPart>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut FStringValue {
+    type Item = &'a mut FStringPart;
+    type IntoIter = IterMut<'a, FStringPart>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
+/// An internal representation of [`FStringValue`].
+#[derive(Clone, Debug, PartialEq)]
+enum FStringValueInner {
+    /// A single f-string i.e., `f"foo"`.
+    ///
+    /// This is always going to be `FStringPart::FString` variant which is
+    /// maintained by the `FStringValue::single` constructor.
+    Single(FStringPart),
+
+    /// An implicitly concatenated f-string i.e., `"foo" f"bar {x}"`.
+    Concatenated(Vec<FStringPart>),
+}
+
+/// An f-string part which is either a string literal or an f-string.
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
+pub enum FStringPart {
+    Literal(StringLiteral),
+    FString(FString),
+}
+
+impl FStringPart {
+    pub fn quote_style(&self) -> Quote {
+        match self {
+            Self::Literal(string_literal) => string_literal.flags.quote_style(),
+            Self::FString(f_string) => f_string.flags.quote_style(),
+        }
+    }
+}
+
+impl Ranged for FStringPart {
+    fn range(&self) -> TextRange {
+        match self {
+            FStringPart::Literal(string_literal) => string_literal.range(),
+            FStringPart::FString(f_string) => f_string.range(),
+        }
+    }
+}
+
+bitflags! {
+    #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
+    struct FStringFlagsInner: u8 {
+        /// The f-string uses double quotes (`"`) for its opener and closer.
+        /// If this flag is not set, the f-string uses single quotes (`'`)
+        /// for its opener and closer.
+        const DOUBLE = 1 << 0;
+
+        /// The f-string is triple-quoted:
+        /// it begins and ends with three consecutive quote characters.
+        const TRIPLE_QUOTED = 1 << 1;
+
+        /// The f-string has an `r` or `R` prefix, meaning it is a raw f-string.
+        const R_PREFIX = 1 << 3;
+    }
+}
+
+/// Flags that can be queried to obtain information
+/// regarding the prefixes and quotes used for an f-string.
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct FStringFlags(FStringFlagsInner);
+
+impl FStringFlags {
+    #[must_use]
+    pub fn with_double_quotes(mut self) -> Self {
+        self.0 |= FStringFlagsInner::DOUBLE;
+        self
+    }
+
+    #[must_use]
+    pub fn with_triple_quotes(mut self) -> Self {
+        self.0 |= FStringFlagsInner::TRIPLE_QUOTED;
+        self
+    }
+
+    #[must_use]
+    pub fn with_r_prefix(mut self) -> Self {
+        self.0 |= FStringFlagsInner::R_PREFIX;
+        self
+    }
+
+    /// Does the f-string have an `r` or `R` prefix?
+    pub const fn is_raw(self) -> bool {
+        self.0.contains(FStringFlagsInner::R_PREFIX)
+    }
+
+    /// Is the f-string triple-quoted, i.e.,
+    /// does it begin and end with three consecutive quote characters?
+    pub const fn is_triple_quoted(self) -> bool {
+        self.0.contains(FStringFlagsInner::TRIPLE_QUOTED)
+    }
+
+    /// Does the f-string use single or double quotes in its opener and closer?
+    pub const fn quote_style(self) -> Quote {
+        if self.0.contains(FStringFlagsInner::DOUBLE) {
+            Quote::Double
+        } else {
+            Quote::Single
+        }
+    }
+}
+
+impl fmt::Debug for FStringFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FStringFlags")
+            .field("quote_style", &self.quote_style())
+            .field("raw", &self.is_raw())
+            .field("triple_quoted", &self.is_triple_quoted())
+            .finish()
+    }
+}
+
+/// An AST node that represents a single f-string which is part of an [`ExprFString`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct FString {
+    pub range: TextRange,
+    pub elements: Vec<FStringElement>,
+    pub flags: FStringFlags,
+}
+
+impl FString {
+    /// Returns an iterator over all the [`FStringLiteralElement`] nodes contained in this f-string.
+    pub fn literals(&self) -> impl Iterator<Item = &FStringLiteralElement> {
+        self.elements
+            .iter()
+            .filter_map(|element| element.as_literal())
+    }
+
+    /// Returns an iterator over all the [`FStringExpressionElement`] nodes contained in this f-string.
+    pub fn expressions(&self) -> impl Iterator<Item = &FStringExpressionElement> {
+        self.elements
+            .iter()
+            .filter_map(|element| element.as_expression())
+    }
+}
+
+impl Ranged for FString {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+impl From<FString> for Expr {
+    fn from(payload: FString) -> Self {
+        ExprFString {
+            range: payload.range,
+            value: FStringValue::single(payload),
+        }
+        .into()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
+pub enum FStringElement {
+    Literal(FStringLiteralElement),
+    Expression(FStringExpressionElement),
+}
+
+impl Ranged for FStringElement {
+    fn range(&self) -> TextRange {
+        match self {
+            FStringElement::Literal(node) => node.range(),
+            FStringElement::Expression(node) => node.range(),
+        }
+    }
+}
+
+/// An AST node that represents either a single string literal or an implicitly
+/// concatenated string literals.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExprStringLiteral {
     pub range: TextRange,
-    pub value: String,
-    pub unicode: bool,
-    pub implicit_concatenated: bool,
+    pub value: StringLiteralValue,
 }
 
 impl From<ExprStringLiteral> for Expr {
@@ -1019,19 +1324,368 @@ impl Ranged for ExprStringLiteral {
     }
 }
 
-impl Deref for ExprStringLiteral {
-    type Target = str;
+/// The value representing a [`ExprStringLiteral`].
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct StringLiteralValue {
+    inner: StringLiteralValueInner,
+}
 
-    fn deref(&self) -> &Self::Target {
-        self.value.as_str()
+impl StringLiteralValue {
+    /// Creates a new single string literal with the given value.
+    pub fn single(string: StringLiteral) -> Self {
+        Self {
+            inner: StringLiteralValueInner::Single(string),
+        }
+    }
+
+    /// Creates a new string literal with the given values that represents an
+    /// implicitly concatenated strings.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `strings` is less than 2. Use [`StringLiteralValue::single`]
+    /// instead.
+    pub fn concatenated(strings: Vec<StringLiteral>) -> Self {
+        assert!(strings.len() > 1);
+        Self {
+            inner: StringLiteralValueInner::Concatenated(ConcatenatedStringLiteral {
+                strings,
+                value: OnceCell::new(),
+            }),
+        }
+    }
+
+    /// Returns `true` if the string literal is implicitly concatenated.
+    pub const fn is_implicit_concatenated(&self) -> bool {
+        matches!(self.inner, StringLiteralValueInner::Concatenated(_))
+    }
+
+    /// Returns `true` if the string literal is a unicode string.
+    ///
+    /// For an implicitly concatenated string, it returns `true` only if the first
+    /// string literal is a unicode string.
+    pub fn is_unicode(&self) -> bool {
+        self.iter()
+            .next()
+            .map_or(false, |part| part.flags.is_u_string())
+    }
+
+    /// Returns a slice of all the [`StringLiteral`] parts contained in this value.
+    pub fn as_slice(&self) -> &[StringLiteral] {
+        match &self.inner {
+            StringLiteralValueInner::Single(value) => std::slice::from_ref(value),
+            StringLiteralValueInner::Concatenated(value) => value.strings.as_slice(),
+        }
+    }
+
+    /// Returns a mutable slice of all the [`StringLiteral`] parts contained in this value.
+    fn as_mut_slice(&mut self) -> &mut [StringLiteral] {
+        match &mut self.inner {
+            StringLiteralValueInner::Single(value) => std::slice::from_mut(value),
+            StringLiteralValueInner::Concatenated(value) => value.strings.as_mut_slice(),
+        }
+    }
+
+    /// Returns an iterator over all the [`StringLiteral`] parts contained in this value.
+    pub fn iter(&self) -> Iter<StringLiteral> {
+        self.as_slice().iter()
+    }
+
+    /// Returns an iterator over all the [`StringLiteral`] parts contained in this value
+    /// that allows modification.
+    pub(crate) fn iter_mut(&mut self) -> IterMut<StringLiteral> {
+        self.as_mut_slice().iter_mut()
+    }
+
+    /// Returns `true` if the string literal value is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Returns the total length of the string literal value, in bytes, not
+    /// [`char`]s or graphemes.
+    pub fn len(&self) -> usize {
+        self.iter().fold(0, |acc, part| acc + part.value.len())
+    }
+
+    /// Returns an iterator over the [`char`]s of each string literal part.
+    pub fn chars(&self) -> impl Iterator<Item = char> + '_ {
+        self.iter().flat_map(|part| part.value.chars())
+    }
+
+    /// Returns the concatenated string value as a [`str`].
+    ///
+    /// Note that this will perform an allocation on the first invocation if the
+    /// string value is implicitly concatenated.
+    pub fn to_str(&self) -> &str {
+        match &self.inner {
+            StringLiteralValueInner::Single(value) => value.as_str(),
+            StringLiteralValueInner::Concatenated(value) => value.to_str(),
+        }
     }
 }
 
+impl<'a> IntoIterator for &'a StringLiteralValue {
+    type Item = &'a StringLiteral;
+    type IntoIter = Iter<'a, StringLiteral>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut StringLiteralValue {
+    type Item = &'a mut StringLiteral;
+    type IntoIter = IterMut<'a, StringLiteral>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
+impl PartialEq<str> for StringLiteralValue {
+    fn eq(&self, other: &str) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+        // The `zip` here is safe because we have checked the length of both parts.
+        self.chars().zip(other.chars()).all(|(c1, c2)| c1 == c2)
+    }
+}
+
+impl PartialEq<String> for StringLiteralValue {
+    fn eq(&self, other: &String) -> bool {
+        self == other.as_str()
+    }
+}
+
+impl fmt::Display for StringLiteralValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.to_str())
+    }
+}
+
+/// An internal representation of [`StringLiteralValue`].
+#[derive(Clone, Debug, PartialEq)]
+enum StringLiteralValueInner {
+    /// A single string literal i.e., `"foo"`.
+    Single(StringLiteral),
+
+    /// An implicitly concatenated string literals i.e., `"foo" "bar"`.
+    Concatenated(ConcatenatedStringLiteral),
+}
+
+impl Default for StringLiteralValueInner {
+    fn default() -> Self {
+        Self::Single(StringLiteral::default())
+    }
+}
+
+bitflags! {
+    #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+    struct StringLiteralFlagsInner: u8 {
+        /// The string uses double quotes (`"`).
+        /// If this flag is not set, the string uses single quotes (`'`).
+        const DOUBLE = 1 << 0;
+
+        /// The string is triple-quoted:
+        /// it begins and ends with three consecutive quote characters.
+        const TRIPLE_QUOTED = 1 << 1;
+
+        /// The string has a `u` or `U` prefix.
+        /// While this prefix is a no-op at runtime,
+        /// strings with this prefix can have no other prefixes set;
+        /// it is therefore invalid for this flag to be set
+        /// if `R_PREFIX` is also set.
+        const U_PREFIX = 1 << 2;
+
+        /// The string has an `r` or `R` prefix, meaning it is a raw string.
+        /// It is invalid to set this flag if `U_PREFIX` is also set.
+        const R_PREFIX = 1 << 3;
+    }
+}
+
+/// Flags that can be queried to obtain information
+/// regarding the prefixes and quotes used for a string literal.
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct StringLiteralFlags(StringLiteralFlagsInner);
+
+impl StringLiteralFlags {
+    #[must_use]
+    pub fn with_double_quotes(mut self) -> Self {
+        self.0 |= StringLiteralFlagsInner::DOUBLE;
+        self
+    }
+
+    #[must_use]
+    pub fn with_triple_quotes(mut self) -> Self {
+        self.0 |= StringLiteralFlagsInner::TRIPLE_QUOTED;
+        self
+    }
+
+    #[must_use]
+    pub fn with_prefix(mut self, prefix: StringLiteralPrefix) -> Self {
+        match prefix {
+            StringLiteralPrefix::None => {}
+            StringLiteralPrefix::RString => self.0 |= StringLiteralFlagsInner::R_PREFIX,
+            StringLiteralPrefix::UString => self.0 |= StringLiteralFlagsInner::U_PREFIX,
+        };
+        self
+    }
+
+    pub const fn prefix(self) -> &'static str {
+        if self.0.contains(StringLiteralFlagsInner::U_PREFIX) {
+            debug_assert!(!self.0.contains(StringLiteralFlagsInner::R_PREFIX));
+            "u"
+        } else if self.0.contains(StringLiteralFlagsInner::R_PREFIX) {
+            "r"
+        } else {
+            ""
+        }
+    }
+
+    /// Does the string use single or double quotes in its opener and closer?
+    pub const fn quote_style(self) -> Quote {
+        if self.0.contains(StringLiteralFlagsInner::DOUBLE) {
+            Quote::Double
+        } else {
+            Quote::Single
+        }
+    }
+
+    /// Is the string triple-quoted, i.e.,
+    /// does it begin and end with three consecutive quote characters?
+    pub const fn is_triple_quoted(self) -> bool {
+        self.0.contains(StringLiteralFlagsInner::TRIPLE_QUOTED)
+    }
+
+    /// Does the string have a `u` or `U` prefix?
+    pub const fn is_u_string(&self) -> bool {
+        self.0.contains(StringLiteralFlagsInner::U_PREFIX)
+    }
+
+    /// Does the string have an `r` or `R` prefix?
+    pub const fn is_r_string(&self) -> bool {
+        self.0.contains(StringLiteralFlagsInner::R_PREFIX)
+    }
+}
+
+impl fmt::Debug for StringLiteralFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("StringLiteralFlags")
+            .field("quote_style", &self.quote_style())
+            .field("prefix", &self.prefix())
+            .field("triple_quoted", &self.is_triple_quoted())
+            .finish()
+    }
+}
+
+/// Enumerations of the valid prefixes a string literal can have.
+///
+/// Bytestrings and f-strings are excluded from this enumeration,
+/// as they are represented by different AST nodes.
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum StringLiteralPrefix {
+    /// Just a regular string with no prefixes
+    #[default]
+    None,
+
+    /// A string with a `u` or `U` prefix.
+    /// This is a no-op at runtime,
+    /// but is mutually exclusive with a string having an `r` prefix.
+    UString,
+
+    /// A "raw" string, that has an `r` or `R` prefix
+    RString,
+}
+
+/// An AST node that represents a single string literal which is part of an
+/// [`ExprStringLiteral`].
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct StringLiteral {
+    pub range: TextRange,
+    pub value: Box<str>,
+    pub flags: StringLiteralFlags,
+}
+
+impl Ranged for StringLiteral {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+impl Deref for StringLiteral {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl StringLiteral {
+    /// Extracts a string slice containing the entire `String`.
+    pub fn as_str(&self) -> &str {
+        self
+    }
+}
+
+impl From<StringLiteral> for Expr {
+    fn from(payload: StringLiteral) -> Self {
+        ExprStringLiteral {
+            range: payload.range,
+            value: StringLiteralValue::single(payload),
+        }
+        .into()
+    }
+}
+
+/// An internal representation of [`StringLiteral`] that represents an
+/// implicitly concatenated string.
+#[derive(Clone)]
+struct ConcatenatedStringLiteral {
+    /// Each string literal that makes up the concatenated string.
+    strings: Vec<StringLiteral>,
+    /// The concatenated string value.
+    value: OnceCell<Box<str>>,
+}
+
+impl ConcatenatedStringLiteral {
+    /// Extracts a string slice containing the entire concatenated string.
+    fn to_str(&self) -> &str {
+        self.value.get_or_init(|| {
+            let concatenated: String = self.strings.iter().map(StringLiteral::as_str).collect();
+            concatenated.into_boxed_str()
+        })
+    }
+}
+
+impl PartialEq for ConcatenatedStringLiteral {
+    fn eq(&self, other: &Self) -> bool {
+        if self.strings.len() != other.strings.len() {
+            return false;
+        }
+        // The `zip` here is safe because we have checked the length of both parts.
+        self.strings
+            .iter()
+            .zip(other.strings.iter())
+            .all(|(s1, s2)| s1 == s2)
+    }
+}
+
+impl Debug for ConcatenatedStringLiteral {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ConcatenatedStringLiteral")
+            .field("strings", &self.strings)
+            .field("value", &self.to_str())
+            .finish()
+    }
+}
+
+/// An AST node that represents either a single bytes literal or an implicitly
+/// concatenated bytes literals.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExprBytesLiteral {
     pub range: TextRange,
-    pub value: Vec<u8>,
-    pub implicit_concatenated: bool,
+    pub value: BytesLiteralValue,
 }
 
 impl From<ExprBytesLiteral> for Expr {
@@ -1043,6 +1697,238 @@ impl From<ExprBytesLiteral> for Expr {
 impl Ranged for ExprBytesLiteral {
     fn range(&self) -> TextRange {
         self.range
+    }
+}
+
+/// The value representing a [`ExprBytesLiteral`].
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct BytesLiteralValue {
+    inner: BytesLiteralValueInner,
+}
+
+impl BytesLiteralValue {
+    /// Creates a new single bytes literal with the given value.
+    pub fn single(value: BytesLiteral) -> Self {
+        Self {
+            inner: BytesLiteralValueInner::Single(value),
+        }
+    }
+
+    /// Creates a new bytes literal with the given values that represents an
+    /// implicitly concatenated bytes.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `values` is less than 2. Use [`BytesLiteralValue::single`]
+    /// instead.
+    pub fn concatenated(values: Vec<BytesLiteral>) -> Self {
+        assert!(values.len() > 1);
+        Self {
+            inner: BytesLiteralValueInner::Concatenated(values),
+        }
+    }
+
+    /// Returns `true` if the bytes literal is implicitly concatenated.
+    pub const fn is_implicit_concatenated(&self) -> bool {
+        matches!(self.inner, BytesLiteralValueInner::Concatenated(_))
+    }
+
+    /// Returns a slice of all the [`BytesLiteral`] parts contained in this value.
+    pub fn as_slice(&self) -> &[BytesLiteral] {
+        match &self.inner {
+            BytesLiteralValueInner::Single(value) => std::slice::from_ref(value),
+            BytesLiteralValueInner::Concatenated(value) => value.as_slice(),
+        }
+    }
+
+    /// Returns a mutable slice of all the [`BytesLiteral`] parts contained in this value.
+    fn as_mut_slice(&mut self) -> &mut [BytesLiteral] {
+        match &mut self.inner {
+            BytesLiteralValueInner::Single(value) => std::slice::from_mut(value),
+            BytesLiteralValueInner::Concatenated(value) => value.as_mut_slice(),
+        }
+    }
+
+    /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value.
+    pub fn iter(&self) -> Iter<BytesLiteral> {
+        self.as_slice().iter()
+    }
+
+    /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value
+    /// that allows modification.
+    pub(crate) fn iter_mut(&mut self) -> IterMut<BytesLiteral> {
+        self.as_mut_slice().iter_mut()
+    }
+
+    /// Returns `true` if the concatenated bytes has a length of zero.
+    pub fn is_empty(&self) -> bool {
+        self.iter().all(|part| part.is_empty())
+    }
+
+    /// Returns the length of the concatenated bytes.
+    pub fn len(&self) -> usize {
+        self.iter().map(|part| part.len()).sum()
+    }
+
+    /// Returns an iterator over the bytes of the concatenated bytes.
+    fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
+        self.iter().flat_map(|part| part.as_slice().iter().copied())
+    }
+}
+
+impl<'a> IntoIterator for &'a BytesLiteralValue {
+    type Item = &'a BytesLiteral;
+    type IntoIter = Iter<'a, BytesLiteral>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut BytesLiteralValue {
+    type Item = &'a mut BytesLiteral;
+    type IntoIter = IterMut<'a, BytesLiteral>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
+impl PartialEq<[u8]> for BytesLiteralValue {
+    fn eq(&self, other: &[u8]) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+        // The `zip` here is safe because we have checked the length of both parts.
+        self.bytes()
+            .zip(other.iter().copied())
+            .all(|(b1, b2)| b1 == b2)
+    }
+}
+
+/// An internal representation of [`BytesLiteralValue`].
+#[derive(Clone, Debug, PartialEq)]
+enum BytesLiteralValueInner {
+    /// A single bytes literal i.e., `b"foo"`.
+    Single(BytesLiteral),
+
+    /// An implicitly concatenated bytes literals i.e., `b"foo" b"bar"`.
+    Concatenated(Vec<BytesLiteral>),
+}
+
+impl Default for BytesLiteralValueInner {
+    fn default() -> Self {
+        Self::Single(BytesLiteral::default())
+    }
+}
+
+bitflags! {
+    #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
+    struct BytesLiteralFlagsInner: u8 {
+        /// The bytestring uses double quotes (`"`).
+        /// If this flag is not set, the bytestring uses single quotes (`'`).
+        const DOUBLE = 1 << 0;
+
+        /// The bytestring is triple-quoted:
+        /// it begins and ends with three consecutive quote characters.
+        const TRIPLE_QUOTED = 1 << 1;
+
+        /// The bytestring has an `r` or `R` prefix, meaning it is a raw bytestring.
+        const R_PREFIX = 1 << 3;
+    }
+}
+
+/// Flags that can be queried to obtain information
+/// regarding the prefixes and quotes used for a bytes literal.
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct BytesLiteralFlags(BytesLiteralFlagsInner);
+
+impl BytesLiteralFlags {
+    #[must_use]
+    pub fn with_double_quotes(mut self) -> Self {
+        self.0 |= BytesLiteralFlagsInner::DOUBLE;
+        self
+    }
+
+    #[must_use]
+    pub fn with_triple_quotes(mut self) -> Self {
+        self.0 |= BytesLiteralFlagsInner::TRIPLE_QUOTED;
+        self
+    }
+
+    #[must_use]
+    pub fn with_r_prefix(mut self) -> Self {
+        self.0 |= BytesLiteralFlagsInner::R_PREFIX;
+        self
+    }
+
+    /// Does the bytestring have an `r` or `R` prefix?
+    pub const fn is_raw(self) -> bool {
+        self.0.contains(BytesLiteralFlagsInner::R_PREFIX)
+    }
+
+    /// Is the bytestring triple-quoted, i.e.,
+    /// does it begin and end with three consecutive quote characters?
+    pub const fn is_triple_quoted(self) -> bool {
+        self.0.contains(BytesLiteralFlagsInner::TRIPLE_QUOTED)
+    }
+
+    /// Does the bytestring use single or double quotes in its opener and closer?
+    pub const fn quote_style(self) -> Quote {
+        if self.0.contains(BytesLiteralFlagsInner::DOUBLE) {
+            Quote::Double
+        } else {
+            Quote::Single
+        }
+    }
+}
+
+impl fmt::Debug for BytesLiteralFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BytesLiteralFlags")
+            .field("quote_style", &self.quote_style())
+            .field("raw", &self.is_raw())
+            .field("triple_quoted", &self.is_triple_quoted())
+            .finish()
+    }
+}
+
+/// An AST node that represents a single bytes literal which is part of an
+/// [`ExprBytesLiteral`].
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct BytesLiteral {
+    pub range: TextRange,
+    pub value: Box<[u8]>,
+    pub flags: BytesLiteralFlags,
+}
+
+impl Ranged for BytesLiteral {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+impl Deref for BytesLiteral {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl BytesLiteral {
+    /// Extracts a byte slice containing the entire [`BytesLiteral`].
+    pub fn as_slice(&self) -> &[u8] {
+        self
+    }
+}
+
+impl From<BytesLiteral> for Expr {
+    fn from(payload: BytesLiteral) -> Self {
+        ExprBytesLiteral {
+            range: payload.range,
+            value: BytesLiteralValue::single(payload),
+        }
+        .into()
     }
 }
 
@@ -1201,6 +2087,9 @@ pub struct ExprTuple {
     pub range: TextRange,
     pub elts: Vec<Expr>,
     pub ctx: ExprContext,
+
+    /// Whether the tuple is parenthesized in the source code.
+    pub parenthesized: bool,
 }
 
 impl From<ExprTuple> for Expr {
@@ -2361,8 +3250,8 @@ pub struct ParameterWithDefault {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arguments {
     pub range: TextRange,
-    pub args: Vec<Expr>,
-    pub keywords: Vec<Keyword>,
+    pub args: Box<[Expr]>,
+    pub keywords: Box<[Keyword]>,
 }
 
 /// An entry in the argument list of a function call.
@@ -2936,7 +3825,7 @@ impl Ranged for crate::nodes::ExprBoolOp {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprNamedExpr {
+impl Ranged for crate::nodes::ExprNamed {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2956,7 +3845,7 @@ impl Ranged for crate::nodes::ExprLambda {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprIfExp {
+impl Ranged for crate::nodes::ExprIf {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -2986,7 +3875,7 @@ impl Ranged for crate::nodes::ExprDictComp {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprGeneratorExp {
+impl Ranged for crate::nodes::ExprGenerator {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -3012,11 +3901,6 @@ impl Ranged for crate::nodes::ExprCompare {
     }
 }
 impl Ranged for crate::nodes::ExprCall {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl Ranged for crate::nodes::ExprFormattedValue {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -3070,30 +3954,29 @@ impl Ranged for crate::Expr {
     fn range(&self) -> TextRange {
         match self {
             Self::BoolOp(node) => node.range(),
-            Self::NamedExpr(node) => node.range(),
+            Self::Named(node) => node.range(),
             Self::BinOp(node) => node.range(),
             Self::UnaryOp(node) => node.range(),
             Self::Lambda(node) => node.range(),
-            Self::IfExp(node) => node.range(),
+            Self::If(node) => node.range(),
             Self::Dict(node) => node.range(),
             Self::Set(node) => node.range(),
             Self::ListComp(node) => node.range(),
             Self::SetComp(node) => node.range(),
             Self::DictComp(node) => node.range(),
-            Self::GeneratorExp(node) => node.range(),
+            Self::Generator(node) => node.range(),
             Self::Await(node) => node.range(),
             Self::Yield(node) => node.range(),
             Self::YieldFrom(node) => node.range(),
             Self::Compare(node) => node.range(),
             Self::Call(node) => node.range(),
-            Self::FormattedValue(node) => node.range(),
             Self::FString(node) => node.range(),
-            Expr::StringLiteral(node) => node.range(),
-            Expr::BytesLiteral(node) => node.range(),
-            Expr::NumberLiteral(node) => node.range(),
-            Expr::BooleanLiteral(node) => node.range(),
-            Expr::NoneLiteral(node) => node.range(),
-            Expr::EllipsisLiteral(node) => node.range(),
+            Self::StringLiteral(node) => node.range(),
+            Self::BytesLiteral(node) => node.range(),
+            Self::NumberLiteral(node) => node.range(),
+            Self::BooleanLiteral(node) => node.range(),
+            Self::NoneLiteral(node) => node.range(),
+            Self::EllipsisLiteral(node) => node.range(),
             Self::Attribute(node) => node.range(),
             Self::Subscript(node) => node.range(),
             Self::Starred(node) => node.range(),
@@ -3101,7 +3984,7 @@ impl Ranged for crate::Expr {
             Self::List(node) => node.range(),
             Self::Tuple(node) => node.range(),
             Self::Slice(node) => node.range(),
-            Expr::IpyEscapeCommand(node) => node.range(),
+            Self::IpyEscapeCommand(node) => node.range(),
         }
     }
 }
@@ -3262,216 +4145,55 @@ impl Ranged for crate::nodes::ParameterWithDefault {
     }
 }
 
-/// An expression that may be parenthesized.
-#[derive(Clone, Debug)]
-pub struct ParenthesizedExpr {
-    /// The range of the expression, including any parentheses.
-    pub range: TextRange,
-    /// The underlying expression.
-    pub expr: Expr,
-}
-impl ParenthesizedExpr {
-    /// Returns `true` if the expression is may be parenthesized.
-    pub fn is_parenthesized(&self) -> bool {
-        self.range != self.expr.range()
-    }
-}
-impl Ranged for ParenthesizedExpr {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl From<Expr> for ParenthesizedExpr {
-    fn from(expr: Expr) -> Self {
-        ParenthesizedExpr {
-            range: expr.range(),
-            expr,
-        }
-    }
-}
-impl From<ParenthesizedExpr> for Expr {
-    fn from(parenthesized_expr: ParenthesizedExpr) -> Self {
-        parenthesized_expr.expr
-    }
-}
-impl From<ExprIpyEscapeCommand> for ParenthesizedExpr {
-    fn from(payload: ExprIpyEscapeCommand) -> Self {
-        Expr::IpyEscapeCommand(payload).into()
-    }
-}
-impl From<ExprBoolOp> for ParenthesizedExpr {
-    fn from(payload: ExprBoolOp) -> Self {
-        Expr::BoolOp(payload).into()
-    }
-}
-impl From<ExprNamedExpr> for ParenthesizedExpr {
-    fn from(payload: ExprNamedExpr) -> Self {
-        Expr::NamedExpr(payload).into()
-    }
-}
-impl From<ExprBinOp> for ParenthesizedExpr {
-    fn from(payload: ExprBinOp) -> Self {
-        Expr::BinOp(payload).into()
-    }
-}
-impl From<ExprUnaryOp> for ParenthesizedExpr {
-    fn from(payload: ExprUnaryOp) -> Self {
-        Expr::UnaryOp(payload).into()
-    }
-}
-impl From<ExprLambda> for ParenthesizedExpr {
-    fn from(payload: ExprLambda) -> Self {
-        Expr::Lambda(payload).into()
-    }
-}
-impl From<ExprIfExp> for ParenthesizedExpr {
-    fn from(payload: ExprIfExp) -> Self {
-        Expr::IfExp(payload).into()
-    }
-}
-impl From<ExprDict> for ParenthesizedExpr {
-    fn from(payload: ExprDict) -> Self {
-        Expr::Dict(payload).into()
-    }
-}
-impl From<ExprSet> for ParenthesizedExpr {
-    fn from(payload: ExprSet) -> Self {
-        Expr::Set(payload).into()
-    }
-}
-impl From<ExprListComp> for ParenthesizedExpr {
-    fn from(payload: ExprListComp) -> Self {
-        Expr::ListComp(payload).into()
-    }
-}
-impl From<ExprSetComp> for ParenthesizedExpr {
-    fn from(payload: ExprSetComp) -> Self {
-        Expr::SetComp(payload).into()
-    }
-}
-impl From<ExprDictComp> for ParenthesizedExpr {
-    fn from(payload: ExprDictComp) -> Self {
-        Expr::DictComp(payload).into()
-    }
-}
-impl From<ExprGeneratorExp> for ParenthesizedExpr {
-    fn from(payload: ExprGeneratorExp) -> Self {
-        Expr::GeneratorExp(payload).into()
-    }
-}
-impl From<ExprAwait> for ParenthesizedExpr {
-    fn from(payload: ExprAwait) -> Self {
-        Expr::Await(payload).into()
-    }
-}
-impl From<ExprYield> for ParenthesizedExpr {
-    fn from(payload: ExprYield) -> Self {
-        Expr::Yield(payload).into()
-    }
-}
-impl From<ExprYieldFrom> for ParenthesizedExpr {
-    fn from(payload: ExprYieldFrom) -> Self {
-        Expr::YieldFrom(payload).into()
-    }
-}
-impl From<ExprCompare> for ParenthesizedExpr {
-    fn from(payload: ExprCompare) -> Self {
-        Expr::Compare(payload).into()
-    }
-}
-impl From<ExprCall> for ParenthesizedExpr {
-    fn from(payload: ExprCall) -> Self {
-        Expr::Call(payload).into()
-    }
-}
-impl From<ExprFormattedValue> for ParenthesizedExpr {
-    fn from(payload: ExprFormattedValue) -> Self {
-        Expr::FormattedValue(payload).into()
-    }
-}
-impl From<ExprFString> for ParenthesizedExpr {
-    fn from(payload: ExprFString) -> Self {
-        Expr::FString(payload).into()
-    }
-}
-impl From<ExprStringLiteral> for ParenthesizedExpr {
-    fn from(payload: ExprStringLiteral) -> Self {
-        Expr::StringLiteral(payload).into()
-    }
-}
-impl From<ExprBytesLiteral> for ParenthesizedExpr {
-    fn from(payload: ExprBytesLiteral) -> Self {
-        Expr::BytesLiteral(payload).into()
-    }
-}
-impl From<ExprNumberLiteral> for ParenthesizedExpr {
-    fn from(payload: ExprNumberLiteral) -> Self {
-        Expr::NumberLiteral(payload).into()
-    }
-}
-impl From<ExprBooleanLiteral> for ParenthesizedExpr {
-    fn from(payload: ExprBooleanLiteral) -> Self {
-        Expr::BooleanLiteral(payload).into()
-    }
-}
-impl From<ExprNoneLiteral> for ParenthesizedExpr {
-    fn from(payload: ExprNoneLiteral) -> Self {
-        Expr::NoneLiteral(payload).into()
-    }
-}
-impl From<ExprEllipsisLiteral> for ParenthesizedExpr {
-    fn from(payload: ExprEllipsisLiteral) -> Self {
-        Expr::EllipsisLiteral(payload).into()
-    }
-}
-impl From<ExprAttribute> for ParenthesizedExpr {
-    fn from(payload: ExprAttribute) -> Self {
-        Expr::Attribute(payload).into()
-    }
-}
-impl From<ExprSubscript> for ParenthesizedExpr {
-    fn from(payload: ExprSubscript) -> Self {
-        Expr::Subscript(payload).into()
-    }
-}
-impl From<ExprStarred> for ParenthesizedExpr {
-    fn from(payload: ExprStarred) -> Self {
-        Expr::Starred(payload).into()
-    }
-}
-impl From<ExprName> for ParenthesizedExpr {
-    fn from(payload: ExprName) -> Self {
-        Expr::Name(payload).into()
-    }
-}
-impl From<ExprList> for ParenthesizedExpr {
-    fn from(payload: ExprList) -> Self {
-        Expr::List(payload).into()
-    }
-}
-impl From<ExprTuple> for ParenthesizedExpr {
-    fn from(payload: ExprTuple) -> Self {
-        Expr::Tuple(payload).into()
-    }
-}
-impl From<ExprSlice> for ParenthesizedExpr {
-    fn from(payload: ExprSlice) -> Self {
-        Expr::Slice(payload).into()
-    }
-}
-
-#[cfg(target_pointer_width = "64")]
-mod size_assertions {
-    use static_assertions::assert_eq_size;
-
+#[cfg(test)]
+mod tests {
     #[allow(clippy::wildcard_imports)]
     use super::*;
 
-    assert_eq_size!(Stmt, [u8; 144]);
-    assert_eq_size!(StmtFunctionDef, [u8; 144]);
-    assert_eq_size!(StmtClassDef, [u8; 104]);
-    assert_eq_size!(StmtTry, [u8; 112]);
-    assert_eq_size!(Expr, [u8; 80]);
-    assert_eq_size!(Pattern, [u8; 96]);
-    assert_eq_size!(Mod, [u8; 32]);
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn size() {
+        assert!(std::mem::size_of::<Stmt>() <= 144);
+        assert!(std::mem::size_of::<StmtFunctionDef>() <= 144);
+        assert!(std::mem::size_of::<StmtClassDef>() <= 104);
+        assert!(std::mem::size_of::<StmtTry>() <= 112);
+        assert!(std::mem::size_of::<Mod>() <= 32);
+        // 96 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<Pattern>(), 88 | 96));
+
+        assert_eq!(std::mem::size_of::<Expr>(), 64);
+        assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
+        assert_eq!(std::mem::size_of::<ExprAwait>(), 16);
+        assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
+        assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 12);
+        assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 40);
+        assert_eq!(std::mem::size_of::<ExprCall>(), 56);
+        assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
+        assert_eq!(std::mem::size_of::<ExprDict>(), 56);
+        assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
+        assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
+        // 56 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<ExprFString>(), 48 | 56));
+        assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
+        assert_eq!(std::mem::size_of::<ExprIf>(), 32);
+        assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
+        assert_eq!(std::mem::size_of::<ExprLambda>(), 24);
+        assert_eq!(std::mem::size_of::<ExprList>(), 40);
+        assert_eq!(std::mem::size_of::<ExprListComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprName>(), 40);
+        assert_eq!(std::mem::size_of::<ExprNamed>(), 24);
+        assert_eq!(std::mem::size_of::<ExprNoneLiteral>(), 8);
+        assert_eq!(std::mem::size_of::<ExprNumberLiteral>(), 32);
+        assert_eq!(std::mem::size_of::<ExprSet>(), 32);
+        assert_eq!(std::mem::size_of::<ExprSetComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprSlice>(), 32);
+        assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
+        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 48);
+        assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
+        assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
+        assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
+        assert_eq!(std::mem::size_of::<ExprYield>(), 16);
+        assert_eq!(std::mem::size_of::<ExprYieldFrom>(), 16);
+    }
 }

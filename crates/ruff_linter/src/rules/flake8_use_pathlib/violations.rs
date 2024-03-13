@@ -610,7 +610,7 @@ impl Violation for OsPathIsfile {
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
 /// the lower-level API offered by `os`. When possible, using `Path` object
-/// methods such as `Path.is_link()` can improve readability over the `os`
+/// methods such as `Path.is_symlink()` can improve readability over the `os`
 /// module's counterparts (e.g., `os.path.islink()`).
 ///
 /// Note that `os` functions may be preferable if performance is a concern,
@@ -627,11 +627,11 @@ impl Violation for OsPathIsfile {
 /// ```python
 /// from pathlib import Path
 ///
-/// Path("docs").is_link()
+/// Path("docs").is_symlink()
 /// ```
 ///
 /// ## References
-/// - [Python documentation: `Path.is_link`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.is_link)
+/// - [Python documentation: `Path.is_symlink`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.is_symlink)
 /// - [Python documentation: `os.path.islink`](https://docs.python.org/3/library/os.path.html#os.path.islink)
 /// - [PEP 428](https://peps.python.org/pep-0428/)
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
@@ -705,8 +705,6 @@ impl Violation for OsReadlink {
 /// ## Examples
 /// ```python
 /// import os
-///
-/// import os
 /// from pwd import getpwuid
 /// from grp import getgrgid
 ///
@@ -717,8 +715,6 @@ impl Violation for OsReadlink {
 ///
 /// Use instead:
 /// ```python
-/// from pathlib import Path
-///
 /// from pathlib import Path
 ///
 /// file_path = Path(file_name)

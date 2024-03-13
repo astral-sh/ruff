@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::collect_call_path;
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{BindingKind, ScopeKind};
 use ruff_text_size::Ranged;
@@ -43,7 +43,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Options
-/// - `flake8-self.ignore-names`
+/// - `lint.flake8-self.ignore-names`
 ///
 /// ## References
 /// - [_What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)
@@ -65,6 +65,10 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr else {
         return;
     };
+
+    if checker.semantic().in_annotation() {
+        return;
+    }
 
     if (attr.starts_with("__") && !attr.ends_with("__"))
         || (attr.starts_with('_') && !attr.starts_with("__"))
@@ -137,24 +141,24 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
         }
 
         // Allow some documented private methods, like `os._exit()`.
-        if let Some(call_path) = checker.semantic().resolve_call_path(expr) {
-            if matches!(call_path.as_slice(), ["os", "_exit"]) {
+        if let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) {
+            if matches!(qualified_name.segments(), ["os", "_exit"]) {
                 return;
             }
         }
 
         if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
             // Ignore `super()` calls.
-            if let Some(call_path) = collect_call_path(func) {
-                if matches!(call_path.as_slice(), ["super"]) {
+            if let Some(name) = UnqualifiedName::from_expr(func) {
+                if matches!(name.segments(), ["super"]) {
                     return;
                 }
             }
         }
 
-        if let Some(call_path) = collect_call_path(value) {
+        if let Some(name) = UnqualifiedName::from_expr(value) {
             // Ignore `self` and `cls` accesses.
-            if matches!(call_path.as_slice(), ["self" | "cls" | "mcs"]) {
+            if matches!(name.segments(), ["self" | "cls" | "mcs"]) {
                 return;
             }
         }

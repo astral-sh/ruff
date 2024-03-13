@@ -91,6 +91,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
+            if checker.enabled(Rule::InvalidBoolReturnType) {
+                pylint::rules::invalid_bool_return(checker, name, body);
+            }
             if checker.enabled(Rule::InvalidStrReturnType) {
                 pylint::rules::invalid_str_return(checker, name, body);
             }
@@ -101,30 +104,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     decorator_list,
                     &checker.settings.pep8_naming.ignore_names,
                     &checker.semantic,
-                ) {
-                    checker.diagnostics.push(diagnostic);
-                }
-            }
-            if checker.enabled(Rule::InvalidFirstArgumentNameForClassMethod) {
-                if let Some(diagnostic) =
-                    pep8_naming::rules::invalid_first_argument_name_for_class_method(
-                        checker,
-                        checker.semantic.current_scope(),
-                        name,
-                        decorator_list,
-                        parameters,
-                    )
-                {
-                    checker.diagnostics.push(diagnostic);
-                }
-            }
-            if checker.enabled(Rule::InvalidFirstArgumentNameForMethod) {
-                if let Some(diagnostic) = pep8_naming::rules::invalid_first_argument_name_for_method(
-                    checker,
-                    checker.semantic.current_scope(),
-                    name,
-                    decorator_list,
-                    parameters,
                 ) {
                     checker.diagnostics.push(diagnostic);
                 }
@@ -153,6 +132,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     returns.as_ref().map(AsRef::as_ref),
                     parameters,
                 );
+            }
+            if checker.enabled(Rule::GeneratorReturnFromIterMethod) {
+                flake8_pyi::rules::bad_generator_return_type(function_def, checker);
             }
             if checker.enabled(Rule::CustomTypeVarReturnType) {
                 flake8_pyi::rules::custom_type_var_return_type(
@@ -244,11 +226,19 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::HardcodedPasswordDefault) {
                 flake8_bandit::rules::hardcoded_password_default(checker, parameters);
             }
+            if checker.enabled(Rule::SuspiciousMarkSafeUsage) {
+                for decorator in decorator_list {
+                    flake8_bandit::rules::suspicious_function_decorator(checker, decorator);
+                }
+            }
             if checker.enabled(Rule::PropertyWithParameters) {
                 pylint::rules::property_with_parameters(checker, stmt, decorator_list, parameters);
             }
             if checker.enabled(Rule::TooManyArguments) {
-                pylint::rules::too_many_arguments(checker, parameters, stmt);
+                pylint::rules::too_many_arguments(checker, function_def);
+            }
+            if checker.enabled(Rule::TooManyPositional) {
+                pylint::rules::too_many_positional(checker, function_def);
             }
             if checker.enabled(Rule::TooManyReturnStatements) {
                 if let Some(diagnostic) = pylint::rules::too_many_return_statements(
@@ -341,17 +331,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::FStringDocstring) {
                 flake8_bugbear::rules::f_string_docstring(checker, body);
             }
-            if let ScopeKind::Class(class_def) = checker.semantic.current_scope().kind {
-                if checker.enabled(Rule::BuiltinAttributeShadowing) {
-                    flake8_builtins::rules::builtin_method_shadowing(
-                        checker,
-                        class_def,
-                        name,
-                        decorator_list,
-                        name.range(),
-                    );
-                }
-            } else {
+            if !checker.semantic.current_scope().kind.is_class() {
                 if checker.enabled(Rule::BuiltinVariableShadowing) {
                     flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
                 }
@@ -359,11 +339,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::TrioAsyncFunctionWithTimeout) {
                 flake8_trio::rules::async_function_with_timeout(checker, function_def);
             }
-            #[cfg(feature = "unreachable-code")]
-            if checker.enabled(Rule::UnreachableCode) {
-                checker
-                    .diagnostics
-                    .extend(ruff::rules::unreachable::in_function(name, body));
+            if checker.enabled(Rule::ReimplementedOperator) {
+                refurb::rules::reimplemented_operator(checker, &function_def.into());
+            }
+            if checker.enabled(Rule::SslWithBadDefaults) {
+                flake8_bandit::rules::ssl_with_bad_defaults(checker, function_def);
             }
         }
         Stmt::Return(_) => {
@@ -384,31 +364,23 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 range: _,
             },
         ) => {
+            if checker.enabled(Rule::NoClassmethodDecorator) {
+                pylint::rules::no_classmethod_decorator(checker, stmt);
+            }
+            if checker.enabled(Rule::NoStaticmethodDecorator) {
+                pylint::rules::no_staticmethod_decorator(checker, stmt);
+            }
             if checker.enabled(Rule::DjangoNullableModelStringField) {
                 flake8_django::rules::nullable_model_string_field(checker, body);
             }
             if checker.enabled(Rule::DjangoExcludeWithModelForm) {
-                if let Some(diagnostic) = flake8_django::rules::exclude_with_model_form(
-                    checker,
-                    arguments.as_deref(),
-                    body,
-                ) {
-                    checker.diagnostics.push(diagnostic);
-                }
+                flake8_django::rules::exclude_with_model_form(checker, class_def);
             }
             if checker.enabled(Rule::DjangoAllWithModelForm) {
-                if let Some(diagnostic) =
-                    flake8_django::rules::all_with_model_form(checker, arguments.as_deref(), body)
-                {
-                    checker.diagnostics.push(diagnostic);
-                }
+                flake8_django::rules::all_with_model_form(checker, class_def);
             }
             if checker.enabled(Rule::DjangoUnorderedBodyContentInModel) {
-                flake8_django::rules::unordered_body_content_in_model(
-                    checker,
-                    arguments.as_deref(),
-                    body,
-                );
+                flake8_django::rules::unordered_body_content_in_model(checker, class_def);
             }
             if !checker.source_type.is_stub() {
                 if checker.enabled(Rule::DjangoModelWithoutDunderStr) {
@@ -519,11 +491,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::NoSlotsInNamedtupleSubclass) {
                 flake8_slots::rules::no_slots_in_namedtuple_subclass(checker, stmt, class_def);
             }
+            if checker.enabled(Rule::NonSlotAssignment) {
+                pylint::rules::non_slot_assignment(checker, class_def);
+            }
             if checker.enabled(Rule::SingleStringSlots) {
                 pylint::rules::single_string_slots(checker, class_def);
             }
-            if checker.enabled(Rule::BadDunderMethodName) {
-                pylint::rules::bad_dunder_method_name(checker, body);
+            if checker.enabled(Rule::MetaClassABCMeta) {
+                refurb::rules::metaclass_abcmeta(checker, class_def);
             }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
@@ -550,6 +525,24 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::DeprecatedMockImport) {
                 pyupgrade::rules::deprecated_mock_import(checker, stmt);
+            }
+            if checker.any_enabled(&[
+                Rule::SuspiciousTelnetlibImport,
+                Rule::SuspiciousFtplibImport,
+                Rule::SuspiciousPickleImport,
+                Rule::SuspiciousSubprocessImport,
+                Rule::SuspiciousXmlEtreeImport,
+                Rule::SuspiciousXmlSaxImport,
+                Rule::SuspiciousXmlExpatImport,
+                Rule::SuspiciousXmlMinidomImport,
+                Rule::SuspiciousXmlPulldomImport,
+                Rule::SuspiciousLxmlImport,
+                Rule::SuspiciousXmlrpcImport,
+                Rule::SuspiciousHttpoxyImport,
+                Rule::SuspiciousPycryptoImport,
+                Rule::SuspiciousPyghmiImport,
+            ]) {
+                flake8_bandit::rules::suspicious_imports(checker, stmt);
             }
 
             for alias in names {
@@ -749,6 +742,24 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if let Some(module) = module {
                     pyupgrade::rules::unnecessary_builtin_import(checker, stmt, module, names);
                 }
+            }
+            if checker.any_enabled(&[
+                Rule::SuspiciousTelnetlibImport,
+                Rule::SuspiciousFtplibImport,
+                Rule::SuspiciousPickleImport,
+                Rule::SuspiciousSubprocessImport,
+                Rule::SuspiciousXmlEtreeImport,
+                Rule::SuspiciousXmlSaxImport,
+                Rule::SuspiciousXmlExpatImport,
+                Rule::SuspiciousXmlMinidomImport,
+                Rule::SuspiciousXmlPulldomImport,
+                Rule::SuspiciousLxmlImport,
+                Rule::SuspiciousXmlrpcImport,
+                Rule::SuspiciousHttpoxyImport,
+                Rule::SuspiciousPycryptoImport,
+                Rule::SuspiciousPyghmiImport,
+            ]) {
+                flake8_bandit::rules::suspicious_imports(checker, stmt);
             }
             if checker.enabled(Rule::BannedApi) {
                 if let Some(module) =
@@ -1035,20 +1046,20 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::misplaced_bare_raise(checker, raise);
             }
         }
-        Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+        Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, .. }) => {
             if checker.enabled(Rule::GlobalStatement) {
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
                     pylint::rules::global_statement(checker, id);
                 }
             }
+            if checker.enabled(Rule::UnsortedDunderAll) {
+                ruff::rules::sort_dunder_all_aug_assign(checker, aug_assign);
+            }
         }
-        Stmt::If(
-            if_ @ ast::StmtIf {
-                test,
-                elif_else_clauses,
-                ..
-            },
-        ) => {
+        Stmt::If(if_ @ ast::StmtIf { test, .. }) => {
+            if checker.enabled(Rule::TooManyNestedBlocks) {
+                pylint::rules::too_many_nested_blocks(checker, stmt);
+            }
             if checker.enabled(Rule::EmptyTypeCheckingBlock) {
                 if typing::is_type_checking_block(if_, &checker.semantic) {
                     flake8_type_checking::rules::empty_type_checking_block(checker, if_);
@@ -1065,7 +1076,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 );
             }
             if checker.enabled(Rule::IfWithSameArms) {
-                flake8_simplify::rules::if_with_same_arms(checker, checker.locator, if_);
+                flake8_simplify::rules::if_with_same_arms(checker, if_);
             }
             if checker.enabled(Rule::NeedlessBool) {
                 flake8_simplify::rules::needless_bool(checker, if_);
@@ -1090,9 +1101,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pyupgrade::rules::outdated_version_block(checker, if_);
             }
             if checker.enabled(Rule::CollapsibleElseIf) {
-                if let Some(diagnostic) = pylint::rules::collapsible_else_if(elif_else_clauses) {
-                    checker.diagnostics.push(diagnostic);
-                }
+                pylint::rules::collapsible_else_if(checker, stmt);
             }
             if checker.enabled(Rule::CheckAndRemoveFromSet) {
                 refurb::rules::check_and_remove_from_set(checker, if_);
@@ -1183,6 +1192,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::With(with_stmt @ ast::StmtWith { items, body, .. }) => {
+            if checker.enabled(Rule::TooManyNestedBlocks) {
+                pylint::rules::too_many_nested_blocks(checker, stmt);
+            }
             if checker.enabled(Rule::AssertRaisesException) {
                 flake8_bugbear::rules::assert_raises_exception(checker, items);
             }
@@ -1210,6 +1222,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::While(while_stmt @ ast::StmtWhile { body, orelse, .. }) => {
+            if checker.enabled(Rule::TooManyNestedBlocks) {
+                pylint::rules::too_many_nested_blocks(checker, stmt);
+            }
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Stmt(stmt));
             }
@@ -1233,13 +1248,17 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 range: _,
             },
         ) => {
+            if checker.enabled(Rule::TooManyNestedBlocks) {
+                pylint::rules::too_many_nested_blocks(checker, stmt);
+            }
             if checker.any_enabled(&[
-                Rule::UnusedLoopControlVariable,
+                Rule::EnumerateForLoop,
                 Rule::IncorrectDictIterator,
                 Rule::UnnecessaryEnumerate,
+                Rule::UnusedLoopControlVariable,
                 Rule::YieldInForLoop,
             ]) {
-                checker.deferred.for_loops.push(checker.semantic.snapshot());
+                checker.analyze.for_loops.push(checker.semantic.snapshot());
             }
             if checker.enabled(Rule::LoopVariableOverridesIterator) {
                 flake8_bugbear::rules::loop_variable_overrides_iterator(checker, target, iter);
@@ -1259,6 +1278,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::IterationOverSet) {
                 pylint::rules::iteration_over_set(checker, iter);
             }
+            if checker.enabled(Rule::DictIterMissingItems) {
+                pylint::rules::dict_iter_missing_items(checker, target, iter);
+            }
             if checker.enabled(Rule::ManualListComprehension) {
                 perflint::rules::manual_list_comprehension(checker, target, body);
             }
@@ -1269,7 +1291,16 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 perflint::rules::manual_dict_comprehension(checker, target, body);
             }
             if checker.enabled(Rule::UnnecessaryListCast) {
-                perflint::rules::unnecessary_list_cast(checker, iter);
+                perflint::rules::unnecessary_list_cast(checker, iter, body);
+            }
+            if checker.enabled(Rule::UnnecessaryListIndexLookup) {
+                pylint::rules::unnecessary_list_index_lookup(checker, for_stmt);
+            }
+            if checker.enabled(Rule::UnnecessaryDictIndexLookup) {
+                pylint::rules::unnecessary_dict_index_lookup(checker, for_stmt);
+            }
+            if checker.enabled(Rule::ReadlinesInFor) {
+                refurb::rules::readlines_in_for(checker, for_stmt);
             }
             if !is_async {
                 if checker.enabled(Rule::ReimplementedBuiltin) {
@@ -1290,6 +1321,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             finalbody,
             ..
         }) => {
+            if checker.enabled(Rule::TooManyNestedBlocks) {
+                pylint::rules::too_many_nested_blocks(checker, stmt);
+            }
             if checker.enabled(Rule::JumpStatementInFinally) {
                 flake8_bugbear::rules::jump_statement_in_finally(checker, finalbody);
             }
@@ -1355,7 +1389,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
-            checker.enabled(Rule::NonAsciiName);
             if checker.enabled(Rule::LambdaAssignment) {
                 if let [target] = &targets[..] {
                     pycodestyle::rules::lambda_assignment(checker, target, value, None, stmt);
@@ -1407,9 +1440,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.settings.rules.enabled(Rule::SelfAssigningVariable) {
-                if let [target] = targets.as_slice() {
-                    pylint::rules::self_assigning_variable(checker, target, value);
-                }
+                pylint::rules::self_assignment(checker, assign);
             }
             if checker.settings.rules.enabled(Rule::TypeParamNameMismatch) {
                 pylint::rules::type_param_name_mismatch(checker, value, targets);
@@ -1423,6 +1454,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.settings.rules.enabled(Rule::TypeBivariance) {
                 pylint::rules::type_bivariance(checker, value);
+            }
+            if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
+                ruff::rules::sort_dunder_all_assign(checker, assign);
+            }
+            if checker.enabled(Rule::UnsortedDunderSlots) {
+                ruff::rules::sort_dunder_slots_assign(checker, assign);
             }
             if checker.source_type.is_stub() {
                 if checker.any_enabled(&[
@@ -1479,9 +1516,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         stmt,
                     );
                 }
-                if checker.enabled(Rule::SelfAssigningVariable) {
-                    pylint::rules::self_assigning_variable(checker, target, value);
-                }
+            }
+            if checker.enabled(Rule::SelfAssigningVariable) {
+                pylint::rules::self_annotated_assignment(checker, assign_stmt);
             }
             if checker.enabled(Rule::UnintentionalTypeAnnotation) {
                 flake8_bugbear::rules::unintentional_type_annotation(
@@ -1493,6 +1530,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::NonPEP695TypeAlias) {
                 pyupgrade::rules::non_pep695_type_alias(checker, assign_stmt);
+            }
+            if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
+                ruff::rules::sort_dunder_all_ann_assign(checker, assign_stmt);
+            }
+            if checker.enabled(Rule::UnsortedDunderSlots) {
+                ruff::rules::sort_dunder_slots_ann_assign(checker, assign_stmt);
             }
             if checker.source_type.is_stub() {
                 if let Some(value) = value {
@@ -1525,6 +1568,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
         }
+        Stmt::TypeAlias(ast::StmtTypeAlias { name, .. }) => {
+            if checker.enabled(Rule::SnakeCaseTypeAlias) {
+                flake8_pyi::rules::snake_case_type_alias(checker, name);
+            }
+            if checker.enabled(Rule::TSuffixedTypeAlias) {
+                flake8_pyi::rules::t_suffixed_type_alias(checker, name);
+            }
+        }
         Stmt::Delete(delete @ ast::StmtDelete { targets, range: _ }) => {
             if checker.enabled(Rule::GlobalStatement) {
                 for target in targets {
@@ -1537,7 +1588,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 refurb::rules::delete_full_slice(checker, delete);
             }
         }
-        Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
+        Stmt::Expr(expr @ ast::StmtExpr { value, range: _ }) => {
             if checker.enabled(Rule::UselessComparison) {
                 flake8_bugbear::rules::useless_comparison(checker, value);
             }
@@ -1551,10 +1602,17 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::named_expr_without_context(checker, value);
             }
             if checker.enabled(Rule::AsyncioDanglingTask) {
-                ruff::rules::asyncio_dangling_task(checker, value);
+                if let Some(diagnostic) =
+                    ruff::rules::asyncio_dangling_task(value, checker.semantic())
+                {
+                    checker.diagnostics.push(diagnostic);
+                }
             }
             if checker.enabled(Rule::RepeatedAppend) {
                 refurb::rules::repeated_append(checker, stmt);
+            }
+            if checker.enabled(Rule::UselessExceptionStatement) {
+                pylint::rules::useless_exception_statement(checker, expr);
             }
         }
         _ => {}

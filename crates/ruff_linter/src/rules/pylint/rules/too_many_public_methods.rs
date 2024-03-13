@@ -9,8 +9,8 @@ use crate::checkers::ast::Checker;
 /// ## What it does
 /// Checks for classes with too many public methods
 ///
-/// By default, this rule allows up to 20 statements, as configured by the
-/// [`pylint.max-public-methods`] option.
+/// By default, this rule allows up to 20 public methods, as configured by
+/// the [`lint.pylint.max-public-methods`] option.
 ///
 /// ## Why is this bad?
 /// Classes with many public methods are harder to understand
@@ -81,7 +81,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Options
-/// - `pylint.max-public-methods`
+/// - `lint.pylint.max-public-methods`
 #[violation]
 pub struct TooManyPublicMethods {
     methods: usize,

@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::is_list;
-use ruff_python_semantic::{Binding, BindingId, DefinitionId, SemanticModel};
+use ruff_python_semantic::{Binding, BindingId, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -183,8 +183,7 @@ fn match_consecutive_appends<'a>(
     let siblings: &[Stmt] = if semantic.at_top_level() {
         // If the statement is at the top level, we should go to the parent module.
         // Module is available in the definitions list.
-        let module = semantic.definitions[DefinitionId::module()].as_module()?;
-        module.python_ast
+        semantic.definitions.python_ast()?
     } else {
         // Otherwise, go to the parent, and take its body as a sequence of siblings.
         semantic
@@ -281,7 +280,7 @@ fn match_append<'a>(semantic: &'a SemanticModel, stmt: &'a Stmt) -> Option<Appen
     };
 
     // `append` should have just one argument, an element to be added.
-    let [argument] = arguments.args.as_slice() else {
+    let [argument] = &*arguments.args else {
         return None;
     };
 
@@ -348,6 +347,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         elts,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
+        parenthesized: true,
     };
     // Make `var.extend`.
     // NOTE: receiver is the same for all appends and that's why we can take the first.
@@ -361,8 +361,8 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
-            args: vec![tuple.into()],
-            keywords: vec![],
+            args: Box::from([tuple.into()]),
+            keywords: Box::from([]),
             range: TextRange::default(),
         },
         range: TextRange::default(),

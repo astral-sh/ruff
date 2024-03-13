@@ -2,11 +2,11 @@
 source: crates/ruff_python_parser/src/parser.rs
 expression: parse_ast
 ---
-GeneratorExp(
-    ExprGeneratorExp {
+Generator(
+    ExprGenerator {
         range: 0..26,
-        elt: IfExp(
-            ExprIfExp {
+        elt: If(
+            ExprIf {
                 range: 1..14,
                 test: Name(
                     ExprName {
@@ -52,5 +52,6 @@ GeneratorExp(
                 is_async: false,
             },
         ],
+        parenthesized: true,
     },
 )

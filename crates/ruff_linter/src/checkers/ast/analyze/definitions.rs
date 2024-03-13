@@ -1,13 +1,15 @@
 use ruff_python_ast::str::raw_contents_range;
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_python_semantic::{BindingKind, ContextualizedDefinition, Export};
+use ruff_python_semantic::{
+    BindingKind, ContextualizedDefinition, Definition, Export, Member, MemberKind,
+};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::docstrings::Docstring;
 use crate::fs::relativize_path;
-use crate::rules::{flake8_annotations, flake8_pyi, pydocstyle};
+use crate::rules::{flake8_annotations, flake8_pyi, pydocstyle, pylint};
 use crate::{docstrings, warn_user};
 
 /// Run lint rules over all [`Definition`] nodes in the [`SemanticModel`].
@@ -31,6 +33,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
     ]);
     let enforce_stubs = checker.source_type.is_stub() && checker.enabled(Rule::DocstringInStub);
     let enforce_stubs_and_runtime = checker.enabled(Rule::IterMethodReturnIterable);
+    let enforce_dunder_method = checker.enabled(Rule::BadDunderMethodName);
     let enforce_docstrings = checker.any_enabled(&[
         Rule::BlankLineAfterLastSection,
         Rule::BlankLineAfterSummary,
@@ -80,7 +83,12 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::UndocumentedPublicPackage,
     ]);
 
-    if !enforce_annotations && !enforce_docstrings && !enforce_stubs && !enforce_stubs_and_runtime {
+    if !enforce_annotations
+        && !enforce_docstrings
+        && !enforce_stubs
+        && !enforce_stubs_and_runtime
+        && !enforce_dunder_method
+    {
         return;
     }
 
@@ -147,6 +155,19 @@ pub(crate) fn definitions(checker: &mut Checker) {
             }
         }
 
+        // pylint
+        if enforce_dunder_method {
+            if checker.enabled(Rule::BadDunderMethodName) {
+                if let Definition::Member(Member {
+                    kind: MemberKind::Method(method),
+                    ..
+                }) = definition
+                {
+                    pylint::rules::bad_dunder_method_name(checker, method);
+                }
+            }
+        }
+
         // pydocstyle
         if enforce_docstrings {
             if pydocstyle::helpers::should_ignore_definition(
@@ -158,21 +179,23 @@ pub(crate) fn definitions(checker: &mut Checker) {
             }
 
             // Extract a `Docstring` from a `Definition`.
-            let Some(expr) = docstring else {
+            let Some(string_literal) = docstring else {
                 pydocstyle::rules::not_missing(checker, definition, *visibility);
                 continue;
             };
 
-            let contents = checker.locator().slice(expr);
+            let contents = checker.locator().slice(string_literal);
 
             let indentation = checker.locator().slice(TextRange::new(
-                checker.locator.line_start(expr.start()),
-                expr.start(),
+                checker.locator.line_start(string_literal.start()),
+                string_literal.start(),
             ));
 
-            if expr.implicit_concatenated {
+            if string_literal.value.is_implicit_concatenated() {
                 #[allow(deprecated)]
-                let location = checker.locator.compute_source_location(expr.start());
+                let location = checker
+                    .locator
+                    .compute_source_location(string_literal.start());
                 warn_user!(
                     "Docstring at {}:{}:{} contains implicit string concatenation; ignoring...",
                     relativize_path(checker.path),
@@ -186,7 +209,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
             let body_range = raw_contents_range(contents).unwrap();
             let docstring = Docstring {
                 definition,
-                expr,
+                expr: string_literal,
                 contents,
                 body_range,
                 indentation,

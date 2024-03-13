@@ -1,7 +1,7 @@
 use crate::visitor::preorder::PreorderVisitor;
 use crate::{
     self as ast, Alias, ArgOrKeyword, Arguments, Comprehension, Decorator, ExceptHandler, Expr,
-    Keyword, MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern,
+    FStringElement, Keyword, MatchCase, Mod, Parameter, ParameterWithDefault, Parameters, Pattern,
     PatternArguments, PatternKeyword, Stmt, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
     TypeParamTypeVarTuple, TypeParams, WithItem,
 };
@@ -55,23 +55,22 @@ pub enum AnyNode {
     StmtContinue(ast::StmtContinue),
     StmtIpyEscapeCommand(ast::StmtIpyEscapeCommand),
     ExprBoolOp(ast::ExprBoolOp),
-    ExprNamedExpr(ast::ExprNamedExpr),
+    ExprNamed(ast::ExprNamed),
     ExprBinOp(ast::ExprBinOp),
     ExprUnaryOp(ast::ExprUnaryOp),
     ExprLambda(ast::ExprLambda),
-    ExprIfExp(ast::ExprIfExp),
+    ExprIf(ast::ExprIf),
     ExprDict(ast::ExprDict),
     ExprSet(ast::ExprSet),
     ExprListComp(ast::ExprListComp),
     ExprSetComp(ast::ExprSetComp),
     ExprDictComp(ast::ExprDictComp),
-    ExprGeneratorExp(ast::ExprGeneratorExp),
+    ExprGenerator(ast::ExprGenerator),
     ExprAwait(ast::ExprAwait),
     ExprYield(ast::ExprYield),
     ExprYieldFrom(ast::ExprYieldFrom),
     ExprCompare(ast::ExprCompare),
     ExprCall(ast::ExprCall),
-    ExprFormattedValue(ast::ExprFormattedValue),
     ExprFString(ast::ExprFString),
     ExprStringLiteral(ast::ExprStringLiteral),
     ExprBytesLiteral(ast::ExprBytesLiteral),
@@ -88,6 +87,9 @@ pub enum AnyNode {
     ExprSlice(ast::ExprSlice),
     ExprIpyEscapeCommand(ast::ExprIpyEscapeCommand),
     ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler),
+    FStringExpressionElement(ast::FStringExpressionElement),
+    FStringLiteralElement(ast::FStringLiteralElement),
+    FStringFormatSpec(ast::FStringFormatSpec),
     PatternMatchValue(ast::PatternMatchValue),
     PatternMatchSingleton(ast::PatternMatchSingleton),
     PatternMatchSequence(ast::PatternMatchSequence),
@@ -113,6 +115,9 @@ pub enum AnyNode {
     TypeParamTypeVar(TypeParamTypeVar),
     TypeParamTypeVarTuple(TypeParamTypeVarTuple),
     TypeParamParamSpec(TypeParamParamSpec),
+    FString(ast::FString),
+    StringLiteral(ast::StringLiteral),
+    BytesLiteral(ast::BytesLiteral),
 }
 
 impl AnyNode {
@@ -147,23 +152,25 @@ impl AnyNode {
             AnyNode::ModModule(_)
             | AnyNode::ModExpression(_)
             | AnyNode::ExprBoolOp(_)
-            | AnyNode::ExprNamedExpr(_)
+            | AnyNode::ExprNamed(_)
             | AnyNode::ExprBinOp(_)
             | AnyNode::ExprUnaryOp(_)
             | AnyNode::ExprLambda(_)
-            | AnyNode::ExprIfExp(_)
+            | AnyNode::ExprIf(_)
             | AnyNode::ExprDict(_)
             | AnyNode::ExprSet(_)
             | AnyNode::ExprListComp(_)
             | AnyNode::ExprSetComp(_)
             | AnyNode::ExprDictComp(_)
-            | AnyNode::ExprGeneratorExp(_)
+            | AnyNode::ExprGenerator(_)
             | AnyNode::ExprAwait(_)
             | AnyNode::ExprYield(_)
             | AnyNode::ExprYieldFrom(_)
             | AnyNode::ExprCompare(_)
             | AnyNode::ExprCall(_)
-            | AnyNode::ExprFormattedValue(_)
+            | AnyNode::FStringExpressionElement(_)
+            | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringFormatSpec(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprStringLiteral(_)
             | AnyNode::ExprBytesLiteral(_)
@@ -204,6 +211,9 @@ impl AnyNode {
             | AnyNode::TypeParamTypeVar(_)
             | AnyNode::TypeParamTypeVarTuple(_)
             | AnyNode::TypeParamParamSpec(_)
+            | AnyNode::FString(_)
+            | AnyNode::StringLiteral(_)
+            | AnyNode::BytesLiteral(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -211,23 +221,22 @@ impl AnyNode {
     pub fn expression(self) -> Option<Expr> {
         match self {
             AnyNode::ExprBoolOp(node) => Some(Expr::BoolOp(node)),
-            AnyNode::ExprNamedExpr(node) => Some(Expr::NamedExpr(node)),
+            AnyNode::ExprNamed(node) => Some(Expr::Named(node)),
             AnyNode::ExprBinOp(node) => Some(Expr::BinOp(node)),
             AnyNode::ExprUnaryOp(node) => Some(Expr::UnaryOp(node)),
             AnyNode::ExprLambda(node) => Some(Expr::Lambda(node)),
-            AnyNode::ExprIfExp(node) => Some(Expr::IfExp(node)),
+            AnyNode::ExprIf(node) => Some(Expr::If(node)),
             AnyNode::ExprDict(node) => Some(Expr::Dict(node)),
             AnyNode::ExprSet(node) => Some(Expr::Set(node)),
             AnyNode::ExprListComp(node) => Some(Expr::ListComp(node)),
             AnyNode::ExprSetComp(node) => Some(Expr::SetComp(node)),
             AnyNode::ExprDictComp(node) => Some(Expr::DictComp(node)),
-            AnyNode::ExprGeneratorExp(node) => Some(Expr::GeneratorExp(node)),
+            AnyNode::ExprGenerator(node) => Some(Expr::Generator(node)),
             AnyNode::ExprAwait(node) => Some(Expr::Await(node)),
             AnyNode::ExprYield(node) => Some(Expr::Yield(node)),
             AnyNode::ExprYieldFrom(node) => Some(Expr::YieldFrom(node)),
             AnyNode::ExprCompare(node) => Some(Expr::Compare(node)),
             AnyNode::ExprCall(node) => Some(Expr::Call(node)),
-            AnyNode::ExprFormattedValue(node) => Some(Expr::FormattedValue(node)),
             AnyNode::ExprFString(node) => Some(Expr::FString(node)),
             AnyNode::ExprStringLiteral(node) => Some(Expr::StringLiteral(node)),
             AnyNode::ExprBytesLiteral(node) => Some(Expr::BytesLiteral(node)),
@@ -272,6 +281,9 @@ impl AnyNode {
             | AnyNode::StmtContinue(_)
             | AnyNode::StmtIpyEscapeCommand(_)
             | AnyNode::ExceptHandlerExceptHandler(_)
+            | AnyNode::FStringExpressionElement(_)
+            | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringFormatSpec(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
             | AnyNode::PatternMatchSequence(_)
@@ -296,6 +308,9 @@ impl AnyNode {
             | AnyNode::TypeParamTypeVar(_)
             | AnyNode::TypeParamTypeVarTuple(_)
             | AnyNode::TypeParamParamSpec(_)
+            | AnyNode::FString(_)
+            | AnyNode::StringLiteral(_)
+            | AnyNode::BytesLiteral(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -331,23 +346,25 @@ impl AnyNode {
             | AnyNode::StmtContinue(_)
             | AnyNode::StmtIpyEscapeCommand(_)
             | AnyNode::ExprBoolOp(_)
-            | AnyNode::ExprNamedExpr(_)
+            | AnyNode::ExprNamed(_)
             | AnyNode::ExprBinOp(_)
             | AnyNode::ExprUnaryOp(_)
             | AnyNode::ExprLambda(_)
-            | AnyNode::ExprIfExp(_)
+            | AnyNode::ExprIf(_)
             | AnyNode::ExprDict(_)
             | AnyNode::ExprSet(_)
             | AnyNode::ExprListComp(_)
             | AnyNode::ExprSetComp(_)
             | AnyNode::ExprDictComp(_)
-            | AnyNode::ExprGeneratorExp(_)
+            | AnyNode::ExprGenerator(_)
             | AnyNode::ExprAwait(_)
             | AnyNode::ExprYield(_)
             | AnyNode::ExprYieldFrom(_)
             | AnyNode::ExprCompare(_)
             | AnyNode::ExprCall(_)
-            | AnyNode::ExprFormattedValue(_)
+            | AnyNode::FStringExpressionElement(_)
+            | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringFormatSpec(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprStringLiteral(_)
             | AnyNode::ExprBytesLiteral(_)
@@ -388,6 +405,9 @@ impl AnyNode {
             | AnyNode::TypeParamTypeVar(_)
             | AnyNode::TypeParamTypeVarTuple(_)
             | AnyNode::TypeParamParamSpec(_)
+            | AnyNode::FString(_)
+            | AnyNode::StringLiteral(_)
+            | AnyNode::BytesLiteral(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -431,23 +451,25 @@ impl AnyNode {
             | AnyNode::StmtContinue(_)
             | AnyNode::StmtIpyEscapeCommand(_)
             | AnyNode::ExprBoolOp(_)
-            | AnyNode::ExprNamedExpr(_)
+            | AnyNode::ExprNamed(_)
             | AnyNode::ExprBinOp(_)
             | AnyNode::ExprUnaryOp(_)
             | AnyNode::ExprLambda(_)
-            | AnyNode::ExprIfExp(_)
+            | AnyNode::ExprIf(_)
             | AnyNode::ExprDict(_)
             | AnyNode::ExprSet(_)
             | AnyNode::ExprListComp(_)
             | AnyNode::ExprSetComp(_)
             | AnyNode::ExprDictComp(_)
-            | AnyNode::ExprGeneratorExp(_)
+            | AnyNode::ExprGenerator(_)
             | AnyNode::ExprAwait(_)
             | AnyNode::ExprYield(_)
             | AnyNode::ExprYieldFrom(_)
             | AnyNode::ExprCompare(_)
             | AnyNode::ExprCall(_)
-            | AnyNode::ExprFormattedValue(_)
+            | AnyNode::FStringExpressionElement(_)
+            | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringFormatSpec(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprStringLiteral(_)
             | AnyNode::ExprBytesLiteral(_)
@@ -480,6 +502,9 @@ impl AnyNode {
             | AnyNode::TypeParamTypeVar(_)
             | AnyNode::TypeParamTypeVarTuple(_)
             | AnyNode::TypeParamParamSpec(_)
+            | AnyNode::FString(_)
+            | AnyNode::StringLiteral(_)
+            | AnyNode::BytesLiteral(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -516,23 +541,25 @@ impl AnyNode {
             | AnyNode::StmtContinue(_)
             | AnyNode::StmtIpyEscapeCommand(_)
             | AnyNode::ExprBoolOp(_)
-            | AnyNode::ExprNamedExpr(_)
+            | AnyNode::ExprNamed(_)
             | AnyNode::ExprBinOp(_)
             | AnyNode::ExprUnaryOp(_)
             | AnyNode::ExprLambda(_)
-            | AnyNode::ExprIfExp(_)
+            | AnyNode::ExprIf(_)
             | AnyNode::ExprDict(_)
             | AnyNode::ExprSet(_)
             | AnyNode::ExprListComp(_)
             | AnyNode::ExprSetComp(_)
             | AnyNode::ExprDictComp(_)
-            | AnyNode::ExprGeneratorExp(_)
+            | AnyNode::ExprGenerator(_)
             | AnyNode::ExprAwait(_)
             | AnyNode::ExprYield(_)
             | AnyNode::ExprYieldFrom(_)
             | AnyNode::ExprCompare(_)
             | AnyNode::ExprCall(_)
-            | AnyNode::ExprFormattedValue(_)
+            | AnyNode::FStringExpressionElement(_)
+            | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringFormatSpec(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprStringLiteral(_)
             | AnyNode::ExprBytesLiteral(_)
@@ -572,6 +599,9 @@ impl AnyNode {
             | AnyNode::TypeParamTypeVar(_)
             | AnyNode::TypeParamTypeVarTuple(_)
             | AnyNode::TypeParamParamSpec(_)
+            | AnyNode::FString(_)
+            | AnyNode::StringLiteral(_)
+            | AnyNode::BytesLiteral(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -626,23 +656,25 @@ impl AnyNode {
             Self::StmtContinue(node) => AnyNodeRef::StmtContinue(node),
             Self::StmtIpyEscapeCommand(node) => AnyNodeRef::StmtIpyEscapeCommand(node),
             Self::ExprBoolOp(node) => AnyNodeRef::ExprBoolOp(node),
-            Self::ExprNamedExpr(node) => AnyNodeRef::ExprNamedExpr(node),
+            Self::ExprNamed(node) => AnyNodeRef::ExprNamed(node),
             Self::ExprBinOp(node) => AnyNodeRef::ExprBinOp(node),
             Self::ExprUnaryOp(node) => AnyNodeRef::ExprUnaryOp(node),
             Self::ExprLambda(node) => AnyNodeRef::ExprLambda(node),
-            Self::ExprIfExp(node) => AnyNodeRef::ExprIfExp(node),
+            Self::ExprIf(node) => AnyNodeRef::ExprIf(node),
             Self::ExprDict(node) => AnyNodeRef::ExprDict(node),
             Self::ExprSet(node) => AnyNodeRef::ExprSet(node),
             Self::ExprListComp(node) => AnyNodeRef::ExprListComp(node),
             Self::ExprSetComp(node) => AnyNodeRef::ExprSetComp(node),
             Self::ExprDictComp(node) => AnyNodeRef::ExprDictComp(node),
-            Self::ExprGeneratorExp(node) => AnyNodeRef::ExprGeneratorExp(node),
+            Self::ExprGenerator(node) => AnyNodeRef::ExprGenerator(node),
             Self::ExprAwait(node) => AnyNodeRef::ExprAwait(node),
             Self::ExprYield(node) => AnyNodeRef::ExprYield(node),
             Self::ExprYieldFrom(node) => AnyNodeRef::ExprYieldFrom(node),
             Self::ExprCompare(node) => AnyNodeRef::ExprCompare(node),
             Self::ExprCall(node) => AnyNodeRef::ExprCall(node),
-            Self::ExprFormattedValue(node) => AnyNodeRef::ExprFormattedValue(node),
+            Self::FStringExpressionElement(node) => AnyNodeRef::FStringExpressionElement(node),
+            Self::FStringLiteralElement(node) => AnyNodeRef::FStringLiteralElement(node),
+            Self::FStringFormatSpec(node) => AnyNodeRef::FStringFormatSpec(node),
             Self::ExprFString(node) => AnyNodeRef::ExprFString(node),
             Self::ExprStringLiteral(node) => AnyNodeRef::ExprStringLiteral(node),
             Self::ExprBytesLiteral(node) => AnyNodeRef::ExprBytesLiteral(node),
@@ -683,6 +715,9 @@ impl AnyNode {
             Self::TypeParamTypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
             Self::TypeParamTypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
             Self::TypeParamParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
+            Self::FString(node) => AnyNodeRef::FString(node),
+            Self::StringLiteral(node) => AnyNodeRef::StringLiteral(node),
+            Self::BytesLiteral(node) => AnyNodeRef::BytesLiteral(node),
             Self::ElifElseClause(node) => AnyNodeRef::ElifElseClause(node),
         }
     }
@@ -1924,12 +1959,12 @@ impl AstNode for ast::ExprBoolOp {
         }
     }
 }
-impl AstNode for ast::ExprNamedExpr {
+impl AstNode for ast::ExprNamed {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::ExprNamedExpr(node) = kind {
+        if let AnyNode::ExprNamed(node) = kind {
             Some(node)
         } else {
             None
@@ -1937,7 +1972,7 @@ impl AstNode for ast::ExprNamedExpr {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprNamedExpr(node) = kind {
+        if let AnyNodeRef::ExprNamed(node) = kind {
             Some(node)
         } else {
             None
@@ -1956,7 +1991,7 @@ impl AstNode for ast::ExprNamedExpr {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::ExprNamedExpr {
+        let ast::ExprNamed {
             target,
             value,
             range: _,
@@ -2094,12 +2129,12 @@ impl AstNode for ast::ExprLambda {
         visitor.visit_expr(body);
     }
 }
-impl AstNode for ast::ExprIfExp {
+impl AstNode for ast::ExprIf {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::ExprIfExp(node) = kind {
+        if let AnyNode::ExprIf(node) = kind {
             Some(node)
         } else {
             None
@@ -2107,7 +2142,7 @@ impl AstNode for ast::ExprIfExp {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprIfExp(node) = kind {
+        if let AnyNodeRef::ExprIf(node) = kind {
             Some(node)
         } else {
             None
@@ -2126,7 +2161,7 @@ impl AstNode for ast::ExprIfExp {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::ExprIfExp {
+        let ast::ExprIf {
             test,
             body,
             orelse,
@@ -2359,12 +2394,12 @@ impl AstNode for ast::ExprDictComp {
         }
     }
 }
-impl AstNode for ast::ExprGeneratorExp {
+impl AstNode for ast::ExprGenerator {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::ExprGeneratorExp(node) = kind {
+        if let AnyNode::ExprGenerator(node) = kind {
             Some(node)
         } else {
             None
@@ -2372,7 +2407,7 @@ impl AstNode for ast::ExprGeneratorExp {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprGeneratorExp(node) = kind {
+        if let AnyNodeRef::ExprGenerator(node) = kind {
             Some(node)
         } else {
             None
@@ -2391,10 +2426,11 @@ impl AstNode for ast::ExprGeneratorExp {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::ExprGeneratorExp {
+        let ast::ExprGenerator {
             elt,
             generators,
             range: _,
+            parenthesized: _,
         } = self;
         visitor.visit_expr(elt);
         for comprehension in generators {
@@ -2553,7 +2589,7 @@ impl AstNode for ast::ExprCompare {
 
         visitor.visit_expr(left);
 
-        for (op, comparator) in ops.iter().zip(comparators) {
+        for (op, comparator) in ops.iter().zip(&**comparators) {
             visitor.visit_cmp_op(op);
             visitor.visit_expr(comparator);
         }
@@ -2600,12 +2636,12 @@ impl AstNode for ast::ExprCall {
         visitor.visit_arguments(arguments);
     }
 }
-impl AstNode for ast::ExprFormattedValue {
+impl AstNode for ast::FStringFormatSpec {
     fn cast(kind: AnyNode) -> Option<Self>
     where
         Self: Sized,
     {
-        if let AnyNode::ExprFormattedValue(node) = kind {
+        if let AnyNode::FStringFormatSpec(node) = kind {
             Some(node)
         } else {
             None
@@ -2613,7 +2649,7 @@ impl AstNode for ast::ExprFormattedValue {
     }
 
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
-        if let AnyNodeRef::ExprFormattedValue(node) = kind {
+        if let AnyNodeRef::FStringFormatSpec(node) = kind {
             Some(node)
         } else {
             None
@@ -2632,14 +2668,89 @@ impl AstNode for ast::ExprFormattedValue {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::ExprFormattedValue {
-            value, format_spec, ..
-        } = self;
-        visitor.visit_expr(value);
-
-        if let Some(expr) = format_spec {
-            visitor.visit_format_spec(expr);
+        for element in &self.elements {
+            visitor.visit_f_string_element(element);
         }
+    }
+}
+impl AstNode for ast::FStringExpressionElement {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::FStringExpressionElement(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::FStringExpressionElement(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::FStringExpressionElement {
+            expression,
+            format_spec,
+            ..
+        } = self;
+        visitor.visit_expr(expression);
+
+        if let Some(format_spec) = format_spec {
+            for spec_part in &format_spec.elements {
+                visitor.visit_f_string_element(spec_part);
+            }
+        }
+    }
+}
+impl AstNode for ast::FStringLiteralElement {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::FStringLiteralElement(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::FStringLiteralElement(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
     }
 }
 impl AstNode for ast::ExprFString {
@@ -2674,14 +2785,17 @@ impl AstNode for ast::ExprFString {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::ExprFString {
-            values,
-            implicit_concatenated: _,
-            range: _,
-        } = self;
+        let ast::ExprFString { value, range: _ } = self;
 
-        for expr in values {
-            visitor.visit_expr(expr);
+        for f_string_part in value {
+            match f_string_part {
+                ast::FStringPart::Literal(string_literal) => {
+                    visitor.visit_string_literal(string_literal);
+                }
+                ast::FStringPart::FString(f_string) => {
+                    visitor.visit_f_string(f_string);
+                }
+            }
         }
     }
 }
@@ -2713,10 +2827,15 @@ impl AstNode for ast::ExprStringLiteral {
         AnyNode::from(self)
     }
 
-    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
+        let ast::ExprStringLiteral { value, range: _ } = self;
+
+        for string_literal in value {
+            visitor.visit_string_literal(string_literal);
+        }
     }
 }
 impl AstNode for ast::ExprBytesLiteral {
@@ -2747,10 +2866,15 @@ impl AstNode for ast::ExprBytesLiteral {
         AnyNode::from(self)
     }
 
-    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
+        let ast::ExprBytesLiteral { value, range: _ } = self;
+
+        for bytes_literal in value {
+            visitor.visit_bytes_literal(bytes_literal);
+        }
     }
 }
 impl AstNode for ast::ExprNumberLiteral {
@@ -3133,6 +3257,7 @@ impl AstNode for ast::ExprTuple {
             elts,
             ctx: _,
             range: _,
+            parenthesized: _,
         } = self;
 
         for expr in elts {
@@ -4273,6 +4398,118 @@ impl AstNode for ast::TypeParamParamSpec {
         let ast::TypeParamParamSpec { range: _, name: _ } = self;
     }
 }
+impl AstNode for ast::FString {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::FString(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::FString(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::FString {
+            elements,
+            range: _,
+            flags: _,
+        } = self;
+
+        for fstring_element in elements {
+            visitor.visit_f_string_element(fstring_element);
+        }
+    }
+}
+impl AstNode for ast::StringLiteral {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StringLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StringLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+    }
+}
+impl AstNode for ast::BytesLiteral {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::BytesLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::BytesLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+    }
+}
+
 impl From<Stmt> for AnyNode {
     fn from(stmt: Stmt) -> Self {
         match stmt {
@@ -4309,23 +4546,22 @@ impl From<Expr> for AnyNode {
     fn from(expr: Expr) -> Self {
         match expr {
             Expr::BoolOp(node) => AnyNode::ExprBoolOp(node),
-            Expr::NamedExpr(node) => AnyNode::ExprNamedExpr(node),
+            Expr::Named(node) => AnyNode::ExprNamed(node),
             Expr::BinOp(node) => AnyNode::ExprBinOp(node),
             Expr::UnaryOp(node) => AnyNode::ExprUnaryOp(node),
             Expr::Lambda(node) => AnyNode::ExprLambda(node),
-            Expr::IfExp(node) => AnyNode::ExprIfExp(node),
+            Expr::If(node) => AnyNode::ExprIf(node),
             Expr::Dict(node) => AnyNode::ExprDict(node),
             Expr::Set(node) => AnyNode::ExprSet(node),
             Expr::ListComp(node) => AnyNode::ExprListComp(node),
             Expr::SetComp(node) => AnyNode::ExprSetComp(node),
             Expr::DictComp(node) => AnyNode::ExprDictComp(node),
-            Expr::GeneratorExp(node) => AnyNode::ExprGeneratorExp(node),
+            Expr::Generator(node) => AnyNode::ExprGenerator(node),
             Expr::Await(node) => AnyNode::ExprAwait(node),
             Expr::Yield(node) => AnyNode::ExprYield(node),
             Expr::YieldFrom(node) => AnyNode::ExprYieldFrom(node),
             Expr::Compare(node) => AnyNode::ExprCompare(node),
             Expr::Call(node) => AnyNode::ExprCall(node),
-            Expr::FormattedValue(node) => AnyNode::ExprFormattedValue(node),
             Expr::FString(node) => AnyNode::ExprFString(node),
             Expr::StringLiteral(node) => AnyNode::ExprStringLiteral(node),
             Expr::BytesLiteral(node) => AnyNode::ExprBytesLiteral(node),
@@ -4350,6 +4586,15 @@ impl From<Mod> for AnyNode {
         match module {
             Mod::Module(node) => AnyNode::ModModule(node),
             Mod::Expression(node) => AnyNode::ModExpression(node),
+        }
+    }
+}
+
+impl From<FStringElement> for AnyNode {
+    fn from(element: FStringElement) -> Self {
+        match element {
+            FStringElement::Literal(node) => AnyNode::FStringLiteralElement(node),
+            FStringElement::Expression(node) => AnyNode::FStringExpressionElement(node),
         }
     }
 }
@@ -4551,9 +4796,9 @@ impl From<ast::ExprBoolOp> for AnyNode {
     }
 }
 
-impl From<ast::ExprNamedExpr> for AnyNode {
-    fn from(node: ast::ExprNamedExpr) -> Self {
-        AnyNode::ExprNamedExpr(node)
+impl From<ast::ExprNamed> for AnyNode {
+    fn from(node: ast::ExprNamed) -> Self {
+        AnyNode::ExprNamed(node)
     }
 }
 
@@ -4575,9 +4820,9 @@ impl From<ast::ExprLambda> for AnyNode {
     }
 }
 
-impl From<ast::ExprIfExp> for AnyNode {
-    fn from(node: ast::ExprIfExp) -> Self {
-        AnyNode::ExprIfExp(node)
+impl From<ast::ExprIf> for AnyNode {
+    fn from(node: ast::ExprIf) -> Self {
+        AnyNode::ExprIf(node)
     }
 }
 
@@ -4611,9 +4856,9 @@ impl From<ast::ExprDictComp> for AnyNode {
     }
 }
 
-impl From<ast::ExprGeneratorExp> for AnyNode {
-    fn from(node: ast::ExprGeneratorExp) -> Self {
-        AnyNode::ExprGeneratorExp(node)
+impl From<ast::ExprGenerator> for AnyNode {
+    fn from(node: ast::ExprGenerator) -> Self {
+        AnyNode::ExprGenerator(node)
     }
 }
 
@@ -4647,9 +4892,21 @@ impl From<ast::ExprCall> for AnyNode {
     }
 }
 
-impl From<ast::ExprFormattedValue> for AnyNode {
-    fn from(node: ast::ExprFormattedValue) -> Self {
-        AnyNode::ExprFormattedValue(node)
+impl From<ast::FStringExpressionElement> for AnyNode {
+    fn from(node: ast::FStringExpressionElement) -> Self {
+        AnyNode::FStringExpressionElement(node)
+    }
+}
+
+impl From<ast::FStringLiteralElement> for AnyNode {
+    fn from(node: ast::FStringLiteralElement) -> Self {
+        AnyNode::FStringLiteralElement(node)
+    }
+}
+
+impl From<ast::FStringFormatSpec> for AnyNode {
+    fn from(node: ast::FStringFormatSpec) -> Self {
+        AnyNode::FStringFormatSpec(node)
     }
 }
 
@@ -4882,6 +5139,24 @@ impl From<TypeParamParamSpec> for AnyNode {
     }
 }
 
+impl From<ast::FString> for AnyNode {
+    fn from(node: ast::FString) -> Self {
+        AnyNode::FString(node)
+    }
+}
+
+impl From<ast::StringLiteral> for AnyNode {
+    fn from(node: ast::StringLiteral) -> Self {
+        AnyNode::StringLiteral(node)
+    }
+}
+
+impl From<ast::BytesLiteral> for AnyNode {
+    fn from(node: ast::BytesLiteral) -> Self {
+        AnyNode::BytesLiteral(node)
+    }
+}
+
 impl Ranged for AnyNode {
     fn range(&self) -> TextRange {
         match self {
@@ -4913,23 +5188,25 @@ impl Ranged for AnyNode {
             AnyNode::StmtContinue(node) => node.range(),
             AnyNode::StmtIpyEscapeCommand(node) => node.range(),
             AnyNode::ExprBoolOp(node) => node.range(),
-            AnyNode::ExprNamedExpr(node) => node.range(),
+            AnyNode::ExprNamed(node) => node.range(),
             AnyNode::ExprBinOp(node) => node.range(),
             AnyNode::ExprUnaryOp(node) => node.range(),
             AnyNode::ExprLambda(node) => node.range(),
-            AnyNode::ExprIfExp(node) => node.range(),
+            AnyNode::ExprIf(node) => node.range(),
             AnyNode::ExprDict(node) => node.range(),
             AnyNode::ExprSet(node) => node.range(),
             AnyNode::ExprListComp(node) => node.range(),
             AnyNode::ExprSetComp(node) => node.range(),
             AnyNode::ExprDictComp(node) => node.range(),
-            AnyNode::ExprGeneratorExp(node) => node.range(),
+            AnyNode::ExprGenerator(node) => node.range(),
             AnyNode::ExprAwait(node) => node.range(),
             AnyNode::ExprYield(node) => node.range(),
             AnyNode::ExprYieldFrom(node) => node.range(),
             AnyNode::ExprCompare(node) => node.range(),
             AnyNode::ExprCall(node) => node.range(),
-            AnyNode::ExprFormattedValue(node) => node.range(),
+            AnyNode::FStringExpressionElement(node) => node.range(),
+            AnyNode::FStringLiteralElement(node) => node.range(),
+            AnyNode::FStringFormatSpec(node) => node.range(),
             AnyNode::ExprFString(node) => node.range(),
             AnyNode::ExprStringLiteral(node) => node.range(),
             AnyNode::ExprBytesLiteral(node) => node.range(),
@@ -4970,6 +5247,9 @@ impl Ranged for AnyNode {
             AnyNode::TypeParamTypeVar(node) => node.range(),
             AnyNode::TypeParamTypeVarTuple(node) => node.range(),
             AnyNode::TypeParamParamSpec(node) => node.range(),
+            AnyNode::FString(node) => node.range(),
+            AnyNode::StringLiteral(node) => node.range(),
+            AnyNode::BytesLiteral(node) => node.range(),
             AnyNode::ElifElseClause(node) => node.range(),
         }
     }
@@ -5005,23 +5285,25 @@ pub enum AnyNodeRef<'a> {
     StmtContinue(&'a ast::StmtContinue),
     StmtIpyEscapeCommand(&'a ast::StmtIpyEscapeCommand),
     ExprBoolOp(&'a ast::ExprBoolOp),
-    ExprNamedExpr(&'a ast::ExprNamedExpr),
+    ExprNamed(&'a ast::ExprNamed),
     ExprBinOp(&'a ast::ExprBinOp),
     ExprUnaryOp(&'a ast::ExprUnaryOp),
     ExprLambda(&'a ast::ExprLambda),
-    ExprIfExp(&'a ast::ExprIfExp),
+    ExprIf(&'a ast::ExprIf),
     ExprDict(&'a ast::ExprDict),
     ExprSet(&'a ast::ExprSet),
     ExprListComp(&'a ast::ExprListComp),
     ExprSetComp(&'a ast::ExprSetComp),
     ExprDictComp(&'a ast::ExprDictComp),
-    ExprGeneratorExp(&'a ast::ExprGeneratorExp),
+    ExprGenerator(&'a ast::ExprGenerator),
     ExprAwait(&'a ast::ExprAwait),
     ExprYield(&'a ast::ExprYield),
     ExprYieldFrom(&'a ast::ExprYieldFrom),
     ExprCompare(&'a ast::ExprCompare),
     ExprCall(&'a ast::ExprCall),
-    ExprFormattedValue(&'a ast::ExprFormattedValue),
+    FStringExpressionElement(&'a ast::FStringExpressionElement),
+    FStringLiteralElement(&'a ast::FStringLiteralElement),
+    FStringFormatSpec(&'a ast::FStringFormatSpec),
     ExprFString(&'a ast::ExprFString),
     ExprStringLiteral(&'a ast::ExprStringLiteral),
     ExprBytesLiteral(&'a ast::ExprBytesLiteral),
@@ -5062,6 +5344,9 @@ pub enum AnyNodeRef<'a> {
     TypeParamTypeVar(&'a TypeParamTypeVar),
     TypeParamTypeVarTuple(&'a TypeParamTypeVarTuple),
     TypeParamParamSpec(&'a TypeParamParamSpec),
+    FString(&'a ast::FString),
+    StringLiteral(&'a ast::StringLiteral),
+    BytesLiteral(&'a ast::BytesLiteral),
     ElifElseClause(&'a ast::ElifElseClause),
 }
 
@@ -5096,23 +5381,25 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::StmtContinue(node) => NonNull::from(*node).cast(),
             AnyNodeRef::StmtIpyEscapeCommand(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprBoolOp(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::ExprNamedExpr(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprNamed(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprBinOp(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprUnaryOp(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprLambda(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::ExprIfExp(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprIf(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprDict(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprSet(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprListComp(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprSetComp(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprDictComp(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::ExprGeneratorExp(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprGenerator(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprAwait(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprYield(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprYieldFrom(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprCompare(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprCall(node) => NonNull::from(*node).cast(),
-            AnyNodeRef::ExprFormattedValue(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::FStringExpressionElement(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::FStringLiteralElement(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::FStringFormatSpec(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprFString(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprStringLiteral(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprBytesLiteral(node) => NonNull::from(*node).cast(),
@@ -5153,6 +5440,9 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::TypeParamTypeVar(node) => NonNull::from(*node).cast(),
             AnyNodeRef::TypeParamTypeVarTuple(node) => NonNull::from(*node).cast(),
             AnyNodeRef::TypeParamParamSpec(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::FString(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StringLiteral(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::BytesLiteral(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ElifElseClause(node) => NonNull::from(*node).cast(),
         }
     }
@@ -5193,23 +5483,25 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::StmtContinue(_) => NodeKind::StmtContinue,
             AnyNodeRef::StmtIpyEscapeCommand(_) => NodeKind::StmtIpyEscapeCommand,
             AnyNodeRef::ExprBoolOp(_) => NodeKind::ExprBoolOp,
-            AnyNodeRef::ExprNamedExpr(_) => NodeKind::ExprNamedExpr,
+            AnyNodeRef::ExprNamed(_) => NodeKind::ExprNamed,
             AnyNodeRef::ExprBinOp(_) => NodeKind::ExprBinOp,
             AnyNodeRef::ExprUnaryOp(_) => NodeKind::ExprUnaryOp,
             AnyNodeRef::ExprLambda(_) => NodeKind::ExprLambda,
-            AnyNodeRef::ExprIfExp(_) => NodeKind::ExprIfExp,
+            AnyNodeRef::ExprIf(_) => NodeKind::ExprIf,
             AnyNodeRef::ExprDict(_) => NodeKind::ExprDict,
             AnyNodeRef::ExprSet(_) => NodeKind::ExprSet,
             AnyNodeRef::ExprListComp(_) => NodeKind::ExprListComp,
             AnyNodeRef::ExprSetComp(_) => NodeKind::ExprSetComp,
             AnyNodeRef::ExprDictComp(_) => NodeKind::ExprDictComp,
-            AnyNodeRef::ExprGeneratorExp(_) => NodeKind::ExprGeneratorExp,
+            AnyNodeRef::ExprGenerator(_) => NodeKind::ExprGenerator,
             AnyNodeRef::ExprAwait(_) => NodeKind::ExprAwait,
             AnyNodeRef::ExprYield(_) => NodeKind::ExprYield,
             AnyNodeRef::ExprYieldFrom(_) => NodeKind::ExprYieldFrom,
             AnyNodeRef::ExprCompare(_) => NodeKind::ExprCompare,
             AnyNodeRef::ExprCall(_) => NodeKind::ExprCall,
-            AnyNodeRef::ExprFormattedValue(_) => NodeKind::ExprFormattedValue,
+            AnyNodeRef::FStringExpressionElement(_) => NodeKind::FStringExpressionElement,
+            AnyNodeRef::FStringLiteralElement(_) => NodeKind::FStringLiteralElement,
+            AnyNodeRef::FStringFormatSpec(_) => NodeKind::FStringFormatSpec,
             AnyNodeRef::ExprFString(_) => NodeKind::ExprFString,
             AnyNodeRef::ExprStringLiteral(_) => NodeKind::ExprStringLiteral,
             AnyNodeRef::ExprBytesLiteral(_) => NodeKind::ExprBytesLiteral,
@@ -5250,6 +5542,9 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::TypeParamTypeVar(_) => NodeKind::TypeParamTypeVar,
             AnyNodeRef::TypeParamTypeVarTuple(_) => NodeKind::TypeParamTypeVarTuple,
             AnyNodeRef::TypeParamParamSpec(_) => NodeKind::TypeParamParamSpec,
+            AnyNodeRef::FString(_) => NodeKind::FString,
+            AnyNodeRef::StringLiteral(_) => NodeKind::StringLiteral,
+            AnyNodeRef::BytesLiteral(_) => NodeKind::BytesLiteral,
             AnyNodeRef::ElifElseClause(_) => NodeKind::ElifElseClause,
         }
     }
@@ -5285,23 +5580,25 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::ModModule(_)
             | AnyNodeRef::ModExpression(_)
             | AnyNodeRef::ExprBoolOp(_)
-            | AnyNodeRef::ExprNamedExpr(_)
+            | AnyNodeRef::ExprNamed(_)
             | AnyNodeRef::ExprBinOp(_)
             | AnyNodeRef::ExprUnaryOp(_)
             | AnyNodeRef::ExprLambda(_)
-            | AnyNodeRef::ExprIfExp(_)
+            | AnyNodeRef::ExprIf(_)
             | AnyNodeRef::ExprDict(_)
             | AnyNodeRef::ExprSet(_)
             | AnyNodeRef::ExprListComp(_)
             | AnyNodeRef::ExprSetComp(_)
             | AnyNodeRef::ExprDictComp(_)
-            | AnyNodeRef::ExprGeneratorExp(_)
+            | AnyNodeRef::ExprGenerator(_)
             | AnyNodeRef::ExprAwait(_)
             | AnyNodeRef::ExprYield(_)
             | AnyNodeRef::ExprYieldFrom(_)
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
-            | AnyNodeRef::ExprFormattedValue(_)
+            | AnyNodeRef::FStringExpressionElement(_)
+            | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringFormatSpec(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)
@@ -5342,6 +5639,9 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
+            | AnyNodeRef::FString(_)
+            | AnyNodeRef::StringLiteral(_)
+            | AnyNodeRef::BytesLiteral(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -5349,23 +5649,22 @@ impl<'a> AnyNodeRef<'a> {
     pub const fn is_expression(self) -> bool {
         match self {
             AnyNodeRef::ExprBoolOp(_)
-            | AnyNodeRef::ExprNamedExpr(_)
+            | AnyNodeRef::ExprNamed(_)
             | AnyNodeRef::ExprBinOp(_)
             | AnyNodeRef::ExprUnaryOp(_)
             | AnyNodeRef::ExprLambda(_)
-            | AnyNodeRef::ExprIfExp(_)
+            | AnyNodeRef::ExprIf(_)
             | AnyNodeRef::ExprDict(_)
             | AnyNodeRef::ExprSet(_)
             | AnyNodeRef::ExprListComp(_)
             | AnyNodeRef::ExprSetComp(_)
             | AnyNodeRef::ExprDictComp(_)
-            | AnyNodeRef::ExprGeneratorExp(_)
+            | AnyNodeRef::ExprGenerator(_)
             | AnyNodeRef::ExprAwait(_)
             | AnyNodeRef::ExprYield(_)
             | AnyNodeRef::ExprYieldFrom(_)
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
-            | AnyNodeRef::ExprFormattedValue(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)
@@ -5410,6 +5709,9 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::StmtContinue(_)
             | AnyNodeRef::StmtIpyEscapeCommand(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
+            | AnyNodeRef::FStringExpressionElement(_)
+            | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringFormatSpec(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -5434,6 +5736,9 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
+            | AnyNodeRef::FString(_)
+            | AnyNodeRef::StringLiteral(_)
+            | AnyNodeRef::BytesLiteral(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -5468,23 +5773,25 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::StmtContinue(_)
             | AnyNodeRef::StmtIpyEscapeCommand(_)
             | AnyNodeRef::ExprBoolOp(_)
-            | AnyNodeRef::ExprNamedExpr(_)
+            | AnyNodeRef::ExprNamed(_)
             | AnyNodeRef::ExprBinOp(_)
             | AnyNodeRef::ExprUnaryOp(_)
             | AnyNodeRef::ExprLambda(_)
-            | AnyNodeRef::ExprIfExp(_)
+            | AnyNodeRef::ExprIf(_)
             | AnyNodeRef::ExprDict(_)
             | AnyNodeRef::ExprSet(_)
             | AnyNodeRef::ExprListComp(_)
             | AnyNodeRef::ExprSetComp(_)
             | AnyNodeRef::ExprDictComp(_)
-            | AnyNodeRef::ExprGeneratorExp(_)
+            | AnyNodeRef::ExprGenerator(_)
             | AnyNodeRef::ExprAwait(_)
             | AnyNodeRef::ExprYield(_)
             | AnyNodeRef::ExprYieldFrom(_)
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
-            | AnyNodeRef::ExprFormattedValue(_)
+            | AnyNodeRef::FStringExpressionElement(_)
+            | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringFormatSpec(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)
@@ -5525,6 +5832,9 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
+            | AnyNodeRef::FString(_)
+            | AnyNodeRef::StringLiteral(_)
+            | AnyNodeRef::BytesLiteral(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -5568,23 +5878,25 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::StmtContinue(_)
             | AnyNodeRef::StmtIpyEscapeCommand(_)
             | AnyNodeRef::ExprBoolOp(_)
-            | AnyNodeRef::ExprNamedExpr(_)
+            | AnyNodeRef::ExprNamed(_)
             | AnyNodeRef::ExprBinOp(_)
             | AnyNodeRef::ExprUnaryOp(_)
             | AnyNodeRef::ExprLambda(_)
-            | AnyNodeRef::ExprIfExp(_)
+            | AnyNodeRef::ExprIf(_)
             | AnyNodeRef::ExprDict(_)
             | AnyNodeRef::ExprSet(_)
             | AnyNodeRef::ExprListComp(_)
             | AnyNodeRef::ExprSetComp(_)
             | AnyNodeRef::ExprDictComp(_)
-            | AnyNodeRef::ExprGeneratorExp(_)
+            | AnyNodeRef::ExprGenerator(_)
             | AnyNodeRef::ExprAwait(_)
             | AnyNodeRef::ExprYield(_)
             | AnyNodeRef::ExprYieldFrom(_)
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
-            | AnyNodeRef::ExprFormattedValue(_)
+            | AnyNodeRef::FStringExpressionElement(_)
+            | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringFormatSpec(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)
@@ -5617,6 +5929,9 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
+            | AnyNodeRef::FString(_)
+            | AnyNodeRef::StringLiteral(_)
+            | AnyNodeRef::BytesLiteral(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -5653,23 +5968,25 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::StmtContinue(_)
             | AnyNodeRef::StmtIpyEscapeCommand(_)
             | AnyNodeRef::ExprBoolOp(_)
-            | AnyNodeRef::ExprNamedExpr(_)
+            | AnyNodeRef::ExprNamed(_)
             | AnyNodeRef::ExprBinOp(_)
             | AnyNodeRef::ExprUnaryOp(_)
             | AnyNodeRef::ExprLambda(_)
-            | AnyNodeRef::ExprIfExp(_)
+            | AnyNodeRef::ExprIf(_)
             | AnyNodeRef::ExprDict(_)
             | AnyNodeRef::ExprSet(_)
             | AnyNodeRef::ExprListComp(_)
             | AnyNodeRef::ExprSetComp(_)
             | AnyNodeRef::ExprDictComp(_)
-            | AnyNodeRef::ExprGeneratorExp(_)
+            | AnyNodeRef::ExprGenerator(_)
             | AnyNodeRef::ExprAwait(_)
             | AnyNodeRef::ExprYield(_)
             | AnyNodeRef::ExprYieldFrom(_)
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
-            | AnyNodeRef::ExprFormattedValue(_)
+            | AnyNodeRef::FStringExpressionElement(_)
+            | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringFormatSpec(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)
@@ -5709,24 +6026,11 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
+            | AnyNodeRef::FString(_)
+            | AnyNodeRef::StringLiteral(_)
+            | AnyNodeRef::BytesLiteral(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
-    }
-
-    pub const fn is_node_with_body(self) -> bool {
-        matches!(
-            self,
-            AnyNodeRef::StmtIf(_)
-                | AnyNodeRef::StmtFor(_)
-                | AnyNodeRef::StmtWhile(_)
-                | AnyNodeRef::StmtWith(_)
-                | AnyNodeRef::StmtMatch(_)
-                | AnyNodeRef::StmtFunctionDef(_)
-                | AnyNodeRef::StmtClassDef(_)
-                | AnyNodeRef::StmtTry(_)
-                | AnyNodeRef::ExceptHandlerExceptHandler(_)
-                | AnyNodeRef::ElifElseClause(_)
-        )
     }
 
     /// In our AST, only some alternative branches are represented as a node. This has historical
@@ -5739,9 +6043,10 @@ impl<'a> AnyNodeRef<'a> {
         )
     }
 
-    pub fn visit_preorder<'b, V>(&'b self, visitor: &mut V)
+    pub fn visit_preorder<'b, V>(self, visitor: &mut V)
     where
         V: PreorderVisitor<'b> + ?Sized,
+        'a: 'b,
     {
         match self {
             AnyNodeRef::ModModule(node) => node.visit_preorder(visitor),
@@ -5772,23 +6077,25 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::StmtContinue(node) => node.visit_preorder(visitor),
             AnyNodeRef::StmtIpyEscapeCommand(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprBoolOp(node) => node.visit_preorder(visitor),
-            AnyNodeRef::ExprNamedExpr(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprNamed(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprBinOp(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprUnaryOp(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprLambda(node) => node.visit_preorder(visitor),
-            AnyNodeRef::ExprIfExp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprIf(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprDict(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprSet(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprListComp(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprSetComp(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprDictComp(node) => node.visit_preorder(visitor),
-            AnyNodeRef::ExprGeneratorExp(node) => node.visit_preorder(visitor),
+            AnyNodeRef::ExprGenerator(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprAwait(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprYield(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprYieldFrom(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprCompare(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprCall(node) => node.visit_preorder(visitor),
-            AnyNodeRef::ExprFormattedValue(node) => node.visit_preorder(visitor),
+            AnyNodeRef::FStringExpressionElement(node) => node.visit_preorder(visitor),
+            AnyNodeRef::FStringLiteralElement(node) => node.visit_preorder(visitor),
+            AnyNodeRef::FStringFormatSpec(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprFString(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprStringLiteral(node) => node.visit_preorder(visitor),
             AnyNodeRef::ExprBytesLiteral(node) => node.visit_preorder(visitor),
@@ -5829,6 +6136,9 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::TypeParamTypeVar(node) => node.visit_preorder(visitor),
             AnyNodeRef::TypeParamTypeVarTuple(node) => node.visit_preorder(visitor),
             AnyNodeRef::TypeParamParamSpec(node) => node.visit_preorder(visitor),
+            AnyNodeRef::FString(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StringLiteral(node) => node.visit_preorder(visitor),
+            AnyNodeRef::BytesLiteral(node) => node.visit_preorder(visitor),
             AnyNodeRef::ElifElseClause(node) => node.visit_preorder(visitor),
         }
     }
@@ -5892,6 +6202,120 @@ impl<'a> AnyNodeRef<'a> {
 
         body.last().map(AnyNodeRef::from)
     }
+
+    /// Check if the given statement is the first statement after the colon of a branch, be it in if
+    /// statements, for statements, after each part of a try-except-else-finally or function/class
+    /// definitions.
+    ///
+    ///
+    /// ```python
+    /// if True:    <- has body
+    ///     a       <- first statement
+    ///     b
+    /// elif b:     <- has body
+    ///     c       <- first statement
+    ///     d
+    /// else:       <- has body
+    ///     e       <- first statement
+    ///     f
+    ///
+    /// class:      <- has body
+    ///     a: int  <- first statement
+    ///     b: int
+    ///
+    /// ```
+    ///
+    /// For nodes with multiple bodies, we check all bodies that don't have their own node. For
+    /// try-except-else-finally, each except branch has it's own node, so for the `StmtTry`, we check
+    /// the `try:`, `else:` and `finally:`, bodies, while `ExceptHandlerExceptHandler` has it's own
+    /// check. For for-else and while-else, we check both branches for the whole statement.
+    ///
+    /// ```python
+    /// try:        <- has body (a)
+    ///     6/8     <- first statement (a)
+    ///     1/0
+    /// except:     <- has body (b)
+    ///     a       <- first statement (b)
+    ///     b
+    /// else:
+    ///     c       <- first statement (a)
+    ///     d
+    /// finally:
+    ///     e       <- first statement (a)
+    ///     f
+    /// ```
+    pub fn is_first_statement_in_body(&self, body: AnyNodeRef) -> bool {
+        match body {
+            AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
+            | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
+                are_same_optional(*self, body.first()) || are_same_optional(*self, orelse.first())
+            }
+
+            AnyNodeRef::StmtTry(ast::StmtTry {
+                body,
+                orelse,
+                finalbody,
+                ..
+            }) => {
+                are_same_optional(*self, body.first())
+                    || are_same_optional(*self, orelse.first())
+                    || are_same_optional(*self, finalbody.first())
+            }
+
+            AnyNodeRef::StmtIf(ast::StmtIf { body, .. })
+            | AnyNodeRef::ElifElseClause(ast::ElifElseClause { body, .. })
+            | AnyNodeRef::StmtWith(ast::StmtWith { body, .. })
+            | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
+                body,
+                ..
+            })
+            | AnyNodeRef::MatchCase(MatchCase { body, .. })
+            | AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
+            | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. }) => {
+                are_same_optional(*self, body.first())
+            }
+
+            AnyNodeRef::StmtMatch(ast::StmtMatch { cases, .. }) => {
+                are_same_optional(*self, cases.first())
+            }
+
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if `statement` is the first statement in an alternate `body` (e.g. the else of an if statement)
+    pub fn is_first_statement_in_alternate_body(&self, body: AnyNodeRef) -> bool {
+        match body {
+            AnyNodeRef::StmtFor(ast::StmtFor { orelse, .. })
+            | AnyNodeRef::StmtWhile(ast::StmtWhile { orelse, .. }) => {
+                are_same_optional(*self, orelse.first())
+            }
+
+            AnyNodeRef::StmtTry(ast::StmtTry {
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            }) => {
+                are_same_optional(*self, handlers.first())
+                    || are_same_optional(*self, orelse.first())
+                    || are_same_optional(*self, finalbody.first())
+            }
+
+            AnyNodeRef::StmtIf(ast::StmtIf {
+                elif_else_clauses, ..
+            }) => are_same_optional(*self, elif_else_clauses.first()),
+            _ => false,
+        }
+    }
+}
+
+/// Returns `true` if `right` is `Some` and `left` and `right` are referentially equal.
+fn are_same_optional<'a, T>(left: AnyNodeRef, right: Option<T>) -> bool
+where
+    T: Into<AnyNodeRef<'a>>,
+{
+    right.is_some_and(|right| left.ptr_eq(right.into()))
 }
 
 impl<'a> From<&'a ast::ModModule> for AnyNodeRef<'a> {
@@ -6068,9 +6492,9 @@ impl<'a> From<&'a ast::ExprBoolOp> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ExprNamedExpr> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::ExprNamedExpr) -> Self {
-        AnyNodeRef::ExprNamedExpr(node)
+impl<'a> From<&'a ast::ExprNamed> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::ExprNamed) -> Self {
+        AnyNodeRef::ExprNamed(node)
     }
 }
 
@@ -6092,9 +6516,9 @@ impl<'a> From<&'a ast::ExprLambda> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ExprIfExp> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::ExprIfExp) -> Self {
-        AnyNodeRef::ExprIfExp(node)
+impl<'a> From<&'a ast::ExprIf> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::ExprIf) -> Self {
+        AnyNodeRef::ExprIf(node)
     }
 }
 
@@ -6128,9 +6552,9 @@ impl<'a> From<&'a ast::ExprDictComp> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ExprGeneratorExp> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::ExprGeneratorExp) -> Self {
-        AnyNodeRef::ExprGeneratorExp(node)
+impl<'a> From<&'a ast::ExprGenerator> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::ExprGenerator) -> Self {
+        AnyNodeRef::ExprGenerator(node)
     }
 }
 
@@ -6164,9 +6588,21 @@ impl<'a> From<&'a ast::ExprCall> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ExprFormattedValue> for AnyNodeRef<'a> {
-    fn from(node: &'a ast::ExprFormattedValue) -> Self {
-        AnyNodeRef::ExprFormattedValue(node)
+impl<'a> From<&'a ast::FStringExpressionElement> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::FStringExpressionElement) -> Self {
+        AnyNodeRef::FStringExpressionElement(node)
+    }
+}
+
+impl<'a> From<&'a ast::FStringLiteralElement> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::FStringLiteralElement) -> Self {
+        AnyNodeRef::FStringLiteralElement(node)
+    }
+}
+
+impl<'a> From<&'a ast::FStringFormatSpec> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::FStringFormatSpec) -> Self {
+        AnyNodeRef::FStringFormatSpec(node)
     }
 }
 
@@ -6355,6 +6791,24 @@ impl<'a> From<&'a TypeParamParamSpec> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a ast::FString> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::FString) -> Self {
+        AnyNodeRef::FString(node)
+    }
+}
+
+impl<'a> From<&'a ast::StringLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::StringLiteral) -> Self {
+        AnyNodeRef::StringLiteral(node)
+    }
+}
+
+impl<'a> From<&'a ast::BytesLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::BytesLiteral) -> Self {
+        AnyNodeRef::BytesLiteral(node)
+    }
+}
+
 impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
     fn from(stmt: &'a Stmt) -> Self {
         match stmt {
@@ -6391,23 +6845,22 @@ impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
     fn from(expr: &'a Expr) -> Self {
         match expr {
             Expr::BoolOp(node) => AnyNodeRef::ExprBoolOp(node),
-            Expr::NamedExpr(node) => AnyNodeRef::ExprNamedExpr(node),
+            Expr::Named(node) => AnyNodeRef::ExprNamed(node),
             Expr::BinOp(node) => AnyNodeRef::ExprBinOp(node),
             Expr::UnaryOp(node) => AnyNodeRef::ExprUnaryOp(node),
             Expr::Lambda(node) => AnyNodeRef::ExprLambda(node),
-            Expr::IfExp(node) => AnyNodeRef::ExprIfExp(node),
+            Expr::If(node) => AnyNodeRef::ExprIf(node),
             Expr::Dict(node) => AnyNodeRef::ExprDict(node),
             Expr::Set(node) => AnyNodeRef::ExprSet(node),
             Expr::ListComp(node) => AnyNodeRef::ExprListComp(node),
             Expr::SetComp(node) => AnyNodeRef::ExprSetComp(node),
             Expr::DictComp(node) => AnyNodeRef::ExprDictComp(node),
-            Expr::GeneratorExp(node) => AnyNodeRef::ExprGeneratorExp(node),
+            Expr::Generator(node) => AnyNodeRef::ExprGenerator(node),
             Expr::Await(node) => AnyNodeRef::ExprAwait(node),
             Expr::Yield(node) => AnyNodeRef::ExprYield(node),
             Expr::YieldFrom(node) => AnyNodeRef::ExprYieldFrom(node),
             Expr::Compare(node) => AnyNodeRef::ExprCompare(node),
             Expr::Call(node) => AnyNodeRef::ExprCall(node),
-            Expr::FormattedValue(node) => AnyNodeRef::ExprFormattedValue(node),
             Expr::FString(node) => AnyNodeRef::ExprFString(node),
             Expr::StringLiteral(node) => AnyNodeRef::ExprStringLiteral(node),
             Expr::BytesLiteral(node) => AnyNodeRef::ExprBytesLiteral(node),
@@ -6432,6 +6885,15 @@ impl<'a> From<&'a Mod> for AnyNodeRef<'a> {
         match module {
             Mod::Module(node) => AnyNodeRef::ModModule(node),
             Mod::Expression(node) => AnyNodeRef::ModExpression(node),
+        }
+    }
+}
+
+impl<'a> From<&'a FStringElement> for AnyNodeRef<'a> {
+    fn from(element: &'a FStringElement) -> Self {
+        match element {
+            FStringElement::Expression(node) => AnyNodeRef::FStringExpressionElement(node),
+            FStringElement::Literal(node) => AnyNodeRef::FStringLiteralElement(node),
         }
     }
 }
@@ -6548,23 +7010,25 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::StmtContinue(node) => node.range(),
             AnyNodeRef::StmtIpyEscapeCommand(node) => node.range(),
             AnyNodeRef::ExprBoolOp(node) => node.range(),
-            AnyNodeRef::ExprNamedExpr(node) => node.range(),
+            AnyNodeRef::ExprNamed(node) => node.range(),
             AnyNodeRef::ExprBinOp(node) => node.range(),
             AnyNodeRef::ExprUnaryOp(node) => node.range(),
             AnyNodeRef::ExprLambda(node) => node.range(),
-            AnyNodeRef::ExprIfExp(node) => node.range(),
+            AnyNodeRef::ExprIf(node) => node.range(),
             AnyNodeRef::ExprDict(node) => node.range(),
             AnyNodeRef::ExprSet(node) => node.range(),
             AnyNodeRef::ExprListComp(node) => node.range(),
             AnyNodeRef::ExprSetComp(node) => node.range(),
             AnyNodeRef::ExprDictComp(node) => node.range(),
-            AnyNodeRef::ExprGeneratorExp(node) => node.range(),
+            AnyNodeRef::ExprGenerator(node) => node.range(),
             AnyNodeRef::ExprAwait(node) => node.range(),
             AnyNodeRef::ExprYield(node) => node.range(),
             AnyNodeRef::ExprYieldFrom(node) => node.range(),
             AnyNodeRef::ExprCompare(node) => node.range(),
             AnyNodeRef::ExprCall(node) => node.range(),
-            AnyNodeRef::ExprFormattedValue(node) => node.range(),
+            AnyNodeRef::FStringExpressionElement(node) => node.range(),
+            AnyNodeRef::FStringLiteralElement(node) => node.range(),
+            AnyNodeRef::FStringFormatSpec(node) => node.range(),
             AnyNodeRef::ExprFString(node) => node.range(),
             AnyNodeRef::ExprStringLiteral(node) => node.range(),
             AnyNodeRef::ExprBytesLiteral(node) => node.range(),
@@ -6606,6 +7070,9 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::TypeParamTypeVar(node) => node.range(),
             AnyNodeRef::TypeParamTypeVarTuple(node) => node.range(),
             AnyNodeRef::TypeParamParamSpec(node) => node.range(),
+            AnyNodeRef::FString(node) => node.range(),
+            AnyNodeRef::StringLiteral(node) => node.range(),
+            AnyNodeRef::BytesLiteral(node) => node.range(),
         }
     }
 }
@@ -6642,23 +7109,25 @@ pub enum NodeKind {
     StmtBreak,
     StmtContinue,
     ExprBoolOp,
-    ExprNamedExpr,
+    ExprNamed,
     ExprBinOp,
     ExprUnaryOp,
     ExprLambda,
-    ExprIfExp,
+    ExprIf,
     ExprDict,
     ExprSet,
     ExprListComp,
     ExprSetComp,
     ExprDictComp,
-    ExprGeneratorExp,
+    ExprGenerator,
     ExprAwait,
     ExprYield,
     ExprYieldFrom,
     ExprCompare,
     ExprCall,
-    ExprFormattedValue,
+    FStringExpressionElement,
+    FStringLiteralElement,
+    FStringFormatSpec,
     ExprFString,
     ExprStringLiteral,
     ExprBytesLiteral,
@@ -6701,4 +7170,7 @@ pub enum NodeKind {
     TypeParamTypeVar,
     TypeParamTypeVarTuple,
     TypeParamParamSpec,
+    FString,
+    StringLiteral,
+    BytesLiteral,
 }

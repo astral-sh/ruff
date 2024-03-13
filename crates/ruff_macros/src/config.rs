@@ -48,10 +48,10 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream> {
                         for token in list.tokens.clone() {
                             if let TokenTree::Ident(ident) = token {
                                 if ident == "flatten" {
-                                    let ty_name = ty.path.require_ident()?;
                                     output.push(quote_spanned!(
-                                        ident.span() => (#ty_name::record(visit))
+                                        ty.span() => (<#ty>::record(visit))
                                     ));
+
                                     break;
                                 }
                             }
@@ -190,8 +190,15 @@ fn handle_option(field: &Field, attr: &Attribute) -> syn::Result<proc_macro2::To
         default,
         value_type,
         example,
+        scope,
     } = parse_field_attributes(attr)?;
     let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
+
+    let scope = if let Some(scope) = scope {
+        quote!(Some(#scope))
+    } else {
+        quote!(None)
+    };
 
     let deprecated = if let Some(deprecated) = field
         .attrs
@@ -221,6 +228,7 @@ fn handle_option(field: &Field, attr: &Attribute) -> syn::Result<proc_macro2::To
                 default: &#default,
                 value_type: &#value_type,
                 example: &#example,
+                scope: #scope,
                 deprecated: #deprecated
             })
         }
@@ -232,18 +240,22 @@ struct FieldAttributes {
     default: String,
     value_type: String,
     example: String,
+    scope: Option<String>,
 }
 
 fn parse_field_attributes(attribute: &Attribute) -> syn::Result<FieldAttributes> {
     let mut default = None;
     let mut value_type = None;
     let mut example = None;
+    let mut scope = None;
 
     attribute.parse_nested_meta(|meta| {
         if meta.path.is_ident("default") {
             default = Some(get_string_literal(&meta, "default", "option")?.value());
         } else if meta.path.is_ident("value_type") {
             value_type = Some(get_string_literal(&meta, "value_type", "option")?.value());
+        } else if meta.path.is_ident("scope") {
+            scope = Some(get_string_literal(&meta, "scope", "option")?.value());
         } else if meta.path.is_ident("example") {
             let example_text = get_string_literal(&meta, "value_type", "option")?.value();
             example = Some(dedent(&example_text).trim_matches('\n').to_string());
@@ -276,6 +288,7 @@ fn parse_field_attributes(attribute: &Attribute) -> syn::Result<FieldAttributes>
         default,
         value_type,
         example,
+        scope,
     })
 }
 

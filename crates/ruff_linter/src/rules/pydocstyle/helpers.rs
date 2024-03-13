@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
-use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_source_file::UniversalNewlines;
 
@@ -10,8 +10,9 @@ pub(super) fn logical_line(content: &str) -> Option<usize> {
     // Find the first logical line.
     let mut logical_line = None;
     for (i, line) in content.universal_newlines().enumerate() {
-        if line.trim().is_empty() {
-            // Empty line. If this is the line _after_ the first logical line, stop.
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.chars().all(|c| matches!(c, '-' | '~' | '=' | '#')) {
+            // Empty line, or underline. If this is the line _after_ the first logical line, stop.
             if logical_line.is_some() {
                 break;
             }
@@ -52,11 +53,11 @@ pub(crate) fn should_ignore_definition(
 
     function.decorator_list.iter().any(|decorator| {
         semantic
-            .resolve_call_path(map_callable(&decorator.expression))
-            .is_some_and(|call_path| {
+            .resolve_qualified_name(map_callable(&decorator.expression))
+            .is_some_and(|qualified_name| {
                 ignore_decorators
                     .iter()
-                    .any(|decorator| from_qualified_name(decorator) == call_path)
+                    .any(|decorator| QualifiedName::from_dotted_name(decorator) == qualified_name)
             })
     })
 }

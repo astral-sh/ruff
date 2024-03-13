@@ -55,7 +55,7 @@ fn password_target(target: &Expr) -> Option<&str> {
         Expr::Name(ast::ExprName { id, .. }) => id.as_str(),
         // d["password"] = "s3cr3t"
         Expr::Subscript(ast::ExprSubscript { slice, .. }) => match slice.as_ref() {
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value,
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.to_str(),
             _ => return None,
         },
         // obj.password = "s3cr3t"

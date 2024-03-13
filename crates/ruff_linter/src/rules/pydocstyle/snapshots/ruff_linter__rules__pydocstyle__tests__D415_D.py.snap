@@ -308,5 +308,8 @@ D.py:664:5: D415 [*] First line should end with a period, question mark, or excl
 664 664 |     "We enforce a newline after the closing quote for a multi-line docstring \
 665     |-    but continuations shouldn't be considered multi-line"
     665 |+    but continuations shouldn't be considered multi-line."
+666 666 | 
+667 667 | 
+668 668 | 
 
 

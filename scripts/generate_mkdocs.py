@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import shutil
 import subprocess
@@ -50,6 +51,7 @@ LINK_REWRITES: dict[str, str] = {
     "https://docs.astral.sh/ruff/installation/": "installation.md",
     "https://docs.astral.sh/ruff/rules/": "rules.md",
     "https://docs.astral.sh/ruff/settings/": "settings.md",
+    "#whos-using-ruff": "https://github.com/astral-sh/ruff#whos-using-ruff",
 }
 
 
@@ -106,7 +108,7 @@ def main() -> None:
         if not generated:
             continue
 
-        with Path(f"docs/{filename}").open("w+") as f:
+        with Path(f"docs/{filename}").open("w+", encoding="utf8") as f:
             if filename == "contributing.md":
                 # Copy the CONTRIBUTING.md.
                 shutil.copy("CONTRIBUTING.md", "docs/contributing.md")
@@ -138,12 +140,40 @@ def main() -> None:
 
             f.write(clean_file_content(file_content, title))
 
-    # Add the nav section to mkdocs.yml.
     with Path("mkdocs.template.yml").open(encoding="utf8") as fp:
         config = yaml.safe_load(fp)
+
+    # Add the redirect section to mkdocs.yml.
+    rules = json.loads(
+        subprocess.check_output(
+            [
+                "cargo",
+                "run",
+                "-p",
+                "ruff",
+                "--",
+                "rule",
+                "--all",
+                "--output-format",
+                "json",
+            ],
+        ),
+    )
+    config["plugins"].append(
+        {
+            "redirects": {
+                "redirect_maps": {
+                    f'rules/{rule["code"]}.md': f'rules/{rule["name"]}.md'
+                    for rule in rules
+                },
+            },
+        },
+    )
+
+    # Add the nav section to mkdocs.yml.
     config["nav"] = [{section.title: section.filename} for section in SECTIONS]
 
-    with Path("mkdocs.generated.yml").open("w+") as fp:
+    with Path("mkdocs.generated.yml").open("w+", encoding="utf8") as fp:
         yaml.safe_dump(config, fp)
 
 

@@ -1,12 +1,10 @@
-use ruff_python_ast::{Expr, Keyword};
-
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_text_size::Ranged;
+use ruff_python_ast as ast;
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-
-use crate::rules::flake8_comprehensions::fixes;
+use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
 
 use super::helpers;
 
@@ -28,6 +26,10 @@ use super::helpers;
 /// ```python
 /// {f(x) for x in foo}
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may occasionally drop comments
+/// when rewriting the call. In most cases, though, comments will be preserved.
 #[violation]
 pub struct UnnecessaryGeneratorSet;
 
@@ -43,26 +45,40 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorSet {
 }
 
 /// C401 (`set(generator)`)
-pub(crate) fn unnecessary_generator_set(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
-    let Some(argument) =
-        helpers::exactly_one_argument_with_matching_function("set", func, args, keywords)
-    else {
+pub(crate) fn unnecessary_generator_set(checker: &mut Checker, call: &ast::ExprCall) {
+    let Some(argument) = helpers::exactly_one_argument_with_matching_function(
+        "set",
+        &call.func,
+        &call.arguments.args,
+        &call.arguments.keywords,
+    ) else {
         return;
     };
     if !checker.semantic().is_builtin("set") {
         return;
     }
-    if let Expr::GeneratorExp(_) = argument {
-        let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorSet, expr.range());
-        diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_generator_set(expr, checker).map(Fix::unsafe_edit)
+    if argument.is_generator_expr() {
+        let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorSet, call.range());
+
+        // Convert `set(x for x in y)` to `{x for x in y}`.
+        diagnostic.set_fix({
+            // Replace `set(` with `}`.
+            let call_start = Edit::replacement(
+                pad_start("{", call.range(), checker.locator(), checker.semantic()),
+                call.start(),
+                call.arguments.start() + TextSize::from(1),
+            );
+
+            // Replace `)` with `}`.
+            let call_end = Edit::replacement(
+                pad_end("}", call.range(), checker.locator(), checker.semantic()),
+                call.arguments.end() - TextSize::from(1),
+                call.end(),
+            );
+
+            Fix::unsafe_edits(call_start, [call_end])
         });
+
         checker.diagnostics.push(diagnostic);
     }
 }

@@ -181,15 +181,10 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
             continue;
         };
 
-        if let Expr::StringLiteral(ast::ExprStringLiteral {
-            range,
-            value: string,
-            ..
-        }) = annotation.as_ref()
-        {
+        if let Expr::StringLiteral(ast::ExprStringLiteral { range, value }) = annotation.as_ref() {
             // Quoted annotation.
             if let Ok((annotation, kind)) =
-                parse_type_annotation(string, *range, checker.locator().contents())
+                parse_type_annotation(value.to_str(), *range, checker.locator().contents())
             {
                 let Some(expr) = type_hint_explicitly_allows_none(
                     &annotation,

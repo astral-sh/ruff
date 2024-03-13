@@ -1,35 +1,4 @@
-#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, is_macro::Is)]
-pub enum Quote {
-    Single,
-    Double,
-}
-
-impl Quote {
-    #[inline]
-    #[must_use]
-    pub const fn swap(self) -> Self {
-        match self {
-            Quote::Single => Quote::Double,
-            Quote::Double => Quote::Single,
-        }
-    }
-
-    #[inline]
-    pub const fn to_byte(&self) -> u8 {
-        match self {
-            Quote::Single => b'\'',
-            Quote::Double => b'"',
-        }
-    }
-
-    #[inline]
-    pub const fn to_char(&self) -> char {
-        match self {
-            Quote::Single => '\'',
-            Quote::Double => '"',
-        }
-    }
-}
+use ruff_python_ast::str::Quote;
 
 pub struct EscapeLayout {
     pub quote: Quote,
@@ -69,7 +38,7 @@ pub(crate) const fn choose_quote(
     // always use primary unless we have primary but no secondary
     let use_secondary = primary_count > 0 && secondary_count == 0;
     if use_secondary {
-        (preferred_quote.swap(), secondary_count)
+        (preferred_quote.opposite(), secondary_count)
     } else {
         (preferred_quote, primary_count)
     }
@@ -105,7 +74,7 @@ pub struct StrRepr<'r, 'a>(&'r UnicodeEscape<'a>);
 
 impl StrRepr<'_, '_> {
     pub fn write(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
-        let quote = self.0.layout().quote.to_char();
+        let quote = self.0.layout().quote.as_char();
         formatter.write_char(quote)?;
         self.0.write_body(formatter)?;
         formatter.write_char(quote)
@@ -216,7 +185,7 @@ impl UnicodeEscape<'_> {
             // unicodedata lookup just for ascii characters
             '\x20'..='\x7e' => {
                 // printable ascii range
-                if ch == quote.to_char() || ch == '\\' {
+                if ch == quote.as_char() || ch == '\\' {
                     formatter.write_char('\\')?;
                 }
                 formatter.write_char(ch)
@@ -257,24 +226,6 @@ impl<'a> Escape for UnicodeEscape<'a> {
             Self::write_char(ch, self.layout().quote, formatter)?;
         }
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod unicode_escape_tests {
-    use super::*;
-
-    #[test]
-    fn changed() {
-        fn test(s: &str) -> bool {
-            UnicodeEscape::new_repr(s).changed()
-        }
-        assert!(!test("hello"));
-        assert!(!test("'hello'"));
-        assert!(!test("\"hello\""));
-
-        assert!(test("'\"hello"));
-        assert!(test("hello\n"));
     }
 }
 
@@ -397,7 +348,7 @@ impl AsciiEscape<'_> {
             b'\r' => formatter.write_str("\\r"),
             0x20..=0x7e => {
                 // printable ascii range
-                if ch == quote.to_byte() || ch == b'\\' {
+                if ch == quote.as_byte() || ch == b'\\' {
                     formatter.write_char('\\')?;
                 }
                 formatter.write_char(ch as char)
@@ -415,12 +366,10 @@ impl<'a> Escape for AsciiEscape<'a> {
     fn layout(&self) -> &EscapeLayout {
         &self.layout
     }
-    #[allow(unsafe_code)]
     fn write_source(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
-        formatter.write_str(unsafe {
-            // SAFETY: this function must be called only when source is printable ascii characters
-            std::str::from_utf8_unchecked(self.source)
-        })
+        // OK because function must be called only when source is printable ascii characters.
+        let string = std::str::from_utf8(self.source).expect("ASCII bytes");
+        formatter.write_str(string)
     }
 
     #[cold]
@@ -436,7 +385,7 @@ pub struct BytesRepr<'r, 'a>(&'r AsciiEscape<'a>);
 
 impl BytesRepr<'_, '_> {
     pub fn write(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
-        let quote = self.0.layout().quote.to_char();
+        let quote = self.0.layout().quote.as_char();
         formatter.write_char('b')?;
         formatter.write_char(quote)?;
         self.0.write_body(formatter)?;
@@ -453,5 +402,23 @@ impl BytesRepr<'_, '_> {
 impl std::fmt::Display for BytesRepr<'_, '_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.write(formatter)
+    }
+}
+
+#[cfg(test)]
+mod unicode_escape_tests {
+    use super::*;
+
+    #[test]
+    fn changed() {
+        fn test(s: &str) -> bool {
+            UnicodeEscape::new_repr(s).changed()
+        }
+        assert!(!test("hello"));
+        assert!(!test("'hello'"));
+        assert!(!test("\"hello\""));
+
+        assert!(test("'\"hello"));
+        assert!(test("hello\n"));
     }
 }

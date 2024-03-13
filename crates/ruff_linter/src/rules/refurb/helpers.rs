@@ -21,8 +21,8 @@ pub(super) fn generate_method_call(name: &str, method: &str, generator: Generato
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
-            args: vec![],
-            keywords: vec![],
+            args: Box::from([]),
+            keywords: Box::from([]),
             range: TextRange::default(),
         },
         range: TextRange::default(),
@@ -55,8 +55,8 @@ pub(super) fn generate_none_identity_comparison(
     };
     let compare = ast::ExprCompare {
         left: Box::new(var.into()),
-        ops: vec![op],
-        comparators: vec![ast::Expr::NoneLiteral(ast::ExprNoneLiteral::default())],
+        ops: Box::from([op]),
+        comparators: Box::from([ast::Expr::NoneLiteral(ast::ExprNoneLiteral::default())]),
         range: TextRange::default(),
     };
     generator.expr(&compare.into())

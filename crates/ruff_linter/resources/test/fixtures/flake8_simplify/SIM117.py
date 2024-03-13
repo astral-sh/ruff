@@ -134,3 +134,32 @@ with A() as a:
         f" something { my_dict["key"] } something else "
 
         f"foo {f"bar {x}"} baz"
+
+# Allow cascading for some statements.
+import anyio
+import asyncio
+import trio
+
+async with asyncio.timeout(1):
+    async with A() as a:
+        pass
+
+async with A():
+    async with asyncio.timeout(1):
+        pass
+
+async with asyncio.timeout(1):
+    async with asyncio.timeout_at(1):
+        async with anyio.CancelScope():
+            async with anyio.fail_after(1):
+                async with anyio.move_on_after(1):
+                    async with trio.fail_after(1):
+                        async with trio.fail_at(1):
+                            async with trio.move_on_after(1):
+                                async with trio.move_on_at(1):
+                                    pass
+
+# Do not suppress combination, if a context manager is already combined with another.
+async with asyncio.timeout(1), A():
+    async with B():
+        pass

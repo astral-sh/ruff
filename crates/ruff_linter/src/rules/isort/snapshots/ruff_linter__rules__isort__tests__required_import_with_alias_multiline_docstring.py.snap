@@ -8,7 +8,7 @@ multiline_docstring.py:1:1: I002 [*] Missing required import: `from __future__ i
 2 | b"""
 3 | # b
   |
-  = help: Insert required import: `from future import annotations as _annotations`
+  = help: Insert required import: `from __future__ import annotations as _annotations`
 
 ℹ Safe fix
 1 1 | """a

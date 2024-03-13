@@ -48,3 +48,12 @@ await (
     # comment
     [foo]
 )
+
+# https://github.com/astral-sh/ruff/issues/8644
+test_data = await (
+    Stream.from_async(async_data)
+    .flat_map_async()
+    .map()
+    .filter_async(is_valid_data)
+    .to_list()
+)

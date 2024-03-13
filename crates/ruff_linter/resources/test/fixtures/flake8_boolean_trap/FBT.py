@@ -71,6 +71,8 @@ foo.is_(True)
 bar.is_not(False)
 next(iter([]), False)
 sa.func.coalesce(tbl.c.valid, False)
+setVisible(True)
+set_visible(True)
 
 
 class Registry:
@@ -91,3 +93,42 @@ class Registry:
 
     def foo(self) -> None:
         object.__setattr__(self, "flag", True)
+
+
+from typing import Optional, Union
+
+
+def func(x: Union[list, Optional[int | str | float | bool]]):
+    pass
+
+
+def func(x: bool | str):
+    pass
+
+
+def func(x: int | str):
+    pass
+
+
+from typing import override
+
+
+@override
+def func(x: bool):
+    pass
+
+
+settings(True)
+
+
+from dataclasses import dataclass, InitVar
+
+
+@dataclass
+class Fit:
+    force: InitVar[bool] = False
+
+    def __post_init__(self, force: bool) -> None:
+        print(force)
+
+Fit(force=True)

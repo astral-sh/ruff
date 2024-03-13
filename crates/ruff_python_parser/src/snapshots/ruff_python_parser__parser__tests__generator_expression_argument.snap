@@ -11,9 +11,19 @@ Call(
                 value: StringLiteral(
                     ExprStringLiteral {
                         range: 0..3,
-                        value: " ",
-                        unicode: false,
-                        implicit_concatenated: false,
+                        value: StringLiteralValue {
+                            inner: Single(
+                                StringLiteral {
+                                    range: 0..3,
+                                    value: " ",
+                                    flags: StringLiteralFlags {
+                                        quote_style: Single,
+                                        prefix: "",
+                                        triple_quoted: false,
+                                    },
+                                },
+                            ),
+                        },
                     },
                 ),
                 attr: Identifier {
@@ -26,8 +36,8 @@ Call(
         arguments: Arguments {
             range: 8..141,
             args: [
-                GeneratorExp(
-                    ExprGeneratorExp {
+                Generator(
+                    ExprGenerator {
                         range: 14..139,
                         elt: Name(
                             ExprName {
@@ -50,8 +60,8 @@ Call(
                                     ExprTuple {
                                         range: 33..139,
                                         elts: [
-                                            IfExp(
-                                                ExprIfExp {
+                                            If(
+                                                ExprIf {
                                                     range: 43..80,
                                                     test: Name(
                                                         ExprName {
@@ -66,9 +76,19 @@ Call(
                                                             left: StringLiteral(
                                                                 ExprStringLiteral {
                                                                     range: 43..53,
-                                                                    value: "LIMIT %d",
-                                                                    unicode: false,
-                                                                    implicit_concatenated: false,
+                                                                    value: StringLiteralValue {
+                                                                        inner: Single(
+                                                                            StringLiteral {
+                                                                                range: 43..53,
+                                                                                value: "LIMIT %d",
+                                                                                flags: StringLiteralFlags {
+                                                                                    quote_style: Double,
+                                                                                    prefix: "",
+                                                                                    triple_quoted: false,
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                    },
                                                                 },
                                                             ),
                                                             op: Mod,
@@ -88,8 +108,8 @@ Call(
                                                     ),
                                                 },
                                             ),
-                                            IfExp(
-                                                ExprIfExp {
+                                            If(
+                                                ExprIf {
                                                     range: 90..132,
                                                     test: Name(
                                                         ExprName {
@@ -104,9 +124,19 @@ Call(
                                                             left: StringLiteral(
                                                                 ExprStringLiteral {
                                                                     range: 91..102,
-                                                                    value: "OFFSET %d",
-                                                                    unicode: false,
-                                                                    implicit_concatenated: false,
+                                                                    value: StringLiteralValue {
+                                                                        inner: Single(
+                                                                            StringLiteral {
+                                                                                range: 91..102,
+                                                                                value: "OFFSET %d",
+                                                                                flags: StringLiteralFlags {
+                                                                                    quote_style: Double,
+                                                                                    prefix: "",
+                                                                                    triple_quoted: false,
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                    },
                                                                 },
                                                             ),
                                                             op: Mod,
@@ -128,12 +158,14 @@ Call(
                                             ),
                                         ],
                                         ctx: Load,
+                                        parenthesized: true,
                                     },
                                 ),
                                 ifs: [],
                                 is_async: false,
                             },
                         ],
+                        parenthesized: false,
                     },
                 ),
             ],

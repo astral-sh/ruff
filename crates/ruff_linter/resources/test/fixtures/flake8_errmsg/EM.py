@@ -27,7 +27,7 @@ def f_ok():
     raise RuntimeError(msg)
 
 
-def f_unfixable():
+def f_msg_defined():
     msg = "hello"
     raise RuntimeError("This is an example exception")
 

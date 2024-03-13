@@ -124,17 +124,24 @@ test_particular = [
     b'c'
     )
 }
+
+b"Unicode Escape sequence don't apply to bytes: \N{0x} \u{ABCD} \U{ABCDEFGH}"
 ```
 
 ## Outputs
 ### Output 1
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 4
-quote-style             = Double
-magic-trailing-comma    = Respect
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -273,17 +280,24 @@ test_particular = [
 
 # Parenthesized string continuation with messed up indentation
 {"key": ([], b"a" b"b" b"c")}
+
+b"Unicode Escape sequence don't apply to bytes: \N{0x} \u{ABCD} \U{ABCDEFGH}"
 ```
 
 
 ### Output 2
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 4
-quote-style             = Single
-magic-trailing-comma    = Respect
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Single
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -422,6 +436,8 @@ test_particular = [
 
 # Parenthesized string continuation with messed up indentation
 {'key': ([], b'a' b'b' b'c')}
+
+b"Unicode Escape sequence don't apply to bytes: \N{0x} \u{ABCD} \U{ABCDEFGH}"
 ```
 
 

@@ -1,12 +1,12 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::{from_qualified_name, CallPath};
+use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_python_semantic::{
     analyze::{function_type, visibility},
     Scope, ScopeId, ScopeKind,
 };
-use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, rules::flake8_unused_arguments::helpers};
 
@@ -53,16 +53,17 @@ pub(crate) fn no_self_use(
         return;
     };
 
-    let ScopeKind::Function(ast::StmtFunctionDef {
+    let ScopeKind::Function(func) = scope.kind else {
+        return;
+    };
+
+    let ast::StmtFunctionDef {
         name,
         parameters,
         body,
         decorator_list,
         ..
-    }) = scope.kind
-    else {
-        return;
-    };
+    } = func;
 
     if !matches!(
         function_type::classify(
@@ -83,8 +84,8 @@ pub(crate) fn no_self_use(
         .pydocstyle
         .property_decorators
         .iter()
-        .map(|decorator| from_qualified_name(decorator))
-        .collect::<Vec<CallPath>>();
+        .map(|decorator| QualifiedName::from_dotted_name(decorator))
+        .collect::<Vec<QualifiedName>>();
 
     if helpers::is_empty(body)
         || visibility::is_magic(name)
@@ -135,7 +136,7 @@ pub(crate) fn no_self_use(
             NoSelfUse {
                 method_name: name.to_string(),
             },
-            parameter.range(),
+            func.identifier(),
         ));
     }
 }

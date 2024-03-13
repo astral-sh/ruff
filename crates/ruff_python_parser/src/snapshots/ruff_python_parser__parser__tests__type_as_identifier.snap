@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "parse_suite(source, \"<test>\").unwrap()"
+expression: parse_suite(source).unwrap()
 ---
 [
     Expr(
@@ -52,6 +52,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: false,
                 },
             ),
         },
@@ -105,6 +106,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: false,
                 },
             ),
         },
@@ -385,6 +387,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                             range: 283..285,
                                             elts: [],
                                             ctx: Load,
+                                            parenthesized: true,
                                         },
                                     ),
                                 ],
@@ -425,6 +428,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                             range: 312..314,
                                             elts: [],
                                             ctx: Load,
+                                            parenthesized: true,
                                         },
                                     ),
                                 ],
@@ -505,6 +509,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                         ),
                                     ],
                                     ctx: Load,
+                                    parenthesized: false,
                                 },
                             ),
                             ctx: Load,
@@ -548,6 +553,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                         ),
                                     ],
                                     ctx: Load,
+                                    parenthesized: true,
                                 },
                             ),
                             ctx: Load,
@@ -617,8 +623,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
     If(
         StmtIf {
             range: 481..499,
-            test: NamedExpr(
-                ExprNamedExpr {
+            test: Named(
+                ExprNamed {
                     range: 484..493,
                     target: Name(
                         ExprName {
@@ -983,6 +989,46 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     range: 650..651,
                     value: Int(
                         1,
+                    ),
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 652..666,
+            value: Lambda(
+                ExprLambda {
+                    range: 652..666,
+                    parameters: Some(
+                        Parameters {
+                            range: 659..660,
+                            posonlyargs: [],
+                            args: [
+                                ParameterWithDefault {
+                                    range: 659..660,
+                                    parameter: Parameter {
+                                        range: 659..660,
+                                        name: Identifier {
+                                            id: "x",
+                                            range: 659..660,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                            ],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                    ),
+                    body: Name(
+                        ExprName {
+                            range: 662..666,
+                            id: "type",
+                            ctx: Load,
+                        },
                     ),
                 },
             ),

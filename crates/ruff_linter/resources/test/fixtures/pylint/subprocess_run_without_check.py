@@ -3,6 +3,11 @@ import subprocess
 # Errors.
 subprocess.run("ls")
 subprocess.run("ls", shell=True)
+subprocess.run(
+    ["ls"],
+    shell=False,
+)
+subprocess.run(["ls"], **kwargs)
 
 # Non-errors.
 subprocess.run("ls", check=True)

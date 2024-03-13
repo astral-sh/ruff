@@ -139,21 +139,32 @@ x = (b"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""" b"""bbbbbbbbbbbbbbbbbbbbbbbbbbb
 
 # https://github.com/astral-sh/ruff/issues/7460
 trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
+
+a = f"""\x1F"""
+a = """\x1F"""
+a = """\\x1F"""
+a = """\\\x1F"""
 ```
 
 ## Outputs
 ### Output 1
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 4
-quote-style             = Double
-magic-trailing-comma    = Respect
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
+source_type                = Python
 ```
 
 ```python
 "' test"
+
 '" test'
 
 '" test'
@@ -312,21 +323,32 @@ x = (
 
 # https://github.com/astral-sh/ruff/issues/7460
 trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
+
+a = f"""\x1f"""
+a = """\x1f"""
+a = """\\x1F"""
+a = """\\\x1f"""
 ```
 
 
 ### Output 2
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 4
-quote-style             = Single
-magic-trailing-comma    = Respect
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Single
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
+source_type                = Python
 ```
 
 ```python
 "' test"
+
 '" test'
 
 '" test'
@@ -485,6 +507,11 @@ x = (
 
 # https://github.com/astral-sh/ruff/issues/7460
 trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
+
+a = f"""\x1f"""
+a = """\x1f"""
+a = """\\x1F"""
+a = """\\\x1f"""
 ```
 
 

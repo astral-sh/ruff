@@ -1,0 +1,2 @@
+[tool.ruff]
+include = ["a.py", "subdirectory/c.py"]

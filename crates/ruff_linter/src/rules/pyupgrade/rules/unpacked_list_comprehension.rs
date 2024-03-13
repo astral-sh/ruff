@@ -44,7 +44,7 @@ impl AlwaysFixableViolation for UnpackedListComprehension {
 
 /// UP027
 pub(crate) fn unpacked_list_comprehension(checker: &mut Checker, targets: &[Expr], value: &Expr) {
-    let Some(target) = targets.get(0) else {
+    let Some(target) = targets.first() else {
         return;
     };
 

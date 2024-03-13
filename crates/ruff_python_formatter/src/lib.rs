@@ -1,21 +1,27 @@
 use thiserror::Error;
 use tracing::Level;
 
+pub use range::format_range;
 use ruff_formatter::prelude::*;
-use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
+use ruff_formatter::{format, write, FormatError, Formatted, PrintError, Printed, SourceCode};
 use ruff_python_ast::AstNode;
 use ruff_python_ast::Mod;
 use ruff_python_index::tokens_and_ranges;
-use ruff_python_parser::lexer::LexicalError;
-use ruff_python_parser::{parse_ok_tokens, AsMode, ParseError};
+use ruff_python_parser::{parse_tokens, AsMode, ParseError, ParseErrorType};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use crate::comments::{
-    dangling_comments, leading_comments, trailing_comments, Comments, SourceComment,
+    dangling_comments, has_skip_comment, leading_comments, trailing_comments, Comments,
+    SourceComment,
 };
 pub use crate::context::PyFormatContext;
-pub use crate::options::{MagicTrailingComma, PreviewMode, PyFormatOptions, QuoteStyle};
+pub use crate::options::{
+    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
+    PythonVersion, QuoteStyle,
+};
+use crate::range::is_logical_line;
+pub use crate::shared_traits::{AsFormat, FormattedIter, FormattedIterExt, IntoFormat};
 use crate::verbatim::suppressed_node;
 
 pub(crate) mod builders;
@@ -29,11 +35,13 @@ mod options;
 pub(crate) mod other;
 pub(crate) mod pattern;
 mod prelude;
+mod preview;
+mod range;
+mod shared_traits;
 pub(crate) mod statement;
+pub(crate) mod string;
 pub(crate) mod type_param;
 mod verbatim;
-
-include!("../../ruff_formatter/shared_traits.rs");
 
 /// 'ast is the lifetime of the source code (input), 'buf is the lifetime of the buffer (output)
 pub(crate) type PyFormatter<'ast, 'buf> = Formatter<'buf, PyFormatContext<'ast>>;
@@ -53,19 +61,27 @@ where
         } else {
             leading_comments(node_comments.leading).fmt(f)?;
 
-            let is_source_map_enabled = f.options().source_map_generation().is_enabled();
+            let node_ref = node.as_any_node_ref();
 
-            if is_source_map_enabled {
-                source_position(node.start()).fmt(f)?;
-            }
+            // Emit source map information for nodes that are valid "narrowing" targets
+            // in range formatting. Never emit source map information if they're disabled
+            // for performance reasons.
+            let emit_source_position = (is_logical_line(node_ref) || node_ref.is_mod_module())
+                && f.options().source_map_generation().is_enabled();
+
+            emit_source_position
+                .then_some(source_position(node.start()))
+                .fmt(f)?;
 
             self.fmt_fields(node, f)?;
 
-            if is_source_map_enabled {
-                source_position(node.end()).fmt(f)?;
-            }
-
-            trailing_comments(node_comments.trailing).fmt(f)
+            write!(
+                f,
+                [
+                    emit_source_position.then_some(source_position(node.end())),
+                    trailing_comments(node_comments.trailing)
+                ]
+            )
         }
     }
 
@@ -103,26 +119,12 @@ where
 
 #[derive(Error, Debug)]
 pub enum FormatModuleError {
-    #[error("source contains syntax errors: {0:?}")]
-    LexError(LexicalError),
-    #[error("source contains syntax errors: {0:?}")]
-    ParseError(ParseError),
+    #[error(transparent)]
+    ParseError(#[from] ParseError),
     #[error(transparent)]
     FormatError(#[from] FormatError),
     #[error(transparent)]
     PrintError(#[from] PrintError),
-}
-
-impl From<LexicalError> for FormatModuleError {
-    fn from(value: LexicalError) -> Self {
-        Self::LexError(value)
-    }
-}
-
-impl From<ParseError> for FormatModuleError {
-    fn from(value: ParseError) -> Self {
-        Self::ParseError(value)
-    }
 }
 
 #[tracing::instrument(name = "format", level = Level::TRACE, skip_all)]
@@ -131,8 +133,12 @@ pub fn format_module_source(
     options: PyFormatOptions,
 ) -> Result<Printed, FormatModuleError> {
     let source_type = options.source_type();
-    let (tokens, comment_ranges) = tokens_and_ranges(source, source_type)?;
-    let module = parse_ok_tokens(tokens, source, source_type.as_mode(), "<filename>")?;
+    let (tokens, comment_ranges) =
+        tokens_and_ranges(source, source_type).map_err(|err| ParseError {
+            offset: err.location(),
+            error: ParseErrorType::Lexical(err.into_error()),
+        })?;
+    let module = parse_tokens(tokens, source, source_type.as_mode())?;
     let formatted = format_module_ast(&module, &comment_ranges, source, options)?;
     Ok(formatted.print()?)
 }
@@ -175,25 +181,25 @@ mod tests {
 
     use ruff_python_ast::PySourceType;
     use ruff_python_index::tokens_and_ranges;
+    use ruff_python_parser::{parse_tokens, AsMode};
+    use ruff_text_size::{TextRange, TextSize};
 
-    use ruff_python_parser::{parse_ok_tokens, AsMode};
-
-    use crate::{format_module_ast, format_module_source, PyFormatOptions};
+    use crate::{format_module_ast, format_module_source, format_range, PyFormatOptions};
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]
     fn basic() -> Result<()> {
-        let input = r#"
+        let input = r"
 # preceding
 if    True:
     pass
 # trailing
-"#;
-        let expected = r#"# preceding
+";
+        let expected = r"# preceding
 if True:
     pass
 # trailing
-"#;
+";
         let actual = format_module_source(input, PyFormatOptions::default())?
             .as_code()
             .to_string();
@@ -220,7 +226,7 @@ def main() -> None:
 
         // Parse the AST.
         let source_path = "code_inline.py";
-        let module = parse_ok_tokens(tokens, source, source_type.as_mode(), source_path).unwrap();
+        let module = parse_tokens(tokens, source, source_type.as_mode()).unwrap();
         let options = PyFormatOptions::from_extension(Path::new(source_path));
         let formatted = format_module_ast(&module, &comment_ranges, source, options).unwrap();
 
@@ -241,11 +247,62 @@ def main() -> None:
 
         assert_eq!(
             printed.as_code(),
-            r#"for converter in connection.ops.get_db_converters(
+            r"for converter in connection.ops.get_db_converters(
     expression
 ) + expression.get_db_converters(connection):
     ...
-"#
+"
+        );
+    }
+
+    /// Use this test to quickly debug some formatting issue.
+    #[ignore]
+    #[test]
+    fn range_formatting_quick_test() {
+        let source = r#"def convert_str(value: str) -> str:  # Trailing comment
+    """Return a string as-is."""
+
+<RANGE_START>
+
+    return value  # Trailing comment
+<RANGE_END>"#;
+
+        let mut source = source.to_string();
+
+        let start = TextSize::try_from(
+            source
+                .find("<RANGE_START>")
+                .expect("Start marker not found"),
+        )
+        .unwrap();
+
+        source.replace_range(
+            start.to_usize()..start.to_usize() + "<RANGE_START>".len(),
+            "",
+        );
+
+        let end =
+            TextSize::try_from(source.find("<RANGE_END>").expect("End marker not found")).unwrap();
+
+        source.replace_range(end.to_usize()..end.to_usize() + "<RANGE_END>".len(), "");
+
+        let source_type = PySourceType::Python;
+        let options = PyFormatOptions::from_source_type(source_type);
+        let printed = format_range(&source, TextRange::new(start, end), options).unwrap();
+
+        let mut formatted = source.to_string();
+        formatted.replace_range(
+            std::ops::Range::<usize>::from(printed.source_range()),
+            printed.as_code(),
+        );
+
+        assert_eq!(
+            formatted,
+            r#"print ( "format me" )
+print("format me")
+print("format me")
+print ( "format me" )
+print ( "format me" )"#
         );
     }
 
@@ -276,7 +333,7 @@ def main() -> None:
                     while let Some(word) = words.next() {
                         let is_last = words.peek().is_none();
                         let format_word = format_with(|f| {
-                            write!(f, [text(word, None)])?;
+                            write!(f, [text(word)])?;
 
                             if is_last {
                                 write!(f, [token("\"")])?;
@@ -304,9 +361,9 @@ def main() -> None:
 
         // 77 after g group (leading quote)
         let fits =
-            r#"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg h"#;
+            r"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg h";
         let breaks =
-            r#"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg hh"#;
+            r"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg hh";
 
         let output = format!(
             SimpleFormatContext::default(),

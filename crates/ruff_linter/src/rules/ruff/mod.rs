@@ -16,8 +16,7 @@ mod tests {
 
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
-    use crate::settings::resolve_per_file_ignores;
-    use crate::settings::types::{PerFileIgnore, PreviewMode, PythonVersion};
+    use crate::settings::types::{PerFileIgnore, PerFileIgnores, PreviewMode, PythonVersion};
     use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 
@@ -27,23 +26,30 @@ mod tests {
     #[test_case(Rule::FunctionCallInDataclassDefaultArgument, Path::new("RUF009.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_0.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_1.py"))]
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_2.py"))]
     #[test_case(Rule::MutableClassDefault, Path::new("RUF012.py"))]
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
     #[test_case(Rule::PairwiseOverZipped, Path::new("RUF007.py"))]
-    #[test_case(Rule::StaticKeyDictComprehension, Path::new("RUF011.py"))]
     #[test_case(
         Rule::UnnecessaryIterableAllocationForFirstElement,
         Path::new("RUF015.py")
     )]
     #[test_case(Rule::InvalidIndexType, Path::new("RUF016.py"))]
-    #[cfg_attr(
-        feature = "unreachable-code",
-        test_case(Rule::UnreachableCode, Path::new("RUF014.py"))
-    )]
     #[test_case(Rule::QuadraticListSummation, Path::new("RUF017_1.py"))]
     #[test_case(Rule::QuadraticListSummation, Path::new("RUF017_0.py"))]
     #[test_case(Rule::AssignmentInAssert, Path::new("RUF018.py"))]
     #[test_case(Rule::UnnecessaryKeyCheck, Path::new("RUF019.py"))]
+    #[test_case(Rule::NeverUnion, Path::new("RUF020.py"))]
+    #[test_case(Rule::ParenthesizeChainedOperators, Path::new("RUF021.py"))]
+    #[test_case(Rule::UnsortedDunderAll, Path::new("RUF022.py"))]
+    #[test_case(Rule::UnsortedDunderSlots, Path::new("RUF023.py"))]
+    #[test_case(Rule::MutableFromkeysValue, Path::new("RUF024.py"))]
+    #[test_case(Rule::UnnecessaryDictComprehensionForIterable, Path::new("RUF025.py"))]
+    #[test_case(Rule::DefaultFactoryKwarg, Path::new("RUF026.py"))]
+    #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_0.py"))]
+    #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_1.py"))]
+    #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_2.py"))]
+    #[test_case(Rule::InvalidFormatterSuppressionComment, Path::new("RUF028.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -172,7 +178,7 @@ mod tests {
         let mut settings =
             settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]);
 
-        settings.per_file_ignores = resolve_per_file_ignores(vec![PerFileIgnore::new(
+        settings.per_file_ignores = PerFileIgnores::resolve(vec![PerFileIgnore::new(
             "RUF100_2.py".to_string(),
             &["F401".parse().unwrap()],
             None,
@@ -223,6 +229,25 @@ mod tests {
         assert_messages!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn ruff_per_file_ignores() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/ruff_per_file_ignores.py"),
+            &settings::LinterSettings {
+                per_file_ignores: PerFileIgnores::resolve(vec![PerFileIgnore::new(
+                    "ruff_per_file_ignores.py".to_string(),
+                    &["F401".parse().unwrap(), "RUF100".parse().unwrap()],
+                    None,
+                )])
+                .unwrap(),
+                ..settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedNOQA])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn flake8_noqa() -> Result<()> {
         let diagnostics = test_path(

@@ -2,6 +2,7 @@ use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -59,24 +60,32 @@ impl Violation for NumpyLegacyRandom {
 
 /// NPY002
 pub(crate) fn legacy_random(checker: &mut Checker, expr: &Expr) {
-    if let Some(method_name) = checker
-        .semantic()
-        .resolve_call_path(expr)
-        .and_then(|call_path| {
-            // seeding state
-            if matches!(
-                call_path.as_slice(),
-                [
-                    "numpy",
-                    "random",
-                    // Seeds
-                    "seed" |
+    if !checker.semantic().seen_module(Modules::NUMPY) {
+        return;
+    }
+
+    if let Some(method_name) =
+        checker
+            .semantic()
+            .resolve_qualified_name(expr)
+            .and_then(|qualified_name| {
+                // seeding state
+                if matches!(
+                    qualified_name.segments(),
+                    [
+                        "numpy",
+                        "random",
+                        // Seeds
+                        "seed" |
                     "get_state" |
                     "set_state" |
                     // Simple random data
                     "rand" |
+                    "ranf" |
+                    "sample" |
                     "randn" |
                     "randint" |
+                    "random" |
                     "random_integers" |
                     "random_sample" |
                     "choice" |
@@ -120,13 +129,13 @@ pub(crate) fn legacy_random(checker: &mut Checker, expr: &Expr) {
                     "wald" |
                     "weibull" |
                     "zipf"
-                ]
-            ) {
-                Some(call_path[2])
-            } else {
-                None
-            }
-        })
+                    ]
+                ) {
+                    Some(qualified_name.segments()[2])
+                } else {
+                    None
+                }
+            })
     {
         checker.diagnostics.push(Diagnostic::new(
             NumpyLegacyRandom {

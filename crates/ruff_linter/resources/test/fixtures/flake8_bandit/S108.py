@@ -5,6 +5,9 @@ with open("/abc/tmp", "w") as f:
 with open("/tmp/abc", "w") as f:
     f.write("def")
 
+with open(f"/tmp/abc", "w") as f:
+    f.write("def")
+
 with open("/var/tmp/123", "w") as f:
     f.write("def")
 

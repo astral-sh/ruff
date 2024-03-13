@@ -26,7 +26,7 @@ use super::helpers::{is_pytest_parametrize, split_names};
 /// The `argnames` argument of `pytest.mark.parametrize` takes a string or
 /// a sequence of strings. For a single parameter, it's preferable to use a
 /// string. For multiple parameters, it's preferable to use the style
-/// configured via the [`flake8-pytest-style.parametrize-names-type`] setting.
+/// configured via the [`lint.flake8-pytest-style.parametrize-names-type`] setting.
 ///
 /// ## Example
 /// ```python
@@ -67,7 +67,7 @@ use super::helpers::{is_pytest_parametrize, split_names};
 /// ```
 ///
 /// ## Options
-/// - `flake8-pytest-style.parametrize-names-type`
+/// - `lint.flake8-pytest-style.parametrize-names-type`
 ///
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
@@ -103,17 +103,17 @@ impl Violation for PytestParametrizeNamesWrongType {
 /// of values.
 ///
 /// The style for the list of values rows can be configured via the
-/// the [`flake8-pytest-style.parametrize-values-type`] setting, while the
+/// [`lint.flake8-pytest-style.parametrize-values-type`] setting, while the
 /// style for each row of values can be configured via the
-/// the [`flake8-pytest-style.parametrize-values-row-type`] setting.
+/// [`lint.flake8-pytest-style.parametrize-values-row-type`] setting.
 ///
-/// For example, [`flake8-pytest-style.parametrize-values-type`] will lead to
+/// For example, [`lint.flake8-pytest-style.parametrize-values-type`] will lead to
 /// the following expectations:
 ///
 /// - `tuple`: `@pytest.mark.parametrize("value", ("a", "b", "c"))`
 /// - `list`: `@pytest.mark.parametrize("value", ["a", "b", "c"])`
 ///
-/// Similarly, [`flake8-pytest-style.parametrize-values-row-type`] will lead to
+/// Similarly, [`lint.flake8-pytest-style.parametrize-values-row-type`] will lead to
 /// the following expectations:
 ///
 /// - `tuple`: `@pytest.mark.parametrize(("key", "value"), [("a", "b"), ("c", "d")])`
@@ -170,8 +170,8 @@ impl Violation for PytestParametrizeNamesWrongType {
 /// ```
 ///
 /// ## Options
-/// - `flake8-pytest-style.parametrize-values-type`
-/// - `flake8-pytest-style.parametrize-values-row-type`
+/// - `lint.flake8-pytest-style.parametrize-values-type`
+/// - `lint.flake8-pytest-style.parametrize-values-row-type`
 ///
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
@@ -226,6 +226,10 @@ impl Violation for PytestParametrizeValuesWrongType {
 ///     ...
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as tests that rely on mutable global
+/// state may be affected by removing duplicate test cases.
+///
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[violation]
@@ -252,19 +256,20 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
         return None;
     }
 
-    let node = Expr::StringLiteral(ast::ExprStringLiteral {
-        value: elts.iter().fold(String::new(), |mut acc, elt| {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
-                if !acc.is_empty() {
-                    acc.push(',');
+    let node = Expr::from(ast::StringLiteral {
+        value: elts
+            .iter()
+            .fold(String::new(), |mut acc, elt| {
+                if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
+                    if !acc.is_empty() {
+                        acc.push(',');
+                    }
+                    acc.push_str(value.to_str());
                 }
-                acc.push_str(value.as_str());
-            }
-            acc
-        }),
-        unicode: false,
-        implicit_concatenated: false,
-        range: TextRange::default(),
+                acc
+            })
+            .into_boxed_str(),
+        ..ast::StringLiteral::default()
     });
     Some(generator.expr(&node))
 }
@@ -302,8 +307,8 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
     let names_type = checker.settings.flake8_pytest_style.parametrize_names_type;
 
     match expr {
-        Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. }) => {
-            let names = split_names(string);
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+            let names = split_names(value.to_str());
             if names.len() > 1 {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
@@ -324,14 +329,15 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             elts: names
                                 .iter()
                                 .map(|name| {
-                                    Expr::StringLiteral(ast::ExprStringLiteral {
-                                        value: (*name).to_string(),
-                                        ..ast::ExprStringLiteral::default()
+                                    Expr::from(ast::StringLiteral {
+                                        value: (*name).to_string().into_boxed_str(),
+                                        ..ast::StringLiteral::default()
                                     })
                                 })
                                 .collect(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            parenthesized: true,
                         });
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             format!("({})", checker.generator().expr(&node)),
@@ -357,9 +363,9 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             elts: names
                                 .iter()
                                 .map(|name| {
-                                    Expr::StringLiteral(ast::ExprStringLiteral {
-                                        value: (*name).to_string(),
-                                        ..ast::ExprStringLiteral::default()
+                                    Expr::from(ast::StringLiteral {
+                                        value: (*name).to_string().into_boxed_str(),
+                                        ..ast::StringLiteral::default()
                                     })
                                 })
                                 .collect(),
@@ -439,6 +445,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             elts: elts.clone(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            parenthesized: true,
                         });
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             format!("({})", checker.generator().expr(&node)),
@@ -477,12 +484,11 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
         .flake8_pytest_style
         .parametrize_values_row_type;
 
-    let is_multi_named =
-        if let Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. }) = &names {
-            split_names(string).len() > 1
-        } else {
-            true
-        };
+    let is_multi_named = if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &names {
+        split_names(value.to_str()).len() > 1
+    } else {
+        true
+    };
 
     match values {
         Expr::List(ast::ExprList { elts, .. }) => {
@@ -553,7 +559,7 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
                     element.range(),
                 );
                 if let Some(prev) = prev {
-                    let values_end = values.range().end() - TextSize::new(1);
+                    let values_end = values.end() - TextSize::new(1);
                     let previous_end =
                         trailing_comma(prev, checker.locator().contents()).unwrap_or(values_end);
                     let element_end =
@@ -634,17 +640,17 @@ pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Decorator]) {
             }) = &decorator.expression
             {
                 if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
-                    if let [names, ..] = args.as_slice() {
+                    if let [names, ..] = &**args {
                         check_names(checker, decorator, names);
                     }
                 }
                 if checker.enabled(Rule::PytestParametrizeValuesWrongType) {
-                    if let [names, values, ..] = args.as_slice() {
+                    if let [names, values, ..] = &**args {
                         check_values(checker, names, values);
                     }
                 }
                 if checker.enabled(Rule::PytestDuplicateParametrizeTestCases) {
-                    if let [_, values, ..] = args.as_slice() {
+                    if let [_, values, ..] = &**args {
                         check_duplicates(checker, values);
                     }
                 }

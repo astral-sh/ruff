@@ -82,3 +82,26 @@ raise IndexError();
 
 # RSE102
 raise Foo()
+
+# OK
+raise ctypes.WinError()
+
+
+def func():
+    pass
+
+
+# OK
+raise func()
+
+
+# OK
+future = executor.submit(float, "a")
+if future.exception():
+    raise future.exception()
+
+
+# RSE102
+future = executor.submit(float, "a")
+if future.exception():
+    raise future.Exception()

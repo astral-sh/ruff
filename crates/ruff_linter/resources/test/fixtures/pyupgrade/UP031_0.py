@@ -110,3 +110,10 @@ print('Hello %(arg)s' % bar['bop'])
 "%s" % (
     x,  # comment
 )
+
+
+path = "%s-%s-%s.pem" % (
+    safe_domain_name(cn), # common name, which should be filename safe because it is IDNA-encoded, but in case of a malformed cert make sure it's ok to use as a filename
+    cert.not_valid_after.date().isoformat().replace("-", ""), # expiration date
+    hexlify(cert.fingerprint(hashes.SHA256())).decode("ascii")[0:8], # fingerprint prefix
+)

@@ -1,6 +1,8 @@
+use ruff_notebook::CellOffsets;
+use ruff_python_ast::PySourceType;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
-use ruff_text_size::TextRange;
+use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -101,6 +103,8 @@ pub(crate) fn compound_statements(
     lxr: &[LexResult],
     locator: &Locator,
     indexer: &Indexer,
+    source_type: PySourceType,
+    cell_offsets: Option<&CellOffsets>,
 ) {
     // Track the last seen instance of a variety of tokens.
     let mut colon = None;
@@ -127,7 +131,13 @@ pub(crate) fn compound_statements(
     let mut sqb_count = 0u32;
     let mut brace_count = 0u32;
 
-    for &(ref tok, range) in lxr.iter().flatten() {
+    // Track indentation.
+    let mut indent = 0u32;
+
+    // Keep the token iterator to perform lookaheads.
+    let mut tokens = lxr.iter().flatten();
+
+    while let Some(&(ref tok, range)) = tokens.next() {
         match tok {
             Tok::Lpar => {
                 par_count = par_count.saturating_add(1);
@@ -153,6 +163,12 @@ pub(crate) fn compound_statements(
                     continue;
                 }
             }
+            Tok::Indent => {
+                indent = indent.saturating_add(1);
+            }
+            Tok::Dedent => {
+                indent = indent.saturating_sub(1);
+            }
             _ => {}
         }
 
@@ -163,15 +179,24 @@ pub(crate) fn compound_statements(
         match tok {
             Tok::Newline => {
                 if let Some((start, end)) = semi {
-                    let mut diagnostic =
-                        Diagnostic::new(UselessSemicolon, TextRange::new(start, end));
-                    diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-                        indexer
-                            .preceded_by_continuations(start, locator)
-                            .unwrap_or(start),
-                        end,
-                    )));
-                    diagnostics.push(diagnostic);
+                    if !(source_type.is_ipynb()
+                        && indent == 0
+                        && cell_offsets
+                            .and_then(|cell_offsets| cell_offsets.containing_range(range.start()))
+                            .is_some_and(|cell_range| {
+                                !has_non_trivia_tokens_till(tokens.clone(), cell_range.end())
+                            }))
+                    {
+                        let mut diagnostic =
+                            Diagnostic::new(UselessSemicolon, TextRange::new(start, end));
+                        diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                            indexer
+                                .preceded_by_continuations(start, locator)
+                                .unwrap_or(start),
+                            end,
+                        )));
+                        diagnostics.push(diagnostic);
+                    }
                 }
 
                 // Reset.
@@ -308,4 +333,24 @@ pub(crate) fn compound_statements(
             _ => {}
         };
     }
+}
+
+/// Returns `true` if there are any non-trivia tokens from the given token
+/// iterator till the given end offset.
+fn has_non_trivia_tokens_till<'a>(
+    tokens: impl Iterator<Item = &'a (Tok, TextRange)>,
+    cell_end: TextSize,
+) -> bool {
+    for &(ref tok, tok_range) in tokens {
+        if tok_range.start() >= cell_end {
+            return false;
+        }
+        if !matches!(
+            tok,
+            Tok::Newline | Tok::Comment(_) | Tok::EndOfFile | Tok::NonLogicalNewline
+        ) {
+            return true;
+        }
+    }
+    false
 }

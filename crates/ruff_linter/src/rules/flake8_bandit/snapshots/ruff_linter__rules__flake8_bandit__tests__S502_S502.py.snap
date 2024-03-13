@@ -1,0 +1,72 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S502.py:6:13: S502 Call made with insecure SSL protocol: `PROTOCOL_SSLv3`
+  |
+4 | from OpenSSL.SSL import Context
+5 | 
+6 | wrap_socket(ssl_version=ssl.PROTOCOL_SSLv3)  # S502
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S502
+7 | ssl.wrap_socket(ssl_version=ssl.PROTOCOL_TLSv1)  # S502
+8 | ssl.wrap_socket(ssl_version=ssl.PROTOCOL_SSLv2)  # S502
+  |
+
+S502.py:7:17: S502 Call made with insecure SSL protocol: `PROTOCOL_TLSv1`
+  |
+6 | wrap_socket(ssl_version=ssl.PROTOCOL_SSLv3)  # S502
+7 | ssl.wrap_socket(ssl_version=ssl.PROTOCOL_TLSv1)  # S502
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S502
+8 | ssl.wrap_socket(ssl_version=ssl.PROTOCOL_SSLv2)  # S502
+9 | SSL.Context(method=SSL.SSLv2_METHOD)  # S502
+  |
+
+S502.py:8:17: S502 Call made with insecure SSL protocol: `PROTOCOL_SSLv2`
+   |
+ 6 | wrap_socket(ssl_version=ssl.PROTOCOL_SSLv3)  # S502
+ 7 | ssl.wrap_socket(ssl_version=ssl.PROTOCOL_TLSv1)  # S502
+ 8 | ssl.wrap_socket(ssl_version=ssl.PROTOCOL_SSLv2)  # S502
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S502
+ 9 | SSL.Context(method=SSL.SSLv2_METHOD)  # S502
+10 | SSL.Context(method=SSL.SSLv23_METHOD)  # S502
+   |
+
+S502.py:9:13: S502 Call made with insecure SSL protocol: `SSLv2_METHOD`
+   |
+ 7 | ssl.wrap_socket(ssl_version=ssl.PROTOCOL_TLSv1)  # S502
+ 8 | ssl.wrap_socket(ssl_version=ssl.PROTOCOL_SSLv2)  # S502
+ 9 | SSL.Context(method=SSL.SSLv2_METHOD)  # S502
+   |             ^^^^^^^^^^^^^^^^^^^^^^^ S502
+10 | SSL.Context(method=SSL.SSLv23_METHOD)  # S502
+11 | Context(method=SSL.SSLv3_METHOD)  # S502
+   |
+
+S502.py:10:13: S502 Call made with insecure SSL protocol: `SSLv23_METHOD`
+   |
+ 8 | ssl.wrap_socket(ssl_version=ssl.PROTOCOL_SSLv2)  # S502
+ 9 | SSL.Context(method=SSL.SSLv2_METHOD)  # S502
+10 | SSL.Context(method=SSL.SSLv23_METHOD)  # S502
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^ S502
+11 | Context(method=SSL.SSLv3_METHOD)  # S502
+12 | Context(method=SSL.TLSv1_METHOD)  # S502
+   |
+
+S502.py:11:9: S502 Call made with insecure SSL protocol: `SSLv3_METHOD`
+   |
+ 9 | SSL.Context(method=SSL.SSLv2_METHOD)  # S502
+10 | SSL.Context(method=SSL.SSLv23_METHOD)  # S502
+11 | Context(method=SSL.SSLv3_METHOD)  # S502
+   |         ^^^^^^^^^^^^^^^^^^^^^^^ S502
+12 | Context(method=SSL.TLSv1_METHOD)  # S502
+   |
+
+S502.py:12:9: S502 Call made with insecure SSL protocol: `TLSv1_METHOD`
+   |
+10 | SSL.Context(method=SSL.SSLv23_METHOD)  # S502
+11 | Context(method=SSL.SSLv3_METHOD)  # S502
+12 | Context(method=SSL.TLSv1_METHOD)  # S502
+   |         ^^^^^^^^^^^^^^^^^^^^^^^ S502
+13 | 
+14 | wrap_socket(ssl_version=ssl.PROTOCOL_TLS_CLIENT)  # OK
+   |
+
+

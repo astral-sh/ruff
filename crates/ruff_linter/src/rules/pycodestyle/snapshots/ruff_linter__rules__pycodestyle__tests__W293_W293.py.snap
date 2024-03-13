@@ -1,0 +1,84 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+W293.py:4:1: W293 [*] Blank line contains whitespace
+  |
+2 | class Chassis(RobotModuleTemplate):
+3 |     """底盘信息推送控制
+4 |     
+  | ^^^^ W293
+5 |     """\
+  |
+  = help: Remove whitespace from blank line
+
+ℹ Unsafe fix
+1 1 | # See: https://github.com/astral-sh/ruff/issues/9323
+2 2 | class Chassis(RobotModuleTemplate):
+3 3 |     """底盘信息推送控制
+4   |-    
+  4 |+
+5 5 |     """\
+6 6 | 
+7 7 | 
+
+W293.py:10:1: W293 [*] Blank line contains whitespace
+   |
+ 8 | """""" \
+ 9 |     \
+10 |     
+   | ^^^^ W293
+   |
+   = help: Remove whitespace from blank line
+
+ℹ Safe fix
+5  5  |     """\
+6  6  | 
+7  7  | 
+8     |-"""""" \
+9     |-    \
+10    |-    
+   8  |+"""""" 
+11 9  | 
+12 10 | 
+13 11 | "abc\
+
+W293.py:16:1: W293 [*] Blank line contains whitespace
+   |
+14 |  " \
+15 |     \
+16 |     
+   | ^^^^ W293
+17 | '''blank line with whitespace
+   |
+   = help: Remove whitespace from blank line
+
+ℹ Safe fix
+11 11 | 
+12 12 | 
+13 13 | "abc\
+14    |- " \
+15    |-    \
+16    |-    
+   14 |+ " 
+17 15 | '''blank line with whitespace
+18 16 |  
+19 17 | inside a multiline string'''
+
+W293.py:18:1: W293 [*] Blank line contains whitespace
+   |
+17 | '''blank line with whitespace
+18 |  
+   | ^ W293
+19 | inside a multiline string'''
+   |
+   = help: Remove whitespace from blank line
+
+ℹ Unsafe fix
+15 15 |     \
+16 16 |     
+17 17 | '''blank line with whitespace
+18    |- 
+   18 |+
+19 19 | inside a multiline string'''
+
+

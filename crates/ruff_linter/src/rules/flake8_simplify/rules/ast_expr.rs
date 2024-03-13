@@ -1,9 +1,12 @@
+use ast::{StringLiteralFlags, StringLiteralPrefix};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::Ranged;
 
 use crate::fix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::analyze::typing::is_dict;
+use ruff_python_semantic::Modules;
 
 use crate::checkers::ast::Checker;
 
@@ -62,7 +65,7 @@ impl Violation for UncapitalizedEnvironmentVariables {
 }
 
 /// ## What it does
-/// Check for `dict.get()` calls that pass `None` as the default value.
+/// Checks for `dict.get()` calls that pass `None` as the default value.
 ///
 /// ## Why is this bad?
 /// `None` is the default value for `dict.get()`, so it is redundant to pass it
@@ -71,13 +74,13 @@ impl Violation for UncapitalizedEnvironmentVariables {
 /// ## Example
 /// ```python
 /// ages = {"Tom": 23, "Maria": 23, "Dog": 11}
-/// age = ages.get("Cat", None)  # None
+/// age = ages.get("Cat", None)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// ages = {"Tom": 23, "Maria": 23, "Dog": 11}
-/// age = ages.get("Cat")  # None
+/// age = ages.get("Cat")
 /// ```
 ///
 /// ## References
@@ -120,6 +123,10 @@ fn is_lowercase_allowed(env_var: &str) -> bool {
 
 /// SIM112
 pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
+    if !checker.semantic().seen_module(Modules::OS) {
+        return;
+    }
+
     // Ex) `os.environ['foo']`
     if let Expr::Subscript(_) = expr {
         check_os_environ_subscript(checker, expr);
@@ -135,7 +142,7 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
     else {
         return;
     };
-    let Some(arg) = args.get(0) else {
+    let Some(arg) = args.first() else {
         return;
     };
     let Expr::StringLiteral(ast::ExprStringLiteral { value: env_var, .. }) = arg else {
@@ -143,10 +150,10 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
     };
     if !checker
         .semantic()
-        .resolve_call_path(func)
-        .is_some_and(|call_path| {
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.as_slice(),
+                qualified_name.segments(),
                 ["os", "environ", "get"] | ["os", "getenv"]
             )
         })
@@ -154,19 +161,19 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
         return;
     }
 
-    if is_lowercase_allowed(env_var) {
+    if is_lowercase_allowed(env_var.to_str()) {
         return;
     }
 
-    let capital_env_var = env_var.to_ascii_uppercase();
-    if &capital_env_var == env_var {
+    let capital_env_var = env_var.to_str().to_ascii_uppercase();
+    if capital_env_var == env_var.to_str() {
         return;
     }
 
     checker.diagnostics.push(Diagnostic::new(
         UncapitalizedEnvironmentVariables {
             expected: SourceCodeSnippet::new(capital_env_var),
-            actual: SourceCodeSnippet::new(env_var.clone()),
+            actual: SourceCodeSnippet::new(env_var.to_string()),
         },
         arg.range(),
     ));
@@ -190,35 +197,36 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
     if id != "os" || attr != "environ" {
         return;
     }
-    let Expr::StringLiteral(ast::ExprStringLiteral {
-        value: env_var,
-        unicode,
-        ..
-    }) = slice.as_ref()
-    else {
+    let Expr::StringLiteral(ast::ExprStringLiteral { value: env_var, .. }) = slice.as_ref() else {
         return;
     };
 
-    if is_lowercase_allowed(env_var) {
+    if is_lowercase_allowed(env_var.to_str()) {
         return;
     }
 
-    let capital_env_var = env_var.to_ascii_uppercase();
-    if &capital_env_var == env_var {
+    let capital_env_var = env_var.to_str().to_ascii_uppercase();
+    if capital_env_var == env_var.to_str() {
         return;
     }
 
     let mut diagnostic = Diagnostic::new(
         UncapitalizedEnvironmentVariables {
             expected: SourceCodeSnippet::new(capital_env_var.clone()),
-            actual: SourceCodeSnippet::new(env_var.clone()),
+            actual: SourceCodeSnippet::new(env_var.to_string()),
         },
         slice.range(),
     );
-    let node = ast::ExprStringLiteral {
-        value: capital_env_var,
-        unicode: *unicode,
-        ..ast::ExprStringLiteral::default()
+    let node = ast::StringLiteral {
+        value: capital_env_var.into_boxed_str(),
+        flags: StringLiteralFlags::default().with_prefix({
+            if env_var.is_unicode() {
+                StringLiteralPrefix::UString
+            } else {
+                StringLiteralPrefix::None
+            }
+        }),
+        ..ast::StringLiteral::default()
     };
     let new_env_var = node.into();
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
@@ -244,13 +252,10 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
         return;
     };
-    if !value.is_dict_expr() {
-        return;
-    }
     if attr != "get" {
         return;
     }
-    let Some(key) = args.get(0) else {
+    let Some(key) = args.first() else {
         return;
     };
     if !(key.is_literal_expr() || key.is_name_expr()) {
@@ -261,6 +266,24 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     };
     if !default.is_none_literal_expr() {
         return;
+    }
+
+    // Check if the value is a dictionary.
+    match value.as_ref() {
+        Expr::Dict(_) | Expr::DictComp(_) => {}
+        Expr::Name(name) => {
+            let Some(binding) = checker
+                .semantic()
+                .only_binding(name)
+                .map(|id| checker.semantic().binding(id))
+            else {
+                return;
+            };
+            if !is_dict(binding, checker.semantic()) {
+                return;
+            }
+        }
+        _ => return,
     }
 
     let expected = format!(
@@ -277,7 +300,6 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
         },
         expr.range(),
     );
-
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         expected,
         expr.range(),

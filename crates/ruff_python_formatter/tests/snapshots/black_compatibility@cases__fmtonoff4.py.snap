@@ -1,0 +1,97 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/fmtonoff4.py
+---
+## Input
+
+```python
+# fmt: off
+@test([
+    1, 2,
+    3, 4,
+])
+# fmt: on
+def f(): pass
+
+@test([
+    1, 2,
+    3, 4,
+])
+def f(): pass
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -4,17 +4,10 @@
+     3, 4,
+ ])
+ # fmt: on
+-def f():
+-    pass
+-
++def f(): pass
+ 
+-@test(
+-    [
+-        1,
+-        2,
+-        3,
+-        4,
+-    ]
+-)
+-def f():
+-    pass
++@test([
++    1, 2,
++    3, 4,
++])
++def f(): pass
+```
+
+## Ruff Output
+
+```python
+# fmt: off
+@test([
+    1, 2,
+    3, 4,
+])
+# fmt: on
+def f(): pass
+
+@test([
+    1, 2,
+    3, 4,
+])
+def f(): pass
+```
+
+## Black Output
+
+```python
+# fmt: off
+@test([
+    1, 2,
+    3, 4,
+])
+# fmt: on
+def f():
+    pass
+
+
+@test(
+    [
+        1,
+        2,
+        3,
+        4,
+    ]
+)
+def f():
+    pass
+```
+
+

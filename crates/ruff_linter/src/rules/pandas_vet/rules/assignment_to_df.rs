@@ -33,7 +33,7 @@ pub struct PandasDfVariableName;
 impl Violation for PandasDfVariableName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`df` is a bad variable name. Be kinder to your future self.")
+        format!("Avoid using the generic variable name `df` for DataFrames")
     }
 }
 

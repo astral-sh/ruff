@@ -53,7 +53,7 @@ async def main(
         async with semaphore:
             return await coroutine
 
-    comparisons: list[Exception | Comparison] = await asyncio.gather(
+    comparisons: list[BaseException | Comparison] = await asyncio.gather(
         *[
             limited_parallelism(
                 clone_and_compare(
@@ -72,9 +72,10 @@ async def main(
     comparisons_by_target = dict(zip(targets, comparisons, strict=True))
 
     # Split comparisons into errored / completed
-    errored, completed = [], []
+    errored: list[tuple[Project, BaseException]] = []
+    completed: list[tuple[Project, Comparison]] = []
     for target, comparison in comparisons_by_target.items():
-        if isinstance(comparison, Exception):
+        if isinstance(comparison, BaseException):
             errored.append((target, comparison))
         else:
             completed.append((target, comparison))
@@ -112,11 +113,17 @@ async def clone_and_compare(
 
     match command:
         case RuffCommand.check:
-            compare, options, kwargs = (compare_check, target.check_options, {})
+            compare, options, overrides, kwargs = (
+                compare_check,
+                target.check_options,
+                target.config_overrides,
+                {},
+            )
         case RuffCommand.format:
-            compare, options, kwargs = (
+            compare, options, overrides, kwargs = (
                 compare_format,
                 target.format_options,
+                target.config_overrides,
                 {"format_comparison": format_comparison},
             )
         case _:
@@ -130,6 +137,7 @@ async def clone_and_compare(
             baseline_executable,
             comparison_executable,
             options,
+            overrides,
             cloned_repo,
             **kwargs,
         )
@@ -138,7 +146,7 @@ async def clone_and_compare(
 
 
 class JSONEncoder(json.JSONEncoder):
-    def default(self, o):
+    def default(self, o: object):
         if isinstance(o, Serializable):
             return o.jsonable()
         if dataclasses.is_dataclass(o):

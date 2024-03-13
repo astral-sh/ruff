@@ -2,13 +2,12 @@ use std::str::FromStr;
 
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_literal::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
-use ruff_python_parser::{lexer, AsMode};
+use ruff_python_parser::{lexer, AsMode, StringKind, Tok};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 
 use crate::checkers::ast::Checker;
@@ -124,8 +123,8 @@ fn equivalent(format: &CFormatSpec, value: &Expr) -> bool {
         ResolvedPythonType::Atom(atom) => {
             // Special case where `%c` allows single character strings to be formatted
             if format.format_char == 'c' {
-                if let Expr::StringLiteral(string) = value {
-                    let mut chars = string.chars();
+                if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = value {
+                    let mut chars = value.chars();
                     if chars.next().is_some() && chars.next().is_none() {
                         return true;
                     }
@@ -201,7 +200,7 @@ fn is_valid_dict(
             value: mapping_key, ..
         }) = key
         {
-            let Some(format) = formats_hash.get(mapping_key.as_str()) else {
+            let Some(format) = formats_hash.get(mapping_key.to_str()) else {
                 return true;
             };
             if !equivalent(format, value) {
@@ -219,15 +218,15 @@ fn is_valid_dict(
 pub(crate) fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
     let content = checker.locator().slice(expr);
-    let mut strings: Vec<TextRange> = vec![];
+    let mut strings: Vec<(TextRange, StringKind)> = vec![];
     for (tok, range) in
         lexer::lex_starts_at(content, checker.source_type.as_mode(), expr.start()).flatten()
     {
-        if tok.is_string() {
-            strings.push(range);
-        } else if tok.is_percent() {
+        match tok {
+            Tok::String { kind, .. } => strings.push((range, kind)),
             // Break as soon as we find the modulo symbol.
-            break;
+            Tok::Percent => break,
+            _ => {}
         }
     }
 
@@ -238,12 +237,11 @@ pub(crate) fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: 
 
     // Parse each string segment.
     let mut format_strings = vec![];
-    for range in &strings {
+    for (range, flags) in &strings {
         let string = checker.locator().slice(*range);
-        let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
-            return;
-        };
-        let string = &string[leader.len()..string.len() - trailer.len()];
+        let quote_len = usize::from(flags.quote_len());
+        let string =
+            &string[(usize::from(flags.prefix_len()) + quote_len)..(string.len() - quote_len)];
 
         // Parse the format string (e.g. `"%s"`) into a list of `PercentFormat`.
         if let Ok(format_string) = CFormatString::from_str(string) {

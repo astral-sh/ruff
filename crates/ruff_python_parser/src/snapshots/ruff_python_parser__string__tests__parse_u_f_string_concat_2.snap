@@ -9,17 +9,52 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..22,
-                    values: [
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 2..21,
-                                value: "Hello world!",
-                                unicode: true,
-                                implicit_concatenated: true,
-                            },
+                    value: FStringValue {
+                        inner: Concatenated(
+                            [
+                                Literal(
+                                    StringLiteral {
+                                        range: 0..9,
+                                        value: "Hello ",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: "u",
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                                FString(
+                                    FString {
+                                        range: 10..18,
+                                        elements: [
+                                            Literal(
+                                                FStringLiteralElement {
+                                                    range: 12..17,
+                                                    value: "world",
+                                                },
+                                            ),
+                                        ],
+                                        flags: FStringFlags {
+                                            quote_style: Single,
+                                            raw: false,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                                Literal(
+                                    StringLiteral {
+                                        range: 19..22,
+                                        value: "!",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: "",
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            ],
                         ),
-                    ],
-                    implicit_concatenated: true,
+                    },
                 },
             ),
         },

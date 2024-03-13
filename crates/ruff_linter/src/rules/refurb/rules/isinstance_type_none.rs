@@ -95,7 +95,7 @@ fn is_none(expr: &Expr) -> bool {
             }) if arguments.len() == 1 => {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if id.as_str() == "type" {
-                        return matches!(arguments.args.get(0), Some(Expr::NoneLiteral(_)));
+                        return matches!(arguments.args.first(), Some(Expr::NoneLiteral(_)));
                     }
                 }
                 false

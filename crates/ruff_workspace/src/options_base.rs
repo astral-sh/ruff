@@ -29,6 +29,15 @@ pub trait OptionsMetadata {
     }
 }
 
+impl<T> OptionsMetadata for Option<T>
+where
+    T: OptionsMetadata,
+{
+    fn record(visit: &mut dyn Visit) {
+        T::record(visit);
+    }
+}
+
 /// Metadata of an option that can either be a [`OptionField`] or [`OptionSet`].
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum OptionEntry {
@@ -100,6 +109,7 @@ impl OptionSet {
     ///             default: "false",
     ///             value_type: "bool",
     ///             example: "",
+    ///             scope: None,
     ///             deprecated: None,
     ///         });
     ///     }
@@ -122,6 +132,7 @@ impl OptionSet {
     ///             default: "false",
     ///             value_type: "bool",
     ///             example: "",
+    ///             scope: None,
     ///             deprecated: None
     ///         });
     ///
@@ -138,6 +149,7 @@ impl OptionSet {
     ///             default: "false",
     ///             value_type: "bool",
     ///             example: "",
+    ///             scope: None,
     ///             deprecated: None
     ///         });
     ///     }
@@ -169,6 +181,7 @@ impl OptionSet {
     ///     default: "false",
     ///     value_type: "bool",
     ///     example: "",
+    ///     scope: None,
     ///     deprecated: None
     ///  };
     ///
@@ -191,6 +204,7 @@ impl OptionSet {
     ///     default: "false",
     ///     value_type: "bool",
     ///     example: "",
+    ///     scope: None,
     ///     deprecated: None
     /// };
     ///
@@ -203,6 +217,7 @@ impl OptionSet {
     ///             default: "false",
     ///             value_type: "bool",
     ///             example: "",
+    ///             scope: None,
     ///             deprecated: None
     ///         });
     ///
@@ -319,8 +334,12 @@ impl Debug for OptionSet {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct OptionField {
     pub doc: &'static str,
+    /// Ex) `"false"`
     pub default: &'static str,
+    /// Ex) `"bool"`
     pub value_type: &'static str,
+    /// Ex) `"per-file-ignores"`
+    pub scope: Option<&'static str>,
     pub example: &'static str,
     pub deprecated: Option<Deprecated>,
 }

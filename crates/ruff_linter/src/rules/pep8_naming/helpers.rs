@@ -1,6 +1,7 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
+use ruff_python_ast::name::UnqualifiedName;
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::str::{is_cased_lowercase, is_cased_uppercase};
 
@@ -30,14 +31,20 @@ pub(super) fn is_named_tuple_assignment(stmt: &Stmt, semantic: &SemanticModel) -
     let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
         return false;
     };
-    semantic.resolve_call_path(func).is_some_and(|call_path| {
-        matches!(call_path.as_slice(), ["collections", "namedtuple"])
-            || semantic.match_typing_call_path(&call_path, "NamedTuple")
-    })
+    semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["collections", "namedtuple"])
+                || semantic.match_typing_qualified_name(&qualified_name, "NamedTuple")
+        })
 }
 
 /// Returns `true` if the statement is an assignment to a `TypedDict`.
 pub(super) fn is_typed_dict_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_typing() {
+        return false;
+    }
+
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
@@ -49,33 +56,118 @@ pub(super) fn is_typed_dict_assignment(stmt: &Stmt, semantic: &SemanticModel) ->
 
 /// Returns `true` if the statement is an assignment to a `TypeVar` or `NewType`.
 pub(super) fn is_type_var_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_typing() {
+        return false;
+    }
+
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
     let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
         return false;
     };
-    semantic.resolve_call_path(func).is_some_and(|call_path| {
-        semantic.match_typing_call_path(&call_path, "TypeVar")
-            || semantic.match_typing_call_path(&call_path, "NewType")
-    })
+    semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
+            semantic.match_typing_qualified_name(&qualified_name, "TypeVar")
+                || semantic.match_typing_qualified_name(&qualified_name, "NewType")
+        })
 }
 
 /// Returns `true` if the statement is an assignment to a `TypeAlias`.
 pub(super) fn is_type_alias_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
-    let Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) = stmt else {
-        return false;
-    };
-    semantic.match_typing_expr(annotation, "TypeAlias")
+    match stmt {
+        Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
+            semantic.match_typing_expr(annotation, "TypeAlias")
+        }
+        Stmt::TypeAlias(_) => true,
+        _ => false,
+    }
 }
 
+/// Returns `true` if the statement is an assignment to a `TypedDict`.
 pub(super) fn is_typed_dict_class(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
+    if !semantic.seen_typing() {
+        return false;
+    }
+
     arguments.is_some_and(|arguments| {
         arguments
             .args
             .iter()
             .any(|base| semantic.match_typing_expr(base, "TypedDict"))
     })
+}
+
+/// Returns `true` if a statement appears to be a dynamic import of a Django model.
+///
+/// For example, in Django, it's common to use `get_model` to access a model dynamically, as in:
+/// ```python
+/// def migrate_existing_attachment_data(
+///     apps: StateApps, schema_editor: BaseDatabaseSchemaEditor
+/// ) -> None:
+///     Attachment = apps.get_model("zerver", "Attachment")
+/// ```
+pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &SemanticModel) -> bool {
+    fn match_model_import(name: &str, expr: &Expr, semantic: &SemanticModel) -> bool {
+        let Expr::Call(ast::ExprCall {
+            func, arguments, ..
+        }) = expr
+        else {
+            return false;
+        };
+
+        if arguments.is_empty() {
+            return false;
+        }
+
+        // Match against, e.g., `apps.get_model("zerver", "Attachment")`.
+        if let Some(unqualified_name) = UnqualifiedName::from_expr(func.as_ref()) {
+            if matches!(unqualified_name.segments(), [.., "get_model"]) {
+                if let Some(argument) =
+                    arguments.find_argument("model_name", arguments.args.len().saturating_sub(1))
+                {
+                    if let Some(string_literal) = argument.as_string_literal_expr() {
+                        if string_literal.value.to_str() == name {
+                            return true;
+                        }
+                    } else {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // Match against, e.g., `import_string("zerver.models.Attachment")`.
+        if let Some(qualified_name) = semantic.resolve_qualified_name(func.as_ref()) {
+            if matches!(
+                qualified_name.segments(),
+                ["django", "utils", "module_loading", "import_string"]
+            ) {
+                if let Some(argument) = arguments.find_argument("dotted_path", 0) {
+                    if let Some(string_literal) = argument.as_string_literal_expr() {
+                        if let Some((.., model)) = string_literal.value.to_str().rsplit_once('.') {
+                            if model == name {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
+    match stmt {
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            value: Some(value), ..
+        }) => match_model_import(name, value.as_ref(), semantic),
+        Stmt::Assign(ast::StmtAssign { value, .. }) => {
+            match_model_import(name, value.as_ref(), semantic)
+        }
+        _ => false,
+    }
 }
 
 #[cfg(test)]

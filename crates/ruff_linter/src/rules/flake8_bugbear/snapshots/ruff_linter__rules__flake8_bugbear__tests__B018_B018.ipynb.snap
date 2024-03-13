@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B018.ipynb:5:1: B018 Found useless expression. Either assign it to a variable or remove it.
+  |
+3 | x
+4 | # Only skip the last expression
+5 | x  # B018
+  | ^ B018
+6 | x
+7 | # Nested expressions isn't relevant
+  |
+
+B018.ipynb:9:5: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+ 7 | # Nested expressions isn't relevant
+ 8 | if True:
+ 9 |     x
+   |     ^ B018
+10 | # Semicolons shouldn't affect the output
+11 | x;
+   |
+
+B018.ipynb:13:1: B018 Found useless expression. Either assign it to a variable or remove it.
+   |
+11 | x;
+12 | # Semicolons with multiple expressions
+13 | x; x
+   | ^ B018
+14 | # Comments, newlines and whitespace
+15 | x  # comment
+   |
+
+

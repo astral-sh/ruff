@@ -122,7 +122,7 @@ impl fmt::Display for RemovalKind {
 
 /// Return `true` if a string contains duplicate characters, taking into account
 /// escapes.
-fn has_duplicates(s: &str) -> bool {
+fn has_duplicates(s: &ast::StringLiteralValue) -> bool {
     let mut escaped = false;
     let mut seen = FxHashSet::default();
     for ch in s.chars() {
@@ -149,7 +149,7 @@ pub(crate) fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Exp
             Expr::StringLiteral(_) | Expr::BytesLiteral(_)
         ) {
             if let Some(strip) = StripKind::from_str(attr.as_str()) {
-                if let Some(arg) = args.get(0) {
+                if let Some(arg) = args.first() {
                     if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &arg {
                         if has_duplicates(value) {
                             let removal = if checker.settings.target_version >= PythonVersion::Py39

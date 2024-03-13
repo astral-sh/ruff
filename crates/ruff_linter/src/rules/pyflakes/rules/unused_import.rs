@@ -28,6 +28,15 @@ enum UnusedImportContext {
 /// If an import statement is used to check for the availability or existence
 /// of a module, consider using `importlib.util.find_spec` instead.
 ///
+/// If an import statement is used to re-export a symbol as part of a module's
+/// public interface, consider using a "redundant" import alias, which
+/// instructs Ruff (and other tools) to respect the re-export, and avoid
+/// marking it as unused, as in:
+///
+/// ```python
+/// from module import member as member
+/// ```
+///
 /// ## Example
 /// ```python
 /// import numpy as np  # unused import
@@ -54,11 +63,12 @@ enum UnusedImportContext {
 /// ```
 ///
 /// ## Options
-/// - `pyflakes.extend-generics`
+/// - `lint.ignore-init-module-imports`
 ///
 /// ## References
 /// - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 /// - [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
+/// - [Typing documentation: interface conventions](https://typing.readthedocs.io/en/latest/source/libraries.html#library-interface-public-and-private-symbols)
 #[violation]
 pub struct UnusedImport {
     name: String,
@@ -168,7 +178,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         {
             let mut diagnostic = Diagnostic::new(
                 UnusedImport {
-                    name: import.qualified_name(),
+                    name: import.qualified_name().to_string(),
                     context: if in_except_handler {
                         Some(UnusedImportContext::ExceptHandler)
                     } else if in_init {
@@ -202,7 +212,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
     {
         let mut diagnostic = Diagnostic::new(
             UnusedImport {
-                name: import.qualified_name(),
+                name: import.qualified_name().to_string(),
                 context: None,
                 multiple: false,
             },
@@ -219,7 +229,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 #[derive(Debug)]
 struct ImportBinding<'a> {
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
-    import: AnyImport<'a>,
+    import: AnyImport<'a, 'a>,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
     range: TextRange,
     /// The range of the import's parent statement.

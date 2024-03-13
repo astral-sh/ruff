@@ -207,3 +207,55 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 # The fixed string will exceed the line length, but it's still smaller than the
 # existing line length, so it's fine.
 "<Customer: {}, {}, {}, {}, {}>".format(self.internal_ids, self.external_ids, self.properties, self.tags, self.others)
+
+# When fixing, trim the trailing empty string.
+raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+                 "".format(new_dict, d))
+
+# When fixing, trim the trailing empty string.
+raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+                 .format(new_dict, d))
+
+raise ValueError(
+    "Conflicting configuration dicts: {!r} {!r}"
+    "".format(new_dict, d)
+)
+
+raise ValueError(
+    "Conflicting configuration dicts: {!r} {!r}"
+    "".format(new_dict, d)
+
+)
+
+# The first string will be converted to an f-string and the curly braces in the second should be converted to be unescaped
+(
+    "{}"
+    "{{}}"
+).format(a)
+
+("{}" "{{}}").format(a)
+
+
+# Both strings will be converted to an f-string and the curly braces in the second should left escaped
+(
+    "{}"
+    "{{{}}}"
+).format(a, b)
+
+("{}" "{{{}}}").format(a, b)
+
+# The dictionary should be parenthesized.
+"{}".format({0: 1}[0])
+
+# The dictionary should be parenthesized.
+"{}".format({0: 1}.bar)
+
+# The dictionary should be parenthesized.
+"{}".format({0: 1}())
+
+# The string shouldn't be converted, since it would require repeating the function call.
+"{x} {x}".format(x=foo())
+"{0} {0}".format(foo())
+
+# The string _should_ be converted, since the function call is repeated in the arguments.
+"{0} {1}".format(foo(), foo())

@@ -1,20 +1,21 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use ruff_python_trivia::CommentRanges;
+use rustc_hash::FxHashMap;
+
+use ruff_python_trivia::{indentation_at_offset, CommentRanges, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
-use smallvec::SmallVec;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use ruff_text_size::{Ranged, TextRange};
-
-use crate::call_path::CallPath;
+use crate::name::{QualifiedName, QualifiedNameBuilder};
 use crate::parenthesize::parenthesized_range;
-use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
+use crate::statement_visitor::StatementVisitor;
 use crate::visitor::Visitor;
-use crate::AnyNodeRef;
 use crate::{
-    self as ast, Arguments, CmpOp, ExceptHandler, Expr, MatchCase, Pattern, Stmt, TypeParam,
+    self as ast, Arguments, CmpOp, ExceptHandler, Expr, FStringElement, MatchCase, Operator,
+    Pattern, Stmt, TypeParam,
 };
+use crate::{AnyNodeRef, ExprContext};
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
 pub const fn is_compound_statement(stmt: &Stmt) -> bool {
@@ -50,12 +51,12 @@ where
         // Accept empty initializers.
         if let Expr::Call(ast::ExprCall {
             func,
-            arguments: Arguments { args, keywords, .. },
+            arguments,
             range: _,
         }) = expr
         {
             // Ex) `list()`
-            if args.is_empty() && keywords.is_empty() {
+            if arguments.is_empty() {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if !is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
                         return true;
@@ -114,7 +115,7 @@ where
             Expr::Await(_)
                 | Expr::Call(_)
                 | Expr::DictComp(_)
-                | Expr::GeneratorExp(_)
+                | Expr::Generator(_)
                 | Expr::ListComp(_)
                 | Expr::SetComp(_)
                 | Expr::Subscript(_)
@@ -132,11 +133,13 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         return true;
     }
     match expr {
-        Expr::BoolOp(ast::ExprBoolOp { values, .. })
-        | Expr::FString(ast::ExprFString { values, .. }) => {
+        Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
             values.iter().any(|expr| any_over_expr(expr, func))
         }
-        Expr::NamedExpr(ast::ExprNamedExpr {
+        Expr::FString(ast::ExprFString { value, .. }) => value
+            .elements()
+            .any(|expr| any_over_f_string_element(expr, func)),
+        Expr::Named(ast::ExprNamed {
             target,
             value,
             range: _,
@@ -146,7 +149,7 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         }
         Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => any_over_expr(operand, func),
         Expr::Lambda(ast::ExprLambda { body, .. }) => any_over_expr(body, func),
-        Expr::IfExp(ast::ExprIfExp {
+        Expr::If(ast::ExprIf {
             test,
             body,
             orelse,
@@ -175,10 +178,11 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
             generators,
             range: _,
         })
-        | Expr::GeneratorExp(ast::ExprGeneratorExp {
+        | Expr::Generator(ast::ExprGenerator {
             elt,
             generators,
             range: _,
+            parenthesized: _,
         }) => {
             any_over_expr(elt, func)
                 || generators.iter().any(|generator| {
@@ -217,24 +221,16 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         }) => any_over_expr(left, func) || comparators.iter().any(|expr| any_over_expr(expr, func)),
         Expr::Call(ast::ExprCall {
             func: call_func,
-            arguments: Arguments { args, keywords, .. },
+            arguments,
             range: _,
         }) => {
             any_over_expr(call_func, func)
                 // Note that this is the evaluation order but not necessarily the declaration order
                 // (e.g. for `f(*args, a=2, *args2, **kwargs)` it's not)
-                || args.iter().any(|expr| any_over_expr(expr, func))
-                || keywords
+                || arguments.args.iter().any(|expr| any_over_expr(expr, func))
+                || arguments.keywords
                     .iter()
                     .any(|keyword| any_over_expr(&keyword.value, func))
-        }
-        Expr::FormattedValue(ast::ExprFormattedValue {
-            value, format_spec, ..
-        }) => {
-            any_over_expr(value, func)
-                || format_spec
-                    .as_ref()
-                    .is_some_and(|value| any_over_expr(value, func))
         }
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
             any_over_expr(value, func) || any_over_expr(slice, func)
@@ -309,6 +305,27 @@ pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool
         Pattern::MatchOr(ast::PatternMatchOr { patterns, range: _ }) => patterns
             .iter()
             .any(|pattern| any_over_pattern(pattern, func)),
+    }
+}
+
+pub fn any_over_f_string_element(
+    element: &ast::FStringElement,
+    func: &dyn Fn(&Expr) -> bool,
+) -> bool {
+    match element {
+        ast::FStringElement::Literal(_) => false,
+        ast::FStringElement::Expression(ast::FStringExpressionElement {
+            expression,
+            format_spec,
+            ..
+        }) => {
+            any_over_expr(expression, func)
+                || format_spec.as_ref().is_some_and(|spec| {
+                    spec.elements
+                        .iter()
+                        .any(|spec_element| any_over_f_string_element(spec_element, func))
+                })
+        }
     }
 }
 
@@ -775,16 +792,16 @@ pub fn to_module_path(package: &Path, path: &Path) -> Option<Vec<String>> {
 /// ```rust
 /// # use ruff_python_ast::helpers::collect_import_from_member;
 ///
-/// assert_eq!(collect_import_from_member(None, None, "bar").as_slice(), ["bar"]);
-/// assert_eq!(collect_import_from_member(Some(1), None, "bar").as_slice(), [".", "bar"]);
-/// assert_eq!(collect_import_from_member(Some(1), Some("foo"), "bar").as_slice(), [".", "foo", "bar"]);
+/// assert_eq!(collect_import_from_member(None, None, "bar").segments(), ["bar"]);
+/// assert_eq!(collect_import_from_member(Some(1), None, "bar").segments(), [".", "bar"]);
+/// assert_eq!(collect_import_from_member(Some(1), Some("foo"), "bar").segments(), [".", "foo", "bar"]);
 /// ```
 pub fn collect_import_from_member<'a>(
     level: Option<u32>,
     module: Option<&'a str>,
     member: &'a str,
-) -> CallPath<'a> {
-    let mut call_path: CallPath = SmallVec::with_capacity(
+) -> QualifiedName<'a> {
+    let mut qualified_name_builder = QualifiedNameBuilder::with_capacity(
         level.unwrap_or_default() as usize
             + module
                 .map(|module| module.split('.').count())
@@ -796,20 +813,20 @@ pub fn collect_import_from_member<'a>(
     if let Some(level) = level {
         if level > 0 {
             for _ in 0..level {
-                call_path.push(".");
+                qualified_name_builder.push(".");
             }
         }
     }
 
     // Add the remaining segments.
     if let Some(module) = module {
-        call_path.extend(module.split('.'));
+        qualified_name_builder.extend(module.split('.'));
     }
 
     // Add the member.
-    call_path.push(member);
+    qualified_name_builder.push(member);
 
-    call_path
+    qualified_name_builder.build()
 }
 
 /// Format the call path for a relative import, or `None` if the relative import extends beyond
@@ -821,28 +838,29 @@ pub fn from_relative_import<'a>(
     import: &[&'a str],
     // The remaining segments to the call path (e.g., given `bar.baz`, `["baz"]`).
     tail: &[&'a str],
-) -> Option<CallPath<'a>> {
-    let mut call_path: CallPath = SmallVec::with_capacity(module.len() + import.len() + tail.len());
+) -> Option<QualifiedName<'a>> {
+    let mut qualified_name_builder =
+        QualifiedNameBuilder::with_capacity(module.len() + import.len() + tail.len());
 
     // Start with the module path.
-    call_path.extend(module.iter().map(String::as_str));
+    qualified_name_builder.extend(module.iter().map(String::as_str));
 
     // Remove segments based on the number of dots.
     for segment in import {
         if *segment == "." {
-            if call_path.is_empty() {
+            if qualified_name_builder.is_empty() {
                 return None;
             }
-            call_path.pop();
+            qualified_name_builder.pop();
         } else {
-            call_path.push(segment);
+            qualified_name_builder.push(segment);
         }
     }
 
     // Add the remaining segments.
-    call_path.extend_from_slice(tail);
+    qualified_name_builder.extend_from_slice(tail);
 
-    Some(call_path)
+    Some(qualified_name_builder.build())
 }
 
 /// Given an imported module (based on its relative import level and module name), return the
@@ -878,23 +896,63 @@ pub fn resolve_imported_module_path<'a>(
     Some(Cow::Owned(qualified_path))
 }
 
-/// A [`StatementVisitor`] that collects all `return` statements in a function or method.
+/// A [`Visitor`] to collect all [`Expr::Name`] nodes in an AST.
+#[derive(Debug, Default)]
+pub struct NameFinder<'a> {
+    /// A map from identifier to defining expression.
+    pub names: FxHashMap<&'a str, &'a ast::ExprName>,
+}
+
+impl<'a> Visitor<'a> for NameFinder<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        if let Expr::Name(name) = expr {
+            self.names.insert(&name.id, name);
+        }
+        crate::visitor::walk_expr(self, expr);
+    }
+}
+
+/// A [`Visitor`] to collect all stored [`Expr::Name`] nodes in an AST.
+#[derive(Debug, Default)]
+pub struct StoredNameFinder<'a> {
+    /// A map from identifier to defining expression.
+    pub names: FxHashMap<&'a str, &'a ast::ExprName>,
+}
+
+impl<'a> Visitor<'a> for StoredNameFinder<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        if let Expr::Name(name) = expr {
+            if name.ctx.is_store() {
+                self.names.insert(&name.id, name);
+            }
+        }
+        crate::visitor::walk_expr(self, expr);
+    }
+}
+
+/// A [`Visitor`] that collects all `return` statements in a function or method.
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
     pub returns: Vec<&'a ast::StmtReturn>,
+    pub is_generator: bool,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for ReturnStatementVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> Visitor<'a> for ReturnStatementVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
             }
             Stmt::Return(stmt) => self.returns.push(stmt),
-            _ => walk_stmt(self, stmt),
+            _ => crate::visitor::walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        if let Expr::Yield(_) | Expr::YieldFrom(_) = expr {
+            self.is_generator = true;
+        } else {
+            crate::visitor::walk_expr(self, expr);
         }
     }
 }
@@ -905,11 +963,8 @@ pub struct RaiseStatementVisitor<'a> {
     pub raises: Vec<(TextRange, Option<&'a Expr>, Option<&'a Expr>)>,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for RaiseStatementVisitor<'b>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Raise(ast::StmtRaise {
                 exc,
@@ -925,7 +980,7 @@ where
                 elif_else_clauses,
                 ..
             }) => {
-                walk_body(self, body);
+                crate::statement_visitor::walk_body(self, body);
                 for clause in elif_else_clauses {
                     self.visit_elif_else_clause(clause);
                 }
@@ -933,11 +988,11 @@ where
             Stmt::While(ast::StmtWhile { body, .. })
             | Stmt::With(ast::StmtWith { body, .. })
             | Stmt::For(ast::StmtFor { body, .. }) => {
-                walk_body(self, body);
+                crate::statement_visitor::walk_body(self, body);
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 for case in cases {
-                    walk_body(self, &case.body);
+                    crate::statement_visitor::walk_body(self, &case.body);
                 }
             }
             _ => {}
@@ -955,6 +1010,12 @@ impl Visitor<'_> for AwaitVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => (),
+            Stmt::With(ast::StmtWith { is_async: true, .. }) => {
+                self.seen_await = true;
+            }
+            Stmt::For(ast::StmtFor { is_async: true, .. }) => {
+                self.seen_await = true;
+            }
             _ => crate::visitor::walk_stmt(self, stmt),
         }
     }
@@ -984,7 +1045,7 @@ pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -
             return true;
         }
         if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = parent {
-            if value.is_if_exp_expr() {
+            if value.is_if_expr() {
                 return true;
             }
         }
@@ -1129,16 +1190,10 @@ impl Truthiness {
             }
             Expr::NoneLiteral(_) => Self::Falsey,
             Expr::EllipsisLiteral(_) => Self::Truthy,
-            Expr::FString(ast::ExprFString { values, .. }) => {
-                if values.is_empty() {
+            Expr::FString(f_string) => {
+                if is_empty_f_string(f_string) {
                     Self::Falsey
-                } else if values.iter().any(|value| {
-                    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &value {
-                        !value.is_empty()
-                    } else {
-                        false
-                    }
-                }) {
+                } else if is_non_empty_f_string(f_string) {
                     Self::Truthy
                 } else {
                     Self::Unknown
@@ -1161,18 +1216,16 @@ impl Truthiness {
                 }
             }
             Expr::Call(ast::ExprCall {
-                func,
-                arguments: Arguments { args, keywords, .. },
-                ..
+                func, arguments, ..
             }) => {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
-                        if args.is_empty() && keywords.is_empty() {
+                        if arguments.is_empty() {
                             // Ex) `list()`
                             Self::Falsey
-                        } else if args.len() == 1 && keywords.is_empty() {
+                        } else if arguments.args.len() == 1 && arguments.keywords.is_empty() {
                             // Ex) `list([1, 2, 3])`
-                            Self::from_expr(&args[0], is_builtin)
+                            Self::from_expr(&arguments.args[0], is_builtin)
                         } else {
                             Self::Unknown
                         }
@@ -1194,6 +1247,99 @@ impl Truthiness {
             Self::Unknown => None,
         }
     }
+}
+
+/// Returns `true` if the expression definitely resolves to a non-empty string, when used as an
+/// f-string expression, or `false` if the expression may resolve to an empty string.
+fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
+    fn inner(expr: &Expr) -> bool {
+        match expr {
+            // When stringified, these expressions are always non-empty.
+            Expr::Lambda(_) => true,
+            Expr::Dict(_) => true,
+            Expr::Set(_) => true,
+            Expr::ListComp(_) => true,
+            Expr::SetComp(_) => true,
+            Expr::DictComp(_) => true,
+            Expr::Compare(_) => true,
+            Expr::NumberLiteral(_) => true,
+            Expr::BooleanLiteral(_) => true,
+            Expr::NoneLiteral(_) => true,
+            Expr::EllipsisLiteral(_) => true,
+            Expr::List(_) => true,
+            Expr::Tuple(_) => true,
+
+            // These expressions must resolve to the inner expression.
+            Expr::If(ast::ExprIf { body, orelse, .. }) => inner(body) && inner(orelse),
+            Expr::Named(ast::ExprNamed { value, .. }) => inner(value),
+
+            // These expressions are complex. We can't determine whether they're empty or not.
+            Expr::BoolOp(ast::ExprBoolOp { .. }) => false,
+            Expr::BinOp(ast::ExprBinOp { .. }) => false,
+            Expr::UnaryOp(ast::ExprUnaryOp { .. }) => false,
+            Expr::Generator(_) => false,
+            Expr::Await(_) => false,
+            Expr::Yield(_) => false,
+            Expr::YieldFrom(_) => false,
+            Expr::Call(_) => false,
+            Expr::Attribute(_) => false,
+            Expr::Subscript(_) => false,
+            Expr::Starred(_) => false,
+            Expr::Name(_) => false,
+            Expr::Slice(_) => false,
+            Expr::IpyEscapeCommand(_) => false,
+
+            // These literals may or may not be empty.
+            Expr::FString(f_string) => is_non_empty_f_string(f_string),
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => !value.is_empty(),
+            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => !value.is_empty(),
+        }
+    }
+
+    expr.value.iter().any(|part| match part {
+        ast::FStringPart::Literal(string_literal) => !string_literal.is_empty(),
+        ast::FStringPart::FString(f_string) => {
+            f_string.elements.iter().all(|element| match element {
+                FStringElement::Literal(string_literal) => !string_literal.is_empty(),
+                FStringElement::Expression(f_string) => inner(&f_string.expression),
+            })
+        }
+    })
+}
+
+/// Returns `true` if the expression definitely resolves to the empty string, when used as an f-string
+/// expression.
+fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
+    fn inner(expr: &Expr) -> bool {
+        match expr {
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
+            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.is_empty(),
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                value
+                    .elements()
+                    .all(|f_string_element| match f_string_element {
+                        FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => {
+                            value.is_empty()
+                        }
+                        FStringElement::Expression(ast::FStringExpressionElement {
+                            expression,
+                            ..
+                        }) => inner(expression),
+                    })
+            }
+            _ => false,
+        }
+    }
+
+    expr.value.iter().all(|part| match part {
+        ast::FStringPart::Literal(string_literal) => string_literal.is_empty(),
+        ast::FStringPart::FString(f_string) => {
+            f_string.elements.iter().all(|element| match element {
+                FStringElement::Literal(string_literal) => string_literal.is_empty(),
+                FStringElement::Expression(f_string) => inner(&f_string.expression),
+            })
+        }
+    })
 }
 
 pub fn generate_comparison(
@@ -1246,6 +1392,158 @@ pub fn generate_comparison(
     }
 
     contents
+}
+
+/// Format the expression as a PEP 604-style optional.
+pub fn pep_604_optional(expr: &Expr) -> Expr {
+    ast::ExprBinOp {
+        left: Box::new(expr.clone()),
+        op: Operator::BitOr,
+        right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
+        range: TextRange::default(),
+    }
+    .into()
+}
+
+/// Format the expressions as a PEP 604-style union.
+pub fn pep_604_union(elts: &[Expr]) -> Expr {
+    match elts {
+        [] => Expr::Tuple(ast::ExprTuple {
+            elts: vec![],
+            ctx: ExprContext::Load,
+            range: TextRange::default(),
+            parenthesized: true,
+        }),
+        [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts),
+        [elt] => elt.clone(),
+        [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
+            left: Box::new(pep_604_union(rest)),
+            op: Operator::BitOr,
+            right: Box::new(pep_604_union(&[elt.clone()])),
+            range: TextRange::default(),
+        }),
+    }
+}
+
+/// Format the expression as a `typing.Optional`-style optional.
+pub fn typing_optional(elt: Expr, binding: String) -> Expr {
+    Expr::Subscript(ast::ExprSubscript {
+        value: Box::new(Expr::Name(ast::ExprName {
+            id: binding,
+            range: TextRange::default(),
+            ctx: ExprContext::Load,
+        })),
+        slice: Box::new(elt),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    })
+}
+
+/// Format the expressions as a `typing.Union`-style union.
+pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
+    fn tuple(elts: &[Expr], binding: String) -> Expr {
+        match elts {
+            [] => Expr::Tuple(ast::ExprTuple {
+                elts: vec![],
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+                parenthesized: true,
+            }),
+            [Expr::Tuple(ast::ExprTuple { elts, .. })] => typing_union(elts, binding),
+            [elt] => elt.clone(),
+            [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
+                left: Box::new(tuple(rest, binding)),
+                op: Operator::BitOr,
+                right: Box::new(elt.clone()),
+                range: TextRange::default(),
+            }),
+        }
+    }
+
+    Expr::Subscript(ast::ExprSubscript {
+        value: Box::new(Expr::Name(ast::ExprName {
+            id: binding.clone(),
+            range: TextRange::default(),
+            ctx: ExprContext::Load,
+        })),
+        slice: Box::new(tuple(elts, binding)),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    })
+}
+
+/// Determine the indentation level of an own-line comment, defined as the minimum indentation of
+/// all comments between the preceding node and the comment, including the comment itself. In
+/// other words, we don't allow successive comments to ident _further_ than any preceding comments.
+///
+/// For example, given:
+/// ```python
+/// if True:
+///     pass
+///     # comment
+/// ```
+///
+/// The indentation would be 4, as the comment is indented by 4 spaces.
+///
+/// Given:
+/// ```python
+/// if True:
+///     pass
+/// # comment
+/// else:
+///     pass
+/// ```
+///
+/// The indentation would be 0, as the comment is not indented at all.
+///
+/// Given:
+/// ```python
+/// if True:
+///     pass
+///     # comment
+///         # comment
+/// ```
+///
+/// Both comments would be marked as indented at 4 spaces, as the indentation of the first comment
+/// is used for the second comment.
+///
+/// This logic avoids pathological cases like:
+/// ```python
+/// try:
+///     if True:
+///         if True:
+///             pass
+///
+///         # a
+///             # b
+///         # c
+/// except Exception:
+///     pass
+/// ```
+///
+/// If we don't use the minimum indentation of any preceding comments, we would mark `# b` as
+/// indented to the same depth as `pass`, which could in turn lead to us treating it as a trailing
+/// comment of `pass`, despite there being a comment between them that "resets" the indentation.
+pub fn comment_indentation_after(
+    preceding: AnyNodeRef,
+    comment_range: TextRange,
+    locator: &Locator,
+) -> TextSize {
+    let tokenizer = SimpleTokenizer::new(
+        locator.contents(),
+        TextRange::new(locator.full_line_end(preceding.end()), comment_range.end()),
+    );
+
+    tokenizer
+        .filter_map(|token| {
+            if token.kind() == SimpleTokenKind::Comment {
+                indentation_at_offset(token.start(), locator).map(TextLen::text_len)
+            } else {
+                None
+            }
+        })
+        .min()
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

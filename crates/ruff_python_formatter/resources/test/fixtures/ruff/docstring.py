@@ -148,5 +148,10 @@ class TabbedIndent:
 		"""check for correct tabbed formatting
 		                            ^^^^^^^^^^
 		Normal indented line
-		  	- autor
+		  	- author
 		"""
+
+
+def single_quoted():
+    ' content\     '
+    return

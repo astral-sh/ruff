@@ -1,12 +1,14 @@
 use ruff_formatter::write;
 use ruff_python_ast::StmtAugAssign;
 
-use crate::comments::{SourceComment, SuppressionKind};
-
-use crate::expression::maybe_parenthesize_expression;
-use crate::expression::parentheses::Parenthesize;
-use crate::prelude::*;
+use crate::comments::SourceComment;
+use crate::expression::parentheses::is_expression_parenthesized;
+use crate::statement::stmt_assign::{
+    has_target_own_parentheses, AnyAssignmentOperator, AnyBeforeOperator,
+    FormatStatementsLastExpression,
+};
 use crate::statement::trailing_semicolon;
+use crate::{has_skip_comment, prelude::*};
 use crate::{AsFormat, FormatNodeRule};
 
 #[derive(Default)]
@@ -20,17 +22,34 @@ impl FormatNodeRule<StmtAugAssign> for FormatStmtAugAssign {
             value,
             range: _,
         } = item;
-        write!(
-            f,
-            [
-                target.format(),
-                space(),
-                op.format(),
-                token("="),
-                space(),
-                maybe_parenthesize_expression(value, item, Parenthesize::IfBreaks)
-            ]
-        )?;
+
+        if has_target_own_parentheses(target, f.context())
+            && !is_expression_parenthesized(
+                target.into(),
+                f.context().comments().ranges(),
+                f.context().source(),
+            )
+        {
+            FormatStatementsLastExpression::RightToLeft {
+                before_operator: AnyBeforeOperator::Expression(target),
+                operator: AnyAssignmentOperator::AugAssign(*op),
+                value,
+                statement: item.into(),
+            }
+            .fmt(f)?;
+        } else {
+            write!(
+                f,
+                [
+                    target.format(),
+                    space(),
+                    op.format(),
+                    token("="),
+                    space(),
+                    FormatStatementsLastExpression::left_to_right(value, item)
+                ]
+            )?;
+        }
 
         if f.options().source_type().is_ipynb()
             && f.context().node_level().is_last_top_level_statement()
@@ -48,6 +67,6 @@ impl FormatNodeRule<StmtAugAssign> for FormatStmtAugAssign {
         trailing_comments: &[SourceComment],
         context: &PyFormatContext,
     ) -> bool {
-        SuppressionKind::has_skip_comment(trailing_comments, context.source())
+        has_skip_comment(trailing_comments, context.source())
     }
 }

@@ -9,7 +9,7 @@ UP008.py:17:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
 18 |         super(Child, self).method  # wrong
 19 |         super(
    |
-   = help: Remove `super` parameters
+   = help: Remove `__super__` parameters
 
 ℹ Unsafe fix
 14 14 |         Parent.super(1, 2)  # ok
@@ -30,7 +30,7 @@ UP008.py:18:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 19 |         super(
 20 |             Child,
    |
-   = help: Remove `super` parameters
+   = help: Remove `__super__` parameters
 
 ℹ Unsafe fix
 15 15 | 
@@ -53,7 +53,7 @@ UP008.py:19:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 22 | |         ).method()  # wrong
    | |_________^ UP008
    |
-   = help: Remove `super` parameters
+   = help: Remove `__super__` parameters
 
 ℹ Unsafe fix
 16 16 |     def wrong(self):
@@ -76,7 +76,7 @@ UP008.py:36:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |              ^^^^^^^^^^^^^^^ UP008
 37 |         super().f()
    |
-   = help: Remove `super` parameters
+   = help: Remove `__super__` parameters
 
 ℹ Unsafe fix
 33 33 | 
@@ -95,7 +95,7 @@ UP008.py:50:18: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |                  ^^^^^^^^^^^^^^^ UP008
 51 |             super().f()
    |
-   = help: Remove `super` parameters
+   = help: Remove `__super__` parameters
 
 ℹ Unsafe fix
 47 47 |             super(MyClass, self).f()  # CANNOT use super()

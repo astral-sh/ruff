@@ -50,7 +50,7 @@ class Apples:
         return "Docstring"
 
     # Added in Python 3.12
-    def __buffer__(self):  
+    def __buffer__(self):
         return memoryview(b'')
 
     def __release_buffer__(self, buf):
@@ -81,6 +81,17 @@ class Apples:
 
     # Allow anonymous functions.
     def _(self):
+        pass
+
+    # Allow custom dunder names (via setting).
+    def __special_custom_magic__(self):
+        pass
+
+    @classmethod
+    def __prepare__():
+        pass
+
+    def __mro_entries__(self, bases):
         pass
 
 

@@ -537,7 +537,7 @@ pub(crate) fn percent_format_expected_mapping(
             | Expr::Set(_)
             | Expr::ListComp(_)
             | Expr::SetComp(_)
-            | Expr::GeneratorExp(_) => checker
+            | Expr::Generator(_) => checker
                 .diagnostics
                 .push(Diagnostic::new(PercentFormatExpectedMapping, location)),
             _ => {}
@@ -583,10 +583,10 @@ pub(crate) fn percent_format_extra_named_arguments(
         .enumerate()
         .filter_map(|(index, key)| match key {
             Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) => {
-                if summary.keywords.contains(value.as_str()) {
+                if summary.keywords.contains(value.to_str()) {
                     None
                 } else {
-                    Some((index, value.as_str()))
+                    Some((index, value.to_str()))
                 }
             }
             _ => None,
@@ -641,7 +641,7 @@ pub(crate) fn percent_format_missing_arguments(
     for key in keys.iter().flatten() {
         match key {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                keywords.insert(value);
+                keywords.insert(value.to_str());
             }
             _ => {
                 return; // Dynamic keys present
@@ -652,7 +652,7 @@ pub(crate) fn percent_format_missing_arguments(
     let missing: Vec<&String> = summary
         .keywords
         .iter()
-        .filter(|k| !keywords.contains(k))
+        .filter(|k| !keywords.contains(k.as_str()))
         .collect();
 
     if !missing.is_empty() {

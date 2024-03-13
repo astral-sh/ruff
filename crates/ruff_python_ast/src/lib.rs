@@ -6,7 +6,6 @@ pub use node::{AnyNode, AnyNodeRef, AstNode, NodeKind};
 pub use nodes::*;
 
 pub mod all;
-pub mod call_path;
 pub mod comparable;
 pub mod docstrings;
 mod expression;
@@ -15,6 +14,7 @@ pub mod helpers;
 pub mod identifier;
 pub mod imports;
 mod int;
+pub mod name;
 mod node;
 mod nodes;
 pub mod parenthesize;
@@ -68,7 +68,7 @@ pub enum TomlSourceType {
     Unrecognized,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, is_macro::Is)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, is_macro::Is)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PySourceType {
     /// The source is a Python file (`.py`).

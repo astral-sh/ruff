@@ -39,3 +39,18 @@ def func():
     for i in range(1110):
         if True:
             break
+
+# TODO(charlie): The `pass` here does not get properly redirected to the top of the
+# loop, unlike below.
+def func():
+    for i in range(5):
+        pass
+    else:
+        return 1
+
+def func():
+    for i in range(5):
+        pass
+    else:
+        return 1
+    x = 1

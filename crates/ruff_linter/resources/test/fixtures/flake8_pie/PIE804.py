@@ -10,7 +10,6 @@ Foo.objects.create(**{**bar})  # PIE804
 
 foo(**{})
 
-
 foo(**{**data, "foo": "buzz"})
 foo(**buzz)
 foo(**{"bar-foo": True})
@@ -20,3 +19,8 @@ foo(**{buzz: True})
 foo(**{"": True})
 foo(**{f"buzz__{bar}": True})
 abc(**{"for": 3})
+foo(**{},)
+
+# Duplicated key names won't be fixed, to avoid syntax errors.
+abc(**{'a': b}, **{'a': c})  # PIE804
+abc(a=1, **{'a': c}, **{'b': c})  # PIE804

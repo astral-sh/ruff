@@ -2,10 +2,9 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
+use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
-use globset::{Glob, GlobMatcher};
 use once_cell::sync::Lazy;
 use path_absolutize::path_dedot;
 use regex::Regex;
@@ -15,7 +14,7 @@ use crate::codes::RuleCodePrefix;
 use ruff_macros::CacheKey;
 
 use crate::line_width::LineLength;
-use crate::registry::{Linter, Rule, RuleSet};
+use crate::registry::{Linter, Rule};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
@@ -23,7 +22,7 @@ use crate::rules::{
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
-use crate::settings::types::{ExtensionMapping, FilePatternSet, PerFileIgnore, PythonVersion};
+use crate::settings::types::{ExtensionMapping, FilePatternSet, PerFileIgnores, PythonVersion};
 use crate::{codes, RuleSelector};
 
 use super::line_width::IndentWidth;
@@ -38,19 +37,188 @@ pub mod flags;
 pub mod rule_table;
 pub mod types;
 
+/// `display_settings!` is a macro that can display and format struct fields in a readable,
+/// namespaced format. It's particularly useful at generating `Display` implementations
+/// for types used in settings.
+///
+/// # Example
+/// ```
+/// use std::fmt;
+/// use ruff_linter::display_settings;
+/// #[derive(Default)]
+/// struct Settings {
+///     option_a: bool,
+///     sub_settings: SubSettings,
+///     option_b: String,
+/// }
+///
+/// struct SubSettings {
+///     name: String
+/// }
+///
+/// impl Default for SubSettings {
+///     fn default() -> Self {
+///         Self { name: "Default Name".into() }
+///     }
+///
+/// }
+///
+/// impl fmt::Display for SubSettings {
+///     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         display_settings! {
+///             formatter = f,
+///             namespace = "sub_settings",
+///             fields = [
+///                 self.name | quoted
+///             ]
+///         }
+///         Ok(())
+///     }
+///
+/// }
+///
+/// impl fmt::Display for Settings {
+///     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         display_settings! {
+///             formatter = f,
+///             fields = [
+///                 self.option_a,
+///                 self.sub_settings | nested,
+///                 self.option_b | quoted,
+///             ]
+///         }
+///         Ok(())
+///     }
+///
+/// }
+///
+/// const EXPECTED_OUTPUT: &str = r#"option_a = false
+/// sub_settings.name = "Default Name"
+/// option_b = ""
+/// "#;
+///
+/// fn main() {
+///     let settings = Settings::default();
+///     assert_eq!(format!("{settings}"), EXPECTED_OUTPUT);
+/// }
+/// ```
+#[macro_export]
+macro_rules! display_settings {
+    (formatter = $fmt:ident, namespace = $namespace:literal, fields = [$($settings:ident.$field:ident $(| $modifier:tt)?),* $(,)?]) => {
+        {
+            const _PREFIX: &str = concat!($namespace, ".");
+            $(
+                display_settings!(@field $fmt, _PREFIX, $settings.$field $(| $modifier)?);
+            )*
+        }
+    };
+    (formatter = $fmt:ident, fields = [$($settings:ident.$field:ident $(| $modifier:tt)?),* $(,)?]) => {
+        {
+            const _PREFIX: &str = "";
+            $(
+                display_settings!(@field $fmt, _PREFIX, $settings.$field $(| $modifier)?);
+            )*
+        }
+    };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | debug) => {
+        writeln!($fmt, "{}{} = {:?}", $prefix, stringify!($field), $settings.$field)?;
+    };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | path) => {
+        writeln!($fmt, "{}{} = \"{}\"", $prefix, stringify!($field), $settings.$field.display())?;
+    };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | quoted) => {
+        writeln!($fmt, "{}{} = \"{}\"", $prefix, stringify!($field), $settings.$field)?;
+    };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | nested) => {
+        write!($fmt, "{}", $settings.$field)?;
+    };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | optional) => {
+        {
+            write!($fmt, "{}{} = ", $prefix, stringify!($field))?;
+            match &$settings.$field {
+                Some(value) => writeln!($fmt, "{}", value)?,
+                None        => writeln!($fmt, "none")?
+            };
+        }
+    };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | array) => {
+        {
+            write!($fmt, "{}{} = ", $prefix, stringify!($field))?;
+            if $settings.$field.is_empty() {
+                writeln!($fmt, "[]")?;
+            } else {
+                writeln!($fmt, "[")?;
+                for elem in &$settings.$field {
+                    writeln!($fmt, "\t{elem},")?;
+                }
+                writeln!($fmt, "]")?;
+            }
+        }
+    };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | map) => {
+        {
+            use itertools::Itertools;
+
+            write!($fmt, "{}{} = ", $prefix, stringify!($field))?;
+            if $settings.$field.is_empty() {
+                writeln!($fmt, "{{}}")?;
+            } else {
+                writeln!($fmt, "{{")?;
+                for (key, value) in $settings.$field.iter().sorted_by(|(left, _), (right, _)| left.cmp(right)) {
+                    writeln!($fmt, "\t{key} = {value},")?;
+                }
+                writeln!($fmt, "}}")?;
+            }
+        }
+    };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | set) => {
+        {
+            use itertools::Itertools;
+
+            write!($fmt, "{}{} = ", $prefix, stringify!($field))?;
+            if $settings.$field.is_empty() {
+                writeln!($fmt, "[]")?;
+            } else {
+                writeln!($fmt, "[")?;
+                for elem in $settings.$field.iter().sorted_by(|left, right| left.cmp(right)) {
+                    writeln!($fmt, "\t{elem},")?;
+                }
+                writeln!($fmt, "]")?;
+            }
+        }
+    };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | paths) => {
+        {
+            write!($fmt, "{}{} = ", $prefix, stringify!($field))?;
+            if $settings.$field.is_empty() {
+                writeln!($fmt, "[]")?;
+            } else {
+                writeln!($fmt, "[")?;
+                for elem in &$settings.$field {
+                    writeln!($fmt, "\t\"{}\",", elem.display())?;
+                }
+                writeln!($fmt, "]")?;
+            }
+        }
+    };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident) => {
+        writeln!($fmt, "{}{} = {}", $prefix, stringify!($field), $settings.$field)?;
+    };
+}
+
 #[derive(Debug, CacheKey)]
 pub struct LinterSettings {
     pub exclude: FilePatternSet,
+    pub extension: ExtensionMapping,
     pub project_root: PathBuf,
 
     pub rules: RuleTable,
-    pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
+    pub per_file_ignores: PerFileIgnores,
     pub fix_safety: FixSafetyTable,
 
     pub target_version: PythonVersion,
     pub preview: PreviewMode,
     pub explicit_preview_rules: bool,
-    pub extension: ExtensionMapping,
 
     // Rule-specific settings
     pub allowed_confusables: FxHashSet<char>,
@@ -91,6 +259,73 @@ pub struct LinterSettings {
     pub pyflakes: pyflakes::settings::Settings,
     pub pylint: pylint::settings::Settings,
     pub pyupgrade: pyupgrade::settings::Settings,
+}
+
+impl Display for LinterSettings {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "\n# Linter Settings")?;
+        display_settings! {
+            formatter = f,
+            namespace = "linter",
+            fields = [
+                self.exclude,
+                self.project_root | path,
+
+                self.rules | nested,
+                self.per_file_ignores,
+                self.fix_safety | nested,
+
+                self.target_version | debug,
+                self.preview,
+                self.explicit_preview_rules,
+                self.extension | nested,
+
+                self.allowed_confusables | array,
+                self.builtins | array,
+                self.dummy_variable_rgx,
+                self.external | array,
+                self.ignore_init_module_imports,
+                self.logger_objects | array,
+                self.namespace_packages | debug,
+                self.src | paths,
+                self.tab_size,
+                self.line_length,
+                self.task_tags | array,
+                self.typing_modules | array,
+            ]
+        }
+        writeln!(f, "\n# Linter Plugins")?;
+        display_settings! {
+            formatter = f,
+            namespace = "linter",
+            fields = [
+                self.flake8_annotations | nested,
+                self.flake8_bandit | nested,
+                self.flake8_bugbear | nested,
+                self.flake8_builtins | nested,
+                self.flake8_comprehensions | nested,
+                self.flake8_copyright | nested,
+                self.flake8_errmsg | nested,
+                self.flake8_gettext | nested,
+                self.flake8_implicit_str_concat | nested,
+                self.flake8_import_conventions | nested,
+                self.flake8_pytest_style | nested,
+                self.flake8_quotes | nested,
+                self.flake8_self | nested,
+                self.flake8_tidy_imports | nested,
+                self.flake8_type_checking | nested,
+                self.flake8_unused_arguments | nested,
+                self.isort | nested,
+                self.mccabe | nested,
+                self.pep8_naming | nested,
+                self.pycodestyle | nested,
+                self.pyflakes | nested,
+                self.pylint | nested,
+                self.pyupgrade | nested,
+            ]
+        }
+        Ok(())
+    }
 }
 
 pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
@@ -152,7 +387,7 @@ impl LinterSettings {
             logger_objects: vec![],
             namespace_packages: vec![],
 
-            per_file_ignores: vec![],
+            per_file_ignores: PerFileIgnores::default(),
             fix_safety: FixSafetyTable::default(),
 
             src: vec![path_dedot::CWD.clone()],
@@ -203,23 +438,4 @@ impl Default for LinterSettings {
     fn default() -> Self {
         Self::new(path_dedot::CWD.as_path())
     }
-}
-
-/// Given a list of patterns, create a `GlobSet`.
-pub fn resolve_per_file_ignores(
-    per_file_ignores: Vec<PerFileIgnore>,
-) -> Result<Vec<(GlobMatcher, GlobMatcher, RuleSet)>> {
-    per_file_ignores
-        .into_iter()
-        .map(|per_file_ignore| {
-            // Construct absolute path matcher.
-            let absolute =
-                Glob::new(&per_file_ignore.absolute.to_string_lossy())?.compile_matcher();
-
-            // Construct basename matcher.
-            let basename = Glob::new(&per_file_ignore.basename)?.compile_matcher();
-
-            Ok((absolute, basename, per_file_ignore.rules))
-        })
-        .collect()
 }

@@ -64,3 +64,9 @@ class FakeEnum10(enum.Enum):
     A = enum.auto()
     B = enum.auto()
     C = enum.auto()
+
+
+class FakeEnum10(enum.Enum):
+    A = ...
+    B = ...  # PIE796
+    C = ...  # PIE796

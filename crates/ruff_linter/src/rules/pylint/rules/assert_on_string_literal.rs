@@ -69,31 +69,36 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
                 test.range(),
             ));
         }
-        Expr::FString(ast::ExprFString { values, .. }) => {
+        Expr::FString(ast::ExprFString { value, .. }) => {
+            let kind = if value.iter().all(|f_string_part| match f_string_part {
+                ast::FStringPart::Literal(literal) => literal.is_empty(),
+                ast::FStringPart::FString(f_string) => {
+                    f_string.elements.iter().all(|element| match element {
+                        ast::FStringElement::Literal(ast::FStringLiteralElement {
+                            value, ..
+                        }) => value.is_empty(),
+                        ast::FStringElement::Expression(_) => false,
+                    })
+                }
+            }) {
+                Kind::Empty
+            } else if value.iter().any(|f_string_part| match f_string_part {
+                ast::FStringPart::Literal(literal) => !literal.is_empty(),
+                ast::FStringPart::FString(f_string) => {
+                    f_string.elements.iter().any(|element| match element {
+                        ast::FStringElement::Literal(ast::FStringLiteralElement {
+                            value, ..
+                        }) => !value.is_empty(),
+                        ast::FStringElement::Expression(_) => false,
+                    })
+                }
+            }) {
+                Kind::NonEmpty
+            } else {
+                Kind::Unknown
+            };
             checker.diagnostics.push(Diagnostic::new(
-                AssertOnStringLiteral {
-                    kind: if values.iter().all(|value| match value {
-                        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                            value.is_empty()
-                        }
-                        Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.is_empty(),
-                        _ => false,
-                    }) {
-                        Kind::Empty
-                    } else if values.iter().any(|value| match value {
-                        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                            !value.is_empty()
-                        }
-                        Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
-                            !value.is_empty()
-                        }
-                        _ => false,
-                    }) {
-                        Kind::NonEmpty
-                    } else {
-                        Kind::Unknown
-                    },
-                },
+                AssertOnStringLiteral { kind },
                 test.range(),
             ));
         }

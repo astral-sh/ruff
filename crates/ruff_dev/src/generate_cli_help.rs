@@ -8,7 +8,7 @@ use anyhow::{bail, Context, Result};
 use clap::CommandFactory;
 use pretty_assertions::StrComparison;
 
-use ruff_cli::args;
+use ruff::args;
 
 use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
 use crate::ROOT_DIR;
@@ -114,12 +114,15 @@ pub(super) fn main(args: &Args) -> Result<()> {
 
 /// Returns the output of `ruff help`.
 fn help_text() -> String {
-    args::Args::command().render_help().to_string()
+    args::Args::command()
+        .term_width(79)
+        .render_help()
+        .to_string()
 }
 
 /// Returns the output of a given subcommand (e.g., `ruff help check`).
 fn subcommand_help_text(subcommand: &str) -> Result<String> {
-    let mut cmd = args::Args::command();
+    let mut cmd = args::Args::command().term_width(79);
 
     // The build call is necessary for the help output to contain `Usage: ruff
     // check` instead of `Usage: check` see https://github.com/clap-rs/clap/issues/4685

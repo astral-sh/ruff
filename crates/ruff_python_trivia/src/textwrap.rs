@@ -4,8 +4,9 @@
 use std::borrow::Cow;
 use std::cmp;
 
+use ruff_source_file::UniversalNewlines;
+
 use crate::PythonWhitespace;
-use ruff_source_file::newlines::UniversalNewlines;
 
 /// Indent each line by the given prefix.
 ///
@@ -73,7 +74,9 @@ pub fn indent<'a>(text: &'a str, prefix: &str) -> Cow<'a, str> {
 /// Removes common leading whitespace from each line.
 ///
 /// This function will look at each non-empty line and determine the
-/// maximum amount of whitespace that can be removed from all lines:
+/// maximum amount of whitespace that can be removed from all lines.
+///
+/// Lines that consist solely of whitespace are trimmed to a blank line.
 ///
 /// ```
 /// # use ruff_python_trivia::textwrap::dedent;
@@ -119,6 +122,58 @@ pub fn dedent(text: &str) -> Cow<'_, str> {
         }
     }
     Cow::Owned(result)
+}
+
+/// Reduce a block's indentation to match the provided indentation.
+///
+/// This function looks at the first line in the block to determine the
+/// current indentation, then removes whitespace from each line to
+/// match the provided indentation.
+///
+/// Lines that are indented by _less_ than the indent of the first line
+/// are left unchanged.
+///
+/// Lines that consist solely of whitespace are trimmed to a blank line.
+///
+/// # Panics
+/// If the first line is indented by less than the provided indent.
+pub fn dedent_to(text: &str, indent: &str) -> String {
+    // Look at the indentation of the first non-empty line, to determine the "baseline" indentation.
+    let existing_indent_len = text
+        .universal_newlines()
+        .find_map(|line| {
+            let trimmed = line.trim_whitespace_start();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                None
+            } else {
+                Some(line.len() - trimmed.len())
+            }
+        })
+        .unwrap_or_default();
+
+    // Determine the amount of indentation to remove.
+    let dedent_len = existing_indent_len - indent.len();
+
+    let mut result = String::with_capacity(text.len() + indent.len());
+    for line in text.universal_newlines() {
+        let trimmed = line.trim_whitespace_start();
+        if trimmed.is_empty() {
+            if let Some(line_ending) = line.line_ending() {
+                result.push_str(&line_ending);
+            }
+        } else {
+            // Determine the current indentation level.
+            let current_indent_len = line.len() - trimmed.len();
+            if current_indent_len < existing_indent_len {
+                // If the current indentation level is less than the baseline, keep it as is.
+                result.push_str(line.as_full_str());
+            } else {
+                // Otherwise, reduce the indentation level.
+                result.push_str(&line.as_full_str()[dedent_len..]);
+            }
+        }
+    }
+    result
 }
 
 #[cfg(test)]
@@ -337,10 +392,40 @@ mod tests {
 
     #[test]
     fn dedent_non_python_whitespace() {
-        let text = r#"        C = int(f.rea1,0],[-1,0,1]],
+        let text = r"        C = int(f.rea1,0],[-1,0,1]],
               [[-1,-1,1],[1,1,-1],[0,-1,0]],
               [[-1,-1,-1],[1,1,0],[1,0,1]]
-             ]"#;
+             ]";
         assert_eq!(dedent(text), text);
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn adjust_indent() {
+        let x = [
+            "    foo",
+            "  bar",
+            "   ",
+            "    baz"
+        ].join("\n");
+        let y = [
+            "  foo",
+            "  bar",
+            "",
+            "  baz"
+        ].join("\n");
+        assert_eq!(dedent_to(&x, "  "), y);
+
+        let x = [
+            "    foo",
+            "        bar",
+            "    baz",
+        ].join("\n");
+        let y = [
+            "foo",
+            "    bar",
+            "baz"
+        ].join("\n");
+        assert_eq!(dedent_to(&x, ""), y);
     }
 }

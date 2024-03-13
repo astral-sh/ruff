@@ -18,9 +18,19 @@ expression: parse_ast
             value: StringLiteral(
                 ExprStringLiteral {
                     range: 4..37,
-                    value: "\u{8}another cool trick",
-                    unicode: false,
-                    implicit_concatenated: false,
+                    value: StringLiteralValue {
+                        inner: Single(
+                            StringLiteral {
+                                range: 4..37,
+                                value: "\u{8}another cool trick",
+                                flags: StringLiteralFlags {
+                                    quote_style: Double,
+                                    prefix: "",
+                                    triple_quoted: false,
+                                },
+                            },
+                        ),
+                    },
                 },
             ),
         },

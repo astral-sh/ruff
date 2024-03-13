@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Stmt;
-use ruff_python_ast::{self as ast, Expr, ExprCall, Int};
+use ruff_python_ast::{self as ast, Expr, ExprCall, Int, Number};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -16,12 +16,18 @@ use crate::importer::ImportRequest;
 ///
 /// ## Example
 /// ```python
+/// import trio
+///
+///
 /// async def func():
 ///     await trio.sleep(0)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import trio
+///
+///
 /// async def func():
 ///     await trio.lowlevel.checkpoint()
 /// ```
@@ -41,11 +47,7 @@ impl AlwaysFixableViolation for TrioZeroSleepCall {
 
 /// TRIO115
 pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
-    if !checker
-        .semantic()
-        .resolve_call_path(call.func.as_ref())
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["trio", "sleep"]))
-    {
+    if !checker.semantic().seen_module(Modules::TRIO) {
         return;
     }
 
@@ -57,38 +59,18 @@ pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
         return;
     };
 
+    if !checker
+        .semantic()
+        .resolve_qualified_name(call.func.as_ref())
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["trio", "sleep"]))
+    {
+        return;
+    }
+
     match arg {
         Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
-            let Some(int) = value.as_int() else { return };
-            if *int != Int::ZERO {
+            if !matches!(value, Number::Int(Int::ZERO)) {
                 return;
-            }
-        }
-        Expr::Name(ast::ExprName { id, .. }) => {
-            let scope = checker.semantic().current_scope();
-            if let Some(binding_id) = scope.get(id) {
-                let binding = checker.semantic().binding(binding_id);
-                if binding.kind.is_assignment() || binding.kind.is_named_expr_assignment() {
-                    if let Some(parent_id) = binding.source {
-                        let parent = checker.semantic().statement(parent_id);
-                        if let Stmt::Assign(ast::StmtAssign { value, .. })
-                        | Stmt::AnnAssign(ast::StmtAnnAssign {
-                            value: Some(value), ..
-                        })
-                        | Stmt::AugAssign(ast::StmtAugAssign { value, .. }) = parent
-                        {
-                            let Expr::NumberLiteral(ast::ExprNumberLiteral { value: num, .. }) =
-                                value.as_ref()
-                            else {
-                                return;
-                            };
-                            let Some(int) = num.as_int() else { return };
-                            if *int != Int::ZERO {
-                                return;
-                            }
-                        }
-                    }
-                }
             }
         }
         _ => return,
@@ -97,12 +79,13 @@ pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
     let mut diagnostic = Diagnostic::new(TrioZeroSleepCall, call.range());
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
-            &ImportRequest::import("trio", "lowlevel.checkpoint"),
+            &ImportRequest::import_from("trio", "lowlevel"),
             call.func.start(),
             checker.semantic(),
         )?;
-        let reference_edit = Edit::range_replacement(binding, call.func.range());
-        let arg_edit = Edit::range_deletion(call.arguments.range);
+        let reference_edit =
+            Edit::range_replacement(format!("{binding}.checkpoint"), call.func.range());
+        let arg_edit = Edit::range_replacement("()".to_string(), call.arguments.range());
         Ok(Fix::safe_edits(import_edit, [reference_edit, arg_edit]))
     });
     checker.diagnostics.push(diagnostic);

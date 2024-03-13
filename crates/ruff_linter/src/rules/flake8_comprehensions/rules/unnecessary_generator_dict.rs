@@ -27,6 +27,10 @@ use super::helpers;
 /// ```python
 /// {x: f(x) for x in foo}
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may occasionally drop comments
+/// when rewriting the call. In most cases, though, comments will be preserved.
 #[violation]
 pub struct UnnecessaryGeneratorDict;
 
@@ -54,7 +58,7 @@ pub(crate) fn unnecessary_generator_dict(
     else {
         return;
     };
-    let Expr::GeneratorExp(ast::ExprGeneratorExp { elt, .. }) = argument else {
+    let Expr::Generator(ast::ExprGenerator { elt, .. }) = argument else {
         return;
     };
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = elt.as_ref() else {

@@ -2,12 +2,15 @@ use ruff_benchmark::criterion::{
     criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
 };
 use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
-use ruff_linter::linter::lint_only;
+use ruff_linter::linter::{lint_only, ParseSource};
+use ruff_linter::rule_selector::PreviewOptions;
 use ruff_linter::settings::rule_table::RuleTable;
+use ruff_linter::settings::types::PreviewMode;
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{registry::Rule, RuleSelector};
 use ruff_python_ast::PySourceType;
+use ruff_python_parser::{lexer, parse_program_tokens, Mode};
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -51,7 +54,12 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
             BenchmarkId::from_parameter(case.name()),
             &case,
             |b, case| {
-                let kind = SourceKind::Python(case.code().to_string());
+                // Tokenize the source.
+                let tokens: Vec<_> = lexer::lex(case.code(), Mode::Module).collect();
+
+                // Parse the source.
+                let ast = parse_program_tokens(tokens.clone(), case.code(), false).unwrap();
+
                 b.iter(|| {
                     let path = case.path();
                     let result = lint_only(
@@ -59,8 +67,12 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
                         None,
                         settings,
                         flags::Noqa::Enabled,
-                        &kind,
+                        &SourceKind::Python(case.code().to_string()),
                         PySourceType::from(path.as_path()),
+                        ParseSource::Precomputed {
+                            tokens: &tokens,
+                            ast: &ast,
+                        },
                     );
 
                     // Assert that file contains no parse errors
@@ -78,12 +90,21 @@ fn benchmark_default_rules(criterion: &mut Criterion) {
     benchmark_linter(group, &LinterSettings::default());
 }
 
-fn benchmark_all_rules(criterion: &mut Criterion) {
-    let mut rules: RuleTable = RuleSelector::All.all_rules().collect();
-
-    // Disable IO based rules because it is a source of flakiness
+/// Disables IO based rules because they are a source of flakiness
+fn disable_io_rules(rules: &mut RuleTable) {
     rules.disable(Rule::ShebangMissingExecutableFile);
     rules.disable(Rule::ShebangNotExecutable);
+}
+
+fn benchmark_all_rules(criterion: &mut Criterion) {
+    let mut rules: RuleTable = RuleSelector::All
+        .rules(&PreviewOptions {
+            mode: PreviewMode::Disabled,
+            require_explicit: false,
+        })
+        .collect();
+
+    disable_io_rules(&mut rules);
 
     let settings = LinterSettings {
         rules,
@@ -94,6 +115,22 @@ fn benchmark_all_rules(criterion: &mut Criterion) {
     benchmark_linter(group, &settings);
 }
 
+fn benchmark_preview_rules(criterion: &mut Criterion) {
+    let mut rules: RuleTable = RuleSelector::All.all_rules().collect();
+
+    disable_io_rules(&mut rules);
+
+    let settings = LinterSettings {
+        rules,
+        preview: PreviewMode::Enabled,
+        ..LinterSettings::default()
+    };
+
+    let group = criterion.benchmark_group("linter/all-with-preview-rules");
+    benchmark_linter(group, &settings);
+}
+
 criterion_group!(default_rules, benchmark_default_rules);
 criterion_group!(all_rules, benchmark_all_rules);
-criterion_main!(default_rules, all_rules);
+criterion_group!(preview_rules, benchmark_preview_rules);
+criterion_main!(default_rules, all_rules, preview_rules);

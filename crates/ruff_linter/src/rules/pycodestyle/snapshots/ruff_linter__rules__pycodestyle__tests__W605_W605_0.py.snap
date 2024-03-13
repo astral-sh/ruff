@@ -125,6 +125,8 @@ W605_0.py:45:12: W605 [*] Invalid escape sequence: `\_`
 44 | 
 45 | regex = '\\\_'
    |            ^^ W605
+46 | 
+47 | #: W605:1:7
    |
    = help: Add backslash to escape sequence
 
@@ -134,5 +136,23 @@ W605_0.py:45:12: W605 [*] Invalid escape sequence: `\_`
 44 44 | 
 45    |-regex = '\\\_'
    45 |+regex = '\\\\_'
+46 46 | 
+47 47 | #: W605:1:7
+48 48 | u'foo\ bar'
+
+W605_0.py:48:6: W605 [*] Invalid escape sequence: `\ `
+   |
+47 | #: W605:1:7
+48 | u'foo\ bar'
+   |      ^^ W605
+   |
+   = help: Use a raw string literal
+
+ℹ Safe fix
+45 45 | regex = '\\\_'
+46 46 | 
+47 47 | #: W605:1:7
+48    |-u'foo\ bar'
+   48 |+r'foo\ bar'
 
 

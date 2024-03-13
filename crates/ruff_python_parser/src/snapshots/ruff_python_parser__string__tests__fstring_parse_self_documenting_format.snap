@@ -9,46 +9,54 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..14,
-                    values: [
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 2..13,
-                                value: Name(
-                                    ExprName {
-                                        range: 3..7,
-                                        id: "user",
-                                        ctx: Load,
-                                    },
-                                ),
-                                debug_text: Some(
-                                    DebugText {
-                                        leading: "",
-                                        trailing: "=",
-                                    },
-                                ),
-                                conversion: None,
-                                format_spec: Some(
-                                    FString(
-                                        ExprFString {
-                                            range: 9..12,
-                                            values: [
-                                                StringLiteral(
-                                                    ExprStringLiteral {
-                                                        range: 9..12,
-                                                        value: ">10",
-                                                        unicode: false,
-                                                        implicit_concatenated: false,
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 0..14,
+                                    elements: [
+                                        Expression(
+                                            FStringExpressionElement {
+                                                range: 2..13,
+                                                expression: Name(
+                                                    ExprName {
+                                                        range: 3..7,
+                                                        id: "user",
+                                                        ctx: Load,
                                                     },
                                                 ),
-                                            ],
-                                            implicit_concatenated: false,
-                                        },
-                                    ),
-                                ),
-                            },
+                                                debug_text: Some(
+                                                    DebugText {
+                                                        leading: "",
+                                                        trailing: "=",
+                                                    },
+                                                ),
+                                                conversion: None,
+                                                format_spec: Some(
+                                                    FStringFormatSpec {
+                                                        range: 9..12,
+                                                        elements: [
+                                                            Literal(
+                                                                FStringLiteralElement {
+                                                                    range: 9..12,
+                                                                    value: ">10",
+                                                                },
+                                                            ),
+                                                        ],
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    flags: FStringFlags {
+                                        quote_style: Double,
+                                        raw: false,
+                                        triple_quoted: false,
+                                    },
+                                },
+                            ),
                         ),
-                    ],
-                    implicit_concatenated: false,
+                    },
                 },
             ),
         },

@@ -11,23 +11,29 @@ and more.
 directories, and lints all discovered Python files, optionally fixing any fixable errors:
 
 ```shell
-ruff check .          # Lint all files in the current directory.
-ruff check . --fix    # Lint all files in the current directory, and fix any fixable errors.
-ruff check . --watch  # Lint all files in the current directory, and re-lint on change.
+ruff check                  # Lint all files in the current directory.
+ruff check --fix            # Lint all files in the current directory, and fix any fixable errors.
+ruff check --watch          # Lint all files in the current directory, and re-lint on change.
+ruff check path/to/code/    # Lint all files in `path/to/code` (and any subdirectories).
 ```
 
 For the full list of supported options, run `ruff check --help`.
 
+!!! note
+    As of Ruff v0.1.7 the `ruff check` command uses the current working directory (`.`) as the default path to check.
+    On older versions, you must provide this manually e.g. `ruff check .`.
+    See [the file discovery documentation](configuration.md#python-file-discovery) for details.
+
 ## Rule selection
 
-The set of enabled rules is controlled via the [`select`](settings.md#select),
-[`extend-select`](settings.md#extend-select), and [`ignore`](settings.md#ignore) settings.
+The set of enabled rules is controlled via the [`lint.select`](settings.md#lint_select),
+[`lint.extend-select`](settings.md#lint_extend-select), and [`lint.ignore`](settings.md#lint_ignore) settings.
 
 Ruff's linter mirrors Flake8's rule code system, in which each rule code consists of a one-to-three
 letter prefix, followed by three digits (e.g., `F401`). The prefix indicates that "source" of the rule
 (e.g., `F` for Pyflakes, `E` for pycodestyle, `ANN` for flake8-annotations).
 
-Rule selectors like [`select`](settings.md#select) and [`ignore`](settings.md#ignore) accept either
+Rule selectors like [`lint.select`](settings.md#lint_select) and [`lint.ignore`](settings.md#lint_ignore) accept either
 a full rule code (e.g., `F401`) or any valid prefix (e.g., `F`). For example, given the following
 configuration file:
 
@@ -56,7 +62,7 @@ formats. Ruff will automatically disable any conflicting rules when `ALL` is ena
 
 If you're wondering how to configure Ruff, here are some **recommended guidelines**:
 
-- Prefer [`select`](settings.md#select) over [`extend-select`](settings.md#extend-select) to make your rule set explicit.
+- Prefer [`lint.select`](settings.md#lint_select) over [`lint.extend-select`](settings.md#lint_extend-select) to make your rule set explicit.
 - Use `ALL` with discretion. Enabling `ALL` will implicitly enable new rules whenever you upgrade.
 - Start with a small set of rules (`select = ["E", "F"]`) and add a category at-a-time. For example,
     you might consider expanding to `select = ["E", "F", "B"]` to enable the popular flake8-bugbear
@@ -105,13 +111,13 @@ pedantic) might look like the following:
     ]
     ```
 
-To resolve the enabled rule set, Ruff may need to reconcile [`select`](settings.md#select) and
-[`ignore`](settings.md#ignore) from a variety of sources, including the current `pyproject.toml`,
-any inherited `pyproject.toml` files, and the CLI (e.g., [`--select`](settings.md#select)).
+To resolve the enabled rule set, Ruff may need to reconcile [`lint.select`](settings.md#lint_select) and
+[`lint.ignore`](settings.md#lint_ignore) from a variety of sources, including the current `pyproject.toml`,
+any inherited `pyproject.toml` files, and the CLI (e.g., [`--select`](settings.md#lint_select)).
 
-In those scenarios, Ruff uses the "highest-priority" [`select`](settings.md#select) as the basis for
-the rule set, and then applies [`extend-select`](settings.md#extend-select) and
-[`ignore`](settings.md#ignore) adjustments. CLI options are given higher priority than
+In those scenarios, Ruff uses the "highest-priority" [`select`](settings.md#lint_select) as the basis for
+the rule set, and then applies [`extend-select`](settings.md#lint_extend-select) and
+[`ignore`](settings.md#lint_ignore) adjustments. CLI options are given higher priority than
 `pyproject.toml` options, and the current `pyproject.toml` file is given higher priority than any
 inherited `pyproject.toml` files.
 
@@ -146,7 +152,7 @@ imports, reformat docstrings, rewrite type annotations to use newer Python synta
 To enable fixes, pass the `--fix` flag to `ruff check`:
 
 ```shell
-ruff check . --fix
+ruff check --fix
 ```
 
 By default, Ruff will fix all violations for which safe fixes are available; to determine
@@ -193,13 +199,16 @@ Ruff only enables safe fixes by default. Unsafe fixes can be enabled by settings
 
 ```shell
 # Show unsafe fixes
-ruff check . --unsafe-fixes
+ruff check --unsafe-fixes
 
 # Apply unsafe fixes
-ruff check . --fix --unsafe-fixes
+ruff check --fix --unsafe-fixes
 ```
 
-The safety of fixes can be adjusted per rule using the [`extend-safe-fixes`](settings.md#extend-safe-fixes) and [`extend-unsafe-fixes`](settings.md#extend-unsafe-fixes) settings.
+By default, Ruff will display a hint when unsafe fixes are available but not enabled. The suggestion can be silenced
+by setting the [`unsafe-fixes`](settings.md#unsafe-fixes) setting to `false` or using the `--no-unsafe-fixes` flag.
+
+The safety of fixes can be adjusted per rule using the [`lint.extend-safe-fixes`](settings.md#lint_extend-safe-fixes) and [`lint.extend-unsafe-fixes`](settings.md#lint_extend-unsafe-fixes) settings.
 
 For example, the following configuration would promote unsafe fixes for `F601` to safe fixes and demote safe fixes for `UP034` to unsafe fixes:
 
@@ -226,9 +235,9 @@ You may use prefixes to select rules as well, e.g., `F` can be used to promote f
 
 ### Disabling fixes
 
-To limit the set of rules that Ruff should fix, use the [`fixable`](settings.md#fixable) and
-[`unfixable`](settings.md#unfixable) settings, along with their [`extend-fixable`](settings.md#extend-fixable)
-and [`extend-unfixable`](settings.md#extend-unfixable) variants.
+To limit the set of rules that Ruff should fix, use the [`lint.fixable`](settings.md#lint_fixable) and
+[`lint.unfixable`](settings.md#lint_unfixable) settings, along with their [`lint.extend-fixable`](settings.md#lint_extend-fixable)
+and [`lint.extend-unfixable`](settings.md#lint_extend-unfixable) variants.
 
 For example, the following configuration would enable fixes for all rules except
 [`unused-imports`](rules/unused-import.md) (`F401`):
@@ -270,7 +279,7 @@ Conversely, the following configuration would only enable fixes for `F401`:
 Ruff supports several mechanisms for suppressing lint errors, be they false positives or
 permissible violations.
 
-To omit a lint rule entirely, add it to the "ignore" list via the [`ignore`](settings.md#ignore)
+To omit a lint rule entirely, add it to the "ignore" list via the [`lint.ignore`](settings.md#lint_ignore)
 setting, either on the command-line or in your `pyproject.toml` or `ruff.toml` file.
 
 To suppress a violation inline, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
@@ -297,6 +306,14 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
 """  # noqa: E501
 ```
 
+For import sorting, the `noqa` should come at the end of the first line in the import block, and
+will apply to all imports in the block, like so:
+
+```python
+import os  # noqa: I001
+import abc
+```
+
 To ignore all violations across an entire file, add the line `# ruff: noqa` anywhere in the file,
 preferably towards the top, like so:
 
@@ -311,7 +328,7 @@ file, preferably towards the top, like so:
 # ruff: noqa: F841
 ```
 
-Or see the [`per-file-ignores`](settings.md#per-file-ignores) setting, which enables the same
+Or see the [`lint.per-file-ignores`](settings.md#lint_per-file-ignores) setting, which enables the same
 functionality from within your `pyproject.toml` or `ruff.toml` file.
 
 Global `noqa` comments must be on their own line to disambiguate from comments which ignore

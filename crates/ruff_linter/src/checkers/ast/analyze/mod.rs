@@ -10,6 +10,7 @@ pub(super) use module::module;
 pub(super) use parameter::parameter;
 pub(super) use parameters::parameters;
 pub(super) use statement::statement;
+pub(super) use string_like::string_like;
 pub(super) use suite::suite;
 pub(super) use unresolved_references::unresolved_references;
 
@@ -25,5 +26,6 @@ mod module;
 mod parameter;
 mod parameters;
 mod statement;
+mod string_like;
 mod suite;
 mod unresolved_references;

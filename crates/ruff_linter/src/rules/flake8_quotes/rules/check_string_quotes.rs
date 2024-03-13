@@ -14,7 +14,7 @@ use super::super::settings::Quote;
 
 /// ## What it does
 /// Checks for inline strings that use single quotes or double quotes,
-/// depending on the value of the [`flake8-quotes.inline-quotes`] option.
+/// depending on the value of the [`lint.flake8-quotes.inline-quotes`] option.
 ///
 /// ## Why is this bad?
 /// Consistency is good. Use either single or double quotes for inline
@@ -31,7 +31,7 @@ use super::super::settings::Quote;
 /// ```
 ///
 /// ## Options
-/// - `flake8-quotes.inline-quotes`
+/// - `lint.flake8-quotes.inline-quotes`
 ///
 /// ## Formatter compatibility
 /// We recommend against using this rule alongside the [formatter]. The
@@ -65,7 +65,7 @@ impl AlwaysFixableViolation for BadQuotesInlineString {
 
 /// ## What it does
 /// Checks for multiline strings that use single quotes or double quotes,
-/// depending on the value of the [`flake8-quotes.multiline-quotes`]
+/// depending on the value of the [`lint.flake8-quotes.multiline-quotes`]
 /// setting.
 ///
 /// ## Why is this bad?
@@ -87,7 +87,7 @@ impl AlwaysFixableViolation for BadQuotesInlineString {
 /// ```
 ///
 /// ## Options
-/// - `flake8-quotes.multiline-quotes`
+/// - `lint.flake8-quotes.multiline-quotes`
 ///
 /// ## Formatter compatibility
 /// We recommend against using this rule alongside the [formatter]. The
@@ -121,7 +121,7 @@ impl AlwaysFixableViolation for BadQuotesMultilineString {
 
 /// ## What it does
 /// Checks for docstrings that use single quotes or double quotes, depending
-/// on the value of the [`flake8-quotes.docstring-quotes`] setting.
+/// on the value of the [`lint.flake8-quotes.docstring-quotes`] setting.
 ///
 /// ## Why is this bad?
 /// Consistency is good. Use either single or double quotes for docstring
@@ -142,7 +142,7 @@ impl AlwaysFixableViolation for BadQuotesMultilineString {
 /// ```
 ///
 /// ## Options
-/// - `flake8-quotes.docstring-quotes`
+/// - `lint.flake8-quotes.docstring-quotes`
 ///
 /// ## Formatter compatibility
 /// We recommend against using this rule alongside the [formatter]. The
@@ -383,7 +383,7 @@ struct FStringRangeBuilder {
 impl FStringRangeBuilder {
     fn visit_token(&mut self, token: &Tok, range: TextRange) {
         match token {
-            Tok::FStringStart => {
+            Tok::FStringStart(_) => {
                 if self.nesting == 0 {
                     self.start_location = range.start();
                 }

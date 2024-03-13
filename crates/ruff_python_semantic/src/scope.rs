@@ -95,7 +95,7 @@ impl<'a> Scope<'a> {
     }
 
     /// Returns a tuple of the name and ID of all bindings defined in this scope.
-    pub fn bindings(&self) -> impl Iterator<Item = (&str, BindingId)> + '_ {
+    pub fn bindings(&self) -> impl Iterator<Item = (&'a str, BindingId)> + '_ {
         self.bindings.iter().map(|(&name, &id)| (name, id))
     }
 
@@ -127,6 +127,11 @@ impl<'a> Scope<'a> {
     /// Returns the ID of the binding that the given binding shadows, if any.
     pub fn shadowed_binding(&self, id: BindingId) -> Option<BindingId> {
         self.shadowed_bindings.get(&id).copied()
+    }
+
+    /// Returns an iterator over all bindings that the given binding shadows, including itself.
+    pub fn shadowed_bindings(&self, id: BindingId) -> impl Iterator<Item = BindingId> + '_ {
+        std::iter::successors(Some(id), |id| self.shadowed_bindings.get(id).copied())
     }
 
     /// Adds a reference to a star import (e.g., `from sys import *`) to this scope.
@@ -233,7 +238,7 @@ impl<'a> Scopes<'a> {
     }
 
     /// Returns an iterator over all [`Scope`] ancestors, starting from the given [`ScopeId`].
-    pub fn ancestors(&self, scope_id: ScopeId) -> impl Iterator<Item = &Scope> + '_ {
+    pub fn ancestors(&self, scope_id: ScopeId) -> impl Iterator<Item = &Scope<'a>> + '_ {
         std::iter::successors(Some(&self[scope_id]), |&scope| {
             scope.parent.map(|scope_id| &self[scope_id])
         })

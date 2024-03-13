@@ -4,13 +4,13 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_ast::visitor::Visitor;
 
 /// ## What it does
 /// Checks for functions or methods with too many return statements.
 ///
 /// By default, this rule allows up to six return statements, as configured by
-/// the [`pylint.max-returns`] option.
+/// the [`lint.pylint.max-returns`] option.
 ///
 /// ## Why is this bad?
 /// Functions or methods with many return statements are harder to understand
@@ -50,7 +50,7 @@ use ruff_python_ast::statement_visitor::StatementVisitor;
 /// ```
 ///
 /// ## Options
-/// - `pylint.max-returns`
+/// - `lint.pylint.max-returns`
 #[violation]
 pub struct TooManyReturnStatements {
     returns: usize,
@@ -103,14 +103,14 @@ mod tests {
     use super::num_returns;
 
     fn test_helper(source: &str, expected: usize) -> Result<()> {
-        let stmts = parse_suite(source, "<filename>")?;
+        let stmts = parse_suite(source)?;
         assert_eq!(num_returns(&stmts), expected);
         Ok(())
     }
 
     #[test]
     fn if_() -> Result<()> {
-        let source = r#"
+        let source = r"
 x = 1
 if x == 1:  # 9
     return
@@ -130,7 +130,7 @@ if x == 8:
     return
 if x == 9:
     return
-"#;
+";
 
         test_helper(source, 9)?;
         Ok(())
@@ -138,12 +138,12 @@ if x == 9:
 
     #[test]
     fn for_else() -> Result<()> {
-        let source = r#"
+        let source = r"
 for _i in range(10):
     return
 else:
     return
-"#;
+";
 
         test_helper(source, 2)?;
         Ok(())
@@ -151,12 +151,12 @@ else:
 
     #[test]
     fn async_for_else() -> Result<()> {
-        let source = r#"
+        let source = r"
 async for _i in range(10):
     return
 else:
     return
-"#;
+";
 
         test_helper(source, 2)?;
         Ok(())
@@ -164,7 +164,7 @@ else:
 
     #[test]
     fn nested_def_ignored() -> Result<()> {
-        let source = r#"
+        let source = r"
 def f():
     return
 
@@ -173,7 +173,7 @@ if x == 1:
     print()
 else:
     print()
-"#;
+";
 
         test_helper(source, 0)?;
         Ok(())
@@ -181,7 +181,7 @@ else:
 
     #[test]
     fn while_nested_if() -> Result<()> {
-        let source = r#"
+        let source = r"
 x = 1
 while x < 10:
     print()
@@ -189,7 +189,7 @@ while x < 10:
         return
     x += 1
 return
-"#;
+";
 
         test_helper(source, 2)?;
         Ok(())
@@ -197,12 +197,12 @@ return
 
     #[test]
     fn with_if() -> Result<()> {
-        let source = r#"
+        let source = r"
 with a as f:
     return
     if f == 1:
         return
-"#;
+";
 
         test_helper(source, 2)?;
         Ok(())
@@ -210,12 +210,12 @@ with a as f:
 
     #[test]
     fn async_with_if() -> Result<()> {
-        let source = r#"
+        let source = r"
 async with a as f:
     return
     if f == 1:
         return
-"#;
+";
 
         test_helper(source, 2)?;
         Ok(())
@@ -223,7 +223,7 @@ async with a as f:
 
     #[test]
     fn try_except_except_else_finally() -> Result<()> {
-        let source = r#"
+        let source = r"
 try:
     print()
     return
@@ -235,7 +235,7 @@ else:
     return
 finally:
     return
-"#;
+";
 
         test_helper(source, 5)?;
         Ok(())
@@ -243,14 +243,14 @@ finally:
 
     #[test]
     fn class_def_ignored() -> Result<()> {
-        let source = r#"
+        let source = r"
 class A:
     def f(self):
         return
 
     def g(self):
         return
-"#;
+";
 
         test_helper(source, 0)?;
         Ok(())

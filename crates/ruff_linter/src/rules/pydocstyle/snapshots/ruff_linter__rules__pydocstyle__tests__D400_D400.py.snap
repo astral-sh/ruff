@@ -247,4 +247,28 @@ D400.py:69:5: D400 [*] First line should end with a period
 73 73 | 
 74 74 | 
 
+D400.py:97:5: D400 [*] First line should end with a period
+    |
+ 96 |   def f():
+ 97 |       """
+    |  _____^
+ 98 | |     My example
+ 99 | |     ==========
+100 | | 
+101 | |     My example explanation
+102 | |     """
+    | |_______^ D400
+    |
+    = help: Add period
+
+ℹ Unsafe fix
+95 95 | 
+96 96 | def f():
+97 97 |     """
+98    |-    My example
+   98 |+    My example.
+99 99 |     ==========
+100 100 | 
+101 101 |     My example explanation
+
 

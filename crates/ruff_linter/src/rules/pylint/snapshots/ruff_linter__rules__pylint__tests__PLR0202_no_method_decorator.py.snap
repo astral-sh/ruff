@@ -1,0 +1,50 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+no_method_decorator.py:9:5: PLR0202 [*] Class method defined without decorator
+   |
+ 7 |         self.color = color
+ 8 | 
+ 9 |     def pick_colors(cls, *args):  # [no-classmethod-decorator]
+   |      PLR0202
+10 |         """classmethod to pick fruit colors"""
+11 |         cls.COLORS = args
+   |
+   = help: Add @classmethod decorator
+
+ℹ Safe fix
+6  6  |     def __init__(self, color):
+7  7  |         self.color = color
+8  8  | 
+   9  |+    @classmethod
+9  10 |     def pick_colors(cls, *args):  # [no-classmethod-decorator]
+10 11 |         """classmethod to pick fruit colors"""
+11 12 |         cls.COLORS = args
+12 13 | 
+13    |-    pick_colors = classmethod(pick_colors)
+14 14 | 
+15 15 |     def pick_one_color():  # [no-staticmethod-decorator]
+16 16 |         """staticmethod to pick one fruit color"""
+
+no_method_decorator.py:22:5: PLR0202 [*] Class method defined without decorator
+   |
+21 | class Class:
+22 |     def class_method(cls):
+   |      PLR0202
+23 |         pass
+   |
+   = help: Add @classmethod decorator
+
+ℹ Safe fix
+19 19 |     pick_one_color = staticmethod(pick_one_color)
+20 20 | 
+21 21 | class Class:
+   22 |+    @classmethod
+22 23 |     def class_method(cls):
+23 24 |         pass
+24 25 | 
+25    |-    class_method = classmethod(class_method);another_statement
+   26 |+    another_statement
+26 27 | 
+27 28 |     def static_method():
+28 29 |         pass

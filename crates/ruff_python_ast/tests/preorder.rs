@@ -2,22 +2,14 @@ use std::fmt::{Debug, Write};
 
 use insta::assert_snapshot;
 
-use ruff_python_ast::visitor::preorder::{
-    walk_alias, walk_comprehension, walk_except_handler, walk_expr, walk_keyword, walk_match_case,
-    walk_module, walk_parameter, walk_parameters, walk_pattern, walk_stmt, walk_type_param,
-    walk_with_item, PreorderVisitor,
-};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{
-    Alias, BoolOp, CmpOp, Comprehension, ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator,
-    Parameter, Parameters, Pattern, Singleton, Stmt, TypeParam, UnaryOp, WithItem,
-};
+use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
+use ruff_python_ast::{AnyNodeRef, BoolOp, CmpOp, Operator, Singleton, UnaryOp};
 use ruff_python_parser::lexer::lex;
 use ruff_python_parser::{parse_tokens, Mode};
 
 #[test]
 fn function_arguments() {
-    let source = r#"def a(b, c,/, d, e = 20, *args, named=5, other=20, **kwargs): pass"#;
+    let source = r"def a(b, c,/, d, e = 20, *args, named=5, other=20, **kwargs): pass";
 
     let trace = trace_preorder_visitation(source);
 
@@ -26,7 +18,7 @@ fn function_arguments() {
 
 #[test]
 fn function_positional_only_with_default() {
-    let source = r#"def a(b, c = 34,/, e = 20, *args): pass"#;
+    let source = r"def a(b, c = 34,/, e = 20, *args): pass";
 
     let trace = trace_preorder_visitation(source);
 
@@ -35,7 +27,7 @@ fn function_positional_only_with_default() {
 
 #[test]
 fn compare() {
-    let source = r#"4 < x < 5"#;
+    let source = r"4 < x < 5";
 
     let trace = trace_preorder_visitation(source);
 
@@ -71,13 +63,13 @@ fn set_comprehension() {
 
 #[test]
 fn match_class_pattern() {
-    let source = r#"
+    let source = r"
 match x:
     case Point2D(0, 0):
         ...
     case Point3D(x=0, y=0, z=0):
         ...
-"#;
+";
 
     let trace = trace_preorder_visitation(source);
 
@@ -86,7 +78,7 @@ match x:
 
 #[test]
 fn decorators() {
-    let source = r#"
+    let source = r"
 @decorator
 def a():
     pass
@@ -94,7 +86,7 @@ def a():
 @test
 class A:
     pass
-"#;
+";
 
     let trace = trace_preorder_visitation(source);
 
@@ -103,7 +95,7 @@ class A:
 
 #[test]
 fn type_aliases() {
-    let source = r#"type X[T: str, U, *Ts, **P] = list[T]"#;
+    let source = r"type X[T: str, U, *Ts, **P] = list[T]";
 
     let trace = trace_preorder_visitation(source);
 
@@ -112,7 +104,7 @@ fn type_aliases() {
 
 #[test]
 fn class_type_parameters() {
-    let source = r#"class X[T: str, U, *Ts, **P]: ..."#;
+    let source = r"class X[T: str, U, *Ts, **P]: ...";
 
     let trace = trace_preorder_visitation(source);
 
@@ -121,7 +113,34 @@ fn class_type_parameters() {
 
 #[test]
 fn function_type_parameters() {
-    let source = r#"def X[T: str, U, *Ts, **P](): ..."#;
+    let source = r"def X[T: str, U, *Ts, **P](): ...";
+
+    let trace = trace_preorder_visitation(source);
+
+    assert_snapshot!(trace);
+}
+
+#[test]
+fn string_literals() {
+    let source = r"'a' 'b' 'c'";
+
+    let trace = trace_preorder_visitation(source);
+
+    assert_snapshot!(trace);
+}
+
+#[test]
+fn bytes_literals() {
+    let source = r"b'a' b'b' b'c'";
+
+    let trace = trace_preorder_visitation(source);
+
+    assert_snapshot!(trace);
+}
+
+#[test]
+fn f_strings() {
+    let source = r"'pre' f'foo {bar:.{x}f} baz'";
 
     let trace = trace_preorder_visitation(source);
 
@@ -130,7 +149,7 @@ fn function_type_parameters() {
 
 fn trace_preorder_visitation(source: &str) -> String {
     let tokens = lex(source, Mode::Module);
-    let parsed = parse_tokens(tokens, source, Mode::Module, "test.py").unwrap();
+    let parsed = parse_tokens(tokens.collect(), source, Mode::Module).unwrap();
 
     let mut visitor = RecordVisitor::default();
     visitor.visit_mod(&parsed);
@@ -147,18 +166,6 @@ struct RecordVisitor {
 }
 
 impl RecordVisitor {
-    fn enter_node<'a, T>(&mut self, node: T)
-    where
-        T: Into<AnyNodeRef<'a>>,
-    {
-        self.emit(&node.into().kind());
-        self.depth += 1;
-    }
-
-    fn exit_node(&mut self) {
-        self.depth -= 1;
-    }
-
     fn emit(&mut self, text: &dyn Debug) {
         for _ in 0..self.depth {
             self.output.push_str("  ");
@@ -168,29 +175,16 @@ impl RecordVisitor {
     }
 }
 
-impl PreorderVisitor<'_> for RecordVisitor {
-    fn visit_mod(&mut self, module: &Mod) {
-        self.enter_node(module);
-        walk_module(self, module);
-        self.exit_node();
+impl<'a> PreorderVisitor<'a> for RecordVisitor {
+    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+        self.emit(&node.kind());
+        self.depth += 1;
+
+        TraversalSignal::Traverse
     }
 
-    fn visit_stmt(&mut self, stmt: &Stmt) {
-        self.enter_node(stmt);
-        walk_stmt(self, stmt);
-        self.exit_node();
-    }
-
-    fn visit_annotation(&mut self, expr: &Expr) {
-        self.enter_node(expr);
-        walk_expr(self, expr);
-        self.exit_node();
-    }
-
-    fn visit_expr(&mut self, expr: &Expr) {
-        self.enter_node(expr);
-        walk_expr(self, expr);
-        self.exit_node();
+    fn leave_node(&mut self, _node: AnyNodeRef<'a>) {
+        self.depth -= 1;
     }
 
     fn visit_singleton(&mut self, singleton: &Singleton) {
@@ -211,71 +205,5 @@ impl PreorderVisitor<'_> for RecordVisitor {
 
     fn visit_cmp_op(&mut self, cmp_op: &CmpOp) {
         self.emit(&cmp_op);
-    }
-
-    fn visit_comprehension(&mut self, comprehension: &Comprehension) {
-        self.enter_node(comprehension);
-        walk_comprehension(self, comprehension);
-        self.exit_node();
-    }
-
-    fn visit_except_handler(&mut self, except_handler: &ExceptHandler) {
-        self.enter_node(except_handler);
-        walk_except_handler(self, except_handler);
-        self.exit_node();
-    }
-
-    fn visit_format_spec(&mut self, format_spec: &Expr) {
-        self.enter_node(format_spec);
-        walk_expr(self, format_spec);
-        self.exit_node();
-    }
-
-    fn visit_parameters(&mut self, parameters: &Parameters) {
-        self.enter_node(parameters);
-        walk_parameters(self, parameters);
-        self.exit_node();
-    }
-
-    fn visit_parameter(&mut self, parameter: &Parameter) {
-        self.enter_node(parameter);
-        walk_parameter(self, parameter);
-        self.exit_node();
-    }
-
-    fn visit_keyword(&mut self, keyword: &Keyword) {
-        self.enter_node(keyword);
-        walk_keyword(self, keyword);
-        self.exit_node();
-    }
-
-    fn visit_alias(&mut self, alias: &Alias) {
-        self.enter_node(alias);
-        walk_alias(self, alias);
-        self.exit_node();
-    }
-
-    fn visit_with_item(&mut self, with_item: &WithItem) {
-        self.enter_node(with_item);
-        walk_with_item(self, with_item);
-        self.exit_node();
-    }
-
-    fn visit_match_case(&mut self, match_case: &MatchCase) {
-        self.enter_node(match_case);
-        walk_match_case(self, match_case);
-        self.exit_node();
-    }
-
-    fn visit_pattern(&mut self, pattern: &Pattern) {
-        self.enter_node(pattern);
-        walk_pattern(self, pattern);
-        self.exit_node();
-    }
-
-    fn visit_type_param(&mut self, type_param: &TypeParam) {
-        self.enter_node(type_param);
-        walk_type_param(self, type_param);
-        self.exit_node();
     }
 }

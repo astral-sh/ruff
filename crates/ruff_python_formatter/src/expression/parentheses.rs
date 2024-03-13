@@ -14,6 +14,7 @@ use crate::comments::{
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
 
+/// From the perspective of the expression, under which circumstances does it need parentheses
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum OptionalParentheses {
     /// Add parentheses if the expression expands over multiple lines
@@ -41,7 +42,8 @@ pub(crate) trait NeedsParentheses {
     ) -> OptionalParentheses;
 }
 
-/// Configures if the expression should be parenthesized.
+/// From the perspective of the parent statement or expression, when should the child expression
+/// get parentheses?
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Parenthesize {
     /// Parenthesizes the expression if it doesn't fit on a line OR if the expression is parenthesized in the source code.
@@ -82,6 +84,7 @@ pub enum Parentheses {
     Never,
 }
 
+/// Returns `true` if the [`ExpressionRef`] is enclosed by parentheses in the source code.
 pub(crate) fn is_expression_parenthesized(
     expr: ExpressionRef,
     comment_ranges: &CommentRanges,
@@ -123,6 +126,7 @@ where
     FormatParenthesized {
         left,
         comments: &[],
+        hug: false,
         content: Argument::new(content),
         right,
     }
@@ -131,6 +135,7 @@ where
 pub(crate) struct FormatParenthesized<'content, 'ast> {
     left: &'static str,
     comments: &'content [SourceComment],
+    hug: bool,
     content: Argument<'content, PyFormatContext<'ast>>,
     right: &'static str,
 }
@@ -151,18 +156,32 @@ impl<'content, 'ast> FormatParenthesized<'content, 'ast> {
     ) -> FormatParenthesized<'content, 'ast> {
         FormatParenthesized { comments, ..self }
     }
+
+    /// Whether to indent the content within the parentheses.
+    pub(crate) fn with_hugging(self, hug: bool) -> FormatParenthesized<'content, 'ast> {
+        FormatParenthesized { hug, ..self }
+    }
 }
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         let current_level = f.context().node_level();
 
-        let content = format_with(|f| {
-            group(&format_args![
-                dangling_open_parenthesis_comments(self.comments),
-                soft_block_indent(&Arguments::from(&self.content))
-            ])
-            .fmt(f)
+        let indented = format_with(|f| {
+            let content = Arguments::from(&self.content);
+            if self.comments.is_empty() {
+                if self.hug {
+                    content.fmt(f)
+                } else {
+                    group(&soft_block_indent(&content)).fmt(f)
+                }
+            } else {
+                group(&format_args![
+                    dangling_open_parenthesis_comments(self.comments),
+                    soft_block_indent(&content),
+                ])
+                .fmt(f)
+            }
         });
 
         let inner = format_with(|f| {
@@ -171,12 +190,12 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
                 // This ensures that expanding this parenthesized expression does not expand the optional parentheses group.
                 write!(
                     f,
-                    [fits_expanded(&content)
+                    [fits_expanded(&indented)
                         .with_condition(Some(Condition::if_group_fits_on_line(group_id)))]
                 )
             } else {
                 // It's not necessary to wrap the content if it is not inside of an optional_parentheses group.
-                content.fmt(f)
+                indented.fmt(f)
             }
         });
 
@@ -340,6 +359,26 @@ pub(super) fn write_in_parentheses_only_group_end_tag(f: &mut PyFormatter) {
     }
 }
 
+/// Shows prints `content` only if the expression is enclosed by (optional) parentheses (`()`, `[]`, or `{}`)
+/// and splits across multiple lines.
+pub(super) fn in_parentheses_only_if_group_breaks<'a, T>(
+    content: T,
+) -> impl Format<PyFormatContext<'a>>
+where
+    T: Format<PyFormatContext<'a>>,
+{
+    format_with(move |f: &mut PyFormatter| match f.context().node_level() {
+        NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement | NodeLevel::Expression(None) => {
+            // no-op, not parenthesized
+            Ok(())
+        }
+        NodeLevel::Expression(Some(parentheses_id)) => if_group_breaks(&content)
+            .with_group_id(Some(parentheses_id))
+            .fmt(f),
+        NodeLevel::ParenthesizedExpression => if_group_breaks(&content).fmt(f),
+    })
+}
+
 /// Format comments inside empty parentheses, brackets or curly braces.
 ///
 /// Empty `()`, `[]` and `{}` are special because there can be dangling comments, and they can be in
@@ -412,7 +451,7 @@ mod tests {
     #[test]
     fn test_has_parentheses() {
         let expression = r#"(b().c("")).d()"#;
-        let expr = parse_expression(expression, "<filename>").unwrap();
+        let expr = parse_expression(expression).unwrap();
         assert!(!is_expression_parenthesized(
             ExpressionRef::from(&expr),
             &CommentRanges::default(),

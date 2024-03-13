@@ -18,7 +18,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// builtin and vice versa.
 ///
 /// Builtins can be marked as exceptions to this rule via the
-/// [`flake8-builtins.builtins-ignorelist`] configuration option.
+/// [`lint.flake8-builtins.builtins-ignorelist`] configuration option.
 ///
 /// ## Example
 /// ```python
@@ -41,7 +41,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// ```
 ///
 /// ## Options
-/// - `flake8-builtins.builtins-ignorelist`
+/// - `lint.flake8-builtins.builtins-ignorelist`
 ///
 /// ## References
 /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
@@ -60,7 +60,11 @@ impl Violation for BuiltinVariableShadowing {
 
 /// A001
 pub(crate) fn builtin_variable_shadowing(checker: &mut Checker, name: &str, range: TextRange) {
-    if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
+    if shadows_builtin(
+        name,
+        &checker.settings.flake8_builtins.builtins_ignorelist,
+        checker.source_type,
+    ) {
         checker.diagnostics.push(Diagnostic::new(
             BuiltinVariableShadowing {
                 name: name.to_string(),

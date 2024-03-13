@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Sequence  # TCH003
+from pandas import DataFrame
+from pydantic import BaseModel
 
 
-class MyBaseClass:
-    pass
+class Parent(BaseModel):
+    ...
 
 
-class Foo(MyBaseClass):
-    foo: Sequence
+class Child(Parent):
+    baz: DataFrame

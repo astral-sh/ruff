@@ -329,10 +329,8 @@ macro_rules! format {
 #[macro_export]
 macro_rules! best_fitting {
     ($least_expanded:expr, $($tail:expr),+ $(,)?) => {{
-        #[allow(unsafe_code)]
-        unsafe {
-            $crate::BestFitting::from_arguments_unchecked($crate::format_args!($least_expanded, $($tail),+))
-        }
+        // OK because the macro syntax requires at least two variants.
+        $crate::BestFitting::from_arguments_unchecked($crate::format_args!($least_expanded, $($tail),+))
     }}
 }
 

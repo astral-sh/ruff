@@ -1,0 +1,74 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/line_ranges_diff_edge_case.py
+---
+## Input
+
+```python
+# flags: --line-ranges=10-11
+# NOTE: If you need to modify this file, pay special attention to the --line-ranges=
+# flag above as it's formatting specifically these lines.
+
+# Reproducible example for https://github.com/psf/black/issues/4033.
+# This can be fixed in the future if we use a better diffing algorithm, or make Black
+# perform formatting in a single pass.
+
+print ( "format me" )
+print ( "format me" )
+print ( "format me" )
+print ( "format me" )
+print ( "format me" )
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -9,5 +9,5 @@
+ print ( "format me" )
+ print("format me")
+ print("format me")
+-print("format me")
+-print("format me")
++print ( "format me" )
++print ( "format me" )
+```
+
+## Ruff Output
+
+```python
+# flags: --line-ranges=10-11
+# NOTE: If you need to modify this file, pay special attention to the --line-ranges=
+# flag above as it's formatting specifically these lines.
+
+# Reproducible example for https://github.com/psf/black/issues/4033.
+# This can be fixed in the future if we use a better diffing algorithm, or make Black
+# perform formatting in a single pass.
+
+print ( "format me" )
+print("format me")
+print("format me")
+print ( "format me" )
+print ( "format me" )
+```
+
+## Black Output
+
+```python
+# flags: --line-ranges=10-11
+# NOTE: If you need to modify this file, pay special attention to the --line-ranges=
+# flag above as it's formatting specifically these lines.
+
+# Reproducible example for https://github.com/psf/black/issues/4033.
+# This can be fixed in the future if we use a better diffing algorithm, or make Black
+# perform formatting in a single pass.
+
+print ( "format me" )
+print("format me")
+print("format me")
+print("format me")
+print("format me")
+```
+
+

@@ -287,7 +287,7 @@ impl AlwaysFixableViolation for ExprAndFalse {
 }
 
 /// Return `true` if two `Expr` instances are equivalent names.
-fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
+pub(crate) fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
     if let (Expr::Name(ast::ExprName { id: a, .. }), Expr::Name(ast::ExprName { id: b, .. })) =
         (&a, &b)
     {
@@ -379,7 +379,8 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 ..
             }) = &values[indices[0]]
             {
-                args.get(0).expect("`isinstance` should have two arguments")
+                args.first()
+                    .expect("`isinstance` should have two arguments")
             } else {
                 unreachable!("Indices should only contain `isinstance` calls")
             };
@@ -427,6 +428,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                         .collect(),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
+                    parenthesized: true,
                 };
                 let node1 = ast::ExprName {
                     id: "isinstance".into(),
@@ -436,8 +438,8 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 let node2 = ast::ExprCall {
                     func: Box::new(node1.into()),
                     arguments: Arguments {
-                        args: vec![target.clone(), node.into()],
-                        keywords: vec![],
+                        args: Box::from([target.clone(), node.into()]),
+                        keywords: Box::from([]),
                         range: TextRange::default(),
                     },
                     range: TextRange::default(),
@@ -479,13 +481,13 @@ fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
     else {
         return None;
     };
-    if ops != &[CmpOp::Eq] {
+    if **ops != [CmpOp::Eq] {
         return None;
     }
     let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
         return None;
     };
-    let [comparator] = comparators.as_slice() else {
+    let [comparator] = &**comparators else {
         return None;
     };
     if !comparator.is_name_expr() {
@@ -542,6 +544,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             elts: comparators.into_iter().map(Clone::clone).collect(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            parenthesized: true,
         };
         let node1 = ast::ExprName {
             id: id.into(),
@@ -550,8 +553,8 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         };
         let node2 = ast::ExprCompare {
             left: Box::new(node1.into()),
-            ops: vec![CmpOp::In],
-            comparators: vec![node.into()],
+            ops: Box::from([CmpOp::In]),
+            comparators: Box::from([node.into()]),
             range: TextRange::default(),
         };
         let in_expr = node2.into();
@@ -717,7 +720,7 @@ fn get_short_circuit_edit(
         generator.expr(expr)
     };
     Edit::range_replacement(
-        if matches!(expr, Expr::Tuple(ast::ExprTuple { elts, ctx: _, range: _}) if !elts.is_empty())
+        if matches!(expr, Expr::Tuple(ast::ExprTuple { elts, ctx: _, range: _, parenthesized: _}) if !elts.is_empty())
         {
             format!("({content})")
         } else {

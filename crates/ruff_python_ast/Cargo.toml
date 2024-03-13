@@ -17,15 +17,13 @@ ruff_python_trivia = { path = "../ruff_python_trivia" }
 ruff_source_file = { path = "../ruff_source_file" }
 ruff_text_size = { path = "../ruff_text_size" }
 
+aho-corasick = { workspace = true }
 bitflags = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
-memchr = { workspace = true }
 once_cell = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true, optional = true }
-smallvec = { workspace = true }
-static_assertions = "1.1.0"
 
 [dev-dependencies]
 insta = { workspace = true }
@@ -33,3 +31,6 @@ ruff_python_parser = { path = "../ruff_python_parser" }
 
 [features]
 serde = ["dep:serde", "ruff_text_size/serde"]
+
+[lints]
+workspace = true

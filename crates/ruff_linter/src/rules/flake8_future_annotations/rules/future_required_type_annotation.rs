@@ -1,11 +1,13 @@
-use ruff_python_ast::Expr;
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_text_size::Ranged;
+use ruff_python_ast::imports::{AnyImport, ImportFrom};
+use ruff_python_ast::Expr;
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::importer::Importer;
 
 /// ## What it does
 /// Checks for uses of PEP 585- and PEP 604-style type annotations in Python
@@ -42,6 +44,10 @@ use crate::checkers::ast::Checker;
 ///     ...
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as adding `from __future__ import annotations`
+/// may change the semantics of the program.
+///
 /// ## Options
 /// - `target-version`
 #[violation]
@@ -66,18 +72,28 @@ impl fmt::Display for Reason {
     }
 }
 
-impl Violation for FutureRequiredTypeAnnotation {
+impl AlwaysFixableViolation for FutureRequiredTypeAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
         let FutureRequiredTypeAnnotation { reason } = self;
         format!("Missing `from __future__ import annotations`, but uses {reason}")
     }
+
+    fn fix_title(&self) -> String {
+        format!("Add `from __future__ import annotations`")
+    }
 }
 
 /// FA102
 pub(crate) fn future_required_type_annotation(checker: &mut Checker, expr: &Expr, reason: Reason) {
-    checker.diagnostics.push(Diagnostic::new(
-        FutureRequiredTypeAnnotation { reason },
-        expr.range(),
-    ));
+    let mut diagnostic = Diagnostic::new(FutureRequiredTypeAnnotation { reason }, expr.range());
+    if let Some(python_ast) = checker.semantic().definitions.python_ast() {
+        let required_import =
+            AnyImport::ImportFrom(ImportFrom::member("__future__", "annotations"));
+        diagnostic.set_fix(Fix::unsafe_edit(
+            Importer::new(python_ast, checker.locator(), checker.stylist())
+                .add_import(&required_import, TextSize::default()),
+        ));
+    }
+    checker.diagnostics.push(diagnostic);
 }

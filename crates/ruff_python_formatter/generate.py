@@ -30,10 +30,20 @@ nodes_file = (
 node_lines = (
     nodes_file.split("pub enum AnyNode {")[1].split("}")[0].strip().splitlines()
 )
-nodes = [
-    node_line.split("(")[1].split(")")[0].split("::")[-1].split("<")[0]
-    for node_line in node_lines
-]
+nodes = []
+for node_line in node_lines:
+    node = node_line.split("(")[1].split(")")[0].split("::")[-1].split("<")[0]
+    # `FString` and `StringLiteral` has a custom implementation while the formatting for
+    # `FStringLiteralElement` and `FStringExpressionElement` are handled by the `FString`
+    # implementation.
+    if node in (
+        "FString",
+        "StringLiteral",
+        "FStringLiteralElement",
+        "FStringExpressionElement",
+    ):
+        continue
+    nodes.append(node)
 print(nodes)
 
 # %%

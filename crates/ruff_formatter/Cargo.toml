@@ -15,7 +15,7 @@ ruff_cache = { path = "../ruff_cache" }
 ruff_macros = { path = "../ruff_macros" }
 ruff_text_size = { path = "../ruff_text_size" }
 
-drop_bomb = { version = "0.1.5" }
+drop_bomb = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
@@ -29,3 +29,6 @@ insta = { workspace = true }
 [features]
 serde = ["dep:serde", "ruff_text_size/serde"]
 schemars = ["dep:schemars", "ruff_text_size/schemars"]
+
+[lints]
+workspace = true

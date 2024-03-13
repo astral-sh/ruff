@@ -9,32 +9,43 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..9,
-                    values: [
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 3..5,
-                                value: "\\\n",
-                                unicode: false,
-                                implicit_concatenated: false,
-                            },
-                        ),
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 5..8,
-                                value: Name(
-                                    ExprName {
-                                        range: 6..7,
-                                        id: "x",
-                                        ctx: Load,
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 0..9,
+                                    elements: [
+                                        Literal(
+                                            FStringLiteralElement {
+                                                range: 3..5,
+                                                value: "\\\n",
+                                            },
+                                        ),
+                                        Expression(
+                                            FStringExpressionElement {
+                                                range: 5..8,
+                                                expression: Name(
+                                                    ExprName {
+                                                        range: 6..7,
+                                                        id: "x",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                    ],
+                                    flags: FStringFlags {
+                                        quote_style: Double,
+                                        raw: true,
+                                        triple_quoted: false,
                                     },
-                                ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: None,
-                            },
+                                },
+                            ),
                         ),
-                    ],
-                    implicit_concatenated: false,
+                    },
                 },
             ),
         },

@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.1.5"
+version = "0.3.2"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -29,37 +29,37 @@ ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_source_file = { path = "../ruff_source_file", features = ["serde"] }
 ruff_text_size = { path = "../ruff_text_size" }
 
-aho-corasick = { version = "1.1.2" }
-annotate-snippets = { version = "0.9.1", features = ["color"] }
+aho-corasick = { workspace = true }
+annotate-snippets = { workspace = true, features = ["color"] }
 anyhow = { workspace = true }
 bitflags = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive", "string"], optional = true }
 colored = { workspace = true }
-fern = { version = "0.6.1" }
+fern = { workspace = true }
 glob = { workspace = true }
 globset = { workspace = true }
-imperative = { version = "1.0.4" }
+imperative = { workspace = true }
 is-macro = { workspace = true }
+is-wsl = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
 log = { workspace = true }
 memchr = { workspace = true }
-natord = { version = "1.0.9" }
+natord = { workspace = true }
 once_cell = { workspace = true }
 path-absolutize = { workspace = true, features = [
   "once_cell_cache",
   "use_unix_paths_on_wasm",
 ] }
-pathdiff = { version = "0.2.1" }
-pep440_rs = { version = "0.3.12", features = ["serde"] }
-pyproject-toml = { version = "0.8.0" }
-quick-junit = { version = "0.3.2" }
+pathdiff = { workspace = true }
+pep440_rs = { workspace = true, features = ["serde"] }
+pyproject-toml = { workspace = true }
+quick-junit = { workspace = true }
 regex = { workspace = true }
-result-like = { version = "0.4.6" }
+result-like = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
-semver = { version = "1.0.20" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 similar = { workspace = true }
@@ -68,21 +68,24 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
-typed-arena = { version = "2.0.2" }
+typed-arena = { workspace = true }
 unicode-width = { workspace = true }
 unicode_names2 = { workspace = true }
-wsl = { version = "0.1.0" }
+url = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
-pretty_assertions = "1.3.0"
+pretty_assertions = { workspace = true }
 test-case = { workspace = true }
 # Disable colored output in tests
 colored = { workspace = true, features = ["no-color"] }
-tempfile = "3.8.1"
+tempfile = { workspace = true }
 
 [features]
 default = []
 schemars = ["dep:schemars"]
-# Enables the UnreachableCode rule
-unreachable-code = []
+# Enables rules for internal integration tests
+test-rules = []
+
+[lints]
+workspace = true

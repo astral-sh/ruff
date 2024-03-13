@@ -501,9 +501,19 @@ expression: parse_ast
                                     StringLiteral(
                                         ExprStringLiteral {
                                             range: 484..489,
-                                            value: "seq",
-                                            unicode: false,
-                                            implicit_concatenated: false,
+                                            value: StringLiteralValue {
+                                                inner: Single(
+                                                    StringLiteral {
+                                                        range: 484..489,
+                                                        value: "seq",
+                                                        flags: StringLiteralFlags {
+                                                            quote_style: Double,
+                                                            prefix: "",
+                                                            triple_quoted: false,
+                                                        },
+                                                    },
+                                                ),
+                                            },
                                         },
                                     ),
                                 ),
@@ -530,9 +540,19 @@ expression: parse_ast
                                     StringLiteral(
                                         ExprStringLiteral {
                                             range: 518..523,
-                                            value: "map",
-                                            unicode: false,
-                                            implicit_concatenated: false,
+                                            value: StringLiteralValue {
+                                                inner: Single(
+                                                    StringLiteral {
+                                                        range: 518..523,
+                                                        value: "map",
+                                                        flags: StringLiteralFlags {
+                                                            quote_style: Double,
+                                                            prefix: "",
+                                                            triple_quoted: false,
+                                                        },
+                                                    },
+                                                ),
+                                            },
                                         },
                                     ),
                                 ),
@@ -821,9 +841,19 @@ expression: parse_ast
                                         value: StringLiteral(
                                             ExprStringLiteral {
                                                 range: 664..667,
-                                                value: "X",
-                                                unicode: false,
-                                                implicit_concatenated: false,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 664..667,
+                                                            value: "X",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: "",
+                                                                triple_quoted: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
                                             },
                                         ),
                                     },
@@ -1551,9 +1581,19 @@ expression: parse_ast
                                 StringLiteral(
                                     ExprStringLiteral {
                                         range: 1287..1292,
-                                        value: "foo",
-                                        unicode: false,
-                                        implicit_concatenated: false,
+                                        value: StringLiteralValue {
+                                            inner: Single(
+                                                StringLiteral {
+                                                    range: 1287..1292,
+                                                    value: "foo",
+                                                    flags: StringLiteralFlags {
+                                                        quote_style: Double,
+                                                        prefix: "",
+                                                        triple_quoted: false,
+                                                    },
+                                                },
+                                            ),
+                                        },
                                     },
                                 ),
                             ],
@@ -1635,6 +1675,7 @@ expression: parse_ast
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: true,
                 },
             ),
             cases: [
@@ -1821,8 +1862,8 @@ expression: parse_ast
                         },
                     ),
                     guard: Some(
-                        NamedExpr(
-                            ExprNamedExpr {
+                        Named(
+                            ExprNamed {
                                 range: 1472..1482,
                                 target: Name(
                                     ExprName {
@@ -2124,6 +2165,7 @@ expression: parse_ast
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: true,
                 },
             ),
             cases: [
@@ -2469,9 +2511,19 @@ expression: parse_ast
                                         value: StringLiteral(
                                             ExprStringLiteral {
                                                 range: 2036..2038,
-                                                value: "",
-                                                unicode: false,
-                                                implicit_concatenated: false,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 2036..2038,
+                                                            value: "",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: "",
+                                                                triple_quoted: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
                                             },
                                         ),
                                     },
@@ -2513,9 +2565,19 @@ expression: parse_ast
                             value: StringLiteral(
                                 ExprStringLiteral {
                                     range: 2064..2066,
-                                    value: "",
-                                    unicode: false,
-                                    implicit_concatenated: false,
+                                    value: StringLiteralValue {
+                                        inner: Single(
+                                            StringLiteral {
+                                                range: 2064..2066,
+                                                value: "",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Double,
+                                                    prefix: "",
+                                                    triple_quoted: false,
+                                                },
+                                            },
+                                        ),
+                                    },
                                 },
                             ),
                         },
@@ -3131,9 +3193,19 @@ expression: parse_ast
                                         value: StringLiteral(
                                             ExprStringLiteral {
                                                 range: 2449..2452,
-                                                value: "X",
-                                                unicode: false,
-                                                implicit_concatenated: false,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 2449..2452,
+                                                            value: "X",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: "",
+                                                                triple_quoted: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
                                             },
                                         ),
                                     },
@@ -3245,6 +3317,7 @@ expression: parse_ast
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: true,
                 },
             ),
             cases: [
@@ -3343,6 +3416,7 @@ expression: parse_ast
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: true,
                 },
             ),
             cases: [
@@ -3424,6 +3498,7 @@ expression: parse_ast
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: false,
                 },
             ),
             cases: [
@@ -3500,6 +3575,7 @@ expression: parse_ast
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: false,
                 },
             ),
             cases: [
@@ -3572,8 +3648,8 @@ expression: parse_ast
                 ExprTuple {
                     range: 2789..2796,
                     elts: [
-                        NamedExpr(
-                            ExprNamedExpr {
+                        Named(
+                            ExprNamed {
                                 range: 2789..2795,
                                 target: Name(
                                     ExprName {
@@ -3593,6 +3669,7 @@ expression: parse_ast
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: false,
                 },
             ),
             cases: [

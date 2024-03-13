@@ -325,6 +325,18 @@ expected_content = (
     )
 )
 
+# Skip FString content when determining whether to omit optional parentheses or not.0
+# The below expression should be parenthesized because it ends with an fstring and starts with a name.
+# (Call expressions at the beginning don't count as parenthesized because they don't start with parens).
+assert (
+    format.format_event(spec)
+    == f'Event("_remove_cookie", {{key:`testkey`,options:{json.dumps(options)}}})'
+)
+# Avoid parentheses for this example because it starts with a tuple expression.
+assert (
+    (spec, format)
+    == f'Event("_remove_cookie", {{key:`testkey`,options:{json.dumps(options)}}})'
+)
 
 rowuses = [(1 << j) |                  # column ordinal
            (1 << (n + i-j + n-1)) |    # NW-SE ordinal
@@ -790,6 +802,18 @@ expected_content = (
     )
 )
 
+# Skip FString content when determining whether to omit optional parentheses or not.0
+# The below expression should be parenthesized because it ends with an fstring and starts with a name.
+# (Call expressions at the beginning don't count as parenthesized because they don't start with parens).
+assert (
+    format.format_event(spec)
+    == f'Event("_remove_cookie", {{key:`testkey`,options:{json.dumps(options)}}})'
+)
+# Avoid parentheses for this example because it starts with a tuple expression.
+assert (
+    spec,
+    format,
+) == f'Event("_remove_cookie", {{key:`testkey`,options:{json.dumps(options)}}})'
 
 rowuses = [
     (1 << j)  # column ordinal

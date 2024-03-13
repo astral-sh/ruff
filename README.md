@@ -7,8 +7,9 @@
 [![image](https://img.shields.io/pypi/l/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![Actions status](https://github.com/astral-sh/ruff/workflows/CI/badge.svg)](https://github.com/astral-sh/ruff/actions)
+[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?logo=discord&logoColor=white)](https://discord.com/invite/astral-sh)
 
-[**Discord**](https://discord.gg/c9MhzV8aU5) | [**Docs**](https://docs.astral.sh/ruff/) | [**Playground**](https://play.ruff.rs/)
+[**Docs**](https://docs.astral.sh/ruff/) | [**Playground**](https://play.ruff.rs/)
 
 An extremely fast Python linter and code formatter, written in Rust.
 
@@ -54,7 +55,7 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Pandas](https://github.com/pandas-dev/pandas)
 - [SciPy](https://github.com/scipy/scipy)
 
-...and many more.
+...and [many more](#whos-using-ruff).
 
 Ruff is backed by [Astral](https://astral.sh). Read the [launch post](https://astral.sh/blog/announcing-astral-the-company-behind-ruff),
 or the original [project announcement](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
@@ -128,7 +129,7 @@ and with [a variety of other package managers](https://docs.astral.sh/ruff/insta
 To run Ruff as a linter, try any of the following:
 
 ```shell
-ruff check .                        # Lint all files in the current directory (and any subdirectories).
+ruff check                          # Lint all files in the current directory (and any subdirectories).
 ruff check path/to/code/            # Lint all files in `/path/to/code` (and any subdirectories).
 ruff check path/to/code/*.py        # Lint all `.py` files in `/path/to/code`.
 ruff check path/to/code/to/file.py  # Lint `file.py`.
@@ -138,7 +139,7 @@ ruff check @arguments.txt           # Lint using an input file, treating its con
 Or, to run Ruff as a formatter:
 
 ```shell
-ruff format .                        # Format all files in the current directory (and any subdirectories).
+ruff format                          # Format all files in the current directory (and any subdirectories).
 ruff format path/to/code/            # Format all files in `/path/to/code` (and any subdirectories).
 ruff format path/to/code/*.py        # Format all `.py` files in `/path/to/code`.
 ruff format path/to/code/to/file.py  # Format `file.py`.
@@ -150,7 +151,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.5
+  rev: v0.3.2
   hooks:
     # Run the linter.
     - id: ruff
@@ -172,7 +173,7 @@ jobs:
   ruff:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: chartboost/ruff-action@v1
 ```
 
@@ -194,20 +195,25 @@ exclude = [
     ".git",
     ".git-rewrite",
     ".hg",
+    ".ipynb_checkpoints",
     ".mypy_cache",
     ".nox",
     ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
     ".pytype",
     ".ruff_cache",
     ".svn",
     ".tox",
     ".venv",
+    ".vscode",
     "__pypackages__",
     "_build",
     "buck-out",
     "build",
     "dist",
     "node_modules",
+    "site-packages",
     "venv",
 ]
 
@@ -336,14 +342,14 @@ For a complete enumeration of the supported rules, see [_Rules_](https://docs.as
 Contributions are welcome and highly appreciated. To get started, check out the
 [**contributing guidelines**](https://docs.astral.sh/ruff/contributing/).
 
-You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5).
+You can also join us on [**Discord**](https://discord.com/invite/astral-sh).
 
 ## Support
 
 Having trouble? Check out the existing issues on [**GitHub**](https://github.com/astral-sh/ruff/issues),
 or feel free to [**open a new one**](https://github.com/astral-sh/ruff/issues/new).
 
-You can also ask for help on [**Discord**](https://discord.gg/c9MhzV8aU5).
+You can also ask for help on [**Discord**](https://discord.com/invite/astral-sh).
 
 ## Acknowledgements
 
@@ -373,14 +379,16 @@ Ruff is released under the MIT license.
 
 Ruff is used by a number of major open-source projects and companies, including:
 
+- [Albumentations](https://github.com/albumentations-team/albumentations)
 - Amazon ([AWS SAM](https://github.com/aws/serverless-application-model))
 - Anthropic ([Python SDK](https://github.com/anthropics/anthropic-sdk-python))
 - [Apache Airflow](https://github.com/apache/airflow)
 - AstraZeneca ([Magnus](https://github.com/AstraZeneca/magnus-core))
-- Benchling ([Refac](https://github.com/benchling/refac))
 - [Babel](https://github.com/python-babel/babel)
+- Benchling ([Refac](https://github.com/benchling/refac))
 - [Bokeh](https://github.com/bokeh/bokeh)
 - [Cryptography (PyCA)](https://github.com/pyca/cryptography)
+- CERN ([Indico](https://getindico.io/))
 - [DVC](https://github.com/iterative/dvc)
 - [Dagger](https://github.com/dagger/dagger)
 - [Dagster](https://github.com/dagster-io/dagster)
@@ -389,15 +397,18 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Gradio](https://github.com/gradio-app/gradio)
 - [Great Expectations](https://github.com/great-expectations/great_expectations)
 - [HTTPX](https://github.com/encode/httpx)
+- [Hatch](https://github.com/pypa/hatch)
+- [Home Assistant](https://github.com/home-assistant/core)
 - Hugging Face ([Transformers](https://github.com/huggingface/transformers),
     [Datasets](https://github.com/huggingface/datasets),
     [Diffusers](https://github.com/huggingface/diffusers))
-- [Hatch](https://github.com/pypa/hatch)
-- [Home Assistant](https://github.com/home-assistant/core)
 - ING Bank ([popmon](https://github.com/ing-bank/popmon), [probatus](https://github.com/ing-bank/probatus))
 - [Ibis](https://github.com/ibis-project/ibis)
+- [ivy](https://github.com/unifyai/ivy)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
+- [Kraken Tech](https://kraken.tech/)
 - [LangChain](https://github.com/hwchase17/langchain)
+- [Litestar](https://litestar.dev/)
 - [LlamaIndex](https://github.com/jerryjliu/llama_index)
 - Matrix ([Synapse](https://github.com/matrix-org/synapse))
 - [MegaLinter](https://github.com/oxsecurity/megalinter)
@@ -411,6 +422,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
 - [Neon](https://github.com/neondatabase/neon)
 - [NoneBot](https://github.com/nonebot/nonebot2)
+- [NumPyro](https://github.com/pyro-ppl/numpyro)
 - [ONNX](https://github.com/onnx/onnx)
 - [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
 - [PDM](https://github.com/pdm-project/pdm)
@@ -422,20 +434,24 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [PostHog](https://github.com/PostHog/posthog)
 - Prefect ([Python SDK](https://github.com/PrefectHQ/prefect), [Marvin](https://github.com/PrefectHQ/marvin))
 - [PyInstaller](https://github.com/pyinstaller/pyinstaller)
+- [PyMC](https://github.com/pymc-devs/pymc/)
+- [PyMC-Marketing](https://github.com/pymc-labs/pymc-marketing)
+- [pytest](https://github.com/pytest-dev/pytest)
 - [PyTorch](https://github.com/pytorch/pytorch)
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Pylint](https://github.com/PyCQA/pylint)
-- [PyMC-Marketing](https://github.com/pymc-labs/pymc-marketing)
+- [PyVista](https://github.com/pyvista/pyvista)
 - [Reflex](https://github.com/reflex-dev/reflex)
+- [River](https://github.com/online-ml/river)
 - [Rippling](https://rippling.com)
 - [Robyn](https://github.com/sansyrox/robyn)
-- Scale AI ([Launch SDK](https://github.com/scaleapi/launch-python-client))
-- Snowflake ([SnowCLI](https://github.com/Snowflake-Labs/snowcli))
 - [Saleor](https://github.com/saleor/saleor)
+- Scale AI ([Launch SDK](https://github.com/scaleapi/launch-python-client))
 - [SciPy](https://github.com/scipy/scipy)
+- Snowflake ([SnowCLI](https://github.com/Snowflake-Labs/snowcli))
 - [Sphinx](https://github.com/sphinx-doc/sphinx)
 - [Stable Baselines3](https://github.com/DLR-RM/stable-baselines3)
-- [Litestar](https://litestar.dev/)
+- [Starlette](https://github.com/encode/starlette)
 - [The Algorithms](https://github.com/TheAlgorithms/Python)
 - [Vega-Altair](https://github.com/altair-viz/altair)
 - WordPress ([Openverse](https://github.com/WordPress/openverse))
@@ -451,7 +467,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 
 ### Show Your Support
 
-If you're using Ruff, consider adding the Ruff badge to project's `README.md`:
+If you're using Ruff, consider adding the Ruff badge to your project's `README.md`:
 
 ```md
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -477,6 +493,6 @@ MIT
 
 <div align="center">
   <a target="_blank" href="https://astral.sh" style="background:none">
-    <img src="https://raw.githubusercontent.com/astral-sh/ruff/main/assets/svg/Astral.svg">
+    <img src="https://raw.githubusercontent.com/astral-sh/ruff/main/assets/svg/Astral.svg" alt="Made by Astral">
   </a>
 </div>

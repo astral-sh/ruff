@@ -28,7 +28,12 @@ from ruff_ecosystem.types import (
 )
 
 if TYPE_CHECKING:
-    from ruff_ecosystem.projects import CheckOptions, ClonedRepository, Project
+    from ruff_ecosystem.projects import (
+        CheckOptions,
+        ClonedRepository,
+        ConfigOverrides,
+        Project,
+    )
 
 
 # Matches lines that are summaries rather than diagnostics
@@ -52,6 +57,8 @@ def markdown_check_result(result: Result) -> str:
     """
     Render a `ruff check` ecosystem check result as markdown.
     """
+    projects_with_changes = 0
+
     # Calculate the total number of rule changes
     all_rule_changes = RuleChanges()
     project_diffs = {
@@ -63,7 +70,10 @@ def markdown_check_result(result: Result) -> str:
         project_rule_changes[project] = changes = RuleChanges.from_diff(diff)
         all_rule_changes.update(changes)
 
-    lines = []
+        if diff:
+            projects_with_changes += 1
+
+    lines: list[str] = []
     total_removed = all_rule_changes.total_removed_violations()
     total_added = all_rule_changes.total_added_violations()
     total_added_fixes = all_rule_changes.total_added_fixes()
@@ -88,11 +98,17 @@ def markdown_check_result(result: Result) -> str:
         change_summary = (
             f"{markdown_plus_minus(total_added, total_removed)} violations, "
             f"{markdown_plus_minus(total_added_fixes, total_removed_fixes)} fixes "
-            f"in {len(result.completed)} projects"
+            f"in {projects_with_changes} projects"
         )
         if error_count:
             s = "s" if error_count != 1 else ""
             change_summary += f"; {error_count} project error{s}"
+
+        unchanged_projects = len(result.completed) - projects_with_changes
+        if unchanged_projects:
+            s = "s" if unchanged_projects != 1 else ""
+            change_summary += f"; {unchanged_projects} project{s} unchanged"
+
         lines.append(
             f"\u2139\ufe0f ecosystem check **detected linter changes**. ({change_summary})"
         )
@@ -105,7 +121,7 @@ def markdown_check_result(result: Result) -> str:
         if len(" ".join(lines)) > GITHUB_MAX_COMMENT_LENGTH // 3:
             lines.append("")
             lines.append(
-                "_... Truncated remaining completed projected reports due to GitHub comment length restrictions_"
+                "_... Truncated remaining completed project reports due to GitHub comment length restrictions_"
             )
             lines.append("")
             break
@@ -466,25 +482,27 @@ async def compare_check(
     ruff_baseline_executable: Path,
     ruff_comparison_executable: Path,
     options: CheckOptions,
+    config_overrides: ConfigOverrides,
     cloned_repo: ClonedRepository,
 ) -> Comparison:
-    async with asyncio.TaskGroup() as tg:
-        baseline_task = tg.create_task(
-            ruff_check(
-                executable=ruff_baseline_executable.resolve(),
-                path=cloned_repo.path,
-                name=cloned_repo.fullname,
-                options=options,
-            ),
-        )
-        comparison_task = tg.create_task(
-            ruff_check(
-                executable=ruff_comparison_executable.resolve(),
-                path=cloned_repo.path,
-                name=cloned_repo.fullname,
-                options=options,
-            ),
-        )
+    with config_overrides.patch_config(cloned_repo.path, options.preview):
+        async with asyncio.TaskGroup() as tg:
+            baseline_task = tg.create_task(
+                ruff_check(
+                    executable=ruff_baseline_executable.resolve(),
+                    path=cloned_repo.path,
+                    name=cloned_repo.fullname,
+                    options=options,
+                ),
+            )
+            comparison_task = tg.create_task(
+                ruff_check(
+                    executable=ruff_comparison_executable.resolve(),
+                    path=cloned_repo.path,
+                    name=cloned_repo.fullname,
+                    options=options,
+                ),
+            )
 
     baseline_output, comparison_output = (
         baseline_task.result(),

@@ -9,17 +9,28 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..14,
-                    values: [
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 2..13,
-                                value: "Hello world",
-                                unicode: false,
-                                implicit_concatenated: false,
-                            },
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 0..14,
+                                    elements: [
+                                        Literal(
+                                            FStringLiteralElement {
+                                                range: 2..13,
+                                                value: "Hello world",
+                                            },
+                                        ),
+                                    ],
+                                    flags: FStringFlags {
+                                        quote_style: Single,
+                                        raw: false,
+                                        triple_quoted: false,
+                                    },
+                                },
+                            ),
                         ),
-                    ],
-                    implicit_concatenated: false,
+                    },
                 },
             ),
         },

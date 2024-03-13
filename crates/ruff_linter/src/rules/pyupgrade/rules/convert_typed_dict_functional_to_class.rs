@@ -148,10 +148,10 @@ fn create_class_def_stmt(
     ast::StmtClassDef {
         name: Identifier::new(class_name.to_string(), TextRange::default()),
         arguments: Some(Box::new(Arguments {
-            args: vec![base_class.clone()],
+            args: Box::from([base_class.clone()]),
             keywords: match total_keyword {
-                Some(keyword) => vec![keyword.clone()],
-                None => vec![],
+                Some(keyword) => Box::from([keyword.clone()]),
+                None => Box::from([]),
             },
             range: TextRange::default(),
         })),
@@ -174,13 +174,13 @@ fn fields_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Option<Ve
             .zip(values.iter())
             .map(|(key, value)| match key {
                 Some(Expr::StringLiteral(ast::ExprStringLiteral { value: field, .. })) => {
-                    if !is_identifier(field) {
+                    if !is_identifier(field.to_str()) {
                         return None;
                     }
-                    if is_dunder(field) {
+                    if is_dunder(field.to_str()) {
                         return None;
                     }
-                    Some(create_field_assignment_stmt(field, value))
+                    Some(create_field_assignment_stmt(field.to_str(), value))
                 }
                 _ => None,
             })
@@ -226,7 +226,7 @@ fn fields_from_keywords(keywords: &[Keyword]) -> Option<Vec<Stmt>> {
 
 /// Match the fields and `total` keyword from a `TypedDict` call.
 fn match_fields_and_total(arguments: &Arguments) -> Option<(Vec<Stmt>, Option<&Keyword>)> {
-    match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+    match (&*arguments.args, &*arguments.keywords) {
         // Ex) `TypedDict("MyType", {"a": int, "b": str})`
         ([_typename, fields], [..]) => {
             let total = arguments.find_keyword("total");

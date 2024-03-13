@@ -3,6 +3,7 @@ pub(crate) use indentation::*;
 pub(crate) use missing_whitespace::*;
 pub(crate) use missing_whitespace_after_keyword::*;
 pub(crate) use missing_whitespace_around_operator::*;
+pub(crate) use redundant_backslash::*;
 pub(crate) use space_around_operator::*;
 pub(crate) use whitespace_around_keywords::*;
 pub(crate) use whitespace_around_named_parameter_equals::*;
@@ -25,6 +26,7 @@ mod indentation;
 mod missing_whitespace;
 mod missing_whitespace_after_keyword;
 mod missing_whitespace_around_operator;
+mod redundant_backslash;
 mod space_around_operator;
 mod whitespace_around_keywords;
 mod whitespace_around_named_parameter_equals;
@@ -381,20 +383,16 @@ impl Whitespace {
             }
         }
 
-        if has_tabs {
+        if len == content.text_len() {
+            // All whitespace up to the start of the line -> Indent
+            (Self::None, TextSize::default())
+        } else if has_tabs {
             (Self::Tab, len)
         } else {
             match count {
                 0 => (Self::None, TextSize::default()),
                 1 => (Self::Single, len),
-                _ => {
-                    if len == content.text_len() {
-                        // All whitespace up to the start of the line -> Indent
-                        (Self::None, TextSize::default())
-                    } else {
-                        (Self::Many, len)
-                    }
-                }
+                _ => (Self::Many, len),
             }
         }
     }
@@ -518,10 +516,10 @@ mod tests {
     #[test]
     fn multi_line() {
         assert_logical_lines(
-            r#"
+            r"
 x = 1
 y = 2
-z = x + 1"#
+z = x + 1"
                 .trim(),
             &["x = 1", "y = 2", "z = x + 1"],
         );
@@ -530,14 +528,14 @@ z = x + 1"#
     #[test]
     fn indented() {
         assert_logical_lines(
-            r#"
+            r"
 x = [
   1,
   2,
   3,
 ]
 y = 2
-z = x + 1"#
+z = x + 1"
                 .trim(),
             &["x = [\n  1,\n  2,\n  3,\n]", "y = 2", "z = x + 1"],
         );
@@ -551,11 +549,11 @@ z = x + 1"#
     #[test]
     fn function_definition() {
         assert_logical_lines(
-            r#"
+            r"
 def f():
   x = 1
-f()"#
-                .trim(),
+f()"
+            .trim(),
             &["def f():", "x = 1", "f()"],
         );
     }
@@ -583,11 +581,11 @@ f()"#
     #[test]
     fn empty_line() {
         assert_logical_lines(
-            r#"
+            r"
 if False:
 
     print()
-"#
+"
             .trim(),
             &["if False:", "print()", ""],
         );

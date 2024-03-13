@@ -244,15 +244,11 @@ fn match_open_keywords(
 
 /// Match open mode to see if it is supported.
 fn match_open_mode(mode: &Expr) -> Option<ReadMode> {
-    let ast::ExprStringLiteral {
-        value,
-        implicit_concatenated: false,
-        ..
-    } = mode.as_string_literal_expr()?
-    else {
+    let ast::ExprStringLiteral { value, .. } = mode.as_string_literal_expr()?;
+    if value.is_implicit_concatenated() {
         return None;
-    };
-    match value.as_str() {
+    }
+    match value.to_str() {
         "r" => Some(ReadMode::Text),
         "rb" => Some(ReadMode::Bytes),
         _ => None,
@@ -326,7 +322,7 @@ fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> SourceCodeSnipp
     let call = ast::ExprCall {
         func: Box::new(name.into()),
         arguments: ast::Arguments {
-            args: vec![],
+            args: Box::from([]),
             keywords: open.keywords.iter().copied().cloned().collect(),
             range: TextRange::default(),
         },

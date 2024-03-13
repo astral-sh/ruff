@@ -67,7 +67,7 @@ git -C "$dir/home-assistant" checkout -q 88296c1998fd1943576e0167ab190d25af17525
 if [ ! -d "$dir/poetry/.git" ]; then
   git clone --filter=tree:0 https://github.com/python-poetry/poetry "$dir/poetry"
 fi
-git -C "$dir/poetry" checkout -q f5cb9f0fb19063cf280faf5e39c82d5691da9939
+git -C "$dir/poetry" checkout -q f310a592ad3ab41bb8d635af6bacaf044a1fefef
 
 # cpython itself
 if [ ! -d "$dir/cpython/.git" ]; then
@@ -75,19 +75,13 @@ if [ ! -d "$dir/cpython/.git" ]; then
 fi
 git -C "$dir/cpython" checkout -q b75186f69edcf54615910a5cd707996144163ef7
 
-# poetry itself
-if [ ! -d "$dir/poetry/.git" ]; then
-  git clone --filter=tree:0 https://github.com/python-poetry/poetry "$dir/poetry"
-fi
-git -C "$dir/poetry" checkout -q 611033a7335f3c8e2b74dd58688fb9021cf84a5b
-
 # Uncomment if you want to update the hashes
 #for i in "$dir"/*/; do git -C "$i" switch main && git -C "$i" pull; done
 #for i in "$dir"/*/; do echo "# $(basename "$i") $(git -C "$i" rev-parse HEAD)"; done
 
 time cargo run --bin ruff_dev -- format-dev --stability-check \
   --error-file "$target/progress_projects_errors.txt" --log-file "$target/progress_projects_log.txt" --stats-file "$target/progress_projects_stats.txt" \
-  --files-with-errors 14 --multi-project "$dir" || (
+  --files-with-errors 15 --multi-project "$dir" || (
   echo "Ecosystem check failed"
   cat "$target/progress_projects_log.txt"
   exit 1

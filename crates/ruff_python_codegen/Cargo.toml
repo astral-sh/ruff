@@ -11,6 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [lib]
+doctest = false
 
 [dependencies]
 ruff_python_ast = { path = "../ruff_python_ast" }
@@ -19,4 +20,7 @@ ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_source_file = { path = "../ruff_source_file" }
 
 once_cell = { workspace = true }
+
+[lints]
+workspace = true
 

@@ -8,11 +8,11 @@ use clap::{command, Parser, ValueEnum};
 use ruff_formatter::SourceCode;
 use ruff_python_ast::PySourceType;
 use ruff_python_index::tokens_and_ranges;
-use ruff_python_parser::{parse_ok_tokens, AsMode};
+use ruff_python_parser::{parse_tokens, AsMode};
 use ruff_text_size::Ranged;
 
 use crate::comments::collect_comments;
-use crate::{format_module_ast, PreviewMode, PyFormatOptions};
+use crate::{format_module_ast, MagicTrailingComma, PreviewMode, PyFormatOptions};
 
 #[derive(ValueEnum, Clone, Debug)]
 pub enum Emit {
@@ -40,6 +40,8 @@ pub struct Cli {
     pub print_ir: bool,
     #[clap(long)]
     pub print_comments: bool,
+    #[clap(long, short = 'C')]
+    pub skip_magic_trailing_comma: bool,
 }
 
 pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Result<String> {
@@ -48,14 +50,20 @@ pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Re
         .map_err(|err| format_err!("Source contains syntax errors {err:?}"))?;
 
     // Parse the AST.
-    let module = parse_ok_tokens(tokens, source, source_type.as_mode(), "<filename>")
-        .context("Syntax error in input")?;
+    let module =
+        parse_tokens(tokens, source, source_type.as_mode()).context("Syntax error in input")?;
 
-    let options = PyFormatOptions::from_extension(source_path).with_preview(if cli.preview {
-        PreviewMode::Enabled
-    } else {
-        PreviewMode::Disabled
-    });
+    let options = PyFormatOptions::from_extension(source_path)
+        .with_preview(if cli.preview {
+            PreviewMode::Enabled
+        } else {
+            PreviewMode::Disabled
+        })
+        .with_magic_trailing_comma(if cli.skip_magic_trailing_comma {
+            MagicTrailingComma::Ignore
+        } else {
+            MagicTrailingComma::Respect
+        });
 
     let source_code = SourceCode::new(source);
     let formatted = format_module_ast(&module, &comment_ranges, source, options)

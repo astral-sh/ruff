@@ -1,0 +1,49 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S202.py:8:5: S202 Uses of `tarfile.extractall()`
+  |
+6 | def unsafe_archive_handler(filename):
+7 |     tar = tarfile.open(filename)
+8 |     tar.extractall(path=tempfile.mkdtemp())
+  |     ^^^^^^^^^^^^^^ S202
+9 |     tar.close()
+  |
+
+S202.py:14:5: S202 Uses of `tarfile.extractall()`
+   |
+12 | def managed_members_archive_handler(filename):
+13 |     tar = tarfile.open(filename)
+14 |     tar.extractall(path=tempfile.mkdtemp(), members=members_filter(tar))
+   |     ^^^^^^^^^^^^^^ S202
+15 |     tar.close()
+   |
+
+S202.py:20:5: S202 Uses of `tarfile.extractall()`
+   |
+18 | def list_members_archive_handler(filename):
+19 |     tar = tarfile.open(filename)
+20 |     tar.extractall(path=tempfile.mkdtemp(), members=[])
+   |     ^^^^^^^^^^^^^^ S202
+21 |     tar.close()
+   |
+
+S202.py:26:5: S202 Uses of `tarfile.extractall()`
+   |
+24 | def provided_members_archive_handler(filename):
+25 |     tar = tarfile.open(filename)
+26 |     tarfile.extractall(path=tempfile.mkdtemp(), members=tar)
+   |     ^^^^^^^^^^^^^^^^^^ S202
+27 |     tar.close()
+   |
+
+S202.py:38:5: S202 Uses of `tarfile.extractall()`
+   |
+36 | def filter_fully_trusted(filename):
+37 |     tar = tarfile.open(filename)
+38 |     tarfile.extractall(path=tempfile.mkdtemp(), filter="fully_trusted")
+   |     ^^^^^^^^^^^^^^^^^^ S202
+39 |     tar.close()
+   |
+
+

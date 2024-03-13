@@ -57,7 +57,7 @@ F841_0.py:20:5: F841 [*] Local variable `foo` is assigned to but never used
 22 21 | 
 23 22 |     bar = (1, 2)
 
-F841_0.py:21:6: F841 Local variable `a` is assigned to but never used
+F841_0.py:21:6: F841 [*] Local variable `a` is assigned to but never used
    |
 19 | def f():
 20 |     foo = (1, 2)
@@ -68,7 +68,17 @@ F841_0.py:21:6: F841 Local variable `a` is assigned to but never used
    |
    = help: Remove assignment to unused variable `a`
 
-F841_0.py:21:9: F841 Local variable `b` is assigned to but never used
+ℹ Unsafe fix
+18 18 | 
+19 19 | def f():
+20 20 |     foo = (1, 2)
+21    |-    (a, b) = (1, 2)
+   21 |+    (_a, b) = (1, 2)
+22 22 | 
+23 23 |     bar = (1, 2)
+24 24 |     (c, d) = bar
+
+F841_0.py:21:9: F841 [*] Local variable `b` is assigned to but never used
    |
 19 | def f():
 20 |     foo = (1, 2)
@@ -78,6 +88,16 @@ F841_0.py:21:9: F841 Local variable `b` is assigned to but never used
 23 |     bar = (1, 2)
    |
    = help: Remove assignment to unused variable `b`
+
+ℹ Unsafe fix
+18 18 | 
+19 19 | def f():
+20 20 |     foo = (1, 2)
+21    |-    (a, b) = (1, 2)
+   21 |+    (a, _b) = (1, 2)
+22 22 | 
+23 23 |     bar = (1, 2)
+24 24 |     (c, d) = bar
 
 F841_0.py:26:14: F841 [*] Local variable `baz` is assigned to but never used
    |

@@ -57,4 +57,21 @@ PIE796.py:54:5: PIE796 Enum contains duplicate value: `2`
    |     ^^^^^ PIE796
    |
 
+PIE796.py:71:5: PIE796 Enum contains duplicate value: `...`
+   |
+69 | class FakeEnum10(enum.Enum):
+70 |     A = ...
+71 |     B = ...  # PIE796
+   |     ^^^^^^^ PIE796
+72 |     C = ...  # PIE796
+   |
+
+PIE796.py:72:5: PIE796 Enum contains duplicate value: `...`
+   |
+70 |     A = ...
+71 |     B = ...  # PIE796
+72 |     C = ...  # PIE796
+   |     ^^^^^^^ PIE796
+   |
+
 

@@ -58,11 +58,7 @@ impl<'a> UniversalNewlineIterator<'a> {
 pub fn find_newline(text: &str) -> Option<(usize, LineEnding)> {
     let bytes = text.as_bytes();
     if let Some(position) = memchr2(b'\n', b'\r', bytes) {
-        // SAFETY: memchr guarantees to return valid positions
-        #[allow(unsafe_code)]
-        let newline_character = unsafe { *bytes.get_unchecked(position) };
-
-        let line_ending = match newline_character {
+        let line_ending = match bytes[position] {
             // Explicit branch for `\n` as this is the most likely path
             b'\n' => LineEnding::Lf,
             // '\r\n'
@@ -188,8 +184,15 @@ impl<'a> Iterator for NewlineWithTrailingNewline<'a> {
     type Item = Line<'a>;
 
     #[inline]
-    fn next(&mut self) -> Option<Line<'a>> {
+    fn next(&mut self) -> Option<Self::Item> {
         self.underlying.next().or_else(|| self.trailing.take())
+    }
+}
+
+impl DoubleEndedIterator for NewlineWithTrailingNewline<'_> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.trailing.take().or_else(|| self.underlying.next_back())
     }
 }
 

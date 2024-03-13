@@ -4,13 +4,23 @@ expression: fstring_single_quote_escape_eol(MAC_EOL)
 ---
 [
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: "f",
+                triple_quoted: false,
+                quote_style: Single,
+            },
+        ),
         0..2,
     ),
     (
         FStringMiddle {
             value: "text \\\r more text",
-            is_raw: false,
+            kind: StringKind {
+                prefix: "f",
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         2..19,
     ),

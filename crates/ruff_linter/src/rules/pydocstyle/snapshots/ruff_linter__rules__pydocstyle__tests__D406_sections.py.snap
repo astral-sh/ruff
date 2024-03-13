@@ -61,4 +61,31 @@ sections.py:216:5: D406 [*] Section name should end with a newline ("Raises")
 229 229 | 
 230 230 |     """
 
+sections.py:588:5: D406 [*] Section name should end with a newline ("Parameters")
+    |
+587 |   def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213
+588 |       """Test that lower case subsection header is valid even if it has the same name as section kind.
+    |  _____^
+589 | | 
+590 | |     Parameters:
+591 | |     ----------
+592 | |     parameters:
+593 | |         A list of string parameters
+594 | |     value:
+595 | |         Some value
+596 | |     """
+    | |_______^ D406
+    |
+    = help: Add newline after "Parameters"
+
+ℹ Safe fix
+587 587 | def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213
+588 588 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
+589 589 | 
+590     |-    Parameters:
+    590 |+    Parameters
+591 591 |     ----------
+592 592 |     parameters:
+593 593 |         A list of string parameters
+
 

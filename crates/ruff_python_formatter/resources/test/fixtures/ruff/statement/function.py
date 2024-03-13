@@ -278,6 +278,13 @@ def f42(
 ):
     pass
 
+# Regression test for https://github.com/astral-sh/ruff/issues/10281
+def f43(
+    __bar: str,
+    /,
+    **specifiers: typing.Any,  # noqa: ANN401
+) -> int:
+    return len(specifiers)
 
 # Check trailing commas are permitted in funcdef argument list.
 def f(a, ): pass
@@ -410,3 +417,13 @@ def default_arg_comments2(#
         #
 ):
     print(x)
+
+def function_with_one_argument_and_a_positional_separator(
+    argument: str, /
+) -> ReallyReallyReallyReallyReallyReallyReallyReallyLongName:
+    pass
+
+def function_with_one_argument_and_a_keyword_separator(
+    *, argument: str
+) -> ReallyReallyReallyReallyReallyReallyReallyReallyLongName:
+    pass

@@ -1,0 +1,32 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_skip/reason.py
+---
+## Input
+```python
+# Supported
+x =    1  # fmt: skip
+x =    1  # fmt: skip # reason
+x =    1  # reason # fmt: skip
+
+# Unsupported
+x =    1  # fmt: skip reason
+x =    1  # fmt: skip - reason
+x =    1  # fmt: skip; noqa
+```
+
+## Output
+```python
+# Supported
+x =    1  # fmt: skip
+x =    1  # fmt: skip # reason
+x =    1  # reason # fmt: skip
+
+# Unsupported
+x = 1  # fmt: skip reason
+x = 1  # fmt: skip - reason
+x = 1  # fmt: skip; noqa
+```
+
+
+

@@ -7,13 +7,13 @@ use std::error::Error;
 
 use anyhow::Result;
 use libcst_native::{ImportAlias, Name, NameOrAttribute};
-use ruff_python_ast::{self as ast, PySourceType, Stmt, Suite};
+use ruff_python_ast::{self as ast, PySourceType, Stmt};
 use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};
 use ruff_python_codegen::Stylist;
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{ImportedName, SemanticModel};
 use ruff_python_trivia::textwrap::indent;
 use ruff_source_file::Locator;
 
@@ -26,7 +26,7 @@ mod insertion;
 
 pub(crate) struct Importer<'a> {
     /// The Python AST to which we are adding imports.
-    python_ast: &'a Suite,
+    python_ast: &'a [Stmt],
     /// The [`Locator`] for the Python AST.
     locator: &'a Locator<'a>,
     /// The [`Stylist`] for the Python AST.
@@ -39,7 +39,7 @@ pub(crate) struct Importer<'a> {
 
 impl<'a> Importer<'a> {
     pub(crate) fn new(
-        python_ast: &'a Suite,
+        python_ast: &'a [Stmt],
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
     ) -> Self {
@@ -132,7 +132,48 @@ impl<'a> Importer<'a> {
         )?;
 
         // Import the `TYPE_CHECKING` symbol from the typing module.
-        let (type_checking_edit, type_checking) = self.get_or_import_type_checking(at, semantic)?;
+        let (type_checking_edit, type_checking) =
+            if let Some(type_checking) = Self::find_type_checking(at, semantic)? {
+                // Special-case: if the `TYPE_CHECKING` symbol is imported as part of the same
+                // statement that we're modifying, avoid adding a no-op edit. For example, here,
+                // the `TYPE_CHECKING` no-op edit would overlap with the edit to remove `Final`
+                // from the import:
+                // ```python
+                // from __future__ import annotations
+                //
+                // from typing import Final, TYPE_CHECKING
+                //
+                // Const: Final[dict] = {}
+                // ```
+                let edit = if type_checking.statement(semantic) == import.statement {
+                    None
+                } else {
+                    Some(Edit::range_replacement(
+                        self.locator.slice(type_checking.range()).to_string(),
+                        type_checking.range(),
+                    ))
+                };
+                (edit, type_checking.into_name())
+            } else {
+                // Special-case: if the `TYPE_CHECKING` symbol would be added to the same import
+                // we're modifying, import it as a separate import statement. For example, here,
+                // we're concurrently removing `Final` and adding `TYPE_CHECKING`, so it's easier to
+                // use a separate import statement:
+                // ```python
+                // from __future__ import annotations
+                //
+                // from typing import Final
+                //
+                // Const: Final[dict] = {}
+                // ```
+                let (edit, name) = self.import_symbol(
+                    &ImportRequest::import_from("typing", "TYPE_CHECKING"),
+                    at,
+                    Some(import.statement),
+                    semantic,
+                )?;
+                (Some(edit), name)
+            };
 
         // Add the import to a `TYPE_CHECKING` block.
         let add_import_edit = if let Some(block) = self.preceding_type_checking_block(at) {
@@ -157,28 +198,21 @@ impl<'a> Importer<'a> {
         })
     }
 
-    /// Generate an [`Edit`] to reference `typing.TYPE_CHECKING`. Returns the [`Edit`] necessary to
-    /// make the symbol available in the current scope along with the bound name of the symbol.
-    fn get_or_import_type_checking(
-        &self,
+    /// Find a reference to `typing.TYPE_CHECKING`.
+    fn find_type_checking(
         at: TextSize,
         semantic: &SemanticModel,
-    ) -> Result<(Edit, String), ResolutionError> {
+    ) -> Result<Option<ImportedName>, ResolutionError> {
         for module in semantic.typing_modules() {
-            if let Some((edit, name)) = self.get_symbol(
+            if let Some(imported_name) = Self::find_symbol(
                 &ImportRequest::import_from(module, "TYPE_CHECKING"),
                 at,
                 semantic,
             )? {
-                return Ok((edit, name));
+                return Ok(Some(imported_name));
             }
         }
-
-        self.import_symbol(
-            &ImportRequest::import_from("typing", "TYPE_CHECKING"),
-            at,
-            semantic,
-        )
+        Ok(None)
     }
 
     /// Generate an [`Edit`] to reference the given symbol. Returns the [`Edit`] necessary to make
@@ -192,16 +226,15 @@ impl<'a> Importer<'a> {
         semantic: &SemanticModel,
     ) -> Result<(Edit, String), ResolutionError> {
         self.get_symbol(symbol, at, semantic)?
-            .map_or_else(|| self.import_symbol(symbol, at, semantic), Ok)
+            .map_or_else(|| self.import_symbol(symbol, at, None, semantic), Ok)
     }
 
-    /// Return an [`Edit`] to reference an existing symbol, if it's present in the given [`SemanticModel`].
-    fn get_symbol(
-        &self,
+    /// Return the [`ImportedName`] to for existing symbol, if it's present in the given [`SemanticModel`].
+    fn find_symbol(
         symbol: &ImportRequest,
         at: TextSize,
         semantic: &SemanticModel,
-    ) -> Result<Option<(Edit, String)>, ResolutionError> {
+    ) -> Result<Option<ImportedName>, ResolutionError> {
         // If the symbol is already available in the current scope, use it.
         let Some(imported_name) =
             semantic.resolve_qualified_import_name(symbol.module, symbol.member)
@@ -225,6 +258,21 @@ impl<'a> Importer<'a> {
         if imported_name.context().is_typing() && semantic.execution_context().is_runtime() {
             return Err(ResolutionError::IncompatibleContext);
         }
+
+        Ok(Some(imported_name))
+    }
+
+    /// Return an [`Edit`] to reference an existing symbol, if it's present in the given [`SemanticModel`].
+    fn get_symbol(
+        &self,
+        symbol: &ImportRequest,
+        at: TextSize,
+        semantic: &SemanticModel,
+    ) -> Result<Option<(Edit, String)>, ResolutionError> {
+        // Find the symbol in the current scope.
+        let Some(imported_name) = Self::find_symbol(symbol, at, semantic)? else {
+            return Ok(None);
+        };
 
         // We also add a no-op edit to force conflicts with any other fixes that might try to
         // remove the import. Consider:
@@ -259,9 +307,13 @@ impl<'a> Importer<'a> {
         &self,
         symbol: &ImportRequest,
         at: TextSize,
+        except: Option<&Stmt>,
         semantic: &SemanticModel,
     ) -> Result<(Edit, String), ResolutionError> {
-        if let Some(stmt) = self.find_import_from(symbol.module, at) {
+        if let Some(stmt) = self
+            .find_import_from(symbol.module, at)
+            .filter(|stmt| except != Some(stmt))
+        {
             // Case 1: `from functools import lru_cache` is in scope, and we're trying to reference
             // `functools.cache`; thus, we add `cache` to the import, and return `"cache"` as the
             // bound name.
@@ -423,14 +475,18 @@ impl RuntimeImportEdit {
 #[derive(Debug)]
 pub(crate) struct TypingImportEdit {
     /// The edit to add the `TYPE_CHECKING` symbol to the module.
-    type_checking_edit: Edit,
+    type_checking_edit: Option<Edit>,
     /// The edit to add the import to a `TYPE_CHECKING` block.
     add_import_edit: Edit,
 }
 
 impl TypingImportEdit {
-    pub(crate) fn into_edits(self) -> Vec<Edit> {
-        vec![self.type_checking_edit, self.add_import_edit]
+    pub(crate) fn into_edits(self) -> (Edit, Option<Edit>) {
+        if let Some(type_checking_edit) = self.type_checking_edit {
+            (type_checking_edit, Some(self.add_import_edit))
+        } else {
+            (self.add_import_edit, None)
+        }
     }
 }
 

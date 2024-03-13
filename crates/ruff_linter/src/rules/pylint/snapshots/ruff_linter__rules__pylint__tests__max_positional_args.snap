@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+too_many_positional_params.py:3:5: PLR0917 Too many positional arguments (7/4)
+  |
+1 | # Too many positional arguments (7/4) for max_positional=4
+2 | # OK for dummy_variable_rgx ~ "skip_.*"
+3 | def f(w, x, y, z, skip_t, skip_u, skip_v):
+  |     ^ PLR0917
+4 |     pass
+  |
+
+too_many_positional_params.py:9:5: PLR0917 Too many positional arguments (7/4)
+   |
+ 7 | # Too many positional arguments (7/4) for max_args=4
+ 8 | # Too many positional arguments (7/3) for dummy_variable_rgx ~ "skip_.*"
+ 9 | def f(w, x, y, z, t, u, v):
+   |     ^ PLR0917
+10 |     pass
+   |
+
+

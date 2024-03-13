@@ -9,49 +9,83 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..16,
-                    values: [
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 2..15,
-                                value: Name(
-                                    ExprName {
-                                        range: 3..6,
-                                        id: "foo",
-                                        ctx: Load,
-                                    },
-                                ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: Some(
-                                    FString(
-                                        ExprFString {
-                                            range: 7..14,
-                                            values: [
-                                                FormattedValue(
-                                                    ExprFormattedValue {
-                                                        range: 7..14,
-                                                        value: StringLiteral(
-                                                            ExprStringLiteral {
-                                                                range: 8..13,
-                                                                value: "",
-                                                                unicode: false,
-                                                                implicit_concatenated: true,
-                                                            },
-                                                        ),
-                                                        debug_text: None,
-                                                        conversion: None,
-                                                        format_spec: None,
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 0..16,
+                                    elements: [
+                                        Expression(
+                                            FStringExpressionElement {
+                                                range: 2..15,
+                                                expression: Name(
+                                                    ExprName {
+                                                        range: 3..6,
+                                                        id: "foo",
+                                                        ctx: Load,
                                                     },
                                                 ),
-                                            ],
-                                            implicit_concatenated: false,
-                                        },
-                                    ),
-                                ),
-                            },
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: Some(
+                                                    FStringFormatSpec {
+                                                        range: 7..14,
+                                                        elements: [
+                                                            Expression(
+                                                                FStringExpressionElement {
+                                                                    range: 7..14,
+                                                                    expression: StringLiteral(
+                                                                        ExprStringLiteral {
+                                                                            range: 8..13,
+                                                                            value: StringLiteralValue {
+                                                                                inner: Concatenated(
+                                                                                    ConcatenatedStringLiteral {
+                                                                                        strings: [
+                                                                                            StringLiteral {
+                                                                                                range: 8..10,
+                                                                                                value: "",
+                                                                                                flags: StringLiteralFlags {
+                                                                                                    quote_style: Single,
+                                                                                                    prefix: "",
+                                                                                                    triple_quoted: false,
+                                                                                                },
+                                                                                            },
+                                                                                            StringLiteral {
+                                                                                                range: 11..13,
+                                                                                                value: "",
+                                                                                                flags: StringLiteralFlags {
+                                                                                                    quote_style: Single,
+                                                                                                    prefix: "",
+                                                                                                    triple_quoted: false,
+                                                                                                },
+                                                                                            },
+                                                                                        ],
+                                                                                        value: "",
+                                                                                    },
+                                                                                ),
+                                                                            },
+                                                                        },
+                                                                    ),
+                                                                    debug_text: None,
+                                                                    conversion: None,
+                                                                    format_spec: None,
+                                                                },
+                                                            ),
+                                                        ],
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    flags: FStringFlags {
+                                        quote_style: Double,
+                                        raw: false,
+                                        triple_quoted: false,
+                                    },
+                                },
+                            ),
                         ),
-                    ],
-                    implicit_concatenated: false,
+                    },
                 },
             ),
         },

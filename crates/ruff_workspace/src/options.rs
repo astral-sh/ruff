@@ -8,12 +8,14 @@ use strum::IntoEnumIterator;
 
 use ruff_formatter::IndentStyle;
 use ruff_linter::line_width::{IndentWidth, LineLength};
+use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
 use ruff_linter::rules::isort::settings::RelativeImportsOrder;
 use ruff_linter::rules::isort::{ImportSection, ImportType};
+use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
 use ruff_linter::rules::pydocstyle::settings::Convention;
 use ruff_linter::rules::pylint::settings::ConstantType;
 use ruff_linter::rules::{
@@ -23,15 +25,16 @@ use ruff_linter::rules::{
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, PythonVersion, SerializationFormat, Version,
+    IdentifierPattern, PythonVersion, RequiredVersion, SerializationFormat,
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
-use ruff_python_formatter::QuoteStyle;
+use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 
+use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 
-#[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
@@ -71,14 +74,14 @@ pub struct Options {
     )]
     pub extend: Option<String>,
 
-    /// The style in which violation messages should be formatted: `"text"`
-    /// (default), `"grouped"` (group messages by file), `"json"`
+    /// The style in which violation messages should be formatted: `"full"`
+    /// (shows source),`"concise"` (default), `"grouped"` (group messages by file), `"json"`
     /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
     /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
     /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
     #[option(
-        default = r#""text""#,
-        value_type = r#""text" | "json" | "junit" | "github" | "gitlab" | "pylint" | "azure""#,
+        default = r#""concise""#,
+        value_type = r#""full" | "concise" | "grouped" | "json" | "junit" | "github" | "gitlab" | "pylint" | "azure""#,
         example = r#"
             # Group violations by containing file.
             output-format = "grouped"
@@ -93,8 +96,10 @@ pub struct Options {
     pub fix: Option<bool>,
 
     /// Enable application of unsafe fixes.
+    /// If excluded, a hint will be displayed when unsafe fixes are available.
+    /// If set to false, the hint will be hidden.
     #[option(
-        default = "false",
+        default = r#"null"#,
         value_type = "bool",
         example = "unsafe-fixes = true"
     )]
@@ -114,6 +119,9 @@ pub struct Options {
             show-source = true
         "#
     )]
+    #[deprecated(
+        note = "`show-source` is deprecated and is now part of `output-format` in the form of `full` or `concise` options. Please update your configuration."
+    )]
     pub show_source: Option<bool>,
 
     /// Whether to show an enumeration of all fixed lint violations
@@ -128,17 +136,22 @@ pub struct Options {
     )]
     pub show_fixes: Option<bool>,
 
-    /// Require a specific version of Ruff to be running (useful for unifying
-    /// results across many environments, e.g., with a `pyproject.toml`
-    /// file).
+    /// Enforce a requirement on the version of Ruff, to enforce at runtime.
+    /// If the version of Ruff does not meet the requirement, Ruff will exit
+    /// with an error.
+    ///
+    /// Useful for unifying results across many environments, e.g., with a
+    /// `pyproject.toml` file.
+    ///
+    /// Accepts a PEP 440 specifier, like `==0.3.1` or `>=0.3.1`.
     #[option(
         default = "null",
         value_type = "str",
         example = r#"
-            required-version = "0.0.193"
+            required-version = ">=0.0.193"
         "#
     )]
-    pub required_version: Option<Version>,
+    pub required_version: Option<RequiredVersion>,
 
     /// Whether to enable preview mode. When preview mode is enabled, Ruff will
     /// use unstable rules, fixes, and formatting.
@@ -170,7 +183,7 @@ pub struct Options {
     /// Note that you'll typically want to use
     /// [`extend-exclude`](#extend-exclude) to modify the excluded paths.
     #[option(
-        default = r#"[".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]"#,
+        default = r#"[".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "dist", "node_modules", "venv"]"#,
         value_type = "list[str]",
         example = r#"
             exclude = [".venv"]
@@ -371,7 +384,7 @@ pub struct Options {
     /// within the `line-length`, it isn't a hard upper bound, and formatted lines may
     /// exceed the `line-length`.
     ///
-    /// See [`pycodestyle.max-line-length`](#pycodestyle-max-line-length) to configure different lengths for `E501` and the formatter.
+    /// See [`pycodestyle.max-line-length`](#lint_pycodestyle_max-line-length) to configure different lengths for `E501` and the formatter.
     #[option(
         default = "88",
         value_type = "int",
@@ -418,23 +431,23 @@ pub struct Options {
     )]
     pub tab_size: Option<IndentWidth>,
 
+    #[option_group]
     pub lint: Option<LintOptions>,
 
     /// The lint sections specified at the top level.
     #[serde(flatten)]
-    pub lint_top_level: LintCommonOptions,
+    pub lint_top_level: DeprecatedTopLevelLintOptions,
 
     /// Options to configure code formatting.
     #[option_group]
     pub format: Option<FormatOptions>,
 }
 
-/// Experimental section to configure Ruff's linting. This new section will eventually
-/// replace the top-level linting options.
+/// Configures how ruff checks your code.
 ///
-/// Options specified in the `lint` section take precedence over the top-level settings.
+/// Options specified in the `lint` section take precedence over the deprecated top-level settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct LintOptions {
     #[serde(flatten)]
@@ -475,15 +488,67 @@ pub struct LintOptions {
     pub preview: Option<bool>,
 }
 
+/// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
+#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct DeprecatedTopLevelLintOptions(pub LintCommonOptions);
+
+impl OptionsMetadata for DeprecatedTopLevelLintOptions {
+    fn record(_visit: &mut dyn Visit) {
+        // Intentionally empty. Omit all fields from the documentation and instead promote the options under the `lint.` section.
+        // This doesn't create an empty 'common' option  because the field in the `Options` struct is marked with `#[serde(flatten)]`.
+        // Meaning, the code here flattens no-properties into the parent, which is what we want.
+    }
+}
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
+    fn schema_name() -> std::string::String {
+        "DeprecatedTopLevelLintOptions".to_owned()
+    }
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed(std::concat!(
+            std::module_path!(),
+            "::",
+            "DeprecatedTopLevelLintOptions"
+        ))
+    }
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        use schemars::schema::Schema;
+
+        let common_schema = LintCommonOptions::json_schema(gen);
+        let mut schema_obj = common_schema.into_object();
+
+        if let Some(object) = schema_obj.object.as_mut() {
+            for property in object.properties.values_mut() {
+                if let Schema::Object(property_object) = property {
+                    if let Some(metadata) = &mut property_object.metadata {
+                        metadata.deprecated = true;
+                    } else {
+                        property_object.metadata = Some(Box::new(schemars::schema::Metadata {
+                            deprecated: true,
+                            ..schemars::schema::Metadata::default()
+                        }));
+                    }
+                }
+            }
+        }
+
+        Schema::Object(schema_obj)
+    }
+}
+
 // Note: This struct should be inlined into [`LintOptions`] once support for the top-level lint settings
 // is removed.
-
+// Don't add any new options to this struct. Add them to [`LintOptions`] directly to avoid exposing them in the
+// global settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(
-    Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
+    Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct LintCommonOptions {
+    // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
     /// A list of allowed "confusable" Unicode characters to ignore when
     /// enforcing `RUF001`, `RUF002`, and `RUF003`.
     #[option(
@@ -732,6 +797,7 @@ pub struct LintCommonOptions {
     )]
     pub unfixable: Option<Vec<RuleSelector>>,
 
+    // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
     /// Options for the `flake8-annotations` plugin.
     #[option_group]
     pub flake8_annotations: Option<Flake8AnnotationsOptions>,
@@ -828,15 +894,17 @@ pub struct LintCommonOptions {
     #[option_group]
     pub pyupgrade: Option<PyUpgradeOptions>,
 
+    // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
+
     // Tables are required to go last.
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, when considering any matching files.
     #[option(
         default = "{}",
         value_type = "dict[str, list[RuleSelector]]",
+        scope = "per-file-ignores",
         example = r#"
             # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
-            [tool.ruff.lint.per-file-ignores]
             "__init__.py" = ["E402"]
             "path/to/file.py" = ["E402"]
         "#
@@ -848,18 +916,19 @@ pub struct LintCommonOptions {
     #[option(
         default = "{}",
         value_type = "dict[str, list[RuleSelector]]",
+        scope = "extend-per-file-ignores",
         example = r#"
             # Also ignore `E402` in all `__init__.py` files.
-            [tool.ruff.lint.extend-per-file-ignores]
             "__init__.py" = ["E402"]
         "#
     )]
     pub extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
 }
 
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(
-    Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
+    Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Flake8AnnotationsOptions {
@@ -927,7 +996,7 @@ impl Flake8AnnotationsOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -975,7 +1044,7 @@ impl Flake8BanditOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1005,7 +1074,7 @@ impl Flake8BugbearOptions {
     }
 }
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1027,7 +1096,7 @@ impl Flake8BuiltinsOptions {
     }
 }
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1052,7 +1121,7 @@ impl Flake8ComprehensionsOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1060,14 +1129,14 @@ pub struct Flake8CopyrightOptions {
     /// The regular expression used to match the copyright notice, compiled
     /// with the [`regex`](https://docs.rs/regex/latest/regex/) crate.
     ///
-    /// Defaults to `(?i)Copyright\s+(\(C\)\s+)?\d{4}(-\d{4})*`, which matches
+    /// Defaults to `(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}(-\d{4})*`, which matches
     /// the following:
     /// - `Copyright 2023`
     /// - `Copyright (C) 2023`
     /// - `Copyright 2021-2023`
     /// - `Copyright (C) 2021-2023`
     #[option(
-        default = r#"(?i)Copyright\s+(\(C\)\s+)?\d{4}([-,]\d{4})*"#,
+        default = r#"(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}([-,]\d{4})*"#,
         value_type = "str",
         example = r#"notice-rgx = "(?i)Copyright \\(C\\) \\d{4}""#
     )]
@@ -1106,7 +1175,7 @@ impl Flake8CopyrightOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1125,7 +1194,7 @@ impl Flake8ErrMsgOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1162,7 +1231,7 @@ impl Flake8GetTextOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1195,7 +1264,7 @@ impl Flake8ImplicitStrConcatOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1205,8 +1274,8 @@ pub struct Flake8ImportConventionsOptions {
     #[option(
         default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa"}"#,
         value_type = "dict[str, str]",
+        scope = "aliases",
         example = r#"
-            [tool.ruff.lint.flake8-import-conventions.aliases]
             # Declare the default aliases.
             altair = "alt"
             "matplotlib.pyplot" = "plt"
@@ -1223,8 +1292,8 @@ pub struct Flake8ImportConventionsOptions {
     #[option(
         default = r#"{}"#,
         value_type = "dict[str, str]",
+        scope = "extend-aliases",
         example = r#"
-            [tool.ruff.lint.flake8-import-conventions.extend-aliases]
             # Declare a custom alias for the `matplotlib` module.
             "dask.dataframe" = "dd"
         "#
@@ -1235,13 +1304,13 @@ pub struct Flake8ImportConventionsOptions {
     #[option(
         default = r#"{}"#,
         value_type = "dict[str, list[str]]",
+        scope = "banned-aliases",
         example = r#"
-            [tool.ruff.lint.flake8-import-conventions.banned-aliases]
             # Declare the banned aliases.
             "tensorflow.keras.backend" = ["K"]
     "#
     )]
-    pub banned_aliases: Option<FxHashMap<String, Vec<String>>>,
+    pub banned_aliases: Option<FxHashMap<String, BannedAliases>>,
 
     /// A list of modules that should not be imported from using the
     /// `from ... import ...` syntax.
@@ -1277,7 +1346,7 @@ impl Flake8ImportConventionsOptions {
     }
 }
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1413,7 +1482,7 @@ impl Flake8PytestStyleOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1485,7 +1554,7 @@ impl Flake8QuotesOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1525,7 +1594,7 @@ impl Flake8SelfOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1548,8 +1617,8 @@ pub struct Flake8TidyImportsOptions {
     #[option(
         default = r#"{}"#,
         value_type = r#"dict[str, { "msg": str }]"#,
+        scope = "banned-api",
         example = r#"
-            [tool.ruff.lint.flake8-tidy-imports.banned-api]
             "cgi".msg = "The cgi module is deprecated, see https://peps.python.org/pep-0594/#cgi."
             "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
         "#
@@ -1582,7 +1651,7 @@ impl Flake8TidyImportsOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1630,16 +1699,70 @@ pub struct Flake8TypeCheckingOptions {
     )]
     pub runtime_evaluated_base_classes: Option<Vec<String>>,
 
-    /// Exempt classes decorated with any of the enumerated decorators from
-    /// needing to be moved into type-checking blocks.
+    /// Exempt classes and functions decorated with any of the enumerated
+    /// decorators from being moved into type-checking blocks.
+    ///
+    /// Common examples include Pydantic's `@pydantic.validate_call` decorator
+    /// (for functions) and attrs' `@attrs.define` decorator (for classes).
     #[option(
         default = "[]",
         value_type = "list[str]",
         example = r#"
-            runtime-evaluated-decorators = ["attrs.define", "attrs.frozen"]
+            runtime-evaluated-decorators = ["pydantic.validate_call", "attrs.define"]
         "#
     )]
     pub runtime_evaluated_decorators: Option<Vec<String>>,
+
+    /// Whether to add quotes around type annotations, if doing so would allow
+    /// the corresponding import to be moved into a type-checking block.
+    ///
+    /// For example, in the following, Python requires that `Sequence` be
+    /// available at runtime, despite the fact that it's only used in a type
+    /// annotation:
+    ///
+    /// ```python
+    /// from collections.abc import Sequence
+    ///
+    ///
+    /// def func(value: Sequence[int]) -> None:
+    ///     ...
+    /// ```
+    ///
+    /// In other words, moving `from collections.abc import Sequence` into an
+    /// `if TYPE_CHECKING:` block above would cause a runtime error, as the
+    /// type would no longer be available at runtime.
+    ///
+    /// By default, Ruff will respect such runtime semantics and avoid moving
+    /// the import to prevent such runtime errors.
+    ///
+    /// Setting `quote-annotations` to `true` will instruct Ruff to add quotes
+    /// around the annotation (e.g., `"Sequence[int]"`), which in turn enables
+    /// Ruff to move the import into an `if TYPE_CHECKING:` block, like so:
+    ///
+    /// ```python
+    /// from typing import TYPE_CHECKING
+    ///
+    /// if TYPE_CHECKING:
+    ///     from collections.abc import Sequence
+    ///
+    ///
+    /// def func(value: "Sequence[int]") -> None:
+    ///     ...
+    /// ```
+    ///
+    /// Note that this setting has no effect when `from __future__ import annotations`
+    /// is present, as `__future__` annotations are always treated equivalently
+    /// to quoted annotations.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Add quotes around type annotations, if doing so would allow
+            # an import to be moved into a type-checking block.
+            quote-annotations = true
+        "#
+    )]
+    pub quote_annotations: Option<bool>,
 }
 
 impl Flake8TypeCheckingOptions {
@@ -1649,14 +1772,15 @@ impl Flake8TypeCheckingOptions {
             exempt_modules: self
                 .exempt_modules
                 .unwrap_or_else(|| vec!["typing".to_string()]),
-            runtime_evaluated_base_classes: self.runtime_evaluated_base_classes.unwrap_or_default(),
-            runtime_evaluated_decorators: self.runtime_evaluated_decorators.unwrap_or_default(),
+            runtime_required_base_classes: self.runtime_evaluated_base_classes.unwrap_or_default(),
+            runtime_required_decorators: self.runtime_evaluated_decorators.unwrap_or_default(),
+            quote_annotations: self.quote_annotations.unwrap_or_default(),
         }
     }
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1679,7 +1803,7 @@ impl Flake8UnusedArgumentsOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1931,6 +2055,9 @@ pub struct IsortOptions {
     /// The number of blank lines to place after imports.
     /// Use `-1` for automatic determination.
     ///
+    /// Ruff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to
+    /// the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)).
+    ///
     /// When using the formatter, only the values `-1`, `1`, and `2` are compatible because
     /// it enforces at least one empty and at most two empty lines after imports.
     #[option(
@@ -1978,6 +2105,43 @@ pub struct IsortOptions {
     )]
     pub section_order: Option<Vec<ImportSection>>,
 
+    /// Define a default section for any imports that don't fit into the specified `section-order`.
+    #[option(
+        default = r#"third-party"#,
+        value_type = "str",
+        example = r#"
+            default-section = "third-party"
+        "#
+    )]
+    pub default_section: Option<ImportSection>,
+
+    /// Put all imports into the same section bucket.
+    ///
+    /// For example, rather than separating standard library and third-party imports, as in:
+    /// ```python
+    /// import os
+    /// import sys
+    ///
+    /// import numpy
+    /// import pandas
+    /// ```
+    ///
+    /// Setting `no-sections = true` will instead group all imports into a single section:
+    /// ```python
+    /// import os
+    /// import numpy
+    /// import pandas
+    /// import sys
+    /// ```
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            no-sections = true
+        "#
+    )]
+    pub no_sections: Option<bool>,
+
     /// Whether to automatically mark imports from within the same package as first-party.
     /// For example, when `detect-same-package = true`, then when analyzing files within the
     /// `foo` package, any imports from within the `foo` package will be considered first-party.
@@ -1994,15 +2158,75 @@ pub struct IsortOptions {
     )]
     pub detect_same_package: Option<bool>,
 
+    /// Whether to place `import from` imports before straight imports when sorting.
+    ///
+    /// For example, by default, imports will be sorted such that straight imports appear
+    /// before `import from` imports, as in:
+    /// ```python
+    /// import os
+    /// import sys
+    /// from typing import List
+    /// ```
+    ///
+    /// Setting `from-first = true` will instead sort such that `import from` imports appear
+    /// before straight imports, as in:
+    /// ```python
+    /// from typing import List
+    /// import os
+    /// import sys
+    /// ```
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            from-first = true
+        "#
+    )]
+    pub from_first: Option<bool>,
+
+    /// Sort imports by their string length, such that shorter imports appear
+    /// before longer imports. For example, by default, imports will be sorted
+    /// alphabetically, as in:
+    /// ```python
+    /// import collections
+    /// import os
+    /// ```
+    ///
+    /// Setting `length-sort = true` will instead sort such that shorter imports
+    /// appear before longer imports, as in:
+    /// ```python
+    /// import os
+    /// import collections
+    /// ```
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            length-sort = true
+        "#
+    )]
+    pub length_sort: Option<bool>,
+
+    /// Sort straight imports by their string length. Similar to `length-sort`,
+    /// but applies only to straight imports and doesn't affect `from` imports.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            length-sort-straight = true
+        "#
+    )]
+    pub length_sort_straight: Option<bool>,
+
     // Tables are required to go last.
     /// A list of mappings from section names to modules.
     /// By default custom sections are output last, but this can be overridden with `section-order`.
     #[option(
         default = "{}",
         value_type = "dict[str, list[str]]",
+        scope = "sections",
         example = r#"
             # Group all Django imports into a separate section.
-            [tool.ruff.lint.isort.sections]
             "django" = ["django"]
         "#
     )]
@@ -2013,10 +2237,33 @@ impl IsortOptions {
     pub fn try_into_settings(
         self,
     ) -> Result<isort::settings::Settings, isort::settings::SettingsError> {
+        // Verify that if `no_sections` is set, then `section_order` is empty.
+        let no_sections = self.no_sections.unwrap_or_default();
+        if no_sections && self.section_order.is_some() {
+            warn_user_once!("`section-order` is ignored when `no-sections` is set to `true`");
+        }
+        if no_sections && self.default_section.is_some() {
+            warn_user_once!("`default-section` is ignored when `no-sections` is set to `true`");
+        }
+        if no_sections && self.sections.is_some() {
+            warn_user_once!("`sections` is ignored when `no-sections` is set to `true`");
+        }
+
+        // Verify that if `force_sort_within_sections` is `True`, then `lines_between_types` is set to `0`.
+        let force_sort_within_sections = self.force_sort_within_sections.unwrap_or_default();
+        let lines_between_types = self.lines_between_types.unwrap_or_default();
+        if force_sort_within_sections && lines_between_types != 0 {
+            warn_user_once!("`lines-between-types` is ignored when `force-sort-within-sections` is set to `true`");
+        }
+
         // Extract any configuration options that deal with user-defined sections.
         let mut section_order: Vec<_> = self
             .section_order
             .unwrap_or_else(|| ImportType::iter().map(ImportSection::Known).collect());
+        let default_section = self
+            .default_section
+            .unwrap_or(ImportSection::Known(ImportType::ThirdParty));
+
         let known_first_party = self
             .known_first_party
             .map(|names| {
@@ -2062,6 +2309,7 @@ impl IsortOptions {
             .map_err(isort::settings::SettingsError::InvalidExtraStandardLibrary)?
             .unwrap_or_default();
         let no_lines_before = self.no_lines_before.unwrap_or_default();
+        let from_first = self.from_first.unwrap_or_default();
         let sections = self.sections.unwrap_or_default();
 
         // Verify that `sections` doesn't contain any built-in sections.
@@ -2119,35 +2367,24 @@ impl IsortOptions {
             }
         }
 
-        // Add all built-in sections to `section_order`, if not already present.
-        for section in ImportType::iter().map(ImportSection::Known) {
-            if !section_order.contains(&section) {
-                warn_user_once!(
-                    "`section-order` is missing built-in section: `{:?}`",
-                    section
-                );
-                section_order.push(section);
-            }
-        }
-
-        // Add all user-defined sections to `section-order`, if not already present.
-        for section_name in sections.keys() {
-            let section = ImportSection::UserDefined(section_name.clone());
-            if !section_order.contains(&section) {
-                warn_user_once!("`section-order` is missing section: `{:?}`", section);
-                section_order.push(section);
-            }
+        // Verify that `default_section` is in `section_order`.
+        if !section_order.contains(&default_section) {
+            warn_user_once!(
+                "`section-order` must contain `default-section`: {:?}",
+                default_section,
+            );
+            section_order.push(default_section.clone());
         }
 
         Ok(isort::settings::Settings {
             required_imports: BTreeSet::from_iter(self.required_imports.unwrap_or_default()),
             combine_as_imports: self.combine_as_imports.unwrap_or(false),
             force_single_line: self.force_single_line.unwrap_or(false),
-            force_sort_within_sections: self.force_sort_within_sections.unwrap_or(false),
+            force_sort_within_sections,
             case_sensitive: self.case_sensitive.unwrap_or(false),
             force_wrap_aliases: self.force_wrap_aliases.unwrap_or(false),
             detect_same_package: self.detect_same_package.unwrap_or(true),
-            force_to_top: BTreeSet::from_iter(self.force_to_top.unwrap_or_default()),
+            force_to_top: FxHashSet::from_iter(self.force_to_top.unwrap_or_default()),
             known_modules: isort::categorize::KnownModules::new(
                 known_first_party,
                 known_third_party,
@@ -2157,24 +2394,29 @@ impl IsortOptions {
             ),
             order_by_type: self.order_by_type.unwrap_or(true),
             relative_imports_order: self.relative_imports_order.unwrap_or_default(),
-            single_line_exclusions: BTreeSet::from_iter(
+            single_line_exclusions: FxHashSet::from_iter(
                 self.single_line_exclusions.unwrap_or_default(),
             ),
             split_on_trailing_comma: self.split_on_trailing_comma.unwrap_or(true),
-            classes: BTreeSet::from_iter(self.classes.unwrap_or_default()),
-            constants: BTreeSet::from_iter(self.constants.unwrap_or_default()),
-            variables: BTreeSet::from_iter(self.variables.unwrap_or_default()),
-            no_lines_before: BTreeSet::from_iter(no_lines_before),
+            classes: FxHashSet::from_iter(self.classes.unwrap_or_default()),
+            constants: FxHashSet::from_iter(self.constants.unwrap_or_default()),
+            variables: FxHashSet::from_iter(self.variables.unwrap_or_default()),
+            no_lines_before: FxHashSet::from_iter(no_lines_before),
             lines_after_imports: self.lines_after_imports.unwrap_or(-1),
-            lines_between_types: self.lines_between_types.unwrap_or_default(),
+            lines_between_types,
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),
             section_order,
+            default_section,
+            no_sections,
+            from_first,
+            length_sort: self.length_sort.unwrap_or(false),
+            length_sort_straight: self.length_sort_straight.unwrap_or(false),
         })
     }
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2202,7 +2444,7 @@ impl McCabeOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2286,16 +2528,7 @@ impl Pep8NamingOptions {
         self,
     ) -> Result<pep8_naming::settings::Settings, pep8_naming::settings::SettingsError> {
         Ok(pep8_naming::settings::Settings {
-            ignore_names: self
-                .ignore_names
-                .unwrap_or_else(pep8_naming::settings::default_ignore_names)
-                .into_iter()
-                .chain(self.extend_ignore_names.unwrap_or_default())
-                .map(|name| {
-                    IdentifierPattern::new(&name)
-                        .map_err(pep8_naming::settings::SettingsError::InvalidIgnoreName)
-                })
-                .collect::<Result<Vec<_>, pep8_naming::settings::SettingsError>>()?,
+            ignore_names: IgnoreNames::from_options(self.ignore_names, self.extend_ignore_names)?,
             classmethod_decorators: self.classmethod_decorators.unwrap_or_default(),
             staticmethod_decorators: self.staticmethod_decorators.unwrap_or_default(),
         })
@@ -2303,7 +2536,7 @@ impl Pep8NamingOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2375,7 +2608,7 @@ impl PycodestyleOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2383,10 +2616,10 @@ pub struct PydocstyleOptions {
     /// Whether to use Google-style or NumPy-style conventions or the [PEP 257](https://peps.python.org/pep-0257/)
     /// defaults when analyzing docstring sections.
     ///
-    /// Enabling a convention will force-disable any rules that are not
-    /// included in the specified convention. As such, the intended use is
-    /// to enable a convention and then selectively disable any additional
-    /// rules on top of it.
+    /// Enabling a convention will disable all rules that are not included in
+    /// the specified convention. As such, the intended workflow is to enable a
+    /// convention and then selectively enable or disable any additional rules
+    /// on top of it.
     ///
     /// For example, to use Google-style conventions but avoid requiring
     /// documentation for every function parameter:
@@ -2405,9 +2638,9 @@ pub struct PydocstyleOptions {
     /// convention = "google"
     /// ```
     ///
-    /// To modify a convention (i.e., to enable an additional rule that's excluded
-    /// from the convention by default), select the desired rule via its fully
-    /// qualified rule code (e.g., `D400` instead of `D4` or `D40`):
+    /// To enable an additional rule that's excluded from the convention,
+    /// select the desired rule via its fully qualified rule code (e.g.,
+    /// `D400` instead of `D4` or `D40`):
     ///
     /// ```toml
     /// [tool.ruff.lint]
@@ -2465,7 +2698,7 @@ impl PydocstyleOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2493,7 +2726,7 @@ impl PyflakesOptions {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2507,6 +2740,17 @@ pub struct PylintOptions {
         "#
     )]
     pub allow_magic_value_types: Option<Vec<ConstantType>>,
+
+    /// Dunder methods name to allow, in addition to the default set from the
+    /// Python standard library (see: `PLW3201`).
+    #[option(
+        default = r#"[]"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            allow-dunder-method-names = ["__tablename__", "__table_args__"]
+        "#
+    )]
+    pub allow_dunder_method_names: Option<FxHashSet<String>>,
 
     /// Maximum number of branches allowed for a function or method body (see:
     /// `PLR0912`).
@@ -2522,6 +2766,22 @@ pub struct PylintOptions {
     /// (see: `PLR0913`).
     #[option(default = r"5", value_type = "int", example = r"max-args = 5")]
     pub max_args: Option<usize>,
+
+    /// Maximum number of positional arguments allowed for a function or method definition
+    /// (see: `PLR0917`).
+    ///
+    /// If not specified, defaults to the value of `max-args`.
+    #[option(
+        default = r"5", // Needs to be in sync with default of `max-args`.
+        value_type = "int",
+        example = r"max-positional-args = 3"
+    )]
+    pub max_positional_args: Option<usize>,
+
+    /// Maximum number of local variables allowed for a function or method body (see:
+    /// `PLR0914`).
+    #[option(default = r"15", value_type = "int", example = r"max-locals = 15")]
+    pub max_locals: Option<usize>,
 
     /// Maximum number of statements allowed for a function or method body (see:
     /// `PLR0915`).
@@ -2540,6 +2800,11 @@ pub struct PylintOptions {
     /// (see: `PLR0916`).
     #[option(default = r"5", value_type = "int", example = r"max-bool-expr = 5")]
     pub max_bool_expr: Option<usize>,
+
+    /// Maximum number of nested blocks allowed within a function or method body
+    /// (see: `PLR1702`).
+    #[option(default = r"5", value_type = "int", example = r"max-nested-blocks = 5")]
+    pub max_nested_blocks: Option<usize>,
 }
 
 impl PylintOptions {
@@ -2549,7 +2814,12 @@ impl PylintOptions {
             allow_magic_value_types: self
                 .allow_magic_value_types
                 .unwrap_or(defaults.allow_magic_value_types),
+            allow_dunder_method_names: self.allow_dunder_method_names.unwrap_or_default(),
             max_args: self.max_args.unwrap_or(defaults.max_args),
+            max_positional_args: self
+                .max_positional_args
+                .or(self.max_args)
+                .unwrap_or(defaults.max_positional_args),
             max_bool_expr: self.max_bool_expr.unwrap_or(defaults.max_bool_expr),
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),
             max_branches: self.max_branches.unwrap_or(defaults.max_branches),
@@ -2557,12 +2827,14 @@ impl PylintOptions {
             max_public_methods: self
                 .max_public_methods
                 .unwrap_or(defaults.max_public_methods),
+            max_locals: self.max_locals.unwrap_or(defaults.max_locals),
+            max_nested_blocks: self.max_nested_blocks.unwrap_or(defaults.max_nested_blocks),
         }
     }
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2616,11 +2888,9 @@ impl PyUpgradeOptions {
     }
 }
 
-/// Experimental: Configures how `ruff format` formats your code.
-///
-/// Please provide feedback in [this discussion](https://github.com/astral-sh/ruff/discussions/7310).
+/// Configures the way ruff formats your code.
 #[derive(
-    Debug, PartialEq, Eq, Default, Deserialize, Serialize, OptionsMetadata, CombineOptions,
+    Clone, Debug, PartialEq, Eq, Default, Deserialize, Serialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2688,26 +2958,31 @@ pub struct FormatOptions {
     )]
     pub indent_style: Option<IndentStyle>,
 
-    /// Whether to prefer single `'` or double `"` quotes for strings. Defaults to double quotes.
+    /// Configures the preferred quote character for strings. The recommended options are
+    /// * `double` (default): Use double quotes `"`
+    /// * `single`: Use single quotes `'`
     ///
     /// In compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/),
-    /// Ruff prefers double quotes for multiline strings and docstrings, regardless of the
-    /// configured quote style.
+    /// Ruff prefers double quotes for triple quoted strings and docstrings even when using `quote-style = "single"`.
     ///
-    /// Ruff may also deviate from this option if using the configured quotes would require
-    /// escaping quote characters within the string. For example, given:
+    /// Ruff deviates from using the configured quotes if doing so prevents the need for
+    /// escaping quote characters inside the string:
     ///
     /// ```python
     /// a = "a string without any quotes"
     /// b = "It's monday morning"
     /// ```
     ///
-    /// Ruff will change `a` to use single quotes when using `quote-style = "single"`. However,
-    /// `b` will be unchanged, as converting to single quotes would require the inner `'` to be
-    /// escaped, which leads to less readable code: `'It\'s monday morning'`.
+    /// Ruff will change the quotes of the string assigned to `a` to single quotes when using `quote-style = "single"`.
+    /// However, ruff uses double quotes for he string assigned to `b` because using single quotes would require escaping the `'`,
+    /// which leads to the less readable code: `'It\'s monday morning'`.
+    ///
+    /// In addition, Ruff supports the quote style `preserve` for projects that already use
+    /// a mixture of single and double quotes and can't migrate to the `double` or `single` style.
+    /// The quote style `preserve` leaves the quotes of all strings unchanged.
     #[option(
         default = r#"double"#,
-        value_type = r#""double" | "single""#,
+        value_type = r#""double" | "single" | "preserve""#,
         example = r#"
             # Prefer single quotes over double quotes.
             quote-style = "single"
@@ -2758,6 +3033,156 @@ pub struct FormatOptions {
         "#
     )]
     pub line_ending: Option<LineEnding>,
+
+    /// Whether to format code snippets in docstrings.
+    ///
+    /// When this is enabled, Python code examples within docstrings are
+    /// automatically reformatted.
+    ///
+    /// For example, when this is enabled, the following code:
+    ///
+    /// ```python
+    /// def f(x):
+    ///     """
+    ///     Something about `f`. And an example in doctest format:
+    ///
+    ///     >>> f(  x  )
+    ///
+    ///     Markdown is also supported:
+    ///
+    ///     ```py
+    ///     f(  x  )
+    ///     ```
+    ///
+    ///     As are reStructuredText literal blocks::
+    ///
+    ///         f(  x  )
+    ///
+    ///
+    ///     And reStructuredText code blocks:
+    ///
+    ///     .. code-block:: python
+    ///
+    ///         f(  x  )
+    ///     """
+    ///     pass
+    /// ```
+    ///
+    /// ... will be reformatted (assuming the rest of the options are set to
+    /// their defaults) as:
+    ///
+    /// ```python
+    /// def f(x):
+    ///     """
+    ///     Something about `f`. And an example in doctest format:
+    ///
+    ///     >>> f(x)
+    ///
+    ///     Markdown is also supported:
+    ///
+    ///     ```py
+    ///     f(x)
+    ///     ```
+    ///
+    ///     As are reStructuredText literal blocks::
+    ///
+    ///         f(x)
+    ///
+    ///
+    ///     And reStructuredText code blocks:
+    ///
+    ///     .. code-block:: python
+    ///
+    ///         f(x)
+    ///     """
+    ///     pass
+    /// ```
+    ///
+    /// If a code snippet in a docstring contains invalid Python code or if the
+    /// formatter would otherwise write invalid Python code, then the code
+    /// example is ignored by the formatter and kept as-is.
+    ///
+    /// Currently, doctest, Markdown, reStructuredText literal blocks, and
+    /// reStructuredText code blocks are all supported and automatically
+    /// recognized. In the case of unlabeled fenced code blocks in Markdown and
+    /// reStructuredText literal blocks, the contents are assumed to be Python
+    /// and reformatted. As with any other format, if the contents aren't valid
+    /// Python, then the block is left untouched automatically.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable reformatting of code snippets in docstrings.
+            docstring-code-format = true
+        "#
+    )]
+    pub docstring_code_format: Option<bool>,
+
+    /// Set the line length used when formatting code snippets in docstrings.
+    ///
+    /// This only has an effect when the `docstring-code-format` setting is
+    /// enabled.
+    ///
+    /// The default value for this setting is `"dynamic"`, which has the effect
+    /// of ensuring that any reformatted code examples in docstrings adhere to
+    /// the global line length configuration that is used for the surrounding
+    /// Python code. The point of this setting is that it takes the indentation
+    /// of the docstring into account when reformatting code examples.
+    ///
+    /// Alternatively, this can be set to a fixed integer, which will result
+    /// in the same line length limit being applied to all reformatted code
+    /// examples in docstrings. When set to a fixed integer, the indent of the
+    /// docstring is not taken into account. That is, this may result in lines
+    /// in the reformatted code example that exceed the globally configured
+    /// line length limit.
+    ///
+    /// For example, when this is set to `20` and `docstring-code-format` is
+    /// enabled, then this code:
+    ///
+    /// ```python
+    /// def f(x):
+    ///     '''
+    ///     Something about `f`. And an example:
+    ///
+    ///     .. code-block:: python
+    ///
+    ///         foo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear)
+    ///     '''
+    ///     pass
+    /// ```
+    ///
+    /// ... will be reformatted (assuming the rest of the options are set
+    /// to their defaults) as:
+    ///
+    /// ```python
+    /// def f(x):
+    ///     """
+    ///     Something about `f`. And an example:
+    ///
+    ///     .. code-block:: python
+    ///
+    ///         (
+    ///             foo,
+    ///             bar,
+    ///             quux,
+    ///         ) = this_is_a_long_line(
+    ///             lion,
+    ///             hippo,
+    ///             lemur,
+    ///             bear,
+    ///         )
+    ///     """
+    ///     pass
+    /// ```
+    #[option(
+        default = r#""dynamic""#,
+        value_type = r#"int | "dynamic""#,
+        example = r#"
+            # Format all docstring code snippets with a line length of 60.
+            docstring-code-line-length = 60
+        "#
+    )]
+    pub docstring_code_line_length: Option<DocstringCodeLineWidth>,
 }
 
 #[cfg(test)]

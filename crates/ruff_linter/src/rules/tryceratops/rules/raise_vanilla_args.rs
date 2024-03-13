@@ -72,8 +72,10 @@ pub(crate) fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
     // `NotImplementedError`.
     if checker
         .semantic()
-        .resolve_call_path(func)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "NotImplementedError"]))
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["", "NotImplementedError"])
+        })
     {
         return;
     }
@@ -89,10 +91,21 @@ pub(crate) fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
 /// some whitespace).
 fn contains_message(expr: &Expr) -> bool {
     match expr {
-        Expr::FString(ast::ExprFString { values, .. }) => {
-            for value in values {
-                if contains_message(value) {
-                    return true;
+        Expr::FString(ast::ExprFString { value, .. }) => {
+            for f_string_part in value {
+                match f_string_part {
+                    ast::FStringPart::Literal(literal) => {
+                        if literal.chars().any(char::is_whitespace) {
+                            return true;
+                        }
+                    }
+                    ast::FStringPart::FString(f_string) => {
+                        for literal in f_string.literals() {
+                            if literal.chars().any(char::is_whitespace) {
+                                return true;
+                            }
+                        }
+                    }
                 }
             }
         }

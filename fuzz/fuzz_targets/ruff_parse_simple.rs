@@ -15,7 +15,7 @@ fn do_fuzz(case: &[u8]) -> Corpus {
 
     // just round-trip it once to trigger both parse and unparse
     let locator = Locator::new(code);
-    let python_ast = match parse_suite(code, "fuzzed-source.py") {
+    let python_ast = match parse_suite(code) {
         Ok(stmts) => stmts,
         Err(ParseError { offset, .. }) => {
             let offset = offset.to_usize();
@@ -47,7 +47,7 @@ fn do_fuzz(case: &[u8]) -> Corpus {
                 );
             }
             Err(err) => {
-                let offset = err.location.to_usize();
+                let offset = err.location().to_usize();
                 assert!(
                     code.is_char_boundary(offset),
                     "Invalid error location {} (not at char boundary)",

@@ -229,7 +229,7 @@ mod tests {
 
     #[test]
     fn extract_global_names() {
-        let contents = r#"global X,Y, Z"#.trim();
+        let contents = r"global X,Y, Z".trim();
 
         let mut names = IdentifierTokenizer::new(
             contents,

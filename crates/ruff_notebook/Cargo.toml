@@ -11,6 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [lib]
+doctest = false
 
 [dependencies]
 ruff_diagnostics = { path = "../ruff_diagnostics" }
@@ -22,10 +23,14 @@ itertools = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-serde_with = { version = "3.4.0", default-features = false, features = ["macros"] }
+serde_with = { workspace = true, default-features = false, features = ["macros"] }
 thiserror = { workspace = true }
 uuid = { workspace = true }
+rand = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
 test-case = { workspace = true }
+
+[lints]
+workspace = true

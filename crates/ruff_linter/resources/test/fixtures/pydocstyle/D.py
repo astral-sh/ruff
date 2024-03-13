@@ -663,3 +663,62 @@ class CommentAfterDocstring:
 def newline_after_closing_quote(self):
     "We enforce a newline after the closing quote for a multi-line docstring \
     but continuations shouldn't be considered multi-line"
+
+
+
+
+def retain_extra_whitespace():
+    """Summary.
+
+        This is overindented
+            And so is this, but it we should preserve the extra space on this line relative
+            to the one before
+    """
+
+
+def retain_extra_whitespace_multiple():
+    """Summary.
+
+        This is overindented
+            And so is this, but it we should preserve the extra space on this line relative
+            to the one before
+        This is also overindented
+            And so is this, but it we should preserve the extra space on this line relative
+            to the one before
+    """
+
+
+
+def retain_extra_whitespace_deeper():
+    """Summary.
+
+        This is overindented
+            And so is this, but it we should preserve the extra space on this line relative
+            to the one before
+                And the relative indent here should be preserved too
+    """
+
+def retain_extra_whitespace_followed_by_same_offset():
+    """Summary.
+
+        This is overindented
+            And so is this, but it we should preserve the extra space on this line relative
+        This is overindented
+        This is overindented
+    """
+
+
+def retain_extra_whitespace_not_overindented():
+    """Summary.
+
+    This is not overindented
+        This is overindented, but since one line is not overindented this should not raise
+            And so is this, but it we should preserve the extra space on this line relative
+    """
+
+
+def inconsistent_indent_byte_size():
+    """There's a non-breaking space (2-bytes) after 3 spaces (https://github.com/astral-sh/ruff/issues/9080).
+
+       Returns:
+    """

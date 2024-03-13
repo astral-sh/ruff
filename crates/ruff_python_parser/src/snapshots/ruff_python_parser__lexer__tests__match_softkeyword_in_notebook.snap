@@ -1,0 +1,66 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_jupyter_source(source)
+---
+[
+    (
+        Match,
+        0..5,
+    ),
+    (
+        Name {
+            name: "foo",
+        },
+        6..9,
+    ),
+    (
+        Colon,
+        9..10,
+    ),
+    (
+        Newline,
+        10..11,
+    ),
+    (
+        Indent,
+        11..15,
+    ),
+    (
+        Case,
+        15..19,
+    ),
+    (
+        Name {
+            name: "bar",
+        },
+        20..23,
+    ),
+    (
+        Colon,
+        23..24,
+    ),
+    (
+        Newline,
+        24..25,
+    ),
+    (
+        Indent,
+        25..33,
+    ),
+    (
+        Pass,
+        33..37,
+    ),
+    (
+        Newline,
+        37..37,
+    ),
+    (
+        Dedent,
+        37..37,
+    ),
+    (
+        Dedent,
+        37..37,
+    ),
+]

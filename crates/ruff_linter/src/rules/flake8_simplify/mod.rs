@@ -27,6 +27,7 @@ mod tests {
     #[test_case(Rule::ReimplementedBuiltin, Path::new("SIM110.py"))]
     #[test_case(Rule::ReimplementedBuiltin, Path::new("SIM111.py"))]
     #[test_case(Rule::UncapitalizedEnvironmentVariables, Path::new("SIM112.py"))]
+    #[test_case(Rule::EnumerateForLoop, Path::new("SIM113.py"))]
     #[test_case(Rule::OpenFileWithContextHandler, Path::new("SIM115.py"))]
     #[test_case(Rule::MultipleWithStatements, Path::new("SIM117.py"))]
     #[test_case(Rule::InDictKeys, Path::new("SIM118.py"))]
@@ -55,8 +56,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::InDictKeys, Path::new("SIM118.py"))]
-    #[test_case(Rule::IfElseBlockInsteadOfDictGet, Path::new("SIM401.py"))]
+    #[test_case(Rule::YodaConditions, Path::new("SIM300.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

@@ -116,7 +116,7 @@ fn find_paths_from_pth_files(parent_dir: &Path) -> io::Result<impl Iterator<Item
             file_len > 0 && file_len < 64 * 1024
         })
         .filter_map(|path| {
-            let data = fs::read_to_string(&path).ok()?;
+            let data = fs::read_to_string(path).ok()?;
             for line in data.lines() {
                 let trimmed_line = line.trim();
                 if !trimmed_line.is_empty()

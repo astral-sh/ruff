@@ -1,24 +1,20 @@
+use crate::rules::isort::sorting::ImportStyle;
+use crate::rules::isort::{ImportSection, ImportType};
 use itertools::Itertools;
 
 use super::settings::Settings;
 use super::sorting::{MemberKey, ModuleKey};
-use super::types::{AliasData, CommentSet, ImportBlock, ImportFromStatement, OrderedImportBlock};
+use super::types::EitherImport::{self, Import, ImportFrom};
+use super::types::{AliasData, CommentSet, ImportBlock, ImportFromStatement};
 
 pub(crate) fn order_imports<'a>(
     block: ImportBlock<'a>,
+    section: &ImportSection,
     settings: &Settings,
-) -> OrderedImportBlock<'a> {
-    let mut ordered = OrderedImportBlock::default();
+) -> Vec<EitherImport<'a>> {
+    let straight_imports = block.import.into_iter();
 
-    // Sort `Stmt::Import`.
-    ordered
-        .import
-        .extend(block.import.into_iter().sorted_by_cached_key(|(alias, _)| {
-            ModuleKey::from_module(Some(alias.name), alias.asname, None, None, settings)
-        }));
-
-    // Sort `Stmt::ImportFrom`.
-    ordered.import_from.extend(
+    let from_imports =
         // Include all non-re-exports.
         block
             .import_from
@@ -56,16 +52,95 @@ pub(crate) fn order_imports<'a>(
                             .collect::<Vec<(AliasData, CommentSet)>>(),
                     )
                 },
-            )
+            );
+
+    let ordered_imports = if matches!(section, ImportSection::Known(ImportType::Future)) {
+        from_imports
             .sorted_by_cached_key(|(import_from, _, _, aliases)| {
                 ModuleKey::from_module(
                     import_from.module,
                     None,
                     import_from.level,
                     aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
+                    ImportStyle::From,
                     settings,
                 )
-            }),
-    );
-    ordered
+            })
+            .map(ImportFrom)
+            .chain(
+                straight_imports
+                    .sorted_by_cached_key(|(alias, _)| {
+                        ModuleKey::from_module(
+                            Some(alias.name),
+                            alias.asname,
+                            None,
+                            None,
+                            ImportStyle::Straight,
+                            settings,
+                        )
+                    })
+                    .map(Import),
+            )
+            .collect()
+    } else if settings.force_sort_within_sections {
+        straight_imports
+            .map(Import)
+            .chain(from_imports.map(ImportFrom))
+            .sorted_by_cached_key(|import| match import {
+                Import((alias, _)) => ModuleKey::from_module(
+                    Some(alias.name),
+                    alias.asname,
+                    None,
+                    None,
+                    ImportStyle::Straight,
+                    settings,
+                ),
+                ImportFrom((import_from, _, _, aliases)) => ModuleKey::from_module(
+                    import_from.module,
+                    None,
+                    import_from.level,
+                    aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
+                    ImportStyle::From,
+                    settings,
+                ),
+            })
+            .collect()
+    } else {
+        let ordered_straight_imports = straight_imports.sorted_by_cached_key(|(alias, _)| {
+            ModuleKey::from_module(
+                Some(alias.name),
+                alias.asname,
+                None,
+                None,
+                ImportStyle::Straight,
+                settings,
+            )
+        });
+        let ordered_from_imports =
+            from_imports.sorted_by_cached_key(|(import_from, _, _, aliases)| {
+                ModuleKey::from_module(
+                    import_from.module,
+                    None,
+                    import_from.level,
+                    aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
+                    ImportStyle::From,
+                    settings,
+                )
+            });
+        if settings.from_first {
+            ordered_from_imports
+                .into_iter()
+                .map(ImportFrom)
+                .chain(ordered_straight_imports.into_iter().map(Import))
+                .collect()
+        } else {
+            ordered_straight_imports
+                .into_iter()
+                .map(Import)
+                .chain(ordered_from_imports.into_iter().map(ImportFrom))
+                .collect()
+        }
+    };
+
+    ordered_imports
 }

@@ -131,6 +131,11 @@ pub(crate) fn non_self_return_type(
         return;
     };
 
+    // PEP 673 forbids the use of `typing(_extensions).Self` in metaclasses.
+    if is_metaclass(class_def, checker.semantic()) {
+        return;
+    }
+
     // Skip any abstract or overloaded methods.
     if is_abstract(decorator_list, checker.semantic())
         || is_overload(decorator_list, checker.semantic())
@@ -214,6 +219,28 @@ pub(crate) fn non_self_return_type(
     }
 }
 
+/// Returns `true` if the given class is a metaclass.
+fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    class_def.arguments.as_ref().is_some_and(|arguments| {
+        arguments
+            .args
+            .iter()
+            .any(|expr| is_metaclass_base(expr, semantic))
+    })
+}
+
+/// Returns `true` if the given expression resolves to a metaclass.
+fn is_metaclass_base(base: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
+        .resolve_qualified_name(base)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["" | "builtins", "type"] | ["abc", "ABCMeta"] | ["enum", "EnumMeta" | "EnumType"]
+            )
+        })
+}
+
 /// Returns `true` if the method is an in-place binary operator.
 fn is_inplace_bin_op(name: &str) -> bool {
     matches!(
@@ -254,10 +281,10 @@ fn is_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool 
     };
     bases.iter().any(|expr| {
         semantic
-            .resolve_call_path(map_subscript(expr))
-            .is_some_and(|call_path| {
+            .resolve_qualified_name(map_subscript(expr))
+            .is_some_and(|qualified_name| {
                 matches!(
-                    call_path.as_slice(),
+                    qualified_name.segments(),
                     ["typing", "Iterator"] | ["collections", "abc", "Iterator"]
                 )
             })
@@ -267,10 +294,10 @@ fn is_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool 
 /// Return `true` if the given expression resolves to `collections.abc.Iterable`.
 fn is_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_call_path(map_subscript(expr))
-        .is_some_and(|call_path| {
+        .resolve_qualified_name(map_subscript(expr))
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.as_slice(),
+                qualified_name.segments(),
                 ["typing", "Iterable" | "Iterator"]
                     | ["collections", "abc", "Iterable" | "Iterator"]
             )
@@ -284,10 +311,10 @@ fn is_async_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) ->
     };
     bases.iter().any(|expr| {
         semantic
-            .resolve_call_path(map_subscript(expr))
-            .is_some_and(|call_path| {
+            .resolve_qualified_name(map_subscript(expr))
+            .is_some_and(|qualified_name| {
                 matches!(
-                    call_path.as_slice(),
+                    qualified_name.segments(),
                     ["typing", "AsyncIterator"] | ["collections", "abc", "AsyncIterator"]
                 )
             })
@@ -297,10 +324,10 @@ fn is_async_iterator(arguments: Option<&Arguments>, semantic: &SemanticModel) ->
 /// Return `true` if the given expression resolves to `collections.abc.AsyncIterable`.
 fn is_async_iterable(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_call_path(map_subscript(expr))
-        .is_some_and(|call_path| {
+        .resolve_qualified_name(map_subscript(expr))
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.as_slice(),
+                qualified_name.segments(),
                 ["typing", "AsyncIterable" | "AsyncIterator"]
                     | ["collections", "abc", "AsyncIterable" | "AsyncIterator"]
             )

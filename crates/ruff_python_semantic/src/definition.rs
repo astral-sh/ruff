@@ -81,7 +81,7 @@ pub struct Member<'a> {
 
 impl<'a> Member<'a> {
     /// Return the name of the member.
-    pub fn name(&self) -> &str {
+    pub fn name(&self) -> &'a str {
         match self.kind {
             MemberKind::Class(class) => &class.name,
             MemberKind::NestedClass(class) => &class.name,
@@ -92,7 +92,7 @@ impl<'a> Member<'a> {
     }
 
     /// Return the body of the member.
-    pub fn body(&self) -> &[Stmt] {
+    pub fn body(&self) -> &'a [Stmt] {
         match self.kind {
             MemberKind::Class(class) => &class.body,
             MemberKind::NestedClass(class) => &class.body,
@@ -123,7 +123,7 @@ pub enum Definition<'a> {
     Member(Member<'a>),
 }
 
-impl Definition<'_> {
+impl<'a> Definition<'a> {
     /// Returns `true` if the [`Definition`] is a method definition.
     pub const fn is_method(&self) -> bool {
         matches!(
@@ -136,7 +136,7 @@ impl Definition<'_> {
     }
 
     /// Return the name of the definition.
-    pub fn name(&self) -> Option<&str> {
+    pub fn name(&self) -> Option<&'a str> {
         match self {
             Definition::Module(module) => module.name(),
             Definition::Member(member) => Some(member.name()),
@@ -144,7 +144,7 @@ impl Definition<'_> {
     }
 
     /// Return the [`ast::StmtFunctionDef`] of the definition, if it's a function definition.
-    pub fn as_function_def(&self) -> Option<&ast::StmtFunctionDef> {
+    pub fn as_function_def(&self) -> Option<&'a ast::StmtFunctionDef> {
         match self {
             Definition::Member(Member {
                 kind:
@@ -158,7 +158,7 @@ impl Definition<'_> {
     }
 
     /// Return the [`ast::StmtClassDef`] of the definition, if it's a class definition.
-    pub fn as_class_def(&self) -> Option<&ast::StmtClassDef> {
+    pub fn as_class_def(&self) -> Option<&'a ast::StmtClassDef> {
         match self {
             Definition::Member(Member {
                 kind: MemberKind::Class(class) | MemberKind::NestedClass(class),
@@ -248,6 +248,12 @@ impl<'a> Definitions<'a> {
 
         ContextualizedDefinitions(definitions.raw)
     }
+
+    /// Returns a reference to the Python AST.
+    pub fn python_ast(&self) -> Option<&'a [Stmt]> {
+        let module = self[DefinitionId::module()].as_module()?;
+        Some(module.python_ast)
+    }
 }
 
 impl<'a> Deref for Definitions<'a> {
@@ -259,8 +265,8 @@ impl<'a> Deref for Definitions<'a> {
 }
 
 impl<'a> IntoIterator for Definitions<'a> {
-    type IntoIter = std::vec::IntoIter<Self::Item>;
     type Item = Definition<'a>;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()

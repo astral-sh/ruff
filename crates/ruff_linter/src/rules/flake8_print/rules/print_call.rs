@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-
-use ruff_python_ast::{self as ast};
+use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::delete_stmt;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -28,13 +28,23 @@ use crate::registry::AsRule;
 /// def add_numbers(a, b):
 ///     return a + b
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may remove `print` statements
+/// that are used beyond debugging purposes.
 #[violation]
 pub struct Print;
 
 impl Violation for Print {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`print` found")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Remove `print`".to_string())
     }
 }
 
@@ -65,43 +75,54 @@ impl Violation for Print {
 ///     dict_c = {**dict_a, **dict_b}
 ///     return dict_c
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may remove `pprint` statements
+/// that are used beyond debugging purposes.
 #[violation]
 pub struct PPrint;
 
 impl Violation for PPrint {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`pprint` found")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Remove `pprint`".to_string())
     }
 }
 
 /// T201, T203
 pub(crate) fn print_call(checker: &mut Checker, call: &ast::ExprCall) {
-    let diagnostic = {
-        let call_path = checker.semantic().resolve_call_path(&call.func);
-        if call_path
+    let mut diagnostic = {
+        let qualified_name = checker.semantic().resolve_qualified_name(&call.func);
+        if qualified_name
             .as_ref()
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["", "print"]))
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", "print"]))
         {
             // If the print call has a `file=` argument (that isn't `None`, `"sys.stdout"`,
             // or `"sys.stderr"`), don't trigger T201.
             if let Some(keyword) = call.arguments.find_keyword("file") {
                 if !keyword.value.is_none_literal_expr() {
-                    if checker.semantic().resolve_call_path(&keyword.value).map_or(
-                        true,
-                        |call_path| {
-                            call_path.as_slice() != ["sys", "stdout"]
-                                && call_path.as_slice() != ["sys", "stderr"]
-                        },
-                    ) {
+                    if checker
+                        .semantic()
+                        .resolve_qualified_name(&keyword.value)
+                        .map_or(true, |qualified_name| {
+                            qualified_name.segments() != ["sys", "stdout"]
+                                && qualified_name.segments() != ["sys", "stderr"]
+                        })
+                    {
                         return;
                     }
                 }
             }
             Diagnostic::new(Print, call.func.range())
-        } else if call_path
+        } else if qualified_name
             .as_ref()
-            .is_some_and(|call_path| matches!(call_path.as_slice(), ["pprint", "pprint"]))
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pprint", "pprint"]))
         {
             Diagnostic::new(PPrint, call.func.range())
         } else {
@@ -111,6 +132,16 @@ pub(crate) fn print_call(checker: &mut Checker, call: &ast::ExprCall) {
 
     if !checker.enabled(diagnostic.kind.rule()) {
         return;
+    }
+
+    // Remove the `print`, if it's a standalone statement.
+    if checker.semantic().current_expression_parent().is_none() {
+        let statement = checker.semantic().current_statement();
+        let parent = checker.semantic().current_statement_parent();
+        let edit = delete_stmt(statement, parent, checker.locator(), checker.indexer());
+        diagnostic.set_fix(Fix::unsafe_edit(edit).isolate(Checker::isolation(
+            checker.semantic().current_statement_parent_id(),
+        )));
     }
 
     checker.diagnostics.push(diagnostic);

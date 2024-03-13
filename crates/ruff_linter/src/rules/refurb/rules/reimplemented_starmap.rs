@@ -163,13 +163,13 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
 /// An enum for a node that can be considered a candidate for replacement with `starmap`.
 #[derive(Debug)]
 pub(crate) enum StarmapCandidate<'a> {
-    Generator(&'a ast::ExprGeneratorExp),
+    Generator(&'a ast::ExprGenerator),
     ListComp(&'a ast::ExprListComp),
     SetComp(&'a ast::ExprSetComp),
 }
 
-impl<'a> From<&'a ast::ExprGeneratorExp> for StarmapCandidate<'a> {
-    fn from(generator: &'a ast::ExprGeneratorExp) -> Self {
+impl<'a> From<&'a ast::ExprGenerator> for StarmapCandidate<'a> {
+    fn from(generator: &'a ast::ExprGenerator) -> Self {
         Self::Generator(generator)
     }
 }
@@ -304,8 +304,8 @@ fn construct_starmap_call(starmap_binding: String, iter: &Expr, func: &Expr) -> 
     ast::ExprCall {
         func: Box::new(starmap.into()),
         arguments: ast::Arguments {
-            args: vec![func.clone(), iter.clone()],
-            keywords: vec![],
+            args: Box::from([func.clone(), iter.clone()]),
+            keywords: Box::from([]),
             range: TextRange::default(),
         },
         range: TextRange::default(),
@@ -322,8 +322,8 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: &str) -> ast::ExprCall {
     ast::ExprCall {
         func: Box::new(name.into()),
         arguments: ast::Arguments {
-            args: vec![call.into()],
-            keywords: vec![],
+            args: Box::from([call.into()]),
+            keywords: Box::from([]),
             range: TextRange::default(),
         },
         range: TextRange::default(),

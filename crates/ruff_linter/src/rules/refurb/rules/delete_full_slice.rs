@@ -14,7 +14,7 @@ use crate::rules::refurb::helpers::generate_method_call;
 /// dictionary.
 ///
 /// ## Why is this bad?
-/// It's is faster and more succinct to remove all items via the `clear()`
+/// It is faster and more succinct to remove all items via the `clear()`
 /// method.
 ///
 /// ## Known problems

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
 from pathlib import Path
 
 
@@ -14,47 +16,79 @@ def import_fixture(fixture: Path, fixture_set: str):
     output_directory = Path(__file__).parent.joinpath("black").joinpath(fixture_set)
     output_directory.mkdir(parents=True, exist_ok=True)
 
-    fixture_path = output_directory.joinpath(fixture.name)
-    expect_path = fixture_path.with_suffix(".py.expect")
-
-    with (
-        fixture.open("r") as black_file,
-        fixture_path.open("w") as fixture_file,
-        expect_path.open("w") as expect_file
-    ):
+    with fixture.open("r") as black_file:
         lines = iter(black_file)
         expected = []
         input = []
+        flags = None
 
         for line in lines:
             if line.rstrip() == "# output":
                 expected = list(lines)
                 break
+            elif not input and line.startswith("# flags:"):
+                flags = line
             else:
                 input.append(line)
 
         if not expected:
-            # If there's no output marker, tread the whole file as already pre-formatted
+            # If there's no output marker, treat the whole file as already pre-formatted
             expected = input
 
-        fixture_file.write("".join(input).strip() + "\n")
-        expect_file.write("".join(expected).strip() + "\n")
+        options = {}
+        extension = "py"
+
+        if flags:
+            if "--preview" in flags:
+                options["preview"] = "enabled"
+
+            if "--pyi" in flags:
+                extension = "pyi"
+
+            if "--line-ranges=" in flags:
+                # Black preserves the flags for line-ranges tests to not mess up the line numbers
+                input.insert(0, flags)
+
+            if "--line-length=" in flags:
+                [_, length_and_rest] = flags.split("--line-length=", 1)
+                length = length_and_rest.split(" ", 1)[0]
+                length = int(length)
+                options["line_width"] = 1 if length == 0 else length
+
+            if "--minimum-version=" in flags:
+                [_, version] = flags.split("--minimum-version=", 1)
+                version = version.split(" ", 1)[0]
+                # Convert 3.10 to py310
+                options["target_version"] = f"py{version.strip().replace('.', '')}"
+
+            if "--skip-magic-trailing-comma" in flags:
+                options["magic_trailing_comma"] = "ignore"
+
+        fixture_path = output_directory.joinpath(fixture.name).with_suffix(f".{extension}")
+        expect_path = fixture_path.with_suffix(f".{extension}.expect")
+        options_path = fixture_path.with_suffix(".options.json")
+
+        if len(options) > 0:
+            if extension == "pyi":
+                options["source_type"] = "Stub"
+
+            with options_path.open("w") as options_file:
+                json.dump(options, options_file)
+        elif os.path.exists(options_path):
+            os.remove(options_path)
+
+        with (
+            fixture_path.open("w") as fixture_file,
+            expect_path.open("w") as expect_file
+        ):
+            fixture_file.write("".join(input).strip() + "\n")
+            expect_file.write("".join(expected).strip() + "\n")
 
 
 # The name of the folders in the `data` for which the tests should be imported
 FIXTURE_SETS = [
-    "fast",
-    "py_36",
-    "py_37",
-    "py_38",
-    "py_39",
-    "py_310",
-    "py_311",
-    "py_312",
-    "simple_cases",
+    "cases",
     "miscellaneous",
-    ".",
-    "type_comments"
 ]
 
 # Tests that ruff doesn't fully support yet and, therefore, should not be imported
@@ -63,9 +97,13 @@ IGNORE_LIST = [
     "async_as_identifier.py",
     "invalid_header.py",
     "pattern_matching_invalid.py",
+    "pep_572_do_not_remove_parens.py",
 
     # Python 2
-    "python2_detection.py"
+    "python2_detection.py",
+
+    # Uses a different output format
+    "decorators.py",
 ]
 
 

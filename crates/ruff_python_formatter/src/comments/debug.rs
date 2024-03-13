@@ -182,11 +182,11 @@ mod tests {
     use ruff_formatter::SourceCode;
     use ruff_python_ast::AnyNode;
     use ruff_python_ast::{StmtBreak, StmtContinue};
-    use ruff_python_trivia::CommentRanges;
+    use ruff_python_trivia::{CommentLinePosition, CommentRanges};
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::comments::map::MultiMap;
-    use crate::comments::{CommentLinePosition, Comments, CommentsMap, SourceComment};
+    use crate::comments::{Comments, CommentsMap, SourceComment};
 
     #[test]
     fn debug() {
@@ -198,11 +198,11 @@ mod tests {
             range: TextRange::default(),
         });
 
-        let source = r#"# leading comment
+        let source = r"# leading comment
 continue; # trailing
 # break leading
 break;
-"#;
+";
 
         let source_code = SourceCode::new(source);
 

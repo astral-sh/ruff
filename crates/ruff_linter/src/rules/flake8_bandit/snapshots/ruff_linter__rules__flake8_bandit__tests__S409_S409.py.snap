@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S409.py:1:6: S409 `xml.dom.pulldom` is vulnerable to XML attacks
+  |
+1 | from xml.dom.pulldom import parseString  # S409
+  |      ^^^^^^^^^^^^^^^ S409
+2 | import xml.dom.pulldom  # S409
+  |
+
+S409.py:2:8: S409 `xml.dom.pulldom` is vulnerable to XML attacks
+  |
+1 | from xml.dom.pulldom import parseString  # S409
+2 | import xml.dom.pulldom  # S409
+  |        ^^^^^^^^^^^^^^^ S409
+  |
+
+

@@ -32,11 +32,15 @@ class Diff(Serializable):
             line[2:]
             for line in self.lines
             if line.startswith("+" + " " * leading_spaces)
+            # Do not include patch headers
+            and not line.startswith("+++")
         )
         self.removed = list(
             line[2:]
             for line in self.lines
             if line.startswith("-" + " " * leading_spaces)
+            # Do not include patch headers
+            and not line.startswith("---")
         )
 
     def __bool__(self) -> bool:
@@ -75,7 +79,7 @@ class Result(Serializable):
     The result of an ecosystem check for a collection of projects.
     """
 
-    errored: list[tuple[Project, Exception]]
+    errored: list[tuple[Project, BaseException]]
     completed: list[tuple[Project, Comparison]]
 
 

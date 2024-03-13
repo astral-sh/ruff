@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::fmt;
 use std::hash::Hasher;
 use std::num::{NonZeroU16, NonZeroU8, ParseIntError};
 use std::str::FromStr;
@@ -36,6 +37,12 @@ impl LineLength {
 impl Default for LineLength {
     fn default() -> Self {
         Self(NonZeroU16::new(88).unwrap())
+    }
+}
+
+impl fmt::Display for LineLength {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
     }
 }
 
@@ -245,6 +252,12 @@ impl IndentWidth {
 impl Default for IndentWidth {
     fn default() -> Self {
         Self(NonZeroU8::new(4).unwrap())
+    }
+}
+
+impl fmt::Display for IndentWidth {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
     }
 }
 

@@ -1,0 +1,752 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/hug.py
+---
+## Input
+```python
+# Preview style: hug brackets to call parentheses.
+func([1, 2, 3,])
+
+func(  # comment
+[1, 2, 3,])
+
+func(
+    # comment
+[1, 2, 3,])
+
+func([1, 2, 3,]  # comment
+)
+
+func([1, 2, 3,]
+    # comment
+)
+
+func([  # comment
+    1, 2, 3,]
+)
+
+func(([1, 2, 3,]))
+
+
+func(
+    (
+        1,
+        2,
+        3,
+    )
+)
+
+# Ensure that comprehensions hug too.
+func([(x, y,) for (x, y) in z])
+
+# Ensure that dictionaries hug too.
+func({1: 2, 3: 4, 5: 6,})
+
+# Ensure that the same behavior is applied to parenthesized expressions.
+([1, 2, 3,])
+
+( # comment
+    [1, 2, 3,])
+
+(
+    [  # comment
+    1, 2, 3,])
+
+# Ensure that starred arguments are also hugged.
+foo(
+    *[
+        a_long_function_name(a_long_variable_name)
+        for a_long_variable_name in some_generator
+    ]
+)
+
+foo(
+    *  # comment
+    [
+        a_long_function_name(a_long_variable_name)
+        for a_long_variable_name in some_generator
+    ]
+)
+
+foo(
+    **[
+        a_long_function_name(a_long_variable_name)
+        for a_long_variable_name in some_generator
+    ]
+)
+
+foo(
+    **  # comment
+    [
+        a_long_function_name(a_long_variable_name)
+        for a_long_variable_name in some_generator
+    ]
+)
+
+# Ensure that multi-argument calls are _not_ hugged.
+func([1, 2, 3,], bar)
+
+func([(x, y,) for (x, y) in z], bar)
+
+# Ensure that return type annotations (which use `parenthesize_if_expands`) are also hugged.
+def func() -> [1, 2, 3,]:
+    pass
+
+def func() -> ([1, 2, 3,]):
+    pass
+
+def func() -> ([1, 2, 3,]):
+    pass
+
+def func() -> (  # comment
+    [1, 2, 3,]):
+    pass
+
+def func() -> (
+    [1, 2, 3,]  # comment
+):
+    pass
+
+def func() -> (
+    [1, 2, 3,]
+    # comment
+):
+    pass
+
+# Ensure that nested lists are hugged.
+func([
+    [
+        1,
+        2,
+        3,
+    ]
+])
+
+
+func([
+    # comment
+    [
+        1,
+        2,
+        3,
+    ]
+])
+
+func([
+    [
+        1,
+        2,
+        3,
+    ]
+    # comment
+])
+
+func([
+    [  # comment
+        1,
+        2,
+        3,
+    ]
+])
+
+
+func([  # comment
+    [
+        1,
+        2,
+        3,
+    ]
+])
+```
+
+## Output
+```python
+# Preview style: hug brackets to call parentheses.
+func(
+    [
+        1,
+        2,
+        3,
+    ]
+)
+
+func(  # comment
+    [
+        1,
+        2,
+        3,
+    ]
+)
+
+func(
+    # comment
+    [
+        1,
+        2,
+        3,
+    ]
+)
+
+func(
+    [
+        1,
+        2,
+        3,
+    ]  # comment
+)
+
+func(
+    [
+        1,
+        2,
+        3,
+    ]
+    # comment
+)
+
+func(
+    [  # comment
+        1,
+        2,
+        3,
+    ]
+)
+
+func(
+    (
+        [
+            1,
+            2,
+            3,
+        ]
+    )
+)
+
+
+func(
+    (
+        1,
+        2,
+        3,
+    )
+)
+
+# Ensure that comprehensions hug too.
+func(
+    [
+        (
+            x,
+            y,
+        )
+        for (x, y) in z
+    ]
+)
+
+# Ensure that dictionaries hug too.
+func(
+    {
+        1: 2,
+        3: 4,
+        5: 6,
+    }
+)
+
+# Ensure that the same behavior is applied to parenthesized expressions.
+(
+    [
+        1,
+        2,
+        3,
+    ]
+)
+
+(  # comment
+    [
+        1,
+        2,
+        3,
+    ]
+)
+
+(
+    [  # comment
+        1,
+        2,
+        3,
+    ]
+)
+
+# Ensure that starred arguments are also hugged.
+foo(
+    *[
+        a_long_function_name(a_long_variable_name)
+        for a_long_variable_name in some_generator
+    ]
+)
+
+foo(
+    # comment
+    *[
+        a_long_function_name(a_long_variable_name)
+        for a_long_variable_name in some_generator
+    ]
+)
+
+foo(
+    **[
+        a_long_function_name(a_long_variable_name)
+        for a_long_variable_name in some_generator
+    ]
+)
+
+foo(
+    # comment
+    **[
+        a_long_function_name(a_long_variable_name)
+        for a_long_variable_name in some_generator
+    ]
+)
+
+# Ensure that multi-argument calls are _not_ hugged.
+func(
+    [
+        1,
+        2,
+        3,
+    ],
+    bar,
+)
+
+func(
+    [
+        (
+            x,
+            y,
+        )
+        for (x, y) in z
+    ],
+    bar,
+)
+
+
+# Ensure that return type annotations (which use `parenthesize_if_expands`) are also hugged.
+def func() -> (
+    [
+        1,
+        2,
+        3,
+    ]
+):
+    pass
+
+
+def func() -> (
+    [
+        1,
+        2,
+        3,
+    ]
+):
+    pass
+
+
+def func() -> (
+    [
+        1,
+        2,
+        3,
+    ]
+):
+    pass
+
+
+def func() -> (  # comment
+    [
+        1,
+        2,
+        3,
+    ]
+):
+    pass
+
+
+def func() -> (
+    [
+        1,
+        2,
+        3,
+    ]  # comment
+):
+    pass
+
+
+def func() -> (
+    [
+        1,
+        2,
+        3,
+    ]
+    # comment
+):
+    pass
+
+
+# Ensure that nested lists are hugged.
+func(
+    [
+        [
+            1,
+            2,
+            3,
+        ]
+    ]
+)
+
+
+func(
+    [
+        # comment
+        [
+            1,
+            2,
+            3,
+        ]
+    ]
+)
+
+func(
+    [
+        [
+            1,
+            2,
+            3,
+        ]
+        # comment
+    ]
+)
+
+func(
+    [
+        [  # comment
+            1,
+            2,
+            3,
+        ]
+    ]
+)
+
+
+func(
+    [  # comment
+        [
+            1,
+            2,
+            3,
+        ]
+    ]
+)
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,11 +1,9 @@
+ # Preview style: hug brackets to call parentheses.
+-func(
+-    [
+-        1,
+-        2,
+-        3,
+-    ]
+-)
++func([
++    1,
++    2,
++    3,
++])
+ 
+ func(  # comment
+     [
+@@ -41,61 +39,47 @@
+     # comment
+ )
+ 
+-func(
+-    [  # comment
+-        1,
+-        2,
+-        3,
+-    ]
+-)
++func([  # comment
++    1,
++    2,
++    3,
++])
+ 
+-func(
+-    (
+-        [
+-            1,
+-            2,
+-            3,
+-        ]
+-    )
+-)
++func(([
++    1,
++    2,
++    3,
++]))
+ 
+ 
+-func(
+-    (
+-        1,
+-        2,
+-        3,
+-    )
+-)
++func((
++    1,
++    2,
++    3,
++))
+ 
+ # Ensure that comprehensions hug too.
+-func(
+-    [
+-        (
+-            x,
+-            y,
+-        )
+-        for (x, y) in z
+-    ]
+-)
++func([
++    (
++        x,
++        y,
++    )
++    for (x, y) in z
++])
+ 
+ # Ensure that dictionaries hug too.
+-func(
+-    {
+-        1: 2,
+-        3: 4,
+-        5: 6,
+-    }
+-)
++func({
++    1: 2,
++    3: 4,
++    5: 6,
++})
+ 
+ # Ensure that the same behavior is applied to parenthesized expressions.
+-(
+-    [
+-        1,
+-        2,
+-        3,
+-    ]
+-)
++([
++    1,
++    2,
++    3,
++])
+ 
+ (  # comment
+     [
+@@ -105,21 +89,17 @@
+     ]
+ )
+ 
+-(
+-    [  # comment
+-        1,
+-        2,
+-        3,
+-    ]
+-)
++([  # comment
++    1,
++    2,
++    3,
++])
+ 
+ # Ensure that starred arguments are also hugged.
+-foo(
+-    *[
+-        a_long_function_name(a_long_variable_name)
+-        for a_long_variable_name in some_generator
+-    ]
+-)
++foo(*[
++    a_long_function_name(a_long_variable_name)
++    for a_long_variable_name in some_generator
++])
+ 
+ foo(
+     # comment
+@@ -129,12 +109,10 @@
+     ]
+ )
+ 
+-foo(
+-    **[
+-        a_long_function_name(a_long_variable_name)
+-        for a_long_variable_name in some_generator
+-    ]
+-)
++foo(**[
++    a_long_function_name(a_long_variable_name)
++    for a_long_variable_name in some_generator
++])
+ 
+ foo(
+     # comment
+@@ -167,33 +145,27 @@
+ 
+ 
+ # Ensure that return type annotations (which use `parenthesize_if_expands`) are also hugged.
+-def func() -> (
+-    [
+-        1,
+-        2,
+-        3,
+-    ]
+-):
++def func() -> ([
++    1,
++    2,
++    3,
++]):
+     pass
+ 
+ 
+-def func() -> (
+-    [
+-        1,
+-        2,
+-        3,
+-    ]
+-):
++def func() -> ([
++    1,
++    2,
++    3,
++]):
+     pass
+ 
+ 
+-def func() -> (
+-    [
+-        1,
+-        2,
+-        3,
+-    ]
+-):
++def func() -> ([
++    1,
++    2,
++    3,
++]):
+     pass
+ 
+ 
+@@ -229,56 +201,46 @@
+ 
+ 
+ # Ensure that nested lists are hugged.
+-func(
++func([
+     [
+-        [
+-            1,
+-            2,
+-            3,
+-        ]
++        1,
++        2,
++        3,
+     ]
+-)
++])
+ 
+ 
+-func(
++func([
++    # comment
+     [
+-        # comment
+-        [
+-            1,
+-            2,
+-            3,
+-        ]
++        1,
++        2,
++        3,
+     ]
+-)
++])
+ 
+-func(
++func([
+     [
+-        [
+-            1,
+-            2,
+-            3,
+-        ]
+-        # comment
++        1,
++        2,
++        3,
+     ]
+-)
++    # comment
++])
+ 
+-func(
+-    [
+-        [  # comment
+-            1,
+-            2,
+-            3,
+-        ]
++func([
++    [  # comment
++        1,
++        2,
++        3,
+     ]
+-)
++])
+ 
+ 
+-func(
+-    [  # comment
+-        [
+-            1,
+-            2,
+-            3,
+-        ]
++func([  # comment
++    [
++        1,
++        2,
++        3,
+     ]
+-)
++])
+```
+
+
+

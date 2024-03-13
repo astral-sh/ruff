@@ -16,7 +16,7 @@ use std::ops::Range;
 ///   before inserting any parts for the key `b`.
 /// * The parts per key are inserted in the following order: *leading*, *dangling*, and then the *trailing* parts.
 ///
-/// Parts inserted in the above mentioned order are stored in a `Vec` shared by all keys to reduce the number
+/// Parts inserted in the above-mentioned order are stored in a `Vec` shared by all keys to reduce the number
 /// of allocations and increased cache locality. The implementation falls back to storing the *leading*,
 /// *dangling*, and *trailing* parts of a key in dedicated `Vec`s if the parts aren't inserted in the before mentioned order.
 /// Out of order insertions come with a slight performance penalty due to:
@@ -539,11 +539,11 @@ struct PartIndex(NonZeroU32);
 impl PartIndex {
     fn from_len(value: usize) -> Self {
         assert!(value < u32::MAX as usize);
-        // SAFETY:
+        // OK because:
         // * The `value < u32::MAX` guarantees that the add doesn't overflow.
         // * The `+ 1` guarantees that the index is not zero
-        #[allow(unsafe_code, clippy::cast_possible_truncation)]
-        Self(unsafe { std::num::NonZeroU32::new_unchecked((value as u32) + 1) })
+        #[allow(clippy::cast_possible_truncation)]
+        Self(std::num::NonZeroU32::new((value as u32) + 1).expect("valid value"))
     }
 
     fn value(self) -> usize {

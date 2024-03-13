@@ -14,3 +14,6 @@ license = { workspace = true }
 
 [dependencies]
 unicode-ident = { workspace = true }
+
+[lints]
+workspace = true
