@@ -256,8 +256,6 @@ impl Rule {
             | Rule::MixedSpacesAndTabs
             | Rule::TrailingWhitespace => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
-            | Rule::AmbiguousUnicodeCharacterDocstring
-            | Rule::AmbiguousUnicodeCharacterString
             | Rule::AvoidableEscapedQuote
             | Rule::BadQuotesDocstring
             | Rule::BadQuotesInlineString
@@ -302,6 +300,7 @@ impl Rule {
             | Rule::SingleLineImplicitStringConcatenation
             | Rule::TabIndentation
             | Rule::TooManyBlankLines
+            | Rule::TooManyNewlinesAtEndOfFile
             | Rule::TrailingCommaOnBareTuple
             | Rule::TypeCommentInStub
             | Rule::UselessSemicolon
@@ -329,6 +328,7 @@ impl Rule {
             | Rule::NoSpaceAfterBlockComment
             | Rule::NoSpaceAfterInlineComment
             | Rule::OverIndented
+            | Rule::RedundantBackslash
             | Rule::TabAfterComma
             | Rule::TabAfterKeyword
             | Rule::TabAfterOperator

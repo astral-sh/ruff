@@ -12,9 +12,10 @@ const STDIN: &str = "l = 1";
 fn ruff_check(show_source: Option<bool>, output_format: Option<String>) -> Command {
     let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
     let output_format = output_format.unwrap_or(format!("{}", SerializationFormat::default(false)));
-    cmd.arg("--output-format");
-    cmd.arg(output_format);
-    cmd.arg("--no-cache");
+    cmd.arg("check")
+        .arg("--output-format")
+        .arg(output_format)
+        .arg("--no-cache");
     match show_source {
         Some(true) => {
             cmd.arg("--show-source");

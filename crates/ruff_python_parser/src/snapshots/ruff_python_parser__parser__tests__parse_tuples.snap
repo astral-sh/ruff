@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "parse_suite(source, \"<test>\").unwrap()"
+expression: parse_suite(source).unwrap()
 ---
 [
     Assign(
@@ -27,6 +27,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ),
                         ],
                         ctx: Store,
+                        parenthesized: false,
                     },
                 ),
             ],
@@ -52,6 +53,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ),
                     ],
                     ctx: Load,
+                    parenthesized: false,
                 },
             ),
         },

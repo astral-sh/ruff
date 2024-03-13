@@ -7,9 +7,14 @@ use std::str;
 
 use anyhow::Result;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
+use regex::escape;
 use tempfile::TempDir;
 
 const BIN_NAME: &str = "ruff";
+
+fn tempdir_filter(tempdir: &TempDir) -> String {
+    format!(r"{}\\?/?", escape(tempdir.path().to_str().unwrap()))
+}
 
 #[test]
 fn default_options() {
@@ -18,7 +23,7 @@ fn default_options() {
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
-    print('Should\'t change quotes')
+    print('Shouldn\'t change quotes')
 
 
 if condition:
@@ -33,7 +38,7 @@ if condition:
         arg1,
         arg2,
     ):
-        print("Should't change quotes")
+        print("Shouldn't change quotes")
 
 
     if condition:
@@ -106,7 +111,7 @@ fn nonexistent_config_file() {
            option
 
     It looks like you were trying to pass a path to a configuration file.
-    The path `foo.toml` does not exist
+    The path `foo.toml` does not point to a configuration file
 
     For more information, try '--help'.
     "###);
@@ -147,28 +152,29 @@ fn too_many_config_files() -> Result<()> {
     let ruff2_dot_toml = tempdir.path().join("ruff2.toml");
     fs::File::create(&ruff_dot_toml)?;
     fs::File::create(&ruff2_dot_toml)?;
-    let expected_stderr = format!(
-        "\
-ruff failed
-  Cause: You cannot specify more than one configuration file on the command line.
-
-  tip: remove either `--config={}` or `--config={}`.
-       For more information, try `--help`.
-
-",
-        ruff_dot_toml.display(),
-        ruff2_dot_toml.display(),
-    );
-    let cmd = Command::new(get_cargo_bin(BIN_NAME))
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .arg("format")
         .arg("--config")
         .arg(&ruff_dot_toml)
         .arg("--config")
         .arg(&ruff2_dot_toml)
-        .arg(".")
-        .output()?;
-    let stderr = std::str::from_utf8(&cmd.stderr)?;
-    assert_eq!(stderr, expected_stderr);
+        .arg("."), @r###"
+            success: false
+            exit_code: 2
+            ----- stdout -----
+
+            ----- stderr -----
+            ruff failed
+              Cause: You cannot specify more than one configuration file on the command line.
+
+              tip: remove either `--config=[TMP]/ruff.toml` or `--config=[TMP]/ruff2.toml`.
+                   For more information, try `--help`.
+
+            "###);
+    });
     Ok(())
 }
 
@@ -177,27 +183,29 @@ fn config_file_and_isolated() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_dot_toml = tempdir.path().join("ruff.toml");
     fs::File::create(&ruff_dot_toml)?;
-    let expected_stderr = format!(
-        "\
-ruff failed
-  Cause: The argument `--config={}` cannot be used with `--isolated`
-
-  tip: You cannot specify a configuration file and also specify `--isolated`,
-       as `--isolated` causes ruff to ignore all configuration files.
-       For more information, try `--help`.
-
-",
-        ruff_dot_toml.display(),
-    );
-    let cmd = Command::new(get_cargo_bin(BIN_NAME))
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .arg("format")
         .arg("--config")
         .arg(&ruff_dot_toml)
         .arg("--isolated")
-        .arg(".")
-        .output()?;
-    let stderr = std::str::from_utf8(&cmd.stderr)?;
-    assert_eq!(stderr, expected_stderr);
+        .arg("."), @r###"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: The argument `--config=[TMP]/ruff.toml` cannot be used with `--isolated`
+
+          tip: You cannot specify a configuration file and also specify `--isolated`,
+               as `--isolated` causes ruff to ignore all configuration files.
+               For more information, try `--help`.
+
+        "###);
+    });
     Ok(())
 }
 
@@ -350,58 +358,52 @@ def f(x):
     '''
     pass
 "#), @r###"
-success: true
-exit_code: 0
------ stdout -----
-def f(x):
-    """
-    Something about `f`. And an example:
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    def f(x):
+        """
+        Something about `f`. And an example:
 
-    .. code-block:: python
+        .. code-block:: python
 
-        (
-            foo,
-            bar,
-            quux,
-        ) = this_is_a_long_line(
-            lion,
-            hippo,
-            lemur,
-            bear,
+            foo, bar, quux = (
+                this_is_a_long_line(
+                    lion,
+                    hippo,
+                    lemur,
+                    bear,
+                )
+            )
+
+        Another example:
+
+        ```py
+        foo, bar, quux = (
+            this_is_a_long_line(
+                lion,
+                hippo,
+                lemur,
+                bear,
+            )
         )
+        ```
 
-    Another example:
+        And another:
 
-    ```py
-    (
-        foo,
-        bar,
-        quux,
-    ) = this_is_a_long_line(
-        lion,
-        hippo,
-        lemur,
-        bear,
-    )
-    ```
+        >>> foo, bar, quux = (
+        ...     this_is_a_long_line(
+        ...         lion,
+        ...         hippo,
+        ...         lemur,
+        ...         bear,
+        ...     )
+        ... )
+        """
+        pass
 
-    And another:
-
-    >>> (
-    ...     foo,
-    ...     bar,
-    ...     quux,
-    ... ) = this_is_a_long_line(
-    ...     lion,
-    ...     hippo,
-    ...     lemur,
-    ...     bear,
-    ... )
-    """
-    pass
-
------ stderr -----
-"###);
+    ----- stderr -----
+    "###);
     Ok(())
 }
 

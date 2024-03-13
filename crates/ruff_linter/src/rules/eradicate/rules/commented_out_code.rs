@@ -47,7 +47,8 @@ fn is_standalone_comment(line: &str) -> bool {
     for char in line.chars() {
         if char == '#' {
             return true;
-        } else if !char.is_whitespace() {
+        }
+        if !char.is_whitespace() {
             return false;
         }
     }

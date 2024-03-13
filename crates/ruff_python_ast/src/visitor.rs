@@ -342,7 +342,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
                 visitor.visit_expr(expr);
             }
         }
-        Expr::NamedExpr(ast::ExprNamedExpr {
+        Expr::Named(ast::ExprNamed {
             target,
             value,
             range: _,
@@ -378,7 +378,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             }
             visitor.visit_expr(body);
         }
-        Expr::IfExp(ast::ExprIfExp {
+        Expr::If(ast::ExprIf {
             test,
             body,
             orelse,
@@ -437,10 +437,11 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             visitor.visit_expr(key);
             visitor.visit_expr(value);
         }
-        Expr::GeneratorExp(ast::ExprGeneratorExp {
+        Expr::Generator(ast::ExprGenerator {
             elt,
             generators,
             range: _,
+            parenthesized: _,
         }) => {
             for comprehension in generators {
                 visitor.visit_comprehension(comprehension);
@@ -539,6 +540,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             elts,
             ctx,
             range: _,
+            parenthesized: _,
         }) => {
             for expr in elts {
                 visitor.visit_expr(expr);

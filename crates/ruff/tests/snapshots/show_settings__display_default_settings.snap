@@ -44,7 +44,6 @@ file_resolver.exclude = [
 	"__pypackages__",
 	"_build",
 	"buck-out",
-	"build",
 	"dist",
 	"node_modules",
 	"site-packages",
@@ -232,7 +231,7 @@ linter.flake8_bandit.check_typed_exception = false
 linter.flake8_bugbear.extend_immutable_calls = []
 linter.flake8_builtins.builtins_ignorelist = []
 linter.flake8_comprehensions.allow_dict_calls_with_keyword_arguments = false
-linter.flake8_copyright.notice_rgx = (?i)Copyright\s+(\(C\)\s+)?\d{4}(-\d{4})*
+linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}(-\d{4})*
 linter.flake8_copyright.author = none
 linter.flake8_copyright.min_file_size = 0
 linter.flake8_errmsg.max_string_length = 0
@@ -242,7 +241,22 @@ linter.flake8_gettext.functions_names = [
 	ngettext,
 ]
 linter.flake8_implicit_str_concat.allow_multiline = true
-linter.flake8_import_conventions.aliases = {"matplotlib": "mpl", "matplotlib.pyplot": "plt", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "networkx": "nx", "plotly.express": "px", "polars": "pl", "numpy": "np", "panel": "pn", "pyarrow": "pa", "altair": "alt", "tkinter": "tk", "holoviews": "hv"}
+linter.flake8_import_conventions.aliases = {
+	altair = alt,
+	holoviews = hv,
+	matplotlib = mpl,
+	matplotlib.pyplot = plt,
+	networkx = nx,
+	numpy = np,
+	pandas = pd,
+	panel = pn,
+	plotly.express = px,
+	polars = pl,
+	pyarrow = pa,
+	seaborn = sns,
+	tensorflow = tf,
+	tkinter = tk,
+}
 linter.flake8_import_conventions.banned_aliases = {}
 linter.flake8_import_conventions.banned_from = []
 linter.flake8_pytest_style.fixture_parentheses = true
@@ -312,6 +326,7 @@ linter.isort.section_order = [
 	known { type = first_party },
 	known { type = local_folder },
 ]
+linter.isort.default_section = known { type = third_party }
 linter.isort.no_sections = false
 linter.isort.from_first = false
 linter.isort.length_sort = false
@@ -366,4 +381,3 @@ formatter.docstring_code_format = disabled
 formatter.docstring_code_line_width = dynamic
 
 ----- stderr -----
-

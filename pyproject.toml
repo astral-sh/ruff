@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.2.1"
+version = "0.3.2"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -73,6 +73,7 @@ force-exclude = '''
 [tool.rooster]
 major_labels = []  # Ruff never uses the major version number
 minor_labels = ["breaking"]   # Bump the minor version on breaking changes
+version_tag_prefix = "v"
 
 changelog_ignore_labels = ["internal", "ci"]
 

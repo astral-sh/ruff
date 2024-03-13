@@ -1665,21 +1665,30 @@ fn common_section(
                 .take_while(|line| line.trim().is_empty())
                 .count();
             if num_blank_lines < 2 {
+                let del_len = if num_blank_lines == 1 {
+                    // SAFETY: Guaranteed to not be None, because `num_blank_lines`is 1.
+                    context.following_lines().next_back().unwrap().text_len()
+                } else {
+                    TextSize::new(0)
+                };
+
+                let edit = Edit::replacement(
+                    format!(
+                        "{}{}",
+                        line_end.repeat(2 - num_blank_lines),
+                        docstring.indentation
+                    ),
+                    context.end() - del_len,
+                    context.end(),
+                );
+
                 let mut diagnostic = Diagnostic::new(
                     BlankLineAfterLastSection {
                         name: context.section_name().to_string(),
                     },
                     docstring.range(),
                 );
-                // Add a newline after the section.
-                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    format!(
-                        "{}{}",
-                        line_end.repeat(2 - num_blank_lines),
-                        docstring.indentation
-                    ),
-                    context.end(),
-                )));
+                diagnostic.set_fix(Fix::safe_edit(edit));
                 checker.diagnostics.push(diagnostic);
             }
         }

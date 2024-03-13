@@ -87,7 +87,7 @@ pub(crate) struct FStringRangesBuilder {
 impl FStringRangesBuilder {
     pub(crate) fn visit_token(&mut self, token: &Tok, range: TextRange) {
         match token {
-            Tok::FStringStart => {
+            Tok::FStringStart(_) => {
                 self.start_locations.push(range.start());
             }
             Tok::FStringEnd => {

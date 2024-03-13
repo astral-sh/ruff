@@ -57,21 +57,20 @@ pub(crate) fn regex_flag_alias(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    let Some(flag) =
-        checker
-            .semantic()
-            .resolve_call_path(expr)
-            .and_then(|call_path| match call_path.as_slice() {
-                ["re", "A"] => Some(RegexFlag::Ascii),
-                ["re", "I"] => Some(RegexFlag::IgnoreCase),
-                ["re", "L"] => Some(RegexFlag::Locale),
-                ["re", "M"] => Some(RegexFlag::Multiline),
-                ["re", "S"] => Some(RegexFlag::DotAll),
-                ["re", "T"] => Some(RegexFlag::Template),
-                ["re", "U"] => Some(RegexFlag::Unicode),
-                ["re", "X"] => Some(RegexFlag::Verbose),
-                _ => None,
-            })
+    let Some(flag) = checker
+        .semantic()
+        .resolve_qualified_name(expr)
+        .and_then(|qualified_name| match qualified_name.segments() {
+            ["re", "A"] => Some(RegexFlag::Ascii),
+            ["re", "I"] => Some(RegexFlag::IgnoreCase),
+            ["re", "L"] => Some(RegexFlag::Locale),
+            ["re", "M"] => Some(RegexFlag::Multiline),
+            ["re", "S"] => Some(RegexFlag::DotAll),
+            ["re", "T"] => Some(RegexFlag::Template),
+            ["re", "U"] => Some(RegexFlag::Unicode),
+            ["re", "X"] => Some(RegexFlag::Verbose),
+            _ => None,
+        })
     else {
         return;
     };

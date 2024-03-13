@@ -6,9 +6,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::options_base::{OptionsMetadata, Visit};
 use ruff_formatter::IndentStyle;
 use ruff_linter::line_width::{IndentWidth, LineLength};
+use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
@@ -25,12 +25,13 @@ use ruff_linter::rules::{
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, PythonVersion, SerializationFormat, Version,
+    IdentifierPattern, PythonVersion, RequiredVersion, SerializationFormat,
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 
+use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
@@ -135,17 +136,22 @@ pub struct Options {
     )]
     pub show_fixes: Option<bool>,
 
-    /// Require a specific version of Ruff to be running (useful for unifying
-    /// results across many environments, e.g., with a `pyproject.toml`
-    /// file).
+    /// Enforce a requirement on the version of Ruff, to enforce at runtime.
+    /// If the version of Ruff does not meet the requirement, Ruff will exit
+    /// with an error.
+    ///
+    /// Useful for unifying results across many environments, e.g., with a
+    /// `pyproject.toml` file.
+    ///
+    /// Accepts a PEP 440 specifier, like `==0.3.1` or `>=0.3.1`.
     #[option(
         default = "null",
         value_type = "str",
         example = r#"
-            required-version = "0.0.193"
+            required-version = ">=0.0.193"
         "#
     )]
-    pub required_version: Option<Version>,
+    pub required_version: Option<RequiredVersion>,
 
     /// Whether to enable preview mode. When preview mode is enabled, Ruff will
     /// use unstable rules, fixes, and formatting.
@@ -177,7 +183,7 @@ pub struct Options {
     /// Note that you'll typically want to use
     /// [`extend-exclude`](#extend-exclude) to modify the excluded paths.
     #[option(
-        default = r#"[".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]"#,
+        default = r#"[".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "dist", "node_modules", "venv"]"#,
         value_type = "list[str]",
         example = r#"
             exclude = [".venv"]
@@ -378,7 +384,7 @@ pub struct Options {
     /// within the `line-length`, it isn't a hard upper bound, and formatted lines may
     /// exceed the `line-length`.
     ///
-    /// See [`pycodestyle.max-line-length`](#pycodestyle-max-line-length) to configure different lengths for `E501` and the formatter.
+    /// See [`pycodestyle.max-line-length`](#lint_pycodestyle_max-line-length) to configure different lengths for `E501` and the formatter.
     #[option(
         default = "88",
         value_type = "int",
@@ -1123,14 +1129,14 @@ pub struct Flake8CopyrightOptions {
     /// The regular expression used to match the copyright notice, compiled
     /// with the [`regex`](https://docs.rs/regex/latest/regex/) crate.
     ///
-    /// Defaults to `(?i)Copyright\s+(\(C\)\s+)?\d{4}(-\d{4})*`, which matches
+    /// Defaults to `(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}(-\d{4})*`, which matches
     /// the following:
     /// - `Copyright 2023`
     /// - `Copyright (C) 2023`
     /// - `Copyright 2021-2023`
     /// - `Copyright (C) 2021-2023`
     #[option(
-        default = r#"(?i)Copyright\s+(\(C\)\s+)?\d{4}([-,]\d{4})*"#,
+        default = r#"(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}([-,]\d{4})*"#,
         value_type = "str",
         example = r#"notice-rgx = "(?i)Copyright \\(C\\) \\d{4}""#
     )]
@@ -1304,7 +1310,7 @@ pub struct Flake8ImportConventionsOptions {
             "tensorflow.keras.backend" = ["K"]
     "#
     )]
-    pub banned_aliases: Option<FxHashMap<String, Vec<String>>>,
+    pub banned_aliases: Option<FxHashMap<String, BannedAliases>>,
 
     /// A list of modules that should not be imported from using the
     /// `from ... import ...` syntax.
@@ -2049,6 +2055,9 @@ pub struct IsortOptions {
     /// The number of blank lines to place after imports.
     /// Use `-1` for automatic determination.
     ///
+    /// Ruff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to
+    /// the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)).
+    ///
     /// When using the formatter, only the values `-1`, `1`, and `2` are compatible because
     /// it enforces at least one empty and at most two empty lines after imports.
     #[option(
@@ -2095,6 +2104,16 @@ pub struct IsortOptions {
         "#
     )]
     pub section_order: Option<Vec<ImportSection>>,
+
+    /// Define a default section for any imports that don't fit into the specified `section-order`.
+    #[option(
+        default = r#"third-party"#,
+        value_type = "str",
+        example = r#"
+            default-section = "third-party"
+        "#
+    )]
+    pub default_section: Option<ImportSection>,
 
     /// Put all imports into the same section bucket.
     ///
@@ -2223,6 +2242,9 @@ impl IsortOptions {
         if no_sections && self.section_order.is_some() {
             warn_user_once!("`section-order` is ignored when `no-sections` is set to `true`");
         }
+        if no_sections && self.default_section.is_some() {
+            warn_user_once!("`default-section` is ignored when `no-sections` is set to `true`");
+        }
         if no_sections && self.sections.is_some() {
             warn_user_once!("`sections` is ignored when `no-sections` is set to `true`");
         }
@@ -2238,6 +2260,10 @@ impl IsortOptions {
         let mut section_order: Vec<_> = self
             .section_order
             .unwrap_or_else(|| ImportType::iter().map(ImportSection::Known).collect());
+        let default_section = self
+            .default_section
+            .unwrap_or(ImportSection::Known(ImportType::ThirdParty));
+
         let known_first_party = self
             .known_first_party
             .map(|names| {
@@ -2341,24 +2367,13 @@ impl IsortOptions {
             }
         }
 
-        // Add all built-in sections to `section_order`, if not already present.
-        for section in ImportType::iter().map(ImportSection::Known) {
-            if !section_order.contains(&section) {
-                warn_user_once!(
-                    "`section-order` is missing built-in section: `{:?}`",
-                    section
-                );
-                section_order.push(section);
-            }
-        }
-
-        // Add all user-defined sections to `section-order`, if not already present.
-        for section_name in sections.keys() {
-            let section = ImportSection::UserDefined(section_name.clone());
-            if !section_order.contains(&section) {
-                warn_user_once!("`section-order` is missing section: `{:?}`", section);
-                section_order.push(section);
-            }
+        // Verify that `default_section` is in `section_order`.
+        if !section_order.contains(&default_section) {
+            warn_user_once!(
+                "`section-order` must contain `default-section`: {:?}",
+                default_section,
+            );
+            section_order.push(default_section.clone());
         }
 
         Ok(isort::settings::Settings {
@@ -2369,7 +2384,7 @@ impl IsortOptions {
             case_sensitive: self.case_sensitive.unwrap_or(false),
             force_wrap_aliases: self.force_wrap_aliases.unwrap_or(false),
             detect_same_package: self.detect_same_package.unwrap_or(true),
-            force_to_top: BTreeSet::from_iter(self.force_to_top.unwrap_or_default()),
+            force_to_top: FxHashSet::from_iter(self.force_to_top.unwrap_or_default()),
             known_modules: isort::categorize::KnownModules::new(
                 known_first_party,
                 known_third_party,
@@ -2379,18 +2394,19 @@ impl IsortOptions {
             ),
             order_by_type: self.order_by_type.unwrap_or(true),
             relative_imports_order: self.relative_imports_order.unwrap_or_default(),
-            single_line_exclusions: BTreeSet::from_iter(
+            single_line_exclusions: FxHashSet::from_iter(
                 self.single_line_exclusions.unwrap_or_default(),
             ),
             split_on_trailing_comma: self.split_on_trailing_comma.unwrap_or(true),
-            classes: BTreeSet::from_iter(self.classes.unwrap_or_default()),
-            constants: BTreeSet::from_iter(self.constants.unwrap_or_default()),
-            variables: BTreeSet::from_iter(self.variables.unwrap_or_default()),
-            no_lines_before: BTreeSet::from_iter(no_lines_before),
+            classes: FxHashSet::from_iter(self.classes.unwrap_or_default()),
+            constants: FxHashSet::from_iter(self.constants.unwrap_or_default()),
+            variables: FxHashSet::from_iter(self.variables.unwrap_or_default()),
+            no_lines_before: FxHashSet::from_iter(no_lines_before),
             lines_after_imports: self.lines_after_imports.unwrap_or(-1),
             lines_between_types,
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),
             section_order,
+            default_section,
             no_sections,
             from_first,
             length_sort: self.length_sort.unwrap_or(false),
@@ -3082,7 +3098,7 @@ pub struct FormatOptions {
     ///     pass
     /// ```
     ///
-    /// If a code snippt in a docstring contains invalid Python code or if the
+    /// If a code snippet in a docstring contains invalid Python code or if the
     /// formatter would otherwise write invalid Python code, then the code
     /// example is ignored by the formatter and kept as-is.
     ///

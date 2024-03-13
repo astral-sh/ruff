@@ -143,7 +143,7 @@ fn merge_branches(
             op: ast::BoolOp::Or,
             ..
         }) | Expr::Lambda(_)
-            | Expr::NamedExpr(_)
+            | Expr::Named(_)
     ) {
         Cow::Owned(format!("({})", locator.slice(following_branch.test)))
     } else {

@@ -7,8 +7,9 @@
 [![image](https://img.shields.io/pypi/l/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![Actions status](https://github.com/astral-sh/ruff/workflows/CI/badge.svg)](https://github.com/astral-sh/ruff/actions)
+[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?logo=discord&logoColor=white)](https://discord.com/invite/astral-sh)
 
-[**Discord**](https://discord.gg/c9MhzV8aU5) | [**Docs**](https://docs.astral.sh/ruff/) | [**Playground**](https://play.ruff.rs/)
+[**Docs**](https://docs.astral.sh/ruff/) | [**Playground**](https://play.ruff.rs/)
 
 An extremely fast Python linter and code formatter, written in Rust.
 
@@ -150,7 +151,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.2.1
+  rev: v0.3.2
   hooks:
     # Run the linter.
     - id: ruff
@@ -172,7 +173,7 @@ jobs:
   ruff:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: chartboost/ruff-action@v1
 ```
 
@@ -341,14 +342,14 @@ For a complete enumeration of the supported rules, see [_Rules_](https://docs.as
 Contributions are welcome and highly appreciated. To get started, check out the
 [**contributing guidelines**](https://docs.astral.sh/ruff/contributing/).
 
-You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5).
+You can also join us on [**Discord**](https://discord.com/invite/astral-sh).
 
 ## Support
 
 Having trouble? Check out the existing issues on [**GitHub**](https://github.com/astral-sh/ruff/issues),
 or feel free to [**open a new one**](https://github.com/astral-sh/ruff/issues/new).
 
-You can also ask for help on [**Discord**](https://discord.gg/c9MhzV8aU5).
+You can also ask for help on [**Discord**](https://discord.com/invite/astral-sh).
 
 ## Acknowledgements
 
@@ -378,6 +379,7 @@ Ruff is released under the MIT license.
 
 Ruff is used by a number of major open-source projects and companies, including:
 
+- [Albumentations](https://github.com/albumentations-team/albumentations)
 - Amazon ([AWS SAM](https://github.com/aws/serverless-application-model))
 - Anthropic ([Python SDK](https://github.com/anthropics/anthropic-sdk-python))
 - [Apache Airflow](https://github.com/apache/airflow)
@@ -404,6 +406,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Ibis](https://github.com/ibis-project/ibis)
 - [ivy](https://github.com/unifyai/ivy)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
+- [Kraken Tech](https://kraken.tech/)
 - [LangChain](https://github.com/hwchase17/langchain)
 - [Litestar](https://litestar.dev/)
 - [LlamaIndex](https://github.com/jerryjliu/llama_index)

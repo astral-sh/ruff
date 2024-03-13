@@ -815,7 +815,7 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Expr::NamedExpr(ast::ExprNamedExpr {
+            Expr::Named(ast::ExprNamed {
                 target,
                 value,
                 range: _,
@@ -891,7 +891,7 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(body, precedence::LAMBDA);
                 });
             }
-            Expr::IfExp(ast::ExprIfExp {
+            Expr::If(ast::ExprIf {
                 test,
                 body,
                 orelse,
@@ -971,9 +971,10 @@ impl<'a> Generator<'a> {
                 self.unparse_comp(generators);
                 self.p("}");
             }
-            Expr::GeneratorExp(ast::ExprGeneratorExp {
+            Expr::Generator(ast::ExprGenerator {
                 elt,
                 generators,
+                parenthesized: _,
                 range: _,
             }) => {
                 self.p("(");
@@ -1037,10 +1038,11 @@ impl<'a> Generator<'a> {
                 self.unparse_expr(func, precedence::MAX);
                 self.p("(");
                 if let (
-                    [Expr::GeneratorExp(ast::ExprGeneratorExp {
+                    [Expr::Generator(ast::ExprGenerator {
                         elt,
                         generators,
                         range: _,
+                        parenthesized: _,
                     })],
                     [],
                 ) = (arguments.args.as_ref(), arguments.keywords.as_ref())
@@ -1279,7 +1281,7 @@ impl<'a> Generator<'a> {
         } else {
             false
         };
-        if string_literal.unicode {
+        if string_literal.flags.is_u_string() {
             self.p("u");
         }
         self.p_str_repr(&string_literal.value, triple);

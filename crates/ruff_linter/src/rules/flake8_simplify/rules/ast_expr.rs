@@ -1,3 +1,4 @@
+use ast::{StringLiteralFlags, StringLiteralPrefix};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::Ranged;
 
@@ -149,10 +150,10 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
     };
     if !checker
         .semantic()
-        .resolve_call_path(func)
-        .is_some_and(|call_path| {
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.as_slice(),
+                qualified_name.segments(),
                 ["os", "environ", "get"] | ["os", "getenv"]
             )
         })
@@ -218,7 +219,13 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
     );
     let node = ast::StringLiteral {
         value: capital_env_var.into_boxed_str(),
-        unicode: env_var.is_unicode(),
+        flags: StringLiteralFlags::default().with_prefix({
+            if env_var.is_unicode() {
+                StringLiteralPrefix::UString
+            } else {
+                StringLiteralPrefix::None
+            }
+        }),
         ..ast::StringLiteral::default()
     };
     let new_env_var = node.into();

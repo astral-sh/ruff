@@ -439,5 +439,3 @@ UP032_2.py:28:1: UP032 [*] Use f-string instead of `format` call
 27 27 | "{.real}".format({1: 2, 3: 4})
 28    |-"{}".format((i for i in range(2)))
    28 |+f"{(i for i in range(2))}"
-
-

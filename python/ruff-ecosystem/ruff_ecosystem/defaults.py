@@ -3,7 +3,6 @@ Default projects for ecosystem checks
 """
 from ruff_ecosystem.projects import (
     CheckOptions,
-    ConfigOverrides,
     FormatOptions,
     Project,
     Repository,
@@ -55,11 +54,6 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="pypa", name="pip", ref="main")),
     Project(
         repo=Repository(owner="pypa", name="setuptools", ref="main"),
-        # Since `setuptools` opts into the "preserve" quote style which
-        # require preview mode, we must disable it during the `--no-preview` run
-        config_overrides=ConfigOverrides(
-            when_no_preview={"format.quote-style": "double"}
-        ),
     ),
     Project(repo=Repository(owner="python", name="mypy", ref="master")),
     Project(
@@ -97,9 +91,7 @@ DEFAULT_TARGETS = [
         repo=Repository(owner="zulip", name="zulip", ref="main"),
         check_options=CheckOptions(select="ALL"),
     ),
-    Project(
-        repo=Repository(owner="indico", name="indico", ref="master"),
-    ),
+    Project(repo=Repository(owner="indico", name="indico", ref="master")),
     # Jupyter Notebooks
     Project(
         # fork of `huggingface` without syntax errors in notebooks
@@ -118,7 +110,8 @@ DEFAULT_TARGETS = [
             "include": ["*.ipynb"],
             # TODO(charlie): Re-enable after fixing typo.
             "exclude": [
-                "examples/dalle/Image_generations_edits_and_variations_with_DALL-E.ipynb"
+                "examples/dalle/Image_generations_edits_and_variations_with_DALL-E.ipynb",
+                "examples/How_to_handle_rate_limits.ipynb",
             ],
         },
     ),

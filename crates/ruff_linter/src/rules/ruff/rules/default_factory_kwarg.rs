@@ -77,8 +77,10 @@ pub(crate) fn default_factory_kwarg(checker: &mut Checker, call: &ast::ExprCall)
     // If the call isn't a `defaultdict` constructor, return.
     if !checker
         .semantic()
-        .resolve_call_path(call.func.as_ref())
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["collections", "defaultdict"]))
+        .resolve_qualified_name(call.func.as_ref())
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["collections", "defaultdict"])
+        })
     {
         return;
     }
@@ -118,7 +120,7 @@ fn is_non_callable_value(value: &Expr) -> bool {
             | Expr::ListComp(_)
             | Expr::SetComp(_)
             | Expr::DictComp(_)
-            | Expr::GeneratorExp(_)
+            | Expr::Generator(_)
             | Expr::FString(_))
 }
 

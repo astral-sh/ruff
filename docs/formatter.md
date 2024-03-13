@@ -3,8 +3,7 @@
 The Ruff formatter is an extremely fast Python code formatter designed as a drop-in replacement for
 [Black](https://pypi.org/project/black/), available as part of the `ruff` CLI via `ruff format`.
 
-The Ruff formatter is available as a [production-ready Beta](https://astral.sh/blog/the-ruff-formatter)
-as of Ruff v0.1.2.
+The Ruff formatter is available as of Ruff [v0.1.2](https://astral.sh/blog/the-ruff-formatter).
 
 ## `ruff format`
 
@@ -290,7 +289,7 @@ def test(a, b, c, d, e, f) -> int: # fmt: skip
     pass
 ```
 
-As such, adding `# fmt: skip` comments at the end of an expressions will have no effect. In
+As such, adding an `# fmt: skip` comment at the end of an expression will have no effect. In
 the following example, the list entry `'1'` will be formatted, despite the `# fmt: skip`:
 
 ```python

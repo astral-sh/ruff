@@ -527,6 +527,7 @@ Commands:
   linter   List all supported upstream linters
   clean    Clear any caches in the current directory and any subdirectories
   format   Run the Ruff formatter on the given files or directories
+  server   Run the language server
   version  Display Ruff's version
   help     Print this message or the help of the given subcommand(s)
 
@@ -539,6 +540,17 @@ Log levels:
   -q, --quiet    Print diagnostics, but nothing else
   -s, --silent   Disable all logging (but still exit with status code "1" upon
                  detecting diagnostics)
+
+Global options:
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
+      --isolated
+          Ignore all configuration files
 
 For help with a specific command, see: `ruff help <command>`.
 ```
@@ -596,13 +608,6 @@ Options:
       --preview
           Enable preview mode; checks will include unstable rules and fixes.
           Use `--no-preview` to disable
-      --config <CONFIG_OPTION>
-          Either a path to a TOML configuration file (`pyproject.toml` or
-          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
-          find in a `ruff.toml` configuration file) overriding a specific
-          configuration option. Overrides of individual settings using this
-          option always take precedence over all configuration files, including
-          configuration files that were also specified using `--config`
       --extension <EXTENSION>
           List of mappings from file extension to language (one of ["python",
           "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython
@@ -658,8 +663,6 @@ File selection:
 Miscellaneous:
   -n, --no-cache
           Disable cache reads [env: RUFF_NO_CACHE=]
-      --isolated
-          Ignore all configuration files
       --cache-dir <CACHE_DIR>
           Path to the cache directory [env: RUFF_CACHE_DIR=]
       --stdin-filename <STDIN_FILENAME>
@@ -675,6 +678,17 @@ Log levels:
   -q, --quiet    Print diagnostics, but nothing else
   -s, --silent   Disable all logging (but still exit with status code "1" upon
                  detecting diagnostics)
+
+Global options:
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
+      --isolated
+          Ignore all configuration files
 ```
 
 <!-- End auto-generated check help. -->
@@ -699,13 +713,6 @@ Options:
           Avoid writing any formatted files back; instead, exit with a non-zero
           status code and the difference between the current file and how the
           formatted file would look like
-      --config <CONFIG_OPTION>
-          Either a path to a TOML configuration file (`pyproject.toml` or
-          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
-          find in a `ruff.toml` configuration file) overriding a specific
-          configuration option. Overrides of individual settings using this
-          option always take precedence over all configuration files, including
-          configuration files that were also specified using `--config`
       --extension <EXTENSION>
           List of mappings from file extension to language (one of ["python",
           "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython
@@ -724,8 +731,6 @@ Miscellaneous:
           Disable cache reads [env: RUFF_NO_CACHE=]
       --cache-dir <CACHE_DIR>
           Path to the cache directory [env: RUFF_CACHE_DIR=]
-      --isolated
-          Ignore all configuration files
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
 
@@ -755,6 +760,17 @@ Log levels:
   -q, --quiet    Print diagnostics, but nothing else
   -s, --silent   Disable all logging (but still exit with status code "1" upon
                  detecting diagnostics)
+
+Global options:
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
+      --isolated
+          Ignore all configuration files
 ```
 
 <!-- End auto-generated format help. -->
