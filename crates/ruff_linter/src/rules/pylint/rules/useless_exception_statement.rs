@@ -2,6 +2,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
+use ruff_python_stdlib::builtins;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -13,6 +14,10 @@ use crate::checkers::ast::Checker;
 /// It's unnecessary to create an exception without raising it. For example,
 /// `ValueError("...")` on its own will have no effect (unlike
 /// `raise ValueError("...")`) and is likely a mistake.
+///
+/// ## Known problems
+/// This rule only detects built-in exceptions, like `ValueError`, and does
+/// not catch user-defined exceptions.
 ///
 /// ## Example
 /// ```python
@@ -60,38 +65,8 @@ pub(crate) fn useless_exception_statement(checker: &mut Checker, expr: &ast::Stm
 }
 
 /// Returns `true` if the given expression is a builtin exception.
-///
-/// See: <https://docs.python.org/3/library/exceptions.html#exception-hierarchy>
 fn is_builtin_exception(expr: &Expr, semantic: &SemanticModel) -> bool {
-    return semantic
+    semantic
         .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                [
-                    "",
-                    "SystemExit"
-                        | "Exception"
-                        | "ArithmeticError"
-                        | "AssertionError"
-                        | "AttributeError"
-                        | "BufferError"
-                        | "EOFError"
-                        | "ImportError"
-                        | "LookupError"
-                        | "IndexError"
-                        | "KeyError"
-                        | "MemoryError"
-                        | "NameError"
-                        | "ReferenceError"
-                        | "RuntimeError"
-                        | "NotImplementedError"
-                        | "StopIteration"
-                        | "SyntaxError"
-                        | "SystemError"
-                        | "TypeError"
-                        | "ValueError"
-                ]
-            )
-        });
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["", name] if builtins::is_exception(name)))
 }
