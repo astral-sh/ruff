@@ -36,7 +36,7 @@ from module import member as member
 
 ## Fix safety
 
-When `ignore_init_module_imports` is disabled, fixes can remove unused imports in `__init__` files.
+When `ignore_init_module_imports` is disabled, fixes can remove for unused imports in `__init__` files.
 These fixes are considered unsafe because they can change the public interface.
 
 ## Example
