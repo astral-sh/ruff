@@ -10,7 +10,7 @@ use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{registry::Rule, RuleSelector};
 use ruff_python_ast::PySourceType;
-use ruff_python_parser::{lexer, parse_program_tokens, Mode};
+use ruff_python_parser::{lexer, parse_program_tokens, set_new_parser, Mode};
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -45,6 +45,8 @@ fn create_test_cases() -> Result<Vec<TestCase>, TestFileDownloadError> {
 }
 
 fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
+    set_new_parser(true);
+
     let test_cases = create_test_cases().unwrap();
 
     for case in test_cases {
