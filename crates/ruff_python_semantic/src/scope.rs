@@ -22,31 +22,29 @@ struct Bindings<'a>(FxHashMap<Cow<'a, str>, BindingId>);
 impl<'a> Bindings<'a> {
     #[inline]
     fn get(&self, name: &str) -> Option<&BindingId> {
-        self.0.get(name).or({
-            if name.is_ascii() {
-                None
-            } else {
-                self.0.get(&*name.nfkc().collect::<String>())
-            }
-        })
+        if name.is_ascii() {
+            self.0.get(name)
+        } else {
+            self.0.get(&*name.nfkc().collect::<String>())
+        }
     }
 
     #[inline]
     fn insert(&mut self, name: &'a str, value: BindingId) -> Option<BindingId> {
-        let name = {
-            if name.is_ascii() {
-                Cow::Borrowed(name)
-            } else {
-                Cow::Owned(name.nfkc().collect())
-            }
-        };
-        self.0.insert(name, value)
+        if name.is_ascii() {
+            self.0.insert(Cow::Borrowed(name), value)
+        } else {
+            self.0.insert(Cow::Owned(name.nfkc().collect()), value)
+        }
     }
 
     #[inline]
     fn contains_key(&self, key: &str) -> bool {
-        self.0.contains_key(key)
-            || (!key.is_ascii() && self.0.contains_key(&*key.nfkc().collect::<String>()))
+        if key.is_ascii() {
+            self.0.contains_key(key)
+        } else {
+            self.0.contains_key(&*key.nfkc().collect::<String>())
+        }
     }
 
     #[inline]
