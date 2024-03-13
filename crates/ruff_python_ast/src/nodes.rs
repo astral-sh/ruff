@@ -971,7 +971,7 @@ impl Ranged for FStringExpressionElement {
     }
 }
 
-/// A `FStringLiteralElement` with an empty `value` is an invalid f-string element.
+/// An `FStringLiteralElement` with an empty `value` is an invalid f-string element.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FStringLiteralElement {
     pub range: TextRange,
@@ -1524,7 +1524,7 @@ bitflags! {
         /// It is invalid to set this flag if `U_PREFIX` is also set.
         const R_PREFIX = 1 << 3;
 
-        /// The string is invalid.
+        /// The string was deemed invalid by the parser.
         const INVALID = 1 << 4;
     }
 }
@@ -1875,7 +1875,7 @@ bitflags! {
         /// The bytestring has an `r` or `R` prefix, meaning it is a raw bytestring.
         const R_PREFIX = 1 << 3;
 
-        /// The bytestring is invalid.
+        /// The bytestring was deemed invalid by the parser.
         const INVALID = 1 << 4;
     }
 }
