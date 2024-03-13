@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 /// Checks for `@lru_cache(maxsize=None)` or `@cache` decorators on class and instance methods.
 ///
 /// ## Why is this bad?
-/// By decorating a method with `lru_cache` or `cache` the 'self' argument will be linked to
+/// By decorating a method with `lru_cache` with unlimited max size or `cache` the 'self' argument will be linked to
 /// the function and therefore never garbage collected.
 /// Unless your instance will never need to be garbage collected.
 ///
@@ -24,6 +24,8 @@ use crate::checkers::ast::Checker;
 ///
 /// class Fibonnaci:
 ///     @functools.lru_cache(maxsize=None)  # [method-cache-max-size-none]
+///     # or using cache
+///     # @functools.cache  # [method-cache-max-size-none]
 ///     def fibonacci(self, n):
 ///         if n in {0, 1}:
 ///             return n
@@ -95,12 +97,12 @@ pub(crate) fn method_cache_size_none(
             ast::Expr::Call(call) => &call.func,
             _ => &decorator.expression,
         };
-        let qualified_name = match checker
+
+        let Some(qualified_name) = checker
             .semantic()
             .resolve_qualified_name(decorator_expression)
-        {
-            Some(qualified_name) => qualified_name,
-            None => continue,
+        else {
+            continue;
         };
         if matches!(qualified_name.segments(), ["functools", "cache"]) {
             let diagnostic = Diagnostic::new(MethodCacheMaxSizeNone, decorator.range());
@@ -117,7 +119,7 @@ pub(crate) fn method_cache_size_none(
                     .keywords
                     .iter()
                     .find(|keyword| match keyword.arg {
-                        Some(ref ident) => ident.to_string() == "maxsize",
+                        Some(ref ident) => ident == "maxsize",
                         None => false,
                     })
             else {
