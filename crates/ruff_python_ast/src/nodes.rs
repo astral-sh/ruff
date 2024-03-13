@@ -1657,6 +1657,15 @@ impl StringLiteral {
     pub fn as_str(&self) -> &str {
         self
     }
+
+    /// Creates an invalid string literal with the given range.
+    pub fn invalid(range: TextRange) -> Self {
+        Self {
+            range,
+            value: "".into(),
+            flags: StringLiteralFlags::default().with_invalid(),
+        }
+    }
 }
 
 impl From<StringLiteral> for Expr {
@@ -1959,6 +1968,15 @@ impl BytesLiteral {
     /// Extracts a byte slice containing the entire [`BytesLiteral`].
     pub fn as_slice(&self) -> &[u8] {
         self
+    }
+
+    /// Creates a new invalid bytes literal with the given range.
+    pub fn invalid(range: TextRange) -> Self {
+        Self {
+            range,
+            value: Box::new([]),
+            flags: BytesLiteralFlags::default().with_invalid(),
+        }
     }
 }
 

@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::ops::Deref;
 
 use ruff_python_ast::{
@@ -9,9 +10,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::parser::helpers::token_kind_to_cmp_op;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser, ParserCtxFlags, EXPR_SET, NEWLINE_EOF_SET};
-use crate::string::{
-    concatenated_strings, parse_fstring_literal_element, parse_string_literal, StringType,
-};
+use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
 use crate::token_set::TokenSet;
 use crate::{FStringErrorType, Mode, ParseErrorType, Tok, TokenKind};
 
@@ -818,17 +817,88 @@ impl<'src> Parser<'src> {
                     range,
                 }),
             },
-            _ => concatenated_strings(strings, range).unwrap_or_else(|error| {
-                let location = error.location();
-                self.add_error(ParseErrorType::Lexical(error.into_error()), location);
-
-                #[allow(deprecated)]
-                Expr::Invalid(ast::ExprInvalid {
-                    value: self.src_text(location).into(),
-                    range: location,
-                })
-            }),
+            _ => self.handle_implicitly_concatenated_strings(strings, range),
         }
+    }
+
+    /// Handles implicitly concatenated strings.
+    fn handle_implicitly_concatenated_strings(
+        &mut self,
+        strings: Vec<StringType>,
+        range: TextRange,
+    ) -> Expr {
+        debug_assert!(strings.len() > 1);
+
+        let mut has_fstring = false;
+        let mut byte_literal_count = 0;
+        for string in &strings {
+            match string {
+                StringType::FString(_) => has_fstring = true,
+                StringType::Bytes(_) => byte_literal_count += 1,
+                StringType::Str(_) => {}
+            }
+        }
+        let has_bytes = byte_literal_count > 0;
+
+        if has_bytes {
+            match byte_literal_count.cmp(&strings.len()) {
+                Ordering::Less => {
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "cannot mix bytes and non-bytes literals".to_string(),
+                        ),
+                        range,
+                    );
+                }
+                // Only construct a byte expression if all the literals are bytes
+                // otherwise, we'll try either string or f-string. This is to retain
+                // as much information as possible.
+                Ordering::Equal => {
+                    let mut values = Vec::with_capacity(strings.len());
+                    for string in strings {
+                        values.push(match string {
+                            StringType::Bytes(value) => value,
+                            _ => ast::BytesLiteral::invalid(string.range()),
+                        });
+                    }
+                    return Expr::from(ast::ExprBytesLiteral {
+                        value: ast::BytesLiteralValue::concatenated(values),
+                        range,
+                    });
+                }
+                Ordering::Greater => {}
+            }
+        }
+
+        if !has_fstring {
+            let mut values = Vec::with_capacity(strings.len());
+            for string in strings {
+                values.push(match string {
+                    StringType::Str(value) => value,
+                    _ => ast::StringLiteral::invalid(string.range()),
+                });
+            }
+            return Expr::from(ast::ExprStringLiteral {
+                value: ast::StringLiteralValue::concatenated(values),
+                range,
+            });
+        }
+
+        let mut parts = Vec::with_capacity(strings.len());
+        for string in strings {
+            match string {
+                StringType::FString(fstring) => parts.push(ast::FStringPart::FString(fstring)),
+                StringType::Str(string) => parts.push(ast::FStringPart::Literal(string)),
+                StringType::Bytes(bytes) => parts.push(ast::FStringPart::Literal(
+                    ast::StringLiteral::invalid(bytes.range()),
+                )),
+            }
+        }
+
+        Expr::from(ast::ExprFString {
+            value: ast::FStringValue::concatenated(parts),
+            range,
+        })
     }
 
     /// Parses a single string literal.
@@ -851,17 +921,13 @@ impl<'src> Parser<'src> {
 
                 if kind.is_byte_string() {
                     StringType::Bytes(ast::BytesLiteral {
-                        value: self
-                            .src_text(range)
-                            .to_string()
-                            .into_boxed_str()
-                            .into_boxed_bytes(),
+                        value: Box::new([]),
                         range,
                         flags: ast::BytesLiteralFlags::from(kind).with_invalid(),
                     })
                 } else {
                     StringType::Str(ast::StringLiteral {
-                        value: self.src_text(range).to_string().into_boxed_str(),
+                        value: "".into(),
                         range,
                         flags: ast::StringLiteralFlags::from(kind).with_invalid(),
                     })
@@ -923,7 +989,7 @@ impl<'src> Parser<'src> {
                                     location,
                                 );
                                 ast::FStringLiteralElement {
-                                    value: parser.src_text(range).to_string().into_boxed_str(),
+                                    value: "".into(),
                                     range,
                                 }
                             },
