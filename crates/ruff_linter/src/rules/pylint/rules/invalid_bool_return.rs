@@ -14,6 +14,23 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// The `__bool__` method should return a `bool` object. Returning a different
 /// type may cause unexpected behavior.
+///
+/// ## Example
+/// ```python
+/// class Foo:
+///     def __bool__(self):
+///         return 2
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Foo:
+///     def __bool__(self):
+///         return True
+/// ```
+///
+/// ## References
+/// - [Python documentation: The `__bool__` method](https://docs.python.org/3/reference/datamodel.html#object.__bool__)
 #[violation]
 pub struct InvalidBoolReturnType;
 
