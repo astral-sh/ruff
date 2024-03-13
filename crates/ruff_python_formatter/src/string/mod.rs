@@ -3,14 +3,14 @@ use bitflags::bitflags;
 pub(crate) use any::AnyString;
 pub(crate) use normalize::{normalize_string, NormalizedString, StringNormalizer};
 use ruff_formatter::format_args;
-use ruff_python_ast::str::QuoteStyle;
+use ruff_python_ast::str::Quote;
 use ruff_source_file::Locator;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
 use crate::prelude::*;
-use crate::QuotePreference;
+use crate::QuoteStyle;
 
 mod any;
 pub(crate) mod docstring;
@@ -188,7 +188,7 @@ impl Format<PyFormatContext<'_>> for StringPrefix {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct StringQuotes {
     triple: bool,
-    quote_char: QuoteStyle,
+    quote_char: Quote,
 }
 
 impl StringQuotes {
@@ -196,7 +196,7 @@ impl StringQuotes {
         let mut chars = input.chars();
 
         let quote_char = chars.next()?;
-        let quote = QuoteStyle::try_from(quote_char).ok()?;
+        let quote = Quote::try_from(quote_char).ok()?;
 
         let triple = chars.next() == Some(quote_char) && chars.next() == Some(quote_char);
 
@@ -222,33 +222,33 @@ impl StringQuotes {
 impl Format<PyFormatContext<'_>> for StringQuotes {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let quotes = match (self.quote_char, self.triple) {
-            (QuoteStyle::Single, false) => "'",
-            (QuoteStyle::Single, true) => "'''",
-            (QuoteStyle::Double, false) => "\"",
-            (QuoteStyle::Double, true) => "\"\"\"",
+            (Quote::Single, false) => "'",
+            (Quote::Single, true) => "'''",
+            (Quote::Double, false) => "\"",
+            (Quote::Double, true) => "\"\"\"",
         };
 
         token(quotes).fmt(f)
     }
 }
 
-impl TryFrom<QuotePreference> for QuoteStyle {
+impl TryFrom<QuoteStyle> for Quote {
     type Error = ();
 
-    fn try_from(style: QuotePreference) -> Result<QuoteStyle, ()> {
+    fn try_from(style: QuoteStyle) -> Result<Quote, ()> {
         match style {
-            QuotePreference::Single => Ok(QuoteStyle::Single),
-            QuotePreference::Double => Ok(QuoteStyle::Double),
-            QuotePreference::Preserve => Err(()),
+            QuoteStyle::Single => Ok(Quote::Single),
+            QuoteStyle::Double => Ok(Quote::Double),
+            QuoteStyle::Preserve => Err(()),
         }
     }
 }
 
-impl From<QuoteStyle> for QuotePreference {
-    fn from(value: QuoteStyle) -> Self {
+impl From<Quote> for QuoteStyle {
+    fn from(value: Quote) -> Self {
         match value {
-            QuoteStyle::Single => QuotePreference::Single,
-            QuoteStyle::Double => QuotePreference::Double,
+            Quote::Single => QuoteStyle::Single,
+            Quote::Double => QuoteStyle::Double,
         }
     }
 }

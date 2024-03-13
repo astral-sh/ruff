@@ -5,16 +5,18 @@ use once_cell::sync::Lazy;
 
 use ruff_text_size::{TextLen, TextRange};
 
+/// Enumeration of the two kinds of quotes that can be used
+/// for Python string/f-string/bytestring literals
 #[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq, is_macro::Is)]
-pub enum QuoteStyle {
-    /// E.g. '
+pub enum Quote {
+    /// E.g. `'`
     Single,
-    /// E.g. "
+    /// E.g. `"`
     #[default]
     Double,
 }
 
-impl QuoteStyle {
+impl Quote {
     #[inline]
     pub const fn as_char(self) -> char {
         match self {
@@ -41,19 +43,19 @@ impl QuoteStyle {
     }
 }
 
-impl fmt::Display for QuoteStyle {
+impl fmt::Display for Quote {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.as_char())
     }
 }
 
-impl TryFrom<char> for QuoteStyle {
+impl TryFrom<char> for Quote {
     type Error = ();
 
     fn try_from(value: char) -> Result<Self, Self::Error> {
         match value {
-            '\'' => Ok(QuoteStyle::Single),
-            '"' => Ok(QuoteStyle::Double),
+            '\'' => Ok(Quote::Single),
+            '"' => Ok(Quote::Double),
             _ => Err(()),
         }
     }

@@ -44,7 +44,7 @@ use ruff_python_ast::helpers::{
 };
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::str::QuoteStyle;
+use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{walk_except_handler, walk_f_string_element, walk_pattern, Visitor};
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
@@ -222,7 +222,7 @@ impl<'a> Checker<'a> {
     /// the f-string.
     ///
     /// If the current expression in the context is not an f-string, returns ``None``.
-    pub(crate) fn f_string_quote_style(&self) -> Option<QuoteStyle> {
+    pub(crate) fn f_string_quote_style(&self) -> Option<Quote> {
         if !self.semantic.in_f_string() {
             return None;
         }

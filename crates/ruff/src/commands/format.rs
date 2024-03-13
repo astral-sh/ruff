@@ -23,9 +23,7 @@ use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_python_formatter::{
-    format_module_source, format_range, FormatModuleError, QuotePreference,
-};
+use ruff_python_formatter::{format_module_source, format_range, FormatModuleError, QuoteStyle};
 use ruff_source_file::LineIndex;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::resolver::{match_exclusion, python_files_in_path, ResolvedFile, Resolver};
@@ -847,10 +845,10 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
                 setting.linter.flake8_quotes.inline_quotes,
                 setting.formatter.quote_style,
             ) {
-                (Quote::Double, QuotePreference::Single) => {
+                (Quote::Double, QuoteStyle::Single) => {
                     warn_user_once!("The `flake8-quotes.inline-quotes=\"double\"` option is incompatible with the formatter's `format.quote-style=\"single\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`.");
                 }
-                (Quote::Single, QuotePreference::Double) => {
+                (Quote::Single, QuoteStyle::Double) => {
                     warn_user_once!("The `flake8-quotes.inline-quotes=\"single\"` option is incompatible with the formatter's `format.quote-style=\"double\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`.");
                 }
                 _ => {}

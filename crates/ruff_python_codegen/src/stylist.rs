@@ -4,7 +4,7 @@ use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
 
-use ruff_python_ast::str::QuoteStyle;
+use ruff_python_ast::str::Quote;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 use ruff_source_file::{find_newline, LineEnding, Locator};
@@ -13,7 +13,7 @@ use ruff_source_file::{find_newline, LineEnding, Locator};
 pub struct Stylist<'a> {
     locator: &'a Locator<'a>,
     indentation: Indentation,
-    quote: QuoteStyle,
+    quote: Quote,
     line_ending: OnceCell<LineEnding>,
 }
 
@@ -22,7 +22,7 @@ impl<'a> Stylist<'a> {
         &self.indentation
     }
 
-    pub fn quote(&'a self) -> QuoteStyle {
+    pub fn quote(&'a self) -> Quote {
         self.quote
     }
 
@@ -47,7 +47,7 @@ impl<'a> Stylist<'a> {
     }
 }
 
-fn detect_quote(tokens: &[LexResult]) -> QuoteStyle {
+fn detect_quote(tokens: &[LexResult]) -> Quote {
     for (token, _) in tokens.iter().flatten() {
         match token {
             Tok::String { kind, .. } if !kind.is_triple_quoted() => return kind.quote_style(),
@@ -55,7 +55,7 @@ fn detect_quote(tokens: &[LexResult]) -> QuoteStyle {
             _ => continue,
         }
     }
-    QuoteStyle::default()
+    Quote::default()
 }
 
 fn detect_indention(tokens: &[LexResult], locator: &Locator) -> Indentation {
@@ -131,7 +131,7 @@ mod tests {
 
     use ruff_source_file::{find_newline, LineEnding};
 
-    use super::{Indentation, QuoteStyle, Stylist};
+    use super::{Indentation, Quote, Stylist};
     use ruff_source_file::Locator;
 
     #[test]
@@ -213,7 +213,7 @@ class FormFeedIndent:
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            QuoteStyle::default()
+            Quote::default()
         );
 
         let contents = r"x = '1'";
@@ -221,7 +221,7 @@ class FormFeedIndent:
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            QuoteStyle::Single
+            Quote::Single
         );
 
         let contents = r"x = f'1'";
@@ -229,7 +229,7 @@ class FormFeedIndent:
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            QuoteStyle::Single
+            Quote::Single
         );
 
         let contents = r#"x = "1""#;
@@ -237,7 +237,7 @@ class FormFeedIndent:
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            QuoteStyle::Double
+            Quote::Double
         );
 
         let contents = r#"x = f"1""#;
@@ -245,7 +245,7 @@ class FormFeedIndent:
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            QuoteStyle::Double
+            Quote::Double
         );
 
         let contents = r#"s = "It's done.""#;
@@ -253,7 +253,7 @@ class FormFeedIndent:
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            QuoteStyle::Double
+            Quote::Double
         );
 
         // No style if only double quoted docstring (will take default Double)
@@ -266,7 +266,7 @@ def f():
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            QuoteStyle::default()
+            Quote::default()
         );
 
         // Detect from string literal appearing after docstring
@@ -279,7 +279,7 @@ a = 'v'
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            QuoteStyle::Single
+            Quote::Single
         );
 
         let contents = r#"
@@ -291,7 +291,7 @@ a = "v"
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            QuoteStyle::Double
+            Quote::Double
         );
 
         // Detect from f-string appearing after docstring
@@ -304,7 +304,7 @@ a = f'v'
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            QuoteStyle::Single
+            Quote::Single
         );
 
         let contents = r#"
@@ -316,7 +316,7 @@ a = f"v"
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            QuoteStyle::Double
+            Quote::Double
         );
 
         let contents = r"
@@ -326,7 +326,7 @@ f'''Module docstring.'''
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            QuoteStyle::Single
+            Quote::Single
         );
     }
 

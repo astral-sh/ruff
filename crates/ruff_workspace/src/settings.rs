@@ -10,7 +10,7 @@ use ruff_macros::CacheKey;
 use ruff_python_ast::PySourceType;
 use ruff_python_formatter::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
-    QuotePreference,
+    QuoteStyle,
 };
 use ruff_source_file::find_newline;
 use std::fmt;
@@ -166,7 +166,7 @@ pub struct FormatterSettings {
     pub indent_style: IndentStyle,
     pub indent_width: IndentWidth,
 
-    pub quote_style: QuotePreference,
+    pub quote_style: QuoteStyle,
 
     pub magic_trailing_comma: MagicTrailingComma,
 

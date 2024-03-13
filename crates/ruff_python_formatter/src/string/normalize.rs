@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::iter::FusedIterator;
 
 use ruff_formatter::FormatContext;
-use ruff_python_ast::str::QuoteStyle;
+use ruff_python_ast::str::Quote;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -11,12 +11,12 @@ use crate::options::PythonVersion;
 use crate::prelude::*;
 use crate::preview::is_f_string_formatting_enabled;
 use crate::string::{Quoting, StringPart, StringPrefix, StringQuotes};
-use crate::QuotePreference;
+use crate::QuoteStyle;
 
 pub(crate) struct StringNormalizer {
     quoting: Quoting,
-    preferred_quote_style: QuotePreference,
-    parent_docstring_quote_char: Option<QuoteStyle>,
+    preferred_quote_style: QuoteStyle,
+    parent_docstring_quote_char: Option<Quote>,
     f_string_state: FStringState,
     target_version: PythonVersion,
     format_fstring: bool,
@@ -26,7 +26,7 @@ impl StringNormalizer {
     pub(crate) fn from_context(context: &PyFormatContext<'_>) -> Self {
         Self {
             quoting: Quoting::default(),
-            preferred_quote_style: QuotePreference::default(),
+            preferred_quote_style: QuoteStyle::default(),
             parent_docstring_quote_char: context.docstring(),
             f_string_state: context.f_string_state(),
             target_version: context.options().target_version(),
@@ -34,7 +34,7 @@ impl StringNormalizer {
         }
     }
 
-    pub(crate) fn with_preferred_quote_style(mut self, quote_style: QuotePreference) -> Self {
+    pub(crate) fn with_preferred_quote_style(mut self, quote_style: QuoteStyle) -> Self {
         self.preferred_quote_style = quote_style;
         self
     }
@@ -131,17 +131,17 @@ impl StringNormalizer {
                     // style from what the parent ultimately decided upon works, even
                     // if it doesn't have perfect alignment with PEP8.
                     if let Some(quote) = self.parent_docstring_quote_char {
-                        QuotePreference::from(quote.opposite())
+                        QuoteStyle::from(quote.opposite())
                     } else if self.preferred_quote_style.is_preserve() {
-                        QuotePreference::Preserve
+                        QuoteStyle::Preserve
                     } else {
-                        QuotePreference::Double
+                        QuoteStyle::Double
                     }
                 } else {
                     self.preferred_quote_style
                 };
 
-                if let Ok(preferred_quote) = QuoteStyle::try_from(preferred_style) {
+                if let Ok(preferred_quote) = Quote::try_from(preferred_style) {
                     if let Some(first_quote_or_normalized_char_offset) =
                         first_quote_or_normalized_char_offset
                     {
@@ -282,7 +282,7 @@ impl Format<PyFormatContext<'_>> for NormalizedString<'_> {
 fn choose_quotes_for_raw_string(
     input: &str,
     quotes: StringQuotes,
-    preferred_quote: QuoteStyle,
+    preferred_quote: Quote,
 ) -> StringQuotes {
     let preferred_quote_char = preferred_quote.as_char();
     let mut chars = input.chars().peekable();
@@ -338,11 +338,7 @@ fn choose_quotes_for_raw_string(
 /// For triple quoted strings, the preferred quote style is always used, unless the string contains
 /// a triplet of the quote character (e.g., if double quotes are preferred, double quotes will be
 /// used unless the string contains `"""`).
-fn choose_quotes_impl(
-    input: &str,
-    quotes: StringQuotes,
-    preferred_quote: QuoteStyle,
-) -> StringQuotes {
+fn choose_quotes_impl(input: &str, quotes: StringQuotes, preferred_quote: Quote) -> StringQuotes {
     let quote = if quotes.triple {
         // True if the string contains a triple quote sequence of the configured quote style.
         let mut uses_triple_quotes = false;
@@ -420,18 +416,18 @@ fn choose_quotes_impl(
         }
 
         match preferred_quote {
-            QuoteStyle::Single => {
+            Quote::Single => {
                 if single_quotes > double_quotes {
-                    QuoteStyle::Double
+                    Quote::Double
                 } else {
-                    QuoteStyle::Single
+                    Quote::Single
                 }
             }
-            QuoteStyle::Double => {
+            Quote::Double => {
                 if double_quotes > single_quotes {
-                    QuoteStyle::Single
+                    Quote::Single
                 } else {
-                    QuoteStyle::Double
+                    Quote::Double
                 }
             }
         }
@@ -708,7 +704,7 @@ impl UnicodeEscape {
 mod tests {
     use std::borrow::Cow;
 
-    use ruff_python_ast::str::QuoteStyle;
+    use ruff_python_ast::str::Quote;
 
     use crate::string::{StringPrefix, StringQuotes};
 
@@ -733,7 +729,7 @@ mod tests {
             0,
             StringQuotes {
                 triple: false,
-                quote_char: QuoteStyle::Double,
+                quote_char: Quote::Double,
             },
             StringPrefix::BYTE,
             true,

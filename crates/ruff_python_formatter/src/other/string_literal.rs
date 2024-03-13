@@ -3,7 +3,7 @@ use ruff_text_size::Ranged;
 
 use crate::prelude::*;
 use crate::string::{docstring, Quoting, StringNormalizer, StringPart};
-use crate::QuotePreference;
+use crate::QuoteStyle;
 
 pub(crate) struct FormatStringLiteral<'a> {
     value: &'a StringLiteral,
@@ -53,7 +53,7 @@ impl Format<PyFormatContext<'_>> for FormatStringLiteral<'_> {
         let quote_style = if self.layout.is_docstring() && !quote_style.is_preserve() {
             // Per PEP 8 and PEP 257, always prefer double quotes for docstrings,
             // except when using quote-style=preserve
-            QuotePreference::Double
+            QuoteStyle::Double
         } else {
             quote_style
         };

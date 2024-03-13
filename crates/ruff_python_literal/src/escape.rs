@@ -1,7 +1,7 @@
-use ruff_python_ast::str::QuoteStyle;
+use ruff_python_ast::str::Quote;
 
 pub struct EscapeLayout {
-    pub quote: QuoteStyle,
+    pub quote: Quote,
     pub len: Option<usize>,
 }
 
@@ -28,11 +28,11 @@ pub trait Escape {
 pub(crate) const fn choose_quote(
     single_count: usize,
     double_count: usize,
-    preferred_quote: QuoteStyle,
-) -> (QuoteStyle, usize) {
+    preferred_quote: Quote,
+) -> (Quote, usize) {
     let (primary_count, secondary_count) = match preferred_quote {
-        QuoteStyle::Single => (single_count, double_count),
-        QuoteStyle::Double => (double_count, single_count),
+        Quote::Single => (single_count, double_count),
+        Quote::Double => (double_count, single_count),
     };
 
     // always use primary unless we have primary but no secondary
@@ -51,18 +51,18 @@ pub struct UnicodeEscape<'a> {
 
 impl<'a> UnicodeEscape<'a> {
     #[inline]
-    pub fn with_forced_quote(source: &'a str, quote: QuoteStyle) -> Self {
+    pub fn with_forced_quote(source: &'a str, quote: Quote) -> Self {
         let layout = EscapeLayout { quote, len: None };
         Self { source, layout }
     }
     #[inline]
-    pub fn with_preferred_quote(source: &'a str, quote: QuoteStyle) -> Self {
+    pub fn with_preferred_quote(source: &'a str, quote: Quote) -> Self {
         let layout = Self::repr_layout(source, quote);
         Self { source, layout }
     }
     #[inline]
     pub fn new_repr(source: &'a str) -> Self {
-        Self::with_preferred_quote(source, QuoteStyle::Single)
+        Self::with_preferred_quote(source, Quote::Single)
     }
     #[inline]
     pub fn str_repr<'r>(&'a self) -> StrRepr<'r, 'a> {
@@ -101,7 +101,7 @@ impl UnicodeEscape<'_> {
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss
     )]
-    pub fn repr_layout(source: &str, preferred_quote: QuoteStyle) -> EscapeLayout {
+    pub fn repr_layout(source: &str, preferred_quote: Quote) -> EscapeLayout {
         Self::output_layout_with_checker(source, preferred_quote, |a, b| {
             Some((a as isize).checked_add(b as isize)? as usize)
         })
@@ -109,7 +109,7 @@ impl UnicodeEscape<'_> {
 
     fn output_layout_with_checker(
         source: &str,
-        preferred_quote: QuoteStyle,
+        preferred_quote: Quote,
         length_add: impl Fn(usize, usize) -> Option<usize>,
     ) -> EscapeLayout {
         let mut out_len = Self::REPR_RESERVED_LEN;
@@ -133,7 +133,7 @@ impl UnicodeEscape<'_> {
                 fn stop(
                     single_count: usize,
                     double_count: usize,
-                    preferred_quote: QuoteStyle,
+                    preferred_quote: Quote,
                 ) -> EscapeLayout {
                     EscapeLayout {
                         quote: choose_quote(single_count, double_count, preferred_quote).0,
@@ -174,7 +174,7 @@ impl UnicodeEscape<'_> {
 
     fn write_char(
         ch: char,
-        quote: QuoteStyle,
+        quote: Quote,
         formatter: &mut impl std::fmt::Write,
     ) -> std::fmt::Result {
         match ch {
@@ -240,18 +240,18 @@ impl<'a> AsciiEscape<'a> {
         Self { source, layout }
     }
     #[inline]
-    pub fn with_forced_quote(source: &'a [u8], quote: QuoteStyle) -> Self {
+    pub fn with_forced_quote(source: &'a [u8], quote: Quote) -> Self {
         let layout = EscapeLayout { quote, len: None };
         Self { source, layout }
     }
     #[inline]
-    pub fn with_preferred_quote(source: &'a [u8], quote: QuoteStyle) -> Self {
+    pub fn with_preferred_quote(source: &'a [u8], quote: Quote) -> Self {
         let layout = Self::repr_layout(source, quote);
         Self { source, layout }
     }
     #[inline]
     pub fn new_repr(source: &'a [u8]) -> Self {
-        Self::with_preferred_quote(source, QuoteStyle::Single)
+        Self::with_preferred_quote(source, Quote::Single)
     }
     #[inline]
     pub fn bytes_repr<'r>(&'a self) -> BytesRepr<'r, 'a> {
@@ -265,7 +265,7 @@ impl AsciiEscape<'_> {
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss
     )]
-    pub fn repr_layout(source: &[u8], preferred_quote: QuoteStyle) -> EscapeLayout {
+    pub fn repr_layout(source: &[u8], preferred_quote: Quote) -> EscapeLayout {
         Self::output_layout_with_checker(source, preferred_quote, 3, |a, b| {
             Some((a as isize).checked_add(b as isize)? as usize)
         })
@@ -277,14 +277,14 @@ impl AsciiEscape<'_> {
         clippy::cast_sign_loss
     )]
     pub fn named_repr_layout(source: &[u8], name: &str) -> EscapeLayout {
-        Self::output_layout_with_checker(source, QuoteStyle::Single, name.len() + 2 + 3, |a, b| {
+        Self::output_layout_with_checker(source, Quote::Single, name.len() + 2 + 3, |a, b| {
             Some((a as isize).checked_add(b as isize)? as usize)
         })
     }
 
     fn output_layout_with_checker(
         source: &[u8],
-        preferred_quote: QuoteStyle,
+        preferred_quote: Quote,
         reserved_len: usize,
         length_add: impl Fn(usize, usize) -> Option<usize>,
     ) -> EscapeLayout {
@@ -309,7 +309,7 @@ impl AsciiEscape<'_> {
                 fn stop(
                     single_count: usize,
                     double_count: usize,
-                    preferred_quote: QuoteStyle,
+                    preferred_quote: Quote,
                 ) -> EscapeLayout {
                     EscapeLayout {
                         quote: choose_quote(single_count, double_count, preferred_quote).0,
@@ -341,11 +341,7 @@ impl AsciiEscape<'_> {
         }
     }
 
-    fn write_char(
-        ch: u8,
-        quote: QuoteStyle,
-        formatter: &mut impl std::fmt::Write,
-    ) -> std::fmt::Result {
+    fn write_char(ch: u8, quote: Quote, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
         match ch {
             b'\t' => formatter.write_str("\\t"),
             b'\n' => formatter.write_str("\\n"),

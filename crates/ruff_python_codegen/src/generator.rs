@@ -2,7 +2,7 @@
 
 use std::ops::Deref;
 
-use ruff_python_ast::str::QuoteStyle;
+use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
     self as ast, Alias, ArgOrKeyword, BoolOp, CmpOp, Comprehension, ConversionFlag, DebugText,
     ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters, Pattern,
@@ -66,7 +66,7 @@ pub struct Generator<'a> {
     /// The indentation style to use.
     indent: &'a Indentation,
     /// The quote style to use for string literals.
-    quote: QuoteStyle,
+    quote: Quote,
     /// The line ending to use.
     line_ending: LineEnding,
     buffer: String,
@@ -90,7 +90,7 @@ impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
 }
 
 impl<'a> Generator<'a> {
-    pub const fn new(indent: &'a Indentation, quote: QuoteStyle, line_ending: LineEnding) -> Self {
+    pub const fn new(indent: &'a Indentation, quote: Quote, line_ending: LineEnding) -> Self {
         Self {
             // Style preferences.
             indent,
@@ -1401,7 +1401,7 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::{str::QuoteStyle, Mod, ModModule};
+    use ruff_python_ast::{str::Quote, Mod, ModModule};
     use ruff_python_parser::{self, parse_suite, Mode};
     use ruff_source_file::LineEnding;
 
@@ -1411,7 +1411,7 @@ mod tests {
 
     fn round_trip(contents: &str) -> String {
         let indentation = Indentation::default();
-        let quote = QuoteStyle::default();
+        let quote = Quote::default();
         let line_ending = LineEnding::default();
         let stmt = parse_suite(contents).unwrap();
         let mut generator = Generator::new(&indentation, quote, line_ending);
@@ -1421,7 +1421,7 @@ mod tests {
 
     fn round_trip_with(
         indentation: &Indentation,
-        quote: QuoteStyle,
+        quote: Quote,
         line_ending: LineEnding,
         contents: &str,
     ) -> String {
@@ -1433,7 +1433,7 @@ mod tests {
 
     fn jupyter_round_trip(contents: &str) -> String {
         let indentation = Indentation::default();
-        let quote = QuoteStyle::default();
+        let quote = Quote::default();
         let line_ending = LineEnding::default();
         let ast = ruff_python_parser::parse(contents, Mode::Ipython).unwrap();
         let Mod::Module(ModModule { body, .. }) = ast else {
@@ -1737,7 +1737,7 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
-                QuoteStyle::Double,
+                Quote::Double,
                 LineEnding::default(),
                 r#""hello""#
             ),
@@ -1746,7 +1746,7 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
-                QuoteStyle::Single,
+                Quote::Single,
                 LineEnding::default(),
                 r#""hello""#
             ),
@@ -1755,7 +1755,7 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
-                QuoteStyle::Double,
+                Quote::Double,
                 LineEnding::default(),
                 r"'hello'"
             ),
@@ -1764,7 +1764,7 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
-                QuoteStyle::Single,
+                Quote::Single,
                 LineEnding::default(),
                 r"'hello'"
             ),
@@ -1777,7 +1777,7 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::new("    ".to_string()),
-                QuoteStyle::default(),
+                Quote::default(),
                 LineEnding::default(),
                 r"
 if True:
@@ -1795,7 +1795,7 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::new("  ".to_string()),
-                QuoteStyle::default(),
+                Quote::default(),
                 LineEnding::default(),
                 r"
 if True:
@@ -1813,7 +1813,7 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::new("\t".to_string()),
-                QuoteStyle::default(),
+                Quote::default(),
                 LineEnding::default(),
                 r"
 if True:
@@ -1835,7 +1835,7 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
-                QuoteStyle::default(),
+                Quote::default(),
                 LineEnding::Lf,
                 "if True:\n    print(42)",
             ),
@@ -1845,7 +1845,7 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
-                QuoteStyle::default(),
+                Quote::default(),
                 LineEnding::CrLf,
                 "if True:\n    print(42)",
             ),
@@ -1855,7 +1855,7 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
-                QuoteStyle::default(),
+                Quote::default(),
                 LineEnding::Cr,
                 "if True:\n    print(42)",
             ),
