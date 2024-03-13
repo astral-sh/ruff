@@ -22,6 +22,18 @@ use ruff_source_file::SourceRow;
 /// import foo
 /// import bar
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe when the redefinition matches the
+/// same bound name as the original definition, but maps to a different
+/// symbol, as removing the redefinition could change behavior.
+///
+/// For example, removing either import definition in the following
+/// snippet would lead to a change in behavior:
+/// ```python
+/// import datetime
+/// from datetime import datetime
+/// ```
 #[violation]
 pub struct RedefinedWhileUnused {
     pub name: String,

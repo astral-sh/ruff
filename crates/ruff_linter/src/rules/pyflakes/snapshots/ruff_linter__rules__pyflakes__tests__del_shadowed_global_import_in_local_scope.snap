@@ -28,12 +28,8 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
   = help: Remove definition: `os`
 
 ℹ Safe fix
-2 2 | import os
-3 3 | 
-4 4 | def f():
-5   |-    import os
-6 5 | 
-7 6 |     # Despite this `del`, `import os` in `f` should still be flagged as shadowing an unused
-8 7 |     # import.
-
-
+1 1 | 
+2   |-import os
+3 2 | 
+4 3 | def f():
+5 4 |     import os

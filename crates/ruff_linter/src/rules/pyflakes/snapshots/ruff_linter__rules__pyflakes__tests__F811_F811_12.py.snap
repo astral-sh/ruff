@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F811_12.py:6:20: F811 Redefinition of unused `mixer` from line 2
+F811_12.py:6:20: F811 [*] Redefinition of unused `mixer` from line 2
   |
 4 |     pass
 5 | else:
@@ -10,3 +10,11 @@ F811_12.py:6:20: F811 Redefinition of unused `mixer` from line 2
 7 | mixer(123)
   |
   = help: Remove definition: `mixer`
+
+ℹ Unsafe fix
+1 1 | try:
+2   |-    from aa import mixer
+  2 |+    pass
+3 3 | except ImportError:
+4 4 |     pass
+5 5 | else:
