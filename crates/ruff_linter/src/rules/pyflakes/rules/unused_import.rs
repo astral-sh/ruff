@@ -271,7 +271,7 @@ fn fix_imports(
         checker.stylist(),
         checker.indexer(),
     )?;
-    // It's unsafe to remove things from init because it can break public interfaces
+    // It's unsafe to remove things from `__init__.py` because it can break public interfaces
     let applicability = if in_init {
         Applicability::Unsafe
     } else {
