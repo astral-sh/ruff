@@ -121,7 +121,7 @@ impl Printer {
                     let s = if remaining == 1 { "" } else { "s" };
                     writeln!(writer, "Found {remaining} error{s}.")?;
                 } else if remaining == 0 {
-                    writeln!(writer, "Found 0 errors.")?;
+                    writeln!(writer, "All checks passed!")?;
                 }
 
                 if let Some(fixables) = fixables {
