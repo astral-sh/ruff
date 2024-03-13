@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
@@ -16,27 +17,38 @@ use crate::star_import::StarImport;
 /// This mirrors Python's behaviour when parsing source code that uses unicode identifiers:
 /// see <https://docs.python.org/3/reference/lexical_analysis.html#identifiers>
 #[derive(Debug, Default)]
-struct Bindings(FxHashMap<Box<str>, BindingId>);
+struct Bindings<'a>(FxHashMap<Cow<'a, str>, BindingId>);
 
-impl Bindings {
+impl<'a> Bindings<'a> {
     fn get(&self, name: &str) -> Option<&BindingId> {
-        self.0.get(&*name.nfkc().collect::<String>())
+        if name.is_ascii() {
+            self.0.get(name)
+        } else {
+            self.0.get(&*name.nfkc().collect::<String>())
+        }
     }
 
-    fn insert(&mut self, name: &str, value: BindingId) -> Option<BindingId> {
-        self.0
-            .insert(name.nfkc().collect::<String>().into_boxed_str(), value)
+    fn insert(&mut self, name: &'a str, value: BindingId) -> Option<BindingId> {
+        if name.is_ascii() {
+            self.0.insert(Cow::Borrowed(name), value)
+        } else {
+            self.0.insert(Cow::Owned(name.nfkc().collect()), value)
+        }
     }
 
     fn contains_key(&self, key: &str) -> bool {
-        self.0.contains_key(&*key.nfkc().collect::<String>())
+        if key.is_ascii() {
+            self.0.contains_key(key)
+        } else {
+            self.0.contains_key(&*key.nfkc().collect::<String>())
+        }
     }
 
     fn values(&self) -> impl Iterator<Item = &BindingId> {
         self.0.values()
     }
 
-    fn iter(&self) -> impl Iterator<Item = (&Box<str>, &BindingId)> {
+    fn iter(&self) -> impl Iterator<Item = (&Cow<'a, str>, &BindingId)> {
         self.0.iter()
     }
 }
@@ -54,7 +66,7 @@ pub struct Scope<'a> {
     star_imports: Vec<StarImport<'a>>,
 
     /// A map from bound name to binding ID.
-    bindings: Bindings,
+    bindings: Bindings<'a>,
 
     /// A map from binding ID to binding ID that it shadows.
     ///
