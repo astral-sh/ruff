@@ -146,6 +146,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pycodestyle, "E401") => (RuleGroup::Stable, rules::pycodestyle::rules::MultipleImportsOnOneLine),
         (Pycodestyle, "E402") => (RuleGroup::Stable, rules::pycodestyle::rules::ModuleImportNotAtTopOfFile),
         (Pycodestyle, "E501") => (RuleGroup::Stable, rules::pycodestyle::rules::LineTooLong),
+        (Pycodestyle, "E502") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::RedundantBackslash),
         (Pycodestyle, "E701") => (RuleGroup::Stable, rules::pycodestyle::rules::MultipleStatementsOnOneLineColon),
         (Pycodestyle, "E702") => (RuleGroup::Stable, rules::pycodestyle::rules::MultipleStatementsOnOneLineSemicolon),
         (Pycodestyle, "E703") => (RuleGroup::Stable, rules::pycodestyle::rules::UselessSemicolon),
@@ -167,6 +168,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pycodestyle, "W291") => (RuleGroup::Stable, rules::pycodestyle::rules::TrailingWhitespace),
         (Pycodestyle, "W292") => (RuleGroup::Stable, rules::pycodestyle::rules::MissingNewlineAtEndOfFile),
         (Pycodestyle, "W293") => (RuleGroup::Stable, rules::pycodestyle::rules::BlankLineWithWhitespace),
+        (Pycodestyle, "W391") => (RuleGroup::Preview, rules::pycodestyle::rules::TooManyNewlinesAtEndOfFile),
         (Pycodestyle, "W505") => (RuleGroup::Stable, rules::pycodestyle::rules::DocLineTooLong),
         (Pycodestyle, "W605") => (RuleGroup::Stable, rules::pycodestyle::rules::InvalidEscapeSequence),
 
@@ -680,6 +682,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "607") => (RuleGroup::Stable, rules::flake8_bandit::rules::StartProcessWithPartialPath),
         (Flake8Bandit, "608") => (RuleGroup::Stable, rules::flake8_bandit::rules::HardcodedSQLExpression),
         (Flake8Bandit, "609") => (RuleGroup::Stable, rules::flake8_bandit::rules::UnixCommandWildcardInjection),
+        (Flake8Bandit, "610") => (RuleGroup::Preview, rules::flake8_bandit::rules::DjangoExtra),
         (Flake8Bandit, "611") => (RuleGroup::Stable, rules::flake8_bandit::rules::DjangoRawSql),
         (Flake8Bandit, "612") => (RuleGroup::Stable, rules::flake8_bandit::rules::LoggingConfigInsecureListen),
         (Flake8Bandit, "701") => (RuleGroup::Stable, rules::flake8_bandit::rules::Jinja2AutoescapeFalse),
