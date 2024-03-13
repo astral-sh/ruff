@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+invalid_return_type_bool.py:3:16: PLE0304 `__bool__` does not return `bool`
+  |
+1 | class Float:
+2 |     def __bool__(self):
+3 |         return 3.05  # [invalid-bool-return]
+  |                ^^^^ PLE0304
+4 | 
+5 | class Int:
+  |
+
+invalid_return_type_bool.py:7:16: PLE0304 `__bool__` does not return `bool`
+  |
+5 | class Int:
+6 |     def __bool__(self):
+7 |         return 0  # [invalid-bool-return]
+  |                ^ PLE0304
+  |
