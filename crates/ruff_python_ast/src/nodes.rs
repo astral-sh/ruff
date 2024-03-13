@@ -1249,14 +1249,14 @@ pub struct FString {
 }
 
 impl FString {
-    /// Returns an iterator over all the [`FStringLiteralElement`] contained in this f-string.
+    /// Returns an iterator over all the [`FStringLiteralElement`] nodes contained in this f-string.
     pub fn literals(&self) -> impl Iterator<Item = &FStringLiteralElement> {
         self.elements
             .iter()
             .filter_map(|element| element.as_literal())
     }
 
-    /// Returns an iterator over all the [`FStringExpressionElement`] contained in this f-string.
+    /// Returns an iterator over all the [`FStringExpressionElement`] nodes contained in this f-string.
     pub fn expressions(&self) -> impl Iterator<Item = &FStringExpressionElement> {
         self.elements
             .iter()
