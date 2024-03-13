@@ -693,11 +693,14 @@ pub struct LintCommonOptions {
     /// imports will still be flagged, but with a dedicated message suggesting
     /// that the import is either added to the module's `__all__` symbol, or
     /// re-exported with a redundant alias (e.g., `import os as os`).
+    ///
+    /// This option is enabled by default, but you can opt-in to removal of imports
+    /// via an unsafe fix.
     #[option(
-        default = "false",
+        default = "true",
         value_type = "bool",
         example = r#"
-            ignore-init-module-imports = true
+            ignore-init-module-imports = false
         "#
     )]
     pub ignore_init_module_imports: Option<bool>,

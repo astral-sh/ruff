@@ -224,6 +224,19 @@ mod tests {
     }
 
     #[test]
+    fn init_unused_import_opt_in_to_fix() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes/__init__.py"),
+            &LinterSettings {
+                ignore_init_module_imports: false,
+                ..LinterSettings::for_rules(vec![Rule::UnusedImport])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn default_builtins() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyflakes/builtins.py"),
