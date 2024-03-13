@@ -3,12 +3,43 @@ use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
+use unicode_normalization::UnicodeNormalization;
 
 use ruff_index::{newtype_index, Idx, IndexSlice, IndexVec};
 
 use crate::binding::BindingId;
 use crate::globals::GlobalsId;
 use crate::star_import::StarImport;
+
+/// Newtype wrapper around an `FxHashMap`
+/// to ensure that all names are unicode-normalized before being stored as bindings.
+/// This mirrors Python's behaviour when parsing source code that uses unicode identifiers:
+/// see <https://docs.python.org/3/reference/lexical_analysis.html#identifiers>
+#[derive(Debug, Default)]
+struct Bindings(FxHashMap<Box<str>, BindingId>);
+
+impl Bindings {
+    fn get(&self, name: &str) -> Option<&BindingId> {
+        self.0.get(&*name.nfkc().collect::<String>())
+    }
+
+    fn insert(&mut self, name: &str, value: BindingId) -> Option<BindingId> {
+        self.0
+            .insert(name.nfkc().collect::<String>().into_boxed_str(), value)
+    }
+
+    fn contains_key(&self, key: &str) -> bool {
+        self.0.contains_key(&*key.nfkc().collect::<String>())
+    }
+
+    fn values(&self) -> impl Iterator<Item = &BindingId> {
+        self.0.values()
+    }
+
+    fn iter(&self) -> impl Iterator<Item = (&Box<str>, &BindingId)> {
+        self.0.iter()
+    }
+}
 
 #[derive(Debug)]
 pub struct Scope<'a> {
@@ -23,7 +54,7 @@ pub struct Scope<'a> {
     star_imports: Vec<StarImport<'a>>,
 
     /// A map from bound name to binding ID.
-    bindings: FxHashMap<&'a str, BindingId>,
+    bindings: Bindings,
 
     /// A map from binding ID to binding ID that it shadows.
     ///
@@ -50,7 +81,7 @@ impl<'a> Scope<'a> {
             kind: ScopeKind::Module,
             parent: None,
             star_imports: Vec::default(),
-            bindings: FxHashMap::default(),
+            bindings: Bindings::default(),
             shadowed_bindings: FxHashMap::default(),
             globals_id: None,
             flags: ScopeFlags::empty(),
@@ -62,7 +93,7 @@ impl<'a> Scope<'a> {
             kind,
             parent: Some(parent),
             star_imports: Vec::default(),
-            bindings: FxHashMap::default(),
+            bindings: Bindings::default(),
             shadowed_bindings: FxHashMap::default(),
             globals_id: None,
             flags: ScopeFlags::empty(),
@@ -95,8 +126,8 @@ impl<'a> Scope<'a> {
     }
 
     /// Returns a tuple of the name and ID of all bindings defined in this scope.
-    pub fn bindings(&self) -> impl Iterator<Item = (&'a str, BindingId)> + '_ {
-        self.bindings.iter().map(|(&name, &id)| (name, id))
+    pub fn bindings(&self) -> impl Iterator<Item = (&str, BindingId)> + '_ {
+        self.bindings.iter().map(|(name, &id)| (&**name, id))
     }
 
     /// Like [`Scope::get`], but returns all bindings with the given name, including
@@ -118,9 +149,9 @@ impl<'a> Scope<'a> {
     /// Like [`Scope::bindings`], but returns all bindings added to the scope, including those that
     /// were shadowed by later bindings.
     pub fn all_bindings(&self) -> impl Iterator<Item = (&str, BindingId)> + '_ {
-        self.bindings.iter().flat_map(|(&name, &id)| {
+        self.bindings.iter().flat_map(|(name, &id)| {
             std::iter::successors(Some(id), |id| self.shadowed_bindings.get(id).copied())
-                .map(move |id| (name, id))
+                .map(move |id| (&**name, id))
         })
     }
 

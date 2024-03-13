@@ -2394,6 +2394,7 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
+ "unicode-normalization",
 ]
 
 [[package]]
