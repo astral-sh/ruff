@@ -10,7 +10,7 @@ use ruff_source_file::Locator;
 ///
 /// ## Why is this bad?
 /// Trailing blank lines are superfluous.
-/// However the last line should end with a new line.
+/// However, the last line should end with a new line.
 ///
 /// ## Example
 /// ```python
