@@ -1170,7 +1170,7 @@ impl<'src> Parser<'src> {
         let optional_vars = if self.eat(TokenKind::As) {
             let mut target = self.parse_conditional_expression_or_higher();
 
-            if helpers::is_valid_assignment_target(&target.expr) {
+            if !helpers::is_valid_assignment_target(&target.expr) {
                 self.add_error(ParseErrorType::InvalidAssignmentTarget, target.range());
             }
 
