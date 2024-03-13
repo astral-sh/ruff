@@ -1,3 +1,5 @@
+use std::fmt;
+
 use aho_corasick::{AhoCorasick, AhoCorasickKind, Anchored, Input, MatchKind, StartKind};
 use once_cell::sync::Lazy;
 
@@ -13,6 +15,7 @@ pub enum QuoteStyle {
 }
 
 impl QuoteStyle {
+    #[inline]
     pub const fn as_char(self) -> char {
         match self {
             Self::Single => '\'',
@@ -21,10 +24,37 @@ impl QuoteStyle {
     }
 
     #[must_use]
+    #[inline]
     pub const fn opposite(self) -> Self {
         match self {
             Self::Single => Self::Double,
             Self::Double => Self::Single,
+        }
+    }
+
+    #[inline]
+    pub const fn as_byte(self) -> u8 {
+        match self {
+            Self::Single => b'\'',
+            Self::Double => b'"',
+        }
+    }
+}
+
+impl fmt::Display for QuoteStyle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_char())
+    }
+}
+
+impl TryFrom<char> for QuoteStyle {
+    type Error = ();
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        match value {
+            '\'' => Ok(QuoteStyle::Single),
+            '"' => Ok(QuoteStyle::Double),
+            _ => Err(()),
         }
     }
 }

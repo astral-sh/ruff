@@ -22,6 +22,8 @@ itertools = { workspace = true }
 lexical-parse-float = { workspace = true, features = ["format"] }
 unic-ucd-category = { workspace = true }
 
+ruff_python_ast = { path = "../ruff_python_ast" }
+
 [dev-dependencies]
 rand = { workspace = true }
 

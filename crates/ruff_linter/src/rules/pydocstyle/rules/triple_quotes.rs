@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_codegen::Quote;
+use ruff_python_ast::str::QuoteStyle;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -39,7 +39,7 @@ use crate::docstrings::Docstring;
 /// [formatter]: https://docs.astral.sh/ruff/formatter/
 #[violation]
 pub struct TripleSingleQuotes {
-    expected_quote: Quote,
+    expected_quote: QuoteStyle,
 }
 
 impl Violation for TripleSingleQuotes {
@@ -49,16 +49,16 @@ impl Violation for TripleSingleQuotes {
     fn message(&self) -> String {
         let TripleSingleQuotes { expected_quote } = self;
         match expected_quote {
-            Quote::Double => format!(r#"Use triple double quotes `"""`"#),
-            Quote::Single => format!(r"Use triple single quotes `'''`"),
+            QuoteStyle::Double => format!(r#"Use triple double quotes `"""`"#),
+            QuoteStyle::Single => format!(r"Use triple single quotes `'''`"),
         }
     }
 
     fn fix_title(&self) -> Option<String> {
         let TripleSingleQuotes { expected_quote } = self;
         Some(match expected_quote {
-            Quote::Double => format!("Convert to triple double quotes"),
-            Quote::Single => format!("Convert to triple single quotes"),
+            QuoteStyle::Double => format!("Convert to triple double quotes"),
+            QuoteStyle::Single => format!("Convert to triple single quotes"),
         })
     }
 }
@@ -75,13 +75,13 @@ pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
         if docstring.body().contains("\'\'\'") {
             return;
         }
-        Quote::Single
+        QuoteStyle::Single
     } else {
-        Quote::Double
+        QuoteStyle::Double
     };
 
     match expected_quote {
-        Quote::Single => {
+        QuoteStyle::Single => {
             if !leading_quote.ends_with("'''") {
                 let mut diagnostic =
                     Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
@@ -97,7 +97,7 @@ pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
                 checker.diagnostics.push(diagnostic);
             }
         }
-        Quote::Double => {
+        QuoteStyle::Double => {
             if !leading_quote.ends_with("\"\"\"") {
                 let mut diagnostic =
                     Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());

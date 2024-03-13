@@ -40,7 +40,7 @@ pub struct PyFormatOptions {
     line_ending: LineEnding,
 
     /// The preferred quote style to use (single vs double quotes).
-    quote_style: QuoteStyle,
+    quote_style: QuotePreference,
 
     /// Whether to expand lists or elements if they have a trailing comma such as `(a, b,)`.
     magic_trailing_comma: MagicTrailingComma,
@@ -84,7 +84,7 @@ impl Default for PyFormatOptions {
             indent_style: default_indent_style(),
             line_width: default_line_width(),
             indent_width: default_indent_width(),
-            quote_style: QuoteStyle::default(),
+            quote_style: QuotePreference::default(),
             line_ending: LineEnding::default(),
             magic_trailing_comma: MagicTrailingComma::default(),
             source_map_generation: SourceMapGeneration::default(),
@@ -116,7 +116,7 @@ impl PyFormatOptions {
         self.magic_trailing_comma
     }
 
-    pub const fn quote_style(&self) -> QuoteStyle {
+    pub const fn quote_style(&self) -> QuotePreference {
         self.quote_style
     }
 
@@ -157,7 +157,7 @@ impl PyFormatOptions {
     }
 
     #[must_use]
-    pub fn with_quote_style(mut self, style: QuoteStyle) -> Self {
+    pub fn with_quote_style(mut self, style: QuotePreference) -> Self {
         self.quote_style = style;
         self
     }
@@ -241,20 +241,20 @@ impl FormatOptions for PyFormatOptions {
     serde(rename_all = "kebab-case")
 )]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub enum QuoteStyle {
+pub enum QuotePreference {
     Single,
     #[default]
     Double,
     Preserve,
 }
 
-impl QuoteStyle {
+impl QuotePreference {
     pub const fn is_preserve(self) -> bool {
-        matches!(self, QuoteStyle::Preserve)
+        matches!(self, QuotePreference::Preserve)
     }
 }
 
-impl fmt::Display for QuoteStyle {
+impl fmt::Display for QuotePreference {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Single => write!(f, "single"),
@@ -264,7 +264,7 @@ impl fmt::Display for QuoteStyle {
     }
 }
 
-impl FromStr for QuoteStyle {
+impl FromStr for QuotePreference {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {

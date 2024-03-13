@@ -36,7 +36,7 @@ use ruff_linter::{
     RUFF_PKG_VERSION,
 };
 use ruff_python_formatter::{
-    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, QuoteStyle,
+    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, QuotePreference,
 };
 
 use crate::options::{
@@ -1165,7 +1165,7 @@ pub struct FormatConfiguration {
     pub extension: Option<ExtensionMapping>,
 
     pub indent_style: Option<IndentStyle>,
-    pub quote_style: Option<QuoteStyle>,
+    pub quote_style: Option<QuotePreference>,
     pub magic_trailing_comma: Option<MagicTrailingComma>,
     pub line_ending: Option<LineEnding>,
     pub docstring_code_format: Option<DocstringCode>,

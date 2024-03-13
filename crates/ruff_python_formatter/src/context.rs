@@ -1,8 +1,8 @@
 use crate::comments::Comments;
 use crate::other::f_string::FStringContext;
-use crate::string::QuoteChar;
 use crate::PyFormatOptions;
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
+use ruff_python_ast::str::QuoteStyle;
 use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
@@ -22,7 +22,7 @@ pub struct PyFormatContext<'a> {
     /// works. For example, multi-line strings will always be written with a
     /// quote style that is inverted from the one here in order to ensure that
     /// the formatted Python code will be valid.
-    docstring: Option<QuoteChar>,
+    docstring: Option<QuoteStyle>,
     /// The state of the formatter with respect to f-strings.
     f_string_state: FStringState,
 }
@@ -74,7 +74,7 @@ impl<'a> PyFormatContext<'a> {
     ///
     /// The quote character returned corresponds to the quoting used for the
     /// docstring containing the code snippet currently being formatted.
-    pub(crate) fn docstring(&self) -> Option<QuoteChar> {
+    pub(crate) fn docstring(&self) -> Option<QuoteStyle> {
         self.docstring
     }
 
@@ -83,7 +83,7 @@ impl<'a> PyFormatContext<'a> {
     ///
     /// The quote character given should correspond to the quote character used
     /// for the docstring containing the code snippets.
-    pub(crate) fn in_docstring(self, quote: QuoteChar) -> PyFormatContext<'a> {
+    pub(crate) fn in_docstring(self, quote: QuoteStyle) -> PyFormatContext<'a> {
         PyFormatContext {
             docstring: Some(quote),
             ..self

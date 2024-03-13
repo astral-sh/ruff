@@ -29,7 +29,7 @@ use ruff_linter::settings::types::{
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
-use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
+use ruff_python_formatter::{DocstringCodeLineWidth, QuotePreference};
 
 use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
@@ -2988,7 +2988,7 @@ pub struct FormatOptions {
             quote-style = "single"
         "#
     )]
-    pub quote_style: Option<QuoteStyle>,
+    pub quote_style: Option<QuotePreference>,
 
     /// Ruff uses existing trailing commas as an indication that short lines should be left separate.
     /// If this option is set to `true`, the magic trailing comma is ignored.

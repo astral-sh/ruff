@@ -1159,6 +1159,15 @@ pub enum FStringPart {
     FString(FString),
 }
 
+impl FStringPart {
+    pub fn quote_style(&self) -> QuoteStyle {
+        match self {
+            Self::Literal(string_literal) => string_literal.flags.quote_style(),
+            Self::FString(f_string) => f_string.flags.quote_style(),
+        }
+    }
+}
+
 impl Ranged for FStringPart {
     fn range(&self) -> TextRange {
         match self {

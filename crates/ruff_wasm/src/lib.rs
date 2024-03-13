@@ -15,7 +15,7 @@ use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
-use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
+use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuotePreference};
 use ruff_python_index::{CommentRangesBuilder, Indexer};
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::{parse_tokens, tokenize_all, AsMode, Mode};
@@ -147,7 +147,7 @@ impl Workspace {
             }),
             format: Some(FormatOptions {
                 indent_style: Some(IndentStyle::Space),
-                quote_style: Some(QuoteStyle::Double),
+                quote_style: Some(QuotePreference::Double),
                 ..FormatOptions::default()
             }),
             ..Options::default()

@@ -1,21 +1,19 @@
 //! Detect code style from Python source code.
 
-use std::fmt;
 use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
-use ruff_python_literal::escape::Quote as StrQuote;
+
+use ruff_python_ast::str::QuoteStyle;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
-use ruff_source_file::{find_newline, LineEnding};
-
-use ruff_source_file::Locator;
+use ruff_source_file::{find_newline, LineEnding, Locator};
 
 #[derive(Debug, Clone)]
 pub struct Stylist<'a> {
     locator: &'a Locator<'a>,
     indentation: Indentation,
-    quote: Quote,
+    quote: QuoteStyle,
     line_ending: OnceCell<LineEnding>,
 }
 
@@ -24,7 +22,7 @@ impl<'a> Stylist<'a> {
         &self.indentation
     }
 
-    pub fn quote(&'a self) -> Quote {
+    pub fn quote(&'a self) -> QuoteStyle {
         self.quote
     }
 
@@ -49,17 +47,15 @@ impl<'a> Stylist<'a> {
     }
 }
 
-fn detect_quote(tokens: &[LexResult]) -> Quote {
+fn detect_quote(tokens: &[LexResult]) -> QuoteStyle {
     for (token, _) in tokens.iter().flatten() {
         match token {
-            Tok::String { kind, .. } if !kind.is_triple_quoted() => {
-                return kind.quote_style().into()
-            }
-            Tok::FStringStart(kind) => return kind.quote_style().into(),
+            Tok::String { kind, .. } if !kind.is_triple_quoted() => return kind.quote_style(),
+            Tok::FStringStart(kind) => return kind.quote_style(),
             _ => continue,
         }
     }
-    Quote::default()
+    QuoteStyle::default()
 }
 
 fn detect_indention(tokens: &[LexResult], locator: &Locator) -> Indentation {
@@ -91,50 +87,6 @@ fn detect_indention(tokens: &[LexResult], locator: &Locator) -> Indentation {
         Indentation(whitespace.to_string())
     } else {
         Indentation::default()
-    }
-}
-
-/// The quotation style used in Python source code.
-#[derive(Debug, Default, PartialEq, Eq, Copy, Clone)]
-pub enum Quote {
-    Single,
-    #[default]
-    Double,
-}
-
-impl From<ruff_python_ast::str::QuoteStyle> for Quote {
-    fn from(value: ruff_python_ast::str::QuoteStyle) -> Self {
-        match value {
-            ruff_python_ast::str::QuoteStyle::Double => Self::Double,
-            ruff_python_ast::str::QuoteStyle::Single => Self::Single,
-        }
-    }
-}
-
-impl From<Quote> for char {
-    fn from(val: Quote) -> Self {
-        match val {
-            Quote::Single => '\'',
-            Quote::Double => '"',
-        }
-    }
-}
-
-impl From<Quote> for StrQuote {
-    fn from(val: Quote) -> Self {
-        match val {
-            Quote::Single => StrQuote::Single,
-            Quote::Double => StrQuote::Double,
-        }
-    }
-}
-
-impl fmt::Display for Quote {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Quote::Single => write!(f, "\'"),
-            Quote::Double => write!(f, "\""),
-        }
     }
 }
 
@@ -179,7 +131,7 @@ mod tests {
 
     use ruff_source_file::{find_newline, LineEnding};
 
-    use super::{Indentation, Quote, Stylist};
+    use super::{Indentation, QuoteStyle, Stylist};
     use ruff_source_file::Locator;
 
     #[test]
@@ -261,7 +213,7 @@ class FormFeedIndent:
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            Quote::default()
+            QuoteStyle::default()
         );
 
         let contents = r"x = '1'";
@@ -269,7 +221,7 @@ class FormFeedIndent:
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            Quote::Single
+            QuoteStyle::Single
         );
 
         let contents = r"x = f'1'";
@@ -277,7 +229,7 @@ class FormFeedIndent:
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            Quote::Single
+            QuoteStyle::Single
         );
 
         let contents = r#"x = "1""#;
@@ -285,7 +237,7 @@ class FormFeedIndent:
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            Quote::Double
+            QuoteStyle::Double
         );
 
         let contents = r#"x = f"1""#;
@@ -293,7 +245,7 @@ class FormFeedIndent:
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            Quote::Double
+            QuoteStyle::Double
         );
 
         let contents = r#"s = "It's done.""#;
@@ -301,7 +253,7 @@ class FormFeedIndent:
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            Quote::Double
+            QuoteStyle::Double
         );
 
         // No style if only double quoted docstring (will take default Double)
@@ -314,7 +266,7 @@ def f():
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            Quote::default()
+            QuoteStyle::default()
         );
 
         // Detect from string literal appearing after docstring
@@ -327,7 +279,7 @@ a = 'v'
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            Quote::Single
+            QuoteStyle::Single
         );
 
         let contents = r#"
@@ -339,7 +291,7 @@ a = "v"
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            Quote::Double
+            QuoteStyle::Double
         );
 
         // Detect from f-string appearing after docstring
@@ -352,7 +304,7 @@ a = f'v'
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            Quote::Single
+            QuoteStyle::Single
         );
 
         let contents = r#"
@@ -364,7 +316,7 @@ a = f"v"
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            Quote::Double
+            QuoteStyle::Double
         );
 
         let contents = r"
@@ -374,7 +326,7 @@ f'''Module docstring.'''
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
             Stylist::from_tokens(&tokens, &locator).quote(),
-            Quote::Single
+            QuoteStyle::Single
         );
     }
 

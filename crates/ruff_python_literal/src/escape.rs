@@ -1,38 +1,7 @@
-#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, is_macro::Is)]
-pub enum Quote {
-    Single,
-    Double,
-}
-
-impl Quote {
-    #[inline]
-    #[must_use]
-    pub const fn swap(self) -> Self {
-        match self {
-            Quote::Single => Quote::Double,
-            Quote::Double => Quote::Single,
-        }
-    }
-
-    #[inline]
-    pub const fn to_byte(&self) -> u8 {
-        match self {
-            Quote::Single => b'\'',
-            Quote::Double => b'"',
-        }
-    }
-
-    #[inline]
-    pub const fn to_char(&self) -> char {
-        match self {
-            Quote::Single => '\'',
-            Quote::Double => '"',
-        }
-    }
-}
+use ruff_python_ast::str::QuoteStyle;
 
 pub struct EscapeLayout {
-    pub quote: Quote,
+    pub quote: QuoteStyle,
     pub len: Option<usize>,
 }
 
@@ -59,17 +28,17 @@ pub trait Escape {
 pub(crate) const fn choose_quote(
     single_count: usize,
     double_count: usize,
-    preferred_quote: Quote,
-) -> (Quote, usize) {
+    preferred_quote: QuoteStyle,
+) -> (QuoteStyle, usize) {
     let (primary_count, secondary_count) = match preferred_quote {
-        Quote::Single => (single_count, double_count),
-        Quote::Double => (double_count, single_count),
+        QuoteStyle::Single => (single_count, double_count),
+        QuoteStyle::Double => (double_count, single_count),
     };
 
     // always use primary unless we have primary but no secondary
     let use_secondary = primary_count > 0 && secondary_count == 0;
     if use_secondary {
-        (preferred_quote.swap(), secondary_count)
+        (preferred_quote.opposite(), secondary_count)
     } else {
         (preferred_quote, primary_count)
     }
@@ -82,18 +51,18 @@ pub struct UnicodeEscape<'a> {
 
 impl<'a> UnicodeEscape<'a> {
     #[inline]
-    pub fn with_forced_quote(source: &'a str, quote: Quote) -> Self {
+    pub fn with_forced_quote(source: &'a str, quote: QuoteStyle) -> Self {
         let layout = EscapeLayout { quote, len: None };
         Self { source, layout }
     }
     #[inline]
-    pub fn with_preferred_quote(source: &'a str, quote: Quote) -> Self {
+    pub fn with_preferred_quote(source: &'a str, quote: QuoteStyle) -> Self {
         let layout = Self::repr_layout(source, quote);
         Self { source, layout }
     }
     #[inline]
     pub fn new_repr(source: &'a str) -> Self {
-        Self::with_preferred_quote(source, Quote::Single)
+        Self::with_preferred_quote(source, QuoteStyle::Single)
     }
     #[inline]
     pub fn str_repr<'r>(&'a self) -> StrRepr<'r, 'a> {
@@ -105,7 +74,7 @@ pub struct StrRepr<'r, 'a>(&'r UnicodeEscape<'a>);
 
 impl StrRepr<'_, '_> {
     pub fn write(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
-        let quote = self.0.layout().quote.to_char();
+        let quote = self.0.layout().quote.as_char();
         formatter.write_char(quote)?;
         self.0.write_body(formatter)?;
         formatter.write_char(quote)
@@ -132,7 +101,7 @@ impl UnicodeEscape<'_> {
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss
     )]
-    pub fn repr_layout(source: &str, preferred_quote: Quote) -> EscapeLayout {
+    pub fn repr_layout(source: &str, preferred_quote: QuoteStyle) -> EscapeLayout {
         Self::output_layout_with_checker(source, preferred_quote, |a, b| {
             Some((a as isize).checked_add(b as isize)? as usize)
         })
@@ -140,7 +109,7 @@ impl UnicodeEscape<'_> {
 
     fn output_layout_with_checker(
         source: &str,
-        preferred_quote: Quote,
+        preferred_quote: QuoteStyle,
         length_add: impl Fn(usize, usize) -> Option<usize>,
     ) -> EscapeLayout {
         let mut out_len = Self::REPR_RESERVED_LEN;
@@ -164,7 +133,7 @@ impl UnicodeEscape<'_> {
                 fn stop(
                     single_count: usize,
                     double_count: usize,
-                    preferred_quote: Quote,
+                    preferred_quote: QuoteStyle,
                 ) -> EscapeLayout {
                     EscapeLayout {
                         quote: choose_quote(single_count, double_count, preferred_quote).0,
@@ -205,7 +174,7 @@ impl UnicodeEscape<'_> {
 
     fn write_char(
         ch: char,
-        quote: Quote,
+        quote: QuoteStyle,
         formatter: &mut impl std::fmt::Write,
     ) -> std::fmt::Result {
         match ch {
@@ -216,7 +185,7 @@ impl UnicodeEscape<'_> {
             // unicodedata lookup just for ascii characters
             '\x20'..='\x7e' => {
                 // printable ascii range
-                if ch == quote.to_char() || ch == '\\' {
+                if ch == quote.as_char() || ch == '\\' {
                     formatter.write_char('\\')?;
                 }
                 formatter.write_char(ch)
@@ -271,18 +240,18 @@ impl<'a> AsciiEscape<'a> {
         Self { source, layout }
     }
     #[inline]
-    pub fn with_forced_quote(source: &'a [u8], quote: Quote) -> Self {
+    pub fn with_forced_quote(source: &'a [u8], quote: QuoteStyle) -> Self {
         let layout = EscapeLayout { quote, len: None };
         Self { source, layout }
     }
     #[inline]
-    pub fn with_preferred_quote(source: &'a [u8], quote: Quote) -> Self {
+    pub fn with_preferred_quote(source: &'a [u8], quote: QuoteStyle) -> Self {
         let layout = Self::repr_layout(source, quote);
         Self { source, layout }
     }
     #[inline]
     pub fn new_repr(source: &'a [u8]) -> Self {
-        Self::with_preferred_quote(source, Quote::Single)
+        Self::with_preferred_quote(source, QuoteStyle::Single)
     }
     #[inline]
     pub fn bytes_repr<'r>(&'a self) -> BytesRepr<'r, 'a> {
@@ -296,7 +265,7 @@ impl AsciiEscape<'_> {
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss
     )]
-    pub fn repr_layout(source: &[u8], preferred_quote: Quote) -> EscapeLayout {
+    pub fn repr_layout(source: &[u8], preferred_quote: QuoteStyle) -> EscapeLayout {
         Self::output_layout_with_checker(source, preferred_quote, 3, |a, b| {
             Some((a as isize).checked_add(b as isize)? as usize)
         })
@@ -308,14 +277,14 @@ impl AsciiEscape<'_> {
         clippy::cast_sign_loss
     )]
     pub fn named_repr_layout(source: &[u8], name: &str) -> EscapeLayout {
-        Self::output_layout_with_checker(source, Quote::Single, name.len() + 2 + 3, |a, b| {
+        Self::output_layout_with_checker(source, QuoteStyle::Single, name.len() + 2 + 3, |a, b| {
             Some((a as isize).checked_add(b as isize)? as usize)
         })
     }
 
     fn output_layout_with_checker(
         source: &[u8],
-        preferred_quote: Quote,
+        preferred_quote: QuoteStyle,
         reserved_len: usize,
         length_add: impl Fn(usize, usize) -> Option<usize>,
     ) -> EscapeLayout {
@@ -340,7 +309,7 @@ impl AsciiEscape<'_> {
                 fn stop(
                     single_count: usize,
                     double_count: usize,
-                    preferred_quote: Quote,
+                    preferred_quote: QuoteStyle,
                 ) -> EscapeLayout {
                     EscapeLayout {
                         quote: choose_quote(single_count, double_count, preferred_quote).0,
@@ -372,14 +341,18 @@ impl AsciiEscape<'_> {
         }
     }
 
-    fn write_char(ch: u8, quote: Quote, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
+    fn write_char(
+        ch: u8,
+        quote: QuoteStyle,
+        formatter: &mut impl std::fmt::Write,
+    ) -> std::fmt::Result {
         match ch {
             b'\t' => formatter.write_str("\\t"),
             b'\n' => formatter.write_str("\\n"),
             b'\r' => formatter.write_str("\\r"),
             0x20..=0x7e => {
                 // printable ascii range
-                if ch == quote.to_byte() || ch == b'\\' {
+                if ch == quote.as_byte() || ch == b'\\' {
                     formatter.write_char('\\')?;
                 }
                 formatter.write_char(ch as char)
@@ -416,7 +389,7 @@ pub struct BytesRepr<'r, 'a>(&'r AsciiEscape<'a>);
 
 impl BytesRepr<'_, '_> {
     pub fn write(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
-        let quote = self.0.layout().quote.to_char();
+        let quote = self.0.layout().quote.as_char();
         formatter.write_char('b')?;
         formatter.write_char(quote)?;
         self.0.write_body(formatter)?;
