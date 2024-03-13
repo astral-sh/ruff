@@ -2,5 +2,5 @@
 # the target version is 3.12 or later. A user can have 3.12 syntax even if the target
 # version isn't set.
 
-# Quotes re-use
+# Quotes reuse
 f"{'a'}"

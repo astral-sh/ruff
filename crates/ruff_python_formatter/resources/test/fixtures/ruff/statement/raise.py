@@ -66,20 +66,20 @@ raise ( # another comment
 raise (
 ) # what now
 
-raise ( # sould I stay here
+raise ( # should I stay here
     # just a comment here
 ) # trailing comment
 
-raise hello( # sould I stay here
+raise hello( # should I stay here
     # just a comment here
 ) # trailing comment
 
-raise ( # sould I stay here
+raise ( # should I stay here
     test,
     # just a comment here
 ) # trailing comment
 
-raise hello( # sould I stay here
+raise hello( # should I stay here
     # just a comment here
     "hey"
 ) # trailing comment

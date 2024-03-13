@@ -15,7 +15,7 @@ use crate::checkers::ast::Checker;
 /// primarily for historic reasons, and have been a cause of
 /// frequent confusion for newcomers.
 ///
-/// These aliases were been deprecated in 1.20, and removed in 1.24.
+/// These aliases were deprecated in 1.20, and removed in 1.24.
 ///
 /// ## Examples
 /// ```python

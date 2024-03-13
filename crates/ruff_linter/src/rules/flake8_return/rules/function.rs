@@ -151,7 +151,7 @@ impl AlwaysFixableViolation for ImplicitReturn {
 /// assigned variable.
 ///
 /// ## Why is this bad?
-/// The variable assignment is not necessary as the value can be returned
+/// The variable assignment is not necessary, as the value can be returned
 /// directly.
 ///
 /// ## Example

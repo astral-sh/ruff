@@ -61,7 +61,7 @@ impl Violation for IfExprWithTrueFalse {
 /// condition.
 ///
 /// ## Why is this bad?
-/// `if` expressions that evaluate to `False` for a truthy condition an `True`
+/// `if` expressions that evaluate to `False` for a truthy condition and `True`
 /// for a falsey condition can be replaced with `not` operators, which are more
 /// concise and readable.
 ///
