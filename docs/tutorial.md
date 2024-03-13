@@ -48,7 +48,7 @@ Ruff identified an unused import, which is a common error in Python code. Ruff c
 "fixable" error, so we can resolve the issue automatically by running `ruff check --fix`:
 
 ```shell
-❯ ruff check --fix .
+❯ ruff check --fix
 Found 1 error (1 fixed, 0 remaining).
 ```
 
@@ -69,6 +69,12 @@ def sum_even_numbers(numbers: Iterable[int]) -> int:
         num for num in numbers
         if num % 2 == 0
     )
+```
+
+Note Ruff runs in the current directory by default, but you can pass specific paths to check:
+
+```shell
+❯ ruff check numbers/numbers.py
 ```
 
 Now that our project is passing `ruff check`, we can run the Ruff formatter via `ruff format`:
