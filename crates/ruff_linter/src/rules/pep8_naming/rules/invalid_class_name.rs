@@ -44,7 +44,7 @@ impl Violation for InvalidClassName {
     #[derive_message_formats]
     fn message(&self) -> String {
         let InvalidClassName { name } = self;
-        format!("Class name `{name}` should use CapWords convention ")
+        format!("Class name `{name}` should use CapWords convention")
     }
 }
 

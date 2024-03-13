@@ -111,9 +111,12 @@ pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &
             || handled_exceptions.iter().any(|expr| {
                 checker
                     .semantic()
-                    .resolve_call_path(expr)
-                    .is_some_and(|call_path| {
-                        matches!(call_path.segments(), ["", "Exception" | "BaseException"])
+                    .resolve_qualified_name(expr)
+                    .is_some_and(|qualified_name| {
+                        matches!(
+                            qualified_name.segments(),
+                            ["", "Exception" | "BaseException"]
+                        )
                     })
             })
         {

@@ -1,0 +1,83 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821_26.py:9:33: F821 Undefined name `CStr`
+   |
+ 8 | # Forward references:
+ 9 | MaybeCStr: TypeAlias = Optional[CStr]  # valid in a `.pyi` stub file, not in a `.py` runtime file
+   |                                 ^^^^ F821
+10 | MaybeCStr2: TypeAlias = Optional["CStr"]  # always okay
+11 | CStr: TypeAlias = Union[C, str]  # valid in a `.pyi` stub file, not in a `.py` runtime file
+   |
+
+F821_26.py:11:25: F821 Undefined name `C`
+   |
+ 9 | MaybeCStr: TypeAlias = Optional[CStr]  # valid in a `.pyi` stub file, not in a `.py` runtime file
+10 | MaybeCStr2: TypeAlias = Optional["CStr"]  # always okay
+11 | CStr: TypeAlias = Union[C, str]  # valid in a `.pyi` stub file, not in a `.py` runtime file
+   |                         ^ F821
+12 | CStr2: TypeAlias = Union["C", str]  # always okay
+   |
+
+F821_26.py:16:12: F821 Undefined name `C`
+   |
+14 | # References to a class from inside the class:
+15 | class C:
+16 |     other: C = ...  # valid in a `.pyi` stub file, not in a `.py` runtime file
+   |            ^ F821
+17 |     other2: "C" = ...  # always okay
+18 |     def from_str(self, s: str) -> C: ...  # valid in a `.pyi` stub file, not in a `.py` runtime file
+   |
+
+F821_26.py:18:35: F821 Undefined name `C`
+   |
+16 |     other: C = ...  # valid in a `.pyi` stub file, not in a `.py` runtime file
+17 |     other2: "C" = ...  # always okay
+18 |     def from_str(self, s: str) -> C: ...  # valid in a `.pyi` stub file, not in a `.py` runtime file
+   |                                   ^ F821
+19 |     def from_str2(self, s: str) -> "C": ...  # always okay
+   |
+
+F821_26.py:23:10: F821 Undefined name `B`
+   |
+21 | # Circular references:
+22 | class A:
+23 |     foo: B  # valid in a `.pyi` stub file, not in a `.py` runtime file
+   |          ^ F821
+24 |     foo2: "B"  # always okay
+25 |     bar: dict[str, B]  # valid in a `.pyi` stub file, not in a `.py` runtime file
+   |
+
+F821_26.py:25:20: F821 Undefined name `B`
+   |
+23 |     foo: B  # valid in a `.pyi` stub file, not in a `.py` runtime file
+24 |     foo2: "B"  # always okay
+25 |     bar: dict[str, B]  # valid in a `.pyi` stub file, not in a `.py` runtime file
+   |                    ^ F821
+26 |     bar2: dict[str, "A"]  # always okay
+   |
+
+F821_26.py:33:17: F821 Undefined name `Tree`
+   |
+32 | class Leaf: ...
+33 | class Tree(list[Tree | Leaf]): ...  # valid in a `.pyi` stub file, not in a `.py` runtime file
+   |                 ^^^^ F821
+34 | class Tree2(list["Tree | Leaf"]): ...  # always okay
+   |
+
+F821_26.py:39:11: F821 Undefined name `foo`
+   |
+37 | class MyClass:
+38 |     foo: int
+39 |     bar = foo  # valid in a `.pyi` stub file, not in a `.py` runtime file
+   |           ^^^ F821
+40 |     bar = "foo"  # always okay
+   |
+
+F821_26.py:43:8: F821 Undefined name `baz`
+   |
+42 | baz: MyClass
+43 | eggs = baz  # valid in a `.pyi` stub file, not in a `.py` runtime file
+   |        ^^^ F821
+44 | eggs = "baz"  # always okay
+   |

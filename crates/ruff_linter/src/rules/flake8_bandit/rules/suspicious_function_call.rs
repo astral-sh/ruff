@@ -59,7 +59,7 @@ impl Violation for SuspiciousPickleUsage {
 /// Checks for calls to `marshal` functions.
 ///
 /// ## Why is this bad?
-/// Deserializing untrusted data with `marshal` is insecure as it can allow for
+/// Deserializing untrusted data with `marshal` is insecure, as it can allow for
 /// the creation of arbitrary objects, which can then be used to achieve
 /// arbitrary code execution and otherwise unexpected behavior.
 ///
@@ -68,7 +68,7 @@ impl Violation for SuspiciousPickleUsage {
 ///
 /// If you must deserialize untrusted data with `marshal`, consider signing the
 /// data with a secret key and verifying the signature before deserializing the
-/// payload, This will prevent an attacker from injecting arbitrary objects
+/// payload. This will prevent an attacker from injecting arbitrary objects
 /// into the serialized data.
 ///
 /// ## Example
@@ -353,7 +353,7 @@ impl Violation for SuspiciousMarkSafeUsage {
 /// behavior.
 ///
 /// To mitigate this risk, audit all uses of URL open functions and ensure that
-/// only permitted schemes are used (e.g., allowing `http:` and `https:` and
+/// only permitted schemes are used (e.g., allowing `http:` and `https:`, and
 /// disallowing `file:` and `ftp:`).
 ///
 /// ## Example
@@ -395,7 +395,7 @@ impl Violation for SuspiciousURLOpenUsage {
 /// Checks for uses of cryptographically weak pseudo-random number generators.
 ///
 /// ## Why is this bad?
-/// Cryptographically weak pseudo-random number generators are insecure as they
+/// Cryptographically weak pseudo-random number generators are insecure, as they
 /// are easily predictable. This can allow an attacker to guess the generated
 /// numbers and compromise the security of the system.
 ///
@@ -825,8 +825,8 @@ impl Violation for SuspiciousFTPLibUsage {
 
 /// S301, S302, S303, S304, S305, S306, S307, S308, S310, S311, S312, S313, S314, S315, S316, S317, S318, S319, S320, S321, S323
 pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
-    let Some(diagnostic_kind) = checker.semantic().resolve_call_path(call.func.as_ref()).and_then(|call_path| {
-        match call_path.segments() {
+    let Some(diagnostic_kind) = checker.semantic().resolve_qualified_name(call.func.as_ref()).and_then(|qualified_name| {
+        match qualified_name.segments() {
             // Pickle
             ["pickle" | "dill", "load" | "loads" | "Unpickler"] |
             ["shelve", "open" | "DbfilenameShelf"] |
@@ -867,7 +867,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
             ["urllib", "request", "URLopener" | "FancyURLopener"] |
             ["six", "moves", "urllib", "request", "URLopener" | "FancyURLopener"] => Some(SuspiciousURLOpenUsage.into()),
             // NonCryptographicRandom
-            ["random", "random" | "randrange" | "randint" | "choice" | "choices" | "uniform" | "triangular"] => Some(SuspiciousNonCryptographicRandomUsage.into()),
+            ["random", "Random" | "random" | "randrange" | "randint" | "choice" | "choices" | "uniform" | "triangular" | "randbytes"] => Some(SuspiciousNonCryptographicRandomUsage.into()),
             // UnverifiedContext
             ["ssl", "_create_unverified_context"] => Some(SuspiciousUnverifiedContextUsage.into()),
             // XMLCElementTree
@@ -906,9 +906,9 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
 pub(crate) fn suspicious_function_decorator(checker: &mut Checker, decorator: &Decorator) {
     let Some(diagnostic_kind) = checker
         .semantic()
-        .resolve_call_path(&decorator.expression)
-        .and_then(|call_path| {
-            match call_path.segments() {
+        .resolve_qualified_name(&decorator.expression)
+        .and_then(|qualified_name| {
+            match qualified_name.segments() {
                 // MarkSafe
                 ["django", "utils", "safestring" | "html", "mark_safe"] => {
                     Some(SuspiciousMarkSafeUsage.into())

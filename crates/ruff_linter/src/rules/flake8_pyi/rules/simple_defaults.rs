@@ -2,8 +2,8 @@ use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::helpers::map_subscript;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{
     self as ast, Expr, Operator, ParameterWithDefault, Parameters, Stmt, UnaryOp,
 };
@@ -248,13 +248,16 @@ impl AlwaysFixableViolation for TypeAliasWithoutAnnotation {
     }
 }
 
-fn is_allowed_negated_math_attribute(call_path: &CallPath) -> bool {
-    matches!(call_path.segments(), ["math", "inf" | "e" | "pi" | "tau"])
+fn is_allowed_negated_math_attribute(qualified_name: &QualifiedName) -> bool {
+    matches!(
+        qualified_name.segments(),
+        ["math", "inf" | "e" | "pi" | "tau"]
+    )
 }
 
-fn is_allowed_math_attribute(call_path: &CallPath) -> bool {
+fn is_allowed_math_attribute(qualified_name: &QualifiedName) -> bool {
     matches!(
-        call_path.segments(),
+        qualified_name.segments(),
         ["math", "inf" | "nan" | "e" | "pi" | "tau"]
             | [
                 "sys",
@@ -324,7 +327,7 @@ fn is_valid_default_value_with_annotation(
                 // Ex) `-math.inf`, `-math.pi`, etc.
                 Expr::Attribute(_) => {
                     if semantic
-                        .resolve_call_path(operand)
+                        .resolve_qualified_name(operand)
                         .as_ref()
                         .is_some_and(is_allowed_negated_math_attribute)
                     {
@@ -373,7 +376,7 @@ fn is_valid_default_value_with_annotation(
         // Ex) `math.inf`, `sys.stdin`, etc.
         Expr::Attribute(_) => {
             if semantic
-                .resolve_call_path(default)
+                .resolve_qualified_name(default)
                 .as_ref()
                 .is_some_and(is_allowed_math_attribute)
             {
@@ -435,15 +438,17 @@ fn is_type_var_like_call(expr: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return false;
     };
-    semantic.resolve_call_path(func).is_some_and(|call_path| {
-        matches!(
-            call_path.segments(),
-            [
-                "typing" | "typing_extensions",
-                "TypeVar" | "TypeVarTuple" | "NewType" | "ParamSpec"
-            ]
-        )
-    })
+    semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                [
+                    "typing" | "typing_extensions",
+                    "TypeVar" | "TypeVarTuple" | "NewType" | "ParamSpec"
+                ]
+            )
+        })
 }
 
 /// Returns `true` if this is a "special" assignment which must have a value (e.g., an assignment to
@@ -480,10 +485,10 @@ fn is_enum(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
         class_def.bases().iter().any(|expr| {
             // If the base class is `enum.Enum`, `enum.Flag`, etc., then this is an enum.
             if semantic
-                .resolve_call_path(map_subscript(expr))
-                .is_some_and(|call_path| {
+                .resolve_qualified_name(map_subscript(expr))
+                .is_some_and(|qualified_name| {
                     matches!(
-                        call_path.segments(),
+                        qualified_name.segments(),
                         [
                             "enum",
                             "Enum" | "Flag" | "IntEnum" | "IntFlag" | "StrEnum" | "ReprEnum"

@@ -6,9 +6,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::options_base::{OptionsMetadata, Visit};
 use ruff_formatter::IndentStyle;
 use ruff_linter::line_width::{IndentWidth, LineLength};
+use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
@@ -25,12 +25,13 @@ use ruff_linter::rules::{
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, PythonVersion, SerializationFormat, Version,
+    IdentifierPattern, PythonVersion, RequiredVersion, SerializationFormat,
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 
+use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
@@ -135,17 +136,22 @@ pub struct Options {
     )]
     pub show_fixes: Option<bool>,
 
-    /// Require a specific version of Ruff to be running (useful for unifying
-    /// results across many environments, e.g., with a `pyproject.toml`
-    /// file).
+    /// Enforce a requirement on the version of Ruff, to enforce at runtime.
+    /// If the version of Ruff does not meet the requirement, Ruff will exit
+    /// with an error.
+    ///
+    /// Useful for unifying results across many environments, e.g., with a
+    /// `pyproject.toml` file.
+    ///
+    /// Accepts a PEP 440 specifier, like `==0.3.1` or `>=0.3.1`.
     #[option(
         default = "null",
         value_type = "str",
         example = r#"
-            required-version = "0.0.193"
+            required-version = ">=0.0.193"
         "#
     )]
-    pub required_version: Option<Version>,
+    pub required_version: Option<RequiredVersion>,
 
     /// Whether to enable preview mode. When preview mode is enabled, Ruff will
     /// use unstable rules, fixes, and formatting.
@@ -1304,7 +1310,7 @@ pub struct Flake8ImportConventionsOptions {
             "tensorflow.keras.backend" = ["K"]
     "#
     )]
-    pub banned_aliases: Option<FxHashMap<String, Vec<String>>>,
+    pub banned_aliases: Option<FxHashMap<String, BannedAliases>>,
 
     /// A list of modules that should not be imported from using the
     /// `from ... import ...` syntax.
@@ -2378,7 +2384,7 @@ impl IsortOptions {
             case_sensitive: self.case_sensitive.unwrap_or(false),
             force_wrap_aliases: self.force_wrap_aliases.unwrap_or(false),
             detect_same_package: self.detect_same_package.unwrap_or(true),
-            force_to_top: BTreeSet::from_iter(self.force_to_top.unwrap_or_default()),
+            force_to_top: FxHashSet::from_iter(self.force_to_top.unwrap_or_default()),
             known_modules: isort::categorize::KnownModules::new(
                 known_first_party,
                 known_third_party,
@@ -2388,14 +2394,14 @@ impl IsortOptions {
             ),
             order_by_type: self.order_by_type.unwrap_or(true),
             relative_imports_order: self.relative_imports_order.unwrap_or_default(),
-            single_line_exclusions: BTreeSet::from_iter(
+            single_line_exclusions: FxHashSet::from_iter(
                 self.single_line_exclusions.unwrap_or_default(),
             ),
             split_on_trailing_comma: self.split_on_trailing_comma.unwrap_or(true),
-            classes: BTreeSet::from_iter(self.classes.unwrap_or_default()),
-            constants: BTreeSet::from_iter(self.constants.unwrap_or_default()),
-            variables: BTreeSet::from_iter(self.variables.unwrap_or_default()),
-            no_lines_before: BTreeSet::from_iter(no_lines_before),
+            classes: FxHashSet::from_iter(self.classes.unwrap_or_default()),
+            constants: FxHashSet::from_iter(self.constants.unwrap_or_default()),
+            variables: FxHashSet::from_iter(self.variables.unwrap_or_default()),
+            no_lines_before: FxHashSet::from_iter(no_lines_before),
             lines_after_imports: self.lines_after_imports.unwrap_or(-1),
             lines_between_types,
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),
@@ -3092,7 +3098,7 @@ pub struct FormatOptions {
     ///     pass
     /// ```
     ///
-    /// If a code snippt in a docstring contains invalid Python code or if the
+    /// If a code snippet in a docstring contains invalid Python code or if the
     /// formatter would otherwise write invalid Python code, then the code
     /// example is ignored by the formatter and kept as-is.
     ///

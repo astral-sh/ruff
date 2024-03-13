@@ -372,7 +372,7 @@ fn match_sibling_return<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Termina
 
 /// Generate a return statement for an `any` or `all` builtin comprehension.
 fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, generator: Generator) -> String {
-    let node = ast::ExprGeneratorExp {
+    let node = ast::ExprGenerator {
         elt: Box::new(test.clone()),
         generators: vec![Comprehension {
             target: target.clone(),

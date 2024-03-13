@@ -43,6 +43,7 @@ use ruff_python_ast::helpers::{
     collect_import_from_member, extract_handled_exceptions, is_docstring_stmt, to_module_path,
 };
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::visitor::{walk_except_handler, walk_f_string_element, walk_pattern, Visitor};
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
@@ -418,11 +419,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.semantic.add_module(module);
 
                     if alias.asname.is_none() && alias.name.contains('.') {
-                        let call_path: Box<[&str]> = alias.name.split('.').collect();
+                        let qualified_name = QualifiedName::user_defined(&alias.name);
                         self.add_binding(
                             module,
                             alias.identifier(),
-                            BindingKind::SubmoduleImport(SubmoduleImport { call_path }),
+                            BindingKind::SubmoduleImport(SubmoduleImport {
+                                qualified_name: Box::new(qualified_name),
+                            }),
                             BindingFlags::EXTERNAL,
                         );
                     } else {
@@ -439,11 +442,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
 
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let call_path: Box<[&str]> = alias.name.split('.').collect();
+                        let qualified_name = QualifiedName::user_defined(&alias.name);
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::Import(Import { call_path }),
+                            BindingKind::Import(Import {
+                                qualified_name: Box::new(qualified_name),
+                            }),
                             flags,
                         );
                     }
@@ -503,12 +508,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         // Attempt to resolve any relative imports; but if we don't know the current
                         // module path, or the relative import extends beyond the package root,
                         // fallback to a literal representation (e.g., `[".", "foo"]`).
-                        let call_path = collect_import_from_member(level, module, &alias.name)
-                            .into_boxed_slice();
+                        let qualified_name = collect_import_from_member(level, module, &alias.name);
                         self.add_binding(
                             name,
                             alias.identifier(),
-                            BindingKind::FromImport(FromImport { call_path }),
+                            BindingKind::FromImport(FromImport {
+                                qualified_name: Box::new(qualified_name),
+                            }),
                             flags,
                         );
                     }
@@ -751,8 +757,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }) => {
                 let mut handled_exceptions = Exceptions::empty();
                 for type_ in extract_handled_exceptions(handlers) {
-                    if let Some(call_path) = self.semantic.resolve_call_path(type_) {
-                        match call_path.segments() {
+                    if let Some(qualified_name) = self.semantic.resolve_qualified_name(type_) {
+                        match qualified_name.segments() {
                             ["", "NameError"] => {
                                 handled_exceptions |= Exceptions::NAME_ERROR;
                             }
@@ -932,6 +938,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             && !self.semantic.in_deferred_type_definition()
             && self.semantic.in_type_definition()
             && self.semantic.future_annotations()
+            && (self.semantic.in_typing_only_annotation() || self.source_type.is_stub())
         {
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
                 self.visit.string_type_definitions.push((
@@ -1000,7 +1007,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 generators,
                 range: _,
             })
-            | Expr::GeneratorExp(ast::ExprGeneratorExp {
+            | Expr::Generator(ast::ExprGenerator {
                 elt,
                 generators,
                 range: _,
@@ -1048,7 +1055,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit.lambdas.push(self.semantic.snapshot());
                 self.analyze.lambdas.push(self.semantic.snapshot());
             }
-            Expr::IfExp(ast::ExprIfExp {
+            Expr::If(ast::ExprIf {
                 test,
                 body,
                 orelse,
@@ -1065,42 +1072,54 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }) => {
                 self.visit_expr(func);
 
-                let callable = self.semantic.resolve_call_path(func).and_then(|call_path| {
-                    if self.semantic.match_typing_call_path(&call_path, "cast") {
-                        Some(typing::Callable::Cast)
-                    } else if self.semantic.match_typing_call_path(&call_path, "NewType") {
-                        Some(typing::Callable::NewType)
-                    } else if self.semantic.match_typing_call_path(&call_path, "TypeVar") {
-                        Some(typing::Callable::TypeVar)
-                    } else if self
-                        .semantic
-                        .match_typing_call_path(&call_path, "NamedTuple")
-                    {
-                        Some(typing::Callable::NamedTuple)
-                    } else if self
-                        .semantic
-                        .match_typing_call_path(&call_path, "TypedDict")
-                    {
-                        Some(typing::Callable::TypedDict)
-                    } else if matches!(
-                        call_path.segments(),
-                        [
-                            "mypy_extensions",
-                            "Arg"
-                                | "DefaultArg"
-                                | "NamedArg"
-                                | "DefaultNamedArg"
-                                | "VarArg"
-                                | "KwArg"
-                        ]
-                    ) {
-                        Some(typing::Callable::MypyExtension)
-                    } else if matches!(call_path.segments(), ["", "bool"]) {
-                        Some(typing::Callable::Bool)
-                    } else {
-                        None
-                    }
-                });
+                let callable =
+                    self.semantic
+                        .resolve_qualified_name(func)
+                        .and_then(|qualified_name| {
+                            if self
+                                .semantic
+                                .match_typing_qualified_name(&qualified_name, "cast")
+                            {
+                                Some(typing::Callable::Cast)
+                            } else if self
+                                .semantic
+                                .match_typing_qualified_name(&qualified_name, "NewType")
+                            {
+                                Some(typing::Callable::NewType)
+                            } else if self
+                                .semantic
+                                .match_typing_qualified_name(&qualified_name, "TypeVar")
+                            {
+                                Some(typing::Callable::TypeVar)
+                            } else if self
+                                .semantic
+                                .match_typing_qualified_name(&qualified_name, "NamedTuple")
+                            {
+                                Some(typing::Callable::NamedTuple)
+                            } else if self
+                                .semantic
+                                .match_typing_qualified_name(&qualified_name, "TypedDict")
+                            {
+                                Some(typing::Callable::TypedDict)
+                            } else if matches!(
+                                qualified_name.segments(),
+                                [
+                                    "mypy_extensions",
+                                    "Arg"
+                                        | "DefaultArg"
+                                        | "NamedArg"
+                                        | "DefaultNamedArg"
+                                        | "VarArg"
+                                        | "KwArg"
+                                ]
+                            ) {
+                                Some(typing::Callable::MypyExtension)
+                            } else if matches!(qualified_name.segments(), ["", "bool"]) {
+                                Some(typing::Callable::Bool)
+                            } else {
+                                None
+                            }
+                        });
                 match callable {
                     Some(typing::Callable::Bool) => {
                         let mut args = arguments.args.iter();
@@ -1330,7 +1349,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             {
                                 let mut iter = elts.iter();
                                 if let Some(expr) = iter.next() {
-                                    self.visit_expr(expr);
+                                    self.visit_type_definition(expr);
                                 }
                                 for expr in iter {
                                     self.visit_non_type_definition(expr);
@@ -1360,7 +1379,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.flags |= SemanticModelFlags::F_STRING;
                 visitor::walk_expr(self, expr);
             }
-            Expr::NamedExpr(ast::ExprNamedExpr {
+            Expr::Named(ast::ExprNamed {
                 target,
                 value,
                 range: _,
@@ -1376,7 +1395,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         // Step 3: Clean-up
         match expr {
             Expr::Lambda(_)
-            | Expr::GeneratorExp(_)
+            | Expr::Generator(_)
             | Expr::ListComp(_)
             | Expr::DictComp(_)
             | Expr::SetComp(_) => {
@@ -1821,11 +1840,13 @@ impl<'a> Checker<'a> {
             flags.insert(BindingFlags::UNPACKED_ASSIGNMENT);
         }
 
-        // Match the left-hand side of an annotated assignment, like `x` in `x: int`.
+        // Match the left-hand side of an annotated assignment without a value,
+        // like `x` in `x: int`. N.B. In stub files, these should be viewed
+        // as assignments on par with statements such as `x: int = 5`.
         if matches!(
             parent,
             Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
-        ) && !self.semantic.in_annotation()
+        ) && !(self.semantic.in_annotation() || self.source_type.is_stub())
         {
             self.add_binding(id, expr.range(), BindingKind::Annotation, flags);
             return;

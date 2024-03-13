@@ -2,7 +2,7 @@ use ruff_python_ast::{Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::{CallPath, CallPathBuilder};
+use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -48,16 +48,17 @@ impl Violation for Debugger {
 
 /// Checks for the presence of a debugger call.
 pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
-    if let Some(using_type) = checker
-        .semantic()
-        .resolve_call_path(func)
-        .and_then(|call_path| {
-            if is_debugger_call(&call_path) {
-                Some(DebuggerUsingType::Call(call_path.to_string()))
-            } else {
-                None
-            }
-        })
+    if let Some(using_type) =
+        checker
+            .semantic()
+            .resolve_qualified_name(func)
+            .and_then(|qualified_name| {
+                if is_debugger_call(&qualified_name) {
+                    Some(DebuggerUsingType::Call(qualified_name.to_string()))
+                } else {
+                    None
+                }
+            })
     {
         checker
             .diagnostics
@@ -68,22 +69,20 @@ pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
 /// Checks for the presence of a debugger import.
 pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<Diagnostic> {
     if let Some(module) = module {
-        let mut builder = CallPathBuilder::from_path(CallPath::from_unqualified_name(module));
-        builder.push(name);
-        let call_path = builder.build();
+        let qualified_name = QualifiedName::user_defined(module).append_member(name);
 
-        if is_debugger_call(&call_path) {
+        if is_debugger_call(&qualified_name) {
             return Some(Diagnostic::new(
                 Debugger {
-                    using_type: DebuggerUsingType::Import(call_path.to_string()),
+                    using_type: DebuggerUsingType::Import(qualified_name.to_string()),
                 },
                 stmt.range(),
             ));
         }
     } else {
-        let call_path: CallPath = CallPath::from_unqualified_name(name);
+        let qualified_name = QualifiedName::user_defined(name);
 
-        if is_debugger_import(&call_path) {
+        if is_debugger_import(&qualified_name) {
             return Some(Diagnostic::new(
                 Debugger {
                     using_type: DebuggerUsingType::Import(name.to_string()),
@@ -95,9 +94,9 @@ pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> 
     None
 }
 
-fn is_debugger_call(call_path: &CallPath) -> bool {
+fn is_debugger_call(qualified_name: &QualifiedName) -> bool {
     matches!(
-        call_path.segments(),
+        qualified_name.segments(),
         ["pdb" | "pudb" | "ipdb", "set_trace"]
             | ["ipdb", "sset_trace"]
             | ["IPython", "terminal", "embed", "InteractiveShellEmbed"]
@@ -115,13 +114,13 @@ fn is_debugger_call(call_path: &CallPath) -> bool {
     )
 }
 
-fn is_debugger_import(call_path: &CallPath) -> bool {
+fn is_debugger_import(qualified_name: &QualifiedName) -> bool {
     // Constructed by taking every pattern in `is_debugger_call`, removing the last element in
     // each pattern, and de-duplicating the values.
     // As a special-case, we omit `builtins` to allow `import builtins`, which is far more general
     // than (e.g.) `import celery.contrib.rdb`.
     matches!(
-        call_path.segments(),
+        qualified_name.segments(),
         ["pdb" | "pudb" | "ipdb" | "debugpy" | "ptvsd"]
             | ["IPython", "terminal", "embed"]
             | ["IPython", "frontend", "terminal", "embed",]

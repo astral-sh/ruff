@@ -3,8 +3,8 @@ use std::fmt;
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::Decorator;
@@ -646,9 +646,9 @@ impl<'a> Visitor<'a> for SkipFunctionsVisitor<'a> {
                 }
             }
             Expr::Call(ast::ExprCall { func, .. }) => {
-                if CallPath::from_expr(func).is_some_and(|call_path| {
-                    matches!(call_path.segments(), ["request", "addfinalizer"])
-                }) {
+                if UnqualifiedName::from_expr(func)
+                    .is_some_and(|name| matches!(name.segments(), ["request", "addfinalizer"]))
+                {
                     self.addfinalizer_call = Some(expr);
                 };
                 visitor::walk_expr(self, expr);

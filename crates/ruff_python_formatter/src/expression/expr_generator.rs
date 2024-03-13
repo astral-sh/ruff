@@ -1,6 +1,6 @@
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::ExprGeneratorExp;
+use ruff_python_ast::ExprGenerator;
 
 use crate::comments::SourceComment;
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
@@ -20,7 +20,7 @@ pub enum GeneratorExpParentheses {
     Preserve,
 }
 
-impl FormatRuleWithOptions<ExprGeneratorExp, PyFormatContext<'_>> for FormatExprGeneratorExp {
+impl FormatRuleWithOptions<ExprGenerator, PyFormatContext<'_>> for FormatExprGenerator {
     type Options = GeneratorExpParentheses;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -30,13 +30,13 @@ impl FormatRuleWithOptions<ExprGeneratorExp, PyFormatContext<'_>> for FormatExpr
 }
 
 #[derive(Default)]
-pub struct FormatExprGeneratorExp {
+pub struct FormatExprGenerator {
     parentheses: GeneratorExpParentheses,
 }
 
-impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
-    fn fmt_fields(&self, item: &ExprGeneratorExp, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprGeneratorExp {
+impl FormatNodeRule<ExprGenerator> for FormatExprGenerator {
+    fn fmt_fields(&self, item: &ExprGenerator, f: &mut PyFormatter) -> FormatResult<()> {
+        let ExprGenerator {
             range: _,
             elt,
             generators,
@@ -87,7 +87,7 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
     }
 }
 
-impl NeedsParentheses for ExprGeneratorExp {
+impl NeedsParentheses for ExprGenerator {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,

@@ -427,7 +427,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                         pyupgrade::rules::format_literals(checker, call, &summary);
                                     }
                                     if checker.enabled(Rule::FString) {
-                                        pyupgrade::rules::f_strings(checker, call, &summary, value);
+                                        pyupgrade::rules::f_strings(checker, call, &summary);
                                     }
                                 }
                             }
@@ -631,6 +631,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::UnixCommandWildcardInjection,
             ]) {
                 flake8_bandit::rules::shell_injection(checker, call);
+            }
+            if checker.enabled(Rule::DjangoExtra) {
+                flake8_bandit::rules::django_extra(checker, call);
             }
             if checker.enabled(Rule::DjangoRawSql) {
                 flake8_bandit::rules::django_raw_sql(checker, call);
@@ -1327,8 +1330,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
         }
-        Expr::IfExp(
-            if_exp @ ast::ExprIfExp {
+        Expr::If(
+            if_exp @ ast::ExprIf {
                 test,
                 body,
                 orelse,
@@ -1450,8 +1453,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_bugbear::rules::static_key_dict_comprehension(checker, dict_comp);
             }
         }
-        Expr::GeneratorExp(
-            generator @ ast::ExprGeneratorExp {
+        Expr::Generator(
+            generator @ ast::ExprGenerator {
                 generators,
                 elt: _,
                 range: _,
@@ -1517,7 +1520,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 ruff::rules::parenthesize_chained_logical_operators(checker, bool_op);
             }
         }
-        Expr::NamedExpr(..) => {
+        Expr::Named(..) => {
             if checker.enabled(Rule::AssignmentInAssert) {
                 ruff::rules::assignment_in_assert(checker, expr);
             }

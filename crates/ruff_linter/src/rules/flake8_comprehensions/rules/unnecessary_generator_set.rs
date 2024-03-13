@@ -57,7 +57,7 @@ pub(crate) fn unnecessary_generator_set(checker: &mut Checker, call: &ast::ExprC
     if !checker.semantic().is_builtin("set") {
         return;
     }
-    if argument.is_generator_exp_expr() {
+    if argument.is_generator_expr() {
         let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorSet, call.range());
 
         // Convert `set(x for x in y)` to `{x for x in y}`.

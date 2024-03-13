@@ -202,6 +202,14 @@ fn handle_enclosed_comment<'a>(
                 }
             })
         }
+        AnyNodeRef::Parameter(parameter) => {
+            // E.g. a comment between the `*` or `**` and the parameter name.
+            if comment.preceding_node().is_none() || comment.following_node().is_none() {
+                CommentPlacement::leading(parameter, comment)
+            } else {
+                CommentPlacement::Default(comment)
+            }
+        }
         AnyNodeRef::Arguments(_) | AnyNodeRef::TypeParams(_) | AnyNodeRef::PatternArguments(_) => {
             handle_bracketed_end_of_line_comment(comment, locator)
         }
@@ -227,14 +235,14 @@ fn handle_enclosed_comment<'a>(
             handle_pattern_keyword_comment(comment, pattern_keyword, locator)
         }
         AnyNodeRef::ExprUnaryOp(unary_op) => handle_unary_op_comment(comment, unary_op, locator),
-        AnyNodeRef::ExprNamedExpr(_) => handle_named_expr_comment(comment, locator),
+        AnyNodeRef::ExprNamed(_) => handle_named_expr_comment(comment, locator),
         AnyNodeRef::ExprLambda(lambda) => handle_lambda_comment(comment, lambda, locator),
         AnyNodeRef::ExprDict(_) => handle_dict_unpacking_comment(comment, locator)
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, locator))
             .or_else(|comment| handle_key_value_comment(comment, locator)),
         AnyNodeRef::ExprDictComp(_) => handle_key_value_comment(comment, locator)
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, locator)),
-        AnyNodeRef::ExprIfExp(expr_if) => handle_expr_if_comment(comment, expr_if, locator),
+        AnyNodeRef::ExprIf(expr_if) => handle_expr_if_comment(comment, expr_if, locator),
         AnyNodeRef::ExprSlice(expr_slice) => {
             handle_slice_comments(comment, expr_slice, comment_ranges, locator)
         }
@@ -317,7 +325,7 @@ fn handle_enclosed_comment<'a>(
             parenthesized: true,
             ..
         }) => handle_bracketed_end_of_line_comment(comment, locator),
-        AnyNodeRef::ExprGeneratorExp(generator) if generator.parenthesized => {
+        AnyNodeRef::ExprGenerator(generator) if generator.parenthesized => {
             handle_bracketed_end_of_line_comment(comment, locator)
         }
         _ => CommentPlacement::Default(comment),
@@ -1353,10 +1361,10 @@ fn handle_attribute_comment<'a>(
 /// happens if the comments are in a weird position but it also doesn't hurt handling it.
 fn handle_expr_if_comment<'a>(
     comment: DecoratedComment<'a>,
-    expr_if: &'a ast::ExprIfExp,
+    expr_if: &'a ast::ExprIf,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    let ast::ExprIfExp {
+    let ast::ExprIf {
         range: _,
         test,
         body,
@@ -1612,7 +1620,7 @@ fn handle_named_expr_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    debug_assert!(comment.enclosing_node().is_expr_named_expr());
+    debug_assert!(comment.enclosing_node().is_expr_named());
 
     let (Some(target), Some(value)) = (comment.preceding_node(), comment.following_node()) else {
         return CommentPlacement::Default(comment);
