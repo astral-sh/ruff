@@ -132,19 +132,6 @@ impl<'src> Parser<'src> {
         }
 
         if !has_eaten_newline && self.at_compound_stmt() {
-            // Avoid create `SimpleStmtAndCompoundStmtInSameLine` error when the
-            // current node is `Expr::Invalid`. Example of when this may happen:
-            // ```python
-            // ! def x(): ...
-            // ```
-            // The `!` (an unexpected token) will be parsed as `Expr::Invalid`.
-            if let Stmt::Expr(expr) = &stmt {
-                #[allow(deprecated)]
-                if let Expr::Invalid(_) = expr.value.as_ref() {
-                    return stmt;
-                }
-            }
-
             self.add_error(
                 ParseErrorType::SimpleStmtAndCompoundStmtInSameLine,
                 stmt.range().cover(self.current_token_range()),
@@ -526,6 +513,12 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a type alias statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `type` token.
+    ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-type_stmt>
     fn parse_type_alias_statement(&mut self) -> ast::StmtTypeAlias {
         let start = self.node_start();
@@ -539,13 +532,16 @@ impl<'src> Parser<'src> {
                 range: tok_range,
             })
         } else {
+            // TODO(dhruvmanila): This recovery isn't possible currently because the soft keyword
+            // transformer will always convert the `type` token to a `Name` token if it's not
+            // followed by a `Name` token.
             self.add_error(
                 ParseErrorType::OtherError(format!("expecting identifier, got {tok}")),
                 tok_range,
             );
-            #[allow(deprecated)]
-            Expr::Invalid(ast::ExprInvalid {
-                value: self.src_text(tok_range).into(),
+            Expr::Name(ast::ExprName {
+                id: String::new(),
+                ctx: ExprContext::Invalid,
                 range: tok_range,
             })
         };
@@ -1146,6 +1142,9 @@ impl<'src> Parser<'src> {
         items
     }
 
+    /// Parses a single `with` item.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-with_item>
     fn parse_with_item(&mut self) -> ParsedWithItem {
         let start = self.node_start();
 
@@ -1171,14 +1170,8 @@ impl<'src> Parser<'src> {
         let optional_vars = if self.eat(TokenKind::As) {
             let mut target = self.parse_conditional_expression_or_higher();
 
-            if matches!(target.expr, Expr::BoolOp(_) | Expr::Compare(_)) {
-                // Should we make `target` an `Expr::Invalid` here?
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "expression not allowed in `with` statement".to_string(),
-                    ),
-                    target.range(),
-                );
+            if helpers::is_valid_assignment_target(&target.expr) {
+                self.add_error(ParseErrorType::InvalidAssignmentTarget, target.range());
             }
 
             helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
@@ -1198,7 +1191,13 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-match_stmt>
+    /// Parses a match statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `match` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-match-statement>
     fn parse_match_statement(&mut self) -> ast::StmtMatch {
         let start_offset = self.node_start();
 
@@ -1243,6 +1242,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a list of match case blocks.
     fn parse_match_cases(&mut self) -> Vec<ast::MatchCase> {
         if !self.at(TokenKind::Case) {
             self.add_error(
@@ -1262,6 +1262,13 @@ impl<'src> Parser<'src> {
         cases
     }
 
+    /// Parses a single match case block.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `case` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-case_block>
     fn parse_match_case(&mut self) -> ast::MatchCase {
         let start = self.node_start();
 

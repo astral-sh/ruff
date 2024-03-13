@@ -2177,6 +2177,7 @@ pub enum ExprContext {
     Load,
     Store,
     Del,
+    Invalid,
 }
 impl ExprContext {
     #[inline]
