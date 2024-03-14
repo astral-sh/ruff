@@ -45,7 +45,7 @@ use ruff_python_ast::helpers::{
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
-use ruff_python_ast::visitor::{walk_except_handler, walk_f_string_element, walk_pattern, Visitor};
+use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
@@ -1407,6 +1407,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 analyze::string_like(string_literal.into(), self);
             }
             Expr::BytesLiteral(bytes_literal) => analyze::string_like(bytes_literal.into(), self),
+            Expr::FString(f_string) => analyze::string_like(f_string.into(), self),
             _ => {}
         }
 
@@ -1571,16 +1572,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
             self.visit
                 .type_param_definitions
                 .push((bound, self.semantic.snapshot()));
-        }
-    }
-
-    fn visit_f_string_element(&mut self, f_string_element: &'a ast::FStringElement) {
-        // Step 2: Traversal
-        walk_f_string_element(self, f_string_element);
-
-        // Step 4: Analysis
-        if let Some(literal) = f_string_element.as_literal() {
-            analyze::string_like(literal.into(), self);
         }
     }
 }
