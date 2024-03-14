@@ -73,14 +73,8 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike
     checker.diagnostics.push(diagnostic);
 }
 
-/// Count the number of characters in an f-string. This accounts for implicitly concatenated
-/// f-strings as well. For example, the following f-string has 12 characters as highlighted
-/// by the caret symbols:
-///
-/// ```python
-/// x = "one" f"one{expr}one" f"one" f"{expr}"
-/// #    ^^^    ^^^      ^^^    ^^^
-/// ````
+/// Count the number of visible characters in an f-string. This accounts for
+/// implicitly concatenated f-strings as well.
 fn count_f_string_chars(f_string: &ast::ExprFString) -> usize {
     f_string
         .value
@@ -90,10 +84,9 @@ fn count_f_string_chars(f_string: &ast::ExprFString) -> usize {
             ast::FStringPart::FString(f_string) => f_string
                 .elements
                 .iter()
-                .map(|element| {
-                    element
-                        .as_literal()
-                        .map_or(0, |literal| literal.chars().count())
+                .map(|element| match element {
+                    ast::FStringElement::Literal(string) => string.chars().count(),
+                    ast::FStringElement::Expression(expr) => expr.range().len().to_usize(),
                 })
                 .sum(),
         })

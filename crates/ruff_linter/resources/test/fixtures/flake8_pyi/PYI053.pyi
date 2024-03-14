@@ -65,4 +65,4 @@ def not_warnings_dot_deprecated(
 )
 def not_a_deprecated_function() -> None: ...
 
-fbaz: str = f"51 character {foo} stringggggggggggggggggggggggggggggggg"  # Error: PYI053
+fbaz: str = f"51 character {foo} stringgggggggggggggggggggggggggg"  # Error: PYI053

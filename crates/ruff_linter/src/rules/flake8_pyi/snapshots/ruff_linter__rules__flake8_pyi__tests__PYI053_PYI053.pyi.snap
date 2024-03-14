@@ -150,8 +150,8 @@ PYI053.pyi:68:13: PYI053 [*] String and bytes literals longer than 50 characters
    |
 66 | def not_a_deprecated_function() -> None: ...
 67 | 
-68 | fbaz: str = f"51 character {foo} stringggggggggggggggggggggggggggggggg"  # Error: PYI053
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
+68 | fbaz: str = f"51 character {foo} stringgggggggggggggggggggggggggg"  # Error: PYI053
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
    |
    = help: Replace with `...`
 
@@ -159,5 +159,5 @@ PYI053.pyi:68:13: PYI053 [*] String and bytes literals longer than 50 characters
 65 65 | )
 66 66 | def not_a_deprecated_function() -> None: ...
 67 67 | 
-68    |-fbaz: str = f"51 character {foo} stringggggggggggggggggggggggggggggggg"  # Error: PYI053
+68    |-fbaz: str = f"51 character {foo} stringgggggggggggggggggggggggggg"  # Error: PYI053
    68 |+fbaz: str = ...  # Error: PYI053
