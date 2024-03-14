@@ -119,16 +119,6 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    /// Eats symbols while predicate returns true or until the end of file is reached.
-    #[inline]
-    pub(super) fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
-        // It was tried making optimized version of this for eg. line comments, but
-        // LLVM can inline all of this and compile it down to fast iteration over bytes.
-        while predicate(self.first()) && !self.is_eof() {
-            self.bump();
-        }
-    }
-
     /// Skips the next `count` bytes.
     ///
     /// ## Panics

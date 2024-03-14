@@ -2368,6 +2368,7 @@ dependencies = [
  "static_assertions",
  "tiny-keccak",
  "unicode-ident",
+ "unicode-normalization",
  "unicode_names2",
 ]
 
