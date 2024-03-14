@@ -1,6 +1,4 @@
-use ruff_python_ast::{
-    self as ast, Expr, ExprContext, Number, Operator, Pattern, Singleton, UnaryOp,
-};
+use ruff_python_ast::{self as ast, Expr, ExprContext, Number, Operator, Pattern, Singleton};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::parser::progress::ParserProgress;
@@ -59,6 +57,9 @@ impl<'src> Parser<'src> {
         self.at_ts(MAPPING_PATTERN_START_SET)
     }
 
+    /// Entry point to start parsing a pattern.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-patterns>
     pub(super) fn parse_match_patterns(&mut self) -> Pattern {
         let start = self.node_start();
         let pattern = self.parse_match_pattern();
@@ -70,6 +71,9 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses an `or_pattern` or an `as_pattern`.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-pattern>
     fn parse_match_pattern(&mut self) -> Pattern {
         let start = self.node_start();
         let mut lhs = self.parse_match_pattern_lhs();
@@ -104,6 +108,9 @@ impl<'src> Parser<'src> {
         lhs
     }
 
+    /// Parses a pattern.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-closed_pattern>
     fn parse_match_pattern_lhs(&mut self) -> Pattern {
         let start = self.node_start();
         let mut lhs = match self.current_token_kind() {
@@ -117,9 +124,6 @@ impl<'src> Parser<'src> {
             lhs = Pattern::MatchClass(self.parse_match_pattern_class(lhs, start));
         }
 
-        // TODO(dhruvmanila): This error isn't being reported (`1 + 2` can't be used as a pattern)
-        // literal_pattern:
-        //     | signed_number !('+' | '-')
         if self.at(TokenKind::Plus) || self.at(TokenKind::Minus) {
             let (operator_token, _) = self.next_token();
             let operator = if matches!(operator_token, Tok::Plus) {
@@ -129,13 +133,10 @@ impl<'src> Parser<'src> {
             };
 
             let lhs_value = if let Pattern::MatchValue(lhs) = lhs {
-                if !lhs.value.is_literal_expr() && !matches!(lhs.value.as_ref(), Expr::UnaryOp(_)) {
+                if !matches!(&*lhs.value, Expr::NumberLiteral(_) | Expr::UnaryOp(_)) {
                     self.add_error(
-                        ParseErrorType::OtherError(format!(
-                            "invalid `{}` expression for match pattern",
-                            self.src_text(lhs.range)
-                        )),
-                        lhs.range,
+                        ParseErrorType::OtherError("invalid lhs pattern".to_string()),
+                        &lhs,
                     );
                 }
                 lhs.value
@@ -145,19 +146,27 @@ impl<'src> Parser<'src> {
                     &lhs,
                 );
 
-                #[allow(deprecated)]
-                Box::new(Expr::Invalid(ast::ExprInvalid {
-                    value: self.src_text(lhs.range()).into(),
+                // In case it's not a valid LHS pattern, we'll use an empty `Expr::Name`
+                // to indicate that.
+                Box::new(Expr::Name(ast::ExprName {
+                    id: String::new(),
+                    ctx: ExprContext::Invalid,
                     range: lhs.range(),
                 }))
             };
 
             let rhs_pattern = self.parse_match_pattern_lhs();
             let rhs_value = if let Pattern::MatchValue(rhs) = rhs_pattern {
-                if !rhs.value.is_literal_expr() {
+                if !matches!(
+                    &*rhs.value,
+                    Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value: ast::Number::Complex { .. },
+                        ..
+                    })
+                ) {
                     self.add_error(
                         ParseErrorType::OtherError(
-                            "invalid expression for match pattern".to_string(),
+                            "imaginary number required in complex literal".to_string(),
                         ),
                         &rhs,
                     );
@@ -169,27 +178,14 @@ impl<'src> Parser<'src> {
                     rhs_pattern.range(),
                 );
 
-                #[allow(deprecated)]
-                Box::new(Expr::Invalid(ast::ExprInvalid {
-                    value: self.src_text(rhs_pattern.range()).into(),
+                // In case it's not a valid RHS pattern, we'll use an empty `Expr::Name`
+                // to indicate that.
+                Box::new(Expr::Name(ast::ExprName {
+                    id: String::new(),
+                    ctx: ExprContext::Invalid,
                     range: rhs_pattern.range(),
                 }))
             };
-
-            if matches!(
-                rhs_value.as_ref(),
-                Expr::UnaryOp(ast::ExprUnaryOp {
-                    op: UnaryOp::USub,
-                    ..
-                })
-            ) {
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "`-` not allowed in rhs of match pattern".to_string(),
-                    ),
-                    rhs_value.range(),
-                );
-            }
 
             let range = self.node_range(start);
 
@@ -247,15 +243,14 @@ impl<'src> Parser<'src> {
                         }
                         pattern => {
                             parser.add_error(
-                                ParseErrorType::OtherError(format!(
-                                    "invalid mapping pattern key `{}`",
-                                    parser.src_text(&pattern)
-                                )),
+                                ParseErrorType::OtherError(
+                                    "invalid mapping pattern key".to_string(),
+                                ),
                                 &pattern,
                             );
-                            #[allow(deprecated)]
-                            Expr::Invalid(ast::ExprInvalid {
-                                value: parser.src_text(&pattern).into(),
+                            Expr::Name(ast::ExprName {
+                                id: String::new(),
+                                ctx: ExprContext::Invalid,
                                 range: pattern.range(),
                             })
                         }
@@ -283,6 +278,13 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a star pattern.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `*` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-star_pattern>
     fn parse_match_pattern_star(&mut self) -> ast::PatternMatchStar {
         let start = self.node_start();
         self.bump(TokenKind::Star);
@@ -299,6 +301,13 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Entry point to start parsing a sequence pattern.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `(` or `[` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#sequence-patterns>
     fn parse_delimited_match_pattern(&mut self) -> Pattern {
         let start = self.node_start();
         let parentheses = if self.eat(TokenKind::Lpar) {
@@ -343,7 +352,7 @@ impl<'src> Parser<'src> {
         pattern
     }
 
-    /// Parses a sequence pattern.
+    /// Parses the rest of a sequence pattern, given the first element.
     ///
     /// If the `parentheses` is `None`, it is an [open sequence pattern].
     ///
@@ -383,6 +392,9 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a literal pattern.
+    ///
+    /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-literal_pattern>
     fn parse_match_pattern_literal(&mut self) -> Pattern {
         let start = self.node_start();
         match self.current_token_kind() {
@@ -520,7 +532,7 @@ impl<'src> Parser<'src> {
                     Expr::Name(ast::ExprName {
                         range: self.missing_node_range(),
                         id: String::new(),
-                        ctx: ExprContext::Load,
+                        ctx: ExprContext::Invalid,
                     })
                 };
 
@@ -532,6 +544,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses an attribute expression until the current token is not a `.`.
     fn parse_attr_expr_for_match_pattern(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
         while self.current_token_kind() == TokenKind::Dot {
             lhs = Expr::Attribute(self.parse_attribute_expression(lhs, start));
@@ -625,21 +638,19 @@ impl<'src> Parser<'src> {
         let cls = match cls {
             Pattern::MatchAs(ast::PatternMatchAs {
                 name: Some(ident), ..
-            }) => {
-                if ident.is_valid() {
-                    Box::new(Expr::Name(ast::ExprName {
-                        range: ident.range(),
-                        id: ident.id,
-                        ctx: ExprContext::Load,
-                    }))
-                } else {
-                    #[allow(deprecated)]
-                    Box::new(Expr::Invalid(ast::ExprInvalid {
-                        value: self.src_text(&ident).into(),
-                        range: ident.range(),
-                    }))
+            }) => Box::new(Expr::Name(if ident.is_valid() {
+                ast::ExprName {
+                    range: ident.range(),
+                    id: ident.id,
+                    ctx: ExprContext::Load,
                 }
-            }
+            } else {
+                ast::ExprName {
+                    range: ident.range(),
+                    id: String::new(),
+                    ctx: ExprContext::Invalid,
+                }
+            })),
             Pattern::MatchValue(ast::PatternMatchValue { value, range: _ })
                 if matches!(value.as_ref(), Expr::Attribute(_)) =>
             {
@@ -647,13 +658,12 @@ impl<'src> Parser<'src> {
             }
             pattern => {
                 self.add_error(
-                    ParseErrorType::OtherError("invalid pattern match class".to_string()),
+                    ParseErrorType::OtherError("invalid value for a class pattern".to_string()),
                     &pattern,
                 );
-                // FIXME(micha): Including the entire range is not ideal because it also includes trivia.
-                #[allow(deprecated)]
-                Box::new(Expr::Invalid(ast::ExprInvalid {
-                    value: self.src_text(pattern.range()).into(),
+                Box::new(Expr::Name(ast::ExprName {
+                    id: String::new(),
+                    ctx: ExprContext::Invalid,
                     range: pattern.range(),
                 }))
             }

@@ -61,7 +61,7 @@ Module(
                         ExprName {
                             range: 43..43,
                             id: "",
-                            ctx: Load,
+                            ctx: Invalid,
                         },
                     ),
                     value: None,
@@ -83,7 +83,7 @@ Module(
 3 | elif False:
 4 |     pass
 5 | elf:
-  |     ^ Syntax Error: Expression expected.
+  |     ^ Syntax Error: Expected an expression
 6 |     pass
   |
 
@@ -100,6 +100,3 @@ Module(
 6 |     pass
 7 | 
   |
-
-
-
