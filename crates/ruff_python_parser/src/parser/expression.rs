@@ -588,7 +588,7 @@ impl<'src> Parser<'src> {
             let mut slices = vec![slice];
 
             self.parse_comma_separated_list(RecoveryContextKind::Slices, |parser| {
-                slices.push(parser.parse_slice())
+                slices.push(parser.parse_slice());
             });
 
             slice = Expr::Tuple(ast::ExprTuple {
@@ -1279,7 +1279,7 @@ impl<'src> Parser<'src> {
         let mut elts = vec![first_element];
 
         self.parse_comma_separated_list(RecoveryContextKind::TupleElements(parenthesized), |p| {
-            elts.push(parse_func(p).expr)
+            elts.push(parse_func(p).expr);
         });
 
         if parenthesized.is_yes() {
@@ -1305,7 +1305,7 @@ impl<'src> Parser<'src> {
         let mut elts = vec![first_element];
 
         self.parse_comma_separated_list(RecoveryContextKind::ListElements, |parser| {
-            elts.push(parser.parse_named_expression_or_higher().expr)
+            elts.push(parser.parse_named_expression_or_higher().expr);
         });
 
         self.expect(TokenKind::Rsqb);
@@ -1328,7 +1328,7 @@ impl<'src> Parser<'src> {
         let mut elts = vec![first_element];
 
         self.parse_comma_separated_list(RecoveryContextKind::SetElements, |parser| {
-            elts.push(parser.parse_named_expression_or_higher().expr)
+            elts.push(parser.parse_named_expression_or_higher().expr);
         });
 
         self.expect(TokenKind::Rbrace);
