@@ -14,6 +14,7 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// The `__str__` method should return a `str` object. Returning a different
 /// type may cause unexpected behavior.
+///
 /// ## Example
 /// ```python
 /// class Foo:
