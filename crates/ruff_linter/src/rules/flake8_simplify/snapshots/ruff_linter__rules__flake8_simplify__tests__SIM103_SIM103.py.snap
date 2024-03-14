@@ -140,6 +140,8 @@ SIM103.py:83:5: SIM103 [*] Return the condition `a` directly
 85 | |     else:
 86 | |         return False
    | |____________________^ SIM103
+87 |   
+88 |   def f():
    |
    = help: Replace with `return bool(a)`
 
@@ -152,3 +154,26 @@ SIM103.py:83:5: SIM103 [*] Return the condition `a` directly
 85    |-    else:
 86    |-        return False
    83 |+    return bool(a)
+87 84 | 
+88 85 | def f():
+89 86 |     if a:
+
+SIM103.py:89:5: SIM103 [*] Return the condition `a` directly
+   |
+88 |   def f():
+89 |       if a:
+   |  _____^
+90 | |         return True
+91 | |     return False
+   | |________________^ SIM103
+   |
+   = help: Replace with `return bool(a)`
+
+ℹ Unsafe fix
+86 86 |         return False
+87 87 | 
+88 88 | def f():
+89    |-    if a:
+90    |-        return True
+91    |-    return False
+   89 |+    return bool(a)

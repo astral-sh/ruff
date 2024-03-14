@@ -68,13 +68,10 @@ pub(crate) fn needless_bool(checker: &mut Checker, body: &[Stmt]) {
     while let Some(stmt) = iter.next() {
         match stmt {
             ast::Stmt::If(stmt_if) => {
-                println!("Checking bool with if: {:#?}", stmt_if);
                 let stmt_return = match iter.peek() {
                     Some(ast::Stmt::Return(stmt_return)) => Some(stmt_return),
                     _ => None,
                 };
-
-                println!("Checking bool with return: {:#?}", stmt_return);
 
                 check_needless_bool(checker, stmt_if, stmt_return);
             }
@@ -124,9 +121,6 @@ pub(crate) fn check_needless_bool(
                 value: Some(value),
                 range,
             }) => {
-                // Print the two statements debug
-                println!("if_stmt: {:#?}", stmt_if);
-                println!("next_stmt: {:#?}", next_stmt);
                 return_stmt.push(ast::Stmt::Return(ast::StmtReturn {
                     value: Some(value.clone()),
                     range: range.clone(),
@@ -135,7 +129,7 @@ pub(crate) fn check_needless_bool(
                     if_test.as_ref(),
                     if_body,
                     &return_stmt,
-                    TextRange::new(if_test.range().start(), range.end()),
+                    TextRange::new(stmt_if.range().start(), range.end()),
                 )
             }
             _ => return,

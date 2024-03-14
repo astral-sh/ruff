@@ -84,3 +84,8 @@ def f():
         return True
     else:
         return False
+
+def f():
+    if a:
+        return True
+    return False
