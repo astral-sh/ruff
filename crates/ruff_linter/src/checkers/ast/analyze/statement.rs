@@ -50,6 +50,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
             }
+            if checker.enabled(Rule::NonlocalAndGlobal) {
+                pylint::rules::nonlocal_and_global(checker, names);
+            }
         }
         Stmt::Break(_) => {
             if checker.enabled(Rule::BreakOutsideLoop) {

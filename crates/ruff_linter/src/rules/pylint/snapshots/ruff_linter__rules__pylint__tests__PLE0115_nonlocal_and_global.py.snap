@@ -1,0 +1,31 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+nonlocal_and_global.py:5:12: PLE0115 Name `counter` is nonlocal and global
+  |
+3 | counter = 0
+4 | def count():
+5 |     global counter
+  |            ^^^^^^^ PLE0115
+6 |     nonlocal counter
+7 |     counter += 1
+  |
+
+nonlocal_and_global.py:16:20: PLE0115 Name `counter` is nonlocal and global
+   |
+14 |             counter += 1
+15 |         else:
+16 |             global counter
+   |                    ^^^^^^^ PLE0115
+17 |             counter += 1
+   |
+
+nonlocal_and_global.py:25:16: PLE0115 Name `counter` is nonlocal and global
+   |
+23 |             nonlocal counter
+24 |             counter += 1
+25 |         global counter
+   |                ^^^^^^^ PLE0115
+26 | 
+27 | # These should be OK
+   |

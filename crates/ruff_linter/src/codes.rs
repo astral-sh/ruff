@@ -234,6 +234,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "C3002") => (RuleGroup::Stable, rules::pylint::rules::UnnecessaryDirectLambdaCall),
         (Pylint, "E0100") => (RuleGroup::Stable, rules::pylint::rules::YieldInInit),
         (Pylint, "E0101") => (RuleGroup::Stable, rules::pylint::rules::ReturnInInit),
+        (Pylint, "E0115") => (RuleGroup::Preview, rules::pylint::rules::NonlocalAndGlobal),
         (Pylint, "E0116") => (RuleGroup::Stable, rules::pylint::rules::ContinueInFinally),
         (Pylint, "E0117") => (RuleGroup::Stable, rules::pylint::rules::NonlocalWithoutBinding),
         (Pylint, "E0118") => (RuleGroup::Stable, rules::pylint::rules::LoadBeforeGlobalDeclaration),
