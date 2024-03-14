@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
-use unicode_normalization::{is_nfkc_quick, IsNormalized, UnicodeNormalization};
+use unicode_normalization::UnicodeNormalization;
 
 use ruff_index::{newtype_index, Idx, IndexSlice, IndexVec};
 
@@ -22,7 +22,7 @@ struct Bindings<'a>(FxHashMap<Cow<'a, str>, BindingId>);
 impl<'a> Bindings<'a> {
     #[inline]
     fn get(&self, name: &str) -> Option<&BindingId> {
-        if matches!(is_nfkc_quick(name.chars()), IsNormalized::Yes) {
+        if name.is_ascii() {
             self.0.get(name)
         } else {
             self.0.get(&*name.nfkc().collect::<String>())
@@ -31,7 +31,7 @@ impl<'a> Bindings<'a> {
 
     #[inline]
     fn insert(&mut self, name: &'a str, value: BindingId) -> Option<BindingId> {
-        if matches!(is_nfkc_quick(name.chars()), IsNormalized::Yes) {
+        if name.is_ascii() {
             self.0.insert(Cow::Borrowed(name), value)
         } else {
             self.0.insert(Cow::Owned(name.nfkc().collect()), value)
@@ -40,7 +40,7 @@ impl<'a> Bindings<'a> {
 
     #[inline]
     fn contains_key(&self, key: &str) -> bool {
-        if matches!(is_nfkc_quick(key.chars()), IsNormalized::Yes) {
+        if key.is_ascii() {
             self.0.contains_key(key)
         } else {
             self.0.contains_key(&*key.nfkc().collect::<String>())
