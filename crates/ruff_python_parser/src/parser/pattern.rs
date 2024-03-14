@@ -218,52 +218,43 @@ impl<'src> Parser<'src> {
         let mut patterns = vec![];
         let mut rest = None;
 
-        self.parse_comma_separated_list(
-            RecoveryContextKind::MatchPatternMapping,
-            |parser| {
-                if parser.eat(TokenKind::DoubleStar) {
-                    rest = Some(parser.parse_identifier());
-                } else {
-                    let key = match parser.parse_match_pattern_lhs() {
-                        Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => *value,
-                        Pattern::MatchSingleton(ast::PatternMatchSingleton { value, range }) => {
-                            match value {
-                                Singleton::None => {
-                                    Expr::NoneLiteral(ast::ExprNoneLiteral { range })
-                                }
-                                Singleton::True => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-                                    value: true,
-                                    range,
-                                }),
-                                Singleton::False => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-                                    value: false,
-                                    range,
-                                }),
+        self.parse_comma_separated_list(RecoveryContextKind::MatchPatternMapping, |parser| {
+            if parser.eat(TokenKind::DoubleStar) {
+                rest = Some(parser.parse_identifier());
+            } else {
+                let key = match parser.parse_match_pattern_lhs() {
+                    Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => *value,
+                    Pattern::MatchSingleton(ast::PatternMatchSingleton { value, range }) => {
+                        match value {
+                            Singleton::None => Expr::NoneLiteral(ast::ExprNoneLiteral { range }),
+                            Singleton::True => {
+                                Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, range })
                             }
+                            Singleton::False => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+                                value: false,
+                                range,
+                            }),
                         }
-                        pattern => {
-                            parser.add_error(
-                                ParseErrorType::OtherError(
-                                    "invalid mapping pattern key".to_string(),
-                                ),
-                                &pattern,
-                            );
-                            Expr::Name(ast::ExprName {
-                                id: String::new(),
-                                ctx: ExprContext::Invalid,
-                                range: pattern.range(),
-                            })
-                        }
-                    };
-                    keys.push(key);
+                    }
+                    pattern => {
+                        parser.add_error(
+                            ParseErrorType::OtherError("invalid mapping pattern key".to_string()),
+                            &pattern,
+                        );
+                        Expr::Name(ast::ExprName {
+                            id: String::new(),
+                            ctx: ExprContext::Invalid,
+                            range: pattern.range(),
+                        })
+                    }
+                };
+                keys.push(key);
 
-                    parser.expect(TokenKind::Colon);
+                parser.expect(TokenKind::Colon);
 
-                    patterns.push(parser.parse_match_pattern());
-                }
-            },
-            true,
-        );
+                patterns.push(parser.parse_match_pattern());
+            }
+        });
 
         // TODO(dhruvmanila): There can't be any other pattern after a `**` pattern.
         // TODO(dhruvmanila): Duplicate literal keys should raise a SyntaxError.
@@ -379,7 +370,6 @@ impl<'src> Parser<'src> {
         self.parse_comma_separated_list(
             RecoveryContextKind::SequenceMatchPattern(parentheses),
             |parser| patterns.push(parser.parse_match_pattern()),
-            true,
         );
 
         if let Some(parentheses) = parentheses {
@@ -628,7 +618,6 @@ impl<'src> Parser<'src> {
                     );
                 }
             },
-            true,
         );
 
         self.expect(TokenKind::Rpar);

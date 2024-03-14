@@ -516,14 +516,9 @@ impl<'src> Parser<'src> {
         &mut self,
         recovery_context_kind: RecoveryContextKind,
         parse_element: impl Fn(&mut Parser<'src>) -> T,
-        allow_trailing_comma: bool,
     ) -> Vec<T> {
         let mut elements = Vec::new();
-        self.parse_comma_separated_list(
-            recovery_context_kind,
-            |p| elements.push(parse_element(p)),
-            allow_trailing_comma,
-        );
+        self.parse_comma_separated_list(recovery_context_kind, |p| elements.push(parse_element(p)));
         elements
     }
 
@@ -534,14 +529,10 @@ impl<'src> Parser<'src> {
     /// is that this function does not return the parsed elements. Instead, it is the
     /// caller's responsibility to handle the parsed elements. This is the reason
     /// that the `parse_element` parameter is bound to [`FnMut`] instead of [`Fn`].
-    ///
-    /// If `allow_trailing_comma` is `true`, the function will allow a trailing
-    /// comma at the end of the list, otherwise it will add an error.
     fn parse_comma_separated_list(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
         mut parse_element: impl FnMut(&mut Parser<'src>),
-        allow_trailing_comma: bool,
     ) {
         let mut progress = ParserProgress::default();
 
@@ -599,7 +590,7 @@ impl<'src> Parser<'src> {
         }
 
         if let Some(trailing_comma_range) = trailing_comma_range {
-            if !allow_trailing_comma {
+            if !recovery_context_kind.allow_trailing_comma() {
                 self.add_error(
                     ParseErrorType::OtherError("Trailing comma not allowed".to_string()),
                     trailing_comma_range,
@@ -797,6 +788,28 @@ enum RecoveryContextKind {
 }
 
 impl RecoveryContextKind {
+    /// Returns `true` if a trailing comma is allowed in the current context.
+    const fn allow_trailing_comma(self) -> bool {
+        matches!(
+            self,
+            RecoveryContextKind::Slices
+                | RecoveryContextKind::TupleElements(_)
+                | RecoveryContextKind::SetElements
+                | RecoveryContextKind::ListElements
+                | RecoveryContextKind::DictElements
+                | RecoveryContextKind::Arguments
+                | RecoveryContextKind::MatchPatternMapping
+                | RecoveryContextKind::SequenceMatchPattern(_)
+                | RecoveryContextKind::MatchPatternClassArguments
+                // Only allow a trailing comma if the with item itself is parenthesized
+                | RecoveryContextKind::WithItems(WithItemKind::Parenthesized)
+                | RecoveryContextKind::Parameters(_)
+                | RecoveryContextKind::TypeParams
+                | RecoveryContextKind::DeleteTargets
+                | RecoveryContextKind::ImportFromAsNames
+        )
+    }
+
     fn is_list_terminator(self, p: &Parser) -> bool {
         match self {
             // The program must consume all tokens until the end
