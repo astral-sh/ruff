@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
-expression: "parse(\"\n# PatternMatchSingleton\nmatch x:\n    case None:\n        ...\n    case True:\n        ...\n    case False:\n        ...\n\n# PatternMatchValue\nmatch x:\n    case a.b:\n        ...\n    case a.b.c:\n        ...\n    case '':\n        ...\n    case b'':\n        ...\n    case 1:\n        ...\n    case 1.0:\n        ...\n    case 1.0J:\n        ...\n    case 1 + 1:\n        ...\n    case -1:\n        ...\n    case -1.:\n        ...\n    case -0b01:\n        ...\n    case (1):\n        ...\n\n# PatternMatchOr\nmatch x:\n    case 1 | 2:\n        ...\n    case '' | 1.1 | -1 | 1 + 1 | a.b:\n        ...\n\n# PatternMatchAs\nmatch x:\n    case a as b:\n        ...\n    case 1 | 2 as two:\n        ...\n    case 1 + 3 as sum:\n        ...\n    case a.b as ab:\n        ...\n    case _:\n        ...\n    case _ as x:\n        ...\n\n# PatternMatchSequence\nmatch x:\n    case 1, 2, 3:\n        ...\n    case (1, 2, 3,):\n        ...\n    case (1 + 2, a, None, a.b):\n        ...\n    case (1 as X, b) as S:\n        ...\n    case [1, 2, 3 + 1]:\n        ...\n    case ([1,2], 3):\n        ...\n    case [1]:\n        ...\n\n# PatternMatchStar\nmatch x:\n    case *a:\n        ...\n    case *_:\n        ...\n    case [1, 2, *rest]:\n        ...\n    case (*_, 1, 2):\n        ...\n\n# PatternMatchClass\nmatch x:\n    case Point():\n        ...\n    case a.b.Point():\n        ...\n    case Point2D(x=0):\n        ...\n    case Point2D(x=0, y=0,):\n        ...\n    case Point2D(0, 1):\n        ...\n    case Point2D([0, 1], y=1):\n        ...\n    case Point2D(x=[0, 1], y=1):\n        ...\n\n# PatternMatchMapping\nmatch x := b:\n    case {1: _}:\n        ...\n    case {'': a, None: (1, 2), **rest}:\n        ...\n\n# Pattern guard\nmatch y:\n    case a if b := c: ...\n    case e if  1 < 2: ...\n\")"
+expression: "parse(\"\n# PatternMatchSingleton\nmatch x:\n    case None:\n        ...\n    case True:\n        ...\n    case False:\n        ...\n\n# PatternMatchValue\nmatch x:\n    case a.b:\n        ...\n    case a.b.c:\n        ...\n    case '':\n        ...\n    case b'':\n        ...\n    case 1:\n        ...\n    case 1.0:\n        ...\n    case 1.0J:\n        ...\n    case 1 + 1j:\n        ...\n    case -1:\n        ...\n    case -1.:\n        ...\n    case -0b01:\n        ...\n    case (1):\n        ...\n\n# PatternMatchOr\nmatch x:\n    case 1 | 2:\n        ...\n    case '' | 1.1 | -1 | 1 + 1j | a.b:\n        ...\n\n# PatternMatchAs\nmatch x:\n    case a as b:\n        ...\n    case 1 | 2 as two:\n        ...\n    case 1 + 3j as sum:\n        ...\n    case a.b as ab:\n        ...\n    case _:\n        ...\n    case _ as x:\n        ...\n\n# PatternMatchSequence\nmatch x:\n    case 1, 2, 3:\n        ...\n    case (1, 2, 3,):\n        ...\n    case (1 + 2j, a, None, a.b):\n        ...\n    case (1 as X, b) as S:\n        ...\n    case [1, 2, 3 + 1j]:\n        ...\n    case ([1,2], 3):\n        ...\n    case [1]:\n        ...\n\n# PatternMatchStar\nmatch x:\n    case *a:\n        ...\n    case *_:\n        ...\n    case [1, 2, *rest]:\n        ...\n    case (*_, 1, 2):\n        ...\n\n# PatternMatchClass\nmatch x:\n    case Point():\n        ...\n    case a.b.Point():\n        ...\n    case Point2D(x=0):\n        ...\n    case Point2D(x=0, y=0,):\n        ...\n    case Point2D(0, 1):\n        ...\n    case Point2D([0, 1], y=1):\n        ...\n    case Point2D(x=[0, 1], y=1):\n        ...\n\n# PatternMatchMapping\nmatch x := b:\n    case {1: _}:\n        ...\n    case {'': a, None: (1, 2), **rest}:\n        ...\n\n# Pattern guard\nmatch y:\n    case a if b := c: ...\n    case e if  1 < 2: ...\n\")"
 ---
 Program {
     ast: Module(
         ModModule {
-            range: 0..1689,
+            range: 0..1694,
             body: [
                 Match(
                     StmtMatch {
@@ -89,7 +89,7 @@ Program {
                 ),
                 Match(
                     StmtMatch {
-                        range: 137..460,
+                        range: 137..461,
                         subject: Name(
                             ExprName {
                                 range: 143..144,
@@ -351,13 +351,13 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 332..355,
+                                range: 332..356,
                                 pattern: MatchValue(
                                     PatternMatchValue {
-                                        range: 337..342,
+                                        range: 337..343,
                                         value: BinOp(
                                             ExprBinOp {
-                                                range: 337..342,
+                                                range: 337..343,
                                                 left: NumberLiteral(
                                                     ExprNumberLiteral {
                                                         range: 337..338,
@@ -369,7 +369,43 @@ Program {
                                                 op: Add,
                                                 right: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 341..342,
+                                                        range: 341..343,
+                                                        value: Complex {
+                                                            real: 0.0,
+                                                            imag: 1.0,
+                                                        },
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                guard: None,
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 353..356,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 353..356,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                            MatchCase {
+                                range: 361..381,
+                                pattern: MatchValue(
+                                    PatternMatchValue {
+                                        range: 366..368,
+                                        value: UnaryOp(
+                                            ExprUnaryOp {
+                                                range: 366..368,
+                                                op: USub,
+                                                operand: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 367..368,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -383,10 +419,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 352..355,
+                                            range: 378..381,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 352..355,
+                                                    range: 378..381,
                                                 },
                                             ),
                                         },
@@ -394,52 +430,17 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 360..380,
+                                range: 386..407,
                                 pattern: MatchValue(
                                     PatternMatchValue {
-                                        range: 365..367,
+                                        range: 391..394,
                                         value: UnaryOp(
                                             ExprUnaryOp {
-                                                range: 365..367,
+                                                range: 391..394,
                                                 op: USub,
                                                 operand: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 366..367,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    },
-                                ),
-                                guard: None,
-                                body: [
-                                    Expr(
-                                        StmtExpr {
-                                            range: 377..380,
-                                            value: EllipsisLiteral(
-                                                ExprEllipsisLiteral {
-                                                    range: 377..380,
-                                                },
-                                            ),
-                                        },
-                                    ),
-                                ],
-                            },
-                            MatchCase {
-                                range: 385..406,
-                                pattern: MatchValue(
-                                    PatternMatchValue {
-                                        range: 390..393,
-                                        value: UnaryOp(
-                                            ExprUnaryOp {
-                                                range: 390..393,
-                                                op: USub,
-                                                operand: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        range: 391..393,
+                                                        range: 392..394,
                                                         value: Float(
                                                             1.0,
                                                         ),
@@ -453,10 +454,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 403..406,
+                                            range: 404..407,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 403..406,
+                                                    range: 404..407,
                                                 },
                                             ),
                                         },
@@ -464,17 +465,17 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 411..434,
+                                range: 412..435,
                                 pattern: MatchValue(
                                     PatternMatchValue {
-                                        range: 416..421,
+                                        range: 417..422,
                                         value: UnaryOp(
                                             ExprUnaryOp {
-                                                range: 416..421,
+                                                range: 417..422,
                                                 op: USub,
                                                 operand: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 417..421,
+                                                        range: 418..422,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -488,10 +489,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 431..434,
+                                            range: 432..435,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 431..434,
+                                                    range: 432..435,
                                                 },
                                             ),
                                         },
@@ -499,13 +500,13 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 439..460,
+                                range: 440..461,
                                 pattern: MatchValue(
                                     PatternMatchValue {
-                                        range: 445..446,
+                                        range: 446..447,
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
-                                                range: 445..446,
+                                                range: 446..447,
                                                 value: Int(
                                                     1,
                                                 ),
@@ -517,10 +518,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 457..460,
+                                            range: 458..461,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 457..460,
+                                                    range: 458..461,
                                                 },
                                             ),
                                         },
@@ -532,27 +533,27 @@ Program {
                 ),
                 Match(
                     StmtMatch {
-                        range: 479..565,
+                        range: 480..567,
                         subject: Name(
                             ExprName {
-                                range: 485..486,
+                                range: 486..487,
                                 id: "x",
                                 ctx: Load,
                             },
                         ),
                         cases: [
                             MatchCase {
-                                range: 492..515,
+                                range: 493..516,
                                 pattern: MatchOr(
                                     PatternMatchOr {
-                                        range: 497..502,
+                                        range: 498..503,
                                         patterns: [
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 497..498,
+                                                    range: 498..499,
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 497..498,
+                                                            range: 498..499,
                                                             value: Int(
                                                                 1,
                                                             ),
@@ -562,10 +563,10 @@ Program {
                                             ),
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 501..502,
+                                                    range: 502..503,
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 501..502,
+                                                            range: 502..503,
                                                             value: Int(
                                                                 2,
                                                             ),
@@ -580,10 +581,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 512..515,
+                                            range: 513..516,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 512..515,
+                                                    range: 513..516,
                                                 },
                                             ),
                                         },
@@ -591,21 +592,21 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 520..565,
+                                range: 521..567,
                                 pattern: MatchOr(
                                     PatternMatchOr {
-                                        range: 525..552,
+                                        range: 526..554,
                                         patterns: [
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 525..527,
+                                                    range: 526..528,
                                                     value: StringLiteral(
                                                         ExprStringLiteral {
-                                                            range: 525..527,
+                                                            range: 526..528,
                                                             value: StringLiteralValue {
                                                                 inner: Single(
                                                                     StringLiteral {
-                                                                        range: 525..527,
+                                                                        range: 526..528,
                                                                         value: "",
                                                                         flags: StringLiteralFlags {
                                                                             quote_style: Single,
@@ -621,10 +622,10 @@ Program {
                                             ),
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 530..533,
+                                                    range: 531..534,
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 530..533,
+                                                            range: 531..534,
                                                             value: Float(
                                                                 1.1,
                                                             ),
@@ -634,14 +635,14 @@ Program {
                                             ),
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 536..538,
+                                                    range: 537..539,
                                                     value: UnaryOp(
                                                         ExprUnaryOp {
-                                                            range: 536..538,
+                                                            range: 537..539,
                                                             op: USub,
                                                             operand: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 537..538,
+                                                                    range: 538..539,
                                                                     value: Int(
                                                                         1,
                                                                     ),
@@ -653,13 +654,13 @@ Program {
                                             ),
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 541..546,
+                                                    range: 542..548,
                                                     value: BinOp(
                                                         ExprBinOp {
-                                                            range: 541..546,
+                                                            range: 542..548,
                                                             left: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 541..542,
+                                                                    range: 542..543,
                                                                     value: Int(
                                                                         1,
                                                                     ),
@@ -668,10 +669,11 @@ Program {
                                                             op: Add,
                                                             right: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 545..546,
-                                                                    value: Int(
-                                                                        1,
-                                                                    ),
+                                                                    range: 546..548,
+                                                                    value: Complex {
+                                                                        real: 0.0,
+                                                                        imag: 1.0,
+                                                                    },
                                                                 },
                                                             ),
                                                         },
@@ -680,20 +682,20 @@ Program {
                                             ),
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 549..552,
+                                                    range: 551..554,
                                                     value: Attribute(
                                                         ExprAttribute {
-                                                            range: 549..552,
+                                                            range: 551..554,
                                                             value: Name(
                                                                 ExprName {
-                                                                    range: 549..550,
+                                                                    range: 551..552,
                                                                     id: "a",
                                                                     ctx: Load,
                                                                 },
                                                             ),
                                                             attr: Identifier {
                                                                 id: "b",
-                                                                range: 551..552,
+                                                                range: 553..554,
                                                             },
                                                             ctx: Load,
                                                         },
@@ -707,10 +709,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 562..565,
+                                            range: 564..567,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 562..565,
+                                                    range: 564..567,
                                                 },
                                             ),
                                         },
@@ -722,29 +724,29 @@ Program {
                 ),
                 Match(
                     StmtMatch {
-                        range: 584..776,
+                        range: 586..779,
                         subject: Name(
                             ExprName {
-                                range: 590..591,
+                                range: 592..593,
                                 id: "x",
                                 ctx: Load,
                             },
                         ),
                         cases: [
                             MatchCase {
-                                range: 597..621,
+                                range: 599..623,
                                 pattern: MatchAs(
                                     PatternMatchAs {
-                                        range: 602..608,
+                                        range: 604..610,
                                         pattern: Some(
                                             MatchAs(
                                                 PatternMatchAs {
-                                                    range: 602..603,
+                                                    range: 604..605,
                                                     pattern: None,
                                                     name: Some(
                                                         Identifier {
                                                             id: "a",
-                                                            range: 602..603,
+                                                            range: 604..605,
                                                         },
                                                     ),
                                                 },
@@ -753,7 +755,7 @@ Program {
                                         name: Some(
                                             Identifier {
                                                 id: "b",
-                                                range: 607..608,
+                                                range: 609..610,
                                             },
                                         ),
                                     },
@@ -762,10 +764,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 618..621,
+                                            range: 620..623,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 618..621,
+                                                    range: 620..623,
                                                 },
                                             ),
                                         },
@@ -773,21 +775,21 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 626..656,
+                                range: 628..658,
                                 pattern: MatchAs(
                                     PatternMatchAs {
-                                        range: 631..643,
+                                        range: 633..645,
                                         pattern: Some(
                                             MatchOr(
                                                 PatternMatchOr {
-                                                    range: 631..636,
+                                                    range: 633..638,
                                                     patterns: [
                                                         MatchValue(
                                                             PatternMatchValue {
-                                                                range: 631..632,
+                                                                range: 633..634,
                                                                 value: NumberLiteral(
                                                                     ExprNumberLiteral {
-                                                                        range: 631..632,
+                                                                        range: 633..634,
                                                                         value: Int(
                                                                             1,
                                                                         ),
@@ -797,10 +799,10 @@ Program {
                                                         ),
                                                         MatchValue(
                                                             PatternMatchValue {
-                                                                range: 635..636,
+                                                                range: 637..638,
                                                                 value: NumberLiteral(
                                                                     ExprNumberLiteral {
-                                                                        range: 635..636,
+                                                                        range: 637..638,
                                                                         value: Int(
                                                                             2,
                                                                         ),
@@ -815,7 +817,7 @@ Program {
                                         name: Some(
                                             Identifier {
                                                 id: "two",
-                                                range: 640..643,
+                                                range: 642..645,
                                             },
                                         ),
                                     },
@@ -824,10 +826,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 653..656,
+                                            range: 655..658,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 653..656,
+                                                    range: 655..658,
                                                 },
                                             ),
                                         },
@@ -835,20 +837,20 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 661..691,
+                                range: 663..694,
                                 pattern: MatchAs(
                                     PatternMatchAs {
-                                        range: 666..678,
+                                        range: 668..681,
                                         pattern: Some(
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 666..671,
+                                                    range: 668..674,
                                                     value: BinOp(
                                                         ExprBinOp {
-                                                            range: 666..671,
+                                                            range: 668..674,
                                                             left: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 666..667,
+                                                                    range: 668..669,
                                                                     value: Int(
                                                                         1,
                                                                     ),
@@ -857,10 +859,11 @@ Program {
                                                             op: Add,
                                                             right: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 670..671,
-                                                                    value: Int(
-                                                                        3,
-                                                                    ),
+                                                                    range: 672..674,
+                                                                    value: Complex {
+                                                                        real: 0.0,
+                                                                        imag: 3.0,
+                                                                    },
                                                                 },
                                                             ),
                                                         },
@@ -871,7 +874,7 @@ Program {
                                         name: Some(
                                             Identifier {
                                                 id: "sum",
-                                                range: 675..678,
+                                                range: 678..681,
                                             },
                                         ),
                                     },
@@ -880,10 +883,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 688..691,
+                                            range: 691..694,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 688..691,
+                                                    range: 691..694,
                                                 },
                                             ),
                                         },
@@ -891,27 +894,27 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 696..723,
+                                range: 699..726,
                                 pattern: MatchAs(
                                     PatternMatchAs {
-                                        range: 701..710,
+                                        range: 704..713,
                                         pattern: Some(
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 701..704,
+                                                    range: 704..707,
                                                     value: Attribute(
                                                         ExprAttribute {
-                                                            range: 701..704,
+                                                            range: 704..707,
                                                             value: Name(
                                                                 ExprName {
-                                                                    range: 701..702,
+                                                                    range: 704..705,
                                                                     id: "a",
                                                                     ctx: Load,
                                                                 },
                                                             ),
                                                             attr: Identifier {
                                                                 id: "b",
-                                                                range: 703..704,
+                                                                range: 706..707,
                                                             },
                                                             ctx: Load,
                                                         },
@@ -922,7 +925,7 @@ Program {
                                         name: Some(
                                             Identifier {
                                                 id: "ab",
-                                                range: 708..710,
+                                                range: 711..713,
                                             },
                                         ),
                                     },
@@ -931,10 +934,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 720..723,
+                                            range: 723..726,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 720..723,
+                                                    range: 723..726,
                                                 },
                                             ),
                                         },
@@ -942,10 +945,10 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 728..747,
+                                range: 731..750,
                                 pattern: MatchAs(
                                     PatternMatchAs {
-                                        range: 733..734,
+                                        range: 736..737,
                                         pattern: None,
                                         name: None,
                                     },
@@ -954,10 +957,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 744..747,
+                                            range: 747..750,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 744..747,
+                                                    range: 747..750,
                                                 },
                                             ),
                                         },
@@ -965,14 +968,14 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 752..776,
+                                range: 755..779,
                                 pattern: MatchAs(
                                     PatternMatchAs {
-                                        range: 757..763,
+                                        range: 760..766,
                                         pattern: Some(
                                             MatchAs(
                                                 PatternMatchAs {
-                                                    range: 757..758,
+                                                    range: 760..761,
                                                     pattern: None,
                                                     name: None,
                                                 },
@@ -981,7 +984,7 @@ Program {
                                         name: Some(
                                             Identifier {
                                                 id: "x",
-                                                range: 762..763,
+                                                range: 765..766,
                                             },
                                         ),
                                     },
@@ -990,10 +993,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 773..776,
+                                            range: 776..779,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 773..776,
+                                                    range: 776..779,
                                                 },
                                             ),
                                         },
@@ -1005,34 +1008,21 @@ Program {
                 ),
                 Match(
                     StmtMatch {
-                        range: 801..1050,
+                        range: 804..1055,
                         subject: Name(
                             ExprName {
-                                range: 807..808,
+                                range: 810..811,
                                 id: "x",
                                 ctx: Load,
                             },
                         ),
                         cases: [
                             MatchCase {
-                                range: 814..839,
+                                range: 817..842,
                                 pattern: MatchSequence(
                                     PatternMatchSequence {
-                                        range: 819..826,
+                                        range: 822..829,
                                         patterns: [
-                                            MatchValue(
-                                                PatternMatchValue {
-                                                    range: 819..820,
-                                                    value: NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            range: 819..820,
-                                                            value: Int(
-                                                                1,
-                                                            ),
-                                                        },
-                                                    ),
-                                                },
-                                            ),
                                             MatchValue(
                                                 PatternMatchValue {
                                                     range: 822..823,
@@ -1040,7 +1030,7 @@ Program {
                                                         ExprNumberLiteral {
                                                             range: 822..823,
                                                             value: Int(
-                                                                2,
+                                                                1,
                                                             ),
                                                         },
                                                     ),
@@ -1053,6 +1043,19 @@ Program {
                                                         ExprNumberLiteral {
                                                             range: 825..826,
                                                             value: Int(
+                                                                2,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                            MatchValue(
+                                                PatternMatchValue {
+                                                    range: 828..829,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 828..829,
+                                                            value: Int(
                                                                 3,
                                                             ),
                                                         },
@@ -1066,10 +1069,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 836..839,
+                                            range: 839..842,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 836..839,
+                                                    range: 839..842,
                                                 },
                                             ),
                                         },
@@ -1077,24 +1080,11 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 844..872,
+                                range: 847..875,
                                 pattern: MatchSequence(
                                     PatternMatchSequence {
-                                        range: 849..859,
+                                        range: 852..862,
                                         patterns: [
-                                            MatchValue(
-                                                PatternMatchValue {
-                                                    range: 850..851,
-                                                    value: NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            range: 850..851,
-                                                            value: Int(
-                                                                1,
-                                                            ),
-                                                        },
-                                                    ),
-                                                },
-                                            ),
                                             MatchValue(
                                                 PatternMatchValue {
                                                     range: 853..854,
@@ -1102,7 +1092,7 @@ Program {
                                                         ExprNumberLiteral {
                                                             range: 853..854,
                                                             value: Int(
-                                                                2,
+                                                                1,
                                                             ),
                                                         },
                                                     ),
@@ -1115,6 +1105,19 @@ Program {
                                                         ExprNumberLiteral {
                                                             range: 856..857,
                                                             value: Int(
+                                                                2,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                            MatchValue(
+                                                PatternMatchValue {
+                                                    range: 859..860,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 859..860,
+                                                            value: Int(
                                                                 3,
                                                             ),
                                                         },
@@ -1128,10 +1131,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 869..872,
+                                            range: 872..875,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 869..872,
+                                                    range: 872..875,
                                                 },
                                             ),
                                         },
@@ -1139,20 +1142,20 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 877..916,
+                                range: 880..920,
                                 pattern: MatchSequence(
                                     PatternMatchSequence {
-                                        range: 882..903,
+                                        range: 885..907,
                                         patterns: [
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 883..888,
+                                                    range: 886..892,
                                                     value: BinOp(
                                                         ExprBinOp {
-                                                            range: 883..888,
+                                                            range: 886..892,
                                                             left: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 883..884,
+                                                                    range: 886..887,
                                                                     value: Int(
                                                                         1,
                                                                     ),
@@ -1161,10 +1164,11 @@ Program {
                                                             op: Add,
                                                             right: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 887..888,
-                                                                    value: Int(
-                                                                        2,
-                                                                    ),
+                                                                    range: 890..892,
+                                                                    value: Complex {
+                                                                        real: 0.0,
+                                                                        imag: 2.0,
+                                                                    },
                                                                 },
                                                             ),
                                                         },
@@ -1173,38 +1177,38 @@ Program {
                                             ),
                                             MatchAs(
                                                 PatternMatchAs {
-                                                    range: 890..891,
+                                                    range: 894..895,
                                                     pattern: None,
                                                     name: Some(
                                                         Identifier {
                                                             id: "a",
-                                                            range: 890..891,
+                                                            range: 894..895,
                                                         },
                                                     ),
                                                 },
                                             ),
                                             MatchSingleton(
                                                 PatternMatchSingleton {
-                                                    range: 893..897,
+                                                    range: 897..901,
                                                     value: None,
                                                 },
                                             ),
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 899..902,
+                                                    range: 903..906,
                                                     value: Attribute(
                                                         ExprAttribute {
-                                                            range: 899..902,
+                                                            range: 903..906,
                                                             value: Name(
                                                                 ExprName {
-                                                                    range: 899..900,
+                                                                    range: 903..904,
                                                                     id: "a",
                                                                     ctx: Load,
                                                                 },
                                                             ),
                                                             attr: Identifier {
                                                                 id: "b",
-                                                                range: 901..902,
+                                                                range: 905..906,
                                                             },
                                                             ctx: Load,
                                                         },
@@ -1218,10 +1222,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 913..916,
+                                            range: 917..920,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 913..916,
+                                                    range: 917..920,
                                                 },
                                             ),
                                         },
@@ -1229,25 +1233,25 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 921..955,
+                                range: 925..959,
                                 pattern: MatchAs(
                                     PatternMatchAs {
-                                        range: 926..942,
+                                        range: 930..946,
                                         pattern: Some(
                                             MatchSequence(
                                                 PatternMatchSequence {
-                                                    range: 926..937,
+                                                    range: 930..941,
                                                     patterns: [
                                                         MatchAs(
                                                             PatternMatchAs {
-                                                                range: 927..933,
+                                                                range: 931..937,
                                                                 pattern: Some(
                                                                     MatchValue(
                                                                         PatternMatchValue {
-                                                                            range: 927..928,
+                                                                            range: 931..932,
                                                                             value: NumberLiteral(
                                                                                 ExprNumberLiteral {
-                                                                                    range: 927..928,
+                                                                                    range: 931..932,
                                                                                     value: Int(
                                                                                         1,
                                                                                     ),
@@ -1259,19 +1263,19 @@ Program {
                                                                 name: Some(
                                                                     Identifier {
                                                                         id: "X",
-                                                                        range: 932..933,
+                                                                        range: 936..937,
                                                                     },
                                                                 ),
                                                             },
                                                         ),
                                                         MatchAs(
                                                             PatternMatchAs {
-                                                                range: 935..936,
+                                                                range: 939..940,
                                                                 pattern: None,
                                                                 name: Some(
                                                                     Identifier {
                                                                         id: "b",
-                                                                        range: 935..936,
+                                                                        range: 939..940,
                                                                     },
                                                                 ),
                                                             },
@@ -1283,7 +1287,7 @@ Program {
                                         name: Some(
                                             Identifier {
                                                 id: "S",
-                                                range: 941..942,
+                                                range: 945..946,
                                             },
                                         ),
                                     },
@@ -1292,10 +1296,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 952..955,
+                                            range: 956..959,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 952..955,
+                                                    range: 956..959,
                                                 },
                                             ),
                                         },
@@ -1303,17 +1307,17 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 960..991,
+                                range: 964..996,
                                 pattern: MatchSequence(
                                     PatternMatchSequence {
-                                        range: 965..978,
+                                        range: 969..983,
                                         patterns: [
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 966..967,
+                                                    range: 970..971,
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 966..967,
+                                                            range: 970..971,
                                                             value: Int(
                                                                 1,
                                                             ),
@@ -1323,10 +1327,10 @@ Program {
                                             ),
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 969..970,
+                                                    range: 973..974,
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 969..970,
+                                                            range: 973..974,
                                                             value: Int(
                                                                 2,
                                                             ),
@@ -1336,13 +1340,13 @@ Program {
                                             ),
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 972..977,
+                                                    range: 976..982,
                                                     value: BinOp(
                                                         ExprBinOp {
-                                                            range: 972..977,
+                                                            range: 976..982,
                                                             left: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 972..973,
+                                                                    range: 976..977,
                                                                     value: Int(
                                                                         3,
                                                                     ),
@@ -1351,10 +1355,11 @@ Program {
                                                             op: Add,
                                                             right: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 976..977,
-                                                                    value: Int(
-                                                                        1,
-                                                                    ),
+                                                                    range: 980..982,
+                                                                    value: Complex {
+                                                                        real: 0.0,
+                                                                        imag: 1.0,
+                                                                    },
                                                                 },
                                                             ),
                                                         },
@@ -1368,10 +1373,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 988..991,
+                                            range: 993..996,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 988..991,
+                                                    range: 993..996,
                                                 },
                                             ),
                                         },
@@ -1379,21 +1384,21 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 996..1024,
+                                range: 1001..1029,
                                 pattern: MatchSequence(
                                     PatternMatchSequence {
-                                        range: 1001..1011,
+                                        range: 1006..1016,
                                         patterns: [
                                             MatchSequence(
                                                 PatternMatchSequence {
-                                                    range: 1002..1007,
+                                                    range: 1007..1012,
                                                     patterns: [
                                                         MatchValue(
                                                             PatternMatchValue {
-                                                                range: 1003..1004,
+                                                                range: 1008..1009,
                                                                 value: NumberLiteral(
                                                                     ExprNumberLiteral {
-                                                                        range: 1003..1004,
+                                                                        range: 1008..1009,
                                                                         value: Int(
                                                                             1,
                                                                         ),
@@ -1403,10 +1408,10 @@ Program {
                                                         ),
                                                         MatchValue(
                                                             PatternMatchValue {
-                                                                range: 1005..1006,
+                                                                range: 1010..1011,
                                                                 value: NumberLiteral(
                                                                     ExprNumberLiteral {
-                                                                        range: 1005..1006,
+                                                                        range: 1010..1011,
                                                                         value: Int(
                                                                             2,
                                                                         ),
@@ -1419,10 +1424,10 @@ Program {
                                             ),
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 1009..1010,
+                                                    range: 1014..1015,
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 1009..1010,
+                                                            range: 1014..1015,
                                                             value: Int(
                                                                 3,
                                                             ),
@@ -1437,10 +1442,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 1021..1024,
+                                            range: 1026..1029,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 1021..1024,
+                                                    range: 1026..1029,
                                                 },
                                             ),
                                         },
@@ -1448,17 +1453,17 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 1029..1050,
+                                range: 1034..1055,
                                 pattern: MatchSequence(
                                     PatternMatchSequence {
-                                        range: 1034..1037,
+                                        range: 1039..1042,
                                         patterns: [
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 1035..1036,
+                                                    range: 1040..1041,
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 1035..1036,
+                                                            range: 1040..1041,
                                                             value: Int(
                                                                 1,
                                                             ),
@@ -1473,10 +1478,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 1047..1050,
+                                            range: 1052..1055,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 1047..1050,
+                                                    range: 1052..1055,
                                                 },
                                             ),
                                         },
@@ -1488,24 +1493,24 @@ Program {
                 ),
                 Match(
                     StmtMatch {
-                        range: 1071..1198,
+                        range: 1076..1203,
                         subject: Name(
                             ExprName {
-                                range: 1077..1078,
+                                range: 1082..1083,
                                 id: "x",
                                 ctx: Load,
                             },
                         ),
                         cases: [
                             MatchCase {
-                                range: 1084..1104,
+                                range: 1089..1109,
                                 pattern: MatchStar(
                                     PatternMatchStar {
-                                        range: 1089..1091,
+                                        range: 1094..1096,
                                         name: Some(
                                             Identifier {
                                                 id: "a",
-                                                range: 1090..1091,
+                                                range: 1095..1096,
                                             },
                                         ),
                                     },
@@ -1514,10 +1519,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 1101..1104,
+                                            range: 1106..1109,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 1101..1104,
+                                                    range: 1106..1109,
                                                 },
                                             ),
                                         },
@@ -1525,10 +1530,10 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 1109..1129,
+                                range: 1114..1134,
                                 pattern: MatchStar(
                                     PatternMatchStar {
-                                        range: 1114..1116,
+                                        range: 1119..1121,
                                         name: None,
                                     },
                                 ),
@@ -1536,10 +1541,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 1126..1129,
+                                            range: 1131..1134,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 1126..1129,
+                                                    range: 1131..1134,
                                                 },
                                             ),
                                         },
@@ -1547,17 +1552,17 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 1134..1165,
+                                range: 1139..1170,
                                 pattern: MatchSequence(
                                     PatternMatchSequence {
-                                        range: 1139..1152,
+                                        range: 1144..1157,
                                         patterns: [
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 1140..1141,
+                                                    range: 1145..1146,
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 1140..1141,
+                                                            range: 1145..1146,
                                                             value: Int(
                                                                 1,
                                                             ),
@@ -1567,10 +1572,10 @@ Program {
                                             ),
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 1143..1144,
+                                                    range: 1148..1149,
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 1143..1144,
+                                                            range: 1148..1149,
                                                             value: Int(
                                                                 2,
                                                             ),
@@ -1580,11 +1585,11 @@ Program {
                                             ),
                                             MatchStar(
                                                 PatternMatchStar {
-                                                    range: 1146..1151,
+                                                    range: 1151..1156,
                                                     name: Some(
                                                         Identifier {
                                                             id: "rest",
-                                                            range: 1147..1151,
+                                                            range: 1152..1156,
                                                         },
                                                     ),
                                                 },
@@ -1596,10 +1601,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 1162..1165,
+                                            range: 1167..1170,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 1162..1165,
+                                                    range: 1167..1170,
                                                 },
                                             ),
                                         },
@@ -1607,23 +1612,23 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 1170..1198,
+                                range: 1175..1203,
                                 pattern: MatchSequence(
                                     PatternMatchSequence {
-                                        range: 1175..1185,
+                                        range: 1180..1190,
                                         patterns: [
                                             MatchStar(
                                                 PatternMatchStar {
-                                                    range: 1176..1178,
+                                                    range: 1181..1183,
                                                     name: None,
                                                 },
                                             ),
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 1180..1181,
+                                                    range: 1185..1186,
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 1180..1181,
+                                                            range: 1185..1186,
                                                             value: Int(
                                                                 1,
                                                             ),
@@ -1633,10 +1638,10 @@ Program {
                                             ),
                                             MatchValue(
                                                 PatternMatchValue {
-                                                    range: 1183..1184,
+                                                    range: 1188..1189,
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 1183..1184,
+                                                            range: 1188..1189,
                                                             value: Int(
                                                                 2,
                                                             ),
@@ -1651,10 +1656,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 1195..1198,
+                                            range: 1200..1203,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 1195..1198,
+                                                    range: 1200..1203,
                                                 },
                                             ),
                                         },
@@ -1666,29 +1671,29 @@ Program {
                 ),
                 Match(
                     StmtMatch {
-                        range: 1220..1492,
+                        range: 1225..1497,
                         subject: Name(
                             ExprName {
-                                range: 1226..1227,
+                                range: 1231..1232,
                                 id: "x",
                                 ctx: Load,
                             },
                         ),
                         cases: [
                             MatchCase {
-                                range: 1233..1258,
+                                range: 1238..1263,
                                 pattern: MatchClass(
                                     PatternMatchClass {
-                                        range: 1238..1245,
+                                        range: 1243..1250,
                                         cls: Name(
                                             ExprName {
-                                                range: 1238..1243,
+                                                range: 1243..1248,
                                                 id: "Point",
                                                 ctx: Load,
                                             },
                                         ),
                                         arguments: PatternArguments {
-                                            range: 1243..1245,
+                                            range: 1248..1250,
                                             patterns: [],
                                             keywords: [],
                                         },
@@ -1698,10 +1703,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 1255..1258,
+                                            range: 1260..1263,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 1255..1258,
+                                                    range: 1260..1263,
                                                 },
                                             ),
                                         },
@@ -1709,39 +1714,39 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 1263..1292,
+                                range: 1268..1297,
                                 pattern: MatchClass(
                                     PatternMatchClass {
-                                        range: 1268..1279,
+                                        range: 1273..1284,
                                         cls: Attribute(
                                             ExprAttribute {
-                                                range: 1268..1277,
+                                                range: 1273..1282,
                                                 value: Attribute(
                                                     ExprAttribute {
-                                                        range: 1268..1271,
+                                                        range: 1273..1276,
                                                         value: Name(
                                                             ExprName {
-                                                                range: 1268..1269,
+                                                                range: 1273..1274,
                                                                 id: "a",
                                                                 ctx: Load,
                                                             },
                                                         ),
                                                         attr: Identifier {
                                                             id: "b",
-                                                            range: 1270..1271,
+                                                            range: 1275..1276,
                                                         },
                                                         ctx: Load,
                                                     },
                                                 ),
                                                 attr: Identifier {
                                                     id: "Point",
-                                                    range: 1272..1277,
+                                                    range: 1277..1282,
                                                 },
                                                 ctx: Load,
                                             },
                                         ),
                                         arguments: PatternArguments {
-                                            range: 1277..1279,
+                                            range: 1282..1284,
                                             patterns: [],
                                             keywords: [],
                                         },
@@ -1751,10 +1756,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 1289..1292,
+                                            range: 1294..1297,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 1289..1292,
+                                                    range: 1294..1297,
                                                 },
                                             ),
                                         },
@@ -1762,33 +1767,33 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 1297..1327,
+                                range: 1302..1332,
                                 pattern: MatchClass(
                                     PatternMatchClass {
-                                        range: 1302..1314,
+                                        range: 1307..1319,
                                         cls: Name(
                                             ExprName {
-                                                range: 1302..1309,
+                                                range: 1307..1314,
                                                 id: "Point2D",
                                                 ctx: Load,
                                             },
                                         ),
                                         arguments: PatternArguments {
-                                            range: 1309..1314,
+                                            range: 1314..1319,
                                             patterns: [],
                                             keywords: [
                                                 PatternKeyword {
-                                                    range: 1310..1313,
+                                                    range: 1315..1318,
                                                     attr: Identifier {
                                                         id: "x",
-                                                        range: 1310..1311,
+                                                        range: 1315..1316,
                                                     },
                                                     pattern: MatchValue(
                                                         PatternMatchValue {
-                                                            range: 1312..1313,
+                                                            range: 1317..1318,
                                                             value: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 1312..1313,
+                                                                    range: 1317..1318,
                                                                     value: Int(
                                                                         0,
                                                                     ),
@@ -1805,10 +1810,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 1324..1327,
+                                            range: 1329..1332,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 1324..1327,
+                                                    range: 1329..1332,
                                                 },
                                             ),
                                         },
@@ -1816,45 +1821,25 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 1332..1368,
+                                range: 1337..1373,
                                 pattern: MatchClass(
                                     PatternMatchClass {
-                                        range: 1337..1355,
+                                        range: 1342..1360,
                                         cls: Name(
                                             ExprName {
-                                                range: 1337..1344,
+                                                range: 1342..1349,
                                                 id: "Point2D",
                                                 ctx: Load,
                                             },
                                         ),
                                         arguments: PatternArguments {
-                                            range: 1344..1355,
+                                            range: 1349..1360,
                                             patterns: [],
                                             keywords: [
                                                 PatternKeyword {
-                                                    range: 1345..1348,
-                                                    attr: Identifier {
-                                                        id: "x",
-                                                        range: 1345..1346,
-                                                    },
-                                                    pattern: MatchValue(
-                                                        PatternMatchValue {
-                                                            range: 1347..1348,
-                                                            value: NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    range: 1347..1348,
-                                                                    value: Int(
-                                                                        0,
-                                                                    ),
-                                                                },
-                                                            ),
-                                                        },
-                                                    ),
-                                                },
-                                                PatternKeyword {
                                                     range: 1350..1353,
                                                     attr: Identifier {
-                                                        id: "y",
+                                                        id: "x",
                                                         range: 1350..1351,
                                                     },
                                                     pattern: MatchValue(
@@ -1871,6 +1856,26 @@ Program {
                                                         },
                                                     ),
                                                 },
+                                                PatternKeyword {
+                                                    range: 1355..1358,
+                                                    attr: Identifier {
+                                                        id: "y",
+                                                        range: 1355..1356,
+                                                    },
+                                                    pattern: MatchValue(
+                                                        PatternMatchValue {
+                                                            range: 1357..1358,
+                                                            value: NumberLiteral(
+                                                                ExprNumberLiteral {
+                                                                    range: 1357..1358,
+                                                                    value: Int(
+                                                                        0,
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
                                             ],
                                         },
                                     },
@@ -1879,10 +1884,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 1365..1368,
+                                            range: 1370..1373,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 1365..1368,
+                                                    range: 1370..1373,
                                                 },
                                             ),
                                         },
@@ -1890,26 +1895,26 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 1373..1404,
+                                range: 1378..1409,
                                 pattern: MatchClass(
                                     PatternMatchClass {
-                                        range: 1378..1391,
+                                        range: 1383..1396,
                                         cls: Name(
                                             ExprName {
-                                                range: 1378..1385,
+                                                range: 1383..1390,
                                                 id: "Point2D",
                                                 ctx: Load,
                                             },
                                         ),
                                         arguments: PatternArguments {
-                                            range: 1385..1391,
+                                            range: 1390..1396,
                                             patterns: [
                                                 MatchValue(
                                                     PatternMatchValue {
-                                                        range: 1386..1387,
+                                                        range: 1391..1392,
                                                         value: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 1386..1387,
+                                                                range: 1391..1392,
                                                                 value: Int(
                                                                     0,
                                                                 ),
@@ -1919,10 +1924,10 @@ Program {
                                                 ),
                                                 MatchValue(
                                                     PatternMatchValue {
-                                                        range: 1389..1390,
+                                                        range: 1394..1395,
                                                         value: NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 1389..1390,
+                                                                range: 1394..1395,
                                                                 value: Int(
                                                                     1,
                                                                 ),
@@ -1939,10 +1944,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 1401..1404,
+                                            range: 1406..1409,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 1401..1404,
+                                                    range: 1406..1409,
                                                 },
                                             ),
                                         },
@@ -1950,30 +1955,30 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 1409..1447,
+                                range: 1414..1452,
                                 pattern: MatchClass(
                                     PatternMatchClass {
-                                        range: 1414..1434,
+                                        range: 1419..1439,
                                         cls: Name(
                                             ExprName {
-                                                range: 1414..1421,
+                                                range: 1419..1426,
                                                 id: "Point2D",
                                                 ctx: Load,
                                             },
                                         ),
                                         arguments: PatternArguments {
-                                            range: 1421..1434,
+                                            range: 1426..1439,
                                             patterns: [
                                                 MatchSequence(
                                                     PatternMatchSequence {
-                                                        range: 1422..1428,
+                                                        range: 1427..1433,
                                                         patterns: [
                                                             MatchValue(
                                                                 PatternMatchValue {
-                                                                    range: 1423..1424,
+                                                                    range: 1428..1429,
                                                                     value: NumberLiteral(
                                                                         ExprNumberLiteral {
-                                                                            range: 1423..1424,
+                                                                            range: 1428..1429,
                                                                             value: Int(
                                                                                 0,
                                                                             ),
@@ -1983,10 +1988,10 @@ Program {
                                                             ),
                                                             MatchValue(
                                                                 PatternMatchValue {
-                                                                    range: 1426..1427,
+                                                                    range: 1431..1432,
                                                                     value: NumberLiteral(
                                                                         ExprNumberLiteral {
-                                                                            range: 1426..1427,
+                                                                            range: 1431..1432,
                                                                             value: Int(
                                                                                 1,
                                                                             ),
@@ -2000,17 +2005,17 @@ Program {
                                             ],
                                             keywords: [
                                                 PatternKeyword {
-                                                    range: 1430..1433,
+                                                    range: 1435..1438,
                                                     attr: Identifier {
                                                         id: "y",
-                                                        range: 1430..1431,
+                                                        range: 1435..1436,
                                                     },
                                                     pattern: MatchValue(
                                                         PatternMatchValue {
-                                                            range: 1432..1433,
+                                                            range: 1437..1438,
                                                             value: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 1432..1433,
+                                                                    range: 1437..1438,
                                                                     value: Int(
                                                                         1,
                                                                     ),
@@ -2027,10 +2032,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 1444..1447,
+                                            range: 1449..1452,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 1444..1447,
+                                                    range: 1449..1452,
                                                 },
                                             ),
                                         },
@@ -2038,37 +2043,37 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 1452..1492,
+                                range: 1457..1497,
                                 pattern: MatchClass(
                                     PatternMatchClass {
-                                        range: 1457..1479,
+                                        range: 1462..1484,
                                         cls: Name(
                                             ExprName {
-                                                range: 1457..1464,
+                                                range: 1462..1469,
                                                 id: "Point2D",
                                                 ctx: Load,
                                             },
                                         ),
                                         arguments: PatternArguments {
-                                            range: 1464..1479,
+                                            range: 1469..1484,
                                             patterns: [],
                                             keywords: [
                                                 PatternKeyword {
-                                                    range: 1465..1473,
+                                                    range: 1470..1478,
                                                     attr: Identifier {
                                                         id: "x",
-                                                        range: 1465..1466,
+                                                        range: 1470..1471,
                                                     },
                                                     pattern: MatchSequence(
                                                         PatternMatchSequence {
-                                                            range: 1467..1473,
+                                                            range: 1472..1478,
                                                             patterns: [
                                                                 MatchValue(
                                                                     PatternMatchValue {
-                                                                        range: 1468..1469,
+                                                                        range: 1473..1474,
                                                                         value: NumberLiteral(
                                                                             ExprNumberLiteral {
-                                                                                range: 1468..1469,
+                                                                                range: 1473..1474,
                                                                                 value: Int(
                                                                                     0,
                                                                                 ),
@@ -2078,10 +2083,10 @@ Program {
                                                                 ),
                                                                 MatchValue(
                                                                     PatternMatchValue {
-                                                                        range: 1471..1472,
+                                                                        range: 1476..1477,
                                                                         value: NumberLiteral(
                                                                             ExprNumberLiteral {
-                                                                                range: 1471..1472,
+                                                                                range: 1476..1477,
                                                                                 value: Int(
                                                                                     1,
                                                                                 ),
@@ -2094,17 +2099,17 @@ Program {
                                                     ),
                                                 },
                                                 PatternKeyword {
-                                                    range: 1475..1478,
+                                                    range: 1480..1483,
                                                     attr: Identifier {
                                                         id: "y",
-                                                        range: 1475..1476,
+                                                        range: 1480..1481,
                                                     },
                                                     pattern: MatchValue(
                                                         PatternMatchValue {
-                                                            range: 1477..1478,
+                                                            range: 1482..1483,
                                                             value: NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 1477..1478,
+                                                                    range: 1482..1483,
                                                                     value: Int(
                                                                         1,
                                                                     ),
@@ -2121,10 +2126,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 1489..1492,
+                                            range: 1494..1497,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 1489..1492,
+                                                    range: 1494..1497,
                                                 },
                                             ),
                                         },
@@ -2136,20 +2141,20 @@ Program {
                 ),
                 Match(
                     StmtMatch {
-                        range: 1516..1610,
+                        range: 1521..1615,
                         subject: Named(
                             ExprNamed {
-                                range: 1522..1528,
+                                range: 1527..1533,
                                 target: Name(
                                     ExprName {
-                                        range: 1522..1523,
+                                        range: 1527..1528,
                                         id: "x",
                                         ctx: Store,
                                     },
                                 ),
                                 value: Name(
                                     ExprName {
-                                        range: 1527..1528,
+                                        range: 1532..1533,
                                         id: "b",
                                         ctx: Load,
                                     },
@@ -2158,14 +2163,14 @@ Program {
                         ),
                         cases: [
                             MatchCase {
-                                range: 1534..1558,
+                                range: 1539..1563,
                                 pattern: MatchMapping(
                                     PatternMatchMapping {
-                                        range: 1539..1545,
+                                        range: 1544..1550,
                                         keys: [
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 1540..1541,
+                                                    range: 1545..1546,
                                                     value: Int(
                                                         1,
                                                     ),
@@ -2175,7 +2180,7 @@ Program {
                                         patterns: [
                                             MatchAs(
                                                 PatternMatchAs {
-                                                    range: 1543..1544,
+                                                    range: 1548..1549,
                                                     pattern: None,
                                                     name: None,
                                                 },
@@ -2188,10 +2193,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 1555..1558,
+                                            range: 1560..1563,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 1555..1558,
+                                                    range: 1560..1563,
                                                 },
                                             ),
                                         },
@@ -2199,18 +2204,18 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 1563..1610,
+                                range: 1568..1615,
                                 pattern: MatchMapping(
                                     PatternMatchMapping {
-                                        range: 1568..1597,
+                                        range: 1573..1602,
                                         keys: [
                                             StringLiteral(
                                                 ExprStringLiteral {
-                                                    range: 1569..1571,
+                                                    range: 1574..1576,
                                                     value: StringLiteralValue {
                                                         inner: Single(
                                                             StringLiteral {
-                                                                range: 1569..1571,
+                                                                range: 1574..1576,
                                                                 value: "",
                                                                 flags: StringLiteralFlags {
                                                                     quote_style: Single,
@@ -2224,33 +2229,33 @@ Program {
                                             ),
                                             NoneLiteral(
                                                 ExprNoneLiteral {
-                                                    range: 1576..1580,
+                                                    range: 1581..1585,
                                                 },
                                             ),
                                         ],
                                         patterns: [
                                             MatchAs(
                                                 PatternMatchAs {
-                                                    range: 1573..1574,
+                                                    range: 1578..1579,
                                                     pattern: None,
                                                     name: Some(
                                                         Identifier {
                                                             id: "a",
-                                                            range: 1573..1574,
+                                                            range: 1578..1579,
                                                         },
                                                     ),
                                                 },
                                             ),
                                             MatchSequence(
                                                 PatternMatchSequence {
-                                                    range: 1582..1588,
+                                                    range: 1587..1593,
                                                     patterns: [
                                                         MatchValue(
                                                             PatternMatchValue {
-                                                                range: 1583..1584,
+                                                                range: 1588..1589,
                                                                 value: NumberLiteral(
                                                                     ExprNumberLiteral {
-                                                                        range: 1583..1584,
+                                                                        range: 1588..1589,
                                                                         value: Int(
                                                                             1,
                                                                         ),
@@ -2260,10 +2265,10 @@ Program {
                                                         ),
                                                         MatchValue(
                                                             PatternMatchValue {
-                                                                range: 1586..1587,
+                                                                range: 1591..1592,
                                                                 value: NumberLiteral(
                                                                     ExprNumberLiteral {
-                                                                        range: 1586..1587,
+                                                                        range: 1591..1592,
                                                                         value: Int(
                                                                             2,
                                                                         ),
@@ -2278,7 +2283,7 @@ Program {
                                         rest: Some(
                                             Identifier {
                                                 id: "rest",
-                                                range: 1592..1596,
+                                                range: 1597..1601,
                                             },
                                         ),
                                     },
@@ -2287,10 +2292,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 1607..1610,
+                                            range: 1612..1615,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 1607..1610,
+                                                    range: 1612..1615,
                                                 },
                                             ),
                                         },
@@ -2302,25 +2307,25 @@ Program {
                 ),
                 Match(
                     StmtMatch {
-                        range: 1628..1688,
+                        range: 1633..1693,
                         subject: Name(
                             ExprName {
-                                range: 1634..1635,
+                                range: 1639..1640,
                                 id: "y",
                                 ctx: Load,
                             },
                         ),
                         cases: [
                             MatchCase {
-                                range: 1641..1662,
+                                range: 1646..1667,
                                 pattern: MatchAs(
                                     PatternMatchAs {
-                                        range: 1646..1647,
+                                        range: 1651..1652,
                                         pattern: None,
                                         name: Some(
                                             Identifier {
                                                 id: "a",
-                                                range: 1646..1647,
+                                                range: 1651..1652,
                                             },
                                         ),
                                     },
@@ -2328,17 +2333,17 @@ Program {
                                 guard: Some(
                                     Named(
                                         ExprNamed {
-                                            range: 1651..1657,
+                                            range: 1656..1662,
                                             target: Name(
                                                 ExprName {
-                                                    range: 1651..1652,
+                                                    range: 1656..1657,
                                                     id: "b",
                                                     ctx: Store,
                                                 },
                                             ),
                                             value: Name(
                                                 ExprName {
-                                                    range: 1656..1657,
+                                                    range: 1661..1662,
                                                     id: "c",
                                                     ctx: Load,
                                                 },
@@ -2349,10 +2354,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 1659..1662,
+                                            range: 1664..1667,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 1659..1662,
+                                                    range: 1664..1667,
                                                 },
                                             ),
                                         },
@@ -2360,15 +2365,15 @@ Program {
                                 ],
                             },
                             MatchCase {
-                                range: 1667..1688,
+                                range: 1672..1693,
                                 pattern: MatchAs(
                                     PatternMatchAs {
-                                        range: 1672..1673,
+                                        range: 1677..1678,
                                         pattern: None,
                                         name: Some(
                                             Identifier {
                                                 id: "e",
-                                                range: 1672..1673,
+                                                range: 1677..1678,
                                             },
                                         ),
                                     },
@@ -2376,10 +2381,10 @@ Program {
                                 guard: Some(
                                     Compare(
                                         ExprCompare {
-                                            range: 1678..1683,
+                                            range: 1683..1688,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 1678..1679,
+                                                    range: 1683..1684,
                                                     value: Int(
                                                         1,
                                                     ),
@@ -2391,7 +2396,7 @@ Program {
                                             comparators: [
                                                 NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 1682..1683,
+                                                        range: 1687..1688,
                                                         value: Int(
                                                             2,
                                                         ),
@@ -2404,10 +2409,10 @@ Program {
                                 body: [
                                     Expr(
                                         StmtExpr {
-                                            range: 1685..1688,
+                                            range: 1690..1693,
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
-                                                    range: 1685..1688,
+                                                    range: 1690..1693,
                                                 },
                                             ),
                                         },
