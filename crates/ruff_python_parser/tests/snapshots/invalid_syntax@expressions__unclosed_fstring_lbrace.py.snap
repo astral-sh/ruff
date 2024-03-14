@@ -1,0 +1,50 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/unclosed_fstring_lbrace.py
+---
+## AST
+
+ ```
+Module(
+    ModModule {
+        range: 0..160,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 107..110,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 107..110,
+                            left: Name(
+                                ExprName {
+                                    range: 107..108,
+                                    id: "x",
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Add,
+                            right: Name(
+                                ExprName {
+                                    range: 110..110,
+                                    id: "",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # TODO(dhruvmanila): Remove the dummy test case and uncomment the others when this is fixed. See PR #10372
+2 | x +
+  |    ^ Syntax Error: Expression expected.
+3 | 
+4 | # f'{'
+5 | # f'{foo!r'
+  |
