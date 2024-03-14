@@ -62,7 +62,24 @@ impl Violation for NeedlessBool {
 }
 
 /// SIM103
-pub(crate) fn needless_bool(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+pub(crate) fn needless_bool(checker: &mut Checker, body: &[Stmt]) {
+    let mut iter = body.iter().peekable();
+
+    while let Some(ast::Stmt::If(stmt_if)) = iter.next() {
+        let stmt_return = match iter.peek() {
+            Some(ast::Stmt::Return(stmt_return)) => Some(stmt_return),
+            _ => None,
+        };
+
+        check_needless_bool(checker, stmt_if, stmt_return);
+    }
+}
+
+pub(crate) fn check_needless_bool(
+    checker: &mut Checker,
+    stmt_if: &ast::StmtIf,
+    next_stmt: Option<&ast::StmtReturn>,
+) {
     let ast::StmtIf {
         test: if_test,
         body: if_body,
@@ -70,8 +87,13 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt_if: &ast::StmtIf) {
         range: _,
     } = stmt_if;
 
-    // Extract an `if` or `elif` (that returns) followed by an else (that returns the same value)
+    // Extract an `if` (that returns) followed by an implicit else (that returns the same value)
     let (if_test, if_body, else_body, range) = match elif_else_clauses.as_slice() {
+        // if-implicit-else case
+        // [] => match next_stmt {
+        //     Some(ast::Stmt::Return(node)) => (if_test.as_ref(), if_body, [node], stmt_if.range()),
+        //     _ => return,
+        // },
         // if-else case
         [ElifElseClause {
             body: else_body,
