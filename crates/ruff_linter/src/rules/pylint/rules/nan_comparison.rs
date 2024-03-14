@@ -14,7 +14,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// if x == float('NaN'):
+/// if x == float("NaN"):
 ///     pass
 /// ```
 ///
