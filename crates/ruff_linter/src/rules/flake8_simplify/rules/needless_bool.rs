@@ -65,13 +65,21 @@ impl Violation for NeedlessBool {
 pub(crate) fn needless_bool(checker: &mut Checker, body: &[Stmt]) {
     let mut iter = body.iter().peekable();
 
-    while let Some(ast::Stmt::If(stmt_if)) = iter.next() {
-        let stmt_return = match iter.peek() {
-            Some(ast::Stmt::Return(stmt_return)) => Some(stmt_return),
-            _ => None,
-        };
+    while let Some(stmt) = iter.next() {
+        match stmt {
+            ast::Stmt::If(stmt_if) => {
+                println!("Checking bool with if: {:#?}", stmt_if);
+                let stmt_return = match iter.peek() {
+                    Some(ast::Stmt::Return(stmt_return)) => Some(stmt_return),
+                    _ => None,
+                };
 
-        check_needless_bool(checker, stmt_if, stmt_return);
+                println!("Checking bool with return: {:#?}", stmt_return);
+
+                check_needless_bool(checker, stmt_if, stmt_return);
+            }
+            _ => continue,
+        }
     }
 }
 
