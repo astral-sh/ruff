@@ -971,10 +971,17 @@ impl Ranged for FStringExpressionElement {
     }
 }
 
+/// An `FStringLiteralElement` with an empty `value` is an invalid f-string element.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FStringLiteralElement {
     pub range: TextRange,
     pub value: Box<str>,
+}
+
+impl FStringLiteralElement {
+    pub fn is_valid(&self) -> bool {
+        !self.value.is_empty()
+    }
 }
 
 impl Ranged for FStringLiteralElement {
@@ -1525,6 +1532,9 @@ bitflags! {
         /// The string has an `r` or `R` prefix, meaning it is a raw string.
         /// It is invalid to set this flag if `U_PREFIX` is also set.
         const R_PREFIX = 1 << 3;
+
+        /// The string was deemed invalid by the parser.
+        const INVALID = 1 << 4;
     }
 }
 
@@ -1553,6 +1563,12 @@ impl StringLiteralFlags {
             StringLiteralPrefix::RString => self.0 |= StringLiteralFlagsInner::R_PREFIX,
             StringLiteralPrefix::UString => self.0 |= StringLiteralFlagsInner::U_PREFIX,
         };
+        self
+    }
+
+    #[must_use]
+    pub fn with_invalid(mut self) -> Self {
+        self.0 |= StringLiteralFlagsInner::INVALID;
         self
     }
 
@@ -1649,6 +1665,15 @@ impl StringLiteral {
     /// Extracts a string slice containing the entire `String`.
     pub fn as_str(&self) -> &str {
         self
+    }
+
+    /// Creates an invalid string literal with the given range.
+    pub fn invalid(range: TextRange) -> Self {
+        Self {
+            range,
+            value: "".into(),
+            flags: StringLiteralFlags::default().with_invalid(),
+        }
     }
 }
 
@@ -1858,6 +1883,9 @@ bitflags! {
 
         /// The bytestring has an `r` or `R` prefix, meaning it is a raw bytestring.
         const R_PREFIX = 1 << 3;
+
+        /// The bytestring was deemed invalid by the parser.
+        const INVALID = 1 << 4;
     }
 }
 
@@ -1882,6 +1910,12 @@ impl BytesLiteralFlags {
     #[must_use]
     pub fn with_r_prefix(mut self) -> Self {
         self.0 |= BytesLiteralFlagsInner::R_PREFIX;
+        self
+    }
+
+    #[must_use]
+    pub fn with_invalid(mut self) -> Self {
+        self.0 |= BytesLiteralFlagsInner::INVALID;
         self
     }
 
@@ -1943,6 +1977,15 @@ impl BytesLiteral {
     /// Extracts a byte slice containing the entire [`BytesLiteral`].
     pub fn as_slice(&self) -> &[u8] {
         self
+    }
+
+    /// Creates a new invalid bytes literal with the given range.
+    pub fn invalid(range: TextRange) -> Self {
+        Self {
+            range,
+            value: Box::new([]),
+            flags: BytesLiteralFlags::default().with_invalid(),
+        }
     }
 }
 
