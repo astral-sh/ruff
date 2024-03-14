@@ -564,8 +564,6 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             }
         }
         Expr::IpyEscapeCommand(_) => {}
-        #[allow(deprecated)]
-        Expr::Invalid(_) => {}
     }
 }
 

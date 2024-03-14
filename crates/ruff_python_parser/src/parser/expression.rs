@@ -398,13 +398,13 @@ impl<'src> Parser<'src> {
                     Expr::Name(self.parse_name())
                 } else {
                     self.add_error(
-                        ParseErrorType::OtherError("Expression expected.".to_string()),
+                        ParseErrorType::OtherError("Expected an expression".to_string()),
                         self.current_token_range(),
                     );
                     Expr::Name(ast::ExprName {
                         range: self.missing_node_range(),
                         id: String::new(),
-                        ctx: ExprContext::Load,
+                        ctx: ExprContext::Invalid,
                     })
                 }
             }
@@ -485,7 +485,7 @@ impl<'src> Parser<'src> {
                         _ => {}
                     }
 
-                    if has_seen_kw_unpack && matches!(parsed_expr.expr, Expr::Starred(_)) {
+                    if has_seen_kw_unpack && parsed_expr.expr.is_starred_expr() {
                         parser.add_error(ParseErrorType::UnpackedArgumentError, &parsed_expr);
                     }
 
@@ -497,11 +497,8 @@ impl<'src> Parser<'src> {
                                 range: ident_expr.range,
                             }
                         } else {
-                            // FIXME(micha): This recovery looks fishy, it drops the parsed expression.
                             parser.add_error(
-                                ParseErrorType::OtherError(
-                                    "cannot be used as a keyword argument!".to_string(),
-                                ),
+                                ParseErrorType::OtherError("Expected a parameter name".to_string()),
                                 &parsed_expr,
                             );
                             ast::Identifier {
@@ -565,26 +562,28 @@ impl<'src> Parser<'src> {
         // we set the context as `Load` here.
         helpers::set_expr_ctx(&mut value, ExprContext::Load);
 
+        // Slice range doesn't include the `[` token.
+        let slice_start = self.node_start();
+
         // Create an error when receiving a empty slice to parse, e.g. `l[]`
         if !self.at(TokenKind::Colon) && !self.at_expr() {
-            let slice_range = TextRange::empty(self.current_token_range().start());
             self.expect(TokenKind::Rsqb);
 
-            let range = self.node_range(start);
-            self.add_error(ParseErrorType::EmptySlice, range);
-            #[allow(deprecated)]
+            let slice_range = self.node_range(slice_start);
+            self.add_error(ParseErrorType::EmptySlice, slice_range);
+
             return ast::ExprSubscript {
                 value: Box::new(value),
-                slice: Box::new(Expr::Invalid(ast::ExprInvalid {
-                    value: self.src_text(slice_range).into(),
+                slice: Box::new(Expr::Name(ast::ExprName {
                     range: slice_range,
+                    id: String::new(),
+                    ctx: ExprContext::Invalid,
                 })),
                 ctx: ExprContext::Load,
-                range,
+                range: self.node_range(start),
             };
         }
 
-        let slice_start = self.node_start();
         let mut slice = self.parse_slice();
 
         // If there are more than one element in the slice, we need to create a tuple
@@ -616,6 +615,8 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a slice expression.
+    ///
     /// See: <https://docs.python.org/3/reference/expressions.html#slicings>
     fn parse_slice(&mut self) -> Expr {
         const UPPER_END_SET: TokenSet =
@@ -1568,7 +1569,6 @@ impl<'src> Parser<'src> {
 
         match &parsed_expr.expr {
             Expr::Starred(ast::ExprStarred { value, .. }) => {
-                // Should we make `expr` an `Expr::Invalid` here?
                 self.add_error(
                     ParseErrorType::OtherError(
                         "starred expression is not allowed in a `yield from` statement".to_string(),
@@ -1577,7 +1577,6 @@ impl<'src> Parser<'src> {
                 );
             }
             Expr::Tuple(tuple) if !tuple.parenthesized => {
-                // Should we make `expr` an `Expr::Invalid` here?
                 self.add_error(
                     ParseErrorType::OtherError(
                         "unparenthesized tuple is not allowed in a `yield from` statement"

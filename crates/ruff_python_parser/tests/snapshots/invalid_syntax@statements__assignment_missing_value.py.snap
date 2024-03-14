@@ -25,7 +25,7 @@ Module(
                         ExprName {
                             range: 3..3,
                             id: "",
-                            ctx: Load,
+                            ctx: Invalid,
                         },
                     ),
                 },
@@ -63,10 +63,7 @@ Module(
 
   |
 1 | a =
-  |    ^ Syntax Error: Expression expected.
+  |    ^ Syntax Error: Expected an expression
 2 | 
 3 | a + b
   |
-
-
-
