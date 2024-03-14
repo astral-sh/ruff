@@ -25,7 +25,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// class Foo:
 ///     def __str__(self):
-///         retirm "Foo"
+///         return "Foo"
 /// ```
 ///
 /// ## References
