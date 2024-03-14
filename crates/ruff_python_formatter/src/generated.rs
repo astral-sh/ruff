@@ -2066,42 +2066,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprIpyEscapeCommand {
     }
 }
 
-impl FormatRule<ast::ExprInvalid, PyFormatContext<'_>>
-    for crate::expression::expr_invalid::FormatExprInvalid
-{
-    #[inline]
-    fn fmt(&self, node: &ast::ExprInvalid, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprInvalid>::fmt(self, node, f)
-    }
-}
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprInvalid {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprInvalid,
-        crate::expression::expr_invalid::FormatExprInvalid,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_invalid::FormatExprInvalid::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprInvalid {
-    type Format = FormatOwnedWithRule<
-        ast::ExprInvalid,
-        crate::expression::expr_invalid::FormatExprInvalid,
-        PyFormatContext<'ast>,
-    >;
-    fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(
-            self,
-            crate::expression::expr_invalid::FormatExprInvalid::default(),
-        )
-    }
-}
-
 impl FormatRule<ast::ExceptHandlerExceptHandler, PyFormatContext<'_>>
     for crate::other::except_handler_except_handler::FormatExceptHandlerExceptHandler
 {
