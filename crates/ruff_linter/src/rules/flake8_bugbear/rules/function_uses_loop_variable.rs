@@ -67,7 +67,7 @@ impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
             Expr::Name(name) => match &name.ctx {
                 ExprContext::Load => self.loaded.push(name),
                 ExprContext::Store => self.stored.push(name),
-                ExprContext::Del => {}
+                _ => {}
             },
             _ => visitor::walk_expr(self, expr),
         }

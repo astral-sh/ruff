@@ -327,8 +327,6 @@ impl From<&Expr> for ResolvedPythonType {
             | Expr::Name(_)
             | Expr::Slice(_)
             | Expr::IpyEscapeCommand(_) => ResolvedPythonType::Unknown,
-            #[allow(deprecated)]
-            Expr::Invalid(_) => ResolvedPythonType::Unknown,
         }
     }
 }
