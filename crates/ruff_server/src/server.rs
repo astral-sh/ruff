@@ -1,6 +1,5 @@
 //! Scheduling, I/O, and API endpoints.
 
-use anyhow::anyhow;
 use lsp::Connection;
 use lsp_server as lsp;
 use lsp_types as types;
@@ -46,9 +45,7 @@ impl Server {
             .workspace_folders
             .map(|folders| folders.into_iter().map(|folder| folder.uri).collect())
             .or_else(|| init_params.root_uri.map(|u| vec![u]))
-            .ok_or_else(|| {
-                anyhow!("No workspace or root URI was given in the LSP initialization parameters. The server cannot start.")
-            })?;
+            .unwrap_or_default();
 
         let initialize_data = serde_json::json!({
             "capabilities": server_capabilities,
