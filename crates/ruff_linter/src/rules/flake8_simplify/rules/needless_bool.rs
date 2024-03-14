@@ -87,13 +87,8 @@ pub(crate) fn check_needless_bool(
         range: _,
     } = stmt_if;
 
-    // Extract an `if` (that returns) followed by an implicit else (that returns the same value)
+    let mut return_stmt = vec![];
     let (if_test, if_body, else_body, range) = match elif_else_clauses.as_slice() {
-        // if-implicit-else case
-        // [] => match next_stmt {
-        //     Some(ast::Stmt::Return(node)) => (if_test.as_ref(), if_body, [node], stmt_if.range()),
-        //     _ => return,
-        // },
         // if-else case
         [ElifElseClause {
             body: else_body,
@@ -115,6 +110,28 @@ pub(crate) fn check_needless_bool(
             else_body,
             TextRange::new(elif_range.start(), else_range.end()),
         ),
+        // if-implicit-else case
+        [] => match next_stmt {
+            Some(ast::StmtReturn {
+                value: Some(value),
+                range,
+            }) => {
+                // Print the two statements debug
+                println!("if_stmt: {:#?}", stmt_if);
+                println!("next_stmt: {:#?}", next_stmt);
+                return_stmt.push(ast::Stmt::Return(ast::StmtReturn {
+                    value: Some(value.clone()),
+                    range: range.clone(),
+                }));
+                (
+                    if_test.as_ref(),
+                    if_body,
+                    &return_stmt,
+                    TextRange::new(if_test.range().start(), range.end()),
+                )
+            }
+            _ => return,
+        },
         _ => return,
     };
 
