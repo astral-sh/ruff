@@ -696,9 +696,7 @@ impl<'a> BlankLinesChecker<'a> {
             state.class_status.update(&logical_line);
             state.fn_status.update(&logical_line);
 
-            if state.is_not_first_logical_line {
-                self.check_line(&logical_line, &state, prev_indent_length, diagnostics);
-            }
+            self.check_line(&logical_line, &state, prev_indent_length, diagnostics);
 
             match logical_line.kind {
                 LogicalLineKind::Class => {
@@ -818,6 +816,8 @@ impl<'a> BlankLinesChecker<'a> {
             && line.kind.is_class_function_or_decorator()
             // Blank lines in stub files are used to group definitions. Don't enforce blank lines.
             && !self.source_type.is_stub()
+            // Do not expect blank lines before the first logical line.
+            && state.is_not_first_logical_line
         {
             // E302
             let mut diagnostic = Diagnostic::new(
