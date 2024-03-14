@@ -171,7 +171,7 @@ impl StringParser {
         let Some(close_idx) = self.source[self.cursor..].find('}') else {
             return Err(LexicalError::new(
                 LexicalErrorType::MissingUnicodeRbrace,
-                TextRange::empty(start_pos),
+                TextRange::empty(self.compute_position(self.source.len())),
             ));
         };
 
@@ -881,6 +881,38 @@ mod tests {
         let parse_ast = parse_suite(source).unwrap();
 
         insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_missing_unicode_lbrace_error() {
+        let source = r"'\N '";
+        let error = parse_suite(source).unwrap_err();
+
+        insta::assert_debug_snapshot!(error);
+    }
+
+    #[test]
+    fn test_missing_unicode_rbrace_error() {
+        let source = r"'\N{SPACE'";
+        let error = parse_suite(source).unwrap_err();
+
+        insta::assert_debug_snapshot!(error);
+    }
+
+    #[test]
+    fn test_invalid_unicode_name_error() {
+        let source = r"'\N{INVALID}'";
+        let error = parse_suite(source).unwrap_err();
+
+        insta::assert_debug_snapshot!(error);
+    }
+
+    #[test]
+    fn test_invalid_byte_literal_error() {
+        let source = r"b'123a𝐁c'";
+        let error = parse_suite(source).unwrap_err();
+
+        insta::assert_debug_snapshot!(error);
     }
 
     macro_rules! test_aliases_parse {

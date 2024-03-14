@@ -1439,7 +1439,7 @@ impl std::fmt::Display for LexicalErrorType {
             LexicalErrorType::InvalidByteLiteral => {
                 write!(f, "bytes can only contain ASCII literal characters")
             }
-            LexicalErrorType::UnicodeError => write!(f, "Got unexpected unicode name"),
+            LexicalErrorType::UnicodeError => write!(f, "Got unexpected unicode"),
             LexicalErrorType::NestingError => write!(f, "Got unexpected nesting"),
             LexicalErrorType::IndentationError => {
                 write!(f, "unindent does not match any outer indentation level")
