@@ -256,7 +256,6 @@ impl<'src> Parser<'src> {
                 }
                 target.expr
             },
-            true,
         );
 
         ast::StmtDelete {
@@ -345,8 +344,6 @@ impl<'src> Parser<'src> {
         let names = self.parse_comma_separated_list_into_vec(
             RecoveryContextKind::ImportNames,
             Parser::parse_alias,
-            // `import a, b,` isn't allowed.
-            false,
         );
 
         // TODO(dhruvmanila): Error when `*` is used
@@ -405,7 +402,6 @@ impl<'src> Parser<'src> {
         let names = self.parse_comma_separated_list_into_vec(
             RecoveryContextKind::ImportFromAsNames,
             Parser::parse_alias,
-            true,
         );
 
         // TODO(dhruvmanila): Error when `*` is mixed with other names.
@@ -481,7 +477,6 @@ impl<'src> Parser<'src> {
         let names = self.parse_comma_separated_list_into_vec(
             RecoveryContextKind::Identifiers,
             Parser::parse_identifier,
-            false,
         );
 
         ast::StmtGlobal {
@@ -504,7 +499,6 @@ impl<'src> Parser<'src> {
         let names = self.parse_comma_separated_list_into_vec(
             RecoveryContextKind::Identifiers,
             Parser::parse_identifier,
-            false,
         );
 
         ast::StmtNonlocal {
@@ -1103,16 +1097,11 @@ impl<'src> Parser<'src> {
 
         let mut is_last_parenthesized = false;
 
-        self.parse_comma_separated_list(
-            RecoveryContextKind::WithItems(with_item_kind),
-            |parser| {
-                let parsed_with_item = parser.parse_with_item();
-                is_last_parenthesized = parsed_with_item.is_parenthesized;
-                items.push(parsed_with_item.item);
-            },
-            // Only allow a trailing comma if the with item itself is parenthesized
-            with_item_kind == WithItemKind::Parenthesized,
-        );
+        self.parse_comma_separated_list(RecoveryContextKind::WithItems(with_item_kind), |parser| {
+            let parsed_with_item = parser.parse_with_item();
+            is_last_parenthesized = parsed_with_item.is_parenthesized;
+            items.push(parsed_with_item.item);
+        });
 
         // Special-case: if we have a parenthesized `WithItem` that was parsed as
         // an expression, then the item should _exclude_ the outer parentheses in
@@ -1456,60 +1445,56 @@ impl<'src> Parser<'src> {
 
         let start = self.node_start();
 
-        self.parse_comma_separated_list(
-            RecoveryContextKind::Parameters(function_kind),
-            |parser| {
-                // Don't allow any parameter after we have seen a vararg `**kwargs`
-                if has_seen_vararg {
+        self.parse_comma_separated_list(RecoveryContextKind::Parameters(function_kind), |parser| {
+            // Don't allow any parameter after we have seen a vararg `**kwargs`
+            if has_seen_vararg {
+                parser.add_error(
+                    ParseErrorType::ParamFollowsVarKeywordParam,
+                    parser.current_token_range(),
+                );
+            }
+
+            if parser.eat(TokenKind::Star) {
+                has_seen_asterisk = true;
+                if parser.at(TokenKind::Comma) {
+                    has_seen_default_param = false;
+                } else if parser.at_expr() {
+                    let param = parser.parse_parameter(function_kind);
+                    vararg = Some(Box::new(param));
+                }
+            } else if parser.eat(TokenKind::DoubleStar) {
+                has_seen_vararg = true;
+                let param = parser.parse_parameter(function_kind);
+                kwarg = Some(Box::new(param));
+            } else if parser.eat(TokenKind::Slash) {
+                // Don't allow `/` after a `*`
+                if has_seen_asterisk {
                     parser.add_error(
-                        ParseErrorType::ParamFollowsVarKeywordParam,
+                        ParseErrorType::OtherError("`/` must be ahead of `*`".to_string()),
                         parser.current_token_range(),
                     );
                 }
-
-                if parser.eat(TokenKind::Star) {
-                    has_seen_asterisk = true;
-                    if parser.at(TokenKind::Comma) {
-                        has_seen_default_param = false;
-                    } else if parser.at_expr() {
-                        let param = parser.parse_parameter(function_kind);
-                        vararg = Some(Box::new(param));
-                    }
-                } else if parser.eat(TokenKind::DoubleStar) {
-                    has_seen_vararg = true;
-                    let param = parser.parse_parameter(function_kind);
-                    kwarg = Some(Box::new(param));
-                } else if parser.eat(TokenKind::Slash) {
-                    // Don't allow `/` after a `*`
-                    if has_seen_asterisk {
-                        parser.add_error(
-                            ParseErrorType::OtherError("`/` must be ahead of `*`".to_string()),
-                            parser.current_token_range(),
-                        );
-                    }
-                    std::mem::swap(&mut args, &mut posonlyargs);
-                } else if parser.at(TokenKind::Name) {
-                    let param = parser.parse_parameter_with_default(function_kind);
-                    // Don't allow non-default parameters after default parameters e.g. `a=1, b`,
-                    // can't place `b` after `a=1`. Non-default parameters are only allowed after
-                    // default parameters if we have a `*` before them, e.g. `a=1, *, b`.
-                    if param.default.is_none() && has_seen_default_param && !has_seen_asterisk {
-                        parser.add_error(
-                            ParseErrorType::DefaultArgumentError,
-                            parser.current_token_range(),
-                        );
-                    }
-                    has_seen_default_param = param.default.is_some();
-
-                    if has_seen_asterisk {
-                        kwonlyargs.push(param);
-                    } else {
-                        args.push(param);
-                    }
+                std::mem::swap(&mut args, &mut posonlyargs);
+            } else if parser.at(TokenKind::Name) {
+                let param = parser.parse_parameter_with_default(function_kind);
+                // Don't allow non-default parameters after default parameters e.g. `a=1, b`,
+                // can't place `b` after `a=1`. Non-default parameters are only allowed after
+                // default parameters if we have a `*` before them, e.g. `a=1, *, b`.
+                if param.default.is_none() && has_seen_default_param && !has_seen_asterisk {
+                    parser.add_error(
+                        ParseErrorType::DefaultArgumentError,
+                        parser.current_token_range(),
+                    );
                 }
-            },
-            true,
-        );
+                has_seen_default_param = param.default.is_some();
+
+                if has_seen_asterisk {
+                    kwonlyargs.push(param);
+                } else {
+                    args.push(param);
+                }
+            }
+        });
 
         let parameters = ast::Parameters {
             range: self.node_range(start),
@@ -1550,7 +1535,6 @@ impl<'src> Parser<'src> {
         let type_params = self.parse_comma_separated_list_into_vec(
             RecoveryContextKind::TypeParams,
             Parser::parse_type_param,
-            true,
         );
 
         self.expect(TokenKind::Rsqb);

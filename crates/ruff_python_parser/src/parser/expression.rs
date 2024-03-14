@@ -454,78 +454,74 @@ impl<'src> Parser<'src> {
         let mut has_seen_kw_arg = false;
         let mut has_seen_kw_unpack = false;
 
-        self.parse_comma_separated_list(
-            RecoveryContextKind::Arguments,
-            |parser| {
-                let argument_start = parser.node_start();
-                if parser.at(TokenKind::DoubleStar) {
-                    parser.eat(TokenKind::DoubleStar);
+        self.parse_comma_separated_list(RecoveryContextKind::Arguments, |parser| {
+            let argument_start = parser.node_start();
+            if parser.at(TokenKind::DoubleStar) {
+                parser.eat(TokenKind::DoubleStar);
+
+                let value = parser.parse_conditional_expression_or_higher();
+                keywords.push(ast::Keyword {
+                    arg: None,
+                    value: value.expr,
+                    range: parser.node_range(argument_start),
+                });
+
+                has_seen_kw_unpack = true;
+            } else {
+                let start = parser.node_start();
+                let mut parsed_expr = parser.parse_named_expression_or_higher();
+
+                match parser.current_token_kind() {
+                    TokenKind::Async | TokenKind::For => {
+                        parsed_expr = Expr::Generator(parser.parse_generator_expression(
+                            parsed_expr.expr,
+                            start,
+                            false,
+                        ))
+                        .into();
+                    }
+                    _ => {}
+                }
+
+                if has_seen_kw_unpack && parsed_expr.expr.is_starred_expr() {
+                    parser.add_error(ParseErrorType::UnpackedArgumentError, &parsed_expr);
+                }
+
+                if parser.eat(TokenKind::Equal) {
+                    has_seen_kw_arg = true;
+                    let arg = if let Expr::Name(ident_expr) = parsed_expr.expr {
+                        ast::Identifier {
+                            id: ident_expr.id,
+                            range: ident_expr.range,
+                        }
+                    } else {
+                        parser.add_error(
+                            ParseErrorType::OtherError("Expected a parameter name".to_string()),
+                            &parsed_expr,
+                        );
+                        ast::Identifier {
+                            id: String::new(),
+                            range: parsed_expr.range(),
+                        }
+                    };
 
                     let value = parser.parse_conditional_expression_or_higher();
+
                     keywords.push(ast::Keyword {
-                        arg: None,
+                        arg: Some(arg),
                         value: value.expr,
                         range: parser.node_range(argument_start),
                     });
-
-                    has_seen_kw_unpack = true;
                 } else {
-                    let start = parser.node_start();
-                    let mut parsed_expr = parser.parse_named_expression_or_higher();
-
-                    match parser.current_token_kind() {
-                        TokenKind::Async | TokenKind::For => {
-                            parsed_expr = Expr::Generator(parser.parse_generator_expression(
-                                parsed_expr.expr,
-                                start,
-                                false,
-                            ))
-                            .into();
-                        }
-                        _ => {}
+                    if has_seen_kw_arg
+                        && !(has_seen_kw_unpack || matches!(parsed_expr.expr, Expr::Starred(_)))
+                    {
+                        parser.add_error(ParseErrorType::PositionalArgumentError, &parsed_expr);
                     }
-
-                    if has_seen_kw_unpack && parsed_expr.expr.is_starred_expr() {
-                        parser.add_error(ParseErrorType::UnpackedArgumentError, &parsed_expr);
-                    }
-
-                    if parser.eat(TokenKind::Equal) {
-                        has_seen_kw_arg = true;
-                        let arg = if let Expr::Name(ident_expr) = parsed_expr.expr {
-                            ast::Identifier {
-                                id: ident_expr.id,
-                                range: ident_expr.range,
-                            }
-                        } else {
-                            parser.add_error(
-                                ParseErrorType::OtherError("Expected a parameter name".to_string()),
-                                &parsed_expr,
-                            );
-                            ast::Identifier {
-                                id: String::new(),
-                                range: parsed_expr.range(),
-                            }
-                        };
-
-                        let value = parser.parse_conditional_expression_or_higher();
-
-                        keywords.push(ast::Keyword {
-                            arg: Some(arg),
-                            value: value.expr,
-                            range: parser.node_range(argument_start),
-                        });
-                    } else {
-                        if has_seen_kw_arg
-                            && !(has_seen_kw_unpack || matches!(parsed_expr.expr, Expr::Starred(_)))
-                        {
-                            parser.add_error(ParseErrorType::PositionalArgumentError, &parsed_expr);
-                        }
-                        args.push(parsed_expr.expr);
-                    }
+                    args.push(parsed_expr.expr);
                 }
-            },
-            true,
-        );
+            }
+        });
 
         self.restore_ctx(ParserCtxFlags::ARGUMENTS, saved_context);
 
@@ -591,11 +587,9 @@ impl<'src> Parser<'src> {
         if self.eat(TokenKind::Comma) {
             let mut slices = vec![slice];
 
-            self.parse_comma_separated_list(
-                RecoveryContextKind::Slices,
-                |parser| slices.push(parser.parse_slice()),
-                true,
-            );
+            self.parse_comma_separated_list(RecoveryContextKind::Slices, |parser| {
+                slices.push(parser.parse_slice())
+            });
 
             slice = Expr::Tuple(ast::ExprTuple {
                 elts: slices,
@@ -1284,11 +1278,9 @@ impl<'src> Parser<'src> {
 
         let mut elts = vec![first_element];
 
-        self.parse_comma_separated_list(
-            RecoveryContextKind::TupleElements(parenthesized),
-            |p| elts.push(parse_func(p).expr),
-            true,
-        );
+        self.parse_comma_separated_list(RecoveryContextKind::TupleElements(parenthesized), |p| {
+            elts.push(parse_func(p).expr)
+        });
 
         if parenthesized.is_yes() {
             self.expect(TokenKind::Rpar);
@@ -1312,11 +1304,9 @@ impl<'src> Parser<'src> {
 
         let mut elts = vec![first_element];
 
-        self.parse_comma_separated_list(
-            RecoveryContextKind::ListElements,
-            |parser| elts.push(parser.parse_named_expression_or_higher().expr),
-            true,
-        );
+        self.parse_comma_separated_list(RecoveryContextKind::ListElements, |parser| {
+            elts.push(parser.parse_named_expression_or_higher().expr)
+        });
 
         self.expect(TokenKind::Rsqb);
 
@@ -1337,11 +1327,9 @@ impl<'src> Parser<'src> {
 
         let mut elts = vec![first_element];
 
-        self.parse_comma_separated_list(
-            RecoveryContextKind::SetElements,
-            |parser| elts.push(parser.parse_named_expression_or_higher().expr),
-            true,
-        );
+        self.parse_comma_separated_list(RecoveryContextKind::SetElements, |parser| {
+            elts.push(parser.parse_named_expression_or_higher().expr)
+        });
 
         self.expect(TokenKind::Rbrace);
 
@@ -1367,20 +1355,16 @@ impl<'src> Parser<'src> {
         let mut keys = vec![key];
         let mut values = vec![value];
 
-        self.parse_comma_separated_list(
-            RecoveryContextKind::DictElements,
-            |parser| {
-                if parser.eat(TokenKind::DoubleStar) {
-                    keys.push(None);
-                } else {
-                    keys.push(Some(parser.parse_conditional_expression_or_higher().expr));
+        self.parse_comma_separated_list(RecoveryContextKind::DictElements, |parser| {
+            if parser.eat(TokenKind::DoubleStar) {
+                keys.push(None);
+            } else {
+                keys.push(Some(parser.parse_conditional_expression_or_higher().expr));
 
-                    parser.expect(TokenKind::Colon);
-                }
-                values.push(parser.parse_conditional_expression_or_higher().expr);
-            },
-            true,
-        );
+                parser.expect(TokenKind::Colon);
+            }
+            values.push(parser.parse_conditional_expression_or_higher().expr);
+        });
 
         self.expect(TokenKind::Rbrace);
 
