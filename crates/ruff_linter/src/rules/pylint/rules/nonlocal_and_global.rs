@@ -14,6 +14,8 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// counter = 0
+///
+///
 /// def increment():
 ///     global counter
 ///     nonlocal counter
@@ -23,6 +25,8 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 /// ```python
 /// counter = 0
+///
+///
 /// def increment():
 ///     global counter
 ///     counter += 1
