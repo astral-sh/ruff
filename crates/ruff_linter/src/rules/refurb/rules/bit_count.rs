@@ -156,8 +156,6 @@ pub(crate) fn bit_count(checker: &mut Checker, call: &ExprCall) {
         | Expr::EllipsisLiteral(_)
         | Expr::Attribute(_)
         | Expr::Subscript(_) => false,
-        #[allow(deprecated)]
-        Expr::Invalid(_) => false,
     };
 
     let replacement = if parenthesize {
