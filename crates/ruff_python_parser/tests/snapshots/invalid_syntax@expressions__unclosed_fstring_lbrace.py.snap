@@ -27,7 +27,7 @@ Module(
                                 ExprName {
                                     range: 110..110,
                                     id: "",
-                                    ctx: Load,
+                                    ctx: Invalid,
                                 },
                             ),
                         },
@@ -43,7 +43,7 @@ Module(
   |
 1 | # TODO(dhruvmanila): Remove the dummy test case and uncomment the others when this is fixed. See PR #10372
 2 | x +
-  |    ^ Syntax Error: Expression expected.
+  |    ^ Syntax Error: Expected an expression
 3 | 
 4 | # f'{'
 5 | # f'{foo!r'
