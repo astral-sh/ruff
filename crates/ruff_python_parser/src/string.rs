@@ -12,7 +12,6 @@ pub(crate) enum StringType {
     Str(ast::StringLiteral),
     Bytes(ast::BytesLiteral),
     FString(ast::FString),
-    Invalid(ast::StringLiteral),
 }
 
 impl Ranged for StringType {
@@ -21,7 +20,6 @@ impl Ranged for StringType {
             Self::Str(node) => node.range(),
             Self::Bytes(node) => node.range(),
             Self::FString(node) => node.range(),
-            Self::Invalid(node) => node.range(),
         }
     }
 }
@@ -32,7 +30,6 @@ impl From<StringType> for Expr {
             StringType::Str(node) => Expr::from(node),
             StringType::Bytes(node) => Expr::from(node),
             StringType::FString(node) => Expr::from(node),
-            StringType::Invalid(node) => Expr::from(node),
         }
     }
 }
@@ -43,10 +40,15 @@ enum EscapedChar {
 }
 
 struct StringParser {
+    /// The raw content of the string e.g., the `foo` part in `"foo"`.
     source: Box<str>,
+    /// Current position of the parser in the source.
     cursor: usize,
+    /// The kind of string.
     kind: AnyStringKind,
+    /// The location of the first character in the source from the start of the file.
     offset: TextSize,
+    /// The range of the string literal.
     range: TextRange,
 }
 
@@ -474,7 +476,7 @@ pub(crate) fn concatenated_strings(
         match string {
             StringType::FString(_) => has_fstring = true,
             StringType::Bytes(_) => byte_literal_count += 1,
-            StringType::Str(_) | StringType::Invalid(_) => {}
+            StringType::Str(_) => {}
         }
     }
     let has_bytes = byte_literal_count > 0;
@@ -508,7 +510,7 @@ pub(crate) fn concatenated_strings(
         let mut values = Vec::with_capacity(strings.len());
         for string in strings {
             match string {
-                StringType::Str(value) | StringType::Invalid(value) => values.push(value),
+                StringType::Str(value) => values.push(value),
                 _ => unreachable!("Unexpected non-string literal."),
             }
         }
@@ -523,7 +525,6 @@ pub(crate) fn concatenated_strings(
         match string {
             StringType::FString(fstring) => parts.push(ast::FStringPart::FString(fstring)),
             StringType::Str(string) => parts.push(ast::FStringPart::Literal(string)),
-            StringType::Invalid(_) => {}
             StringType::Bytes(_) => unreachable!("Unexpected bytes literal."),
         }
     }
