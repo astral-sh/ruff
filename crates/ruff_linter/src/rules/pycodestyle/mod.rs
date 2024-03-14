@@ -171,12 +171,15 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Path::new("E303_first_line_comment.py"))]
-    #[test_case(Path::new("E303_first_line_docstring.py"))]
-    #[test_case(Path::new("E303_first_line_expression.py"))]
-    #[test_case(Path::new("E303_first_line_statement.py"))]
-    fn blank_lines_first_line(path: &Path) -> Result<()> {
-        let rule_code = Rule::TooManyBlankLines;
+    #[test_case(Rule::BlankLinesTopLevel, Path::new("E302_first_line_docstring.py"))]
+    #[test_case(Rule::BlankLinesTopLevel, Path::new("E302_first_line_expression.py"))]
+    #[test_case(Rule::BlankLinesTopLevel, Path::new("E302_first_line_function.py"))]
+    #[test_case(Rule::BlankLinesTopLevel, Path::new("E302_first_line_statement.py"))]
+    #[test_case(Rule::TooManyBlankLines, Path::new("E303_first_line_comment.py"))]
+    #[test_case(Rule::TooManyBlankLines, Path::new("E303_first_line_docstring.py"))]
+    #[test_case(Rule::TooManyBlankLines, Path::new("E303_first_line_expression.py"))]
+    #[test_case(Rule::TooManyBlankLines, Path::new("E303_first_line_statement.py"))]
+    fn blank_lines_first_line(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pycodestyle").join(path).as_path(),
