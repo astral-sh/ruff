@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: e87c0f850a92ae6028f61b32c3d562a176592a5bc5131aa50476844593dbea44
+// sha3: 2caf784e5bd07cf1b11403de13fbdd975631d42b3b1bf48762fdcdbdccab1123
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use super::{

@@ -129,7 +129,7 @@ and with [a variety of other package managers](https://docs.astral.sh/ruff/insta
 To run Ruff as a linter, try any of the following:
 
 ```shell
-ruff check .                        # Lint all files in the current directory (and any subdirectories).
+ruff check                          # Lint all files in the current directory (and any subdirectories).
 ruff check path/to/code/            # Lint all files in `/path/to/code` (and any subdirectories).
 ruff check path/to/code/*.py        # Lint all `.py` files in `/path/to/code`.
 ruff check path/to/code/to/file.py  # Lint `file.py`.
@@ -139,7 +139,7 @@ ruff check @arguments.txt           # Lint using an input file, treating its con
 Or, to run Ruff as a formatter:
 
 ```shell
-ruff format .                        # Format all files in the current directory (and any subdirectories).
+ruff format                          # Format all files in the current directory (and any subdirectories).
 ruff format path/to/code/            # Format all files in `/path/to/code` (and any subdirectories).
 ruff format path/to/code/*.py        # Format all `.py` files in `/path/to/code`.
 ruff format path/to/code/to/file.py  # Format `file.py`.

@@ -43,7 +43,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// This rule's fix is marked as unsafe, as migrating from (e.g.) `list(...)[0]`
 /// to `next(iter(...))` can change the behavior of your program in two ways:
 ///
-/// 1. First, all above mentioned constructs will eagerly evaluate the entire
+/// 1. First, all above-mentioned constructs will eagerly evaluate the entire
 ///    collection, while `next(iter(...))` will only evaluate the first
 ///    element. As such, any side effects that occur during iteration will be
 ///    delayed.

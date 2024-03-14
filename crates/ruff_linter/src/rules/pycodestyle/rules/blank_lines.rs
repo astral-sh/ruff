@@ -241,7 +241,7 @@ impl AlwaysFixableViolation for BlankLineAfterDecorator {
 /// Checks for missing blank lines after the end of function or class.
 ///
 /// ## Why is this bad?
-/// PEP 8 recommends using blank lines as following:
+/// PEP 8 recommends using blank lines as follows:
 /// - Two blank lines are expected between functions and classes
 /// - One blank line is expected between methods of a class.
 ///
@@ -292,7 +292,7 @@ impl AlwaysFixableViolation for BlankLinesAfterFunctionOrClass {
 /// Checks for 1 blank line between nested function or class definitions.
 ///
 /// ## Why is this bad?
-/// PEP 8 recommends using blank lines as following:
+/// PEP 8 recommends using blank lines as follows:
 /// - Two blank lines are expected between functions and classes
 /// - One blank line is expected between methods of a class.
 ///

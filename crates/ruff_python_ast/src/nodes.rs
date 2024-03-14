@@ -1272,6 +1272,22 @@ pub struct FString {
     pub flags: FStringFlags,
 }
 
+impl FString {
+    /// Returns an iterator over all the [`FStringLiteralElement`] nodes contained in this f-string.
+    pub fn literals(&self) -> impl Iterator<Item = &FStringLiteralElement> {
+        self.elements
+            .iter()
+            .filter_map(|element| element.as_literal())
+    }
+
+    /// Returns an iterator over all the [`FStringExpressionElement`] nodes contained in this f-string.
+    pub fn expressions(&self) -> impl Iterator<Item = &FStringExpressionElement> {
+        self.elements
+            .iter()
+            .filter_map(|element| element.as_expression())
+    }
+}
+
 impl Ranged for FString {
     fn range(&self) -> TextRange {
         self.range
@@ -4185,7 +4201,8 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprDict>(), 56);
         assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
         assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
-        assert_eq!(std::mem::size_of::<ExprFString>(), 48);
+        // 56 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<ExprFString>(), 48 | 56));
         assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
         assert_eq!(std::mem::size_of::<ExprIf>(), 32);
         assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);

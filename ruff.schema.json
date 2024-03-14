@@ -755,6 +755,12 @@
       },
       "additionalProperties": false
     },
+    "BannedAliases": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "ConstantType": {
       "type": "string",
       "enum": [
@@ -1036,10 +1042,7 @@
             "null"
           ],
           "additionalProperties": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "$ref": "#/definitions/BannedAliases"
           }
         },
         "banned-from": {
@@ -3216,6 +3219,7 @@
         "PLE03",
         "PLE030",
         "PLE0302",
+        "PLE0304",
         "PLE0307",
         "PLE06",
         "PLE060",
