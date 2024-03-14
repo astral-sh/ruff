@@ -259,9 +259,6 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_)
         | Expr::IpyEscapeCommand(_) => false,
-
-        #[allow(deprecated)]
-        Expr::Invalid(_) => false,
     }
 }
 
@@ -1289,8 +1286,6 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
             Expr::Name(_) => false,
             Expr::Slice(_) => false,
             Expr::IpyEscapeCommand(_) => false,
-            #[allow(deprecated)]
-            Expr::Invalid(_) => false,
 
             // These literals may or may not be empty.
             Expr::FString(f_string) => is_non_empty_f_string(f_string),

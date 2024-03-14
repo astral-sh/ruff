@@ -1094,8 +1094,6 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 value,
                 range: _,
             }) => Self::IpyEscapeCommand(ExprIpyEscapeCommand { kind: *kind, value }),
-            #[allow(deprecated)]
-            ast::Expr::Invalid(_) => Self::Invalid,
         }
     }
 }
