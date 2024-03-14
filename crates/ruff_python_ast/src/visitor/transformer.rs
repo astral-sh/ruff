@@ -552,8 +552,7 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
                 visitor.visit_expr(expr);
             }
         }
-        #[allow(deprecated)]
-        Expr::IpyEscapeCommand(_) | Expr::Invalid(_) => {}
+        Expr::IpyEscapeCommand(_) => {}
     }
 }
 
