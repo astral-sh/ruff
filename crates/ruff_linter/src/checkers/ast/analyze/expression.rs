@@ -247,7 +247,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                 }
-                ExprContext::Del => {}
+                _ => {}
             }
             if checker.enabled(Rule::SixPY3) {
                 flake8_2020::rules::name_or_attribute(checker, expr);
