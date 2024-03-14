@@ -83,6 +83,12 @@ pub(crate) fn unnecessary_placeholder(checker: &mut Checker, body: &[Stmt]) {
         return;
     }
 
+    // In a type-checking block, a trailing ellipsis might be meaningful. A
+    // user might be using the type-checking context to declare a stub.
+    if checker.semantic().in_type_checking_block() {
+        return;
+    }
+
     for stmt in body {
         let kind = match stmt {
             Stmt::Pass(_) => Placeholder::Pass,
