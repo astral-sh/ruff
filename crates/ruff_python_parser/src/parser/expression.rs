@@ -866,7 +866,7 @@ impl<'src> Parser<'src> {
                         range,
                     });
                 }
-                Ordering::Greater => {}
+                Ordering::Greater => unreachable!(),
             }
         }
 
