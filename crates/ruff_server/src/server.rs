@@ -9,6 +9,8 @@ use types::ClientCapabilities;
 use types::CodeActionKind;
 use types::CodeActionOptions;
 use types::DiagnosticOptions;
+use types::DidChangeWatchedFilesRegistrationOptions;
+use types::FileSystemWatcher;
 use types::OneOf;
 use types::TextDocumentSyncCapability;
 use types::TextDocumentSyncKind;
@@ -65,6 +67,38 @@ impl Server {
         });
 
         conn.initialize_finish(id, initialize_data)?;
+
+        // Register capabilites here
+
+        conn.sender
+            .send(lsp_server::Message::Request(lsp_server::Request {
+                id: 1.into(),
+                method: "client/registerCapability".into(),
+                params: serde_json::to_value(lsp_types::RegistrationParams {
+                    registrations: vec![lsp_types::Registration {
+                        id: "ruff-server-watch".into(),
+                        method: "workspace/didChangeWatchedFiles".into(),
+                        register_options: Some(serde_json::to_value(
+                            DidChangeWatchedFilesRegistrationOptions {
+                                watchers: vec![
+                                    FileSystemWatcher {
+                                        glob_pattern: types::GlobPattern::String(
+                                            "**/.?ruff.toml".into(),
+                                        ),
+                                        kind: None,
+                                    },
+                                    FileSystemWatcher {
+                                        glob_pattern: types::GlobPattern::String(
+                                            "**/pyproject.toml".into(),
+                                        ),
+                                        kind: None,
+                                    },
+                                ],
+                            },
+                        )?),
+                    }],
+                })?,
+            }))?;
 
         Ok(Self {
             conn,
