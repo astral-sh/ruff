@@ -20,7 +20,7 @@ use crate::rules::ruff::rules::helpers::{is_class_var_annotation, is_dataclass};
 /// pattern.
 ///
 /// If the default value is intended to be mutable, it must be annotated with
-/// `typing.ClassVar`, otherwise a `ValueError` is raised.
+/// `typing.ClassVar`; otherwise, a `ValueError` will be raised.
 ///
 /// ## Examples
 /// ```python
@@ -29,8 +29,8 @@ use crate::rules::ruff::rules::helpers::{is_class_var_annotation, is_dataclass};
 ///
 /// @dataclass
 /// class A:
-///     # This code does not work, it will raise a ValueError.
-///     # See alternatives below.
+///     # A list without a `default_factory` or `ClassVar` annotation
+///     # will raise a `ValueError`.
 ///     mutable_default: list[int] = []
 /// ```
 ///
