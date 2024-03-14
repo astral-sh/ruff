@@ -70,10 +70,7 @@ Module(
 
   |
 1 | a = = c
-  |     ^ Syntax Error: Expression expected.
+  |     ^ Syntax Error: Expected an expression
 2 | 
 3 | a + b
   |
-
-
-

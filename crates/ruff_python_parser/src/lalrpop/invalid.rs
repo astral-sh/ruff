@@ -70,8 +70,6 @@ pub(crate) fn assignment_target(target: &Expr) -> Result<(), LexicalError> {
         BooleanLiteral(ref e) => Err(err(e.range)),
         NoneLiteral(ref e) => Err(err(e.range)),
         EllipsisLiteral(ref e) => Err(err(e.range)),
-        #[allow(deprecated)]
-        Invalid(ref e) => Err(err(e.range)),
         // This isn't in the Python grammar but is Jupyter notebook specific.
         // It seems like this should be an error. It does also seem like the
         // parser prevents this from ever appearing as an assignment target

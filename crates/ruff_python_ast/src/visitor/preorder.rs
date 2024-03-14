@@ -304,8 +304,6 @@ where
             Expr::Tuple(expr) => expr.visit_preorder(visitor),
             Expr::Slice(expr) => expr.visit_preorder(visitor),
             Expr::IpyEscapeCommand(expr) => expr.visit_preorder(visitor),
-            #[allow(deprecated)]
-            Expr::Invalid(_) => {}
         }
     }
 
