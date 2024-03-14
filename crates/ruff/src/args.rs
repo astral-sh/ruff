@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::fmt::Formatter;
+use std::num::NonZeroUsize;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -501,6 +502,9 @@ pub struct ServerCommand {
     /// Enable preview mode; required for regular operation
     #[arg(long)]
     pub(crate) preview: bool,
+    /// Set the number of background threads used for running tasks concurrently - default is 4.
+    #[arg(long)]
+    pub(crate) threads: Option<NonZeroUsize>,
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]

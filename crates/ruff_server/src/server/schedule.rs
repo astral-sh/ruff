@@ -42,13 +42,13 @@ pub(crate) struct Scheduler {
 impl Scheduler {
     pub(super) fn new(
         session: Session,
-        thread_count: usize,
+        pool_threads: usize,
         sender: &Sender<lsp_server::Message>,
     ) -> Self {
         Self {
             session,
             fmt_pool: thread::Pool::new(1),
-            background_pool: thread::Pool::new(thread_count),
+            background_pool: thread::Pool::new(pool_threads),
             client: Client::new(sender),
         }
     }
