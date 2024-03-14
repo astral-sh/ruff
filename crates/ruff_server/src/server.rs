@@ -1,6 +1,7 @@
 //! Scheduling, I/O, and API endpoints.
 
 use std::num::NonZeroUsize;
+use std::time::Duration;
 
 use lsp::Connection;
 use lsp_server as lsp;
@@ -68,8 +69,7 @@ impl Server {
 
         conn.initialize_finish(id, initialize_data)?;
 
-        // Register capabilites here
-
+        // Register capabilites
         conn.sender
             .send(lsp_server::Message::Request(lsp_server::Request {
                 id: 1.into(),
@@ -99,6 +99,11 @@ impl Server {
                     }],
                 })?,
             }))?;
+
+        // Flush response from server (to avoid an unexpected response appearing in the event loop)
+        let _ = conn.receiver.recv_timeout(Duration::from_secs(5)).map_err(|_| {
+            tracing::error!("Timed out while waiting for client to acknowledge registration of dynamic capabilities");
+        });
 
         Ok(Self {
             conn,
