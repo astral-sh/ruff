@@ -646,7 +646,6 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
             AnyNodeRef::MatchCase(node) => node.format().fmt(f),
             AnyNodeRef::Decorator(node) => node.format().fmt(f),
             AnyNodeRef::ElifElseClause(node) => node.format().fmt(f),
-            AnyNodeRef::ExprInvalid(node) => node.format().fmt(f),
 
             AnyNodeRef::ExprBoolOp(_)
             | AnyNodeRef::ExprNamed(_)

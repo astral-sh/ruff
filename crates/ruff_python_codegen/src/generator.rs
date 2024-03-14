@@ -1193,8 +1193,6 @@ impl<'a> Generator<'a> {
             Expr::IpyEscapeCommand(ast::ExprIpyEscapeCommand { kind, value, .. }) => {
                 self.p(&format!("{kind}{value}"));
             }
-            #[allow(deprecated)]
-            Expr::Invalid(ast::ExprInvalid { value, .. }) => self.p(value.as_str()),
         }
     }
 

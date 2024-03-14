@@ -624,10 +624,6 @@ pub enum Expr {
     // Jupyter notebook specific
     #[is(name = "ipy_escape_command_expr")]
     IpyEscapeCommand(ExprIpyEscapeCommand),
-
-    // TODO(dhruvmanila): Remove this variant
-    #[is(name = "invalid_expr")]
-    Invalid(ExprInvalid),
 }
 
 impl Expr {
@@ -658,25 +654,6 @@ impl Expr {
             Expr::EllipsisLiteral(expr) => Some(LiteralExpressionRef::EllipsisLiteral(expr)),
             _ => None,
         }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprInvalid {
-    pub value: String,
-    pub range: TextRange,
-}
-
-impl From<ExprInvalid> for Expr {
-    fn from(payload: ExprInvalid) -> Self {
-        #[allow(deprecated)]
-        Expr::Invalid(payload)
-    }
-}
-
-impl Ranged for ExprInvalid {
-    fn range(&self) -> TextRange {
-        self.range
     }
 }
 
@@ -2186,6 +2163,7 @@ pub enum ExprContext {
     Load,
     Store,
     Del,
+    Invalid,
 }
 impl ExprContext {
     #[inline]
@@ -4063,8 +4041,6 @@ impl Ranged for crate::Expr {
             Self::Tuple(node) => node.range(),
             Self::Slice(node) => node.range(),
             Self::IpyEscapeCommand(node) => node.range(),
-            #[allow(deprecated)]
-            Self::Invalid(node) => node.range(),
         }
     }
 }
