@@ -437,7 +437,7 @@ pub(crate) fn check_string_quotes(checker: &mut Checker, string_like: StringLike
         .indexer()
         .fstring_ranges()
         .outermost(string_like.start())
-        .is_some_and(|outer_range| outer_range != string_like.range())
+        .is_some_and(|outer| outer.start() < string_like.start() && string_like.end() < outer.end())
     {
         return;
     }
