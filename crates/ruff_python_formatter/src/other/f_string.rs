@@ -138,9 +138,7 @@ impl FStringLayout {
         //
         // Reference: https://prettier.io/docs/en/next/rationale.html#template-literals
         if f_string
-            .elements
-            .iter()
-            .filter_map(|element| element.as_expression())
+            .expressions()
             .any(|expr| memchr::memchr2(b'\n', b'\r', locator.slice(expr).as_bytes()).is_some())
         {
             Self::Multiline

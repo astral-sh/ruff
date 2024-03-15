@@ -91,6 +91,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
+            if checker.enabled(Rule::InvalidBoolReturnType) {
+                pylint::rules::invalid_bool_return(checker, name, body);
+            }
             if checker.enabled(Rule::InvalidStrReturnType) {
                 pylint::rules::invalid_str_return(checker, name, body);
             }

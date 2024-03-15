@@ -4,7 +4,7 @@ mod stylist;
 pub use generator::Generator;
 use ruff_python_parser::{lexer, parse_suite, Mode, ParseError};
 use ruff_source_file::Locator;
-pub use stylist::{Quote, Stylist};
+pub use stylist::Stylist;
 
 /// Run round-trip source code generation on a given Python code.
 pub fn round_trip(code: &str) -> Result<String, ParseError> {

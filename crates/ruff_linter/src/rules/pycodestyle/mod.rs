@@ -171,6 +171,24 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::BlankLinesTopLevel, Path::new("E302_first_line_docstring.py"))]
+    #[test_case(Rule::BlankLinesTopLevel, Path::new("E302_first_line_expression.py"))]
+    #[test_case(Rule::BlankLinesTopLevel, Path::new("E302_first_line_function.py"))]
+    #[test_case(Rule::BlankLinesTopLevel, Path::new("E302_first_line_statement.py"))]
+    #[test_case(Rule::TooManyBlankLines, Path::new("E303_first_line_comment.py"))]
+    #[test_case(Rule::TooManyBlankLines, Path::new("E303_first_line_docstring.py"))]
+    #[test_case(Rule::TooManyBlankLines, Path::new("E303_first_line_expression.py"))]
+    #[test_case(Rule::TooManyBlankLines, Path::new("E303_first_line_statement.py"))]
+    fn blank_lines_first_line(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pycodestyle").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::BlankLineBetweenMethods, Path::new("E30.py"))]
     #[test_case(Rule::BlankLinesTopLevel, Path::new("E30.py"))]
     #[test_case(Rule::TooManyBlankLines, Path::new("E30.py"))]

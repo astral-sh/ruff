@@ -2,7 +2,7 @@ use std::fmt;
 
 use bitflags::bitflags;
 
-use ruff_python_ast::{str::QuoteStyle, StringLiteralPrefix};
+use ruff_python_ast::{str::Quote, StringLiteralPrefix};
 use ruff_text_size::{TextLen, TextSize};
 
 bitflags! {
@@ -171,11 +171,11 @@ impl StringKind {
     }
 
     /// Does the string use single or double quotes in its opener and closer?
-    pub const fn quote_style(self) -> QuoteStyle {
+    pub const fn quote_style(self) -> Quote {
         if self.0.contains(StringFlags::DOUBLE) {
-            QuoteStyle::Double
+            Quote::Double
         } else {
-            QuoteStyle::Single
+            Quote::Single
         }
     }
 
@@ -190,13 +190,13 @@ impl StringKind {
     pub const fn quote_str(self) -> &'static str {
         if self.is_triple_quoted() {
             match self.quote_style() {
-                QuoteStyle::Single => "'''",
-                QuoteStyle::Double => r#"""""#,
+                Quote::Single => "'''",
+                Quote::Double => r#"""""#,
             }
         } else {
             match self.quote_style() {
-                QuoteStyle::Single => "'",
-                QuoteStyle::Double => "\"",
+                Quote::Single => "'",
+                Quote::Double => "\"",
             }
         }
     }

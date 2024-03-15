@@ -2345,6 +2345,7 @@ dependencies = [
  "itertools 0.12.1",
  "lexical-parse-float",
  "rand",
+ "ruff_python_ast",
  "unic-ucd-category",
 ]
 

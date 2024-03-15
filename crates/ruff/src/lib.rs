@@ -206,8 +206,8 @@ fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitS
 
 #[allow(clippy::needless_pass_by_value)] // TODO: remove once we start taking arguments from here
 fn server(args: ServerCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    let ServerCommand {} = args;
-    commands::server::run_server(log_level)
+    let ServerCommand { preview } = args;
+    commands::server::run_server(preview, log_level)
 }
 
 pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {

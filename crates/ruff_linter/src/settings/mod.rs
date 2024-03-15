@@ -383,7 +383,7 @@ impl LinterSettings {
             dummy_variable_rgx: DUMMY_VARIABLE_RGX.clone(),
 
             external: vec![],
-            ignore_init_module_imports: false,
+            ignore_init_module_imports: true,
             logger_objects: vec![],
             namespace_packages: vec![],
 

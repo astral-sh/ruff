@@ -259,23 +259,29 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         diagnostic.set_parent(range.start());
                     }
 
-                    if let Some(import) = binding.as_any_import() {
-                        if let Some(source) = binding.source {
-                            diagnostic.try_set_fix(|| {
-                                let statement = checker.semantic().statement(source);
-                                let parent = checker.semantic().parent_statement(source);
-                                let edit = fix::edits::remove_unused_imports(
-                                    std::iter::once(import.member_name().as_ref()),
-                                    statement,
-                                    parent,
-                                    checker.locator(),
-                                    checker.stylist(),
-                                    checker.indexer(),
-                                )?;
-                                Ok(Fix::safe_edit(edit).isolate(Checker::isolation(
-                                    checker.semantic().parent_statement_id(source),
-                                )))
-                            });
+                    // Remove the import if the binding and the shadowed binding are both imports,
+                    // and both point to the same qualified name.
+                    if let Some(shadowed_import) = shadowed.as_any_import() {
+                        if let Some(import) = binding.as_any_import() {
+                            if shadowed_import.qualified_name() == import.qualified_name() {
+                                if let Some(source) = binding.source {
+                                    diagnostic.try_set_fix(|| {
+                                        let statement = checker.semantic().statement(source);
+                                        let parent = checker.semantic().parent_statement(source);
+                                        let edit = fix::edits::remove_unused_imports(
+                                            std::iter::once(import.member_name().as_ref()),
+                                            statement,
+                                            parent,
+                                            checker.locator(),
+                                            checker.stylist(),
+                                            checker.indexer(),
+                                        )?;
+                                        Ok(Fix::safe_edit(edit).isolate(Checker::isolation(
+                                            checker.semantic().parent_statement_id(source),
+                                        )))
+                                    });
+                                }
+                            }
                         }
                     }
 

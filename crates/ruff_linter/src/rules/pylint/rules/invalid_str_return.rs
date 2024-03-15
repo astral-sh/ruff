@@ -14,6 +14,23 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// The `__str__` method should return a `str` object. Returning a different
 /// type may cause unexpected behavior.
+///
+/// ## Example
+/// ```python
+/// class Foo:
+///     def __str__(self):
+///         return True
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Foo:
+///     def __str__(self):
+///         return "Foo"
+/// ```
+///
+/// ## References
+/// - [Python documentation: The `__str__` method](https://docs.python.org/3/reference/datamodel.html#object.__str__)
 #[violation]
 pub struct InvalidStrReturnType;
 
