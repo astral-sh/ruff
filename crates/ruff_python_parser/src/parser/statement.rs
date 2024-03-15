@@ -9,7 +9,7 @@ use crate::parser::expression::ParsedExpr;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
     helpers, FunctionKind, Parser, ParserCtxFlags, RecoveryContext, RecoveryContextKind,
-    WithItemKind, EXPR_SET, LITERAL_SET,
+    WithItemKind, EXPR_SET,
 };
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, Tok, TokenKind};
@@ -987,142 +987,61 @@ impl<'src> Parser<'src> {
     /// Parses a list of with items.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-with_stmt_contents>
-    fn parse_with_items(&mut self) -> Vec<ast::WithItem> {
+    fn parse_with_items(&mut self) -> Vec<WithItem> {
+        let start = self.node_start();
         let mut items = vec![];
 
         if !self.at_expr() {
-            let range = self.current_token_range();
             self.add_error(
-                ParseErrorType::OtherError("expecting expression after `with` keyword".to_string()),
-                range,
+                ParseErrorType::OtherError(
+                    "Expected the start of an expression after `with` keyword".to_string(),
+                ),
+                self.current_token_range(),
             );
             return items;
         }
 
-        let has_seen_lpar = self.at(TokenKind::Lpar);
-
-        // Consider the two `WithItem` examples below:
-        //      1) `(a) as A`
-        //      2) `(a)`
-        //
-        // In the first example, the `item` contains a parenthesized expression,
-        // while the second example is a parenthesized `WithItem`. This situation
-        // introduces ambiguity during parsing. When encountering an opening parenthesis
-        // `(,` the parser may initially assume it's parsing a parenthesized `WithItem`.
-        // However, this assumption doesn't hold for the first case, `(a) as A`, where
-        // `(a)` represents a parenthesized expression.
-        //
-        // To disambiguate, the following heuristic was created. First, assume we're
-        // parsing an expression, then we look for the following tokens:
-        //      i) `as` keyword outside parenthesis
-        //      ii) `,` outside or inside parenthesis
-        //      iii) `:=` inside an 1-level nested parenthesis
-        //      iv) `*` inside an 1-level nested parenthesis, representing a starred
-        //         expression
-        //
-        // If we find case i we treat it as in case 1. For case ii, we only treat it as in
-        // case 1 if the comma is outside of parenthesis and we've seen an `Rpar` or `Lpar`
-        // before the comma.
-        // Cases iii and iv are special cases, when we find them, we treat it as in case 2.
-        // The reason for this is that the resulting AST node needs to be a tuple for cases
-        // iii and iv instead of multiple `WithItem`s. For example, `with (a, b := 0, c): ...`
-        // will be parsed as one `WithItem` containing a tuple, instead of three different `WithItem`s.
-        let mut treat_it_as_expr = true;
-        if has_seen_lpar {
-            let mut index = 1;
-            let mut paren_nesting = 1;
-            let mut ignore_comma_check = false;
-            let mut has_seen_rpar = false;
-            let mut has_seen_colon_equal = false;
-            let mut has_seen_star = false;
-            let mut prev_token = self.current_token_kind();
-            loop {
-                match self.peek_nth(index) {
-                    TokenKind::Lpar => {
-                        paren_nesting += 1;
-                    }
-                    TokenKind::Rpar => {
-                        paren_nesting -= 1;
-                        has_seen_rpar = true;
-                    }
-                    // Check for `:=` inside an 1-level nested parens, e.g. `with (a, b := c): ...`
-                    TokenKind::ColonEqual if paren_nesting == 1 => {
-                        treat_it_as_expr = true;
-                        ignore_comma_check = true;
-                        has_seen_colon_equal = true;
-                    }
-                    // Check for starred expressions inside an 1-level nested parens,
-                    // e.g. `with (a, *b): ...`
-                    TokenKind::Star if paren_nesting == 1 && !LITERAL_SET.contains(prev_token) => {
-                        treat_it_as_expr = true;
-                        ignore_comma_check = true;
-                        has_seen_star = true;
-                    }
-                    // Check for `as` keyword outside parens
-                    TokenKind::As => {
-                        treat_it_as_expr = paren_nesting == 0;
-                        ignore_comma_check = true;
-                    }
-                    TokenKind::Comma if !ignore_comma_check => {
-                        // If the comma is outside of parens, treat it as an expression
-                        // if we've seen `(` and `)`.
-                        if paren_nesting == 0 {
-                            treat_it_as_expr = has_seen_lpar && has_seen_rpar;
-                        } else if !has_seen_star && !has_seen_colon_equal {
-                            treat_it_as_expr = false;
-                        }
-                    }
-                    TokenKind::Colon | TokenKind::Newline => break,
-                    _ => {}
-                }
-
-                index += 1;
-                prev_token = self.peek_nth(index);
-            }
-        }
-
-        let with_item_kind = if has_seen_lpar {
-            if treat_it_as_expr {
-                WithItemKind::ParenthesizedExpression
-            } else {
-                WithItemKind::Parenthesized
-            }
+        let with_item_kind = if self.eat(TokenKind::Lpar) {
+            self.parse_parenthesized_with_items(start, &mut items)
         } else {
             WithItemKind::Unparenthesized
         };
 
-        if with_item_kind == WithItemKind::Parenthesized {
-            self.bump(TokenKind::Lpar);
-        }
-
-        let mut is_last_parenthesized = false;
-
-        self.parse_comma_separated_list(RecoveryContextKind::WithItems(with_item_kind), |parser| {
-            let parsed_with_item = parser.parse_with_item();
-            is_last_parenthesized = parsed_with_item.is_parenthesized;
-            items.push(parsed_with_item.item);
-        });
-
-        // Special-case: if we have a parenthesized `WithItem` that was parsed as
-        // an expression, then the item should _exclude_ the outer parentheses in
-        // its range. For example:
-        // ```python
-        // with (a := 0): pass
-        // with (*a): pass
-        // with (a): pass
-        // with (1 + 2): pass
-        // ```
-        // In this case, the `(` and `)` are part of the `with` statement.
-        // The exception is when `WithItem` is an `()` (empty tuple).
-        if let [with_item] = items.as_mut_slice() {
-            if treat_it_as_expr
-                && with_item.optional_vars.is_none()
-                && is_last_parenthesized
-                && !matches!(with_item.context_expr, Expr::Tuple(_))
-            {
-                with_item.range = with_item.range.add_start(1.into()).sub_end(1.into());
+        if with_item_kind.is_parenthesized_expression() {
+            // The trailing comma is optional because (1) they aren't allowed in parenthesized
+            // expression context and, (2) We need to raise the correct error if they're present.
+            //
+            // Consider the following three examples:
+            //
+            // ```python
+            // with (item1, item2): ...  # (1)
+            // with (item1, item2),: ...  # (2)
+            // with (item1, item2), item3,: ...  # (3)
+            // ```
+            //
+            // Here, (1) is valid and represents a parenthesized with items while (2) and (3)
+            // are invalid as they are parenthesized expression. Example (3) will raise an error
+            // stating that a trailing comma isn't allowed, while (2) will raise the following
+            // error.
+            //
+            // The reason that (2) expects an expression is because if it raised an error
+            // similar to (3), we would be suggesting to remove the trailing comma, which would
+            // make it a parenthesized with items. This would contradict our original assumption.
+            // However, for (3), if the trailing comma is removed, it still remains a parenthesized
+            // expression.
+            if self.eat(TokenKind::Comma) && !self.at_expr() {
+                self.add_error(
+                    ParseErrorType::OtherError("Expected an expression".to_string()),
+                    self.current_token_range(),
+                );
             }
         }
+
+        // This call is a no-op if the with items are parenthesized as all of them
+        // have already been parsed.
+        self.parse_comma_separated_list(RecoveryContextKind::WithItems(with_item_kind), |parser| {
+            items.push(parser.parse_with_item(WithItemParsingState::Regular).item);
+        });
 
         if with_item_kind == WithItemKind::Parenthesized {
             self.expect(TokenKind::Rpar);
@@ -1131,53 +1050,335 @@ impl<'src> Parser<'src> {
         items
     }
 
+    /// Parse the with items coming after an ambiguous `(` token.
+    ///
+    /// This method is used to parse the with items when the parser has seen an
+    /// ambiguous `(` token. It's used to determine if the with items are
+    /// parenthesized or it's a parenthesized expression.
+    ///
+    /// The return value is the kind of with items parsed. Note that there could
+    /// still be other with items which needs to be parsed as this method stops
+    /// when the matching `)` is found.
+    fn parse_parenthesized_with_items(
+        &mut self,
+        start: TextSize,
+        items: &mut Vec<WithItem>,
+    ) -> WithItemKind {
+        // We'll start with the assumption that the with items are parenthesized.
+        let mut with_item_kind = WithItemKind::Parenthesized;
+
+        // Keep track of any trailing comma. This is used to determine if it's a
+        // tuple expression or not in the case of a single with item.
+        let mut has_trailing_comma = false;
+
+        // Start with parsing the first with item after an ambiguous `(` token
+        // with the start offset.
+        let mut state = WithItemParsingState::AmbiguousLparFirstItem(start);
+
+        let mut progress = ParserProgress::default();
+
+        loop {
+            progress.assert_progressing(self);
+
+            // We stop at the first `)` found. Any nested parentheses will be
+            // consumed by the with item parsing. This check needs to be done
+            // first in case there are no with items. For example,
+            //
+            // ```python
+            // with (): ...
+            // with () as x: ...
+            // ```
+            if self.at(TokenKind::Rpar) {
+                break;
+            }
+
+            let parsed_with_item = self.parse_with_item(state);
+
+            match parsed_with_item.item.context_expr {
+                Expr::Named(_) if !parsed_with_item.is_parenthesized => {
+                    // If the named expression isn't parenthesized, then:
+                    //
+                    // 1. It has either used the ambiguous `(` token e.g., `with (item := 10): ...` or
+                    //    `with (item := 10) as f: ...`.
+                    // 2. It's a tuple element e.g., `with (item1, item2 := 10): ...`.
+                    //
+                    // In either case, our assumption is incorrect as it's a parenthesized expression.
+                    with_item_kind = WithItemKind::ParenthesizedExpression;
+                }
+                Expr::Generator(_) if parsed_with_item.used_ambiguous_lpar => {
+                    // For generator expressions, it's a bit tricky. We need to check if parsing
+                    // a generator expression has used the ambiguous `(` token. This is the case
+                    // for a parenthesized generator expression which is using the ambiguous `(`
+                    // as the start of the generator expression. For example:
+                    //
+                    // ```python
+                    // with (x for x in range(10)): ...
+                    // #                         ^
+                    // #                         Consumed by `parse_with_item`
+                    // ```
+                    //
+                    // This is only allowed if it's the first with item which is made sure by the
+                    // `with_item_parsing` state.
+                    with_item_kind = WithItemKind::SingleParenthesizedGeneratorExpression;
+                    items.push(parsed_with_item.item);
+                    break;
+                }
+                _ => {}
+            }
+
+            items.push(parsed_with_item.item);
+
+            has_trailing_comma = false;
+            if !self.eat(TokenKind::Comma) {
+                break;
+            }
+            has_trailing_comma = true;
+
+            // Update the with item parsing to indicate that we're no longer
+            // parsing the first with item, but we haven't yet found the `)` to
+            // the corresponding ambiguous `(`.
+            state = WithItemParsingState::AmbiguousLparRest;
+        }
+
+        // Check if our assumption is incorrect and it's actually a parenthesized
+        // expression.
+        if self.at(TokenKind::Rpar) {
+            if self.peek() == TokenKind::Colon {
+                // Here, the parser is at a `)` followed by a `:`.
+                match items.as_slice() {
+                    // No with items, treat it as a parenthesized expression to
+                    // create an empty tuple expression.
+                    [] => with_item_kind = WithItemKind::ParenthesizedExpression,
+
+                    // If there's only one with item and it's a starred expression,
+                    // then it's only allowed if there's a trailing comma which makes
+                    // it a tuple expression. A bare starred expression is not allowed.
+                    // For example:
+                    //
+                    // ```python
+                    // # Syntax error
+                    // with (*item): ...
+                    //
+                    // # Tuple expression
+                    // with (*item,): ...
+                    // ```
+                    [item] if item.context_expr.is_starred_expr() => {
+                        if !has_trailing_comma {
+                            self.add_error(
+                                ParseErrorType::OtherError(
+                                    "cannot use starred expression here".to_string(),
+                                ),
+                                item.range(),
+                            );
+                        }
+                        with_item_kind = WithItemKind::ParenthesizedExpression;
+                    }
+
+                    // If there are multiple items, then our assumption is correct.
+                    // For example, `with (item1, item2): ...`
+                    _ => {}
+                }
+            } else {
+                // For any other token followed by `)`, if either of the items has
+                // an optional variables (`as ...`), then our assumption is correct.
+                // Otherwise, treat it as a parenthesized expression. For example:
+                //
+                // ```python
+                // with (item1, item2 as f): ...
+                // ```
+                //
+                // This also helps in raising the correct syntax error for the
+                // following case:
+                // ```python
+                // with (item1, item2 as f) as x: ...
+                // #                        ^^
+                // #                        Expecting `:` but got `as`
+                // ```
+                if items.iter().all(|item| item.optional_vars.is_none()) {
+                    with_item_kind = WithItemKind::ParenthesizedExpression;
+                }
+            }
+        }
+
+        // Transform the items if it's a parenthesized expression.
+        if with_item_kind.is_parenthesized_expression() {
+            // The generator expression has already consumed the `)`, so avoid
+            // expecting it again.
+            if with_item_kind != WithItemKind::SingleParenthesizedGeneratorExpression {
+                self.expect(TokenKind::Rpar);
+            }
+
+            let lhs = if items.len() == 1 && !has_trailing_comma {
+                // SAFETY: We've checked that `items` has only one item.
+                items.pop().unwrap().context_expr
+            } else {
+                Expr::Tuple(ast::ExprTuple {
+                    range: self.node_range(start),
+                    elts: items
+                        .drain(..)
+                        .map(|item| item.context_expr)
+                        .collect::<Vec<_>>(),
+                    ctx: ExprContext::Load,
+                    parenthesized: true,
+                })
+            };
+
+            // Remember that the expression is parenthesized and the parser has just
+            // consumed the `)` token. We need to check for any possible postfix
+            // expressions. For example:
+            //
+            // ```python
+            // with (foo)(): ...
+            // #         ^
+            //
+            // with (1, 2)[0]: ...
+            // #          ^
+            //
+            // with (foo.bar).baz: ...
+            // #             ^
+            // ```
+            //
+            // The reason being that the opening parenthesis is ambiguous and isn't
+            // considered when parsing the with item in the case. So, the parser
+            // stops when it sees the `)` token and doesn't check for any postfix
+            // expressions.
+            let context_expr = if self.is_current_token_postfix() {
+                self.parse_postfix_expression(lhs, start)
+            } else {
+                lhs
+            };
+
+            let optional_vars = self
+                .at(TokenKind::As)
+                .then(|| Box::new(self.parse_with_item_optional_vars().expr));
+
+            items.push(ast::WithItem {
+                range: self.node_range(start),
+                context_expr,
+                optional_vars,
+            });
+        }
+
+        with_item_kind
+    }
+
     /// Parses a single `with` item.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-with_item>
-    fn parse_with_item(&mut self) -> ParsedWithItem {
+    fn parse_with_item(&mut self, state: WithItemParsingState) -> ParsedWithItem {
         let start = self.node_start();
 
-        let context_expr = self.parse_conditional_expression_or_higher();
-        match context_expr.expr {
-            Expr::Starred(_) => {
-                self.add_error(
-                    ParseErrorType::OtherError("starred expression not allowed".into()),
-                    context_expr.range(),
-                );
+        let parsed_expr = self.parse_conditional_expression_or_higher();
+        let mut used_ambiguous_lpar = false;
+
+        // While parsing a with item after an ambiguous `(` token, we need to check
+        // for any additional expressions that can be parsed as the above parse function
+        // doesn't do that.
+        let context_expr = if state.is_ambiguous_lpar() {
+            match self.current_token_kind() {
+                // Named expressions can come at any position after the ambiguous `(` token.
+                // For example:
+                //
+                // ```python
+                // # Only item
+                // with (item := 10): ...
+                //
+                // # Multiple items
+                // with (item1, item2 := 10): ...
+                // ```
+                TokenKind::ColonEqual => {
+                    let named_expr = self.parse_named_expression(parsed_expr.expr, start);
+
+                    // For example: `with (item := 10 as foo): ...`
+                    if self.at(TokenKind::As) {
+                        self.add_error(
+                            ParseErrorType::OtherError(
+                                "unparenthesized named expression cannot be used here".to_string(),
+                            ),
+                            named_expr.range(),
+                        );
+                    }
+
+                    Expr::Named(named_expr).into()
+                }
+                TokenKind::Async | TokenKind::For => {
+                    let generator_expr =
+                        if let WithItemParsingState::AmbiguousLparFirstItem(lpar_start) = state {
+                            // The parser is at the first with item after the ambiguous `(` token.
+                            // For example:
+                            //
+                            // ```python
+                            // with (x for x in range(10)): ...
+                            // with (x for x in range(10)), item: ...
+                            // ```
+                            used_ambiguous_lpar = true;
+                            self.parse_generator_expression(parsed_expr.expr, lpar_start, true)
+                        } else {
+                            // For better error recovery. We would not take this path if the
+                            // expression was parenthesized as it would be parsed as a generator
+                            // expression by `parse_conditional_expression_or_higher`.
+                            //
+                            // ```python
+                            // # This path will be taken for
+                            // with (item, x for x in range(10)): ...
+                            //
+                            // # This path will not be taken for
+                            // with (item, (x for x in range(10))): ...
+                            // ```
+                            self.parse_generator_expression(parsed_expr.expr, start, false)
+                        };
+
+                    if !generator_expr.parenthesized {
+                        self.add_error(
+                            ParseErrorType::OtherError(
+                                "unparenthesized generator expression cannot be used here"
+                                    .to_string(),
+                            ),
+                            generator_expr.range(),
+                        );
+                    }
+
+                    Expr::Generator(generator_expr).into()
+                }
+                _ => parsed_expr,
             }
-            Expr::Named(_) if !context_expr.is_parenthesized => {
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "unparenthesized named expression not allowed".into(),
-                    ),
-                    context_expr.range(),
-                );
-            }
-            _ => {}
-        }
-
-        let optional_vars = if self.eat(TokenKind::As) {
-            let mut target = self.parse_conditional_expression_or_higher();
-
-            if !helpers::is_valid_assignment_target(&target.expr) {
-                self.add_error(ParseErrorType::InvalidAssignmentTarget, target.range());
-            }
-
-            helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
-
-            Some(Box::new(target.expr))
         } else {
-            None
+            parsed_expr
         };
+
+        let optional_vars = self
+            .at(TokenKind::As)
+            .then(|| Box::new(self.parse_with_item_optional_vars().expr));
 
         ParsedWithItem {
             is_parenthesized: context_expr.is_parenthesized,
+            used_ambiguous_lpar,
             item: ast::WithItem {
                 range: self.node_range(start),
                 context_expr: context_expr.expr,
                 optional_vars,
             },
         }
+    }
+
+    /// Parses the optional variables in a `with` item.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at an `as` token.
+    fn parse_with_item_optional_vars(&mut self) -> ParsedExpr {
+        self.bump(TokenKind::As);
+
+        let mut target = self.parse_conditional_expression_or_higher();
+
+        // This has the same semantics as an assignment target.
+        if !helpers::is_valid_assignment_target(&target.expr) {
+            self.add_error(ParseErrorType::InvalidAssignmentTarget, target.range());
+        }
+
+        helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
+
+        target
     }
 
     /// Parses a match statement.
@@ -1714,7 +1915,46 @@ impl Display for Clause {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WithItemParsingState {
+    /// The parser is currently parsing a with item without any ambiguity.
+    Regular,
+
+    /// The parser is currently parsing the first with item after an ambiguous
+    /// left parenthesis. The contained offset is the start of the left parenthesis.
+    ///
+    /// ```python
+    /// with (item1, item2): ...
+    /// ```
+    ///
+    /// The parser is at the start of `item1`.
+    AmbiguousLparFirstItem(TextSize),
+
+    /// The parser is currently parsing one of the with items after an ambiguous
+    /// left parenthesis, but not the first one.
+    ///
+    /// ```python
+    /// with (item1, item2, item3): ...
+    /// ```
+    ///
+    /// The parser could be at the start of `item2` or `item3`, but not `item1`.
+    AmbiguousLparRest,
+}
+
+impl WithItemParsingState {
+    const fn is_ambiguous_lpar(self) -> bool {
+        matches!(
+            self,
+            Self::AmbiguousLparFirstItem(_) | Self::AmbiguousLparRest
+        )
+    }
+}
+
 struct ParsedWithItem {
+    /// The contained with item.
     item: WithItem,
+    /// If the context expression of the item is parenthesized.
     is_parenthesized: bool,
+    /// If the parsing used the ambiguous left parenthesis.
+    used_ambiguous_lpar: bool,
 }

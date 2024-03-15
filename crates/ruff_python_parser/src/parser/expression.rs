@@ -413,7 +413,7 @@ impl<'src> Parser<'src> {
         lhs.into()
     }
 
-    fn parse_postfix_expression(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
+    pub(super) fn parse_postfix_expression(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
         loop {
             lhs = match self.current_token_kind() {
                 TokenKind::Lpar => Expr::Call(self.parse_call_expression(lhs, start)),
@@ -1410,7 +1410,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_generators(&mut self) -> Vec<ast::Comprehension> {
+    pub(super) fn parse_generators(&mut self) -> Vec<ast::Comprehension> {
         const GENERATOR_SET: TokenSet = TokenSet::new([TokenKind::For, TokenKind::Async]);
 
         let mut generators = vec![];
@@ -1425,7 +1425,7 @@ impl<'src> Parser<'src> {
     }
 
     /// See: <https://docs.python.org/3/reference/expressions.html#generator-expressions>
-    fn parse_generator_expression(
+    pub(super) fn parse_generator_expression(
         &mut self,
         element: Expr,
         start: TextSize,
@@ -1585,7 +1585,11 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `:=` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#assignment-expressions>
-    fn parse_named_expression(&mut self, mut target: Expr, start: TextSize) -> ast::ExprNamed {
+    pub(super) fn parse_named_expression(
+        &mut self,
+        mut target: Expr,
+        start: TextSize,
+    ) -> ast::ExprNamed {
         self.bump(TokenKind::ColonEqual);
 
         if !target.is_name_expr() {
