@@ -58,7 +58,6 @@ pub(crate) fn blocking_open_call(checker: &mut Checker, call: &ast::ExprCall) {
     }
 }
 
-
 /// Returns `true` if the expression resolves to a blocking open call, like `open` or `Path().open()`.
 fn is_open_call(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
@@ -66,13 +65,10 @@ fn is_open_call(func: &Expr, semantic: &SemanticModel) -> bool {
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["", "open"]
-                    | ["io", "open"]
-                    | ["io", "open_code"]
+                ["", "open"] | ["io", "open"] | ["io", "open_code"]
             )
         })
 }
-
 
 /// Returns `true` if an expression resolves to a call to `pathlib.Path.open`.
 fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -> bool {

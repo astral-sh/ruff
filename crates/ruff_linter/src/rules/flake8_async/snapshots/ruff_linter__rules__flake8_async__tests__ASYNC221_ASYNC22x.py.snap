@@ -1,0 +1,226 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+---
+ASYNC22x.py:13:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+12 | async def func():
+13 |     subprocess.run("foo")  # ASYNC221
+   |     ^^^^^^^^^^^^^^ ASYNC221
+   |
+
+ASYNC22x.py:17:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+16 | async def func():
+17 |     subprocess.call("foo")  # ASYNC221
+   |     ^^^^^^^^^^^^^^^ ASYNC221
+   |
+
+ASYNC22x.py:34:9: ASYNC221 Async functions should not run processes with blocking methods
+   |
+32 | async def foo():
+33 |     await async_fun(
+34 |         subprocess.getoutput()  # ASYNC221
+   |         ^^^^^^^^^^^^^^^^^^^^ ASYNC221
+35 |     )
+36 |     subprocess.Popen()  # ASYNC220
+   |
+
+ASYNC22x.py:37:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+35 |     )
+36 |     subprocess.Popen()  # ASYNC220
+37 |     os.system()  # ASYNC221
+   |     ^^^^^^^^^ ASYNC221
+38 | 
+39 |     system()
+   |
+
+ASYNC22x.py:43:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+41 |     os.anything()
+42 | 
+43 |     subprocess.run()  # ASYNC221
+   |     ^^^^^^^^^^^^^^ ASYNC221
+44 |     subprocess.call()  # ASYNC221
+45 |     subprocess.check_call()  # ASYNC221
+   |
+
+ASYNC22x.py:44:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+43 |     subprocess.run()  # ASYNC221
+44 |     subprocess.call()  # ASYNC221
+   |     ^^^^^^^^^^^^^^^ ASYNC221
+45 |     subprocess.check_call()  # ASYNC221
+46 |     subprocess.check_output()  # ASYNC221
+   |
+
+ASYNC22x.py:45:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+43 |     subprocess.run()  # ASYNC221
+44 |     subprocess.call()  # ASYNC221
+45 |     subprocess.check_call()  # ASYNC221
+   |     ^^^^^^^^^^^^^^^^^^^^^ ASYNC221
+46 |     subprocess.check_output()  # ASYNC221
+47 |     subprocess.getoutput()  # ASYNC221
+   |
+
+ASYNC22x.py:46:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+44 |     subprocess.call()  # ASYNC221
+45 |     subprocess.check_call()  # ASYNC221
+46 |     subprocess.check_output()  # ASYNC221
+   |     ^^^^^^^^^^^^^^^^^^^^^^^ ASYNC221
+47 |     subprocess.getoutput()  # ASYNC221
+48 |     subprocess.getstatusoutput()  # ASYNC221
+   |
+
+ASYNC22x.py:47:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+45 |     subprocess.check_call()  # ASYNC221
+46 |     subprocess.check_output()  # ASYNC221
+47 |     subprocess.getoutput()  # ASYNC221
+   |     ^^^^^^^^^^^^^^^^^^^^ ASYNC221
+48 |     subprocess.getstatusoutput()  # ASYNC221
+   |
+
+ASYNC22x.py:48:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+46 |     subprocess.check_output()  # ASYNC221
+47 |     subprocess.getoutput()  # ASYNC221
+48 |     subprocess.getstatusoutput()  # ASYNC221
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ ASYNC221
+49 | 
+50 |     await async_fun(
+   |
+
+ASYNC22x.py:51:9: ASYNC221 Async functions should not run processes with blocking methods
+   |
+50 |     await async_fun(
+51 |         subprocess.getoutput()  # ASYNC221
+   |         ^^^^^^^^^^^^^^^^^^^^ ASYNC221
+52 |     )
+   |
+
+ASYNC22x.py:59:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+57 |     subprocess()
+58 | 
+59 |     os.posix_spawn()  # ASYNC221
+   |     ^^^^^^^^^^^^^^ ASYNC221
+60 |     os.posix_spawnp()  # ASYNC221
+   |
+
+ASYNC22x.py:60:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+59 |     os.posix_spawn()  # ASYNC221
+60 |     os.posix_spawnp()  # ASYNC221
+   |     ^^^^^^^^^^^^^^^ ASYNC221
+61 | 
+62 |     os.spawn()
+   |
+
+ASYNC22x.py:66:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+64 |     os.spawnllll()
+65 | 
+66 |     os.spawnl()  # ASYNC221
+   |     ^^^^^^^^^ ASYNC221
+67 |     os.spawnle()  # ASYNC221
+68 |     os.spawnlp()  # ASYNC221
+   |
+
+ASYNC22x.py:67:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+66 |     os.spawnl()  # ASYNC221
+67 |     os.spawnle()  # ASYNC221
+   |     ^^^^^^^^^^ ASYNC221
+68 |     os.spawnlp()  # ASYNC221
+69 |     os.spawnlpe()  # ASYNC221
+   |
+
+ASYNC22x.py:68:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+66 |     os.spawnl()  # ASYNC221
+67 |     os.spawnle()  # ASYNC221
+68 |     os.spawnlp()  # ASYNC221
+   |     ^^^^^^^^^^ ASYNC221
+69 |     os.spawnlpe()  # ASYNC221
+70 |     os.spawnv()  # ASYNC221
+   |
+
+ASYNC22x.py:69:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+67 |     os.spawnle()  # ASYNC221
+68 |     os.spawnlp()  # ASYNC221
+69 |     os.spawnlpe()  # ASYNC221
+   |     ^^^^^^^^^^^ ASYNC221
+70 |     os.spawnv()  # ASYNC221
+71 |     os.spawnve()  # ASYNC221
+   |
+
+ASYNC22x.py:70:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+68 |     os.spawnlp()  # ASYNC221
+69 |     os.spawnlpe()  # ASYNC221
+70 |     os.spawnv()  # ASYNC221
+   |     ^^^^^^^^^ ASYNC221
+71 |     os.spawnve()  # ASYNC221
+72 |     os.spawnvp()  # ASYNC221
+   |
+
+ASYNC22x.py:71:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+69 |     os.spawnlpe()  # ASYNC221
+70 |     os.spawnv()  # ASYNC221
+71 |     os.spawnve()  # ASYNC221
+   |     ^^^^^^^^^^ ASYNC221
+72 |     os.spawnvp()  # ASYNC221
+73 |     os.spawnvpe()  # ASYNC221
+   |
+
+ASYNC22x.py:72:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+70 |     os.spawnv()  # ASYNC221
+71 |     os.spawnve()  # ASYNC221
+72 |     os.spawnvp()  # ASYNC221
+   |     ^^^^^^^^^^ ASYNC221
+73 |     os.spawnvpe()  # ASYNC221
+   |
+
+ASYNC22x.py:73:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+71 |     os.spawnve()  # ASYNC221
+72 |     os.spawnvp()  # ASYNC221
+73 |     os.spawnvpe()  # ASYNC221
+   |     ^^^^^^^^^^^ ASYNC221
+74 | 
+75 |     P_NOWAIT = os.P_NOWAIT
+   |
+
+ASYNC22x.py:86:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+85 |     # if it is P_WAIT, ASYNC221
+86 |     os.spawnl(P_WAIT)  # ASYNC221
+   |     ^^^^^^^^^ ASYNC221
+87 |     os.spawnl(mode=os.P_WAIT)  # ASYNC221
+88 |     os.spawnl(mode=P_WAIT)  # ASYNC221
+   |
+
+ASYNC22x.py:87:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+85 |     # if it is P_WAIT, ASYNC221
+86 |     os.spawnl(P_WAIT)  # ASYNC221
+87 |     os.spawnl(mode=os.P_WAIT)  # ASYNC221
+   |     ^^^^^^^^^ ASYNC221
+88 |     os.spawnl(mode=P_WAIT)  # ASYNC221
+   |
+
+ASYNC22x.py:88:5: ASYNC221 Async functions should not run processes with blocking methods
+   |
+86 |     os.spawnl(P_WAIT)  # ASYNC221
+87 |     os.spawnl(mode=os.P_WAIT)  # ASYNC221
+88 |     os.spawnl(mode=P_WAIT)  # ASYNC221
+   |     ^^^^^^^^^ ASYNC221
+89 | 
+90 |     # other weird cases: ASYNC220
+   |
