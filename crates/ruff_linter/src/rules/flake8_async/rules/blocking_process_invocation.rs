@@ -94,6 +94,7 @@ impl Violation for RunProcessInAsyncFunction {
 /// def wait_for_process():
 ///     os.waitpid(0)
 ///
+///
 /// async def foo():
 ///     await asyncio.loop.run_in_executor(None, wait_for_process)
 /// ```
@@ -115,8 +116,7 @@ pub(crate) fn blocking_process_invocation(checker: &mut Checker, call: &ast::Exp
 
     if checker.enabled(Rule::CreateSubprocessInAsyncFunction) {
         if is_subprocess_call(&call.func, checker.semantic())
-            || (is_os_spawn(&call.func, checker.semantic())
-                && !is_p_wait(&call, checker.semantic()))
+            || (is_os_spawn(&call.func, checker.semantic()) && !is_p_wait(call, checker.semantic()))
         {
             checker.diagnostics.push(Diagnostic::new(
                 CreateSubprocessInAsyncFunction,
@@ -127,7 +127,7 @@ pub(crate) fn blocking_process_invocation(checker: &mut Checker, call: &ast::Exp
 
     if checker.enabled(Rule::RunProcessInAsyncFunction) {
         if is_run_process_call(&call.func, checker.semantic())
-            || (is_os_spawn(&call.func, checker.semantic()) && is_p_wait(&call, checker.semantic()))
+            || (is_os_spawn(&call.func, checker.semantic()) && is_p_wait(call, checker.semantic()))
         {
             checker.diagnostics.push(Diagnostic::new(
                 RunProcessInAsyncFunction,
@@ -202,9 +202,7 @@ fn is_run_process_call(func: &Expr, semantic: &SemanticModel) -> bool {
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["os", "system"]
-                    | ["os", "posix_spawn"]
-                    | ["os", "posix_spawnp"]
+                ["os", "system" | "posix_spawn" | "posix_spawnp"]
                     | [
                         "subprocess",
                         "run"
