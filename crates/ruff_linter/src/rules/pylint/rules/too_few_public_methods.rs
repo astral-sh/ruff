@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for classes that only have a public `__init__` method,
-/// as well as 0 base classes, and 0 decorators.
+/// without base classes and 0 decorators.
 ///
 /// ## Why is this bad?
 /// Classes with just an `__init__` are possibly better off
