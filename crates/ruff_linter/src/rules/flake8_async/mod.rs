@@ -20,8 +20,9 @@ mod tests {
     #[test_case(Rule::TrioUnneededSleep, Path::new("ASYNC110.py"))]
     #[test_case(Rule::TrioZeroSleepCall, Path::new("ASYNC115.py"))]
     #[test_case(Rule::BlockingHttpCallInAsyncFunction, Path::new("ASYNC210.py"))]
-    #[test_case(Rule::OpenSleepOrSubprocessInAsyncFunction, Path::new("ASYNC220.py"))]
-    #[test_case(Rule::BlockingOsCallInAsyncFunction, Path::new("ASYNC222.py"))]
+    #[test_case(Rule::CreateSubprocessInAsyncFunction, Path::new("ASYNC22x.py"))]
+    #[test_case(Rule::RunProcessInAsyncFunction, Path::new("ASYNC22x.py"))]
+    #[test_case(Rule::WaitForProcessInAsyncFunction, Path::new("ASYNC22x.py"))]
     #[test_case(Rule::BlockinOpenCallInAsyncFunction, Path::new("ASYNC230.py"))]
     #[test_case(Rule::SleepForeverCall, Path::new("ASYNC116.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {

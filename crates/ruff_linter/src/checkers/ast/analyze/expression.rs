@@ -505,14 +505,15 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::BlockingHttpCallInAsyncFunction) {
                 flake8_async::rules::blocking_http_call(checker, call);
             }
-            if checker.enabled(Rule::OpenSleepOrSubprocessInAsyncFunction) {
-                flake8_async::rules::open_sleep_or_subprocess_call(checker, call);
-            }
-            if checker.enabled(Rule::BlockingOsCallInAsyncFunction) {
-                flake8_async::rules::blocking_os_call(checker, call);
-            }
             if checker.enabled(Rule::BlockinOpenCallInAsyncFunction) {
                 flake8_async::rules::blocking_open_call(checker, call);
+            }
+            if checker.any_enabled(&[
+                Rule::CreateSubprocessInAsyncFunction,
+                Rule::RunProcessInAsyncFunction,
+                Rule::WaitForProcessInAsyncFunction,
+            ]) {
+                flake8_async::rules::blocking_process_invocation(checker, call);
             }
             if checker.enabled(Rule::SleepForeverCall) {
                 flake8_async::rules::sleep_forever_call(checker, call);

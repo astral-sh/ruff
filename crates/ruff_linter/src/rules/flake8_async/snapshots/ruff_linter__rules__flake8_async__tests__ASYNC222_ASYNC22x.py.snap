@@ -1,0 +1,71 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+---
+ASYNC22x.py:9:5: ASYNC222 Async functions should not wait on processes with blocking methods
+  |
+8 | async def func():
+9 |     time.sleep(1)  # ASYNC222
+  |     ^^^^^^^^^^ ASYNC222
+  |
+
+ASYNC22x.py:25:5: ASYNC222 Async functions should not wait on processes with blocking methods
+   |
+24 | async def func():
+25 |     os.wait4(10)  # ASYNC222
+   |     ^^^^^^^^ ASYNC222
+   |
+
+ASYNC22x.py:29:5: ASYNC222 Async functions should not wait on processes with blocking methods
+   |
+28 | async def func():
+29 |     os.wait(12)  # ASYNC222
+   |     ^^^^^^^ ASYNC222
+   |
+
+ASYNC22x.py:96:5: ASYNC222 Async functions should not wait on processes with blocking methods
+   |
+95 |     # ASYNC222
+96 |     os.wait()  # ASYNC222
+   |     ^^^^^^^ ASYNC222
+97 |     os.wait3()  # ASYNC222
+98 |     os.wait4()  # ASYNC222
+   |
+
+ASYNC22x.py:97:5: ASYNC222 Async functions should not wait on processes with blocking methods
+   |
+95 |     # ASYNC222
+96 |     os.wait()  # ASYNC222
+97 |     os.wait3()  # ASYNC222
+   |     ^^^^^^^^ ASYNC222
+98 |     os.wait4()  # ASYNC222
+99 |     os.waitid()  # ASYNC222
+   |
+
+ASYNC22x.py:98:5: ASYNC222 Async functions should not wait on processes with blocking methods
+    |
+ 96 |     os.wait()  # ASYNC222
+ 97 |     os.wait3()  # ASYNC222
+ 98 |     os.wait4()  # ASYNC222
+    |     ^^^^^^^^ ASYNC222
+ 99 |     os.waitid()  # ASYNC222
+100 |     os.waitpid()  # ASYNC222
+    |
+
+ASYNC22x.py:99:5: ASYNC222 Async functions should not wait on processes with blocking methods
+    |
+ 97 |     os.wait3()  # ASYNC222
+ 98 |     os.wait4()  # ASYNC222
+ 99 |     os.waitid()  # ASYNC222
+    |     ^^^^^^^^^ ASYNC222
+100 |     os.waitpid()  # ASYNC222
+    |
+
+ASYNC22x.py:100:5: ASYNC222 Async functions should not wait on processes with blocking methods
+    |
+ 98 |     os.wait4()  # ASYNC222
+ 99 |     os.waitid()  # ASYNC222
+100 |     os.waitpid()  # ASYNC222
+    |     ^^^^^^^^^^ ASYNC222
+101 | 
+102 |     os.waitpi()
+    |
