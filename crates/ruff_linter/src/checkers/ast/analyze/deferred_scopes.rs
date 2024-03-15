@@ -43,6 +43,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::UnusedStaticMethodArgument,
         Rule::UnusedVariable,
         Rule::SingledispatchMethod,
+        Rule::SingledispatchmethodFunction,
     ]) {
         return;
     }
@@ -401,6 +402,10 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
             if checker.enabled(Rule::SingledispatchMethod) {
                 pylint::rules::singledispatch_method(checker, scope, &mut diagnostics);
+            }
+
+            if checker.enabled(Rule::SingledispatchmethodFunction) {
+                pylint::rules::singledispatchmethod_function(checker, scope, &mut diagnostics);
             }
 
             if checker.any_enabled(&[
