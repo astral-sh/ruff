@@ -45,7 +45,13 @@ impl Server {
             .workspace_folders
             .map(|folders| folders.into_iter().map(|folder| folder.uri).collect())
             .or_else(|| init_params.root_uri.map(|u| vec![u]))
-            .unwrap_or_default();
+            .or_else(|| {
+                tracing::debug!("No root URI or workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
+                Some(vec![types::Url::from_file_path(std::env::current_dir().ok()?).ok()?])
+            })
+            .ok_or_else(|| {
+                anyhow::anyhow!("Failed to get the current working directory while creating a default workspace.")
+            })?;
 
         let initialize_data = serde_json::json!({
             "capabilities": server_capabilities,
