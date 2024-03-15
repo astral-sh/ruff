@@ -114,21 +114,18 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &ast::Stmt) {
                     })
             };
 
-            if let Some(stmt_return) = next_stmt {
-                stmt_return_body = vec![ast::Stmt::Return(ast::StmtReturn {
-                    value: stmt_return.value.clone(),
-                    range: stmt_return.range,
-                })];
+            let Some(stmt_return) = next_stmt else { return };
+            stmt_return_body = vec![ast::Stmt::Return(ast::StmtReturn {
+                value: stmt_return.value.clone(),
+                range: stmt_return.range,
+            })];
 
-                (
-                    if_test.as_ref(),
-                    if_body,
-                    &stmt_return_body,
-                    TextRange::new(stmt_if.range().start(), stmt_return.range.end()),
-                )
-            } else {
-                return;
-            }
+            (
+                if_test.as_ref(),
+                if_body,
+                &stmt_return_body,
+                TextRange::new(stmt_if.range().start(), stmt_return.range.end()),
+            )
         }
         _ => return,
     };
