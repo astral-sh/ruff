@@ -75,31 +75,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &ast::Stmt) {
         range: _,
     } = stmt_if;
 
-    let next_stmt = {
-        if checker.settings.preview.is_enabled() {
-            // Get the next statement after the if statement.
-            checker
-                .semantic()
-                .current_statement_parent()
-                // Get the parent of the if statement.
-                .and_then(|parent| traversal::suite(stmt, parent))
-                // Get the next sibling of the if statement.
-                .and_then(|suite| traversal::next_sibling(stmt, suite))
-                .and_then(|stmt| match stmt {
-                    ast::Stmt::Return(stmt_return) => Some(stmt_return),
-                    _ => None,
-                })
-        } else {
-            None
-        }
-    };
-
-    let stmt_return_body = next_stmt.map(|stmt| {
-        vec![ast::Stmt::Return(ast::StmtReturn {
-            value: stmt.value.clone(),
-            range: stmt.range,
-        })]
-    });
+    let stmt_return_body;
 
     let (if_test, if_body, else_body, range) = match elif_else_clauses.as_slice() {
         // if-else case
@@ -124,15 +100,39 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &ast::Stmt) {
             TextRange::new(elif_range.start(), else_range.end()),
         ),
         // if-implicit-else case
-        [] => match next_stmt {
-            Some(ast::StmtReturn { range, .. }) => (
-                if_test.as_ref(),
-                if_body,
-                stmt_return_body.as_ref().unwrap(),
-                TextRange::new(stmt_if.range().start(), range.end()),
-            ),
-            _ => return,
-        },
+        [] if checker.settings.preview.is_enabled() => {
+            let next_stmt = {
+                // Get the next statement after the if statement.
+                checker
+                    .semantic()
+                    .current_statement_parent()
+                    // Get the parent of the if statement.
+                    .and_then(|parent| traversal::suite(stmt, parent))
+                    // Get the next sibling of the if statement.
+                    .and_then(|suite| traversal::next_sibling(stmt, suite))
+                    .and_then(|stmt| match stmt {
+                        ast::Stmt::Return(stmt_return) => Some(stmt_return),
+                        _ => None,
+                    })
+            };
+
+            stmt_return_body = next_stmt.map(|stmt| {
+                vec![ast::Stmt::Return(ast::StmtReturn {
+                    value: stmt.value.clone(),
+                    range: stmt.range,
+                })]
+            });
+
+            match next_stmt {
+                Some(ast::StmtReturn { range, .. }) => (
+                    if_test.as_ref(),
+                    if_body,
+                    stmt_return_body.as_ref().unwrap(),
+                    TextRange::new(stmt_if.range().start(), range.end()),
+                ),
+                _ => return,
+            }
+        }
         _ => return,
     };
 
