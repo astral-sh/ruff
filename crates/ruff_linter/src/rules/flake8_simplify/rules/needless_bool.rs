@@ -66,16 +66,17 @@ pub(crate) fn needless_bool(checker: &mut Checker, body: &[Stmt]) {
     let mut iter = body.iter().peekable();
 
     while let Some(stmt) = iter.next() {
-        match stmt {
-            ast::Stmt::If(stmt_if) => {
-                let stmt_return = match iter.peek() {
-                    Some(ast::Stmt::Return(stmt_return)) => Some(stmt_return),
-                    _ => None,
-                };
+        // Find all if statements and optionally the next return statement.
+        if let ast::Stmt::If(stmt_if) = stmt {
+            let stmt_return = iter.peek().and_then(|next_stmt| {
+                if let ast::Stmt::Return(stmt_return) = next_stmt {
+                    Some(stmt_return)
+                } else {
+                    None
+                }
+            });
 
-                check_needless_bool(checker, stmt_if, stmt_return);
-            }
-            _ => continue,
+            check_needless_bool(checker, stmt_if, stmt_return);
         }
     }
 }
