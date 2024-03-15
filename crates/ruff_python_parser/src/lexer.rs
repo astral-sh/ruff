@@ -29,7 +29,7 @@
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 
 use std::iter::FusedIterator;
-use std::{borrow::Cow, char, cmp::Ordering, str::FromStr};
+use std::{char, cmp::Ordering, str::FromStr};
 
 use unicode_ident::{is_xid_continue, is_xid_start};
 use unicode_normalization::UnicodeNormalization;
@@ -170,7 +170,7 @@ impl<'source> Lexer<'source> {
     }
 
     /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
-    fn lex_identifier(&mut self, first: char) -> Result<Tok, LexicalError> {
+    fn lex_identifier(&mut self, first: char, ascii_first_char: bool) -> Result<Tok, LexicalError> {
         // Detect potential string like rb'' b'' f'' u'' r''
         match (first, self.cursor.first()) {
             ('f' | 'F', quote @ ('\'' | '"')) => {
@@ -198,7 +198,7 @@ impl<'source> Lexer<'source> {
             _ => {}
         }
 
-        let mut is_ascii = first.is_ascii();
+        let mut is_ascii = ascii_first_char;
 
         loop {
             let c = self.cursor.first();
@@ -220,15 +220,7 @@ impl<'source> Lexer<'source> {
             self.cursor.bump();
         }
 
-        let text = {
-            if is_ascii {
-                Cow::Borrowed(self.token_text())
-            } else {
-                Cow::Owned(self.token_text().nfkc().collect())
-            }
-        };
-
-        let keyword = match &*text {
+        let keyword = match self.token_text() {
             "False" => Tok::False,
             "None" => Tok::None,
             "True" => Tok::True,
@@ -267,10 +259,15 @@ impl<'source> Lexer<'source> {
             "while" => Tok::While,
             "with" => Tok::With,
             "yield" => Tok::Yield,
-            _ => {
+            text => {
+                let name = if is_ascii {
+                    text.to_string()
+                } else {
+                    text.nfkc().collect()
+                };
                 return Ok(Tok::Name {
-                    name: text.to_string().into_boxed_str(),
-                })
+                    name: name.into_boxed_str(),
+                });
             }
         };
 
@@ -933,7 +930,7 @@ impl<'source> Lexer<'source> {
             if c.is_ascii() {
                 self.consume_ascii_character(c)
             } else if is_unicode_identifier_start(c) {
-                let identifier = self.lex_identifier(c)?;
+                let identifier = self.lex_identifier(c, false)?;
                 self.state = State::Other;
 
                 Ok((identifier, self.token_range()))
@@ -1093,7 +1090,7 @@ impl<'source> Lexer<'source> {
     // Dispatch based on the given character.
     fn consume_ascii_character(&mut self, c: char) -> Result<Spanned, LexicalError> {
         let token = match c {
-            c if is_ascii_identifier_start(c) => self.lex_identifier(c)?,
+            c if is_ascii_identifier_start(c) => self.lex_identifier(c, true)?,
             '0'..='9' => self.lex_number(c)?,
             '#' => return Ok((self.lex_comment(), self.token_range())),
             '\'' | '"' => self.lex_string(None, c)?,
