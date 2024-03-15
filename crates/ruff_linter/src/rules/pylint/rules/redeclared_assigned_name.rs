@@ -57,8 +57,8 @@ fn check_expr(checker: &mut Checker, expr: &Expr, names: &mut Vec<String>) {
             }
         }
         Expr::Name(ast::ExprName { id, .. }) => {
-            if *id == "_" {
-                // Ignore `_` assignments
+            if checker.settings.dummy_variable_rgx.is_match(id) {
+                // Ignore dummy variable assignments
                 return;
             }
             if names.contains(id) {
