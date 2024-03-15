@@ -39,7 +39,7 @@ impl Violation for OpenSleepOrSubprocessInAsyncFunction {
     }
 }
 
-/// ASYNC101
+/// ASYNC220
 pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, call: &ast::ExprCall) {
     if !checker.semantic().in_async_context() {
         return;

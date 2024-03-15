@@ -41,7 +41,7 @@ impl Violation for BlockingOsCallInAsyncFunction {
     }
 }
 
-/// ASYNC102
+/// ASYNC222
 pub(crate) fn blocking_os_call(checker: &mut Checker, call: &ExprCall) {
     if checker.semantic().seen_module(Modules::OS) {
         if checker.semantic().in_async_context() {
