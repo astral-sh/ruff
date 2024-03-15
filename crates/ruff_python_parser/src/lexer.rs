@@ -199,26 +199,8 @@ impl<'source> Lexer<'source> {
         }
 
         let mut is_ascii = ascii_first_char;
-
-        loop {
-            let c = self.cursor.first();
-            // Arrange things such that ASCII codepoints never
-            // result in the slower `is_xid_continue` getting called.
-            if c.is_ascii() {
-                if !matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9') {
-                    break;
-                }
-            } else {
-                if !is_xid_continue(c) {
-                    break;
-                }
-                is_ascii = false;
-            }
-            if self.cursor.is_eof() {
-                break;
-            }
-            self.cursor.bump();
-        }
+        self.cursor
+            .eat_while(|c| is_identifier_continuation(c, &mut is_ascii));
 
         let keyword = match self.token_text() {
             "False" => Tok::False,
@@ -1605,6 +1587,19 @@ const fn is_ascii_identifier_start(c: char) -> bool {
 // in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
 fn is_unicode_identifier_start(c: char) -> bool {
     is_xid_start(c)
+}
+
+// Checks if the character c is a valid continuation character as described
+// in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
+fn is_identifier_continuation(c: char, ascii_only_identifier: &mut bool) -> bool {
+    // Arrange things such that ASCII codepoints never
+    // result in the slower `is_xid_continue` getting called.
+    if c.is_ascii() {
+        matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')
+    } else {
+        *ascii_only_identifier = false;
+        is_xid_continue(c)
+    }
 }
 
 /// Returns `true` for [whitespace](https://docs.python.org/3/reference/lexical_analysis.html#whitespace-between-tokens)
