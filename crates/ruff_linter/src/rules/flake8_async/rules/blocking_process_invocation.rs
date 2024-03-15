@@ -115,7 +115,8 @@ pub(crate) fn blocking_process_invocation(checker: &mut Checker, call: &ast::Exp
 
     if checker.enabled(Rule::CreateSubprocessInAsyncFunction) {
         if is_subprocess_call(&call.func, checker.semantic())
-            || (is_os_spawn(&call.func, checker.semantic()) && !is_p_wait(&call, checker.semantic()))
+            || (is_os_spawn(&call.func, checker.semantic())
+                && !is_p_wait(&call, checker.semantic()))
         {
             checker.diagnostics.push(Diagnostic::new(
                 CreateSubprocessInAsyncFunction,
