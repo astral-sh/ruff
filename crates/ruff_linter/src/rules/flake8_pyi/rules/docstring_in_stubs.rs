@@ -22,8 +22,7 @@ use crate::checkers::ast::Checker;
 ///
 /// Use instead:
 /// ```python
-/// def func(param: int) -> str:
-///     ...
+/// def func(param: int) -> str: ...
 /// ```
 #[violation]
 pub struct DocstringInStub;
