@@ -23,7 +23,7 @@ mod tests {
     #[test_case(Rule::CreateSubprocessInAsyncFunction, Path::new("ASYNC22x.py"))]
     #[test_case(Rule::RunProcessInAsyncFunction, Path::new("ASYNC22x.py"))]
     #[test_case(Rule::WaitForProcessInAsyncFunction, Path::new("ASYNC22x.py"))]
-    #[test_case(Rule::BlockinOpenCallInAsyncFunction, Path::new("ASYNC230.py"))]
+    #[test_case(Rule::BlockingOpenCallInAsyncFunction, Path::new("ASYNC230.py"))]
     #[test_case(Rule::SleepForeverCall, Path::new("ASYNC116.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

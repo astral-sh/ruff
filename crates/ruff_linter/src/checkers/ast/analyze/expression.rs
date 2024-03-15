@@ -505,7 +505,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::BlockingHttpCallInAsyncFunction) {
                 flake8_async::rules::blocking_http_call(checker, call);
             }
-            if checker.enabled(Rule::BlockinOpenCallInAsyncFunction) {
+            if checker.enabled(Rule::BlockingOpenCallInAsyncFunction) {
                 flake8_async::rules::blocking_open_call(checker, call);
             }
             if checker.any_enabled(&[
