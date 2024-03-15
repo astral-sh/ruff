@@ -1,7 +1,7 @@
+pub(crate) use async_function_with_timeout::*;
 pub(crate) use blocking_http_call::*;
 pub(crate) use blocking_os_call::*;
 pub(crate) use open_sleep_or_subprocess_call::*;
-pub(crate) use async_function_with_timeout::*;
 pub(crate) use sync_call::*;
 pub(crate) use timeout_without_await::*;
 pub(crate) use unneeded_sleep::*;
