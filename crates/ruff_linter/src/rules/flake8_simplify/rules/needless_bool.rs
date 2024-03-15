@@ -64,10 +64,7 @@ impl Violation for NeedlessBool {
 
 /// SIM103
 pub(crate) fn needless_bool(checker: &mut Checker, stmt: &ast::Stmt) {
-    let stmt_if = match stmt {
-        ast::Stmt::If(stmt_if) => stmt_if,
-        _ => return,
-    };
+    let ast::Stmt::If(stmt_if) = stmt else { return };
     let ast::StmtIf {
         test: if_test,
         body: if_body,
