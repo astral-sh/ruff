@@ -170,7 +170,11 @@ impl<'source> Lexer<'source> {
     }
 
     /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
-    fn lex_identifier(&mut self, first: char, ascii_first_char: bool) -> Result<Tok, LexicalError> {
+    fn lex_identifier(
+        &mut self,
+        first: char,
+        first_char_is_ascii: bool,
+    ) -> Result<Tok, LexicalError> {
         // Detect potential string like rb'' b'' f'' u'' r''
         match (first, self.cursor.first()) {
             ('f' | 'F', quote @ ('\'' | '"')) => {
@@ -198,7 +202,14 @@ impl<'source> Lexer<'source> {
             _ => {}
         }
 
-        let mut is_ascii = ascii_first_char;
+        // Keep track of whether the identifier is ASCII-only or not.
+        //
+        // This is important because Python applies NFKC normalization to
+        // identifiers: https://docs.python.org/3/reference/lexical_analysis.html#identifiers.
+        // We need to therefore do the same in our lexer, but applying NFKC normalization
+        // unconditionally is extremely expensive. If we know an identifier is ASCII-only,
+        // (by far the most common case), we can skip NFKC normalization of the identifier.
+        let mut is_ascii = first_char_is_ascii;
         self.cursor
             .eat_while(|c| is_identifier_continuation(c, &mut is_ascii));
 
@@ -1589,15 +1600,19 @@ fn is_unicode_identifier_start(c: char) -> bool {
     is_xid_start(c)
 }
 
-// Checks if the character c is a valid continuation character as described
-// in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
-fn is_identifier_continuation(c: char, ascii_only_identifier: &mut bool) -> bool {
+/// Checks if the character c is a valid continuation character as described
+/// in <https://docs.python.org/3/reference/lexical_analysis.html#identifiers>.
+///
+/// Additionally, this function also keeps track of whether or not the total
+/// identifier is ASCII-only or not by mutably altering a reference to a
+/// boolean value passed in.
+fn is_identifier_continuation(c: char, identifier_is_ascii_only: &mut bool) -> bool {
     // Arrange things such that ASCII codepoints never
     // result in the slower `is_xid_continue` getting called.
     if c.is_ascii() {
         matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')
     } else {
-        *ascii_only_identifier = false;
+        *identifier_is_ascii_only = false;
         is_xid_continue(c)
     }
 }
