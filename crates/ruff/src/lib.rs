@@ -206,13 +206,8 @@ fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitS
 
 #[allow(clippy::needless_pass_by_value)] // TODO: remove once we start taking arguments from here
 fn server(args: ServerCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    const DEFAULT_THREADS: usize = 4;
     let ServerCommand { preview, threads } = args;
-    commands::server::run_server(
-        preview,
-        threads.map_or(DEFAULT_THREADS, usize::from),
-        log_level,
-    )
+    commands::server::run_server(preview, usize::from(threads), log_level)
 }
 
 pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {

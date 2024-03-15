@@ -502,9 +502,9 @@ pub struct ServerCommand {
     /// Enable preview mode; required for regular operation
     #[arg(long)]
     pub(crate) preview: bool,
-    /// Set the number of background threads used for running tasks concurrently - default is 4.
-    #[arg(long)]
-    pub(crate) threads: Option<NonZeroUsize>,
+    /// Set the number of background threads used for running tasks concurrently - the default is 4.
+    #[arg(long, default_value = "4")]
+    pub(crate) threads: NonZeroUsize,
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
