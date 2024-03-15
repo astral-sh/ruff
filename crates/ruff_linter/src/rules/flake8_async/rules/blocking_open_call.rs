@@ -31,7 +31,7 @@ use crate::checkers::ast::Checker;
 ///
 /// async def foo():
 ///     async with await anyio.open_file("bar.txt") as f:
-///        contents = await f.read()
+///         contents = await f.read()
 /// ```
 #[violation]
 pub struct BlockingOpenCallInAsyncFunction;
