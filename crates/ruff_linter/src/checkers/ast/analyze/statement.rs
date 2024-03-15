@@ -1078,9 +1078,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::IfWithSameArms) {
                 flake8_simplify::rules::if_with_same_arms(checker, if_);
             }
-            // if checker.enabled(Rule::NeedlessBool) {
-            //     flake8_simplify::rules::needless_bool(checker, if_);
-            // }
             if checker.enabled(Rule::IfElseBlockInsteadOfDictLookup) {
                 flake8_simplify::rules::if_else_block_instead_of_dict_lookup(checker, if_);
             }
