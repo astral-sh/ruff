@@ -1,5 +1,5 @@
 ---
-source: crates/ruff_linter/src/rules/flake8_trio/mod.rs
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
 ---
 ASYNC105.py:30:5: ASYNC105 [*] Call to `trio.aclose_forcefully` is not immediately awaited
    |

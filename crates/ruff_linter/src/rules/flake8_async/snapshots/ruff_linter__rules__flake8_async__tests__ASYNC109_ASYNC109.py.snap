@@ -1,5 +1,5 @@
 ---
-source: crates/ruff_linter/src/rules/flake8_trio/mod.rs
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
 ---
 ASYNC109.py:8:16: ASYNC109 Prefer `trio.fail_after` and `trio.move_on_after` over manual `async` timeout behavior
   |

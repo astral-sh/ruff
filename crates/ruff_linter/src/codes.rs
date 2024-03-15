@@ -292,11 +292,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W3301") => (RuleGroup::Stable, rules::pylint::rules::NestedMinMax),
 
         // flake8-async
-        (Flake8Async, "100") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioTimeoutWithoutAwait),
-        (Flake8Async, "105") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioSyncCall),
-        (Flake8Async, "109") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioAsyncFunctionWithTimeout),
-        (Flake8Async, "110") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioUnneededSleep),
-        (Flake8Async, "115") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioZeroSleepCall),
+        (Flake8Async, "100") => (RuleGroup::Stable, rules::flake8_async::rules::TrioTimeoutWithoutAwait),
+        (Flake8Async, "105") => (RuleGroup::Stable, rules::flake8_async::rules::TrioSyncCall),
+        (Flake8Async, "109") => (RuleGroup::Stable, rules::flake8_async::rules::TrioAsyncFunctionWithTimeout),
+        (Flake8Async, "110") => (RuleGroup::Stable, rules::flake8_async::rules::TrioUnneededSleep),
+        (Flake8Async, "115") => (RuleGroup::Stable, rules::flake8_async::rules::TrioZeroSleepCall),
         (Flake8Async, "116") => (RuleGroup::Preview, rules::flake8_async::rules::SleepForeverCall),
         (Flake8Async, "210") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingHttpCallInAsyncFunction),
         (Flake8Async, "220") => (RuleGroup::Stable, rules::flake8_async::rules::OpenSleepOrSubprocessInAsyncFunction),
