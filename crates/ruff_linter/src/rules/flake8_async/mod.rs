@@ -13,9 +13,9 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
-    #[test_case(Rule::BlockingHttpCallInAsyncFunction, Path::new("ASYNC100.py"))]
-    #[test_case(Rule::OpenSleepOrSubprocessInAsyncFunction, Path::new("ASYNC101.py"))]
-    #[test_case(Rule::BlockingOsCallInAsyncFunction, Path::new("ASYNC102.py"))]
+    #[test_case(Rule::BlockingHttpCallInAsyncFunction, Path::new("ASYNC210.py"))]
+    #[test_case(Rule::OpenSleepOrSubprocessInAsyncFunction, Path::new("ASYNC220.py"))]
+    #[test_case(Rule::BlockingOsCallInAsyncFunction, Path::new("ASYNC222.py"))]
     #[test_case(Rule::SleepForeverCall, Path::new("ASYNC116.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
