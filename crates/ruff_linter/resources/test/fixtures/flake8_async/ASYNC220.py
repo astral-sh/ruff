@@ -38,16 +38,16 @@ async def func():
 
 
 async def func():
-    Path("foo").open()  # ASYNC101
+    Path("foo").open()  # ASYNC220
 
 
 async def func():
     p = Path("foo")
-    p.open()  # ASYNC101
+    p.open()  # ASYNC220
 
 
 async def func():
-    with Path("foo").open() as f:  # ASYNC101
+    with Path("foo").open() as f:  # ASYNC220
         pass
 
 
@@ -55,13 +55,13 @@ async def func() -> None:
     p = Path("foo")
 
     async def bar():
-        p.open()  # ASYNC101
+        p.open()  # ASYNC220
 
 
 async def func() -> None:
     (p1, p2) = (Path("foo"), Path("bar"))
 
-    p1.open()  # ASYNC101
+    p1.open()  # ASYNC220
 
 
 # Non-violation cases for pathlib:

@@ -1,0 +1,37 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+---
+ASYNC210.py:7:5: ASYNC210 Async functions should not call blocking HTTP methods
+  |
+6 | async def foo():
+7 |     urllib.request.urlopen("http://example.com/foo/bar").read()
+  |     ^^^^^^^^^^^^^^^^^^^^^^ ASYNC210
+  |
+
+ASYNC210.py:11:5: ASYNC210 Async functions should not call blocking HTTP methods
+   |
+10 | async def foo():
+11 |     requests.get()
+   |     ^^^^^^^^^^^^ ASYNC210
+   |
+
+ASYNC210.py:15:5: ASYNC210 Async functions should not call blocking HTTP methods
+   |
+14 | async def foo():
+15 |     httpx.get()
+   |     ^^^^^^^^^ ASYNC210
+   |
+
+ASYNC210.py:19:5: ASYNC210 Async functions should not call blocking HTTP methods
+   |
+18 | async def foo():
+19 |     requests.post()
+   |     ^^^^^^^^^^^^^ ASYNC210
+   |
+
+ASYNC210.py:23:5: ASYNC210 Async functions should not call blocking HTTP methods
+   |
+22 | async def foo():
+23 |     httpx.post()
+   |     ^^^^^^^^^^ ASYNC210
+   |
