@@ -125,7 +125,7 @@ pub(crate) fn blocking_process_invocation(checker: &mut Checker, call: &ast::Exp
                 ["os", "system" | "posix_spawn" | "posix_spawnp"]
                 | ["subprocess", "run" | "call" | "check_call" | "check_output" | "getoutput"
                 | "getstatusoutput"] => Some(RunProcessInAsyncFunction.into()),
-                ["os", "wait" | "wait3" | "wait4" | "waitid" | "waitpid"] | ["time", "sleep"] => {
+                ["os", "wait" | "wait3" | "wait4" | "waitid" | "waitpid"] => {
                     Some(WaitForProcessInAsyncFunction.into())
                 }
                 ["os", "spawnl" | "spawnle" | "spawnlp" | "spawnlpe" | "spawnv" | "spawnve"

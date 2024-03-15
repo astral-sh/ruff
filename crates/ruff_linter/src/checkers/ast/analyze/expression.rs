@@ -506,6 +506,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             ]) {
                 flake8_async::rules::blocking_process_invocation(checker, call);
             }
+            if checker.enabled(Rule::BlockingSleepInAsyncFunction) {
+                flake8_async::rules::blocking_sleep(checker, call);
+            }
             if checker.any_enabled(&[Rule::Print, Rule::PPrint]) {
                 flake8_print::rules::print_call(checker, call);
             }
