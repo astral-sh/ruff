@@ -60,7 +60,7 @@ fn is_blocking_http_call(qualified_name: &QualifiedName) -> bool {
     )
 }
 
-/// ASYNC100
+/// ASYNC210
 pub(crate) fn blocking_http_call(checker: &mut Checker, call: &ExprCall) {
     if checker.semantic().in_async_context() {
         if checker
