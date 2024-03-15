@@ -301,6 +301,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Async, "210") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingHttpCallInAsyncFunction),
         (Flake8Async, "220") => (RuleGroup::Stable, rules::flake8_async::rules::OpenSleepOrSubprocessInAsyncFunction),
         (Flake8Async, "222") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingOsCallInAsyncFunction),
+        (Flake8Async, "230") => (RuleGroup::Stable, rules::flake8_async::rules::BlockinOpenCallInAsyncFunction),
 
         // flake8-builtins
         (Flake8Builtins, "001") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinVariableShadowing),

@@ -1,14 +1,13 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::{analyze, SemanticModel};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks that async functions do not contain calls to `open`, `time.sleep`,
-/// or `subprocess` methods.
+/// Checks that async functions do not contain calls to `time.sleep`, or `subprocess` methods.
 ///
 /// ## Why is this bad?
 /// Blocking an async function via a blocking call will block the entire
@@ -35,7 +34,7 @@ pub struct OpenSleepOrSubprocessInAsyncFunction;
 impl Violation for OpenSleepOrSubprocessInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Async functions should not call `open`, `time.sleep`, or `subprocess` methods")
+        format!("Async functions should not call `time.sleep`, or `subprocess` methods")
     }
 }
 
@@ -45,9 +44,7 @@ pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, call: &ast::E
         return;
     }
 
-    if is_open_sleep_or_subprocess_call(&call.func, checker.semantic())
-        || is_open_call_from_pathlib(call.func.as_ref(), checker.semantic())
-    {
+    if is_sleep_or_subprocess_call(&call.func, checker.semantic()) {
         checker.diagnostics.push(Diagnostic::new(
             OpenSleepOrSubprocessInAsyncFunction,
             call.func.range(),
@@ -57,14 +54,13 @@ pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, call: &ast::E
 
 /// Returns `true` if the expression resolves to a blocking call, like `time.sleep` or
 /// `subprocess.run`.
-fn is_open_sleep_or_subprocess_call(func: &Expr, semantic: &SemanticModel) -> bool {
+fn is_sleep_or_subprocess_call(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["" | "builtins", "open"]
-                    | ["time", "sleep"]
+                ["time", "sleep"]
                     | [
                         "subprocess",
                         "run"
@@ -78,53 +74,4 @@ fn is_open_sleep_or_subprocess_call(func: &Expr, semantic: &SemanticModel) -> bo
                     | ["os", "wait" | "wait3" | "wait4" | "waitid" | "waitpid"]
             )
         })
-}
-
-/// Returns `true` if an expression resolves to a call to `pathlib.Path.open`.
-fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
-        return false;
-    };
-
-    if attr.as_str() != "open" {
-        return false;
-    }
-
-    // First: is this an inlined call to `pathlib.Path.open`?
-    // ```python
-    // from pathlib import Path
-    // Path("foo").open()
-    // ```
-    if let Expr::Call(call) = value.as_ref() {
-        let Some(qualified_name) = semantic.resolve_qualified_name(call.func.as_ref()) else {
-            return false;
-        };
-        if qualified_name.segments() == ["pathlib", "Path"] {
-            return true;
-        }
-    }
-
-    // Second, is this a call to `pathlib.Path.open` via a variable?
-    // ```python
-    // from pathlib import Path
-    // path = Path("foo")
-    // path.open()
-    // ```
-    let Expr::Name(name) = value.as_ref() else {
-        return false;
-    };
-
-    let Some(binding_id) = semantic.resolve_name(name) else {
-        return false;
-    };
-
-    let binding = semantic.binding(binding_id);
-
-    let Some(Expr::Call(call)) = analyze::typing::find_binding_value(binding, semantic) else {
-        return false;
-    };
-
-    semantic
-        .resolve_qualified_name(call.func.as_ref())
-        .is_some_and(|qualified_name| qualified_name.segments() == ["pathlib", "Path"])
 }
