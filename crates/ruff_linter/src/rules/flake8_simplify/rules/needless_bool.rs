@@ -1,3 +1,4 @@
+use ast::traversal;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, ElifElseClause, Expr, ExprContext, Stmt};
@@ -62,30 +63,7 @@ impl Violation for NeedlessBool {
 }
 
 /// SIM103
-pub(crate) fn needless_bool(checker: &mut Checker, body: &[Stmt]) {
-    let mut iter = body.iter().peekable();
-
-    while let Some(stmt) = iter.next() {
-        // Find all if statements and optionally the next return statement.
-        if let ast::Stmt::If(stmt_if) = stmt {
-            let stmt_return = iter.peek().and_then(|next_stmt| {
-                if let ast::Stmt::Return(stmt_return) = next_stmt {
-                    Some(stmt_return)
-                } else {
-                    None
-                }
-            });
-
-            check_needless_bool(checker, stmt_if, stmt_return);
-        }
-    }
-}
-
-pub(crate) fn check_needless_bool(
-    checker: &mut Checker,
-    stmt_if: &ast::StmtIf,
-    next_stmt: Option<&ast::StmtReturn>,
-) {
+pub(crate) fn needless_bool(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     let ast::StmtIf {
         test: if_test,
         body: if_body,
@@ -93,7 +71,27 @@ pub(crate) fn check_needless_bool(
         range: _,
     } = stmt_if;
 
-    let return_stmt = next_stmt.map(|stmt| {
+    let stmt_if_into_stmt = stmt_if.clone().into();
+    let next_stmt = {
+        if checker.settings.preview.is_enabled() {
+            // Get the next statement after the if statement.
+            checker
+                .semantic()
+                .current_statement_parent()
+                // Get the parent of the if statement.
+                .and_then(|parent| traversal::suite(&stmt_if_into_stmt, parent))
+                // Get the next sibling of the if statement.
+                .and_then(|suite| traversal::next_sibling(&stmt_if_into_stmt, suite))
+                .and_then(|stmt| match stmt {
+                    ast::Stmt::Return(stmt_return) => Some(stmt_return),
+                    _ => None,
+                })
+        } else {
+            None
+        }
+    };
+
+    let stmt_return_body = next_stmt.map(|stmt| {
         vec![ast::Stmt::Return(ast::StmtReturn {
             value: stmt.value.clone(),
             range: stmt.range,
@@ -127,7 +125,7 @@ pub(crate) fn check_needless_bool(
             Some(ast::StmtReturn { range, .. }) => (
                 if_test.as_ref(),
                 if_body,
-                return_stmt.as_ref().unwrap(),
+                stmt_return_body.as_ref().unwrap(),
                 TextRange::new(stmt_if.range().start(), range.end()),
             ),
             _ => return,
