@@ -39,10 +39,7 @@ impl Violation for BlockingSleepInAsyncFunction {
 }
 
 fn is_blocking_sleep(qualified_name: &QualifiedName) -> bool {
-    matches!(
-        qualified_name.segments(),
-        ["time", "sleep"]
-    )
+    matches!(qualified_name.segments(), ["time", "sleep"])
 }
 
 /// ASYNC251
