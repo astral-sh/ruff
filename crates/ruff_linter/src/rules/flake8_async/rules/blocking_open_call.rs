@@ -33,9 +33,9 @@ use crate::checkers::ast::Checker;
 ///        contents = await f.read()
 /// ```
 #[violation]
-pub struct BlockinOpenCallInAsyncFunction;
+pub struct BlockingOpenCallInAsyncFunction;
 
-impl Violation for BlockinOpenCallInAsyncFunction {
+impl Violation for BlockingOpenCallInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Async functions should not open files with blocking methods like `open`")
@@ -52,7 +52,7 @@ pub(crate) fn blocking_open_call(checker: &mut Checker, call: &ast::ExprCall) {
         || is_open_call_from_pathlib(call.func.as_ref(), checker.semantic())
     {
         checker.diagnostics.push(Diagnostic::new(
-            BlockinOpenCallInAsyncFunction,
+            BlockingOpenCallInAsyncFunction,
             call.func.range(),
         ));
     }
