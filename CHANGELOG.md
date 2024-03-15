@@ -17,11 +17,6 @@
 - \[`pylint`\] Implement `invalid-bool-return-type` (`E304`) ([#10377](https://github.com/astral-sh/ruff/pull/10377))
 - \[`pylint`\] Include builtin warnings in useless-exception-statement (`PLW0133`) ([#10394](https://github.com/astral-sh/ruff/pull/10394))
 
-### Server
-
-- Added `ruff server` - a new built-in LSP for Ruff, written in Rust ([#10158](https://github.com/astral-sh/ruff/pull/10158))
-- Require `--preview` for `ruff server` ([#10368](https://github.com/astral-sh/ruff/pull/10368))
-
 ### CLI
 
 - Add message on success to `ruff check` ([#8631](https://github.com/astral-sh/ruff/pull/8631))
