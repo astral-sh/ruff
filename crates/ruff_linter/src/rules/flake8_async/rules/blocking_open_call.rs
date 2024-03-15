@@ -20,7 +20,7 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// async def foo():
-///     with open('bar.txt') as f:
+///     with open("bar.txt") as f:
 ///         contents = f.read()
 /// ```
 ///
@@ -28,8 +28,9 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import anyio
 ///
+///
 /// async def foo():
-///     async with await open_file('bar.txt') as f:
+///     async with await anyio.open_file("bar.txt") as f:
 ///        contents = await f.read()
 /// ```
 #[violation]
@@ -65,7 +66,7 @@ fn is_open_call(func: &Expr, semantic: &SemanticModel) -> bool {
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["", "open"] | ["io", "open"] | ["io", "open_code"]
+                ["" | "io", "open"] | ["io", "open_code"]
             )
         })
 }
