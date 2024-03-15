@@ -1,4 +1,5 @@
 //! Rules from [flake8-async](https://pypi.org/project/flake8-async/).
+mod helpers;
 pub(crate) mod rules;
 
 #[cfg(test)]
@@ -13,6 +14,11 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
+    #[test_case(Rule::TrioTimeoutWithoutAwait, Path::new("ASYNC100.py"))]
+    #[test_case(Rule::TrioSyncCall, Path::new("ASYNC105.py"))]
+    #[test_case(Rule::TrioAsyncFunctionWithTimeout, Path::new("ASYNC109.py"))]
+    #[test_case(Rule::TrioUnneededSleep, Path::new("ASYNC110.py"))]
+    #[test_case(Rule::TrioZeroSleepCall, Path::new("ASYNC115.py"))]
     #[test_case(Rule::BlockingHttpCallInAsyncFunction, Path::new("ASYNC210.py"))]
     #[test_case(Rule::OpenSleepOrSubprocessInAsyncFunction, Path::new("ASYNC220.py"))]
     #[test_case(Rule::BlockingOsCallInAsyncFunction, Path::new("ASYNC222.py"))]

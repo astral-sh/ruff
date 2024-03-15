@@ -6,7 +6,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
-use crate::rules::flake8_trio::method_name::MethodName;
+use crate::rules::flake8_async::helpers::MethodName;
 
 /// ## What it does
 /// Checks for calls to trio functions that are not immediately awaited.

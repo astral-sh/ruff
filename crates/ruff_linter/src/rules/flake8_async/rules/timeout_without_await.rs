@@ -6,7 +6,7 @@ use ruff_python_ast::{StmtWith, WithItem};
 use ruff_python_semantic::Modules;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_trio::method_name::MethodName;
+use crate::rules::flake8_async::helpers::MethodName;
 
 /// ## What it does
 /// Checks for trio functions that should contain await but don't.
