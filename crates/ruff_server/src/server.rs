@@ -69,7 +69,7 @@ impl Server {
 
         conn.initialize_finish(id, initialize_data)?;
 
-        // Register capabilites
+        // Register capabilities
         conn.sender
             .send(lsp_server::Message::Request(lsp_server::Request {
                 id: 1.into(),
