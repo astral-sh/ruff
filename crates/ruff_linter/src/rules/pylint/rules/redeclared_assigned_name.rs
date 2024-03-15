@@ -14,6 +14,19 @@ use crate::checkers::ast::Checker;
 /// Assigning a variable multiple times in the same assignment is redundant,
 /// as the final assignment to the variable is what the value will be.
 ///
+/// ## Example
+/// ```python
+/// a, b, a = (1, 2, 3)
+/// print(a)  # 3
+/// ```
+///
+/// Use instead:
+/// ```python
+/// # this is assuming you want to assign 3 to `a`
+/// _, b, a = (1, 2, 3)
+/// print(a)  # 3
+/// ```
+///
 #[violation]
 pub struct RedeclaredAssignedName {
     name: String,
