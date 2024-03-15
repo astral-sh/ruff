@@ -88,8 +88,6 @@ SIM103.py:32:9: SIM103 [*] Return the condition `b` directly
 34 | |         else:
 35 | |             return False
    | |________________________^ SIM103
-36 |   
-37 |   def f():
    |
    = help: Replace with `return bool(b)`
 
@@ -103,46 +101,44 @@ SIM103.py:32:9: SIM103 [*] Return the condition `b` directly
 35    |-            return False
    32 |+        return bool(b)
 36 33 | 
-37 34 | def f():
-38 35 |     # OK
+37 34 | 
+38 35 | def f():
 
-SIM103.py:56:5: SIM103 [*] Return the condition `a` directly
+SIM103.py:57:5: SIM103 [*] Return the condition `a` directly
    |
-54 |   def f():
-55 |       # SIM103 (but not fixable)
-56 |       if a:
+55 |   def f():
+56 |       # SIM103 (but not fixable)
+57 |       if a:
    |  _____^
-57 | |         return False
-58 | |     else:
-59 | |         return True
+58 | |         return False
+59 | |     else:
+60 | |         return True
    | |___________________^ SIM103
    |
    = help: Replace with `return not a`
 
 ℹ Unsafe fix
-53 53 | 
-54 54 | def f():
-55 55 |     # SIM103 (but not fixable)
-56    |-    if a:
-57    |-        return False
-58    |-    else:
-59    |-        return True
-   56 |+    return not a
-60 57 | 
+54 54 | 
+55 55 | def f():
+56 56 |     # SIM103 (but not fixable)
+57    |-    if a:
+58    |-        return False
+59    |-    else:
+60    |-        return True
+   57 |+    return not a
 61 58 | 
-62 59 | def f():
+62 59 | 
+63 60 | def f():
 
-SIM103.py:82:5: SIM103 Return the condition `a` directly
+SIM103.py:83:5: SIM103 Return the condition `a` directly
    |
-80 |       def bool():
-81 |           return False
-82 |       if a:
+81 |       def bool():
+82 |           return False
+83 |       if a:
    |  _____^
-83 | |         return True
-84 | |     else:
-85 | |         return False
+84 | |         return True
+85 | |     else:
+86 | |         return False
    | |____________________^ SIM103
-86 |   
-87 |   ###
    |
    = help: Inline condition
