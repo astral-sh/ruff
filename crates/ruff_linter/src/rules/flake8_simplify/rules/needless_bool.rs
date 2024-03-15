@@ -92,7 +92,13 @@ pub(crate) fn check_needless_bool(
         range: _,
     } = stmt_if;
 
-    let mut return_stmt = vec![];
+    let return_stmt = next_stmt.map(|stmt| {
+        vec![ast::Stmt::Return(ast::StmtReturn {
+            value: stmt.value.clone(),
+            range: stmt.range,
+        })]
+    });
+
     let (if_test, if_body, else_body, range) = match elif_else_clauses.as_slice() {
         // if-else case
         [ElifElseClause {
@@ -117,21 +123,12 @@ pub(crate) fn check_needless_bool(
         ),
         // if-implicit-else case
         [] => match next_stmt {
-            Some(ast::StmtReturn {
-                value: Some(value),
-                range,
-            }) => {
-                return_stmt.push(ast::Stmt::Return(ast::StmtReturn {
-                    value: Some(value.clone()),
-                    range: range.clone(),
-                }));
-                (
-                    if_test.as_ref(),
-                    if_body,
-                    &return_stmt,
-                    TextRange::new(stmt_if.range().start(), range.end()),
-                )
-            }
+            Some(ast::StmtReturn { range, .. }) => (
+                if_test.as_ref(),
+                if_body,
+                return_stmt.as_ref().unwrap(),
+                TextRange::new(stmt_if.range().start(), range.end()),
+            ),
             _ => return,
         },
         _ => return,
