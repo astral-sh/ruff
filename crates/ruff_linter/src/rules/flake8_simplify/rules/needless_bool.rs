@@ -77,6 +77,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &ast::Stmt) {
 
     let stmt_return_body;
 
+    // Extract an `if` or `elif` (that returns) followed by an else (that returns the same value)
     let (if_test, if_body, else_body, range) = match elif_else_clauses.as_slice() {
         // if-else case
         [ElifElseClause {
@@ -102,7 +103,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &ast::Stmt) {
         // if-implicit-else case
         [] if checker.settings.preview.is_enabled() => {
             let next_stmt = {
-                // Get the next statement after the if statement.
+                // Get the next statement after the if statement and check if it's a return statement.
                 checker
                     .semantic()
                     .current_statement_parent()
@@ -116,21 +117,20 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &ast::Stmt) {
                     })
             };
 
-            stmt_return_body = next_stmt.map(|stmt| {
-                vec![ast::Stmt::Return(ast::StmtReturn {
-                    value: stmt.value.clone(),
-                    range: stmt.range,
-                })]
-            });
+            if let Some(stmt_return) = next_stmt {
+                stmt_return_body = vec![ast::Stmt::Return(ast::StmtReturn {
+                    value: stmt_return.value.clone(),
+                    range: stmt_return.range,
+                })];
 
-            match next_stmt {
-                Some(ast::StmtReturn { range, .. }) => (
+                (
                     if_test.as_ref(),
                     if_body,
-                    stmt_return_body.as_ref().unwrap(),
-                    TextRange::new(stmt_if.range().start(), range.end()),
-                ),
-                _ => return,
+                    &stmt_return_body,
+                    TextRange::new(stmt_if.range().start(), stmt_return.range.end()),
+                )
+            } else {
+                return;
             }
         }
         _ => return,
