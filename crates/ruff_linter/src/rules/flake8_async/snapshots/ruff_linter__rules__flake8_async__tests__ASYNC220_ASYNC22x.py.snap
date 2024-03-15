@@ -1,77 +1,77 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
 ---
-ASYNC22x.py:36:5: ASYNC220 Async functions should not create subprocesses with blocking methods
+ASYNC22x.py:31:5: ASYNC220 Async functions should not create subprocesses with blocking methods
    |
-34 |         subprocess.getoutput()  # ASYNC221
-35 |     )
-36 |     subprocess.Popen()  # ASYNC220
+29 |         subprocess.getoutput()  # ASYNC221
+30 |     )
+31 |     subprocess.Popen()  # ASYNC220
    |     ^^^^^^^^^^^^^^^^ ASYNC220
-37 |     os.system()  # ASYNC221
+32 |     os.system()  # ASYNC221
    |
 
-ASYNC22x.py:78:5: ASYNC220 Async functions should not create subprocesses with blocking methods
+ASYNC22x.py:73:5: ASYNC220 Async functions should not create subprocesses with blocking methods
    |
-77 |     # if mode is given, and is not os.P_WAIT: ASYNC220
-78 |     os.spawnl(os.P_NOWAIT)  # ASYNC220
+72 |     # if mode is given, and is not os.P_WAIT: ASYNC220
+73 |     os.spawnl(os.P_NOWAIT)  # ASYNC220
    |     ^^^^^^^^^ ASYNC220
-79 |     os.spawnl(P_NOWAIT)  # ASYNC220
-80 |     os.spawnl(mode=os.P_NOWAIT)  # ASYNC220
+74 |     os.spawnl(P_NOWAIT)  # ASYNC220
+75 |     os.spawnl(mode=os.P_NOWAIT)  # ASYNC220
    |
 
-ASYNC22x.py:79:5: ASYNC220 Async functions should not create subprocesses with blocking methods
+ASYNC22x.py:74:5: ASYNC220 Async functions should not create subprocesses with blocking methods
    |
-77 |     # if mode is given, and is not os.P_WAIT: ASYNC220
-78 |     os.spawnl(os.P_NOWAIT)  # ASYNC220
-79 |     os.spawnl(P_NOWAIT)  # ASYNC220
+72 |     # if mode is given, and is not os.P_WAIT: ASYNC220
+73 |     os.spawnl(os.P_NOWAIT)  # ASYNC220
+74 |     os.spawnl(P_NOWAIT)  # ASYNC220
    |     ^^^^^^^^^ ASYNC220
-80 |     os.spawnl(mode=os.P_NOWAIT)  # ASYNC220
-81 |     os.spawnl(mode=P_NOWAIT)  # ASYNC220
+75 |     os.spawnl(mode=os.P_NOWAIT)  # ASYNC220
+76 |     os.spawnl(mode=P_NOWAIT)  # ASYNC220
    |
 
-ASYNC22x.py:80:5: ASYNC220 Async functions should not create subprocesses with blocking methods
+ASYNC22x.py:75:5: ASYNC220 Async functions should not create subprocesses with blocking methods
    |
-78 |     os.spawnl(os.P_NOWAIT)  # ASYNC220
-79 |     os.spawnl(P_NOWAIT)  # ASYNC220
-80 |     os.spawnl(mode=os.P_NOWAIT)  # ASYNC220
+73 |     os.spawnl(os.P_NOWAIT)  # ASYNC220
+74 |     os.spawnl(P_NOWAIT)  # ASYNC220
+75 |     os.spawnl(mode=os.P_NOWAIT)  # ASYNC220
    |     ^^^^^^^^^ ASYNC220
-81 |     os.spawnl(mode=P_NOWAIT)  # ASYNC220
+76 |     os.spawnl(mode=P_NOWAIT)  # ASYNC220
    |
 
-ASYNC22x.py:81:5: ASYNC220 Async functions should not create subprocesses with blocking methods
+ASYNC22x.py:76:5: ASYNC220 Async functions should not create subprocesses with blocking methods
    |
-79 |     os.spawnl(P_NOWAIT)  # ASYNC220
-80 |     os.spawnl(mode=os.P_NOWAIT)  # ASYNC220
-81 |     os.spawnl(mode=P_NOWAIT)  # ASYNC220
+74 |     os.spawnl(P_NOWAIT)  # ASYNC220
+75 |     os.spawnl(mode=os.P_NOWAIT)  # ASYNC220
+76 |     os.spawnl(mode=P_NOWAIT)  # ASYNC220
    |     ^^^^^^^^^ ASYNC220
-82 | 
-83 |     P_WAIT = os.P_WAIT
+77 | 
+78 |     P_WAIT = os.P_WAIT
    |
 
-ASYNC22x.py:91:5: ASYNC220 Async functions should not create subprocesses with blocking methods
+ASYNC22x.py:86:5: ASYNC220 Async functions should not create subprocesses with blocking methods
    |
-90 |     # other weird cases: ASYNC220
-91 |     os.spawnl(0)  # ASYNC220
+85 |     # other weird cases: ASYNC220
+86 |     os.spawnl(0)  # ASYNC220
    |     ^^^^^^^^^ ASYNC220
-92 |     os.spawnl(1)  # ASYNC220
-93 |     os.spawnl(foo())  # ASYNC220
+87 |     os.spawnl(1)  # ASYNC220
+88 |     os.spawnl(foo())  # ASYNC220
    |
 
-ASYNC22x.py:92:5: ASYNC220 Async functions should not create subprocesses with blocking methods
+ASYNC22x.py:87:5: ASYNC220 Async functions should not create subprocesses with blocking methods
    |
-90 |     # other weird cases: ASYNC220
-91 |     os.spawnl(0)  # ASYNC220
-92 |     os.spawnl(1)  # ASYNC220
+85 |     # other weird cases: ASYNC220
+86 |     os.spawnl(0)  # ASYNC220
+87 |     os.spawnl(1)  # ASYNC220
    |     ^^^^^^^^^ ASYNC220
-93 |     os.spawnl(foo())  # ASYNC220
+88 |     os.spawnl(foo())  # ASYNC220
    |
 
-ASYNC22x.py:93:5: ASYNC220 Async functions should not create subprocesses with blocking methods
+ASYNC22x.py:88:5: ASYNC220 Async functions should not create subprocesses with blocking methods
    |
-91 |     os.spawnl(0)  # ASYNC220
-92 |     os.spawnl(1)  # ASYNC220
-93 |     os.spawnl(foo())  # ASYNC220
+86 |     os.spawnl(0)  # ASYNC220
+87 |     os.spawnl(1)  # ASYNC220
+88 |     os.spawnl(foo())  # ASYNC220
    |     ^^^^^^^^^ ASYNC220
-94 | 
-95 |     # ASYNC222
+89 | 
+90 |     # ASYNC222
    |

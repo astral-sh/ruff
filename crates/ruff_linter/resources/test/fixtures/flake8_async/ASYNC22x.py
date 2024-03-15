@@ -1,12 +1,7 @@
 import os
 import subprocess
-import time
 
 # Violation cases:
-
-
-async def func():
-    time.sleep(1)  # ASYNC222
 
 
 async def func():
