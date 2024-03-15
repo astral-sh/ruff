@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::find_assigned_value;
@@ -6,7 +6,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Rule;
+use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks that async functions do not create subprocesses with blocking methods.
@@ -114,57 +114,37 @@ pub(crate) fn blocking_process_invocation(checker: &mut Checker, call: &ast::Exp
         return;
     }
 
-    if checker.enabled(Rule::CreateSubprocessInAsyncFunction) {
-        if is_subprocess_call(&call.func, checker.semantic())
-            || (is_os_spawn(&call.func, checker.semantic()) && !is_p_wait(call, checker.semantic()))
-        {
-            checker.diagnostics.push(Diagnostic::new(
-                CreateSubprocessInAsyncFunction,
-                call.func.range(),
-            ));
-        }
+    let Some(diagnostic_kind) =
+        checker
+            .semantic()
+            .resolve_qualified_name(call.func.as_ref())
+            .and_then(|qualified_name| match qualified_name.segments() {
+                ["subprocess", "Popen"] | ["os", "popen"] => {
+                    Some(CreateSubprocessInAsyncFunction.into())
+                }
+                ["os", "system" | "posix_spawn" | "posix_spawnp"]
+                | ["subprocess", "run" | "call" | "check_call" | "check_output" | "getoutput"
+                | "getstatusoutput"] => Some(RunProcessInAsyncFunction.into()),
+                ["os", "wait" | "wait3" | "wait4" | "waitid" | "waitpid"] | ["time", "sleep"] => {
+                    Some(WaitForProcessInAsyncFunction.into())
+                }
+                ["os", "spawnl" | "spawnle" | "spawnlp" | "spawnlpe" | "spawnv" | "spawnve"
+                | "spawnvp" | "spawnvpe"] => {
+                    if is_p_wait(call, checker.semantic()) {
+                        Some(RunProcessInAsyncFunction.into())
+                    } else {
+                        Some(CreateSubprocessInAsyncFunction.into())
+                    }
+                }
+                _ => None,
+            })
+    else {
+        return;
+    };
+    let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, call.func.range());
+    if checker.enabled(diagnostic.kind.rule()) {
+        checker.diagnostics.push(diagnostic);
     }
-
-    if checker.enabled(Rule::RunProcessInAsyncFunction) {
-        if is_run_process_call(&call.func, checker.semantic())
-            || (is_os_spawn(&call.func, checker.semantic()) && is_p_wait(call, checker.semantic()))
-        {
-            checker.diagnostics.push(Diagnostic::new(
-                RunProcessInAsyncFunction,
-                call.func.range(),
-            ));
-        }
-    }
-
-    if checker.enabled(Rule::WaitForProcessInAsyncFunction) {
-        if is_wait_for_process_call(&call.func, checker.semantic()) {
-            checker.diagnostics.push(Diagnostic::new(
-                WaitForProcessInAsyncFunction,
-                call.func.range(),
-            ));
-        }
-    }
-}
-
-fn is_os_spawn(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                [
-                    "os",
-                    "spawnl"
-                        | "spawnle"
-                        | "spawnlp"
-                        | "spawnlpe"
-                        | "spawnv"
-                        | "spawnve"
-                        | "spawnvp"
-                        | "spawnvpe"
-                ]
-            )
-        })
 }
 
 fn is_p_wait(call: &ast::ExprCall, semantic: &SemanticModel) -> bool {
@@ -183,46 +163,4 @@ fn is_p_wait(call: &ast::ExprCall, semantic: &SemanticModel) -> bool {
         }
     }
     false
-}
-
-fn is_subprocess_call(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["subprocess", "Popen"] | ["os", "popen"]
-            )
-        })
-}
-
-fn is_run_process_call(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["os", "system" | "posix_spawn" | "posix_spawnp"]
-                    | [
-                        "subprocess",
-                        "run"
-                            | "call"
-                            | "check_call"
-                            | "check_output"
-                            | "getoutput"
-                            | "getstatusoutput"
-                    ]
-            )
-        })
-}
-
-fn is_wait_for_process_call(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["os", "wait" | "wait3" | "wait4" | "waitid" | "waitpid"] | ["time", "sleep"]
-            )
-        })
 }
