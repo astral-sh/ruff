@@ -35,18 +35,6 @@ def f():
             return False
 
 def f():
-    # SIM103
-    if a:
-        return True
-    return False
-
-def f():
-    # SIM103
-    if a:
-        return False
-    return True
-
-def f():
     # OK
     if a:
         foo()
@@ -96,3 +84,18 @@ def f():
     else:
         return False
 
+###
+# Positive cases (preview)
+###
+
+def f():
+    # SIM103
+    if a:
+        return True
+    return False
+
+def f():
+    # SIM103
+    if a:
+        return False
+    return True
