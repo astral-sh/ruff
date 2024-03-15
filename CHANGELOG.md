@@ -8,51 +8,46 @@
 - \[`pycodestyle`\] Implement `blank-line-at-end-of-file` (`W391`) ([#10243](https://github.com/astral-sh/ruff/pull/10243))
 - \[`pycodestyle`\] Implement `redundant-backslash` (`E502`) ([#10292](https://github.com/astral-sh/ruff/pull/10292))
 - \[`pylint`\] - implement `redeclared-assigned-name` (`W0128`) ([#9268](https://github.com/astral-sh/ruff/pull/9268))
-- `ruff server` - A new built-in LSP for Ruff, written in Rust ([#10158](https://github.com/astral-sh/ruff/pull/10158))
 
 ### Rule changes
 
-- Remove `F401` fix for `__init__` imports by default and allow opt-in to unsafe fix ([#10365](https://github.com/astral-sh/ruff/pull/10365))
-- \[`flake8-bandit`\] Implement upstream updates for `S311`, `S324` and `S605` ([#10313](https://github.com/astral-sh/ruff/pull/10313))
 - \[`flake8_comprehensions`\] Handled special case for `C400` which also matches `C416` ([#10419](https://github.com/astral-sh/ruff/pull/10419))
+- \[`flake8-bandit`\] Implement upstream updates for `S311`, `S324` and `S605` ([#10313](https://github.com/astral-sh/ruff/pull/10313))
+- \[`pyflakes`\] Remove `F401` fix for `__init__` imports by default and allow opt-in to unsafe fix ([#10365](https://github.com/astral-sh/ruff/pull/10365))
 - \[`pylint`\] Implement `invalid-bool-return-type` (`E304`) ([#10377](https://github.com/astral-sh/ruff/pull/10377))
 - \[`pylint`\] Include builtin warnings in useless-exception-statement (`PLW0133`) ([#10394](https://github.com/astral-sh/ruff/pull/10394))
 
 ### Server
 
-- Require --preview for `ruff server` ([#10368](https://github.com/astral-sh/ruff/pull/10368))
+- Added `ruff server` - a new built-in LSP for Ruff, written in Rust ([#10158](https://github.com/astral-sh/ruff/pull/10158))
+- Require `--preview` for `ruff server` ([#10368](https://github.com/astral-sh/ruff/pull/10368))
 
 ### CLI
 
-- Indicated Successful Check ([#8631](https://github.com/astral-sh/ruff/pull/8631))
+- Add message on success to `ruff check` ([#8631](https://github.com/astral-sh/ruff/pull/8631))
 
 ### Bug fixes
 
 - Allow trailing ellipsis in `typing.TYPE_CHECKING` ([#10413](https://github.com/astral-sh/ruff/pull/10413))
 - Avoid `TRIO115` if the argument is a variable ([#10376](https://github.com/astral-sh/ruff/pull/10376))
 - Avoid removing shadowed imports that point to different symbols ([#10387](https://github.com/astral-sh/ruff/pull/10387))
-- F821, F822: fix false positive for `.pyi` files; add more test coverage for `.pyi` files ([#10341](https://github.com/astral-sh/ruff/pull/10341))
-- F821: Fix false negatives in `.py` files when `from __future__ import annotations` is active ([#10362](https://github.com/astral-sh/ruff/pull/10362))
-- Fix Indexer fails to identify continuation preceded by newline #10351 ([#10354](https://github.com/astral-sh/ruff/pull/10354))
+- Fix `F821` and `F822` false positives in `.pyi` files ([#10341](https://github.com/astral-sh/ruff/pull/10341))
+- Fix `F821` false negatives in `.py` files when `from __future__ import annotations` is active ([#10362](https://github.com/astral-sh/ruff/pull/10362))
+- Fix case where `Indexer` fails to identify continuation preceded by newline #10351 ([#10354](https://github.com/astral-sh/ruff/pull/10354))
 - Sort hash maps in `Settings` display ([#10370](https://github.com/astral-sh/ruff/pull/10370))
 - Track conditional deletions in the semantic model ([#10415](https://github.com/astral-sh/ruff/pull/10415))
 - Wrap expressions in parentheses when negating ([#10346](https://github.com/astral-sh/ruff/pull/10346))
 - \[`pycodestyle`\] Do not ignore lines before the first logical line in blank lines rules. ([#10382](https://github.com/astral-sh/ruff/pull/10382))
 - \[`pycodestyle`\] Do not trigger `E225` and `E275` when the next token is a ')' ([#10315](https://github.com/astral-sh/ruff/pull/10315))
 - \[`pylint`\] Avoid false-positive slot non-assignment for `__dict__` (`PLE0237`) ([#10348](https://github.com/astral-sh/ruff/pull/10348))
+- Gate f-string struct size test for Rustc \< 1.76 ([#10371](https://github.com/astral-sh/ruff/pull/10371))
 
 ### Documentation
 
-- Fix typo in docs snippt -> snippet ([#10353](https://github.com/astral-sh/ruff/pull/10353))
-- Use ruff.toml format in README ([#10393](https://github.com/astral-sh/ruff/pull/10393))
-- \[RUF008\] Make it clearer that a mutable default in a dataclass is only valid if it is typed as a ClassVar ([#10395](https://github.com/astral-sh/ruff/pull/10395))
+- Use `ruff.toml` format in README ([#10393](https://github.com/astral-sh/ruff/pull/10393))
+- \[`RUF008`\] Make it clearer that a mutable default in a dataclass is only valid if it is typed as a ClassVar ([#10395](https://github.com/astral-sh/ruff/pull/10395))
 - \[`pylint`\] Extend docs and test in `invalid-str-return-type` (`E307`) ([#10400](https://github.com/astral-sh/ruff/pull/10400))
-- `docs`: remove `.` from check and format commands ([#10217](https://github.com/astral-sh/ruff/pull/10217))
-
-### Other changes
-
-- Add test case for `F401` in `__init__` files ([#10364](https://github.com/astral-sh/ruff/pull/10364))
-- Gate f-string struct size test for Rustc \< 1.76 ([#10371](https://github.com/astral-sh/ruff/pull/10371))
+- Remove `.` from `check` and `format` commands ([#10217](https://github.com/astral-sh/ruff/pull/10217))
 
 ## 0.3.2
 
