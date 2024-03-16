@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
-assertion_line: 48
 ---
 doubles_would_be_triple_quotes.py:1:5: Q000 Double quotes found but single quotes preferred
   |

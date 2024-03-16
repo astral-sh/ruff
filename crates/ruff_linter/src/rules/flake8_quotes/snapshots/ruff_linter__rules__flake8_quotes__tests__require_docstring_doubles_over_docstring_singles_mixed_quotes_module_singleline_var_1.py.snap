@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
-assertion_line: 156
 ---
 docstring_singles_mixed_quotes_module_singleline_var_1.py:1:1: Q002 Single quote docstring found but double quotes preferred
   |
