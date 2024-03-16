@@ -241,6 +241,17 @@ impl<'a> From<&'a str> for Trivia<'a> {
     }
 }
 
+fn text_starts_at_double_quote(locator: &Locator, range: TextRange, quote: &Quote) -> bool {
+    let trivia_of_previous_char: Trivia = locator
+        .slice(TextRange::new(
+            TextSize::new(range.start().to_u32() - 2),
+            range.start(),
+        ))
+        .into();
+    let pat = format!("{}{}", good_docstring(*quote), good_docstring(*quote));
+    trivia_of_previous_char.raw_text.contains(&pat)
+}
+
 fn text_ends_at_quote(locator: &Locator, range: TextRange, quote: &Quote) -> bool {
     let trivia_of_next_char: Trivia = locator
         .slice(TextRange::new(
@@ -379,8 +390,13 @@ fn strings(
             // If we're not using the preferred type, only allow use to avoid escapes.
             && !relax_quote
         {
-            if trivia.has_empty_text()
-                && text_ends_at_quote(locator, *range, &settings.flake8_quotes.inline_quotes)
+            if (trivia.has_empty_text()
+                && text_ends_at_quote(locator, *range, &settings.flake8_quotes.inline_quotes))
+                || text_starts_at_double_quote(
+                    locator,
+                    *range,
+                    &settings.flake8_quotes.inline_quotes,
+                )
             {
                 // Cannot fix. Fix would result in an one-sided multi-line docstring,
                 // which would introduce an error.
