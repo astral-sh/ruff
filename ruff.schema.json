@@ -2481,6 +2481,15 @@
           "format": "uint",
           "minimum": 0.0
         },
+        "max-instance-attributes": {
+          "description": "Maximum number of instance attributes allowed for a class (see: `PLR0902`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
         "max-locals": {
           "description": "Maximum number of local variables allowed for a function or method body (see: `PLR0914`).",
           "type": [
@@ -3282,6 +3291,7 @@
         "PLR0402",
         "PLR09",
         "PLR090",
+        "PLR0902",
         "PLR0904",
         "PLR091",
         "PLR0911",

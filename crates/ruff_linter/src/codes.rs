@@ -269,6 +269,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R0203") => (RuleGroup::Preview, rules::pylint::rules::NoStaticmethodDecorator),
         (Pylint, "R0206") => (RuleGroup::Stable, rules::pylint::rules::PropertyWithParameters),
         (Pylint, "R0402") => (RuleGroup::Stable, rules::pylint::rules::ManualFromImport),
+        (Pylint, "R0902") => (RuleGroup::Preview, rules::pylint::rules::TooManyInstanceAttributes),
         (Pylint, "R0911") => (RuleGroup::Stable, rules::pylint::rules::TooManyReturnStatements),
         (Pylint, "R0912") => (RuleGroup::Stable, rules::pylint::rules::TooManyBranches),
         (Pylint, "R0913") => (RuleGroup::Stable, rules::pylint::rules::TooManyArguments),

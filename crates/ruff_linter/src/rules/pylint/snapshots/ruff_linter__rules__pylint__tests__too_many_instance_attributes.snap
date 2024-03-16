@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+too_many_instance_attributes.py:2:5: PLR0902 Too many instance attributes (11/7)
+  |
+1 | class Stuff:
+2 |     def __init__(self) -> None:  # PLR0902
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLR0902
+3 |         self.a, self.b = 1, 2
+4 |         self.c = 3
+  |

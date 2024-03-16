@@ -2808,6 +2808,14 @@ pub struct PylintOptions {
     /// (see: `PLR1702`).
     #[option(default = r"5", value_type = "int", example = r"max-nested-blocks = 5")]
     pub max_nested_blocks: Option<usize>,
+
+    /// Maximum number of instance attributes allowed for a class (see: `PLR0902`).
+    #[option(
+        default = r"7",
+        value_type = "int",
+        example = r"max-instance-attributes = 7"
+    )]
+    pub max_instance_attributes: Option<usize>,
 }
 
 impl PylintOptions {
@@ -2832,6 +2840,9 @@ impl PylintOptions {
                 .unwrap_or(defaults.max_public_methods),
             max_locals: self.max_locals.unwrap_or(defaults.max_locals),
             max_nested_blocks: self.max_nested_blocks.unwrap_or(defaults.max_nested_blocks),
+            max_instance_attributes: self
+                .max_instance_attributes
+                .unwrap_or(defaults.max_instance_attributes),
         }
     }
 }
