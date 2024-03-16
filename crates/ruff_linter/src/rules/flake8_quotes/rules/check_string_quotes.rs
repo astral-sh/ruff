@@ -241,27 +241,25 @@ impl<'a> From<&'a str> for Trivia<'a> {
     }
 }
 
-fn text_starts_at_double_quote(locator: &Locator, range: TextRange, quote: &Quote) -> bool {
+fn text_starts_at_double_quote(locator: &Locator, range: TextRange, quote: Quote) -> bool {
     let trivia_of_previous_char: Trivia = locator
         .slice(TextRange::new(
             TextSize::new(range.start().to_u32() - 2),
             range.start(),
         ))
         .into();
-    let pat = format!("{}{}", good_docstring(*quote), good_docstring(*quote));
+    let pat = format!("{}{}", good_docstring(quote), good_docstring(quote));
     trivia_of_previous_char.raw_text.contains(&pat)
 }
 
-fn text_ends_at_quote(locator: &Locator, range: TextRange, quote: &Quote) -> bool {
+fn text_ends_at_quote(locator: &Locator, range: TextRange, quote: Quote) -> bool {
     let trivia_of_next_char: Trivia = locator
         .slice(TextRange::new(
             range.end(),
             TextSize::new(range.end().to_u32() + 1),
         ))
         .into();
-    trivia_of_next_char
-        .raw_text
-        .contains(good_docstring(*quote))
+    trivia_of_next_char.raw_text.contains(good_docstring(quote))
 }
 
 /// Q002
@@ -271,7 +269,7 @@ fn docstring(locator: &Locator, range: TextRange, settings: &LinterSettings) -> 
     let text = locator.slice(range);
     let trivia: Trivia = text.into();
     if trivia.has_empty_text()
-        && text_ends_at_quote(locator, range, &settings.flake8_quotes.docstring_quotes)
+        && text_ends_at_quote(locator, range, settings.flake8_quotes.docstring_quotes)
     {
         // Cannot fix. Fix would result in an one-sided multi-line docstring,
         // which would introduce an error.
@@ -391,11 +389,11 @@ fn strings(
             && !relax_quote
         {
             if (trivia.has_empty_text()
-                && text_ends_at_quote(locator, *range, &settings.flake8_quotes.inline_quotes))
+                && text_ends_at_quote(locator, *range, settings.flake8_quotes.inline_quotes))
                 || text_starts_at_double_quote(
                     locator,
                     *range,
-                    &settings.flake8_quotes.inline_quotes,
+                    settings.flake8_quotes.inline_quotes,
                 )
             {
                 // Cannot fix. Fix would result in an one-sided multi-line docstring,
