@@ -71,10 +71,12 @@ pub(crate) fn bool_literal_compare(checker: &mut Checker, compare: &ast::ExprCom
         return;
     }
     let comparator = compare.left.as_ref();
-    let [op, ..] = compare.ops.as_slice() else {
+
+    let [op, ..] = &*compare.ops else {
         return;
     };
-    let [next, ..] = compare.comparators.as_slice() else {
+
+    let [next, ..] = &*compare.comparators else {
         return;
     };
 
