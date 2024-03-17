@@ -1,18 +1,23 @@
+use std::fmt;
+
 use aho_corasick::{AhoCorasick, AhoCorasickKind, Anchored, Input, MatchKind, StartKind};
 use once_cell::sync::Lazy;
 
 use ruff_text_size::{TextLen, TextRange};
 
+/// Enumeration of the two kinds of quotes that can be used
+/// for Python string/f-string/bytestring literals
 #[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq, is_macro::Is)]
-pub enum QuoteStyle {
-    /// E.g. '
+pub enum Quote {
+    /// E.g. `'`
     Single,
-    /// E.g. "
+    /// E.g. `"`
     #[default]
     Double,
 }
 
-impl QuoteStyle {
+impl Quote {
+    #[inline]
     pub const fn as_char(self) -> char {
         match self {
             Self::Single => '\'',
@@ -21,10 +26,37 @@ impl QuoteStyle {
     }
 
     #[must_use]
+    #[inline]
     pub const fn opposite(self) -> Self {
         match self {
             Self::Single => Self::Double,
             Self::Double => Self::Single,
+        }
+    }
+
+    #[inline]
+    pub const fn as_byte(self) -> u8 {
+        match self {
+            Self::Single => b'\'',
+            Self::Double => b'"',
+        }
+    }
+}
+
+impl fmt::Display for Quote {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_char())
+    }
+}
+
+impl TryFrom<char> for Quote {
+    type Error = ();
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        match value {
+            '\'' => Ok(Quote::Single),
+            '"' => Ok(Quote::Double),
+            _ => Err(()),
         }
     }
 }

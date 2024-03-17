@@ -103,9 +103,9 @@ impl Violation for PytestParametrizeNamesWrongType {
 /// of values.
 ///
 /// The style for the list of values rows can be configured via the
-/// the [`lint.flake8-pytest-style.parametrize-values-type`] setting, while the
+/// [`lint.flake8-pytest-style.parametrize-values-type`] setting, while the
 /// style for each row of values can be configured via the
-/// the [`lint.flake8-pytest-style.parametrize-values-row-type`] setting.
+/// [`lint.flake8-pytest-style.parametrize-values-row-type`] setting.
 ///
 /// For example, [`lint.flake8-pytest-style.parametrize-values-type`] will lead to
 /// the following expectations:

@@ -9,7 +9,11 @@ use tracing_subscriber::{
 };
 use tracing_tree::time::Uptime;
 
-pub(crate) fn run_server(log_level: LogLevel) -> Result<ExitStatus> {
+pub(crate) fn run_server(preview: bool, log_level: LogLevel) -> Result<ExitStatus> {
+    if !preview {
+        tracing::error!("--preview needs to be provided as a command line argument while the server is still unstable.\nFor example: `ruff server --preview`");
+        return Ok(ExitStatus::Error);
+    }
     let trace_level = if log_level == LogLevel::Verbose {
         Level::TRACE
     } else {

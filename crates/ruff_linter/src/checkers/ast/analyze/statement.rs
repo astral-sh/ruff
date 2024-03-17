@@ -91,6 +91,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
+            if checker.enabled(Rule::InvalidBoolReturnType) {
+                pylint::rules::invalid_bool_return(checker, name, body);
+            }
             if checker.enabled(Rule::InvalidStrReturnType) {
                 pylint::rules::invalid_str_return(checker, name, body);
             }
@@ -1386,6 +1389,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
+            if checker.enabled(Rule::RedeclaredAssignedName) {
+                pylint::rules::redeclared_assigned_name(checker, targets);
+            }
             if checker.enabled(Rule::LambdaAssignment) {
                 if let [target] = &targets[..] {
                     pycodestyle::rules::lambda_assignment(checker, target, value, None, stmt);

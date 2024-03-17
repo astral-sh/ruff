@@ -3,6 +3,7 @@ source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
 useless_exception_statement.py:7:5: PLW0133 [*] Missing `raise` statement on exception
   |
+5 | # Test case 1: Useless exception statement
 6 | def func():
 7 |     AssertionError("This is an assertion error")  # PLW0133
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133
@@ -11,7 +12,7 @@ useless_exception_statement.py:7:5: PLW0133 [*] Missing `raise` statement on exc
 
 ℹ Unsafe fix
 4 4 | 
-5 5 | 
+5 5 | # Test case 1: Useless exception statement
 6 6 | def func():
 7   |-    AssertionError("This is an assertion error")  # PLW0133
   7 |+    raise AssertionError("This is an assertion error")  # PLW0133
@@ -192,4 +193,23 @@ useless_exception_statement.py:66:12: PLW0133 [*] Missing `raise` statement on e
    66 |+    x = 1; raise (RuntimeError("This is an exception")); y = 2  # PLW0133
 67 67 | 
 68 68 | 
-69 69 | # Non-violation test cases: PLW0133
+69 69 | # Test case 11: Useless warning statement
+
+useless_exception_statement.py:71:5: PLW0133 [*] Missing `raise` statement on exception
+   |
+69 | # Test case 11: Useless warning statement
+70 | def func():
+71 |     UserWarning("This is an assertion error")  # PLW0133
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0133
+   |
+   = help: Add `raise` keyword
+
+ℹ Unsafe fix
+68 68 | 
+69 69 | # Test case 11: Useless warning statement
+70 70 | def func():
+71    |-    UserWarning("This is an assertion error")  # PLW0133
+   71 |+    raise UserWarning("This is an assertion error")  # PLW0133
+72 72 | 
+73 73 | 
+74 74 | # Non-violation test cases: PLW0133

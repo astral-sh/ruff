@@ -11,7 +11,7 @@ use itertools::Itertools;
 
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::{int, str::QuoteStyle, LiteralExpressionRef};
+use crate::{int, str::Quote, LiteralExpressionRef};
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -1159,6 +1159,15 @@ pub enum FStringPart {
     FString(FString),
 }
 
+impl FStringPart {
+    pub fn quote_style(&self) -> Quote {
+        match self {
+            Self::Literal(string_literal) => string_literal.flags.quote_style(),
+            Self::FString(f_string) => f_string.flags.quote_style(),
+        }
+    }
+}
+
 impl Ranged for FStringPart {
     fn range(&self) -> TextRange {
         match self {
@@ -1221,11 +1230,11 @@ impl FStringFlags {
     }
 
     /// Does the f-string use single or double quotes in its opener and closer?
-    pub const fn quote_style(self) -> QuoteStyle {
+    pub const fn quote_style(self) -> Quote {
         if self.0.contains(FStringFlagsInner::DOUBLE) {
-            QuoteStyle::Double
+            Quote::Double
         } else {
-            QuoteStyle::Single
+            Quote::Single
         }
     }
 }
@@ -1246,6 +1255,22 @@ pub struct FString {
     pub range: TextRange,
     pub elements: Vec<FStringElement>,
     pub flags: FStringFlags,
+}
+
+impl FString {
+    /// Returns an iterator over all the [`FStringLiteralElement`] nodes contained in this f-string.
+    pub fn literals(&self) -> impl Iterator<Item = &FStringLiteralElement> {
+        self.elements
+            .iter()
+            .filter_map(|element| element.as_literal())
+    }
+
+    /// Returns an iterator over all the [`FStringExpressionElement`] nodes contained in this f-string.
+    pub fn expressions(&self) -> impl Iterator<Item = &FStringExpressionElement> {
+        self.elements
+            .iter()
+            .filter_map(|element| element.as_expression())
+    }
 }
 
 impl Ranged for FString {
@@ -1519,11 +1544,11 @@ impl StringLiteralFlags {
     }
 
     /// Does the string use single or double quotes in its opener and closer?
-    pub const fn quote_style(self) -> QuoteStyle {
+    pub const fn quote_style(self) -> Quote {
         if self.0.contains(StringLiteralFlagsInner::DOUBLE) {
-            QuoteStyle::Double
+            Quote::Double
         } else {
-            QuoteStyle::Single
+            Quote::Single
         }
     }
 
@@ -1848,11 +1873,11 @@ impl BytesLiteralFlags {
     }
 
     /// Does the bytestring use single or double quotes in its opener and closer?
-    pub const fn quote_style(self) -> QuoteStyle {
+    pub const fn quote_style(self) -> Quote {
         if self.0.contains(BytesLiteralFlagsInner::DOUBLE) {
-            QuoteStyle::Double
+            Quote::Double
         } else {
-            QuoteStyle::Single
+            Quote::Single
         }
     }
 }
@@ -4148,7 +4173,8 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprDict>(), 56);
         assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
         assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
-        assert_eq!(std::mem::size_of::<ExprFString>(), 48);
+        // 56 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<ExprFString>(), 48 | 56));
         assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
         assert_eq!(std::mem::size_of::<ExprIf>(), 32);
         assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);

@@ -88,7 +88,7 @@ impl fmt::Display for Settings {
             namespace = "linter.pylint",
             fields = [
                 self.allow_magic_value_types | array,
-                self.allow_dunder_method_names | array,
+                self.allow_dunder_method_names | set,
                 self.max_args,
                 self.max_positional_args,
                 self.max_returns,

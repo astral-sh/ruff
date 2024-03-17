@@ -142,7 +142,7 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
         }
     }
 
-    if slots.is_empty() {
+    if slots.is_empty() || slots.contains("__dict__") {
         return vec![];
     }
 
