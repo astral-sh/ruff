@@ -107,7 +107,6 @@ pub(crate) fn except_with_non_exception_classes(
             expr,
             Expr::Subscript(_) | Expr::Attribute(_) | Expr::Name(_) | Expr::Call(_),
         ) {
-            println!("expr: {:#?}", expr);
             checker
                 .diagnostics
                 .push(Diagnostic::new(ExceptWithNonExceptionClasses, expr.range()));
