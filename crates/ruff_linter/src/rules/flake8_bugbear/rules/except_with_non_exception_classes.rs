@@ -76,7 +76,7 @@ fn flatten_starred_iterables_and_binops(expr: &Expr) -> Vec<&Expr> {
                         Expr::Starred(ast::ExprStarred { value, .. }) => {
                             exprs_to_process.push_back(value);
                         }
-                        // If their binops we should flatten them.
+                        // If they are binops we should flatten them.
                         Expr::BinOp(ast::ExprBinOp { .. }) => {
                             exprs_to_process.push_back(expr);
                         }
