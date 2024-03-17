@@ -88,11 +88,13 @@ class ConfigOverrides(Serializable):
             **self.always,
             **(self.when_preview if preview else self.when_no_preview),
         }
-        args = [
-            f"--config {key} = {value}"
-            for key, value in overrides.items()
-            if value is not None  # TEMP FIXME
-        ]
+
+        args = []
+        for key, value in overrides.items():
+            if value is None:  # FIXME TEMP
+                continue
+            args.extend(["--config", f"{key} = {value}"])
+
         return args
 
 
