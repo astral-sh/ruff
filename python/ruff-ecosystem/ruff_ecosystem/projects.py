@@ -5,7 +5,6 @@ Abstractions and utilities for working with projects to run ecosystem checks on.
 from __future__ import annotations
 
 import abc
-import contextlib
 import dataclasses
 from asyncio import create_subprocess_exec
 from dataclasses import dataclass, field
@@ -15,7 +14,6 @@ from pathlib import Path
 from subprocess import DEVNULL, PIPE
 from typing import Any, Self
 
-import tomli
 import tomli_w
 
 from ruff_ecosystem import logger
@@ -63,8 +61,6 @@ class ConfigOverrides(Serializable):
 
     The key describes a member to override in the toml file; '.' may be used to indicate a
     nested value e.g. `format.quote-style`.
-
-    If a Ruff configuration file does not exist and overrides are provided, it will be createad.
     """
 
     always: dict[str, Any] = field(default_factory=dict)
@@ -86,83 +82,18 @@ class ConfigOverrides(Serializable):
 
         return hash(as_string())
 
-    @contextlib.contextmanager
-    def patch_config(
-        self,
-        dirpath: Path,
-        preview: bool,
-    ) -> None:
-        """
-        Temporarily patch the Ruff configuration file in the given directory.
-        """
-        dot_ruff_toml = dirpath / ".ruff.toml"
-        ruff_toml = dirpath / "ruff.toml"
-        pyproject_toml = dirpath / "pyproject.toml"
-
-        # Prefer `ruff.toml` over `pyproject.toml`
-        if dot_ruff_toml.exists():
-            path = dot_ruff_toml
-            base = []
-        elif ruff_toml.exists():
-            path = ruff_toml
-            base = []
-        else:
-            path = pyproject_toml
-            base = ["tool", "ruff"]
-
+    def to_ruff_args(self, preview: bool = False) -> list[str]:
         overrides = {
             **ALWAYS_CONFIG_OVERRIDES,
             **self.always,
             **(self.when_preview if preview else self.when_no_preview),
         }
-
-        if not overrides:
-            yield
-            return
-
-        # Read the existing content if the file is present
-        if path.exists():
-            contents = path.read_text()
-            toml = tomli.loads(contents)
-        else:
-            contents = None
-            toml = {}
-
-            # Do not write a toml file if it does not exist and we're just nulling values
-            if all((value is None for value in overrides.values())):
-                yield
-                return
-
-        # Update the TOML, using `.` to descend into nested keys
-        for key, value in overrides.items():
-            if value is not None:
-                logger.debug(f"Setting {key}={value!r} in {path}")
-            else:
-                logger.debug(f"Restoring {key} to default in {path}")
-
-            target = toml
-            names = base + key.split(".")
-            for name in names[:-1]:
-                if name not in target:
-                    target[name] = {}
-                target = target[name]
-
-            if value is None:
-                # Remove null values i.e. restore to default
-                target.pop(names[-1], None)
-            else:
-                target[names[-1]] = value
-
-        tomli_w.dump(toml, path.open("wb"))
-
-        try:
-            yield
-        finally:
-            # Restore the contents or delete the file
-            if contents is None:
-                path.unlink()
-            else:
-                path.write_text(contents)
+        args = [
+            f"--config {key} = {value}"
+            for key, value in overrides.items()
+            if value is not None  # TEMP FIXME
+        ]
+        return args
 
 
 class RuffCommand(Enum):
