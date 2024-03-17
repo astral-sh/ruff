@@ -67,14 +67,18 @@ fn flatten_starred_iterables_and_binops(expr: &Expr) -> Vec<&Expr> {
                 _ => flattened_exprs.push(value),
             },
             Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
-                // if left or right are tuples, we should flatten them
                 for expr in [left, right] {
                     match expr.as_ref() {
+                        // If left or right are tuples or starred we should flatten them.
                         Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                             exprs_to_process.append(&mut elts.iter().collect());
                         }
                         Expr::Starred(ast::ExprStarred { value, .. }) => {
                             exprs_to_process.push_back(value);
+                        }
+                        // If their binops we should flatten them.
+                        Expr::BinOp(ast::ExprBinOp { .. }) => {
+                            exprs_to_process.push_back(expr);
                         }
                         _ => flattened_exprs.push(expr),
                     }

@@ -36,6 +36,12 @@ except (*a, *(RuntimeError, (KeyError, TypeError))):  # error
 
 try:
     pass
+except *(a + (RuntimeError, (KeyError, TypeError))):  # error
+    pass
+
+
+try:
+    pass
 except (ValueError, *(RuntimeError, TypeError)):  # ok
     pass
 
@@ -95,3 +101,10 @@ try:
     pass
 except *(a, (b) + (c)):  # ok
     pass
+
+
+try:
+    pass
+except (a, b) + (c, d) + (e, f):  # ok
+    pass
+
