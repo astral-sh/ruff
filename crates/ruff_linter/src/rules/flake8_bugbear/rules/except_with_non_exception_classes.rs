@@ -49,11 +49,10 @@ impl Violation for ExceptWithNonExceptionClasses {
 /// This should leave any unstarred iterables alone (subsequently raising a
 /// warning for B029).
 fn flatten_starred_iterables_and_binops(expr: &Expr) -> Vec<&Expr> {
-    // The top-level expression should be a tuple or a binop, else return as-is.
+    // Unpack the top-level Tuple into queue, otherwise add as-is.
     let mut exprs_to_process: VecDeque<&Expr> = match expr {
         Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().collect(),
-        Expr::BinOp(ast::ExprBinOp { .. }) => vec![expr].into(),
-        _ => return vec![expr],
+        _ => vec![expr].into(),
     };
 
     let mut flattened_exprs: Vec<&Expr> = Vec::new();

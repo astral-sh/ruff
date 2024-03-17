@@ -46,11 +46,11 @@ B030.py:33:29: B030 `except` handlers should only be exception classes or tuples
 34 |     pass
    |
 
-B030.py:39:29: B030 `except` handlers should only be exception classes or tuples of exception classes
+B030.py:39:28: B030 `except` handlers should only be exception classes or tuples of exception classes
    |
 37 | try:
 38 |     pass
-39 | except *(a + (RuntimeError, (KeyError, TypeError))):  # error
-   |                             ^^^^^^^^^^^^^^^^^^^^^ B030
+39 | except* a + (RuntimeError, (KeyError, TypeError)):  # error
+   |                            ^^^^^^^^^^^^^^^^^^^^^ B030
 40 |     pass
    |
