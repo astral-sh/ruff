@@ -64,6 +64,9 @@ fn flatten_starred_iterables_and_binops(expr: &Expr) -> Vec<&Expr> {
                 | Expr::List(ast::ExprList { elts, .. }) => {
                     exprs_to_process.append(&mut elts.iter().collect());
                 }
+                Expr::BinOp(ast::ExprBinOp { .. }) => {
+                    exprs_to_process.push_back(value);
+                }
                 _ => flattened_exprs.push(value),
             },
             Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
@@ -105,6 +108,7 @@ pub(crate) fn except_with_non_exception_classes(
             expr,
             Expr::Subscript(_) | Expr::Attribute(_) | Expr::Name(_) | Expr::Call(_),
         ) {
+            println!("expr: {:#?}", expr);
             checker
                 .diagnostics
                 .push(Diagnostic::new(ExceptWithNonExceptionClasses, expr.range()));

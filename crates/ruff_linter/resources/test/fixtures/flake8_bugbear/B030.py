@@ -113,3 +113,9 @@ try:
     pass
 except a + (b, c):  # ok
     pass
+
+
+try:
+    pass
+except (ValueError, *(RuntimeError, TypeError), *((ArithmeticError,) + (EOFError,))):
+    pass
