@@ -33,6 +33,7 @@ try:
 except (*a, *(RuntimeError, (KeyError, TypeError))):  # error
     pass
 
+
 try:
     pass
 except (ValueError, *(RuntimeError, TypeError)):  # ok
@@ -80,17 +81,17 @@ except what_to_catch():  # ok
 
 try:
     pass
-except (ValueError,TypeError) + (EOFError,ArithmeticError):  # ok
+except (a, b) + (c, d):  # ok
     pass
 
 
 try:
     pass
-except *(ValueError,TypeError) + (EOFError,ArithmeticError):  # ok
+except *(a, b) + (c, d):  # ok
     pass
 
 
 try:
     pass
-except *(ValueError,(TypeError,) + (EOFError)):  # ok
+except *(a, (b) + (c)):  # ok
     pass
