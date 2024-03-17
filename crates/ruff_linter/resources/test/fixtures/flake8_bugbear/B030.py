@@ -108,3 +108,8 @@ try:
 except (a, b) + (c, d) + (e, f):  # ok
     pass
 
+
+try:
+    pass
+except a + (b, c):  # ok
+    pass
