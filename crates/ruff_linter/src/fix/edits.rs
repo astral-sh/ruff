@@ -153,7 +153,8 @@ pub(crate) fn remove_parameter(
             .context("Unable to find previous star")?;
 
         // The range to remove is expanded to include the previous star
-        range_to_remove.range = TextRange::new(star.start(), range_to_remove.range.end());
+        range_to_remove.parameter_range =
+            TextRange::new(star.start(), range_to_remove.parameter_range.end());
     }
     let range_to_remove = range_to_remove;
 
@@ -218,7 +219,7 @@ pub(crate) fn remove_parameter(
 }
 
 struct ParameterRangeToRemove {
-    range: TextRange,
+    parameter_range: TextRange,
     parameter_kind: ParameterKind,
     before: bool,
     after: bool,
@@ -235,69 +236,47 @@ enum ParameterKind {
 
 impl Ranged for ParameterRangeToRemove {
     fn range(&self) -> TextRange {
-        self.range
+        self.parameter_range
     }
 }
 
 impl ParameterRangeToRemove {
     fn find_range(parameter: TextRange, parameters: &Parameters) -> Result<Self> {
-        let (parameter_range, parameter_kind) = if let Some(range) = parameters
-            .posonlyargs
-            .iter()
-            .map(Ranged::range)
-            .find(|range| range.contains_range(parameter))
-        {
-            (range, ParameterKind::PositionalOnly)
-        } else if let Some(range) = parameters
-            .args
-            .iter()
-            .map(Ranged::range)
-            .find(|range| range.contains_range(parameter))
-        {
-            (range, ParameterKind::Positional)
-        } else if let Some(range) = parameters
-            .kwonlyargs
-            .iter()
-            .map(Ranged::range)
-            .find(|range| range.contains_range(parameter))
-        {
-            (range, ParameterKind::KeywordOnly)
-        } else if let Some(range) = parameters
-            .vararg
-            .as_deref()
-            .map(Ranged::range)
-            .filter(|range| range.contains_range(parameter))
-        {
-            (range, ParameterKind::VariadicPositional)
-        } else if let Some(range) = parameters
-            .kwarg
-            .as_deref()
-            .map(Ranged::range)
-            .filter(|range| range.contains_range(parameter))
-        {
-            (range, ParameterKind::VariadicKeyword)
-        } else {
-            anyhow::bail!("Unable to find parameter to delete");
+        let mut before = false;
+        let mut after = false;
+        let mut parameter_range: Option<TextRange> = None;
+        let mut parameter_kind: Option<ParameterKind> = None;
+
+        let mut classify_range = |range: TextRange, kind: ParameterKind| {
+            if range.end() <= parameter.start() {
+                before = true;
+            } else if parameter.end() <= range.start() {
+                after = true;
+            } else {
+                parameter_range = Some(range);
+                parameter_kind = Some(kind)
+            }
         };
 
-        let all_ranges = parameters
-            .posonlyargs
-            .iter()
-            .chain(&parameters.args)
-            .chain(&parameters.kwonlyargs)
-            .map(Ranged::range)
-            .chain(parameters.vararg.as_deref().into_iter().map(Ranged::range))
-            .chain(parameters.kwarg.as_deref().into_iter().map(Ranged::range))
-            .filter(|range| *range != parameter_range);
-
-        let before = all_ranges
-            .clone()
-            .any(|r| r.start() <= parameter_range.start());
-        let after = all_ranges.clone().any(|r| r.end() >= parameter_range.end());
+        for range in parameters.posonlyargs.iter().map(Ranged::range) {
+            classify_range(range, ParameterKind::PositionalOnly);
+        }
+        for range in parameters.args.iter().map(Ranged::range) {
+            classify_range(range, ParameterKind::Positional);
+        }
+        if let Some(range) = parameters.vararg.as_deref().map(Ranged::range) {
+            classify_range(range, ParameterKind::VariadicPositional);
+        }
+        for range in parameters.kwonlyargs.iter().map(Ranged::range) {
+            classify_range(range, ParameterKind::KeywordOnly);
+        }
+        if let Some(range) = parameters.kwarg.as_deref().map(Ranged::range) {
+            classify_range(range, ParameterKind::VariadicKeyword);
+        }
 
         Ok(Self {
-            range: parameter_range,
-            parameter_kind,
+            parameter_range: parameter_range.context("Unable to find parameter to delete")?,
+            parameter_kind: parameter_kind.context("Unable to find parameter to delete")?,
             before,
             after,
         })
