@@ -254,7 +254,7 @@ impl ParameterRangeToRemove {
                 after = true;
             } else {
                 parameter_range = Some(range);
-                parameter_kind = Some(kind)
+                parameter_kind = Some(kind);
             }
         };
 
