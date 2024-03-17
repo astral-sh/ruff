@@ -540,7 +540,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     for name in names {
                         if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
                             // Mark the binding as "used".
-                            self.semantic.add_local_reference(binding_id, name.range());
+                            self.semantic.add_local_reference(
+                                binding_id,
+                                ExprContext::Load,
+                                name.range(),
+                            );
 
                             // Mark the binding in the enclosing scope as "rebound" in the current
                             // scope.
@@ -2113,7 +2117,8 @@ impl<'a> Checker<'a> {
                 // Mark anything referenced in `__all__` as used.
                 // TODO(charlie): `range` here should be the range of the name in `__all__`, not
                 // the range of `__all__` itself.
-                self.semantic.add_global_reference(binding_id, range);
+                self.semantic
+                    .add_global_reference(binding_id, ExprContext::Load, range);
             } else {
                 if self.semantic.global_scope().uses_star_imports() {
                     if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
