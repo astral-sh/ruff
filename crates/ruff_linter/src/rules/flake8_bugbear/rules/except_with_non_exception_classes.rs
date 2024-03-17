@@ -68,6 +68,23 @@ fn flatten_starred_iterables(expr: &Expr) -> Vec<&Expr> {
     flattened_exprs
 }
 
+/// Given an [`Expr`], flatten any binary operations.
+fn flatten_bin_op(expr: &Expr) -> Vec<&Expr> {
+    let mut stack = vec![expr];
+    let mut flattened_exprs = Vec::new();
+
+    while let Some(expr) = stack.pop() {
+        if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = expr {
+            stack.push(left);
+            stack.push(right);
+        } else {
+            flattened_exprs.push(expr);
+        }
+    }
+
+    flattened_exprs
+}
+
 /// B030
 pub(crate) fn except_with_non_exception_classes(
     checker: &mut Checker,
@@ -78,7 +95,11 @@ pub(crate) fn except_with_non_exception_classes(
     let Some(type_) = type_ else {
         return;
     };
-    for expr in flatten_starred_iterables(type_) {
+    let flattened_exprs = flatten_bin_op(type_);
+    let flattened_exprs = flattened_exprs
+        .iter()
+        .flat_map(|expr| flatten_starred_iterables(expr));
+    for expr in flattened_exprs {
         if !matches!(
             expr,
             Expr::Subscript(_) | Expr::Attribute(_) | Expr::Name(_) | Expr::Call(_),
