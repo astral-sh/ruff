@@ -9,10 +9,12 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 
 /// ## What it does
-/// Checks for `@singledispatchmethod` decorators on functions or static methods.
+/// Checks for `@singledispatchmethod` decorators on functions or static
+/// methods.
 ///
 /// ## Why is this bad?
-/// The `@singledispatchmethod` decorator is intended for use with class and instance methods, not functions.
+/// The `@singledispatchmethod` decorator is intended for use with class and
+/// instance methods, not functions.
 ///
 /// Instead, use the `@singledispatch` decorator.
 ///
@@ -22,7 +24,7 @@ use crate::importer::ImportRequest;
 ///
 ///
 /// @singledispatchmethod
-/// def foo(arg):
+/// def func(arg):
 ///     ...
 /// ```
 ///
@@ -32,7 +34,7 @@ use crate::importer::ImportRequest;
 ///
 ///
 /// @singledispatch
-/// def foo(arg):
+/// def func(arg):
 ///     ...
 /// ```
 ///
@@ -47,7 +49,7 @@ impl Violation for SingledispatchmethodFunction {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`@singledispatchmethod` decorator should not be used on functions")
+        format!("`@singledispatchmethod` decorator should not be used on non-method functions")
     }
 
     fn fix_title(&self) -> Option<String> {

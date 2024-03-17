@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-singledispatchmethod_function.py:4:1: PLE1520 [*] `@singledispatchmethod` decorator should not be used on functions
+singledispatchmethod_function.py:4:1: PLE1520 [*] `@singledispatchmethod` decorator should not be used on non-method functions
   |
 4 | @singledispatchmethod  # [singledispatchmethod-function]
   | ^^^^^^^^^^^^^^^^^^^^^ PLE1520
@@ -21,7 +21,7 @@ singledispatchmethod_function.py:4:1: PLE1520 [*] `@singledispatchmethod` decora
 6 6 |     pass
 7 7 | 
 
-singledispatchmethod_function.py:20:5: PLE1520 [*] `@singledispatchmethod` decorator should not be used on functions
+singledispatchmethod_function.py:20:5: PLE1520 [*] `@singledispatchmethod` decorator should not be used on non-method functions
    |
 18 |         pass
 19 | 
