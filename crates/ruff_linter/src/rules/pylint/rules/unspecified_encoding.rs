@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+use ast::StringLiteralFlags;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
@@ -106,7 +107,7 @@ fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
                 .expr(&Expr::StringLiteral(ast::ExprStringLiteral {
                     value: ast::StringLiteralValue::single(ast::StringLiteral {
                         value: "locale".to_string().into_boxed_str(),
-                        unicode: false,
+                        flags: StringLiteralFlags::default(),
                         range: TextRange::default(),
                     }),
                     range: TextRange::default(),

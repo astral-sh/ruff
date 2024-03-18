@@ -380,7 +380,7 @@ per-file-ignores = { "__init__.py" = ["F401"] }
         assert!(result.is_err());
         let result = PatternPrefixPair::from_str("**/bar:E501");
         assert!(result.is_ok());
-        let result = PatternPrefixPair::from_str("bar:E502");
+        let result = PatternPrefixPair::from_str("bar:E503");
         assert!(result.is_err());
     }
 }

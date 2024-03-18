@@ -2,7 +2,7 @@ use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 use ruff_text_size::{TextRange, TextSize};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::Locator;
 
@@ -44,7 +44,9 @@ pub struct BadQuotesInlineString {
     preferred_quote: Quote,
 }
 
-impl AlwaysFixableViolation for BadQuotesInlineString {
+impl Violation for BadQuotesInlineString {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let BadQuotesInlineString { preferred_quote } = self;
@@ -54,11 +56,11 @@ impl AlwaysFixableViolation for BadQuotesInlineString {
         }
     }
 
-    fn fix_title(&self) -> String {
+    fn fix_title(&self) -> Option<String> {
         let BadQuotesInlineString { preferred_quote } = self;
         match preferred_quote {
-            Quote::Double => "Replace single quotes with double quotes".to_string(),
-            Quote::Single => "Replace double quotes with single quotes".to_string(),
+            Quote::Double => Some("Replace single quotes with double quotes".to_string()),
+            Quote::Single => Some("Replace double quotes with single quotes".to_string()),
         }
     }
 }
@@ -155,7 +157,9 @@ pub struct BadQuotesDocstring {
     preferred_quote: Quote,
 }
 
-impl AlwaysFixableViolation for BadQuotesDocstring {
+impl Violation for BadQuotesDocstring {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let BadQuotesDocstring { preferred_quote } = self;
@@ -165,11 +169,11 @@ impl AlwaysFixableViolation for BadQuotesDocstring {
         }
     }
 
-    fn fix_title(&self) -> String {
+    fn fix_title(&self) -> Option<String> {
         let BadQuotesDocstring { preferred_quote } = self;
         match preferred_quote {
-            Quote::Double => "Replace single quotes docstring with double quotes".to_string(),
-            Quote::Single => "Replace double quotes docstring with single quotes".to_string(),
+            Quote::Double => Some("Replace single quotes docstring with double quotes".to_string()),
+            Quote::Single => Some("Replace double quotes docstring with single quotes".to_string()),
         }
     }
 }
@@ -188,10 +192,10 @@ const fn good_multiline_ending(quote: Quote) -> &'static str {
     }
 }
 
-const fn good_docstring(quote: Quote) -> &'static str {
+const fn good_docstring(quote: Quote) -> char {
     match quote {
-        Quote::Double => "\"",
-        Quote::Single => "'",
+        Quote::Double => '"',
+        Quote::Single => '\'',
     }
 }
 
@@ -201,6 +205,12 @@ struct Trivia<'a> {
     prefix: &'a str,
     raw_text: &'a str,
     is_multiline: bool,
+}
+
+impl Trivia<'_> {
+    fn has_empty_text(&self) -> bool {
+        self.raw_text == "\"\"" || self.raw_text == "''"
+    }
 }
 
 impl<'a> From<&'a str> for Trivia<'a> {
@@ -231,12 +241,38 @@ impl<'a> From<&'a str> for Trivia<'a> {
     }
 }
 
+/// Returns `true` if the [`TextRange`] is preceded by two consecutive quotes.
+fn text_starts_at_consecutive_quote(locator: &Locator, range: TextRange, quote: Quote) -> bool {
+    let mut previous_two_chars = locator.up_to(range.start()).chars().rev();
+    previous_two_chars.next() == Some(good_docstring(quote))
+        && previous_two_chars.next() == Some(good_docstring(quote))
+}
+
+/// Returns `true` if the [`TextRange`] ends at a quote character.
+fn text_ends_at_quote(locator: &Locator, range: TextRange, quote: Quote) -> bool {
+    locator
+        .after(range.end())
+        .starts_with(good_docstring(quote))
+}
+
 /// Q002
 fn docstring(locator: &Locator, range: TextRange, settings: &LinterSettings) -> Option<Diagnostic> {
     let quotes_settings = &settings.flake8_quotes;
 
     let text = locator.slice(range);
     let trivia: Trivia = text.into();
+    if trivia.has_empty_text()
+        && text_ends_at_quote(locator, range, settings.flake8_quotes.docstring_quotes)
+    {
+        // Fixing this would result in a one-sided multi-line docstring, which would
+        // introduce a syntax error.
+        return Some(Diagnostic::new(
+            BadQuotesDocstring {
+                preferred_quote: quotes_settings.docstring_quotes,
+            },
+            range,
+        ));
+    }
 
     if trivia
         .raw_text
@@ -253,7 +289,9 @@ fn docstring(locator: &Locator, range: TextRange, settings: &LinterSettings) -> 
     );
     let quote_count = if trivia.is_multiline { 3 } else { 1 };
     let string_contents = &trivia.raw_text[quote_count..trivia.raw_text.len() - quote_count];
-    let quote = good_docstring(quotes_settings.docstring_quotes).repeat(quote_count);
+    let quote = good_docstring(quotes_settings.docstring_quotes)
+        .to_string()
+        .repeat(quote_count);
     let mut fixed_contents =
         String::with_capacity(trivia.prefix.len() + string_contents.len() + quote.len() * 2);
     fixed_contents.push_str(trivia.prefix);
@@ -344,6 +382,42 @@ fn strings(
             // If we're not using the preferred type, only allow use to avoid escapes.
             && !relax_quote
         {
+            if trivia.has_empty_text()
+                && text_ends_at_quote(locator, *range, settings.flake8_quotes.inline_quotes)
+            {
+                // Fixing this would introduce a syntax error. For example, changing the initial
+                // single quotes to double quotes would result in a syntax error:
+                // ```python
+                // ''"assert" ' SAM macro definitions '''
+                // ```
+                diagnostics.push(Diagnostic::new(
+                    BadQuotesInlineString {
+                        preferred_quote: quotes_settings.inline_quotes,
+                    },
+                    *range,
+                ));
+                continue;
+            }
+
+            if text_starts_at_consecutive_quote(
+                locator,
+                *range,
+                settings.flake8_quotes.inline_quotes,
+            ) {
+                // Fixing this would introduce a syntax error. For example, changing the double
+                // doubles to single quotes would result in a syntax error:
+                // ```python
+                // ''"assert" ' SAM macro definitions '''
+                // ```
+                diagnostics.push(Diagnostic::new(
+                    BadQuotesInlineString {
+                        preferred_quote: quotes_settings.inline_quotes,
+                    },
+                    *range,
+                ));
+                continue;
+            }
+
             let mut diagnostic = Diagnostic::new(
                 BadQuotesInlineString {
                     preferred_quote: quotes_settings.inline_quotes,
@@ -383,7 +457,7 @@ struct FStringRangeBuilder {
 impl FStringRangeBuilder {
     fn visit_token(&mut self, token: &Tok, range: TextRange) {
         match token {
-            Tok::FStringStart => {
+            Tok::FStringStart(_) => {
                 if self.nesting == 0 {
                     self.start_location = range.start();
                 }

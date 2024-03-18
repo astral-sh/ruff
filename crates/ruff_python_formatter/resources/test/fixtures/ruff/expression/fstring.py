@@ -189,7 +189,7 @@ f"aaaaaa {[
     yyyyyyyyyyyy
 ]} ccccccc"
 
-# Remove the parenthese because they aren't required
+# Remove the parentheses because they aren't required
 xxxxxxxxxxxxxxx = (
     f"aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbb {
         xxxxxxxxxxx  # comment 14
@@ -214,7 +214,7 @@ f"{ # comment 15
 # removed once we have a strict parser.
 x = f"aaaaaaaaa { x !  r }"
 
-# Even in the case of debug expresions, we only need to preserve the whitespace within
+# Even in the case of debug expressions, we only need to preserve the whitespace within
 # the expression part of the replacement field.
 x = f"aaaaaaaaa { x   = !  r  }"
 

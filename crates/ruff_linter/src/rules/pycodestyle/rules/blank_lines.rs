@@ -243,7 +243,7 @@ impl AlwaysFixableViolation for BlankLineAfterDecorator {
 /// Checks for missing blank lines after the end of function or class.
 ///
 /// ## Why is this bad?
-/// PEP 8 recommends using blank lines as following:
+/// PEP 8 recommends using blank lines as follows:
 /// - Two blank lines are expected between functions and classes
 /// - One blank line is expected between methods of a class.
 ///
@@ -294,7 +294,7 @@ impl AlwaysFixableViolation for BlankLinesAfterFunctionOrClass {
 /// Checks for 1 blank line between nested function or class definitions.
 ///
 /// ## Why is this bad?
-/// PEP 8 recommends using blank lines as following:
+/// PEP 8 recommends using blank lines as follows:
 /// - Two blank lines are expected between functions and classes
 /// - One blank line is expected between methods of a class.
 ///
@@ -726,10 +726,8 @@ impl<'a> BlankLinesChecker<'a> {
             state.class_status.update(&logical_line);
             state.fn_status.update(&logical_line);
 
-            if state.is_not_first_logical_line
-                // Ignore the first logical line (and any comment preceding it) of each cell in notebooks.
-                && !logical_line.is_beginning_of_cell
-            {
+            // Ignore the first logical line (and any comment preceding it) of each cell in notebooks.
+            if !logical_line.is_beginning_of_cell {
                 self.check_line(&logical_line, &state, prev_indent_length, diagnostics);
             }
 
@@ -851,6 +849,8 @@ impl<'a> BlankLinesChecker<'a> {
             && line.kind.is_class_function_or_decorator()
             // Blank lines in stub files are used to group definitions. Don't enforce blank lines.
             && !self.source_type.is_stub()
+            // Do not expect blank lines before the first logical line.
+            && state.is_not_first_logical_line
         {
             // E302
             let mut diagnostic = Diagnostic::new(
