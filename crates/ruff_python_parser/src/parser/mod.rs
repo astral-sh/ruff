@@ -99,7 +99,10 @@ pub(crate) struct Parser<'src> {
     /// Specify the mode in which the code will be parsed.
     mode: Mode,
 
+    /// The current token along with its range.
     current: Spanned,
+    /// The current token kind.
+    current_kind: TokenKind,
 
     /// The end of the last processed. Used to determine a node's end.
     last_token_end: TextSize,
@@ -163,6 +166,7 @@ impl<'src> Parser<'src> {
             tokens,
             recovery_context: RecoveryContext::empty(),
             last_token_end: tokens_range.start(),
+            current_kind: TokenKind::from_token(&current.0),
             current,
             tokens_range,
         }
@@ -308,6 +312,7 @@ impl<'src> Parser<'src> {
             .unwrap_or_else(|| (Tok::EndOfFile, TextRange::empty(self.tokens_range.end())));
 
         let current = std::mem::replace(&mut self.current, next);
+        self.current_kind = TokenKind::from_token(&self.current.0);
 
         if !matches!(
             current.0,
@@ -347,8 +352,7 @@ impl<'src> Parser<'src> {
     /// Returns the current token kind.
     #[inline]
     fn current_token_kind(&self) -> TokenKind {
-        // TODO: Converting the token kind over and over again can be expensive.
-        TokenKind::from_token(&self.current.0)
+        self.current_kind
     }
 
     /// Returns the range of the current token.
