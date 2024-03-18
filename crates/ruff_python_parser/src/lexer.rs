@@ -170,11 +170,7 @@ impl<'source> Lexer<'source> {
     }
 
     /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
-    fn lex_identifier(
-        &mut self,
-        first: char,
-        first_char_is_ascii: bool,
-    ) -> Result<Tok, LexicalError> {
+    fn lex_identifier(&mut self, first: char) -> Result<Tok, LexicalError> {
         // Detect potential string like rb'' b'' f'' u'' r''
         match (first, self.cursor.first()) {
             ('f' | 'F', quote @ ('\'' | '"')) => {
@@ -209,11 +205,19 @@ impl<'source> Lexer<'source> {
         // We need to therefore do the same in our lexer, but applying NFKC normalization
         // unconditionally is extremely expensive. If we know an identifier is ASCII-only,
         // (by far the most common case), we can skip NFKC normalization of the identifier.
-        let mut is_ascii = first_char_is_ascii;
+        let mut is_ascii = first.is_ascii();
         self.cursor
             .eat_while(|c| is_identifier_continuation(c, &mut is_ascii));
 
-        let keyword = match self.token_text() {
+        let text = self.token_text();
+
+        if !is_ascii {
+            return Ok(Tok::Name {
+                name: text.nfkc().collect::<String>().into_boxed_str(),
+            });
+        }
+
+        let keyword = match text {
             "False" => Tok::False,
             "None" => Tok::None,
             "True" => Tok::True,
@@ -252,15 +256,10 @@ impl<'source> Lexer<'source> {
             "while" => Tok::While,
             "with" => Tok::With,
             "yield" => Tok::Yield,
-            text => {
-                let name = if is_ascii {
-                    text.to_string()
-                } else {
-                    text.nfkc().collect()
-                };
+            _ => {
                 return Ok(Tok::Name {
-                    name: name.into_boxed_str(),
-                });
+                    name: text.to_string().into_boxed_str(),
+                })
             }
         };
 
@@ -923,7 +922,7 @@ impl<'source> Lexer<'source> {
             if c.is_ascii() {
                 self.consume_ascii_character(c)
             } else if is_unicode_identifier_start(c) {
-                let identifier = self.lex_identifier(c, false)?;
+                let identifier = self.lex_identifier(c)?;
                 self.state = State::Other;
 
                 Ok((identifier, self.token_range()))
@@ -1083,7 +1082,7 @@ impl<'source> Lexer<'source> {
     // Dispatch based on the given character.
     fn consume_ascii_character(&mut self, c: char) -> Result<Spanned, LexicalError> {
         let token = match c {
-            c if is_ascii_identifier_start(c) => self.lex_identifier(c, true)?,
+            c if is_ascii_identifier_start(c) => self.lex_identifier(c)?,
             '0'..='9' => self.lex_number(c)?,
             '#' => return Ok((self.lex_comment(), self.token_range())),
             '\'' | '"' => self.lex_string(None, c)?,
@@ -2062,6 +2061,17 @@ def f(arg=%timeit a = b):
     fn test_escape_unicode_name() {
         let source = r#""\N{EN SPACE}""#;
         assert_debug_snapshot!(lex_source(source));
+    }
+
+    fn get_tokens_only(source: &str) -> Vec<Tok> {
+        lex_source(source).into_iter().map(|(tok, _)| tok).collect()
+    }
+
+    #[test]
+    fn test_nfkc_normalization() {
+        let source1 = "𝒞 = 500";
+        let source2 = "C = 500";
+        assert_eq!(get_tokens_only(source1), get_tokens_only(source2));
     }
 
     fn triple_quoted_eol(eol: &str) -> Vec<Spanned> {
