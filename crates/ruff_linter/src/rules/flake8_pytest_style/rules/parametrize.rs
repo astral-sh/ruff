@@ -12,6 +12,7 @@ use ruff_python_codegen::Generator;
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use similar::DiffableStr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -544,12 +545,19 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
                         values.start(),
                         values.start() + TextSize::from(1),
                     );
-                    // Replace `)` with `]`.
-                    let values_end = Edit::replacement(
-                        "]".into(),
-                        values.end() - TextSize::from(1),
-                        values.end(),
-                    );
+                    // Replace `)` or `,)` with `]`.
+                    let start = if checker
+                        .locator()
+                        .contents()
+                        .slice(TextRange::at(values.end() - TextSize::from(2), 2.into()).into())
+                        == ",)"
+                    {
+                        values.end() - TextSize::from(2)
+                    } else {
+                        values.end() - TextSize::from(1)
+                    };
+                    let values_end = Edit::replacement("]".into(), start, values.end());
+
                     Fix::unsafe_edits(values_start, [values_end])
                 });
                 checker.diagnostics.push(diagnostic);
@@ -659,9 +667,17 @@ fn handle_value_rows(
                             elt.start(),
                             elt.start() + TextSize::from(1),
                         );
-                        // Replace `)` with `]`.
-                        let elt_end =
-                            Edit::replacement("]".into(), elt.end() - TextSize::from(1), elt.end());
+                        // Replace `)` or `,)` with `]`.
+                        let start =
+                            if checker.locator().contents().slice(
+                                TextRange::at(elt.end() - TextSize::from(2), 2.into()).into(),
+                            ) == ",)"
+                            {
+                                elt.end() - TextSize::from(2)
+                            } else {
+                                elt.end() - TextSize::from(1)
+                            };
+                        let elt_end = Edit::replacement("]".into(), start, elt.end());
                         Fix::unsafe_edits(elt_start, [elt_end])
                     });
                     checker.diagnostics.push(diagnostic);
