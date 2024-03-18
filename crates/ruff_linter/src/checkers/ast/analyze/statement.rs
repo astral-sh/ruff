@@ -1366,13 +1366,15 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
         }
-        Stmt::Try(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        }) => {
+        Stmt::Try(
+            try_ @ ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            },
+        ) => {
             if checker.enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
@@ -1438,6 +1440,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ErrorInsteadOfException) {
                 tryceratops::rules::error_instead_of_exception(checker, handlers);
+            }
+            if checker.enabled(Rule::TooManyExcepts) {
+                if let Some(diagnostic) = wemake_python_styleguide::too_many_excepts(try_) {
+                    checker.diagnostics.push(diagnostic)
+                }
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {

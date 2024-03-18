@@ -4,9 +4,10 @@ pub(crate) use complexity::*;
 pub(crate) use many_class_methods::*;
 pub(crate) use many_decorators::*;
 pub(crate) use many_func_awaits::*;
-pub (crate) use many_asserts::*;
+pub(crate) use many_asserts::*;
 pub(crate) use many_elifs::*;
 pub(crate) use many_raises::*;
+pub(crate) use many_excepts::*;
 
 mod imports;
 mod definitions;
@@ -19,3 +20,4 @@ mod many_func_awaits;
 mod many_asserts;
 mod many_raises;
 mod many_elifs;
+mod many_excepts;
