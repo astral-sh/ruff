@@ -180,8 +180,17 @@ pub(crate) fn generate() -> String {
             .map(|rule| (rule.upstream_category(&linter), rule))
             .into_group_map();
 
+        let mut rules_by_upstream_category: Vec<_> = rules_by_upstream_category.iter().collect();
+
+        // Sort the upstream categories alphabetically by prefix.
+        rules_by_upstream_category.sort_by(|a, b| {
+            a.0.as_ref()
+                .map_or("", |x| x.prefix)
+                .cmp(b.0.as_ref().map_or("", |x| x.prefix))
+        });
+
         if rules_by_upstream_category.len() > 1 {
-            for (opt, rules) in &rules_by_upstream_category {
+            for (opt, rules) in rules_by_upstream_category {
                 if opt.is_some() {
                     let UpstreamCategoryAndPrefix { category, prefix } = opt.unwrap();
                     table_out.push_str(&format!("#### {category} ({prefix})"));
