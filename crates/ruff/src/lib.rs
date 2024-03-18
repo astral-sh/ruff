@@ -206,14 +206,9 @@ fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitS
 }
 
 fn server(args: ServerCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    let ServerCommand {
-        preview,
-        mut worker_threads,
-    } = args;
-    if worker_threads == 0 {
-        // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
-        worker_threads = num_cpus::get().max(4);
-    }
+    let ServerCommand { preview } = args;
+    // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
+    let worker_threads = num_cpus::get().max(4);
     commands::server::run_server(
         preview,
         NonZeroUsize::try_from(worker_threads).expect("a non-zero worker thread count"),
