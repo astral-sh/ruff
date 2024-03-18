@@ -429,6 +429,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Mypy](https://github.com/python/mypy)
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
 - [Neon](https://github.com/neondatabase/neon)
+- [Nokia](https://nokia.com/)
 - [NoneBot](https://github.com/nonebot/nonebot2)
 - [NumPyro](https://github.com/pyro-ppl/numpyro)
 - [ONNX](https://github.com/onnx/onnx)
