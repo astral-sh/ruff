@@ -17,13 +17,13 @@ use crate::checkers::ast::Checker;
 ///
 /// In Python, an `Iterable` is an object that has an `__iter__` method; an
 /// `Iterator` is an object that has `__iter__` and `__next__` methods. All
-/// `__iter__` methods are expected to return `Iterator`s in Python. Type
-/// checkers may not always recognize an object as being iterable if its
-/// `__iter__` method does not return an `Iterator`.
+/// `__iter__` methods are expected to return `Iterator`s. Type checkers may
+/// not always recognize an object as being iterable if its `__iter__` method
+/// does not return an `Iterator`.
 ///
 /// Every `Iterator` is an `Iterable`, but not every `Iterable` is an `Iterator`.
 /// For example, `list` is an `Iterable`, but not an `Iterator`; you can obtain
-/// an iterator over a list's elements by calling `iter()` on the list:
+/// an iterator over a list's elements by passing the list to `iter()`:
 ///
 /// ```pycon
 /// >>> import collections.abc

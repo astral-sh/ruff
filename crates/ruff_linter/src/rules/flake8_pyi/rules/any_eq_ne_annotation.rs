@@ -19,21 +19,23 @@ use crate::checkers::ast::Checker;
 /// would otherwise be inexpressible to the type checker.
 ///
 /// The expectation in Python is that a comparison of two arbitrary objects
-/// using `==` or `!=` should never raise an exception. As such, the methods
-/// implementing these comparison operators -- `__eq__` and `__ne__` -- should
-/// use `object` rather than `Any` for their second parameter.
+/// using `==` or `!=` should never raise an exception. This contract can be
+/// fully expressed in the type system and does not involve requesting unsound
+/// behaviour from a type checker. As such, `object` is a more appropriate
+/// annotation than `Any` for the second parameter of the methods implementing
+/// these comparison operators -- `__eq__` and `__ne__`.
 ///
 /// ## Example
 /// ```python
 /// class Foo:
-///     def __eq__(self, obj: typing.Any):
+///     def __eq__(self, obj: typing.Any) -> bool:
 ///         ...
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// class Foo:
-///     def __eq__(self, obj: object):
+///     def __eq__(self, obj: object) -> bool:
 ///         ...
 /// ```
 /// ## References

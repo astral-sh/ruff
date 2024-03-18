@@ -34,7 +34,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ```python
 /// from typing import Literal
 ///
-/// x: Literal["A"] | str
+/// x: Literal[b"B"] | str
 /// ```
 #[violation]
 pub struct RedundantLiteralUnion {

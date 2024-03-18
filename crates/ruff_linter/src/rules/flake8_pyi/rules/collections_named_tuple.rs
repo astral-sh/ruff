@@ -16,9 +16,9 @@ use crate::checkers::ast::Checker;
 /// Inheriting from `typing.NamedTuple` creates a custom `tuple` subclass in
 /// the same way as using the `collections.namedtuple` factory function.
 /// However, using `typing.NamedTuple` allows you to provide a type annotation
-/// for each field in the class. This means that type checkers will have much
-/// more information to work with, and will be able to analyze your code far
-/// more precisely.
+/// for each field in the class. This means that type checkers will have more
+/// information to work with, and will be able to analyze your code more
+/// precisely.
 ///
 /// ## Example
 /// ```python

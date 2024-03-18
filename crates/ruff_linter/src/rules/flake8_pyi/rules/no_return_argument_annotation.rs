@@ -13,9 +13,13 @@ use crate::settings::types::PythonVersion::Py311;
 /// parameter annotations.
 ///
 /// ## Why is this bad?
-/// Prefer `typing.Never` (or `typing_extensions.Never`) over `typing.NoReturn`
-/// for parameter annotations. This is a purely stylistic choice, as the two
-/// are semantically equivalent.
+/// Prefer `Never` over `NoReturn` for parameter annotations. `Never` has a
+/// clearer name in these contexts, since it makes little sense to talk about a
+/// parameter annotation "not returning".
+///
+/// This is a purely stylistic lint: the two types have identical semantics for
+/// type checkers. Both represent Python's "[bottom type]" (a type that has no
+/// members).
 ///
 /// ## Example
 /// ```python
@@ -34,6 +38,8 @@ use crate::settings::types::PythonVersion::Py311;
 /// ## References
 /// - [Python documentation: `typing.Never`](https://docs.python.org/3/library/typing.html#typing.Never)
 /// - [Python documentation: `typing.NoReturn`](https://docs.python.org/3/library/typing.html#typing.NoReturn)
+///
+/// [bottom type]: https://en.wikipedia.org/wiki/Bottom_type
 #[violation]
 pub struct NoReturnArgumentAnnotationInStub {
     module: TypingModule,
