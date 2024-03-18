@@ -96,6 +96,7 @@ mod tests {
         Rule::NamedExprWithoutContext,
         Path::new("named_expr_without_context.py")
     )]
+    #[test_case(Rule::NonlocalAndGlobal, Path::new("nonlocal_and_global.py"))]
     #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"))]
     #[test_case(Rule::NonSlotAssignment, Path::new("non_slot_assignment.py"))]
     #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"))]

@@ -30,7 +30,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }));
             }
         }
-        Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
+        Stmt::Nonlocal(nonlocal @ ast::StmtNonlocal { names, range: _ }) => {
             if checker.enabled(Rule::AmbiguousVariableName) {
                 checker.diagnostics.extend(names.iter().filter_map(|name| {
                     pycodestyle::rules::ambiguous_variable_name(name, name.range())
@@ -49,6 +49,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         }
                     }
                 }
+            }
+            if checker.enabled(Rule::NonlocalAndGlobal) {
+                pylint::rules::nonlocal_and_global(checker, nonlocal);
             }
         }
         Stmt::Break(_) => {
