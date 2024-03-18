@@ -96,7 +96,7 @@ strum_macros = { version = "0.25.3" }
 syn = { version = "2.0.51" }
 tempfile = { version = "3.9.0" }
 test-case = { version = "3.3.1" }
-thiserror = { version = "1.0.57" }
+thiserror = { version = "1.0.58" }
 tikv-jemallocator = { version = "0.5.0" }
 toml = { version = "0.8.9" }
 tracing = { version = "0.1.40" }
