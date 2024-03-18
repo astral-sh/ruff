@@ -22,7 +22,7 @@ expression: parse_ast
                                 ],
                                 flags: BytesLiteralFlags {
                                     quote_style: Single,
-                                    prefix: "b",
+                                    prefix: Regular,
                                     triple_quoted: false,
                                 },
                             },

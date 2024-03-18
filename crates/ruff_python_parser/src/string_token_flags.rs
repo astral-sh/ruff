@@ -330,7 +330,7 @@ impl StringKind {
 impl fmt::Debug for StringKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("StringKind")
-            .field("prefix", &self.prefix().as_str())
+            .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
             .field("quote_style", &self.quote_style())
             .finish()

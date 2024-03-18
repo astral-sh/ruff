@@ -1306,7 +1306,7 @@ impl fmt::Debug for FStringFlags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FStringFlags")
             .field("quote_style", &self.quote_style())
-            .field("prefix", &self.prefix().as_str())
+            .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
             .finish()
     }
@@ -1662,7 +1662,7 @@ impl fmt::Debug for StringLiteralFlags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("StringLiteralFlags")
             .field("quote_style", &self.quote_style())
-            .field("prefix", &self.prefix().as_str())
+            .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
             .finish()
     }
@@ -2062,7 +2062,7 @@ impl fmt::Debug for BytesLiteralFlags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BytesLiteralFlags")
             .field("quote_style", &self.quote_style())
-            .field("prefix", &self.prefix().as_str())
+            .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
             .finish()
     }
