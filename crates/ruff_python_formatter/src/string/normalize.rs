@@ -2,23 +2,23 @@ use std::borrow::Cow;
 use std::iter::FusedIterator;
 
 use ruff_formatter::FormatContext;
+use ruff_python_ast::str::Quote;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::context::FStringState;
 use crate::options::PythonVersion;
 use crate::prelude::*;
-use crate::preview::{is_f_string_formatting_enabled, is_hex_codes_in_unicode_sequences_enabled};
-use crate::string::{QuoteChar, Quoting, StringPart, StringPrefix, StringQuotes};
+use crate::preview::is_f_string_formatting_enabled;
+use crate::string::{Quoting, StringPart, StringPrefix, StringQuotes};
 use crate::QuoteStyle;
 
 pub(crate) struct StringNormalizer {
     quoting: Quoting,
     preferred_quote_style: QuoteStyle,
-    parent_docstring_quote_char: Option<QuoteChar>,
+    parent_docstring_quote_char: Option<Quote>,
     f_string_state: FStringState,
     target_version: PythonVersion,
-    normalize_hex: bool,
     format_fstring: bool,
 }
 
@@ -30,7 +30,6 @@ impl StringNormalizer {
             parent_docstring_quote_char: context.docstring(),
             f_string_state: context.f_string_state(),
             target_version: context.options().target_version(),
-            normalize_hex: is_hex_codes_in_unicode_sequences_enabled(context),
             format_fstring: is_f_string_formatting_enabled(context),
         }
     }
@@ -132,7 +131,7 @@ impl StringNormalizer {
                     // style from what the parent ultimately decided upon works, even
                     // if it doesn't have perfect alignment with PEP8.
                     if let Some(quote) = self.parent_docstring_quote_char {
-                        QuoteStyle::from(quote.invert())
+                        QuoteStyle::from(quote.opposite())
                     } else if self.preferred_quote_style.is_preserve() {
                         QuoteStyle::Preserve
                     } else {
@@ -142,7 +141,7 @@ impl StringNormalizer {
                     self.preferred_quote_style
                 };
 
-                if let Some(preferred_quote) = QuoteChar::from_style(preferred_style) {
+                if let Ok(preferred_quote) = Quote::try_from(preferred_style) {
                     if let Some(first_quote_or_normalized_char_offset) =
                         first_quote_or_normalized_char_offset
                     {
@@ -195,7 +194,6 @@ impl StringNormalizer {
                 first_quote_or_escape_offset,
                 quote_selection.quotes,
                 string.prefix(),
-                self.normalize_hex,
                 // TODO: Remove the `b'{'` in `choose_quotes` when promoting the
                 // `format_fstring` preview style
                 self.format_fstring,
@@ -284,7 +282,7 @@ impl Format<PyFormatContext<'_>> for NormalizedString<'_> {
 fn choose_quotes_for_raw_string(
     input: &str,
     quotes: StringQuotes,
-    preferred_quote: QuoteChar,
+    preferred_quote: Quote,
 ) -> StringQuotes {
     let preferred_quote_char = preferred_quote.as_char();
     let mut chars = input.chars().peekable();
@@ -340,11 +338,7 @@ fn choose_quotes_for_raw_string(
 /// For triple quoted strings, the preferred quote style is always used, unless the string contains
 /// a triplet of the quote character (e.g., if double quotes are preferred, double quotes will be
 /// used unless the string contains `"""`).
-fn choose_quotes_impl(
-    input: &str,
-    quotes: StringQuotes,
-    preferred_quote: QuoteChar,
-) -> StringQuotes {
+fn choose_quotes_impl(input: &str, quotes: StringQuotes, preferred_quote: Quote) -> StringQuotes {
     let quote = if quotes.triple {
         // True if the string contains a triple quote sequence of the configured quote style.
         let mut uses_triple_quotes = false;
@@ -422,18 +416,18 @@ fn choose_quotes_impl(
         }
 
         match preferred_quote {
-            QuoteChar::Single => {
+            Quote::Single => {
                 if single_quotes > double_quotes {
-                    QuoteChar::Double
+                    Quote::Double
                 } else {
-                    QuoteChar::Single
+                    Quote::Single
                 }
             }
-            QuoteChar::Double => {
+            Quote::Double => {
                 if double_quotes > single_quotes {
-                    QuoteChar::Single
+                    Quote::Single
                 } else {
-                    QuoteChar::Double
+                    Quote::Double
                 }
             }
         }
@@ -454,7 +448,6 @@ pub(crate) fn normalize_string(
     start_offset: usize,
     quotes: StringQuotes,
     prefix: StringPrefix,
-    normalize_hex: bool,
     format_fstring: bool,
 ) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
@@ -466,7 +459,7 @@ pub(crate) fn normalize_string(
 
     let quote = quotes.quote_char;
     let preferred_quote = quote.as_char();
-    let opposite_quote = quote.invert().as_char();
+    let opposite_quote = quote.opposite().as_char();
 
     let mut chars = CharIndicesWithOffset::new(input, start_offset).peekable();
 
@@ -506,7 +499,7 @@ pub(crate) fn normalize_string(
                     if next == '\\' {
                         // Skip over escaped backslashes
                         chars.next();
-                    } else if normalize_hex {
+                    } else {
                         // Length of the `\` plus the length of the escape sequence character (`u` | `U` | `x`)
                         let escape_start_len = '\\'.len_utf8() + next.len_utf8();
                         if let Some(normalised) = UnicodeEscape::new(next, !prefix.is_byte())
@@ -711,7 +704,9 @@ impl UnicodeEscape {
 mod tests {
     use std::borrow::Cow;
 
-    use crate::string::{QuoteChar, StringPrefix, StringQuotes};
+    use ruff_python_ast::str::Quote;
+
+    use crate::string::{StringPrefix, StringQuotes};
 
     use super::{normalize_string, UnicodeEscape};
 
@@ -734,10 +729,9 @@ mod tests {
             0,
             StringQuotes {
                 triple: false,
-                quote_char: QuoteChar::Double,
+                quote_char: Quote::Double,
             },
             StringPrefix::BYTE,
-            true,
             true,
         );
 

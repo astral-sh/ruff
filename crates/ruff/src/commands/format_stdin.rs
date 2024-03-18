@@ -23,11 +23,7 @@ pub(crate) fn format_stdin(
     cli: &FormatArguments,
     config_arguments: &ConfigArguments,
 ) -> Result<ExitStatus> {
-    let pyproject_config = resolve(
-        cli.isolated,
-        config_arguments,
-        cli.stdin_filename.as_deref(),
-    )?;
+    let pyproject_config = resolve(config_arguments, cli.stdin_filename.as_deref())?;
 
     let mut resolver = Resolver::new(&pyproject_config);
     warn_incompatible_formatter_settings(&resolver);
@@ -122,9 +118,13 @@ fn format_source_code(
             }
             FormatMode::Check => {}
             FormatMode::Diff => {
-                source_kind
-                    .diff(formatted, path, &mut stdout().lock())
-                    .map_err(|err| FormatCommandError::Diff(path.map(Path::to_path_buf), err))?;
+                use std::io::Write;
+                write!(
+                    &mut stdout().lock(),
+                    "{}",
+                    source_kind.diff(formatted, path).unwrap()
+                )
+                .map_err(|err| FormatCommandError::Diff(path.map(Path::to_path_buf), err))?;
             }
         },
         FormattedSource::Unchanged => {

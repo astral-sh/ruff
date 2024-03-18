@@ -7,17 +7,17 @@ use crate::{self as ast, Expr};
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ExpressionRef<'a> {
     BoolOp(&'a ast::ExprBoolOp),
-    NamedExpr(&'a ast::ExprNamedExpr),
+    Named(&'a ast::ExprNamed),
     BinOp(&'a ast::ExprBinOp),
     UnaryOp(&'a ast::ExprUnaryOp),
     Lambda(&'a ast::ExprLambda),
-    IfExp(&'a ast::ExprIfExp),
+    If(&'a ast::ExprIf),
     Dict(&'a ast::ExprDict),
     Set(&'a ast::ExprSet),
     ListComp(&'a ast::ExprListComp),
     SetComp(&'a ast::ExprSetComp),
     DictComp(&'a ast::ExprDictComp),
-    GeneratorExp(&'a ast::ExprGeneratorExp),
+    Generator(&'a ast::ExprGenerator),
     Await(&'a ast::ExprAwait),
     Yield(&'a ast::ExprYield),
     YieldFrom(&'a ast::ExprYieldFrom),
@@ -50,17 +50,17 @@ impl<'a> From<&'a Expr> for ExpressionRef<'a> {
     fn from(value: &'a Expr) -> Self {
         match value {
             Expr::BoolOp(value) => ExpressionRef::BoolOp(value),
-            Expr::NamedExpr(value) => ExpressionRef::NamedExpr(value),
+            Expr::Named(value) => ExpressionRef::Named(value),
             Expr::BinOp(value) => ExpressionRef::BinOp(value),
             Expr::UnaryOp(value) => ExpressionRef::UnaryOp(value),
             Expr::Lambda(value) => ExpressionRef::Lambda(value),
-            Expr::IfExp(value) => ExpressionRef::IfExp(value),
+            Expr::If(value) => ExpressionRef::If(value),
             Expr::Dict(value) => ExpressionRef::Dict(value),
             Expr::Set(value) => ExpressionRef::Set(value),
             Expr::ListComp(value) => ExpressionRef::ListComp(value),
             Expr::SetComp(value) => ExpressionRef::SetComp(value),
             Expr::DictComp(value) => ExpressionRef::DictComp(value),
-            Expr::GeneratorExp(value) => ExpressionRef::GeneratorExp(value),
+            Expr::Generator(value) => ExpressionRef::Generator(value),
             Expr::Await(value) => ExpressionRef::Await(value),
             Expr::Yield(value) => ExpressionRef::Yield(value),
             Expr::YieldFrom(value) => ExpressionRef::YieldFrom(value),
@@ -90,9 +90,9 @@ impl<'a> From<&'a ast::ExprBoolOp> for ExpressionRef<'a> {
         Self::BoolOp(value)
     }
 }
-impl<'a> From<&'a ast::ExprNamedExpr> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprNamedExpr) -> Self {
-        Self::NamedExpr(value)
+impl<'a> From<&'a ast::ExprNamed> for ExpressionRef<'a> {
+    fn from(value: &'a ast::ExprNamed) -> Self {
+        Self::Named(value)
     }
 }
 impl<'a> From<&'a ast::ExprBinOp> for ExpressionRef<'a> {
@@ -110,9 +110,9 @@ impl<'a> From<&'a ast::ExprLambda> for ExpressionRef<'a> {
         Self::Lambda(value)
     }
 }
-impl<'a> From<&'a ast::ExprIfExp> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprIfExp) -> Self {
-        Self::IfExp(value)
+impl<'a> From<&'a ast::ExprIf> for ExpressionRef<'a> {
+    fn from(value: &'a ast::ExprIf) -> Self {
+        Self::If(value)
     }
 }
 impl<'a> From<&'a ast::ExprDict> for ExpressionRef<'a> {
@@ -140,9 +140,9 @@ impl<'a> From<&'a ast::ExprDictComp> for ExpressionRef<'a> {
         Self::DictComp(value)
     }
 }
-impl<'a> From<&'a ast::ExprGeneratorExp> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprGeneratorExp) -> Self {
-        Self::GeneratorExp(value)
+impl<'a> From<&'a ast::ExprGenerator> for ExpressionRef<'a> {
+    fn from(value: &'a ast::ExprGenerator) -> Self {
+        Self::Generator(value)
     }
 }
 impl<'a> From<&'a ast::ExprAwait> for ExpressionRef<'a> {
@@ -250,17 +250,17 @@ impl<'a> From<ExpressionRef<'a>> for AnyNodeRef<'a> {
     fn from(value: ExpressionRef<'a>) -> Self {
         match value {
             ExpressionRef::BoolOp(expression) => AnyNodeRef::ExprBoolOp(expression),
-            ExpressionRef::NamedExpr(expression) => AnyNodeRef::ExprNamedExpr(expression),
+            ExpressionRef::Named(expression) => AnyNodeRef::ExprNamed(expression),
             ExpressionRef::BinOp(expression) => AnyNodeRef::ExprBinOp(expression),
             ExpressionRef::UnaryOp(expression) => AnyNodeRef::ExprUnaryOp(expression),
             ExpressionRef::Lambda(expression) => AnyNodeRef::ExprLambda(expression),
-            ExpressionRef::IfExp(expression) => AnyNodeRef::ExprIfExp(expression),
+            ExpressionRef::If(expression) => AnyNodeRef::ExprIf(expression),
             ExpressionRef::Dict(expression) => AnyNodeRef::ExprDict(expression),
             ExpressionRef::Set(expression) => AnyNodeRef::ExprSet(expression),
             ExpressionRef::ListComp(expression) => AnyNodeRef::ExprListComp(expression),
             ExpressionRef::SetComp(expression) => AnyNodeRef::ExprSetComp(expression),
             ExpressionRef::DictComp(expression) => AnyNodeRef::ExprDictComp(expression),
-            ExpressionRef::GeneratorExp(expression) => AnyNodeRef::ExprGeneratorExp(expression),
+            ExpressionRef::Generator(expression) => AnyNodeRef::ExprGenerator(expression),
             ExpressionRef::Await(expression) => AnyNodeRef::ExprAwait(expression),
             ExpressionRef::Yield(expression) => AnyNodeRef::ExprYield(expression),
             ExpressionRef::YieldFrom(expression) => AnyNodeRef::ExprYieldFrom(expression),
@@ -293,17 +293,17 @@ impl Ranged for ExpressionRef<'_> {
     fn range(&self) -> TextRange {
         match self {
             ExpressionRef::BoolOp(expression) => expression.range(),
-            ExpressionRef::NamedExpr(expression) => expression.range(),
+            ExpressionRef::Named(expression) => expression.range(),
             ExpressionRef::BinOp(expression) => expression.range(),
             ExpressionRef::UnaryOp(expression) => expression.range(),
             ExpressionRef::Lambda(expression) => expression.range(),
-            ExpressionRef::IfExp(expression) => expression.range(),
+            ExpressionRef::If(expression) => expression.range(),
             ExpressionRef::Dict(expression) => expression.range(),
             ExpressionRef::Set(expression) => expression.range(),
             ExpressionRef::ListComp(expression) => expression.range(),
             ExpressionRef::SetComp(expression) => expression.range(),
             ExpressionRef::DictComp(expression) => expression.range(),
-            ExpressionRef::GeneratorExp(expression) => expression.range(),
+            ExpressionRef::Generator(expression) => expression.range(),
             ExpressionRef::Await(expression) => expression.range(),
             ExpressionRef::Yield(expression) => expression.range(),
             ExpressionRef::YieldFrom(expression) => expression.range(),
@@ -399,35 +399,35 @@ impl LiteralExpressionRef<'_> {
 /// f-strings.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum StringLike<'a> {
-    StringLiteral(&'a ast::ExprStringLiteral),
-    BytesLiteral(&'a ast::ExprBytesLiteral),
-    FStringLiteral(&'a ast::FStringLiteralElement),
+    String(&'a ast::ExprStringLiteral),
+    Bytes(&'a ast::ExprBytesLiteral),
+    FString(&'a ast::ExprFString),
 }
 
 impl<'a> From<&'a ast::ExprStringLiteral> for StringLike<'a> {
     fn from(value: &'a ast::ExprStringLiteral) -> Self {
-        StringLike::StringLiteral(value)
+        StringLike::String(value)
     }
 }
 
 impl<'a> From<&'a ast::ExprBytesLiteral> for StringLike<'a> {
     fn from(value: &'a ast::ExprBytesLiteral) -> Self {
-        StringLike::BytesLiteral(value)
+        StringLike::Bytes(value)
     }
 }
 
-impl<'a> From<&'a ast::FStringLiteralElement> for StringLike<'a> {
-    fn from(value: &'a ast::FStringLiteralElement) -> Self {
-        StringLike::FStringLiteral(value)
+impl<'a> From<&'a ast::ExprFString> for StringLike<'a> {
+    fn from(value: &'a ast::ExprFString) -> Self {
+        StringLike::FString(value)
     }
 }
 
 impl Ranged for StringLike<'_> {
     fn range(&self) -> TextRange {
         match self {
-            StringLike::StringLiteral(literal) => literal.range(),
-            StringLike::BytesLiteral(literal) => literal.range(),
-            StringLike::FStringLiteral(literal) => literal.range(),
+            StringLike::String(literal) => literal.range(),
+            StringLike::Bytes(literal) => literal.range(),
+            StringLike::FString(literal) => literal.range(),
         }
     }
 }

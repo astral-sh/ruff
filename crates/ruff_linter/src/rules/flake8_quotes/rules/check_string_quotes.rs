@@ -442,7 +442,7 @@ struct FStringRangeBuilder {
 impl FStringRangeBuilder {
     fn visit_token(&mut self, token: &Tok, range: TextRange) {
         match token {
-            Tok::FStringStart => {
+            Tok::FStringStart(_) => {
                 if self.nesting == 0 {
                     self.start_location = range.start();
                 }

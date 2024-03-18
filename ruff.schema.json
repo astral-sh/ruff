@@ -424,7 +424,7 @@
       }
     },
     "ignore-init-module-imports": {
-      "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).",
+      "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).\n\nThis option is enabled by default, but you can opt-in to removal of imports via an unsafe fix.",
       "deprecated": true,
       "type": [
         "boolean",
@@ -623,10 +623,10 @@
       ]
     },
     "required-version": {
-      "description": "Require a specific version of Ruff to be running (useful for unifying results across many environments, e.g., with a `pyproject.toml` file).",
+      "description": "Enforce a requirement on the version of Ruff, to enforce at runtime. If the version of Ruff does not meet the requirement, Ruff will exit with an error.\n\nUseful for unifying results across many environments, e.g., with a `pyproject.toml` file.\n\nAccepts a PEP 440 specifier, like `==0.3.1` or `>=0.3.1`.",
       "anyOf": [
         {
-          "$ref": "#/definitions/Version"
+          "$ref": "#/definitions/RequiredVersion"
         },
         {
           "type": "null"
@@ -754,6 +754,12 @@
         }
       },
       "additionalProperties": false
+    },
+    "BannedAliases": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "ConstantType": {
       "type": "string",
@@ -1036,10 +1042,7 @@
             "null"
           ],
           "additionalProperties": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "$ref": "#/definitions/BannedAliases"
           }
         },
         "banned-from": {
@@ -1316,7 +1319,7 @@
       "type": "object",
       "properties": {
         "docstring-code-format": {
-          "description": "Whether to format code snippets in docstrings.\n\nWhen this is enabled, Python code examples within docstrings are automatically reformatted.\n\nFor example, when this is enabled, the following code:\n\n```python def f(x): \"\"\" Something about `f`. And an example in doctest format:\n\n>>> f(  x  )\n\nMarkdown is also supported:\n\n```py f(  x  ) ```\n\nAs are reStructuredText literal blocks::\n\nf(  x  )\n\nAnd reStructuredText code blocks:\n\n.. code-block:: python\n\nf(  x  ) \"\"\" pass ```\n\n... will be reformatted (assuming the rest of the options are set to their defaults) as:\n\n```python def f(x): \"\"\" Something about `f`. And an example in doctest format:\n\n>>> f(x)\n\nMarkdown is also supported:\n\n```py f(x) ```\n\nAs are reStructuredText literal blocks::\n\nf(x)\n\nAnd reStructuredText code blocks:\n\n.. code-block:: python\n\nf(x) \"\"\" pass ```\n\nIf a code snippt in a docstring contains invalid Python code or if the formatter would otherwise write invalid Python code, then the code example is ignored by the formatter and kept as-is.\n\nCurrently, doctest, Markdown, reStructuredText literal blocks, and reStructuredText code blocks are all supported and automatically recognized. In the case of unlabeled fenced code blocks in Markdown and reStructuredText literal blocks, the contents are assumed to be Python and reformatted. As with any other format, if the contents aren't valid Python, then the block is left untouched automatically.",
+          "description": "Whether to format code snippets in docstrings.\n\nWhen this is enabled, Python code examples within docstrings are automatically reformatted.\n\nFor example, when this is enabled, the following code:\n\n```python def f(x): \"\"\" Something about `f`. And an example in doctest format:\n\n>>> f(  x  )\n\nMarkdown is also supported:\n\n```py f(  x  ) ```\n\nAs are reStructuredText literal blocks::\n\nf(  x  )\n\nAnd reStructuredText code blocks:\n\n.. code-block:: python\n\nf(  x  ) \"\"\" pass ```\n\n... will be reformatted (assuming the rest of the options are set to their defaults) as:\n\n```python def f(x): \"\"\" Something about `f`. And an example in doctest format:\n\n>>> f(x)\n\nMarkdown is also supported:\n\n```py f(x) ```\n\nAs are reStructuredText literal blocks::\n\nf(x)\n\nAnd reStructuredText code blocks:\n\n.. code-block:: python\n\nf(x) \"\"\" pass ```\n\nIf a code snippet in a docstring contains invalid Python code or if the formatter would otherwise write invalid Python code, then the code example is ignored by the formatter and kept as-is.\n\nCurrently, doctest, Markdown, reStructuredText literal blocks, and reStructuredText code blocks are all supported and automatically recognized. In the case of unlabeled fenced code blocks in Markdown and reStructuredText literal blocks, the contents are assumed to be Python and reformatted. As with any other format, if the contents aren't valid Python, then the block is left untouched automatically.",
           "type": [
             "boolean",
             "null"
@@ -1474,6 +1477,17 @@
             "type": "string"
           }
         },
+        "default-section": {
+          "description": "Define a default section for any imports that don't fit into the specified `section-order`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ImportSection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "detect-same-package": {
           "description": "Whether to automatically mark imports from within the same package as first-party. For example, when `detect-same-package = true`, then when analyzing files within the `foo` package, any imports from within the `foo` package will be considered first-party.\n\nThis heuristic is often unnecessary when `src` is configured to detect all first-party sources; however, if `src` is _not_ configured, this heuristic can be useful to detect first-party imports from _within_ (but not _across_) first-party packages.",
           "type": [
@@ -1584,7 +1598,7 @@
           ]
         },
         "lines-after-imports": {
-          "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.\n\nWhen using the formatter, only the values `-1`, `1`, and `2` are compatible because it enforces at least one empty and at most two empty lines after imports.",
+          "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.\n\nRuff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/source/stubs.html#blank-lines)).\n\nWhen using the formatter, only the values `-1`, `1`, and `2` are compatible because it enforces at least one empty and at most two empty lines after imports.",
           "type": [
             "integer",
             "null"
@@ -2065,7 +2079,7 @@
           }
         },
         "ignore-init-module-imports": {
-          "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).",
+          "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).\n\nThis option is enabled by default, but you can opt-in to removal of imports via an unsafe fix.",
           "type": [
             "boolean",
             "null"
@@ -2579,6 +2593,9 @@
         }
       ]
     },
+    "RequiredVersion": {
+      "type": "string"
+    },
     "RuleSelector": {
       "type": "string",
       "enum": [
@@ -2853,6 +2870,7 @@
         "E5",
         "E50",
         "E501",
+        "E502",
         "E7",
         "E70",
         "E701",
@@ -3201,6 +3219,7 @@
         "PLE03",
         "PLE030",
         "PLE0302",
+        "PLE0304",
         "PLE0307",
         "PLE06",
         "PLE060",
@@ -3231,6 +3250,8 @@
         "PLE15",
         "PLE150",
         "PLE1507",
+        "PLE151",
+        "PLE1519",
         "PLE17",
         "PLE170",
         "PLE1700",
@@ -3309,9 +3330,11 @@
         "PLW012",
         "PLW0120",
         "PLW0127",
+        "PLW0128",
         "PLW0129",
         "PLW013",
         "PLW0131",
+        "PLW0133",
         "PLW02",
         "PLW024",
         "PLW0245",
@@ -3531,6 +3554,7 @@
         "RUF025",
         "RUF026",
         "RUF027",
+        "RUF028",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -3594,7 +3618,6 @@
         "S408",
         "S409",
         "S41",
-        "S410",
         "S411",
         "S412",
         "S413",
@@ -3622,6 +3645,7 @@
         "S608",
         "S609",
         "S61",
+        "S610",
         "S611",
         "S612",
         "S7",
@@ -3797,6 +3821,9 @@
         "W291",
         "W292",
         "W293",
+        "W3",
+        "W39",
+        "W391",
         "W5",
         "W50",
         "W505",
@@ -3856,9 +3883,6 @@
           ]
         }
       ]
-    },
-    "Version": {
-      "type": "string"
     }
   }
 }

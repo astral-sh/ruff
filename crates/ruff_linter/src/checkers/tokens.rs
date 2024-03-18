@@ -41,14 +41,8 @@ pub(crate) fn check_tokens(
         Rule::BlankLinesAfterFunctionOrClass,
         Rule::BlankLinesBeforeNestedDefinition,
     ]) {
-        let mut blank_lines_checker = BlankLinesChecker::default();
-        blank_lines_checker.check_lines(
-            tokens,
-            locator,
-            stylist,
-            settings.tab_size,
-            &mut diagnostics,
-        );
+        BlankLinesChecker::new(locator, stylist, settings, source_type)
+            .check_lines(tokens, &mut diagnostics);
     }
 
     if settings.rules.enabled(Rule::BlanketNOQA) {
@@ -207,6 +201,10 @@ pub(crate) fn check_tokens(
             .collect();
         flake8_todos::rules::todos(&mut diagnostics, &todo_comments, locator, indexer);
         flake8_fixme::rules::todos(&mut diagnostics, &todo_comments);
+    }
+
+    if settings.rules.enabled(Rule::TooManyNewlinesAtEndOfFile) {
+        pycodestyle::rules::too_many_newlines_at_end_of_file(&mut diagnostics, tokens);
     }
 
     diagnostics.retain(|diagnostic| settings.rules.enabled(diagnostic.kind.rule()));

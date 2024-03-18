@@ -1,3 +1,4 @@
+use ast::FStringFlags;
 use itertools::Itertools;
 
 use crate::fix::edits::pad;
@@ -97,6 +98,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
     let node = ast::FString {
         elements: f_string_elements,
         range: TextRange::default(),
+        flags: FStringFlags::default(),
     };
     Some(node.into())
 }

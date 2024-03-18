@@ -2,8 +2,8 @@
 source: crates/ruff_python_parser/src/parser.rs
 expression: parse_ast
 ---
-GeneratorExp(
-    ExprGeneratorExp {
+Generator(
+    ExprGenerator {
         range: 0..14,
         elt: Name(
             ExprName {

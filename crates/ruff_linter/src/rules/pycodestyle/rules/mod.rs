@@ -17,6 +17,7 @@ pub(crate) use module_import_not_at_top_of_file::*;
 pub(crate) use multiple_imports_on_one_line::*;
 pub(crate) use not_tests::*;
 pub(crate) use tab_indentation::*;
+pub(crate) use too_many_newlines_at_end_of_file::*;
 pub(crate) use trailing_whitespace::*;
 pub(crate) use type_comparison::*;
 
@@ -39,5 +40,6 @@ mod module_import_not_at_top_of_file;
 mod multiple_imports_on_one_line;
 mod not_tests;
 mod tab_indentation;
+mod too_many_newlines_at_end_of_file;
 mod trailing_whitespace;
 mod type_comparison;

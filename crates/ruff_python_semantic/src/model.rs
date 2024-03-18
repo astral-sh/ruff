@@ -2,11 +2,10 @@ use std::path::Path;
 
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
-use smallvec::smallvec;
 
-use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::from_relative_import;
-use ruff_python_ast::{self as ast, Expr, Operator, Stmt};
+use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
+use ruff_python_ast::{self as ast, Expr, ExprContext, Operator, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -132,7 +131,7 @@ pub struct SemanticModel<'a> {
 }
 
 impl<'a> SemanticModel<'a> {
-    pub fn new(typing_modules: &'a [String], path: &'a Path, module: Module<'a>) -> Self {
+    pub fn new(typing_modules: &'a [String], path: &Path, module: Module<'a>) -> Self {
         Self {
             typing_modules,
             module_path: module.path(),
@@ -160,7 +159,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Return the [`Binding`] for the given [`BindingId`].
     #[inline]
-    pub fn binding(&self, id: BindingId) -> &Binding {
+    pub fn binding(&self, id: BindingId) -> &Binding<'a> {
         &self.bindings[id]
     }
 
@@ -174,23 +173,28 @@ impl<'a> SemanticModel<'a> {
     pub fn match_typing_expr(&self, expr: &Expr, target: &str) -> bool {
         self.seen_typing()
             && self
-                .resolve_call_path(expr)
-                .is_some_and(|call_path| self.match_typing_call_path(&call_path, target))
+                .resolve_qualified_name(expr)
+                .is_some_and(|qualified_name| {
+                    self.match_typing_qualified_name(&qualified_name, target)
+                })
     }
 
     /// Return `true` if the call path is a reference to `typing.${target}`.
-    pub fn match_typing_call_path(&self, call_path: &CallPath, target: &str) -> bool {
+    pub fn match_typing_qualified_name(
+        &self,
+        qualified_name: &QualifiedName,
+        target: &str,
+    ) -> bool {
         if matches!(
-            call_path.as_slice(),
+            qualified_name.segments(),
             ["typing" | "_typeshed" | "typing_extensions", member] if *member == target
         ) {
             return true;
         }
 
         if self.typing_modules.iter().any(|module| {
-            let mut module: CallPath = from_unqualified_name(module);
-            module.push(target);
-            *call_path == module
+            let module = QualifiedName::from_dotted_name(module);
+            qualified_name == &module.append_member(target)
         }) {
             return true;
         }
@@ -199,7 +203,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return an iterator over the set of `typing` modules allowed in the semantic model.
-    pub fn typing_modules(&self) -> impl Iterator<Item = &str> {
+    pub fn typing_modules(&self) -> impl Iterator<Item = &'a str> {
         ["typing", "_typeshed", "typing_extensions"]
             .iter()
             .copied()
@@ -267,7 +271,7 @@ impl<'a> SemanticModel<'a> {
             .get(symbol)
             .map_or(true, |binding_id| {
                 // Treat the deletion of a name as a reference to that name.
-                self.add_local_reference(binding_id, range);
+                self.add_local_reference(binding_id, ExprContext::Del, range);
                 self.bindings[binding_id].is_unbound()
             });
 
@@ -292,8 +296,9 @@ impl<'a> SemanticModel<'a> {
                     let reference_id = self.resolved_references.push(
                         ScopeId::global(),
                         self.node_id,
-                        name.range,
+                        ExprContext::Load,
                         self.flags,
+                        name.range,
                     );
                     self.bindings[binding_id].references.push(reference_id);
 
@@ -304,8 +309,9 @@ impl<'a> SemanticModel<'a> {
                         let reference_id = self.resolved_references.push(
                             ScopeId::global(),
                             self.node_id,
-                            name.range,
+                            ExprContext::Load,
                             self.flags,
+                            name.range,
                         );
                         self.bindings[binding_id].references.push(reference_id);
                     }
@@ -361,8 +367,9 @@ impl<'a> SemanticModel<'a> {
                 let reference_id = self.resolved_references.push(
                     self.scope_id,
                     self.node_id,
-                    name.range,
+                    ExprContext::Load,
                     self.flags,
+                    name.range,
                 );
                 self.bindings[binding_id].references.push(reference_id);
 
@@ -373,8 +380,9 @@ impl<'a> SemanticModel<'a> {
                     let reference_id = self.resolved_references.push(
                         self.scope_id,
                         self.node_id,
-                        name.range,
+                        ExprContext::Load,
                         self.flags,
+                        name.range,
                     );
                     self.bindings[binding_id].references.push(reference_id);
                 }
@@ -422,6 +430,15 @@ impl<'a> SemanticModel<'a> {
                         return ReadResult::UnboundLocal(binding_id);
                     }
 
+                    BindingKind::ConditionalDeletion(binding_id) => {
+                        self.unresolved_references.push(
+                            name.range,
+                            self.exceptions(),
+                            UnresolvedReferenceFlags::empty(),
+                        );
+                        return ReadResult::UnboundLocal(binding_id);
+                    }
+
                     // If we hit an unbound exception that shadowed a bound name, resole to the
                     // bound name. For example, given:
                     //
@@ -442,8 +459,9 @@ impl<'a> SemanticModel<'a> {
                         let reference_id = self.resolved_references.push(
                             self.scope_id,
                             self.node_id,
-                            name.range,
+                            ExprContext::Load,
                             self.flags,
+                            name.range,
                         );
                         self.bindings[binding_id].references.push(reference_id);
 
@@ -454,8 +472,9 @@ impl<'a> SemanticModel<'a> {
                             let reference_id = self.resolved_references.push(
                                 self.scope_id,
                                 self.node_id,
-                                name.range,
+                                ExprContext::Load,
                                 self.flags,
+                                name.range,
                             );
                             self.bindings[binding_id].references.push(reference_id);
                         }
@@ -544,6 +563,7 @@ impl<'a> SemanticModel<'a> {
                 match self.bindings[binding_id].kind {
                     BindingKind::Annotation => continue,
                     BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
+                    BindingKind::ConditionalDeletion(binding_id) => return Some(binding_id),
                     BindingKind::UnboundException(Some(binding_id)) => return Some(binding_id),
                     _ => return Some(binding_id),
                 }
@@ -566,11 +586,11 @@ impl<'a> SemanticModel<'a> {
     /// For example, given `["Class", "method"`], resolve the `BindingKind::ClassDefinition`
     /// associated with `Class`, then the `BindingKind::FunctionDefinition` associated with
     /// `Class.method`.
-    pub fn lookup_attribute(&'a self, value: &'a Expr) -> Option<BindingId> {
-        let call_path = collect_call_path(value)?;
+    pub fn lookup_attribute(&self, value: &Expr) -> Option<BindingId> {
+        let unqualified_name = UnqualifiedName::from_expr(value)?;
 
         // Find the symbol in the current scope.
-        let (symbol, attribute) = call_path.split_first()?;
+        let (symbol, attribute) = unqualified_name.segments().split_first()?;
         let mut binding_id = self.lookup_symbol(symbol)?;
 
         // Recursively resolve class attributes, e.g., `foo.bar.baz` in.
@@ -610,8 +630,8 @@ impl<'a> SemanticModel<'a> {
         }
 
         // Grab, e.g., `pyarrow` from `import pyarrow as pa`.
-        let call_path = import.call_path();
-        let segment = call_path.last()?;
+        let call_path = import.qualified_name();
+        let segment = call_path.segments().last()?;
         if *segment == symbol {
             return None;
         }
@@ -658,7 +678,13 @@ impl<'a> SemanticModel<'a> {
     /// ```
     ///
     /// ...then `resolve_call_path(${python_version})` will resolve to `sys.version_info`.
-    pub fn resolve_call_path(&'a self, value: &'a Expr) -> Option<CallPath<'a>> {
+    pub fn resolve_qualified_name<'name, 'expr: 'name>(
+        &self,
+        value: &'expr Expr,
+    ) -> Option<QualifiedName<'name>>
+    where
+        'a: 'name,
+    {
         /// Return the [`ast::ExprName`] at the head of the expression, if any.
         const fn match_head(value: &Expr) -> Option<&ast::ExprName> {
             match value {
@@ -676,56 +702,72 @@ impl<'a> SemanticModel<'a> {
             .map(|id| self.binding(id))?;
 
         match &binding.kind {
-            BindingKind::Import(Import { call_path }) => {
-                let value_path = collect_call_path(value)?;
-                let (_, tail) = value_path.split_first()?;
-                let resolved: CallPath = call_path.iter().chain(tail.iter()).copied().collect();
-                Some(resolved)
-            }
-            BindingKind::SubmoduleImport(SubmoduleImport { call_path }) => {
-                let value_path = collect_call_path(value)?;
-                let (_, tail) = value_path.split_first()?;
-                let resolved: CallPath = call_path
+            BindingKind::Import(Import { qualified_name }) => {
+                let unqualified_name = UnqualifiedName::from_expr(value)?;
+                let (_, tail) = unqualified_name.segments().split_first()?;
+                let resolved: QualifiedName = qualified_name
+                    .segments()
                     .iter()
-                    .take(1)
                     .chain(tail.iter())
                     .copied()
                     .collect();
                 Some(resolved)
             }
-            BindingKind::FromImport(FromImport { call_path }) => {
-                let value_path = collect_call_path(value)?;
-                let (_, tail) = value_path.split_first()?;
+            BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
+                let value_name = UnqualifiedName::from_expr(value)?;
+                let (_, tail) = value_name.segments().split_first()?;
 
-                let resolved: CallPath =
-                    if call_path.first().map_or(false, |segment| *segment == ".") {
-                        from_relative_import(self.module_path?, call_path, tail)?
-                    } else {
-                        call_path.iter().chain(tail.iter()).copied().collect()
-                    };
+                Some(
+                    qualified_name
+                        .segments()
+                        .iter()
+                        .take(1)
+                        .chain(tail.iter())
+                        .copied()
+                        .collect(),
+                )
+            }
+            BindingKind::FromImport(FromImport { qualified_name }) => {
+                let value_name = UnqualifiedName::from_expr(value)?;
+                let (_, tail) = value_name.segments().split_first()?;
+
+                let resolved: QualifiedName = if qualified_name
+                    .segments()
+                    .first()
+                    .map_or(false, |segment| *segment == ".")
+                {
+                    from_relative_import(self.module_path?, qualified_name.segments(), tail)?
+                } else {
+                    qualified_name
+                        .segments()
+                        .iter()
+                        .chain(tail.iter())
+                        .copied()
+                        .collect()
+                };
                 Some(resolved)
             }
             BindingKind::Builtin => {
                 if value.is_name_expr() {
                     // Ex) `dict`
-                    Some(smallvec!["", head.id.as_str()])
+                    Some(QualifiedName::builtin(head.id.as_str()))
                 } else {
                     // Ex) `dict.__dict__`
-                    let value_path = collect_call_path(value)?;
+                    let value_name = UnqualifiedName::from_expr(value)?;
                     Some(
                         std::iter::once("")
-                            .chain(value_path.iter().copied())
+                            .chain(value_name.segments().iter().copied())
                             .collect(),
                     )
                 }
             }
             BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {
-                let value_path = collect_call_path(value)?;
-                let resolved: CallPath = self
+                let value_name = UnqualifiedName::from_expr(value)?;
+                let resolved: QualifiedName = self
                     .module_path?
                     .iter()
                     .map(String::as_str)
-                    .chain(value_path)
+                    .chain(value_name.segments().iter().copied())
                     .collect();
                 Some(resolved)
             }
@@ -761,8 +803,8 @@ impl<'a> SemanticModel<'a> {
                         // Ex) Given `module="sys"` and `object="exit"`:
                         // `import sys`         -> `sys.exit`
                         // `import sys as sys2` -> `sys2.exit`
-                        BindingKind::Import(Import { call_path }) => {
-                            if call_path.as_ref() == module_path.as_slice() {
+                        BindingKind::Import(Import { qualified_name }) => {
+                            if qualified_name.segments() == module_path.as_slice() {
                                 if let Some(source) = binding.source {
                                     // Verify that `sys` isn't bound in an inner scope.
                                     if self
@@ -783,8 +825,10 @@ impl<'a> SemanticModel<'a> {
                         // Ex) Given `module="os.path"` and `object="join"`:
                         // `from os.path import join`          -> `join`
                         // `from os.path import join as join2` -> `join2`
-                        BindingKind::FromImport(FromImport { call_path }) => {
-                            if let Some((target_member, target_module)) = call_path.split_last() {
+                        BindingKind::FromImport(FromImport { qualified_name }) => {
+                            if let Some((target_member, target_module)) =
+                                qualified_name.segments().split_last()
+                            {
                                 if target_module == module_path.as_slice()
                                     && target_member == &member
                                 {
@@ -810,8 +854,8 @@ impl<'a> SemanticModel<'a> {
                         // `import os.path ` -> `os.name`
                         // Ex) Given `module="os.path"` and `object="join"`:
                         // `import os.path ` -> `os.path.join`
-                        BindingKind::SubmoduleImport(SubmoduleImport { call_path }) => {
-                            if call_path.starts_with(&module_path) {
+                        BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
+                            if qualified_name.segments().starts_with(&module_path) {
                                 if let Some(source) = binding.source {
                                     // Verify that `os` isn't bound in an inner scope.
                                     if self
@@ -976,7 +1020,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Returns an iterator over all scopes, starting from the current [`Scope`].
-    pub fn current_scopes(&self) -> impl Iterator<Item = &Scope> {
+    pub fn current_scopes(&self) -> impl Iterator<Item = &Scope<'a>> {
         self.scopes.ancestors(self.scope_id)
     }
 
@@ -1156,7 +1200,7 @@ impl<'a> SemanticModel<'a> {
     /// Return the [`TextRange`] at which a name is declared as global in the current [`Scope`].
     pub fn global(&self, name: &str) -> Option<TextRange> {
         let global_id = self.scopes[self.scope_id].globals_id()?;
-        self.globals[global_id].get(name).copied()
+        self.globals[global_id].get(name)
     }
 
     /// Given a `name` that has been declared `nonlocal`, return the [`ScopeId`] and [`BindingId`]
@@ -1287,18 +1331,28 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Add a reference to the given [`BindingId`] in the local scope.
-    pub fn add_local_reference(&mut self, binding_id: BindingId, range: TextRange) {
+    pub fn add_local_reference(
+        &mut self,
+        binding_id: BindingId,
+        ctx: ExprContext,
+        range: TextRange,
+    ) {
         let reference_id =
             self.resolved_references
-                .push(self.scope_id, self.node_id, range, self.flags);
+                .push(self.scope_id, self.node_id, ctx, self.flags, range);
         self.bindings[binding_id].references.push(reference_id);
     }
 
     /// Add a reference to the given [`BindingId`] in the global scope.
-    pub fn add_global_reference(&mut self, binding_id: BindingId, range: TextRange) {
+    pub fn add_global_reference(
+        &mut self,
+        binding_id: BindingId,
+        ctx: ExprContext,
+        range: TextRange,
+    ) {
         let reference_id =
             self.resolved_references
-                .push(ScopeId::global(), self.node_id, range, self.flags);
+                .push(ScopeId::global(), self.node_id, ctx, self.flags, range);
         self.bindings[binding_id].references.push(reference_id);
     }
 
@@ -1672,7 +1726,6 @@ bitflags! {
         /// only required by the Python interpreter, but by runtime type checkers too.
         const RUNTIME_REQUIRED_ANNOTATION = 1 << 2;
 
-
         /// The model is in a type definition.
         ///
         /// For example, the model could be visiting `int` in:
@@ -1858,7 +1911,6 @@ bitflags! {
         /// ```
         const COMPREHENSION_ASSIGNMENT = 1 << 19;
 
-
         /// The model is in a module / class / function docstring.
         ///
         /// For example, the model could be visiting either the module, class,
@@ -2000,7 +2052,7 @@ impl ImportedName {
         self.context
     }
 
-    pub fn statement<'a>(&self, semantic: &'a SemanticModel) -> &'a Stmt {
+    pub fn statement<'a>(&self, semantic: &SemanticModel<'a>) -> &'a Stmt {
         semantic.statement(self.source)
     }
 }

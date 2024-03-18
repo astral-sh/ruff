@@ -223,7 +223,7 @@ RUF021.py:46:8: RUF021 [*] Parenthesize `a and b` expressions when chaining `and
    47 |+    and some_third_reasonably_long_condition)
 48 48 |     or some_fourth_reasonably_long_condition
 49 49 |     and some_fifth_reasonably_long_condition
-50 50 |     # a commment
+50 50 |     # a comment
 
 RUF021.py:48:8: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
    |
@@ -232,7 +232,7 @@ RUF021.py:48:8: RUF021 [*] Parenthesize `a and b` expressions when chaining `and
 48 |       or some_fourth_reasonably_long_condition
    |  ________^
 49 | |     and some_fifth_reasonably_long_condition
-50 | |     # a commment
+50 | |     # a comment
 51 | |     and some_sixth_reasonably_long_condition
 52 | |     and some_seventh_reasonably_long_condition
    | |______________________________________________^ RUF021
@@ -248,12 +248,10 @@ RUF021.py:48:8: RUF021 [*] Parenthesize `a and b` expressions when chaining `and
 48    |-    or some_fourth_reasonably_long_condition
    48 |+    or (some_fourth_reasonably_long_condition
 49 49 |     and some_fifth_reasonably_long_condition
-50 50 |     # a commment
+50 50 |     # a comment
 51 51 |     and some_sixth_reasonably_long_condition
 52    |-    and some_seventh_reasonably_long_condition
    52 |+    and some_seventh_reasonably_long_condition)
 53 53 |     # another comment
 54 54 |     or some_eighth_reasonably_long_condition
 55 55 | ):
-
-

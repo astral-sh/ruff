@@ -17,7 +17,7 @@ use super::helpers;
 ///
 /// If a list literal was passed, then it should be rewritten as a `tuple`
 /// literal. Otherwise, if a tuple literal was passed, then the outer call
-/// to `list()` should be removed.
+/// to `tuple()` should be removed.
 ///
 /// ## Examples
 /// ```python

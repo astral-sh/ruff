@@ -12,7 +12,8 @@ use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use crate::comments::{
-    dangling_comments, leading_comments, trailing_comments, Comments, SourceComment,
+    dangling_comments, has_skip_comment, leading_comments, trailing_comments, Comments,
+    SourceComment,
 };
 pub use crate::context::PyFormatContext;
 pub use crate::options::{

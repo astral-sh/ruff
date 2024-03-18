@@ -55,9 +55,18 @@ def update_schemastore(schemastore: Path) -> None:
     schema = json.loads(root.joinpath("ruff.schema.json").read_text())
     schema["$id"] = "https://json.schemastore.org/ruff.json"
     src.joinpath(ruff_json).write_text(
-        json.dumps(dict(sorted(schema.items())), indent=2, ensure_ascii=False),
+        json.dumps(dict(schema.items()), indent=2, ensure_ascii=False),
     )
-    check_call(["node_modules/.bin/prettier", "--write", ruff_json], cwd=src)
+    check_call(
+        [
+            "node_modules/.bin/prettier",
+            "--plugin",
+            "prettier-plugin-sort-json",
+            "--write",
+            ruff_json,
+        ],
+        cwd=src,
+    )
 
     # Check if the schema has changed
     # https://stackoverflow.com/a/9393642/3549270

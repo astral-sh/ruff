@@ -53,8 +53,8 @@ pub(crate) fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
 
     if checker
         .semantic()
-        .resolve_call_path(expr)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["typing", "Text"]))
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["typing", "Text"]))
     {
         let mut diagnostic = Diagnostic::new(TypingTextStrAlias, expr.range());
         if checker.semantic().is_builtin("str") {

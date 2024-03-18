@@ -91,6 +91,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
+            if checker.enabled(Rule::InvalidBoolReturnType) {
+                pylint::rules::invalid_bool_return(checker, name, body);
+            }
             if checker.enabled(Rule::InvalidStrReturnType) {
                 pylint::rules::invalid_str_return(checker, name, body);
             }
@@ -101,30 +104,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     decorator_list,
                     &checker.settings.pep8_naming.ignore_names,
                     &checker.semantic,
-                ) {
-                    checker.diagnostics.push(diagnostic);
-                }
-            }
-            if checker.enabled(Rule::InvalidFirstArgumentNameForClassMethod) {
-                if let Some(diagnostic) =
-                    pep8_naming::rules::invalid_first_argument_name_for_class_method(
-                        checker,
-                        checker.semantic.current_scope(),
-                        name,
-                        decorator_list,
-                        parameters,
-                    )
-                {
-                    checker.diagnostics.push(diagnostic);
-                }
-            }
-            if checker.enabled(Rule::InvalidFirstArgumentNameForMethod) {
-                if let Some(diagnostic) = pep8_naming::rules::invalid_first_argument_name_for_method(
-                    checker,
-                    checker.semantic.current_scope(),
-                    name,
-                    decorator_list,
-                    parameters,
                 ) {
                     checker.diagnostics.push(diagnostic);
                 }
@@ -1410,6 +1389,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
+            if checker.enabled(Rule::RedeclaredAssignedName) {
+                pylint::rules::redeclared_assigned_name(checker, targets);
+            }
             if checker.enabled(Rule::LambdaAssignment) {
                 if let [target] = &targets[..] {
                     pycodestyle::rules::lambda_assignment(checker, target, value, None, stmt);
@@ -1609,7 +1591,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 refurb::rules::delete_full_slice(checker, delete);
             }
         }
-        Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
+        Stmt::Expr(expr @ ast::StmtExpr { value, range: _ }) => {
             if checker.enabled(Rule::UselessComparison) {
                 flake8_bugbear::rules::useless_comparison(checker, value);
             }
@@ -1631,6 +1613,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::RepeatedAppend) {
                 refurb::rules::repeated_append(checker, stmt);
+            }
+            if checker.enabled(Rule::UselessExceptionStatement) {
+                pylint::rules::useless_exception_statement(checker, expr);
             }
         }
         _ => {}

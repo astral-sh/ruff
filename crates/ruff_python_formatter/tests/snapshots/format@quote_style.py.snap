@@ -73,7 +73,8 @@ source_type                = Python
 ```
 
 ```python
-'single'  # this string is treated as a docstring
+"single"  # this string is treated as a docstring
+
 'double'
 r'r single'
 r'r double'
@@ -130,20 +131,6 @@ def docstring_single():
 ```
 
 
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -1,4 +1,5 @@
--'single'  # this string is treated as a docstring
-+"single"  # this string is treated as a docstring
-+
- 'double'
- r'r single'
- r'r double'
-```
-
-
 ### Output 2
 ```
 indent-style               = space
@@ -161,6 +148,7 @@ source_type                = Python
 
 ```python
 "single"  # this string is treated as a docstring
+
 "double"
 r"r single"
 r"r double"
@@ -217,19 +205,6 @@ def docstring_single():
 ```
 
 
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -1,4 +1,5 @@
- "single"  # this string is treated as a docstring
-+
- "double"
- r"r single"
- r"r double"
-```
-
-
 ### Output 3
 ```
 indent-style               = space
@@ -247,6 +222,7 @@ source_type                = Python
 
 ```python
 'single'  # this string is treated as a docstring
+
 "double"
 r'r single'
 r"r double"
@@ -300,19 +276,6 @@ def docstring_double():
 
 def docstring_single():
     'single'
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -1,4 +1,5 @@
- 'single'  # this string is treated as a docstring
-+
- "double"
- r'r single'
- r"r double"
 ```
 
 

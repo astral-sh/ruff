@@ -222,7 +222,7 @@ impl Violation for StartProcessWithNoShell {
 ///
 /// ## Why is this bad?
 /// Starting a process with a partial executable path can allow attackers to
-/// execute arbitrary executable by adjusting the `PATH` environment variable.
+/// execute an arbitrary executable by adjusting the `PATH` environment variable.
 /// Consider using a full path to the executable instead.
 ///
 /// ## Example
@@ -419,8 +419,8 @@ enum CallKind {
 /// Return the [`CallKind`] of the given function call.
 fn get_call_kind(func: &Expr, semantic: &SemanticModel) -> Option<CallKind> {
     semantic
-        .resolve_call_path(func)
-        .and_then(|call_path| match call_path.as_slice() {
+        .resolve_qualified_name(func)
+        .and_then(|qualified_name| match qualified_name.segments() {
             &[module, submodule] => match module {
                 "os" => match submodule {
                     "execl" | "execle" | "execlp" | "execlpe" | "execv" | "execve" | "execvp"
@@ -433,6 +433,7 @@ fn get_call_kind(func: &Expr, semantic: &SemanticModel) -> Option<CallKind> {
                     "Popen" | "call" | "check_call" | "check_output" | "run" => {
                         Some(CallKind::Subprocess)
                     }
+                    "getoutput" | "getstatusoutput" => Some(CallKind::Shell),
                     _ => None,
                 },
                 "popen2" => match submodule {
