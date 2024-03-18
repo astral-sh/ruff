@@ -506,16 +506,21 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
                     },
                     values.range(),
                 );
-                let node = Expr::Tuple(ast::ExprTuple {
-                    elts: elts.clone(),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                    parenthesized: true,
+                diagnostic.set_fix({
+                    // Replace `[` with `(`.
+                    let values_start = Edit::replacement(
+                        "(".into(),
+                        values.start(),
+                        values.start() + TextSize::from(1),
+                    );
+                    // Replace `]` with `)` or `,)`.
+                    let values_end = Edit::replacement(
+                        (if elts.len() == 1 { ",)" } else { ")" }).into(),
+                        values.end() - TextSize::from(1),
+                        values.end(),
+                    );
+                    Fix::unsafe_edits(values_start, [values_end])
                 });
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    format!("({})", checker.generator().expr(&node)),
-                    values.range(),
-                )));
                 checker.diagnostics.push(diagnostic);
             }
 
@@ -532,17 +537,24 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
                     },
                     values.range(),
                 );
-                let node = Expr::List(ast::ExprList {
-                    elts: elts.clone(),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
+                diagnostic.set_fix({
+                    // Replace `(` with `[`.
+                    let values_start = Edit::replacement(
+                        "[".into(),
+                        values.start(),
+                        values.start() + TextSize::from(1),
+                    );
+                    // Replace `)` with `]`.
+                    let values_end = Edit::replacement(
+                        "]".into(),
+                        values.end() - TextSize::from(1),
+                        values.end(),
+                    );
+                    Fix::unsafe_edits(values_start, [values_end])
                 });
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    checker.generator().expr(&node),
-                    values.range(),
-                )));
                 checker.diagnostics.push(diagnostic);
             }
+
             if is_multi_named {
                 handle_value_rows(checker, elts, values_type, values_row_type);
             }
@@ -631,7 +643,7 @@ fn handle_value_rows(
 ) {
     for elt in elts {
         match elt {
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            Expr::Tuple(_) => {
                 if values_row_type != types::ParametrizeValuesRowType::Tuple {
                     let mut diagnostic = Diagnostic::new(
                         PytestParametrizeValuesWrongType {
@@ -640,15 +652,18 @@ fn handle_value_rows(
                         },
                         elt.range(),
                     );
-                    let node = Expr::List(ast::ExprList {
-                        elts: elts.clone(),
-                        ctx: ExprContext::Load,
-                        range: TextRange::default(),
+                    diagnostic.set_fix({
+                        // Replace `(` with `[`.
+                        let elt_start = Edit::replacement(
+                            "[".into(),
+                            elt.start(),
+                            elt.start() + TextSize::from(1),
+                        );
+                        // Replace `)` with `]`.
+                        let elt_end =
+                            Edit::replacement("]".into(), elt.end() - TextSize::from(1), elt.end());
+                        Fix::unsafe_edits(elt_start, [elt_end])
                     });
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                        checker.generator().expr(&node),
-                        elt.range(),
-                    )));
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -661,16 +676,21 @@ fn handle_value_rows(
                         },
                         elt.range(),
                     );
-                    let node = Expr::Tuple(ast::ExprTuple {
-                        elts: elts.clone(),
-                        ctx: ExprContext::Load,
-                        range: TextRange::default(),
-                        parenthesized: true,
+                    diagnostic.set_fix({
+                        // Replace `[` with `(`.
+                        let elt_start = Edit::replacement(
+                            "(".into(),
+                            elt.start(),
+                            elt.start() + TextSize::from(1),
+                        );
+                        // Replace `]` with `)` or `,)`.
+                        let elt_end = Edit::replacement(
+                            (if elts.len() == 1 { ",)" } else { ")" }).into(),
+                            elt.end() - TextSize::from(1),
+                            elt.end(),
+                        );
+                        Fix::unsafe_edits(elt_start, [elt_end])
                     });
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                        format!("({})", checker.generator().expr(&node)),
-                        elt.range(),
-                    )));
                     checker.diagnostics.push(diagnostic);
                 }
             }
