@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use crossbeam::channel::Sender;
 
 use crate::session::Session;
@@ -42,13 +44,14 @@ pub(crate) struct Scheduler {
 impl Scheduler {
     pub(super) fn new(
         session: Session,
-        pool_threads: usize,
+        worker_threads: NonZeroUsize,
         sender: &Sender<lsp_server::Message>,
     ) -> Self {
+        const FMT_THREADS: usize = 1;
         Self {
             session,
-            fmt_pool: thread::Pool::new(1),
-            background_pool: thread::Pool::new(pool_threads),
+            fmt_pool: thread::Pool::new(NonZeroUsize::try_from(FMT_THREADS).unwrap()),
+            background_pool: thread::Pool::new(worker_threads),
             client: Client::new(sender),
         }
     }

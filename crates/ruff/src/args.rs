@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
 use std::fmt::Formatter;
-use std::num::NonZeroUsize;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -497,14 +496,15 @@ pub struct FormatCommand {
     pub range: Option<FormatRange>,
 }
 
-#[derive(Clone, Debug, clap::Parser)]
+#[derive(Copy, Clone, Debug, clap::Parser)]
 pub struct ServerCommand {
     /// Enable preview mode; required for regular operation
     #[arg(long)]
     pub(crate) preview: bool,
-    /// Set the number of background threads used for running tasks concurrently - the default is 4.
-    #[arg(long, default_value = "4")]
-    pub(crate) threads: NonZeroUsize,
+    /// Set the number of dedicated worker threads used for running tasks concurrently. This does not represent the total number of
+    /// threads running - this is just for the main worker pool. If set to 0, a worker thread count will be set automatically.
+    #[arg(long, default_value = "0")]
+    pub(crate) worker_threads: usize,
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
