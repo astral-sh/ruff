@@ -1556,6 +1556,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
             }
+            if checker.enabled(Rule::TooManyValuesToUnpack) {
+                wemake_python_styleguide::too_many_values_to_unpack(checker, assign)
+            }
         }
         Stmt::AnnAssign(
             assign_stmt @ ast::StmtAnnAssign {
