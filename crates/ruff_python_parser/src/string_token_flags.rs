@@ -151,6 +151,44 @@ impl StringPrefix {
         }
     }
 
+    const fn from_kind(kind: StringKind) -> Self {
+        let StringKind(flags) = kind;
+
+        // f-strings
+        if flags.contains(StringFlags::F_PREFIX) {
+            if flags.contains(StringFlags::R_PREFIX_LOWER) {
+                return Self::Format(FStringPrefix::Raw { uppercase_r: false });
+            }
+            if flags.contains(StringFlags::R_PREFIX_UPPER) {
+                return Self::Format(FStringPrefix::Raw { uppercase_r: true });
+            }
+            return Self::Format(FStringPrefix::Regular);
+        }
+
+        // bytestrings
+        if flags.contains(StringFlags::B_PREFIX) {
+            if flags.contains(StringFlags::R_PREFIX_LOWER) {
+                return Self::Bytes(ByteStringPrefix::Raw { uppercase_r: true });
+            }
+            if flags.contains(StringFlags::R_PREFIX_LOWER) {
+                return Self::Bytes(ByteStringPrefix::Raw { uppercase_r: false });
+            }
+            return Self::Bytes(ByteStringPrefix::Regular);
+        }
+
+        // all other strings
+        if flags.contains(StringFlags::R_PREFIX_LOWER) {
+            return Self::Regular(StringLiteralPrefix::Raw { uppercase: false });
+        }
+        if flags.contains(StringFlags::R_PREFIX_UPPER) {
+            return Self::Regular(StringLiteralPrefix::Raw { uppercase: true });
+        }
+        if flags.contains(StringFlags::U_PREFIX) {
+            return Self::Regular(StringLiteralPrefix::Unicode);
+        }
+        Self::Regular(StringLiteralPrefix::Empty)
+    }
+
     const fn as_str(self) -> &'static str {
         match self {
             Self::Regular(regular_prefix) => regular_prefix.as_str(),
@@ -178,6 +216,10 @@ pub struct StringKind(StringFlags);
 impl StringKind {
     pub(crate) const fn from_prefix(prefix: StringPrefix) -> Self {
         Self(prefix.as_flags())
+    }
+
+    pub const fn prefix(self) -> StringPrefix {
+        StringPrefix::from_kind(self)
     }
 
     /// Does the string have a `u` or `U` prefix?
@@ -230,42 +272,6 @@ impl StringKind {
                 Quote::Double => "\"",
             }
         }
-    }
-
-    pub const fn prefix(self) -> StringPrefix {
-        // f-strings
-        if self.0.contains(StringFlags::F_PREFIX) {
-            if self.0.contains(StringFlags::R_PREFIX_LOWER) {
-                return StringPrefix::Format(FStringPrefix::Raw { uppercase_r: false });
-            }
-            if self.0.contains(StringFlags::R_PREFIX_UPPER) {
-                return StringPrefix::Format(FStringPrefix::Raw { uppercase_r: true });
-            }
-            return StringPrefix::Format(FStringPrefix::Regular);
-        }
-
-        // bytestrings
-        if self.0.contains(StringFlags::B_PREFIX) {
-            if self.0.contains(StringFlags::R_PREFIX_LOWER) {
-                return StringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: true });
-            }
-            if self.0.contains(StringFlags::R_PREFIX_LOWER) {
-                return StringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: false });
-            }
-            return StringPrefix::Bytes(ByteStringPrefix::Regular);
-        }
-
-        // all other strings
-        if self.0.contains(StringFlags::R_PREFIX_LOWER) {
-            return StringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: false });
-        }
-        if self.0.contains(StringFlags::R_PREFIX_UPPER) {
-            return StringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: true });
-        }
-        if self.0.contains(StringFlags::U_PREFIX) {
-            return StringPrefix::Regular(StringLiteralPrefix::Unicode);
-        }
-        StringPrefix::Regular(StringLiteralPrefix::Empty)
     }
 
     /// The length of the prefixes used (if any) in the string's opener.
