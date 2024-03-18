@@ -44,7 +44,7 @@ expression: parse_ast
                                                                                         value: "",
                                                                                         flags: StringLiteralFlags {
                                                                                             quote_style: Single,
-                                                                                            prefix: "",
+                                                                                            prefix: Empty,
                                                                                             triple_quoted: false,
                                                                                         },
                                                                                     },
@@ -65,7 +65,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Double,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: false,
                                     },
                                 },

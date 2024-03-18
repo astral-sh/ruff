@@ -18,7 +18,7 @@ expression: parse_ast
                                         value: "Hello ",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
-                                            prefix: "",
+                                            prefix: Empty,
                                             triple_quoted: false,
                                         },
                                     },
@@ -27,7 +27,7 @@ expression: parse_ast
                                         value: "world",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
-                                            prefix: "u",
+                                            prefix: Unicode,
                                             triple_quoted: false,
                                         },
                                     },

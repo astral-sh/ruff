@@ -6,7 +6,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: true,
                 quote_style: Double,
             },
@@ -17,7 +19,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\nhello\n    world\n",
             kind: StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: true,
                 quote_style: Double,
             },
@@ -31,7 +35,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: true,
                 quote_style: Single,
             },
@@ -42,7 +48,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\n    world\nhello\n",
             kind: StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: true,
                 quote_style: Single,
             },
@@ -56,7 +64,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Double,
             },
@@ -67,7 +77,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: "some ",
             kind: StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Double,
             },
@@ -81,7 +93,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: true,
                 quote_style: Double,
             },
@@ -92,7 +106,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: "multiline\nallowed ",
             kind: StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: true,
                 quote_style: Double,
             },
@@ -125,7 +141,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: " string",
             kind: StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Double,
             },

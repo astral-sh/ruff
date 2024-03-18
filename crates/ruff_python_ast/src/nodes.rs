@@ -1187,10 +1187,53 @@ bitflags! {
 
         /// The f-string is triple-quoted:
         /// it begins and ends with three consecutive quote characters.
+        /// For example: `f"""{bar}"""`.
         const TRIPLE_QUOTED = 1 << 1;
 
-        /// The f-string has an `r` or `R` prefix, meaning it is a raw f-string.
-        const R_PREFIX = 1 << 3;
+        /// The f-string has an `r` prefix, meaning it is a raw f-string
+        /// with a lowercase 'r'. For example: `rf"{bar}"`
+        const R_PREFIX_LOWER = 1 << 2;
+
+        /// The f-string has an `R` prefix, meaning it is a raw f-string
+        /// with an uppercase 'r'. For example: `Rf"{bar}"`.
+        /// See https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
+        /// for why we track the casing of the `r` prefix,
+        /// but not for any other prefix
+        const R_PREFIX_UPPER = 1 << 3;
+    }
+}
+
+/// Enumeration of the valid prefixes an f-string literal can have.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum FStringPrefix {
+    /// Just a regular f-string with no other prefixes, e.g. f"{bar}"
+    Regular,
+
+    /// A "raw" format-string, that has an `r` or `R` prefix,
+    /// e.g. `rf"{bar}"` or `Rf"{bar}"`
+    Raw { uppercase_r: bool },
+}
+
+impl FStringPrefix {
+    /// Return a `str` representation of the prefix
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Regular => "f",
+            Self::Raw { uppercase_r: true } => "Rf",
+            Self::Raw { uppercase_r: false } => "rf",
+        }
+    }
+
+    /// Return true if this prefix indicates a "raw f-string",
+    /// e.g. `rf"{bar}"` or `Rf"{bar}"`
+    pub const fn is_raw(self) -> bool {
+        matches!(self, Self::Raw { .. })
+    }
+}
+
+impl fmt::Display for FStringPrefix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
@@ -1213,23 +1256,43 @@ impl FStringFlags {
     }
 
     #[must_use]
-    pub fn with_r_prefix(mut self) -> Self {
-        self.0 |= FStringFlagsInner::R_PREFIX;
-        self
+    pub fn with_prefix(self, prefix: FStringPrefix) -> Self {
+        let FStringFlags(flags) = self;
+        match prefix {
+            FStringPrefix::Regular => {
+                Self(flags - FStringFlagsInner::R_PREFIX_LOWER - FStringFlagsInner::R_PREFIX_UPPER)
+            }
+            FStringPrefix::Raw { uppercase_r: true } => Self(
+                (flags | FStringFlagsInner::R_PREFIX_UPPER) - FStringFlagsInner::R_PREFIX_LOWER,
+            ),
+            FStringPrefix::Raw { uppercase_r: false } => Self(
+                (flags | FStringFlagsInner::R_PREFIX_LOWER) - FStringFlagsInner::R_PREFIX_UPPER,
+            ),
+        }
     }
 
-    /// Does the f-string have an `r` or `R` prefix?
-    pub const fn is_raw(self) -> bool {
-        self.0.contains(FStringFlagsInner::R_PREFIX)
+    pub const fn prefix(self) -> FStringPrefix {
+        if self.0.contains(FStringFlagsInner::R_PREFIX_LOWER) {
+            debug_assert!(!self.0.contains(FStringFlagsInner::R_PREFIX_UPPER));
+            FStringPrefix::Raw { uppercase_r: false }
+        } else if self.0.contains(FStringFlagsInner::R_PREFIX_UPPER) {
+            FStringPrefix::Raw { uppercase_r: true }
+        } else {
+            FStringPrefix::Regular
+        }
     }
 
-    /// Is the f-string triple-quoted, i.e.,
-    /// does it begin and end with three consecutive quote characters?
+    /// Return `true` if the f-string is triple-quoted, i.e.,
+    /// it begins and ends with three consecutive quote characters.
+    /// For example: `f"""{bar}"""`
     pub const fn is_triple_quoted(self) -> bool {
         self.0.contains(FStringFlagsInner::TRIPLE_QUOTED)
     }
 
-    /// Does the f-string use single or double quotes in its opener and closer?
+    /// Return the quoting style (single or double quotes)
+    /// used by the f-string's opener and closer:
+    /// - `f"{"a"}"` -> `QuoteStyle::Double`
+    /// - `f'{"a"}'` -> `QuoteStyle::Single`
     pub const fn quote_style(self) -> Quote {
         if self.0.contains(FStringFlagsInner::DOUBLE) {
             Quote::Double
@@ -1243,7 +1306,7 @@ impl fmt::Debug for FStringFlags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FStringFlags")
             .field("quote_style", &self.quote_style())
-            .field("raw", &self.is_raw())
+            .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
             .finish()
     }
@@ -1367,7 +1430,7 @@ impl StringLiteralValue {
     pub fn is_unicode(&self) -> bool {
         self.iter()
             .next()
-            .map_or(false, |part| part.flags.is_u_string())
+            .map_or(false, |part| part.flags.prefix().is_unicode())
     }
 
     /// Returns a slice of all the [`StringLiteral`] parts contained in this value.
@@ -1483,24 +1546,32 @@ impl Default for StringLiteralValueInner {
 bitflags! {
     #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
     struct StringLiteralFlagsInner: u8 {
-        /// The string uses double quotes (`"`).
-        /// If this flag is not set, the string uses single quotes (`'`).
+        /// The string uses double quotes (e.g. `"foo"`).
+        /// If this flag is not set, the string uses single quotes (`'foo'`).
         const DOUBLE = 1 << 0;
 
-        /// The string is triple-quoted:
+        /// The string is triple-quoted (`"""foo"""`):
         /// it begins and ends with three consecutive quote characters.
         const TRIPLE_QUOTED = 1 << 1;
 
-        /// The string has a `u` or `U` prefix.
+        /// The string has a `u` or `U` prefix, e.g. `u"foo"`.
         /// While this prefix is a no-op at runtime,
         /// strings with this prefix can have no other prefixes set;
         /// it is therefore invalid for this flag to be set
         /// if `R_PREFIX` is also set.
         const U_PREFIX = 1 << 2;
 
-        /// The string has an `r` or `R` prefix, meaning it is a raw string.
+        /// The string has an `r` prefix, meaning it is a raw string
+        /// with a lowercase 'r' (e.g. `r"foo\."`).
         /// It is invalid to set this flag if `U_PREFIX` is also set.
-        const R_PREFIX = 1 << 3;
+        const R_PREFIX_LOWER = 1 << 3;
+
+        /// The string has an `R` prefix, meaning it is a raw string
+        /// with an uppercase 'R' (e.g. `R'foo\d'`).
+        /// See https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
+        /// for why we track the casing of the `r` prefix,
+        /// but not for any other prefix
+        const R_PREFIX_UPPER = 1 << 4;
     }
 }
 
@@ -1523,27 +1594,54 @@ impl StringLiteralFlags {
     }
 
     #[must_use]
-    pub fn with_prefix(mut self, prefix: StringLiteralPrefix) -> Self {
+    pub fn with_prefix(self, prefix: StringLiteralPrefix) -> Self {
+        let StringLiteralFlags(flags) = self;
         match prefix {
-            StringLiteralPrefix::None => {}
-            StringLiteralPrefix::RString => self.0 |= StringLiteralFlagsInner::R_PREFIX,
-            StringLiteralPrefix::UString => self.0 |= StringLiteralFlagsInner::U_PREFIX,
-        };
-        self
-    }
-
-    pub const fn prefix(self) -> &'static str {
-        if self.0.contains(StringLiteralFlagsInner::U_PREFIX) {
-            debug_assert!(!self.0.contains(StringLiteralFlagsInner::R_PREFIX));
-            "u"
-        } else if self.0.contains(StringLiteralFlagsInner::R_PREFIX) {
-            "r"
-        } else {
-            ""
+            StringLiteralPrefix::Empty => Self(
+                flags
+                    - StringLiteralFlagsInner::R_PREFIX_LOWER
+                    - StringLiteralFlagsInner::R_PREFIX_UPPER
+                    - StringLiteralFlagsInner::U_PREFIX,
+            ),
+            StringLiteralPrefix::Raw { uppercase: false } => Self(
+                (flags | StringLiteralFlagsInner::R_PREFIX_LOWER)
+                    - StringLiteralFlagsInner::R_PREFIX_UPPER
+                    - StringLiteralFlagsInner::U_PREFIX,
+            ),
+            StringLiteralPrefix::Raw { uppercase: true } => Self(
+                (flags | StringLiteralFlagsInner::R_PREFIX_UPPER)
+                    - StringLiteralFlagsInner::R_PREFIX_LOWER
+                    - StringLiteralFlagsInner::U_PREFIX,
+            ),
+            StringLiteralPrefix::Unicode => Self(
+                (flags | StringLiteralFlagsInner::U_PREFIX)
+                    - StringLiteralFlagsInner::R_PREFIX_LOWER
+                    - StringLiteralFlagsInner::R_PREFIX_UPPER,
+            ),
         }
     }
 
-    /// Does the string use single or double quotes in its opener and closer?
+    pub const fn prefix(self) -> StringLiteralPrefix {
+        if self.0.contains(StringLiteralFlagsInner::U_PREFIX) {
+            debug_assert!(!self.0.intersects(
+                StringLiteralFlagsInner::R_PREFIX_LOWER
+                    .union(StringLiteralFlagsInner::R_PREFIX_UPPER)
+            ));
+            StringLiteralPrefix::Unicode
+        } else if self.0.contains(StringLiteralFlagsInner::R_PREFIX_LOWER) {
+            debug_assert!(!self.0.contains(StringLiteralFlagsInner::R_PREFIX_UPPER));
+            StringLiteralPrefix::Raw { uppercase: false }
+        } else if self.0.contains(StringLiteralFlagsInner::R_PREFIX_UPPER) {
+            StringLiteralPrefix::Raw { uppercase: true }
+        } else {
+            StringLiteralPrefix::Empty
+        }
+    }
+
+    /// Return the quoting style (single or double quotes)
+    /// used by the string's opener and closer:
+    /// - `"a"` -> `QuoteStyle::Double`
+    /// - `'a'` -> `QuoteStyle::Single`
     pub const fn quote_style(self) -> Quote {
         if self.0.contains(StringLiteralFlagsInner::DOUBLE) {
             Quote::Double
@@ -1552,20 +1650,11 @@ impl StringLiteralFlags {
         }
     }
 
-    /// Is the string triple-quoted, i.e.,
-    /// does it begin and end with three consecutive quote characters?
+    /// Return `true` if the string is triple-quoted, i.e.,
+    /// it begins and ends with three consecutive quote characters.
+    /// For example: `"""bar"""`
     pub const fn is_triple_quoted(self) -> bool {
         self.0.contains(StringLiteralFlagsInner::TRIPLE_QUOTED)
-    }
-
-    /// Does the string have a `u` or `U` prefix?
-    pub const fn is_u_string(&self) -> bool {
-        self.0.contains(StringLiteralFlagsInner::U_PREFIX)
-    }
-
-    /// Does the string have an `r` or `R` prefix?
-    pub const fn is_r_string(&self) -> bool {
-        self.0.contains(StringLiteralFlagsInner::R_PREFIX)
     }
 }
 
@@ -1583,19 +1672,41 @@ impl fmt::Debug for StringLiteralFlags {
 ///
 /// Bytestrings and f-strings are excluded from this enumeration,
 /// as they are represented by different AST nodes.
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, is_macro::Is)]
 pub enum StringLiteralPrefix {
     /// Just a regular string with no prefixes
-    #[default]
-    None,
+    Empty,
 
-    /// A string with a `u` or `U` prefix.
-    /// This is a no-op at runtime,
-    /// but is mutually exclusive with a string having an `r` prefix.
-    UString,
+    /// A string with a `u` or `U` prefix, e.g. `u"foo"`.
+    /// Note that, despite this variant's name,
+    /// it is in fact a no-op at runtime to use the `u` or `U` prefix
+    /// in Python. All Python-3 strings are unicode strings;
+    /// this prefix is only allowed in Python 3 for backwards compatibility
+    /// with Python 2. However, using this prefix in a Python string
+    /// is mutually exclusive with an `r` or `R` prefix.
+    Unicode,
 
-    /// A "raw" string, that has an `r` or `R` prefix
-    RString,
+    /// A "raw" string, that has an `r` or `R` prefix,
+    /// e.g. `r"foo\."` or `R'bar\d'`.
+    Raw { uppercase: bool },
+}
+
+impl StringLiteralPrefix {
+    /// Return a `str` representation of the prefix
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Empty => "",
+            Self::Unicode => "u",
+            Self::Raw { uppercase: true } => "R",
+            Self::Raw { uppercase: false } => "r",
+        }
+    }
+}
+
+impl fmt::Display for StringLiteralPrefix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 /// An AST node that represents a single string literal which is part of an
@@ -1824,16 +1935,57 @@ impl Default for BytesLiteralValueInner {
 bitflags! {
     #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
     struct BytesLiteralFlagsInner: u8 {
-        /// The bytestring uses double quotes (`"`).
-        /// If this flag is not set, the bytestring uses single quotes (`'`).
+        /// The bytestring uses double quotes (e.g. `b"foo"`).
+        /// If this flag is not set, the bytestring uses single quotes (e.g. `b'foo'`).
         const DOUBLE = 1 << 0;
 
-        /// The bytestring is triple-quoted:
+        /// The bytestring is triple-quoted (e.g. `b"""foo"""`):
         /// it begins and ends with three consecutive quote characters.
         const TRIPLE_QUOTED = 1 << 1;
 
-        /// The bytestring has an `r` or `R` prefix, meaning it is a raw bytestring.
-        const R_PREFIX = 1 << 3;
+        /// The bytestring has an `r` prefix (e.g. `rb"foo"`),
+        /// meaning it is a raw bytestring with a lowercase 'r'.
+        const R_PREFIX_LOWER = 1 << 2;
+
+        /// The bytestring has an `R` prefix (e.g. `Rb"foo"`),
+        /// meaning it is a raw bytestring with an uppercase 'R'.
+        /// See https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
+        /// for why we track the casing of the `r` prefix, but not for any other prefix
+        const R_PREFIX_UPPER = 1 << 3;
+    }
+}
+
+/// Enumeration of the valid prefixes a bytestring literal can have.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum ByteStringPrefix {
+    /// Just a regular bytestring with no other prefixes, e.g. `b"foo"`
+    Regular,
+
+    /// A "raw" bytestring, that has an `r` or `R` prefix,
+    /// e.g. `Rb"foo"` or `rb"foo"`
+    Raw { uppercase_r: bool },
+}
+
+impl ByteStringPrefix {
+    /// Return a `str` representation of the prefix
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Regular => "b",
+            Self::Raw { uppercase_r: true } => "Rb",
+            Self::Raw { uppercase_r: false } => "rb",
+        }
+    }
+
+    /// Return true if this prefix indicates a "raw bytestring",
+    /// e.g. `rb"foo"` or `Rb"foo"`
+    pub const fn is_raw(self) -> bool {
+        matches!(self, Self::Raw { .. })
+    }
+}
+
+impl fmt::Display for ByteStringPrefix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
@@ -1856,23 +2008,47 @@ impl BytesLiteralFlags {
     }
 
     #[must_use]
-    pub fn with_r_prefix(mut self) -> Self {
-        self.0 |= BytesLiteralFlagsInner::R_PREFIX;
-        self
+    pub fn with_prefix(self, prefix: ByteStringPrefix) -> Self {
+        let BytesLiteralFlags(flags) = self;
+        match prefix {
+            ByteStringPrefix::Regular => Self(
+                flags
+                    - BytesLiteralFlagsInner::R_PREFIX_LOWER
+                    - BytesLiteralFlagsInner::R_PREFIX_UPPER,
+            ),
+            ByteStringPrefix::Raw { uppercase_r: true } => Self(
+                (flags | BytesLiteralFlagsInner::R_PREFIX_UPPER)
+                    - BytesLiteralFlagsInner::R_PREFIX_LOWER,
+            ),
+            ByteStringPrefix::Raw { uppercase_r: false } => Self(
+                (flags | BytesLiteralFlagsInner::R_PREFIX_LOWER)
+                    - BytesLiteralFlagsInner::R_PREFIX_UPPER,
+            ),
+        }
     }
 
-    /// Does the bytestring have an `r` or `R` prefix?
-    pub const fn is_raw(self) -> bool {
-        self.0.contains(BytesLiteralFlagsInner::R_PREFIX)
+    pub const fn prefix(self) -> ByteStringPrefix {
+        if self.0.contains(BytesLiteralFlagsInner::R_PREFIX_LOWER) {
+            debug_assert!(!self.0.contains(BytesLiteralFlagsInner::R_PREFIX_UPPER));
+            ByteStringPrefix::Raw { uppercase_r: false }
+        } else if self.0.contains(BytesLiteralFlagsInner::R_PREFIX_UPPER) {
+            ByteStringPrefix::Raw { uppercase_r: true }
+        } else {
+            ByteStringPrefix::Regular
+        }
     }
 
-    /// Is the bytestring triple-quoted, i.e.,
-    /// does it begin and end with three consecutive quote characters?
+    /// Return `true` if the bytestring is triple-quoted, i.e.,
+    /// it begins and ends with three consecutive quote characters.
+    /// For example: `b"""{bar}"""`
     pub const fn is_triple_quoted(self) -> bool {
         self.0.contains(BytesLiteralFlagsInner::TRIPLE_QUOTED)
     }
 
-    /// Does the bytestring use single or double quotes in its opener and closer?
+    /// Return the quoting style (single or double quotes)
+    /// used by the bytestring's opener and closer:
+    /// - `b"a"` -> `QuoteStyle::Double`
+    /// - `b'a'` -> `QuoteStyle::Single`
     pub const fn quote_style(self) -> Quote {
         if self.0.contains(BytesLiteralFlagsInner::DOUBLE) {
             Quote::Double
@@ -1886,7 +2062,7 @@ impl fmt::Debug for BytesLiteralFlags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BytesLiteralFlags")
             .field("quote_style", &self.quote_style())
-            .field("raw", &self.is_raw())
+            .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
             .finish()
     }
