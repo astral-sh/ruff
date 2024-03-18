@@ -256,6 +256,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E1310") => (RuleGroup::Stable, rules::pylint::rules::BadStrStripCall),
         (Pylint, "E1507") => (RuleGroup::Stable, rules::pylint::rules::InvalidEnvvarValue),
         (Pylint, "E1519") => (RuleGroup::Preview, rules::pylint::rules::SingledispatchMethod),
+        (Pylint, "E1520") => (RuleGroup::Preview, rules::pylint::rules::SingledispatchmethodFunction),
         (Pylint, "E1700") => (RuleGroup::Stable, rules::pylint::rules::YieldFromInAsyncFunction),
         (Pylint, "E2502") => (RuleGroup::Stable, rules::pylint::rules::BidirectionalUnicode),
         (Pylint, "E2510") => (RuleGroup::Stable, rules::pylint::rules::InvalidCharacterBackspace),
