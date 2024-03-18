@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Expr, Operator, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprContext, Operator, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -271,7 +271,7 @@ impl<'a> SemanticModel<'a> {
             .get(symbol)
             .map_or(true, |binding_id| {
                 // Treat the deletion of a name as a reference to that name.
-                self.add_local_reference(binding_id, range);
+                self.add_local_reference(binding_id, ExprContext::Del, range);
                 self.bindings[binding_id].is_unbound()
             });
 
@@ -296,8 +296,9 @@ impl<'a> SemanticModel<'a> {
                     let reference_id = self.resolved_references.push(
                         ScopeId::global(),
                         self.node_id,
-                        name.range,
+                        ExprContext::Load,
                         self.flags,
+                        name.range,
                     );
                     self.bindings[binding_id].references.push(reference_id);
 
@@ -308,8 +309,9 @@ impl<'a> SemanticModel<'a> {
                         let reference_id = self.resolved_references.push(
                             ScopeId::global(),
                             self.node_id,
-                            name.range,
+                            ExprContext::Load,
                             self.flags,
+                            name.range,
                         );
                         self.bindings[binding_id].references.push(reference_id);
                     }
@@ -365,8 +367,9 @@ impl<'a> SemanticModel<'a> {
                 let reference_id = self.resolved_references.push(
                     self.scope_id,
                     self.node_id,
-                    name.range,
+                    ExprContext::Load,
                     self.flags,
+                    name.range,
                 );
                 self.bindings[binding_id].references.push(reference_id);
 
@@ -377,8 +380,9 @@ impl<'a> SemanticModel<'a> {
                     let reference_id = self.resolved_references.push(
                         self.scope_id,
                         self.node_id,
-                        name.range,
+                        ExprContext::Load,
                         self.flags,
+                        name.range,
                     );
                     self.bindings[binding_id].references.push(reference_id);
                 }
@@ -426,6 +430,15 @@ impl<'a> SemanticModel<'a> {
                         return ReadResult::UnboundLocal(binding_id);
                     }
 
+                    BindingKind::ConditionalDeletion(binding_id) => {
+                        self.unresolved_references.push(
+                            name.range,
+                            self.exceptions(),
+                            UnresolvedReferenceFlags::empty(),
+                        );
+                        return ReadResult::UnboundLocal(binding_id);
+                    }
+
                     // If we hit an unbound exception that shadowed a bound name, resole to the
                     // bound name. For example, given:
                     //
@@ -446,8 +459,9 @@ impl<'a> SemanticModel<'a> {
                         let reference_id = self.resolved_references.push(
                             self.scope_id,
                             self.node_id,
-                            name.range,
+                            ExprContext::Load,
                             self.flags,
+                            name.range,
                         );
                         self.bindings[binding_id].references.push(reference_id);
 
@@ -458,8 +472,9 @@ impl<'a> SemanticModel<'a> {
                             let reference_id = self.resolved_references.push(
                                 self.scope_id,
                                 self.node_id,
-                                name.range,
+                                ExprContext::Load,
                                 self.flags,
+                                name.range,
                             );
                             self.bindings[binding_id].references.push(reference_id);
                         }
@@ -548,6 +563,7 @@ impl<'a> SemanticModel<'a> {
                 match self.bindings[binding_id].kind {
                     BindingKind::Annotation => continue,
                     BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
+                    BindingKind::ConditionalDeletion(binding_id) => return Some(binding_id),
                     BindingKind::UnboundException(Some(binding_id)) => return Some(binding_id),
                     _ => return Some(binding_id),
                 }
@@ -1315,18 +1331,28 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Add a reference to the given [`BindingId`] in the local scope.
-    pub fn add_local_reference(&mut self, binding_id: BindingId, range: TextRange) {
+    pub fn add_local_reference(
+        &mut self,
+        binding_id: BindingId,
+        ctx: ExprContext,
+        range: TextRange,
+    ) {
         let reference_id =
             self.resolved_references
-                .push(self.scope_id, self.node_id, range, self.flags);
+                .push(self.scope_id, self.node_id, ctx, self.flags, range);
         self.bindings[binding_id].references.push(reference_id);
     }
 
     /// Add a reference to the given [`BindingId`] in the global scope.
-    pub fn add_global_reference(&mut self, binding_id: BindingId, range: TextRange) {
+    pub fn add_global_reference(
+        &mut self,
+        binding_id: BindingId,
+        ctx: ExprContext,
+        range: TextRange,
+    ) {
         let reference_id =
             self.resolved_references
-                .push(ScopeId::global(), self.node_id, range, self.flags);
+                .push(ScopeId::global(), self.node_id, ctx, self.flags, range);
         self.bindings[binding_id].references.push(reference_id);
     }
 
@@ -1700,7 +1726,6 @@ bitflags! {
         /// only required by the Python interpreter, but by runtime type checkers too.
         const RUNTIME_REQUIRED_ANNOTATION = 1 << 2;
 
-
         /// The model is in a type definition.
         ///
         /// For example, the model could be visiting `int` in:
@@ -1885,7 +1910,6 @@ bitflags! {
         /// [_ for x in range(10)]
         /// ```
         const COMPREHENSION_ASSIGNMENT = 1 << 19;
-
 
         /// The model is in a module / class / function docstring.
         ///
