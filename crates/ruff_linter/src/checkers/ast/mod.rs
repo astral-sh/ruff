@@ -45,7 +45,7 @@ use ruff_python_ast::helpers::{
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
-use ruff_python_ast::visitor::{walk_except_handler, walk_f_string_element, walk_pattern, Visitor};
+use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
@@ -540,7 +540,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     for name in names {
                         if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
                             // Mark the binding as "used".
-                            self.semantic.add_local_reference(binding_id, name.range());
+                            self.semantic.add_local_reference(
+                                binding_id,
+                                ExprContext::Load,
+                                name.range(),
+                            );
 
                             // Mark the binding in the enclosing scope as "rebound" in the current
                             // scope.
@@ -1407,6 +1411,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 analyze::string_like(string_literal.into(), self);
             }
             Expr::BytesLiteral(bytes_literal) => analyze::string_like(bytes_literal.into(), self),
+            Expr::FString(f_string) => analyze::string_like(f_string.into(), self),
             _ => {}
         }
 
@@ -1571,16 +1576,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
             self.visit
                 .type_param_definitions
                 .push((bound, self.semantic.snapshot()));
-        }
-    }
-
-    fn visit_f_string_element(&mut self, f_string_element: &'a ast::FStringElement) {
-        // Step 2: Traversal
-        walk_f_string_element(self, f_string_element);
-
-        // Step 4: Analysis
-        if let Some(literal) = f_string_element.as_literal() {
-            analyze::string_like(literal.into(), self);
         }
     }
 }
@@ -2122,7 +2117,8 @@ impl<'a> Checker<'a> {
                 // Mark anything referenced in `__all__` as used.
                 // TODO(charlie): `range` here should be the range of the name in `__all__`, not
                 // the range of `__all__` itself.
-                self.semantic.add_global_reference(binding_id, range);
+                self.semantic
+                    .add_global_reference(binding_id, ExprContext::Load, range);
             } else {
                 if self.semantic.global_scope().uses_star_imports() {
                     if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {

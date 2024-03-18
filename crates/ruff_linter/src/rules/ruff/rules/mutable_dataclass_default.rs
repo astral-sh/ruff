@@ -19,8 +19,8 @@ use crate::rules::ruff::rules::helpers::{is_class_var_annotation, is_dataclass};
 /// Instead of sharing mutable defaults, use the `field(default_factory=...)`
 /// pattern.
 ///
-/// If the default value is intended to be mutable, it should be annotated with
-/// `typing.ClassVar`.
+/// If the default value is intended to be mutable, it must be annotated with
+/// `typing.ClassVar`; otherwise, a `ValueError` will be raised.
 ///
 /// ## Examples
 /// ```python
@@ -29,6 +29,8 @@ use crate::rules::ruff::rules::helpers::{is_class_var_annotation, is_dataclass};
 ///
 /// @dataclass
 /// class A:
+///     # A list without a `default_factory` or `ClassVar` annotation
+///     # will raise a `ValueError`.
 ///     mutable_default: list[int] = []
 /// ```
 ///
@@ -44,7 +46,7 @@ use crate::rules::ruff::rules::helpers::{is_class_var_annotation, is_dataclass};
 ///
 /// Or:
 /// ```python
-/// from dataclasses import dataclass, field
+/// from dataclasses import dataclass
 /// from typing import ClassVar
 ///
 ///

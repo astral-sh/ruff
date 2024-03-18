@@ -499,7 +499,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
             .flat_map(|ImportBinding { binding, .. }| {
                 binding.references.iter().filter_map(|reference_id| {
                     let reference = checker.semantic().reference(*reference_id);
-                    if reference.context().is_runtime() {
+                    if reference.in_runtime_context() {
                         Some(quote_annotation(
                             reference.expression_id()?,
                             checker.semantic(),
