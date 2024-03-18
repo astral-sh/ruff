@@ -151,7 +151,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.3.2
+  rev: v0.3.3
   hooks:
     # Run the linter.
     - id: ruff
@@ -429,6 +429,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Mypy](https://github.com/python/mypy)
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
 - [Neon](https://github.com/neondatabase/neon)
+- [Nokia](https://nokia.com/)
 - [NoneBot](https://github.com/nonebot/nonebot2)
 - [NumPyro](https://github.com/pyro-ppl/numpyro)
 - [ONNX](https://github.com/onnx/onnx)

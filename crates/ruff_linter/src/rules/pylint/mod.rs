@@ -21,6 +21,10 @@ mod tests {
     use crate::test::test_path;
 
     #[test_case(Rule::SingledispatchMethod, Path::new("singledispatch_method.py"))]
+    #[test_case(
+        Rule::SingledispatchmethodFunction,
+        Path::new("singledispatchmethod_function.py")
+    )]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
     #[test_case(Rule::BadOpenMode, Path::new("bad_open_mode.py"))]
@@ -92,9 +96,11 @@ mod tests {
         Rule::NamedExprWithoutContext,
         Path::new("named_expr_without_context.py")
     )]
+    #[test_case(Rule::NonlocalAndGlobal, Path::new("nonlocal_and_global.py"))]
     #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"))]
     #[test_case(Rule::NonSlotAssignment, Path::new("non_slot_assignment.py"))]
     #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"))]
+    #[test_case(Rule::RedeclaredAssignedName, Path::new("redeclared_assigned_name.py"))]
     #[test_case(
         Rule::RedefinedArgumentFromLocal,
         Path::new("redefined_argument_from_local.py")

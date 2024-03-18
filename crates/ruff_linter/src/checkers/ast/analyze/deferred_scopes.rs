@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::{Binding, BindingKind, Imported, ScopeKind};
+use ruff_python_semantic::{Binding, BindingKind, Imported, ResolvedReference, ScopeKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -43,6 +43,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::UnusedStaticMethodArgument,
         Rule::UnusedVariable,
         Rule::SingledispatchMethod,
+        Rule::SingledispatchmethodFunction,
     ]) {
         return;
     }
@@ -91,13 +92,29 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         if checker.enabled(Rule::GlobalVariableNotAssigned) {
             for (name, binding_id) in scope.bindings() {
                 let binding = checker.semantic.binding(binding_id);
+                // If the binding is a `global`, then it's a top-level `global` that was never
+                // assigned in the current scope. If it were assigned, the `global` would be
+                // shadowed by the assignment.
                 if binding.kind.is_global() {
-                    diagnostics.push(Diagnostic::new(
-                        pylint::rules::GlobalVariableNotAssigned {
-                            name: (*name).to_string(),
-                        },
-                        binding.range(),
-                    ));
+                    // If the binding was conditionally deleted, it will include a reference within
+                    // a `Del` context, but won't be shadowed by a `BindingKind::Deletion`, as in:
+                    // ```python
+                    // if condition:
+                    //     del var
+                    // ```
+                    if binding
+                        .references
+                        .iter()
+                        .map(|id| checker.semantic.reference(*id))
+                        .all(ResolvedReference::is_load)
+                    {
+                        diagnostics.push(Diagnostic::new(
+                            pylint::rules::GlobalVariableNotAssigned {
+                                name: (*name).to_string(),
+                            },
+                            binding.range(),
+                        ));
+                    }
                 }
             }
         }
@@ -401,6 +418,10 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
             if checker.enabled(Rule::SingledispatchMethod) {
                 pylint::rules::singledispatch_method(checker, scope, &mut diagnostics);
+            }
+
+            if checker.enabled(Rule::SingledispatchmethodFunction) {
+                pylint::rules::singledispatchmethod_function(checker, scope, &mut diagnostics);
             }
 
             if checker.any_enabled(&[
