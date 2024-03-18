@@ -16,12 +16,14 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// def function() -> "int": ...
+/// def function() -> "int":
+///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def function() -> int: ...
+/// def function() -> int:
+///     ...
 /// ```
 ///
 /// ## References

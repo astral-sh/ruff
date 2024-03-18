@@ -24,7 +24,10 @@ use crate::checkers::ast::Checker;
 ///
 /// a = b = int
 ///
-/// class Klass: ...
+///
+/// class Klass:
+///     ...
+///
 ///
 /// Klass.X: TypeAlias = int
 /// ```
@@ -35,6 +38,7 @@ use crate::checkers::ast::Checker;
 ///
 /// a: TypeAlias = int
 /// b: TypeAlias = int
+///
 ///
 /// class Klass:
 ///     X: TypeAlias = int

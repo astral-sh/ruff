@@ -31,6 +31,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// from typing import NamedTuple
 ///
+///
 /// class Person(NamedTuple):
 ///     name: str
 ///     age: int

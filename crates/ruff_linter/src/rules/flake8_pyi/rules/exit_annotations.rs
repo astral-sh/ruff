@@ -26,6 +26,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// from types import TracebackType
 ///
+///
 /// class Foo:
 ///     def __exit__(
 ///         self, typ: BaseException, exc: BaseException, tb: TracebackType
@@ -36,6 +37,7 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 /// ```python
 /// from types import TracebackType
+///
 ///
 /// class Foo:
 ///     def __exit__(
