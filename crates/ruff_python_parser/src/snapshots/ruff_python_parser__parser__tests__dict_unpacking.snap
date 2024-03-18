@@ -17,7 +17,7 @@ Dict(
                                     value: "a",
                                     flags: StringLiteralFlags {
                                         quote_style: Double,
-                                        prefix: "",
+                                        prefix: Empty,
                                         triple_quoted: false,
                                     },
                                 },
@@ -38,7 +38,7 @@ Dict(
                                     value: "d",
                                     flags: StringLiteralFlags {
                                         quote_style: Double,
-                                        prefix: "",
+                                        prefix: Empty,
                                         triple_quoted: false,
                                     },
                                 },
@@ -59,7 +59,7 @@ Dict(
                                 value: "b",
                                 flags: StringLiteralFlags {
                                     quote_style: Double,
-                                    prefix: "",
+                                    prefix: Empty,
                                     triple_quoted: false,
                                 },
                             },
@@ -84,7 +84,7 @@ Dict(
                                 value: "e",
                                 flags: StringLiteralFlags {
                                     quote_style: Double,
-                                    prefix: "",
+                                    prefix: Empty,
                                     triple_quoted: false,
                                 },
                             },

@@ -6,7 +6,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Single,
             },
@@ -17,7 +19,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\\",
             kind: StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Single,
             },
@@ -45,7 +49,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Single,
             },
@@ -56,7 +62,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\\\\",
             kind: StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Single,
             },
@@ -84,7 +92,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Single,
             },
@@ -95,7 +105,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\\{foo}",
             kind: StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Single,
             },
@@ -109,7 +121,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Single,
             },
@@ -120,7 +134,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\\\\{foo}",
             kind: StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Single,
             },

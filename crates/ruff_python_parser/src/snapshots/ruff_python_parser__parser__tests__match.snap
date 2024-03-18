@@ -21,7 +21,7 @@ expression: parse_ast
                                                 value: "test",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -114,7 +114,7 @@ expression: parse_ast
                                                 value: "label",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -135,7 +135,7 @@ expression: parse_ast
                                             value: "test",
                                             flags: StringLiteralFlags {
                                                 quote_style: Double,
-                                                prefix: "",
+                                                prefix: Empty,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -163,7 +163,7 @@ expression: parse_ast
                                                     value: "label",
                                                     flags: StringLiteralFlags {
                                                         quote_style: Double,
-                                                        prefix: "",
+                                                        prefix: Empty,
                                                         triple_quoted: false,
                                                     },
                                                 },

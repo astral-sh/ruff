@@ -2,7 +2,7 @@ use std::fmt;
 
 use bitflags::bitflags;
 
-use ruff_python_ast::{str::Quote, StringLiteralPrefix};
+use ruff_python_ast::{str::Quote, ByteStringPrefix, FStringPrefix, StringLiteralPrefix};
 use ruff_text_size::{TextLen, TextSize};
 
 bitflags! {
@@ -41,11 +41,18 @@ bitflags! {
         /// but can have no other prefixes.
         const F_PREFIX = 1 << 4;
 
-        /// The string has an `r` or `R` prefix, meaning it is a raw string.
+        /// The string has an `r` prefix, meaning it is a raw string.
         /// F-strings and byte-strings can be raw,
         /// as can strings with no other prefixes.
         /// U-strings cannot be raw.
-        const R_PREFIX = 1 << 5;
+        const R_PREFIX_LOWER = 1 << 5;
+
+        /// The string has an `R` prefix, meaning it is a raw string.
+        /// The casing of the `r`/`R` has no semantic significance at runtime;
+        /// see https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
+        /// for why we track the casing of the `r` prefix,
+        /// but not for any other prefix
+        const R_PREFIX_UPPER = 1 << 6;
     }
 }
 
@@ -61,41 +68,15 @@ bitflags! {
 /// [String and Bytes literals]: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
 /// [PEP 701]: https://peps.python.org/pep-0701/
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum StringPrefix {
-    /// The string has a `u` or `U` prefix.
-    /// While this prefix is a no-op at runtime,
-    /// strings with this prefix can have no other prefixes set.
-    Unicode,
+pub enum StringPrefix {
+    /// Prefixes that indicate the string is a bytestring
+    Bytes(ByteStringPrefix),
 
-    /// The string has an `r` or `R` prefix, meaning it is a raw string.
-    /// F-strings and byte-strings can be raw,
-    /// as can strings with no other prefixes.
-    /// U-strings cannot be raw.
-    Raw,
+    /// Prefixes that indicate the string is an f-string
+    Format(FStringPrefix),
 
-    /// The string has a `f` or `F` prefix, meaning it is an f-string.
-    /// F-strings can also be raw strings,
-    /// but can have no other prefixes.
-    Format,
-
-    /// The string has a `b` or `B` prefix.
-    /// This means that the string is a sequence of `int`s at runtime,
-    /// rather than a sequence of `str`s.
-    /// Bytestrings can also be raw strings,
-    /// but can have no other prefixes.
-    Bytes,
-
-    /// A string that has has any one of the prefixes
-    /// `{"rf", "rF", "Rf", "RF", "fr", "fR", "Fr", "FR"}`
-    /// Semantically, these all have the same meaning:
-    /// the string is both an f-string and a raw-string
-    RawFormat,
-
-    /// A string that has has any one of the prefixes
-    /// `{"rb", "rB", "Rb", "RB", "br", "bR", "Br", "BR"}`
-    /// Semantically, these all have the same meaning:
-    /// the string is both an bytestring and a raw-string
-    RawBytes,
+    /// All other prefixes
+    Regular(StringLiteralPrefix),
 }
 
 impl TryFrom<char> for StringPrefix {
@@ -103,10 +84,11 @@ impl TryFrom<char> for StringPrefix {
 
     fn try_from(value: char) -> Result<Self, String> {
         let result = match value {
-            'r' | 'R' => Self::Raw,
-            'u' | 'U' => Self::Unicode,
-            'b' | 'B' => Self::Bytes,
-            'f' | 'F' => Self::Format,
+            'r' => Self::Regular(StringLiteralPrefix::Raw { uppercase: false }),
+            'R' => Self::Regular(StringLiteralPrefix::Raw { uppercase: true }),
+            'u' | 'U' => Self::Regular(StringLiteralPrefix::Unicode),
+            'b' | 'B' => Self::Bytes(ByteStringPrefix::Regular),
+            'f' | 'F' => Self::Format(FStringPrefix::Regular),
             _ => return Err(format!("Unexpected prefix '{value}'")),
         };
         Ok(result)
@@ -117,24 +99,114 @@ impl TryFrom<[char; 2]> for StringPrefix {
     type Error = String;
 
     fn try_from(value: [char; 2]) -> Result<Self, String> {
-        match value {
-            ['r' | 'R', 'f' | 'F'] | ['f' | 'F', 'r' | 'R'] => Ok(Self::RawFormat),
-            ['r' | 'R', 'b' | 'B'] | ['b' | 'B', 'r' | 'R'] => Ok(Self::RawBytes),
-            _ => Err(format!("Unexpected prefix '{}{}'", value[0], value[1])),
-        }
+        let result = match value {
+            ['r', 'f' | 'F'] | ['f' | 'F', 'r'] => {
+                Self::Format(FStringPrefix::Raw { uppercase_r: false })
+            }
+            ['R', 'f' | 'F'] | ['f' | 'F', 'R'] => {
+                Self::Format(FStringPrefix::Raw { uppercase_r: true })
+            }
+            ['r', 'b' | 'B'] | ['b' | 'B', 'r'] => {
+                Self::Bytes(ByteStringPrefix::Raw { uppercase_r: false })
+            }
+            ['R', 'b' | 'B'] | ['b' | 'B', 'R'] => {
+                Self::Bytes(ByteStringPrefix::Raw { uppercase_r: true })
+            }
+            _ => return Err(format!("Unexpected prefix '{}{}'", value[0], value[1])),
+        };
+        Ok(result)
     }
 }
 
 impl StringPrefix {
     const fn as_flags(self) -> StringFlags {
         match self {
-            Self::Bytes => StringFlags::B_PREFIX,
-            Self::Format => StringFlags::F_PREFIX,
-            Self::Raw => StringFlags::R_PREFIX,
-            Self::RawBytes => StringFlags::R_PREFIX.union(StringFlags::B_PREFIX),
-            Self::RawFormat => StringFlags::R_PREFIX.union(StringFlags::F_PREFIX),
-            Self::Unicode => StringFlags::U_PREFIX,
+            // regular strings
+            Self::Regular(StringLiteralPrefix::Empty) => StringFlags::empty(),
+            Self::Regular(StringLiteralPrefix::Unicode) => StringFlags::U_PREFIX,
+            Self::Regular(StringLiteralPrefix::Raw { uppercase: false }) => {
+                StringFlags::R_PREFIX_LOWER
+            }
+            Self::Regular(StringLiteralPrefix::Raw { uppercase: true }) => {
+                StringFlags::R_PREFIX_UPPER
+            }
+
+            // bytestrings
+            Self::Bytes(ByteStringPrefix::Regular) => StringFlags::B_PREFIX,
+            Self::Bytes(ByteStringPrefix::Raw { uppercase_r: false }) => {
+                StringFlags::B_PREFIX.union(StringFlags::R_PREFIX_LOWER)
+            }
+            Self::Bytes(ByteStringPrefix::Raw { uppercase_r: true }) => {
+                StringFlags::B_PREFIX.union(StringFlags::R_PREFIX_UPPER)
+            }
+
+            // f-strings
+            Self::Format(FStringPrefix::Regular) => StringFlags::F_PREFIX,
+            Self::Format(FStringPrefix::Raw { uppercase_r: false }) => {
+                StringFlags::F_PREFIX.union(StringFlags::R_PREFIX_LOWER)
+            }
+            Self::Format(FStringPrefix::Raw { uppercase_r: true }) => {
+                StringFlags::F_PREFIX.union(StringFlags::R_PREFIX_UPPER)
+            }
         }
+    }
+
+    const fn from_kind(kind: StringKind) -> Self {
+        let StringKind(flags) = kind;
+
+        // f-strings
+        if flags.contains(StringFlags::F_PREFIX) {
+            if flags.contains(StringFlags::R_PREFIX_LOWER) {
+                return Self::Format(FStringPrefix::Raw { uppercase_r: false });
+            }
+            if flags.contains(StringFlags::R_PREFIX_UPPER) {
+                return Self::Format(FStringPrefix::Raw { uppercase_r: true });
+            }
+            return Self::Format(FStringPrefix::Regular);
+        }
+
+        // bytestrings
+        if flags.contains(StringFlags::B_PREFIX) {
+            if flags.contains(StringFlags::R_PREFIX_LOWER) {
+                return Self::Bytes(ByteStringPrefix::Raw { uppercase_r: true });
+            }
+            if flags.contains(StringFlags::R_PREFIX_LOWER) {
+                return Self::Bytes(ByteStringPrefix::Raw { uppercase_r: false });
+            }
+            return Self::Bytes(ByteStringPrefix::Regular);
+        }
+
+        // all other strings
+        if flags.contains(StringFlags::R_PREFIX_LOWER) {
+            return Self::Regular(StringLiteralPrefix::Raw { uppercase: false });
+        }
+        if flags.contains(StringFlags::R_PREFIX_UPPER) {
+            return Self::Regular(StringLiteralPrefix::Raw { uppercase: true });
+        }
+        if flags.contains(StringFlags::U_PREFIX) {
+            return Self::Regular(StringLiteralPrefix::Unicode);
+        }
+        Self::Regular(StringLiteralPrefix::Empty)
+    }
+
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Regular(regular_prefix) => regular_prefix.as_str(),
+            Self::Bytes(bytestring_prefix) => bytestring_prefix.as_str(),
+            Self::Format(fstring_prefix) => fstring_prefix.as_str(),
+        }
+    }
+}
+
+impl fmt::Display for StringPrefix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Default for StringPrefix {
+    fn default() -> Self {
+        Self::Regular(StringLiteralPrefix::Empty)
     }
 }
 
@@ -142,12 +214,12 @@ impl StringPrefix {
 pub struct StringKind(StringFlags);
 
 impl StringKind {
-    pub(crate) const fn from_prefix(prefix: Option<StringPrefix>) -> Self {
-        if let Some(prefix) = prefix {
-            Self(prefix.as_flags())
-        } else {
-            Self(StringFlags::empty())
-        }
+    pub(crate) const fn from_prefix(prefix: StringPrefix) -> Self {
+        Self(prefix.as_flags())
+    }
+
+    pub const fn prefix(self) -> StringPrefix {
+        StringPrefix::from_kind(self)
     }
 
     /// Does the string have a `u` or `U` prefix?
@@ -157,7 +229,8 @@ impl StringKind {
 
     /// Does the string have an `r` or `R` prefix?
     pub const fn is_raw_string(self) -> bool {
-        self.0.contains(StringFlags::R_PREFIX)
+        self.0
+            .intersects(StringFlags::R_PREFIX_LOWER.union(StringFlags::R_PREFIX_UPPER))
     }
 
     /// Does the string have an `f` or `F` prefix?
@@ -201,33 +274,9 @@ impl StringKind {
         }
     }
 
-    /// A `str` representation of the prefixes used (if any)
-    /// in the string's opener.
-    pub const fn prefix_str(self) -> &'static str {
-        if self.0.contains(StringFlags::F_PREFIX) {
-            if self.0.contains(StringFlags::R_PREFIX) {
-                return "rf";
-            }
-            return "f";
-        }
-        if self.0.contains(StringFlags::B_PREFIX) {
-            if self.0.contains(StringFlags::R_PREFIX) {
-                return "rb";
-            }
-            return "b";
-        }
-        if self.0.contains(StringFlags::R_PREFIX) {
-            return "r";
-        }
-        if self.0.contains(StringFlags::U_PREFIX) {
-            return "u";
-        }
-        ""
-    }
-
     /// The length of the prefixes used (if any) in the string's opener.
     pub fn prefix_len(self) -> TextSize {
-        self.prefix_str().text_len()
+        self.prefix().as_str().text_len()
     }
 
     /// The length of the quotes used to start and close the string.
@@ -258,7 +307,7 @@ impl StringKind {
     pub fn format_string_contents(self, contents: &str) -> String {
         format!(
             "{}{}{}{}",
-            self.prefix_str(),
+            self.prefix(),
             self.quote_str(),
             contents,
             self.quote_str()
@@ -281,7 +330,7 @@ impl StringKind {
 impl fmt::Debug for StringKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("StringKind")
-            .field("prefix", &self.prefix_str())
+            .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
             .field("quote_style", &self.quote_style())
             .finish()
@@ -290,9 +339,6 @@ impl fmt::Debug for StringKind {
 
 impl From<StringKind> for ruff_python_ast::StringLiteralFlags {
     fn from(value: StringKind) -> ruff_python_ast::StringLiteralFlags {
-        debug_assert!(!value.is_f_string());
-        debug_assert!(!value.is_byte_string());
-
         let mut new = ruff_python_ast::StringLiteralFlags::default();
         if value.quote_style().is_double() {
             new = new.with_double_quotes();
@@ -300,25 +346,18 @@ impl From<StringKind> for ruff_python_ast::StringLiteralFlags {
         if value.is_triple_quoted() {
             new = new.with_triple_quotes();
         }
-        new.with_prefix({
-            if value.is_u_string() {
-                debug_assert!(!value.is_raw_string());
-                StringLiteralPrefix::UString
-            } else if value.is_raw_string() {
-                StringLiteralPrefix::RString
-            } else {
-                StringLiteralPrefix::None
-            }
-        })
+        let StringPrefix::Regular(prefix) = value.prefix() else {
+            unreachable!(
+                "Should never attempt to convert {} into a regular string",
+                value.prefix()
+            )
+        };
+        new.with_prefix(prefix)
     }
 }
 
 impl From<StringKind> for ruff_python_ast::BytesLiteralFlags {
     fn from(value: StringKind) -> ruff_python_ast::BytesLiteralFlags {
-        debug_assert!(value.is_byte_string());
-        debug_assert!(!value.is_f_string());
-        debug_assert!(!value.is_u_string());
-
         let mut new = ruff_python_ast::BytesLiteralFlags::default();
         if value.quote_style().is_double() {
             new = new.with_double_quotes();
@@ -326,19 +365,18 @@ impl From<StringKind> for ruff_python_ast::BytesLiteralFlags {
         if value.is_triple_quoted() {
             new = new.with_triple_quotes();
         }
-        if value.is_raw_string() {
-            new = new.with_r_prefix();
-        }
-        new
+        let StringPrefix::Bytes(bytestring_prefix) = value.prefix() else {
+            unreachable!(
+                "Should never attempt to convert {} into a bytestring",
+                value.prefix()
+            )
+        };
+        new.with_prefix(bytestring_prefix)
     }
 }
 
 impl From<StringKind> for ruff_python_ast::FStringFlags {
     fn from(value: StringKind) -> ruff_python_ast::FStringFlags {
-        debug_assert!(value.is_f_string());
-        debug_assert!(!value.is_byte_string());
-        debug_assert!(!value.is_u_string());
-
         let mut new = ruff_python_ast::FStringFlags::default();
         if value.quote_style().is_double() {
             new = new.with_double_quotes();
@@ -346,9 +384,12 @@ impl From<StringKind> for ruff_python_ast::FStringFlags {
         if value.is_triple_quoted() {
             new = new.with_triple_quotes();
         }
-        if value.is_raw_string() {
-            new = new.with_r_prefix();
-        }
-        new
+        let StringPrefix::Format(fstring_prefix) = value.prefix() else {
+            unreachable!(
+                "Should never attempt to convert {} into an f-string",
+                value.prefix()
+            )
+        };
+        new.with_prefix(fstring_prefix)
     }
 }

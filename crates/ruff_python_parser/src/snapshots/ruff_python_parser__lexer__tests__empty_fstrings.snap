@@ -6,7 +6,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Double,
             },
@@ -21,7 +23,9 @@ expression: lex_source(source)
         String {
             value: "",
             kind: StringKind {
-                prefix: "",
+                prefix: Regular(
+                    Empty,
+                ),
                 triple_quoted: false,
                 quote_style: Double,
             },
@@ -31,7 +35,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Double,
             },
@@ -45,7 +51,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Single,
             },
@@ -60,7 +68,9 @@ expression: lex_source(source)
         String {
             value: "",
             kind: StringKind {
-                prefix: "",
+                prefix: Regular(
+                    Empty,
+                ),
                 triple_quoted: false,
                 quote_style: Single,
             },
@@ -70,7 +80,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: true,
                 quote_style: Double,
             },
@@ -84,7 +96,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: true,
                 quote_style: Single,
             },
