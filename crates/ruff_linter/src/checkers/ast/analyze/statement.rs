@@ -1206,6 +1206,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
             }
+
+            if checker.enabled(Rule::TooManyElifs) {
+                if let Some(diagnostic) = wemake_python_styleguide::too_many_elifs(if_) {
+                    checker.diagnostics.push(diagnostic)
+                }
+            }
         }
         Stmt::Assert(ast::StmtAssert {
             test,

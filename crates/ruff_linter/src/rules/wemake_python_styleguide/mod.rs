@@ -5,6 +5,8 @@ pub(crate) use many_class_methods::*;
 pub(crate) use many_decorators::*;
 pub(crate) use many_func_awaits::*;
 pub (crate) use many_asserts::*;
+pub(crate) use many_elifs::*;
+pub(crate) use many_raises::*;
 
 mod imports;
 mod definitions;
@@ -15,3 +17,5 @@ mod many_class_methods;
 mod many_decorators;
 mod many_func_awaits;
 mod many_asserts;
+mod many_raises;
+mod many_elifs;
