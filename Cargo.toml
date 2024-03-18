@@ -65,6 +65,7 @@ memchr = { version = "2.7.1" }
 mimalloc = { version = "0.1.39" }
 natord = { version = "1.0.9" }
 notify = { version = "6.1.1" }
+num_cpus = { version = "1.16.0" }
 once_cell = { version = "1.19.0" }
 path-absolutize = { version = "3.1.1" }
 pathdiff = { version = "0.2.1" }

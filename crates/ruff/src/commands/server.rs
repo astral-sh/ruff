@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use crate::ExitStatus;
 use anyhow::Result;
 use ruff_linter::logging::LogLevel;
@@ -9,7 +11,11 @@ use tracing_subscriber::{
 };
 use tracing_tree::time::Uptime;
 
-pub(crate) fn run_server(preview: bool, log_level: LogLevel) -> Result<ExitStatus> {
+pub(crate) fn run_server(
+    preview: bool,
+    worker_threads: NonZeroUsize,
+    log_level: LogLevel,
+) -> Result<ExitStatus> {
     if !preview {
         tracing::error!("--preview needs to be provided as a command line argument while the server is still unstable.\nFor example: `ruff server --preview`");
         return Ok(ExitStatus::Error);
@@ -33,7 +39,7 @@ pub(crate) fn run_server(preview: bool, log_level: LogLevel) -> Result<ExitStatu
 
     tracing::subscriber::set_global_default(subscriber)?;
 
-    let server = Server::new()?;
+    let server = Server::new(worker_threads)?;
 
     server.run().map(|()| ExitStatus::Success)
 }
