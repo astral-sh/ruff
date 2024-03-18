@@ -167,8 +167,8 @@ PT007.py:81:38: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expect
 80 | @pytest.mark.parametrize("a", [1, 2])
 81 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
    |                                      ^^^^^^^^^^^^^^^^ PT007
-82 | def test_multiple_decorators(a, b, c):
-83 |     pass
+82 | @pytest.mark.parametrize("d", [3,])
+83 | def test_multiple_decorators(a, b, c):
    |
    = help: Use `list` of `list` for parameter values
 
@@ -178,16 +178,17 @@ PT007.py:81:38: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expect
 80 80 | @pytest.mark.parametrize("a", [1, 2])
 81    |-@pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
    81 |+@pytest.mark.parametrize(("b", "c"), [(3, 4), (5, 6)])
-82 82 | def test_multiple_decorators(a, b, c):
-83 83 |     pass
+82 82 | @pytest.mark.parametrize("d", [3,])
+83 83 | def test_multiple_decorators(a, b, c):
+84 84 |     pass
 
 PT007.py:81:39: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
    |
 80 | @pytest.mark.parametrize("a", [1, 2])
 81 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
    |                                       ^^^^^^ PT007
-82 | def test_multiple_decorators(a, b, c):
-83 |     pass
+82 | @pytest.mark.parametrize("d", [3,])
+83 | def test_multiple_decorators(a, b, c):
    |
    = help: Use `list` of `list` for parameter values
 
@@ -197,16 +198,17 @@ PT007.py:81:39: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expect
 80 80 | @pytest.mark.parametrize("a", [1, 2])
 81    |-@pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
    81 |+@pytest.mark.parametrize(("b", "c"), ([3, 4], (5, 6)))
-82 82 | def test_multiple_decorators(a, b, c):
-83 83 |     pass
+82 82 | @pytest.mark.parametrize("d", [3,])
+83 83 | def test_multiple_decorators(a, b, c):
+84 84 |     pass
 
 PT007.py:81:47: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
    |
 80 | @pytest.mark.parametrize("a", [1, 2])
 81 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
    |                                               ^^^^^^ PT007
-82 | def test_multiple_decorators(a, b, c):
-83 |     pass
+82 | @pytest.mark.parametrize("d", [3,])
+83 | def test_multiple_decorators(a, b, c):
    |
    = help: Use `list` of `list` for parameter values
 
@@ -216,5 +218,6 @@ PT007.py:81:47: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expect
 80 80 | @pytest.mark.parametrize("a", [1, 2])
 81    |-@pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
    81 |+@pytest.mark.parametrize(("b", "c"), ((3, 4), [5, 6]))
-82 82 | def test_multiple_decorators(a, b, c):
-83 83 |     pass
+82 82 | @pytest.mark.parametrize("d", [3,])
+83 83 | def test_multiple_decorators(a, b, c):
+84 84 |     pass

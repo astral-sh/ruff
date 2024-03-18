@@ -267,7 +267,7 @@ PT007.py:80:31: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expect
 80 | @pytest.mark.parametrize("a", [1, 2])
    |                               ^^^^^^ PT007
 81 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
-82 | def test_multiple_decorators(a, b, c):
+82 | @pytest.mark.parametrize("d", [3,])
    |
    = help: Use `tuple` of `tuple` for parameter values
 
@@ -278,5 +278,25 @@ PT007.py:80:31: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expect
 80    |-@pytest.mark.parametrize("a", [1, 2])
    80 |+@pytest.mark.parametrize("a", (1, 2))
 81 81 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
-82 82 | def test_multiple_decorators(a, b, c):
-83 83 |     pass
+82 82 | @pytest.mark.parametrize("d", [3,])
+83 83 | def test_multiple_decorators(a, b, c):
+
+PT007.py:82:31: PT007 [*] Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
+   |
+80 | @pytest.mark.parametrize("a", [1, 2])
+81 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
+82 | @pytest.mark.parametrize("d", [3,])
+   |                               ^^^^ PT007
+83 | def test_multiple_decorators(a, b, c):
+84 |     pass
+   |
+   = help: Use `tuple` of `tuple` for parameter values
+
+ℹ Unsafe fix
+79 79 | 
+80 80 | @pytest.mark.parametrize("a", [1, 2])
+81 81 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
+82    |-@pytest.mark.parametrize("d", [3,])
+   82 |+@pytest.mark.parametrize("d", (3,))
+83 83 | def test_multiple_decorators(a, b, c):
+84 84 |     pass
