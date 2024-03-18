@@ -1256,17 +1256,19 @@ impl FStringFlags {
     }
 
     #[must_use]
-    pub fn with_prefix(mut self, prefix: FStringPrefix) -> Self {
+    pub fn with_prefix(self, prefix: FStringPrefix) -> Self {
+        let FStringFlags(flags) = self;
         match prefix {
-            FStringPrefix::Regular => {}
-            FStringPrefix::Raw { uppercase_r: true } => {
-                self.0 |= FStringFlagsInner::R_PREFIX_UPPER;
+            FStringPrefix::Regular => {
+                Self(flags - FStringFlagsInner::R_PREFIX_LOWER - FStringFlagsInner::R_PREFIX_UPPER)
             }
-            FStringPrefix::Raw { uppercase_r: false } => {
-                self.0 |= FStringFlagsInner::R_PREFIX_LOWER;
-            }
+            FStringPrefix::Raw { uppercase_r: true } => Self(
+                (flags | FStringFlagsInner::R_PREFIX_UPPER) - FStringFlagsInner::R_PREFIX_LOWER,
+            ),
+            FStringPrefix::Raw { uppercase_r: false } => Self(
+                (flags | FStringFlagsInner::R_PREFIX_LOWER) - FStringFlagsInner::R_PREFIX_UPPER,
+            ),
         }
-        self
     }
 
     pub const fn prefix(self) -> FStringPrefix {
@@ -1592,18 +1594,31 @@ impl StringLiteralFlags {
     }
 
     #[must_use]
-    pub fn with_prefix(mut self, prefix: StringLiteralPrefix) -> Self {
+    pub fn with_prefix(self, prefix: StringLiteralPrefix) -> Self {
+        let StringLiteralFlags(flags) = self;
         match prefix {
-            StringLiteralPrefix::Empty => {}
-            StringLiteralPrefix::Raw { uppercase: false } => {
-                self.0 |= StringLiteralFlagsInner::R_PREFIX_LOWER;
-            }
-            StringLiteralPrefix::Raw { uppercase: true } => {
-                self.0 |= StringLiteralFlagsInner::R_PREFIX_UPPER;
-            }
-            StringLiteralPrefix::Unicode => self.0 |= StringLiteralFlagsInner::U_PREFIX,
-        };
-        self
+            StringLiteralPrefix::Empty => Self(
+                flags
+                    - StringLiteralFlagsInner::R_PREFIX_LOWER
+                    - StringLiteralFlagsInner::R_PREFIX_UPPER
+                    - StringLiteralFlagsInner::U_PREFIX,
+            ),
+            StringLiteralPrefix::Raw { uppercase: false } => Self(
+                (flags | StringLiteralFlagsInner::R_PREFIX_LOWER)
+                    - StringLiteralFlagsInner::R_PREFIX_UPPER
+                    - StringLiteralFlagsInner::U_PREFIX,
+            ),
+            StringLiteralPrefix::Raw { uppercase: true } => Self(
+                (flags | StringLiteralFlagsInner::R_PREFIX_UPPER)
+                    - StringLiteralFlagsInner::R_PREFIX_LOWER
+                    - StringLiteralFlagsInner::U_PREFIX,
+            ),
+            StringLiteralPrefix::Unicode => Self(
+                (flags | StringLiteralFlagsInner::U_PREFIX)
+                    - StringLiteralFlagsInner::R_PREFIX_LOWER
+                    - StringLiteralFlagsInner::R_PREFIX_UPPER,
+            ),
+        }
     }
 
     pub const fn prefix(self) -> StringLiteralPrefix {
@@ -1993,17 +2008,23 @@ impl BytesLiteralFlags {
     }
 
     #[must_use]
-    pub fn with_prefix(mut self, prefix: ByteStringPrefix) -> Self {
+    pub fn with_prefix(self, prefix: ByteStringPrefix) -> Self {
+        let BytesLiteralFlags(flags) = self;
         match prefix {
-            ByteStringPrefix::Regular => {}
-            ByteStringPrefix::Raw { uppercase_r: true } => {
-                self.0 |= BytesLiteralFlagsInner::R_PREFIX_UPPER;
-            }
-            ByteStringPrefix::Raw { uppercase_r: false } => {
-                self.0 |= BytesLiteralFlagsInner::R_PREFIX_LOWER;
-            }
+            ByteStringPrefix::Regular => Self(
+                flags
+                    - BytesLiteralFlagsInner::R_PREFIX_LOWER
+                    - BytesLiteralFlagsInner::R_PREFIX_UPPER,
+            ),
+            ByteStringPrefix::Raw { uppercase_r: true } => Self(
+                (flags | BytesLiteralFlagsInner::R_PREFIX_UPPER)
+                    - BytesLiteralFlagsInner::R_PREFIX_LOWER,
+            ),
+            ByteStringPrefix::Raw { uppercase_r: false } => Self(
+                (flags | BytesLiteralFlagsInner::R_PREFIX_LOWER)
+                    - BytesLiteralFlagsInner::R_PREFIX_UPPER,
+            ),
         }
-        self
     }
 
     pub const fn prefix(self) -> ByteStringPrefix {
