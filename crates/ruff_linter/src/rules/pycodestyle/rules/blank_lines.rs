@@ -404,7 +404,8 @@ impl<'a> LinePreprocessor<'a> {
             max_preceding_blank_lines: BlankLines::Zero,
             indent_width,
             is_beginning_of_cell: cell_offsets.is_some(),
-            cell_offsets: cell_offsets.map(|cell_offsets| cell_offsets[1..].iter().peekable()),
+            cell_offsets: cell_offsets
+                .map(|cell_offsets| cell_offsets.get(1..).unwrap_or_default().iter().peekable()),
         }
     }
 }
