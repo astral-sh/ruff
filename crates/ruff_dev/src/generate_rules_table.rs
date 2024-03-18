@@ -183,10 +183,15 @@ pub(crate) fn generate() -> String {
         let mut rules_by_upstream_category: Vec<_> = rules_by_upstream_category.iter().collect();
 
         // Sort the upstream categories alphabetically by prefix.
-        rules_by_upstream_category.sort_by(|a, b| {
-            a.0.as_ref()
-                .map_or("", |x| x.prefix)
-                .cmp(b.0.as_ref().map_or("", |x| x.prefix))
+        rules_by_upstream_category.sort_by(|(a, _), (b, _)| {
+            a.as_ref()
+                .map(|category| category.prefix)
+                .unwrap_or_default()
+                .cmp(
+                    b.as_ref()
+                        .map(|category| category.prefix)
+                        .unwrap_or_default(),
+                )
         });
 
         if rules_by_upstream_category.len() > 1 {
