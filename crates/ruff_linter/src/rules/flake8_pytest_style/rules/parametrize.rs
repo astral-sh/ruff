@@ -556,17 +556,20 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
                     values.range(),
                 );
                 diagnostic.set_fix({
-                    // Determine whether a trailing comma is present due to the _requirement_ that
-                    // a single-element tuple must have a trailing comma, e.g., `(1,)`.
+                    // Determine whether a trailing comma is present due to the _requirement_
+                    // that a single-element tuple must have a trailing comma, e.g., `(1,)`.
+                    //
+                    // If the trailing comma is on its own line, we intentionally ignore it,
+                    // since the expression is already split over multiple lines, as in:
+                    // ```python
+                    // @pytest.mark.parametrize(
+                    //     (
+                    //         "x",
+                    //     ),
+                    // )
+                    // ```
                     let has_trailing_comma = elts.len() == 1
-                        && checker
-                            .locator()
-                            .up_to(values.end())
-                            .chars()
-                            .rev()
-                            .skip(1)
-                            .next()
-                            == Some(',');
+                        && checker.locator().up_to(values.end()).chars().rev().nth(1) == Some(',');
 
                     // Replace `(` with `[`.
                     let values_start = Edit::replacement(
@@ -685,17 +688,20 @@ fn handle_value_rows(
                         elt.range(),
                     );
                     diagnostic.set_fix({
-                        // Determine whether a trailing comma is present due to the _requirement_ that
-                        // a single-element tuple must have a trailing comma, e.g., `(1,)`.
+                        // Determine whether a trailing comma is present due to the _requirement_
+                        // that a single-element tuple must have a trailing comma, e.g., `(1,)`.
+                        //
+                        // If the trailing comma is on its own line, we intentionally ignore it,
+                        // since the expression is already split over multiple lines, as in:
+                        // ```python
+                        // @pytest.mark.parametrize(
+                        //     (
+                        //         "x",
+                        //     ),
+                        // )
+                        // ```
                         let has_trailing_comma = elts.len() == 1
-                            && checker
-                                .locator()
-                                .up_to(elt.end())
-                                .chars()
-                                .rev()
-                                .skip(1)
-                                .next()
-                                == Some(',');
+                            && checker.locator().up_to(elt.end()).chars().rev().nth(1) == Some(',');
 
                         // Replace `(` with `[`.
                         let elt_start = Edit::replacement(
