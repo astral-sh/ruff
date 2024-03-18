@@ -10,13 +10,13 @@ use ruff_python_semantic::{ScopeKind, SemanticModel};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for methods that are annotated with a fixed return type, which
-/// should instead be returning `self`.
+/// Checks for methods that are annotated with a fixed return type which
+/// should instead be returning `Self`.
 ///
 /// ## Why is this bad?
-/// If methods like `__new__` or `__enter__` are annotated with a fixed return
-/// type, and the class is subclassed, type checkers will not be able to infer
-/// the correct return type.
+/// If methods that generally return `self` at runtime are annotated with a
+/// fixed return type, and the class is subclassed, type checkers will not be
+/// able to infer the correct return type.
 ///
 /// For example:
 /// ```python
@@ -30,7 +30,7 @@ use crate::checkers::ast::Checker;
 ///         self.radius = radius
 ///         return self
 ///
-/// # This returns `Shape`, not `Circle`.
+/// # Type checker infers return type as `Shape`, not `Circle`.
 /// Circle().set_scale(0.5)
 ///
 /// # Thus, this expression is invalid, as `Shape` has no attribute `set_radius`.
@@ -40,7 +40,7 @@ use crate::checkers::ast::Checker;
 /// Specifically, this check enforces that the return type of the following
 /// methods is `Self`:
 ///
-/// 1. In-place binary operations, like `__iadd__`, `__imul__`, etc.
+/// 1. In-place binary-operation dunder methods, like `__iadd__`, `__imul__`, etc.
 /// 1. `__new__`, `__enter__`, and `__aenter__`, if those methods return the
 ///    class name.
 /// 1. `__iter__` methods that return `Iterator`, despite the class inheriting
@@ -51,16 +51,16 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// class Foo:
-///     def __new__(cls, *args: Any, **kwargs: Any) -> Bad:
+///     def __new__(cls, *args: Any, **kwargs: Any) -> Foo:
 ///         ...
 ///
-///     def __enter__(self) -> Bad:
+///     def __enter__(self) -> Foo:
 ///         ...
 ///
-///     async def __aenter__(self) -> Bad:
+///     async def __aenter__(self) -> Foo:
 ///         ...
 ///
-///     def __iadd__(self, other: Bad) -> Bad:
+///     def __iadd__(self, other: Foo) -> Foo:
 ///         ...
 /// ```
 ///
@@ -79,11 +79,11 @@ use crate::checkers::ast::Checker;
 ///     async def __aenter__(self) -> Self:
 ///         ...
 ///
-///     def __iadd__(self, other: Bad) -> Self:
+///     def __iadd__(self, other: Foo) -> Self:
 ///         ...
 /// ```
 /// ## References
-/// - [PEP 673](https://peps.python.org/pep-0673/)
+/// - [`typing.Self` documentation](https://docs.python.org/3/library/typing.html#typing.Self)
 #[violation]
 pub struct NonSelfReturnType {
     class_name: String,

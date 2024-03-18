@@ -25,12 +25,12 @@ impl fmt::Display for VarKind {
 }
 
 /// ## What it does
-/// Checks that type `TypeVar`, `ParamSpec`, and `TypeVarTuple` definitions in
-/// stubs are prefixed with `_`.
+/// Checks that type `TypeVar`s, `ParamSpec`s, and `TypeVarTuple`s in stubs
+/// have names prefixed with `_`.
 ///
 /// ## Why is this bad?
-/// By prefixing type parameters with `_`, we can avoid accidentally exposing
-/// names internal to the stub.
+/// Prefixing type parameters with `_` avoids accidentally exposing names
+/// internal to the stub.
 ///
 /// ## Example
 /// ```python
