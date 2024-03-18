@@ -377,6 +377,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic)
                 }
             }
+            if checker.enabled(Rule::TooManyRaises) {
+                if let Some(diagnostic) = wemake_python_styleguide::too_many_raises(&body) {
+                    checker.diagnostics.push(diagnostic)
+                }
+            }
         }
         Stmt::Return(_) => {
             if checker.enabled(Rule::ReturnOutsideFunction) {
