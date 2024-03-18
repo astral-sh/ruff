@@ -235,30 +235,31 @@ impl Workspaces {
     }
 
     fn snapshot(&self, document_url: &Url) -> Option<DocumentRef> {
-        self.workspace_for_url(document_url)
-            .and_then(|(_, workspace)| workspace.open_documents.snapshot(document_url))
+        self.workspace_for_url(document_url)?
+            .open_documents
+            .snapshot(document_url)
     }
 
     fn controller(&mut self, document_url: &Url) -> Option<&mut DocumentController> {
-        self.workspace_for_url_mut(document_url)
-            .and_then(|(_, workspace)| workspace.open_documents.controller(document_url))
+        self.workspace_for_url_mut(document_url)?
+            .open_documents
+            .controller(document_url)
     }
 
     fn configuration(&self, document_url: &Url) -> Option<&Arc<RuffConfiguration>> {
-        self.workspace_for_url(document_url)
-            .map(|(_, workspace)| &workspace.configuration)
+        Some(&self.workspace_for_url(document_url)?.configuration)
     }
 
     fn reload_configuration(&mut self, changed_url: &Url) -> crate::Result<()> {
         let (path, workspace) = self
-            .workspace_for_url_mut(changed_url)
+            .entry_for_url_mut(changed_url)
             .ok_or_else(|| anyhow!("Workspace not found for {changed_url}"))?;
         workspace.reload_configuration(path);
         Ok(())
     }
 
     fn open(&mut self, url: &Url, contents: String, version: DocumentVersion) {
-        if let Some((_, workspace)) = self.workspace_for_url_mut(url) {
+        if let Some(workspace) = self.workspace_for_url_mut(url) {
             workspace.open_documents.open(url, contents, version);
         }
     }
@@ -266,12 +267,19 @@ impl Workspaces {
     fn close(&mut self, url: &Url) -> crate::Result<()> {
         self.workspace_for_url_mut(url)
             .ok_or_else(|| anyhow!("Workspace not found for {url}"))?
-            .1
             .open_documents
             .close(url)
     }
 
-    fn workspace_for_url(&self, url: &Url) -> Option<(&Path, &Workspace)> {
+    fn workspace_for_url(&self, url: &Url) -> Option<&Workspace> {
+        Some(self.entry_for_url(url)?.1)
+    }
+
+    fn workspace_for_url_mut(&mut self, url: &Url) -> Option<&mut Workspace> {
+        Some(self.entry_for_url_mut(url)?.1)
+    }
+
+    fn entry_for_url(&self, url: &Url) -> Option<(&Path, &Workspace)> {
         let path = url.to_file_path().ok()?;
         self.0
             .range(..path)
@@ -279,7 +287,7 @@ impl Workspaces {
             .map(|(path, workspace)| (path.as_path(), workspace))
     }
 
-    fn workspace_for_url_mut(&mut self, url: &Url) -> Option<(&Path, &mut Workspace)> {
+    fn entry_for_url_mut(&mut self, url: &Url) -> Option<(&Path, &mut Workspace)> {
         let path = url.to_file_path().ok()?;
         self.0
             .range_mut(..path)

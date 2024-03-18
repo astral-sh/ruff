@@ -1,6 +1,8 @@
 //! Scheduling, I/O, and API endpoints.
 
 use std::num::NonZeroUsize;
+use std::sync::atomic::AtomicI32;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use lsp::Connection;
@@ -34,6 +36,7 @@ pub struct Server {
     threads: lsp::IoThreads,
     worker_threads: NonZeroUsize,
     session: Session,
+    next_request_id: AtomicI32,
 }
 
 impl Server {
@@ -46,6 +49,12 @@ impl Server {
 
         let client_capabilities = init_params.capabilities;
         let server_capabilities = Self::server_capabilities(&client_capabilities);
+
+        let dynamic_registration = client_capabilities
+            .workspace
+            .and_then(|workspace| workspace.did_change_watched_files)
+            .and_then(|watched_files| watched_files.dynamic_registration)
+            .unwrap_or_default();
 
         let workspaces = init_params
             .workspace_folders
@@ -67,67 +76,80 @@ impl Server {
             }
         });
 
+        let next_request_id = AtomicI32::from(1);
+
         conn.initialize_finish(id, initialize_data)?;
 
-        // Register capabilities
-        conn.sender
-            .send(lsp_server::Message::Request(lsp_server::Request {
-                id: 1.into(),
-                method: "client/registerCapability".into(),
-                params: serde_json::to_value(lsp_types::RegistrationParams {
-                    registrations: vec![lsp_types::Registration {
-                        id: "ruff-server-watch".into(),
-                        method: "workspace/didChangeWatchedFiles".into(),
-                        register_options: Some(serde_json::to_value(
-                            DidChangeWatchedFilesRegistrationOptions {
-                                watchers: vec![
-                                    FileSystemWatcher {
-                                        glob_pattern: types::GlobPattern::String(
-                                            "**/.?ruff.toml".into(),
-                                        ),
-                                        kind: None,
-                                    },
-                                    FileSystemWatcher {
-                                        glob_pattern: types::GlobPattern::String(
-                                            "**/pyproject.toml".into(),
-                                        ),
-                                        kind: None,
-                                    },
-                                ],
-                            },
-                        )?),
-                    }],
-                })?,
-            }))?;
+        if dynamic_registration {
+            // Register capabilities
+            conn.sender
+                .send(lsp_server::Message::Request(lsp_server::Request {
+                    id: next_request_id.load(Ordering::Relaxed).into(),
+                    method: "client/registerCapability".into(),
+                    params: serde_json::to_value(lsp_types::RegistrationParams {
+                        registrations: vec![lsp_types::Registration {
+                            id: "ruff-server-watch".into(),
+                            method: "workspace/didChangeWatchedFiles".into(),
+                            register_options: Some(serde_json::to_value(
+                                DidChangeWatchedFilesRegistrationOptions {
+                                    watchers: vec![
+                                        FileSystemWatcher {
+                                            glob_pattern: types::GlobPattern::String(
+                                                "**/.?ruff.toml".into(),
+                                            ),
+                                            kind: None,
+                                        },
+                                        FileSystemWatcher {
+                                            glob_pattern: types::GlobPattern::String(
+                                                "**/pyproject.toml".into(),
+                                            ),
+                                            kind: None,
+                                        },
+                                    ],
+                                },
+                            )?),
+                        }],
+                    })?,
+                }))?;
 
-        // Flush response from server (to avoid an unexpected response appearing in the event loop)
-        let _ = conn.receiver.recv_timeout(Duration::from_secs(5)).map_err(|_| {
-            tracing::error!("Timed out while waiting for client to acknowledge registration of dynamic capabilities");
-        });
+            // Flush response from the client (to avoid an unexpected response appearing in the event loop)
+            let _ = conn.receiver.recv_timeout(Duration::from_secs(5)).map_err(|_| {
+                tracing::error!("Timed out while waiting for client to acknowledge registration of dynamic capabilities");
+            });
+
+            next_request_id.fetch_add(1, Ordering::SeqCst);
+        }
 
         Ok(Self {
             conn,
             threads,
             worker_threads,
             session: Session::new(&server_capabilities, &workspaces)?,
+            next_request_id,
         })
     }
 
     pub fn run(self) -> crate::Result<()> {
         let result = event_loop_thread(move || {
-            Self::event_loop(&self.conn, self.session, self.worker_threads)
+            Self::event_loop(
+                &self.conn,
+                self.session,
+                self.worker_threads,
+                self.next_request_id,
+            )
         })?
         .join();
         self.threads.join()?;
         result
     }
 
+    #[allow(clippy::needless_pass_by_value)] // this is because we aren't using `next_request_id` yet.
     fn event_loop(
         connection: &Connection,
         session: Session,
         worker_threads: NonZeroUsize,
+        _next_request_id: AtomicI32,
     ) -> crate::Result<()> {
-        // TODO(jane): Make thread count configurable
         let mut scheduler = schedule::Scheduler::new(session, worker_threads, &connection.sender);
         for msg in &connection.receiver {
             let task = match msg {
