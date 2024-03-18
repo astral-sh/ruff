@@ -118,6 +118,8 @@ impl Server {
             });
 
             next_request_id.fetch_add(1, Ordering::SeqCst);
+        } else {
+            tracing::warn!("LSP client does not support dynamic file watcher registration - automatic configuration reloading will not be available.")
         }
 
         Ok(Self {
