@@ -4,7 +4,7 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/if_extra_clos
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
         range: 0..110,
@@ -77,6 +77,3 @@ Module(
 2 | if True)):
 3 |     pass
   |
-
-
-

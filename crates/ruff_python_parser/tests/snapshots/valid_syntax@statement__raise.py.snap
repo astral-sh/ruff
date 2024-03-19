@@ -1,0 +1,124 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/statement/raise.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..54,
+        body: [
+            Raise(
+                StmtRaise {
+                    range: 0..5,
+                    exc: None,
+                    cause: None,
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 6..13,
+                    exc: Some(
+                        Name(
+                            ExprName {
+                                range: 12..13,
+                                id: "a",
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                    cause: None,
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 14..25,
+                    exc: Some(
+                        Compare(
+                            ExprCompare {
+                                range: 20..25,
+                                left: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 20..21,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                ops: [
+                                    Lt,
+                                ],
+                                comparators: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 24..25,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ),
+                    cause: None,
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 26..39,
+                    exc: Some(
+                        BoolOp(
+                            ExprBoolOp {
+                                range: 32..39,
+                                op: And,
+                                values: [
+                                    Name(
+                                        ExprName {
+                                            range: 32..33,
+                                            id: "a",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 38..39,
+                                            id: "b",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ),
+                    cause: None,
+                },
+            ),
+            Raise(
+                StmtRaise {
+                    range: 40..54,
+                    exc: Some(
+                        Name(
+                            ExprName {
+                                range: 46..47,
+                                id: "a",
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                    cause: Some(
+                        Name(
+                            ExprName {
+                                range: 53..54,
+                                id: "b",
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
