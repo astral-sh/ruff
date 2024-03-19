@@ -4,7 +4,7 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/function_defa
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
         range: 0..95,
@@ -94,6 +94,3 @@ Module(
 2 | def f(a, b=20, c): pass
   |                 ^ Syntax Error: non-default argument follows default argument
   |
-
-
-

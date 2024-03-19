@@ -1,0 +1,133 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/parenthesized.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..35,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..3,
+                    value: Name(
+                        ExprName {
+                            range: 1..2,
+                            id: "l",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 4..9,
+                    value: Call(
+                        ExprCall {
+                            range: 4..9,
+                            func: Name(
+                                ExprName {
+                                    range: 5..6,
+                                    id: "l",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 7..9,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 10..19,
+                    value: Call(
+                        ExprCall {
+                            range: 10..19,
+                            func: Call(
+                                ExprCall {
+                                    range: 10..17,
+                                    func: Call(
+                                        ExprCall {
+                                            range: 10..15,
+                                            func: Name(
+                                                ExprName {
+                                                    range: 11..12,
+                                                    id: "l",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 13..15,
+                                                args: [],
+                                                keywords: [],
+                                            },
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 15..17,
+                                        args: [],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 17..19,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 20..34,
+                    value: BoolOp(
+                        ExprBoolOp {
+                            range: 21..33,
+                            op: Or,
+                            values: [
+                                BoolOp(
+                                    ExprBoolOp {
+                                        range: 21..28,
+                                        op: And,
+                                        values: [
+                                            Name(
+                                                ExprName {
+                                                    range: 21..22,
+                                                    id: "a",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 27..28,
+                                                    id: "b",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 32..33,
+                                        id: "c",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

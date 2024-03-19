@@ -4,7 +4,7 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/invalid_assig
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
         range: 0..788,
