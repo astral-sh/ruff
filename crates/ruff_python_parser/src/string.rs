@@ -71,14 +71,16 @@ impl StringParser {
         skipped_str
     }
 
+    /// Returns the current position of the parser considering the offset.
     #[inline]
-    fn get_pos(&self) -> TextSize {
-        self.offset + TextSize::try_from(self.cursor).unwrap()
+    fn position(&self) -> TextSize {
+        self.compute_position(self.cursor)
     }
 
+    /// Computes the position of the cursor considering the offset.
     #[inline]
-    fn range(&self, start_location: TextSize) -> TextRange {
-        TextRange::new(start_location, self.offset)
+    fn compute_position(&self, cursor: usize) -> TextSize {
+        self.offset + TextSize::try_from(cursor).unwrap()
     }
 
     /// Returns the next byte in the string, if there is one.
@@ -110,20 +112,21 @@ impl StringParser {
     fn parse_unicode_literal(&mut self, literal_number: usize) -> Result<char, LexicalError> {
         let mut p: u32 = 0u32;
         for i in 1..=literal_number {
+            let start = self.position();
             match self.next_char() {
                 Some(c) => match c.to_digit(16) {
                     Some(d) => p += d << ((literal_number - i) * 4),
                     None => {
                         return Err(LexicalError::new(
                             LexicalErrorType::UnicodeError,
-                            TextRange::empty(self.get_pos()),
-                        ))
+                            TextRange::at(start, TextSize::try_from(c.len_utf8()).unwrap()),
+                        ));
                     }
                 },
                 None => {
                     return Err(LexicalError::new(
                         LexicalErrorType::UnicodeError,
-                        TextRange::empty(self.get_pos()),
+                        TextRange::empty(self.position()),
                     ))
                 }
             }
@@ -132,7 +135,7 @@ impl StringParser {
             0xD800..=0xDFFF => Ok(std::char::REPLACEMENT_CHARACTER),
             _ => std::char::from_u32(p).ok_or(LexicalError::new(
                 LexicalErrorType::UnicodeError,
-                TextRange::empty(self.get_pos()),
+                TextRange::empty(self.position()),
             )),
         }
     }
@@ -157,28 +160,36 @@ impl StringParser {
     }
 
     fn parse_unicode_name(&mut self) -> Result<char, LexicalError> {
-        let start_pos = self.get_pos();
-
+        let start_pos = self.position();
         let Some('{') = self.next_char() else {
             return Err(LexicalError::new(
                 LexicalErrorType::MissingUnicodeLbrace,
-                self.range(start_pos),
+                TextRange::empty(start_pos),
             ));
         };
 
-        let start_pos = self.get_pos();
+        let start_pos = self.position();
         let Some(close_idx) = self.source[self.cursor..].find('}') else {
             return Err(LexicalError::new(
                 LexicalErrorType::MissingUnicodeRbrace,
-                self.range(self.get_pos()),
+                TextRange::empty(self.compute_position(self.source.len())),
             ));
         };
 
         let name_and_ending = self.skip_bytes(close_idx + 1);
         let name = &name_and_ending[..name_and_ending.len() - 1];
 
-        unicode_names2::character(name)
-            .ok_or_else(|| LexicalError::new(LexicalErrorType::UnicodeError, self.range(start_pos)))
+        unicode_names2::character(name).ok_or_else(|| {
+            LexicalError::new(
+                LexicalErrorType::UnicodeError,
+                // The cursor is right after the `}` character, so we subtract 1 to get the correct
+                // range of the unicode name.
+                TextRange::new(
+                    start_pos,
+                    self.compute_position(self.cursor - '}'.len_utf8()),
+                ),
+            )
+        })
     }
 
     /// Parse an escaped character, returning the new character.
@@ -187,7 +198,7 @@ impl StringParser {
             // TODO: check when this error case happens
             return Err(LexicalError::new(
                 LexicalErrorType::StringError,
-                self.range(self.get_pos()),
+                TextRange::empty(self.position()),
             ));
         };
 
@@ -216,16 +227,7 @@ impl StringParser {
 
                 return Ok(None);
             }
-            _ => {
-                if self.kind.is_byte_string() && !first_char.is_ascii() {
-                    return Err(LexicalError::new(
-                        LexicalErrorType::InvalidByteLiteral,
-                        self.range(self.get_pos()),
-                    ));
-                }
-
-                return Ok(Some(EscapedChar::Escape(first_char)));
-            }
+            _ => return Ok(Some(EscapedChar::Escape(first_char))),
         };
 
         Ok(Some(EscapedChar::Literal(new_char)))
@@ -294,7 +296,7 @@ impl StringParser {
                     if !ch.is_ascii() {
                         return Err(LexicalError::new(
                             LexicalErrorType::InvalidByteLiteral,
-                            self.range(self.get_pos()),
+                            TextRange::empty(self.position()),
                         ));
                     }
                     value.push(char::from(*ch));
@@ -321,9 +323,13 @@ impl StringParser {
 
     fn parse_bytes(mut self) -> Result<StringType, LexicalError> {
         if let Some(index) = self.source.as_bytes().find_non_ascii_byte() {
+            let ch = self.source.chars().nth(index).unwrap();
             return Err(LexicalError::new(
                 LexicalErrorType::InvalidByteLiteral,
-                self.range(TextSize::try_from(index).unwrap()),
+                TextRange::at(
+                    self.compute_position(index),
+                    TextSize::try_from(ch.len_utf8()).unwrap(),
+                ),
             ));
         }
 
@@ -874,6 +880,46 @@ mod tests {
         let parse_ast = parse_suite(source).unwrap();
 
         insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_invalid_unicode_literal() {
+        let source = r"'\x1ó34'";
+        let error = parse_suite(source).unwrap_err();
+
+        insta::assert_debug_snapshot!(error);
+    }
+
+    #[test]
+    fn test_missing_unicode_lbrace_error() {
+        let source = r"'\N '";
+        let error = parse_suite(source).unwrap_err();
+
+        insta::assert_debug_snapshot!(error);
+    }
+
+    #[test]
+    fn test_missing_unicode_rbrace_error() {
+        let source = r"'\N{SPACE'";
+        let error = parse_suite(source).unwrap_err();
+
+        insta::assert_debug_snapshot!(error);
+    }
+
+    #[test]
+    fn test_invalid_unicode_name_error() {
+        let source = r"'\N{INVALID}'";
+        let error = parse_suite(source).unwrap_err();
+
+        insta::assert_debug_snapshot!(error);
+    }
+
+    #[test]
+    fn test_invalid_byte_literal_error() {
+        let source = r"b'123a𝐁c'";
+        let error = parse_suite(source).unwrap_err();
+
+        insta::assert_debug_snapshot!(error);
     }
 
     macro_rules! test_aliases_parse {
