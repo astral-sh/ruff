@@ -7,8 +7,11 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `set` being modified during the iteration on the set,
-/// which raises a `RuntimeError`.
+/// Checks for `set` being modified during the iteration on the set.
+///
+/// ## Why is this bad?
+/// If `set` is modified during the iteration, it will cause `RuntimeError`.
+/// This could be fixed by using temporal copy of the set to iterate.
 ///
 /// ## Example
 /// ```python
