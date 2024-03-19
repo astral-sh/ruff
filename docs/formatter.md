@@ -3,8 +3,7 @@
 The Ruff formatter is an extremely fast Python code formatter designed as a drop-in replacement for
 [Black](https://pypi.org/project/black/), available as part of the `ruff` CLI via `ruff format`.
 
-The Ruff formatter is available as a [production-ready Beta](https://astral.sh/blog/the-ruff-formatter)
-as of Ruff v0.1.2.
+The Ruff formatter is available as of Ruff [v0.1.2](https://astral.sh/blog/the-ruff-formatter).
 
 ## `ruff format`
 
@@ -12,8 +11,9 @@ as of Ruff v0.1.2.
 directories, and formats all discovered Python files:
 
 ```shell
-ruff format .                 # Format all files in the current directory.
-ruff format /path/to/file.py  # Format a single file.
+ruff format                   # Format all files in the current directory.
+ruff format path/to/code/     # Lint all files in `path/to/code` (and any subdirectories).
+ruff format path/to/file.py   # Format a single file.
 ```
 
 Similar to Black, running `ruff format /path/to/file.py` will format the given file or directory
@@ -268,6 +268,9 @@ Instead, apply the `# fmt: off` comment to the entire statement:
 # fmt: on
 ```
 
+Like Black, Ruff will _also_ recognize [YAPF](https://github.com/google/yapf)'s `# yapf: disable` and `# yapf: enable` pragma
+comments, which are treated equivalently to `# fmt: off` and `# fmt: on`, respectively.
+
 `# fmt: skip` comments suppress formatting for a preceding statement, case header, decorator,
 function definition, or class definition:
 
@@ -287,8 +290,30 @@ def test(a, b, c, d, e, f) -> int: # fmt: skip
     pass
 ```
 
-Like Black, Ruff will _also_ recognize [YAPF](https://github.com/google/yapf)'s `# yapf: disable` and `# yapf: enable` pragma
-comments, which are treated equivalently to `# fmt: off` and `# fmt: on`, respectively.
+As such, adding an `# fmt: skip` comment at the end of an expression will have no effect. In
+the following example, the list entry `'1'` will be formatted, despite the `# fmt: skip`:
+
+```python
+a = call(
+    [
+        '1',  # fmt: skip
+        '2',
+    ],
+    b
+)
+```
+
+Instead, apply the `# fmt: skip` comment to the entire statement:
+
+```python
+a = call(
+  [
+    '1',
+    '2',
+  ],
+  b
+)  # fmt: skip
+```
 
 ## Conflicting lint rules
 
@@ -398,8 +423,8 @@ Currently, the Ruff formatter does not sort imports. In order to both sort impor
 call the Ruff linter and then the formatter:
 
 ```shell
-ruff check --select I --fix .
-ruff format .
+ruff check --select I --fix
+ruff format
 ```
 
 A unified command for both linting and formatting is [planned](https://github.com/astral-sh/ruff/issues/8232).

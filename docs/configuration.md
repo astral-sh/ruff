@@ -449,14 +449,69 @@ Alternatively, pass the notebook file(s) to `ruff` on the command-line directly.
 
 ## Command-line interface
 
-Some configuration options can be provided via the command-line, such as those related to rule
-enablement and disablement, file discovery, logging level, and more:
+Some configuration options can be provided or overridden via dedicated flags on the command line.
+This includes those related to rule enablement and disablement,
+file discovery, logging level, and more:
 
 ```shell
 ruff check path/to/code/ --select F401 --select F403 --quiet
 ```
 
-See `ruff help` for more on Ruff's top-level commands:
+All other configuration options can be set via the command line
+using the `--config` flag, detailed below.
+
+### The `--config` CLI flag
+
+The `--config` flag has two uses. It is most often used to point to the
+configuration file that you would like Ruff to use, for example:
+
+```shell
+ruff check path/to/directory --config path/to/ruff.toml
+```
+
+However, the `--config` flag can also be used to provide arbitrary
+overrides of configuration settings using TOML `<KEY> = <VALUE>` pairs.
+This is mostly useful in situations where you wish to override a configuration setting
+that does not have a dedicated command-line flag.
+
+In the below example, the `--config` flag is the only way of overriding the
+`dummy-variable-rgx` configuration setting from the command line,
+since this setting has no dedicated CLI flag. The `per-file-ignores` setting
+could also have been overridden via the `--per-file-ignores` dedicated flag,
+but using `--config` to override the setting is also fine:
+
+```shell
+ruff check path/to/file --config path/to/ruff.toml --config "lint.dummy-variable-rgx = '__.*'" --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
+```
+
+Configuration options passed to `--config` are parsed in the same way
+as configuration options in a `ruff.toml` file.
+As such, options specific to the Ruff linter need to be prefixed with `lint.`
+(`--config "lint.dummy-variable-rgx = '__.*'"` rather than simply
+`--config "dummy-variable-rgx = '__.*'"`), and options specific to the Ruff formatter
+need to be prefixed with `format.`.
+
+If a specific configuration option is simultaneously overridden by
+a dedicated flag and by the `--config` flag, the dedicated flag
+takes priority. In this example, the maximum permitted line length
+will be set to 90, not 100:
+
+```shell
+ruff format path/to/file --line-length=90 --config "line-length=100"
+```
+
+Specifying `--config "line-length=90"` will override the `line-length`
+setting from *all* configuration files detected by Ruff,
+including configuration files discovered in subdirectories.
+In this respect, specifying `--config "line-length=90"` has
+the same effect as specifying `--line-length=90`,
+which will similarly override the `line-length` setting from
+all configuration files detected by Ruff, regardless of where
+a specific configuration file is located.
+
+### Full command-line interface
+
+See `ruff help` for the full list of Ruff's top-level commands:
 
 <!-- Begin auto-generated command help. -->
 
@@ -472,6 +527,7 @@ Commands:
   linter   List all supported upstream linters
   clean    Clear any caches in the current directory and any subdirectories
   format   Run the Ruff formatter on the given files or directories
+  server   Run the language server
   version  Display Ruff's version
   help     Print this message or the help of the given subcommand(s)
 
@@ -484,6 +540,17 @@ Log levels:
   -q, --quiet    Print diagnostics, but nothing else
   -s, --silent   Disable all logging (but still exit with status code "1" upon
                  detecting diagnostics)
+
+Global options:
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
+      --isolated
+          Ignore all configuration files
 
 For help with a specific command, see: `ruff help <command>`.
 ```
@@ -541,9 +608,6 @@ Options:
       --preview
           Enable preview mode; checks will include unstable rules and fixes.
           Use `--no-preview` to disable
-      --config <CONFIG>
-          Path to the `pyproject.toml` or `ruff.toml` file to use for
-          configuration
       --extension <EXTENSION>
           List of mappings from file extension to language (one of ["python",
           "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython
@@ -599,8 +663,6 @@ File selection:
 Miscellaneous:
   -n, --no-cache
           Disable cache reads [env: RUFF_NO_CACHE=]
-      --isolated
-          Ignore all configuration files
       --cache-dir <CACHE_DIR>
           Path to the cache directory [env: RUFF_CACHE_DIR=]
       --stdin-filename <STDIN_FILENAME>
@@ -616,6 +678,17 @@ Log levels:
   -q, --quiet    Print diagnostics, but nothing else
   -s, --silent   Disable all logging (but still exit with status code "1" upon
                  detecting diagnostics)
+
+Global options:
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
+      --isolated
+          Ignore all configuration files
 ```
 
 <!-- End auto-generated check help. -->
@@ -640,9 +713,6 @@ Options:
           Avoid writing any formatted files back; instead, exit with a non-zero
           status code and the difference between the current file and how the
           formatted file would look like
-      --config <CONFIG>
-          Path to the `pyproject.toml` or `ruff.toml` file to use for
-          configuration
       --extension <EXTENSION>
           List of mappings from file extension to language (one of ["python",
           "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython
@@ -654,15 +724,13 @@ Options:
           Enable preview mode; enables unstable formatting. Use `--no-preview`
           to disable
   -h, --help
-          Print help
+          Print help (see more with '--help')
 
 Miscellaneous:
   -n, --no-cache
           Disable cache reads [env: RUFF_NO_CACHE=]
       --cache-dir <CACHE_DIR>
           Path to the cache directory [env: RUFF_CACHE_DIR=]
-      --isolated
-          Ignore all configuration files
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
 
@@ -679,11 +747,30 @@ File selection:
 Format configuration:
       --line-length <LINE_LENGTH>  Set the line-length
 
+Editor options:
+      --range <RANGE>  When specified, Ruff will try to only format the code in
+                       the given range.
+                       It might be necessary to extend the start backwards or
+                       the end forwards, to fully enclose a logical line.
+                       The `<RANGE>` uses the format
+                       `<start_line>:<start_column>-<end_line>:<end_column>`.
+
 Log levels:
   -v, --verbose  Enable verbose logging
   -q, --quiet    Print diagnostics, but nothing else
   -s, --silent   Disable all logging (but still exit with status code "1" upon
                  detecting diagnostics)
+
+Global options:
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
+      --isolated
+          Ignore all configuration files
 ```
 
 <!-- End auto-generated format help. -->

@@ -6,12 +6,12 @@ use std::borrow::Cow;
 use std::env::VarError;
 use std::num::{NonZeroU16, NonZeroU8};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use glob::{glob, GlobError, Paths, PatternError};
 use itertools::Itertools;
 use regex::Regex;
-use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use rustc_hash::{FxHashMap, FxHashSet};
 use shellexpand;
 use shellexpand::LookupError;
@@ -24,10 +24,11 @@ use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
 use ruff_linter::rules::pycodestyle;
+use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
     ExtensionMapping, FilePattern, FilePatternSet, PerFileIgnore, PerFileIgnores, PreviewMode,
-    PythonVersion, SerializationFormat, UnsafeFixes, Version,
+    PythonVersion, RequiredVersion, SerializationFormat, UnsafeFixes,
 };
 use ruff_linter::settings::{LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS};
 use ruff_linter::{
@@ -51,7 +52,7 @@ use crate::settings::{
     FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
 };
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct RuleSelection {
     pub select: Option<Vec<RuleSelector>>,
     pub ignore: Vec<RuleSelector>,
@@ -106,7 +107,7 @@ impl RuleSelection {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Configuration {
     // Global options
     pub cache_dir: Option<PathBuf>,
@@ -116,7 +117,7 @@ pub struct Configuration {
     pub unsafe_fixes: Option<UnsafeFixes>,
     pub output_format: Option<SerializationFormat>,
     pub preview: Option<PreviewMode>,
-    pub required_version: Option<Version>,
+    pub required_version: Option<RequiredVersion>,
     pub extension: Option<ExtensionMapping>,
     pub show_fixes: Option<bool>,
 
@@ -145,10 +146,12 @@ pub struct Configuration {
 impl Configuration {
     pub fn into_settings(self, project_root: &Path) -> Result<Settings> {
         if let Some(required_version) = &self.required_version {
-            if &**required_version != RUFF_PKG_VERSION {
+            let ruff_pkg_version = pep440_rs::Version::from_str(RUFF_PKG_VERSION)
+                .expect("RUFF_PKG_VERSION is not a valid PEP 440 version specifier");
+            if !required_version.contains(&ruff_pkg_version) {
                 return Err(anyhow!(
                     "Required version `{}` does not match the running version `{}`",
-                    &**required_version,
+                    required_version,
                     RUFF_PKG_VERSION
                 ));
             }
@@ -165,12 +168,6 @@ impl Configuration {
             PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
             PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
         };
-
-        if quote_style == QuoteStyle::Preserve && !format_preview.is_enabled() {
-            return Err(anyhow!(
-                "'quote-style = preserve' is a preview only feature. Run with '--preview' to enable it."
-            ));
-        }
 
         let formatter = FormatterSettings {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
@@ -240,6 +237,7 @@ impl Configuration {
                 project_root: project_root.to_path_buf(),
             },
 
+            #[allow(deprecated)]
             linter: LinterSettings {
                 rules: lint.as_rule_table(lint_preview)?,
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
@@ -256,7 +254,7 @@ impl Configuration {
                     .dummy_variable_rgx
                     .unwrap_or_else(|| DUMMY_VARIABLE_RGX.clone()),
                 external: lint.external.unwrap_or_default(),
-                ignore_init_module_imports: lint.ignore_init_module_imports.unwrap_or_default(),
+                ignore_init_module_imports: lint.ignore_init_module_imports.unwrap_or(true),
                 line_length,
                 tab_size: self.indent_width.unwrap_or_default(),
                 namespace_packages: self.namespace_packages.unwrap_or_default(),
@@ -397,7 +395,13 @@ impl Configuration {
     }
 
     /// Convert the [`Options`] read from the given [`Path`] into a [`Configuration`].
-    pub fn from_options(options: Options, path: &Path, project_root: &Path) -> Result<Self> {
+    /// If `None` is supplied for `path`, it indicates that the `Options` instance
+    /// was created via "inline TOML" from the `--config` flag
+    pub fn from_options(
+        options: Options,
+        path: Option<&Path>,
+        project_root: &Path,
+    ) -> Result<Self> {
         warn_about_deprecated_top_level_lint_options(&options.lint_top_level.0, path);
 
         let lint = if let Some(mut lint) = options.lint {
@@ -578,7 +582,7 @@ impl Configuration {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct LintConfiguration {
     pub exclude: Option<Vec<FilePattern>>,
     pub preview: Option<PreviewMode>,
@@ -647,6 +651,10 @@ impl LintConfiguration {
             .flatten()
             .chain(options.common.extend_unfixable.into_iter().flatten())
             .collect();
+
+        #[allow(deprecated)]
+        let ignore_init_module_imports = options.common.ignore_init_module_imports;
+
         Ok(LintConfiguration {
             exclude: options.exclude.map(|paths| {
                 paths
@@ -689,7 +697,7 @@ impl LintConfiguration {
                 })
                 .unwrap_or_default(),
             external: options.common.external,
-            ignore_init_module_imports: options.common.ignore_init_module_imports,
+            ignore_init_module_imports,
             explicit_preview_rules: options.common.explicit_preview_rules,
             per_file_ignores: options.common.per_file_ignores.map(|per_file_ignores| {
                 per_file_ignores
@@ -1155,7 +1163,7 @@ impl LintConfiguration {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct FormatConfiguration {
     pub exclude: Option<Vec<FilePattern>>,
     pub preview: Option<PreviewMode>,
@@ -1263,7 +1271,7 @@ pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> 
 
 fn warn_about_deprecated_top_level_lint_options(
     top_level_options: &LintCommonOptions,
-    path: &Path,
+    path: Option<&Path>,
 ) {
     let mut used_options = Vec::new();
 
@@ -1313,6 +1321,7 @@ fn warn_about_deprecated_top_level_lint_options(
         used_options.push("extend-unsafe-fixes");
     }
 
+    #[allow(deprecated)]
     if top_level_options.ignore_init_module_imports.is_some() {
         used_options.push("ignore-init-module-imports");
     }
@@ -1454,23 +1463,31 @@ fn warn_about_deprecated_top_level_lint_options(
         .map(|option| format!("- '{option}' -> 'lint.{option}'"))
         .join("\n  ");
 
+    let thing_to_update = path.map_or_else(
+        || String::from("your `--config` CLI arguments"),
+        |path| format!("`{}`", fs::relativize_path(path)),
+    );
+
     warn_user_once_by_message!(
-        "The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `{}`:\n  {options_mapping}",
-        fs::relativize_path(path),
+        "The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. \
+        Please update the following options in {thing_to_update}:\n  {options_mapping}",
     );
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::configuration::{LintConfiguration, RuleSelection};
-    use crate::options::PydocstyleOptions;
+    use std::str::FromStr;
+
     use anyhow::Result;
+
     use ruff_linter::codes::{Flake8Copyright, Pycodestyle, Refurb};
     use ruff_linter::registry::{Linter, Rule, RuleSet};
     use ruff_linter::rule_selector::PreviewOptions;
     use ruff_linter::settings::types::PreviewMode;
     use ruff_linter::RuleSelector;
-    use std::str::FromStr;
+
+    use crate::configuration::{LintConfiguration, RuleSelection};
+    use crate::options::PydocstyleOptions;
 
     const PREVIEW_RULES: &[Rule] = &[
         Rule::IsinstanceTypeNone,
@@ -1483,6 +1500,12 @@ mod tests {
         Rule::UnnecessaryEnumerate,
         Rule::MathConstant,
         Rule::PreviewTestRule,
+        Rule::BlankLineBetweenMethods,
+        Rule::BlankLinesTopLevel,
+        Rule::TooManyBlankLines,
+        Rule::BlankLineAfterDecorator,
+        Rule::BlankLinesAfterFunctionOrClass,
+        Rule::BlankLinesBeforeNestedDefinition,
     ];
 
     #[allow(clippy::needless_pass_by_value)]

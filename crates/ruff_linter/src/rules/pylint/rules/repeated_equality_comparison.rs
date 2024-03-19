@@ -9,7 +9,9 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::hashable::HashableExpr;
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
+use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -74,7 +76,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
     if bool_op
         .values
         .iter()
-        .any(|value| !is_allowed_value(bool_op.op, value))
+        .any(|value| !is_allowed_value(bool_op.op, value, checker.semantic()))
     {
         return;
     }
@@ -96,7 +98,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
         };
 
         // Enforced via `is_allowed_value`.
-        let [right] = comparators.as_slice() else {
+        let [right] = &**comparators else {
             return;
         };
 
@@ -136,14 +138,15 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
                 checker.generator().expr(&Expr::Compare(ast::ExprCompare {
                     left: Box::new(value.as_expr().clone()),
                     ops: match bool_op.op {
-                        BoolOp::Or => vec![CmpOp::In],
-                        BoolOp::And => vec![CmpOp::NotIn],
+                        BoolOp::Or => Box::from([CmpOp::In]),
+                        BoolOp::And => Box::from([CmpOp::NotIn]),
                     },
-                    comparators: vec![Expr::Tuple(ast::ExprTuple {
+                    comparators: Box::from([Expr::Tuple(ast::ExprTuple {
                         elts: comparators.iter().copied().cloned().collect(),
                         range: TextRange::default(),
                         ctx: ExprContext::Load,
-                    })],
+                        parenthesized: true,
+                    })]),
                     range: bool_op.range(),
                 })),
                 bool_op.range(),
@@ -157,7 +160,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
 /// Return `true` if the given expression is compatible with a membership test.
 /// E.g., `==` operators can be joined with `or` and `!=` operators can be
 /// joined with `and`.
-fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
+fn is_allowed_value(bool_op: BoolOp, value: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Compare(ast::ExprCompare {
         left,
         ops,
@@ -169,7 +172,7 @@ fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
     };
 
     // Ignore, e.g., `foo == bar == baz`.
-    let [op] = ops.as_slice() else {
+    let [op] = &**ops else {
         return false;
     };
 
@@ -181,7 +184,7 @@ fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
     }
 
     // Ignore self-comparisons, e.g., `foo == foo`.
-    let [right] = comparators.as_slice() else {
+    let [right] = &**comparators else {
         return false;
     };
     if ComparableExpr::from(left) == ComparableExpr::from(right) {
@@ -193,6 +196,21 @@ fn is_allowed_value(bool_op: BoolOp, value: &Expr) -> bool {
     }
 
     if any(comparators.iter(), Expr::is_call_expr) {
+        return false;
+    }
+
+    // Ignore `sys.version_info` and `sys.platform` comparisons, which are only
+    // respected by type checkers when enforced via equality.
+    if any_over_expr(value, &|expr| {
+        semantic
+            .resolve_qualified_name(expr)
+            .is_some_and(|qualified_name| {
+                matches!(
+                    qualified_name.segments(),
+                    ["sys", "version_info" | "platform"]
+                )
+            })
+    }) {
         return false;
     }
 

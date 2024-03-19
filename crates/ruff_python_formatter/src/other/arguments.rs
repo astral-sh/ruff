@@ -4,12 +4,11 @@ use ruff_python_trivia::{PythonWhitespace, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::SourceComment;
-use crate::expression::expr_generator_exp::GeneratorExpParentheses;
+use crate::expression::expr_generator::GeneratorExpParentheses;
 use crate::expression::is_expression_huggable;
 use crate::expression::parentheses::{empty_parenthesized, parenthesized, Parentheses};
 use crate::other::commas;
 use crate::prelude::*;
-use crate::preview::is_multiline_string_handling_enabled;
 use crate::string::AnyString;
 
 #[derive(Default)]
@@ -38,10 +37,10 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         let all_arguments = format_with(|f: &mut PyFormatter| {
             let source = f.context().source();
             let mut joiner = f.join_comma_separated(range.end());
-            match args.as_slice() {
+            match args.as_ref() {
                 [arg] if keywords.is_empty() => {
                     match arg {
-                        Expr::GeneratorExp(generator_exp) => joiner.entry(
+                        Expr::Generator(generator_exp) => joiner.entry(
                             generator_exp,
                             &generator_exp
                                 .format()
@@ -180,7 +179,7 @@ fn is_single_argument_parenthesized(argument: &Expr, call_end: TextSize, source:
 /// of those collections.
 fn is_arguments_huggable(arguments: &Arguments, context: &PyFormatContext) -> bool {
     // Find the lone argument or `**kwargs` keyword.
-    let arg = match (arguments.args.as_slice(), arguments.keywords.as_slice()) {
+    let arg = match (arguments.args.as_ref(), arguments.keywords.as_ref()) {
         ([arg], []) => arg,
         ([], [keyword]) if keyword.arg.is_none() && !context.comments().has(keyword) => {
             &keyword.value
@@ -206,11 +205,7 @@ fn is_arguments_huggable(arguments: &Arguments, context: &PyFormatContext) -> bo
 
     // If the expression has a trailing comma, then we can't hug it.
     if options.magic_trailing_comma().is_respect()
-        && commas::has_magic_trailing_comma(
-            TextRange::new(arg.end(), arguments.end()),
-            options,
-            context,
-        )
+        && commas::has_magic_trailing_comma(TextRange::new(arg.end(), arguments.end()), context)
     {
         return false;
     }
@@ -238,10 +233,6 @@ fn is_huggable_string_argument(
     arguments: &Arguments,
     context: &PyFormatContext,
 ) -> bool {
-    if !is_multiline_string_handling_enabled(context) {
-        return false;
-    }
-
     if string.is_implicit_concatenated() || !string.is_multiline(context.source()) {
         return false;
     }

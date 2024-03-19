@@ -248,6 +248,12 @@ pub enum QuoteStyle {
     Preserve,
 }
 
+impl QuoteStyle {
+    pub const fn is_preserve(self) -> bool {
+        matches!(self, QuoteStyle::Preserve)
+    }
+}
+
 impl fmt::Display for QuoteStyle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -459,4 +465,13 @@ pub enum PythonVersion {
     Py310,
     Py311,
     Py312,
+}
+
+impl PythonVersion {
+    /// Return `true` if the current version supports [PEP 701].
+    ///
+    /// [PEP 701]: https://peps.python.org/pep-0701/
+    pub fn supports_pep_701(self) -> bool {
+        self >= Self::Py312
+    }
 }

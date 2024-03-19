@@ -19,7 +19,11 @@ Ok(
                                             StringLiteral {
                                                 range: 0..5,
                                                 value: "foo",
-                                                unicode: false,
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Double,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                },
                                             },
                                         ),
                                     },

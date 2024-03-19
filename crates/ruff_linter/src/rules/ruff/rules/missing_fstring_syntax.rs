@@ -18,8 +18,9 @@ use rustc_hash::FxHashSet;
 ///
 /// Since there are many possible string literals which contain syntax similar to f-strings yet are not intended to be,
 /// this lint will disqualify any literal that satisfies any of the following conditions:
+///
 /// 1. The string literal is a standalone expression. For example, a docstring.
-/// 2. The literal is part of a function call with keyword arguments that match at least one variable (for example: `format("Message: {value}", value = "Hello World")`)
+/// 2. The literal is part of a function call with argument names that match at least one variable (for example: `format("Message: {value}", value = "Hello World")`)
 /// 3. The literal (or a parent expression of the literal) has a direct method call on it (for example: `"{value}".format(...)`)
 /// 4. The string has no `{...}` expression sections, or uses invalid f-string syntax.
 /// 5. The string references variables that are not in scope, or it doesn't capture variables at all.
@@ -69,11 +70,36 @@ pub(crate) fn missing_fstring_syntax(
         }
     }
 
+    // We also want to avoid expressions that are intended to be translated.
+    if semantic.current_expressions().any(is_gettext) {
+        return;
+    }
+
     if should_be_fstring(literal, locator, semantic) {
         let diagnostic = Diagnostic::new(MissingFStringSyntax, literal.range())
             .with_fix(fix_fstring_syntax(literal.range()));
         diagnostics.push(diagnostic);
     }
+}
+
+/// Returns `true` if an expression appears to be a `gettext` call.
+///
+/// We want to avoid statement expressions and assignments related to aliases
+/// of the gettext API.
+///
+/// See <https://docs.python.org/3/library/gettext.html> for details. When one
+/// uses `_` to mark a string for translation, the tools look for these markers
+/// and replace the original string with its translated counterpart. If the
+/// string contains variable placeholders or formatting, it can complicate the
+/// translation process, lead to errors or incorrect translations.
+fn is_gettext(expr: &ast::Expr) -> bool {
+    let ast::Expr::Call(ast::ExprCall { func, .. }) = expr else {
+        return false;
+    };
+    let ast::Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
+        return false;
+    };
+    matches!(id.as_str(), "_" | "gettext" | "ngettext")
 }
 
 /// Returns `true` if `literal` is likely an f-string with a missing `f` prefix.
@@ -87,50 +113,76 @@ fn should_be_fstring(
         return false;
     }
 
-    let Ok(ast::Expr::FString(ast::ExprFString { value, .. })) =
-        parse_expression(&format!("f{}", locator.slice(literal.range())))
+    let fstring_expr = format!("f{}", locator.slice(literal));
+
+    // Note: Range offsets for `value` are based on `fstring_expr`
+    let Ok(ast::Expr::FString(ast::ExprFString { value, .. })) = parse_expression(&fstring_expr)
     else {
         return false;
     };
 
-    let mut kwargs = vec![];
+    let mut arg_names = FxHashSet::default();
+    let mut last_expr: Option<&ast::Expr> = None;
     for expr in semantic.current_expressions() {
         match expr {
             ast::Expr::Call(ast::ExprCall {
-                arguments: ast::Arguments { keywords, .. },
+                arguments: ast::Arguments { keywords, args, .. },
                 func,
                 ..
             }) => {
-                if let ast::Expr::Attribute(ast::ExprAttribute { .. }) = func.as_ref() {
-                    return false;
+                if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() {
+                    match value.as_ref() {
+                        // if the first part of the attribute is the string literal,
+                        // we want to ignore this literal from the lint.
+                        // for example: `"{x}".some_method(...)`
+                        ast::Expr::StringLiteral(expr_literal)
+                            if expr_literal.value.as_slice().contains(literal) =>
+                        {
+                            return false;
+                        }
+                        // if the first part of the attribute was the expression we
+                        // just went over in the last iteration, then we also want to pass
+                        // this over in the lint.
+                        // for example: `some_func("{x}").some_method(...)`
+                        value if last_expr == Some(value) => {
+                            return false;
+                        }
+                        _ => {}
+                    }
                 }
-                kwargs.extend(keywords.iter());
+                for keyword in keywords.iter() {
+                    if let Some(ident) = keyword.arg.as_ref() {
+                        arg_names.insert(ident.as_str());
+                    }
+                }
+                for arg in args.iter() {
+                    if let ast::Expr::Name(ast::ExprName { id, .. }) = arg {
+                        arg_names.insert(id.as_str());
+                    }
+                }
             }
             _ => continue,
         }
+        last_expr.replace(expr);
     }
-
-    let kw_idents: FxHashSet<&str> = kwargs
-        .iter()
-        .filter_map(|k| k.arg.as_ref())
-        .map(ast::Identifier::as_str)
-        .collect();
 
     for f_string in value.f_strings() {
         let mut has_name = false;
-        for element in f_string
-            .elements
-            .iter()
-            .filter_map(|element| element.as_expression())
-        {
+        for element in f_string.expressions() {
             if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
-                if kw_idents.contains(id.as_str()) || semantic.lookup_symbol(id).is_none() {
+                if arg_names.contains(id.as_str()) {
+                    return false;
+                }
+                if semantic
+                    .lookup_symbol(id)
+                    .map_or(true, |id| semantic.binding(id).kind.is_builtin())
+                {
                     return false;
                 }
                 has_name = true;
             }
             if let Some(spec) = &element.format_spec {
-                let spec = locator.slice(spec.range());
+                let spec = &fstring_expr[spec.range()];
                 if FormatSpec::parse(spec).is_err() {
                     return false;
                 }

@@ -6,12 +6,12 @@ use std::fmt::Debug;
 use std::ops::Deref;
 use std::slice::{Iter, IterMut};
 
+use bitflags::bitflags;
 use itertools::Itertools;
 
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::{int, LiteralExpressionRef};
+use crate::{int, str::Quote, LiteralExpressionRef};
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
@@ -160,7 +160,7 @@ pub enum Stmt {
 pub struct StmtIpyEscapeCommand {
     pub range: TextRange,
     pub kind: IpyEscapeKind,
-    pub value: String,
+    pub value: Box<str>,
 }
 
 impl From<StmtIpyEscapeCommand> for Stmt {
@@ -559,16 +559,16 @@ impl From<StmtContinue> for Stmt {
 pub enum Expr {
     #[is(name = "bool_op_expr")]
     BoolOp(ExprBoolOp),
-    #[is(name = "named_expr_expr")]
-    NamedExpr(ExprNamedExpr),
+    #[is(name = "named_expr")]
+    Named(ExprNamed),
     #[is(name = "bin_op_expr")]
     BinOp(ExprBinOp),
     #[is(name = "unary_op_expr")]
     UnaryOp(ExprUnaryOp),
     #[is(name = "lambda_expr")]
     Lambda(ExprLambda),
-    #[is(name = "if_exp_expr")]
-    IfExp(ExprIfExp),
+    #[is(name = "if_expr")]
+    If(ExprIf),
     #[is(name = "dict_expr")]
     Dict(ExprDict),
     #[is(name = "set_expr")]
@@ -579,8 +579,8 @@ pub enum Expr {
     SetComp(ExprSetComp),
     #[is(name = "dict_comp_expr")]
     DictComp(ExprDictComp),
-    #[is(name = "generator_exp_expr")]
-    GeneratorExp(ExprGeneratorExp),
+    #[is(name = "generator_expr")]
+    Generator(ExprGenerator),
     #[is(name = "await_expr")]
     Await(ExprAwait),
     #[is(name = "yield_expr")]
@@ -671,7 +671,7 @@ impl Expr {
 pub struct ExprIpyEscapeCommand {
     pub range: TextRange,
     pub kind: IpyEscapeKind,
-    pub value: String,
+    pub value: Box<str>,
 }
 
 impl From<ExprIpyEscapeCommand> for Expr {
@@ -696,15 +696,15 @@ impl From<ExprBoolOp> for Expr {
 
 /// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprNamedExpr {
+pub struct ExprNamed {
     pub range: TextRange,
     pub target: Box<Expr>,
     pub value: Box<Expr>,
 }
 
-impl From<ExprNamedExpr> for Expr {
-    fn from(payload: ExprNamedExpr) -> Self {
-        Expr::NamedExpr(payload)
+impl From<ExprNamed> for Expr {
+    fn from(payload: ExprNamed) -> Self {
+        Expr::Named(payload)
     }
 }
 
@@ -753,16 +753,16 @@ impl From<ExprLambda> for Expr {
 
 /// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprIfExp {
+pub struct ExprIf {
     pub range: TextRange,
     pub test: Box<Expr>,
     pub body: Box<Expr>,
     pub orelse: Box<Expr>,
 }
 
-impl From<ExprIfExp> for Expr {
-    fn from(payload: ExprIfExp) -> Self {
-        Expr::IfExp(payload)
+impl From<ExprIf> for Expr {
+    fn from(payload: ExprIf) -> Self {
+        Expr::If(payload)
     }
 }
 
@@ -838,15 +838,16 @@ impl From<ExprDictComp> for Expr {
 
 /// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprGeneratorExp {
+pub struct ExprGenerator {
     pub range: TextRange,
     pub elt: Box<Expr>,
     pub generators: Vec<Comprehension>,
+    pub parenthesized: bool,
 }
 
-impl From<ExprGeneratorExp> for Expr {
-    fn from(payload: ExprGeneratorExp) -> Self {
-        Expr::GeneratorExp(payload)
+impl From<ExprGenerator> for Expr {
+    fn from(payload: ExprGenerator) -> Self {
+        Expr::Generator(payload)
     }
 }
 
@@ -894,8 +895,8 @@ impl From<ExprYieldFrom> for Expr {
 pub struct ExprCompare {
     pub range: TextRange,
     pub left: Box<Expr>,
-    pub ops: Vec<CmpOp>,
-    pub comparators: Vec<Expr>,
+    pub ops: Box<[CmpOp]>,
+    pub comparators: Box<[Expr]>,
 }
 
 impl From<ExprCompare> for Expr {
@@ -949,7 +950,7 @@ impl Ranged for FStringExpressionElement {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FStringLiteralElement {
     pub range: TextRange,
-    pub value: String,
+    pub value: Box<str>,
 }
 
 impl Ranged for FStringLiteralElement {
@@ -962,7 +963,7 @@ impl Deref for FStringLiteralElement {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        self.value.as_str()
+        &self.value
     }
 }
 
@@ -1158,6 +1159,15 @@ pub enum FStringPart {
     FString(FString),
 }
 
+impl FStringPart {
+    pub fn quote_style(&self) -> Quote {
+        match self {
+            Self::Literal(string_literal) => string_literal.flags.quote_style(),
+            Self::FString(f_string) => f_string.flags.quote_style(),
+        }
+    }
+}
+
 impl Ranged for FStringPart {
     fn range(&self) -> TextRange {
         match self {
@@ -1167,11 +1177,163 @@ impl Ranged for FStringPart {
     }
 }
 
+bitflags! {
+    #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
+    struct FStringFlagsInner: u8 {
+        /// The f-string uses double quotes (`"`) for its opener and closer.
+        /// If this flag is not set, the f-string uses single quotes (`'`)
+        /// for its opener and closer.
+        const DOUBLE = 1 << 0;
+
+        /// The f-string is triple-quoted:
+        /// it begins and ends with three consecutive quote characters.
+        /// For example: `f"""{bar}"""`.
+        const TRIPLE_QUOTED = 1 << 1;
+
+        /// The f-string has an `r` prefix, meaning it is a raw f-string
+        /// with a lowercase 'r'. For example: `rf"{bar}"`
+        const R_PREFIX_LOWER = 1 << 2;
+
+        /// The f-string has an `R` prefix, meaning it is a raw f-string
+        /// with an uppercase 'r'. For example: `Rf"{bar}"`.
+        /// See https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
+        /// for why we track the casing of the `r` prefix,
+        /// but not for any other prefix
+        const R_PREFIX_UPPER = 1 << 3;
+    }
+}
+
+/// Enumeration of the valid prefixes an f-string literal can have.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum FStringPrefix {
+    /// Just a regular f-string with no other prefixes, e.g. f"{bar}"
+    Regular,
+
+    /// A "raw" format-string, that has an `r` or `R` prefix,
+    /// e.g. `rf"{bar}"` or `Rf"{bar}"`
+    Raw { uppercase_r: bool },
+}
+
+impl FStringPrefix {
+    /// Return a `str` representation of the prefix
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Regular => "f",
+            Self::Raw { uppercase_r: true } => "Rf",
+            Self::Raw { uppercase_r: false } => "rf",
+        }
+    }
+
+    /// Return true if this prefix indicates a "raw f-string",
+    /// e.g. `rf"{bar}"` or `Rf"{bar}"`
+    pub const fn is_raw(self) -> bool {
+        matches!(self, Self::Raw { .. })
+    }
+}
+
+impl fmt::Display for FStringPrefix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Flags that can be queried to obtain information
+/// regarding the prefixes and quotes used for an f-string.
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct FStringFlags(FStringFlagsInner);
+
+impl FStringFlags {
+    #[must_use]
+    pub fn with_double_quotes(mut self) -> Self {
+        self.0 |= FStringFlagsInner::DOUBLE;
+        self
+    }
+
+    #[must_use]
+    pub fn with_triple_quotes(mut self) -> Self {
+        self.0 |= FStringFlagsInner::TRIPLE_QUOTED;
+        self
+    }
+
+    #[must_use]
+    pub fn with_prefix(self, prefix: FStringPrefix) -> Self {
+        let FStringFlags(flags) = self;
+        match prefix {
+            FStringPrefix::Regular => {
+                Self(flags - FStringFlagsInner::R_PREFIX_LOWER - FStringFlagsInner::R_PREFIX_UPPER)
+            }
+            FStringPrefix::Raw { uppercase_r: true } => Self(
+                (flags | FStringFlagsInner::R_PREFIX_UPPER) - FStringFlagsInner::R_PREFIX_LOWER,
+            ),
+            FStringPrefix::Raw { uppercase_r: false } => Self(
+                (flags | FStringFlagsInner::R_PREFIX_LOWER) - FStringFlagsInner::R_PREFIX_UPPER,
+            ),
+        }
+    }
+
+    pub const fn prefix(self) -> FStringPrefix {
+        if self.0.contains(FStringFlagsInner::R_PREFIX_LOWER) {
+            debug_assert!(!self.0.contains(FStringFlagsInner::R_PREFIX_UPPER));
+            FStringPrefix::Raw { uppercase_r: false }
+        } else if self.0.contains(FStringFlagsInner::R_PREFIX_UPPER) {
+            FStringPrefix::Raw { uppercase_r: true }
+        } else {
+            FStringPrefix::Regular
+        }
+    }
+
+    /// Return `true` if the f-string is triple-quoted, i.e.,
+    /// it begins and ends with three consecutive quote characters.
+    /// For example: `f"""{bar}"""`
+    pub const fn is_triple_quoted(self) -> bool {
+        self.0.contains(FStringFlagsInner::TRIPLE_QUOTED)
+    }
+
+    /// Return the quoting style (single or double quotes)
+    /// used by the f-string's opener and closer:
+    /// - `f"{"a"}"` -> `QuoteStyle::Double`
+    /// - `f'{"a"}'` -> `QuoteStyle::Single`
+    pub const fn quote_style(self) -> Quote {
+        if self.0.contains(FStringFlagsInner::DOUBLE) {
+            Quote::Double
+        } else {
+            Quote::Single
+        }
+    }
+}
+
+impl fmt::Debug for FStringFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FStringFlags")
+            .field("quote_style", &self.quote_style())
+            .field("prefix", &self.prefix())
+            .field("triple_quoted", &self.is_triple_quoted())
+            .finish()
+    }
+}
+
 /// An AST node that represents a single f-string which is part of an [`ExprFString`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct FString {
     pub range: TextRange,
     pub elements: Vec<FStringElement>,
+    pub flags: FStringFlags,
+}
+
+impl FString {
+    /// Returns an iterator over all the [`FStringLiteralElement`] nodes contained in this f-string.
+    pub fn literals(&self) -> impl Iterator<Item = &FStringLiteralElement> {
+        self.elements
+            .iter()
+            .filter_map(|element| element.as_literal())
+    }
+
+    /// Returns an iterator over all the [`FStringExpressionElement`] nodes contained in this f-string.
+    pub fn expressions(&self) -> impl Iterator<Item = &FStringExpressionElement> {
+        self.elements
+            .iter()
+            .filter_map(|element| element.as_expression())
+    }
 }
 
 impl Ranged for FString {
@@ -1266,7 +1428,9 @@ impl StringLiteralValue {
     /// For an implicitly concatenated string, it returns `true` only if the first
     /// string literal is a unicode string.
     pub fn is_unicode(&self) -> bool {
-        self.iter().next().map_or(false, |part| part.unicode)
+        self.iter()
+            .next()
+            .map_or(false, |part| part.flags.prefix().is_unicode())
     }
 
     /// Returns a slice of all the [`StringLiteral`] parts contained in this value.
@@ -1379,13 +1543,179 @@ impl Default for StringLiteralValueInner {
     }
 }
 
+bitflags! {
+    #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+    struct StringLiteralFlagsInner: u8 {
+        /// The string uses double quotes (e.g. `"foo"`).
+        /// If this flag is not set, the string uses single quotes (`'foo'`).
+        const DOUBLE = 1 << 0;
+
+        /// The string is triple-quoted (`"""foo"""`):
+        /// it begins and ends with three consecutive quote characters.
+        const TRIPLE_QUOTED = 1 << 1;
+
+        /// The string has a `u` or `U` prefix, e.g. `u"foo"`.
+        /// While this prefix is a no-op at runtime,
+        /// strings with this prefix can have no other prefixes set;
+        /// it is therefore invalid for this flag to be set
+        /// if `R_PREFIX` is also set.
+        const U_PREFIX = 1 << 2;
+
+        /// The string has an `r` prefix, meaning it is a raw string
+        /// with a lowercase 'r' (e.g. `r"foo\."`).
+        /// It is invalid to set this flag if `U_PREFIX` is also set.
+        const R_PREFIX_LOWER = 1 << 3;
+
+        /// The string has an `R` prefix, meaning it is a raw string
+        /// with an uppercase 'R' (e.g. `R'foo\d'`).
+        /// See https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
+        /// for why we track the casing of the `r` prefix,
+        /// but not for any other prefix
+        const R_PREFIX_UPPER = 1 << 4;
+    }
+}
+
+/// Flags that can be queried to obtain information
+/// regarding the prefixes and quotes used for a string literal.
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct StringLiteralFlags(StringLiteralFlagsInner);
+
+impl StringLiteralFlags {
+    #[must_use]
+    pub fn with_double_quotes(mut self) -> Self {
+        self.0 |= StringLiteralFlagsInner::DOUBLE;
+        self
+    }
+
+    #[must_use]
+    pub fn with_triple_quotes(mut self) -> Self {
+        self.0 |= StringLiteralFlagsInner::TRIPLE_QUOTED;
+        self
+    }
+
+    #[must_use]
+    pub fn with_prefix(self, prefix: StringLiteralPrefix) -> Self {
+        let StringLiteralFlags(flags) = self;
+        match prefix {
+            StringLiteralPrefix::Empty => Self(
+                flags
+                    - StringLiteralFlagsInner::R_PREFIX_LOWER
+                    - StringLiteralFlagsInner::R_PREFIX_UPPER
+                    - StringLiteralFlagsInner::U_PREFIX,
+            ),
+            StringLiteralPrefix::Raw { uppercase: false } => Self(
+                (flags | StringLiteralFlagsInner::R_PREFIX_LOWER)
+                    - StringLiteralFlagsInner::R_PREFIX_UPPER
+                    - StringLiteralFlagsInner::U_PREFIX,
+            ),
+            StringLiteralPrefix::Raw { uppercase: true } => Self(
+                (flags | StringLiteralFlagsInner::R_PREFIX_UPPER)
+                    - StringLiteralFlagsInner::R_PREFIX_LOWER
+                    - StringLiteralFlagsInner::U_PREFIX,
+            ),
+            StringLiteralPrefix::Unicode => Self(
+                (flags | StringLiteralFlagsInner::U_PREFIX)
+                    - StringLiteralFlagsInner::R_PREFIX_LOWER
+                    - StringLiteralFlagsInner::R_PREFIX_UPPER,
+            ),
+        }
+    }
+
+    pub const fn prefix(self) -> StringLiteralPrefix {
+        if self.0.contains(StringLiteralFlagsInner::U_PREFIX) {
+            debug_assert!(!self.0.intersects(
+                StringLiteralFlagsInner::R_PREFIX_LOWER
+                    .union(StringLiteralFlagsInner::R_PREFIX_UPPER)
+            ));
+            StringLiteralPrefix::Unicode
+        } else if self.0.contains(StringLiteralFlagsInner::R_PREFIX_LOWER) {
+            debug_assert!(!self.0.contains(StringLiteralFlagsInner::R_PREFIX_UPPER));
+            StringLiteralPrefix::Raw { uppercase: false }
+        } else if self.0.contains(StringLiteralFlagsInner::R_PREFIX_UPPER) {
+            StringLiteralPrefix::Raw { uppercase: true }
+        } else {
+            StringLiteralPrefix::Empty
+        }
+    }
+
+    /// Return the quoting style (single or double quotes)
+    /// used by the string's opener and closer:
+    /// - `"a"` -> `QuoteStyle::Double`
+    /// - `'a'` -> `QuoteStyle::Single`
+    pub const fn quote_style(self) -> Quote {
+        if self.0.contains(StringLiteralFlagsInner::DOUBLE) {
+            Quote::Double
+        } else {
+            Quote::Single
+        }
+    }
+
+    /// Return `true` if the string is triple-quoted, i.e.,
+    /// it begins and ends with three consecutive quote characters.
+    /// For example: `"""bar"""`
+    pub const fn is_triple_quoted(self) -> bool {
+        self.0.contains(StringLiteralFlagsInner::TRIPLE_QUOTED)
+    }
+}
+
+impl fmt::Debug for StringLiteralFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("StringLiteralFlags")
+            .field("quote_style", &self.quote_style())
+            .field("prefix", &self.prefix())
+            .field("triple_quoted", &self.is_triple_quoted())
+            .finish()
+    }
+}
+
+/// Enumerations of the valid prefixes a string literal can have.
+///
+/// Bytestrings and f-strings are excluded from this enumeration,
+/// as they are represented by different AST nodes.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, is_macro::Is)]
+pub enum StringLiteralPrefix {
+    /// Just a regular string with no prefixes
+    Empty,
+
+    /// A string with a `u` or `U` prefix, e.g. `u"foo"`.
+    /// Note that, despite this variant's name,
+    /// it is in fact a no-op at runtime to use the `u` or `U` prefix
+    /// in Python. All Python-3 strings are unicode strings;
+    /// this prefix is only allowed in Python 3 for backwards compatibility
+    /// with Python 2. However, using this prefix in a Python string
+    /// is mutually exclusive with an `r` or `R` prefix.
+    Unicode,
+
+    /// A "raw" string, that has an `r` or `R` prefix,
+    /// e.g. `r"foo\."` or `R'bar\d'`.
+    Raw { uppercase: bool },
+}
+
+impl StringLiteralPrefix {
+    /// Return a `str` representation of the prefix
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Empty => "",
+            Self::Unicode => "u",
+            Self::Raw { uppercase: true } => "R",
+            Self::Raw { uppercase: false } => "r",
+        }
+    }
+}
+
+impl fmt::Display for StringLiteralPrefix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// An AST node that represents a single string literal which is part of an
 /// [`ExprStringLiteral`].
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StringLiteral {
     pub range: TextRange,
-    pub value: String,
-    pub unicode: bool,
+    pub value: Box<str>,
+    pub flags: StringLiteralFlags,
 }
 
 impl Ranged for StringLiteral {
@@ -1398,7 +1728,7 @@ impl Deref for StringLiteral {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        self.value.as_str()
+        &self.value
     }
 }
 
@@ -1426,14 +1756,16 @@ struct ConcatenatedStringLiteral {
     /// Each string literal that makes up the concatenated string.
     strings: Vec<StringLiteral>,
     /// The concatenated string value.
-    value: OnceCell<String>,
+    value: OnceCell<Box<str>>,
 }
 
 impl ConcatenatedStringLiteral {
     /// Extracts a string slice containing the entire concatenated string.
     fn to_str(&self) -> &str {
-        self.value
-            .get_or_init(|| self.strings.iter().map(StringLiteral::as_str).collect())
+        self.value.get_or_init(|| {
+            let concatenated: String = self.strings.iter().map(StringLiteral::as_str).collect();
+            concatenated.into_boxed_str()
+        })
     }
 }
 
@@ -1600,12 +1932,149 @@ impl Default for BytesLiteralValueInner {
     }
 }
 
+bitflags! {
+    #[derive(Default, Copy, Clone, PartialEq, Eq, Hash)]
+    struct BytesLiteralFlagsInner: u8 {
+        /// The bytestring uses double quotes (e.g. `b"foo"`).
+        /// If this flag is not set, the bytestring uses single quotes (e.g. `b'foo'`).
+        const DOUBLE = 1 << 0;
+
+        /// The bytestring is triple-quoted (e.g. `b"""foo"""`):
+        /// it begins and ends with three consecutive quote characters.
+        const TRIPLE_QUOTED = 1 << 1;
+
+        /// The bytestring has an `r` prefix (e.g. `rb"foo"`),
+        /// meaning it is a raw bytestring with a lowercase 'r'.
+        const R_PREFIX_LOWER = 1 << 2;
+
+        /// The bytestring has an `R` prefix (e.g. `Rb"foo"`),
+        /// meaning it is a raw bytestring with an uppercase 'R'.
+        /// See https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
+        /// for why we track the casing of the `r` prefix, but not for any other prefix
+        const R_PREFIX_UPPER = 1 << 3;
+    }
+}
+
+/// Enumeration of the valid prefixes a bytestring literal can have.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum ByteStringPrefix {
+    /// Just a regular bytestring with no other prefixes, e.g. `b"foo"`
+    Regular,
+
+    /// A "raw" bytestring, that has an `r` or `R` prefix,
+    /// e.g. `Rb"foo"` or `rb"foo"`
+    Raw { uppercase_r: bool },
+}
+
+impl ByteStringPrefix {
+    /// Return a `str` representation of the prefix
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Regular => "b",
+            Self::Raw { uppercase_r: true } => "Rb",
+            Self::Raw { uppercase_r: false } => "rb",
+        }
+    }
+
+    /// Return true if this prefix indicates a "raw bytestring",
+    /// e.g. `rb"foo"` or `Rb"foo"`
+    pub const fn is_raw(self) -> bool {
+        matches!(self, Self::Raw { .. })
+    }
+}
+
+impl fmt::Display for ByteStringPrefix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Flags that can be queried to obtain information
+/// regarding the prefixes and quotes used for a bytes literal.
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct BytesLiteralFlags(BytesLiteralFlagsInner);
+
+impl BytesLiteralFlags {
+    #[must_use]
+    pub fn with_double_quotes(mut self) -> Self {
+        self.0 |= BytesLiteralFlagsInner::DOUBLE;
+        self
+    }
+
+    #[must_use]
+    pub fn with_triple_quotes(mut self) -> Self {
+        self.0 |= BytesLiteralFlagsInner::TRIPLE_QUOTED;
+        self
+    }
+
+    #[must_use]
+    pub fn with_prefix(self, prefix: ByteStringPrefix) -> Self {
+        let BytesLiteralFlags(flags) = self;
+        match prefix {
+            ByteStringPrefix::Regular => Self(
+                flags
+                    - BytesLiteralFlagsInner::R_PREFIX_LOWER
+                    - BytesLiteralFlagsInner::R_PREFIX_UPPER,
+            ),
+            ByteStringPrefix::Raw { uppercase_r: true } => Self(
+                (flags | BytesLiteralFlagsInner::R_PREFIX_UPPER)
+                    - BytesLiteralFlagsInner::R_PREFIX_LOWER,
+            ),
+            ByteStringPrefix::Raw { uppercase_r: false } => Self(
+                (flags | BytesLiteralFlagsInner::R_PREFIX_LOWER)
+                    - BytesLiteralFlagsInner::R_PREFIX_UPPER,
+            ),
+        }
+    }
+
+    pub const fn prefix(self) -> ByteStringPrefix {
+        if self.0.contains(BytesLiteralFlagsInner::R_PREFIX_LOWER) {
+            debug_assert!(!self.0.contains(BytesLiteralFlagsInner::R_PREFIX_UPPER));
+            ByteStringPrefix::Raw { uppercase_r: false }
+        } else if self.0.contains(BytesLiteralFlagsInner::R_PREFIX_UPPER) {
+            ByteStringPrefix::Raw { uppercase_r: true }
+        } else {
+            ByteStringPrefix::Regular
+        }
+    }
+
+    /// Return `true` if the bytestring is triple-quoted, i.e.,
+    /// it begins and ends with three consecutive quote characters.
+    /// For example: `b"""{bar}"""`
+    pub const fn is_triple_quoted(self) -> bool {
+        self.0.contains(BytesLiteralFlagsInner::TRIPLE_QUOTED)
+    }
+
+    /// Return the quoting style (single or double quotes)
+    /// used by the bytestring's opener and closer:
+    /// - `b"a"` -> `QuoteStyle::Double`
+    /// - `b'a'` -> `QuoteStyle::Single`
+    pub const fn quote_style(self) -> Quote {
+        if self.0.contains(BytesLiteralFlagsInner::DOUBLE) {
+            Quote::Double
+        } else {
+            Quote::Single
+        }
+    }
+}
+
+impl fmt::Debug for BytesLiteralFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BytesLiteralFlags")
+            .field("quote_style", &self.quote_style())
+            .field("prefix", &self.prefix())
+            .field("triple_quoted", &self.is_triple_quoted())
+            .finish()
+    }
+}
+
 /// An AST node that represents a single bytes literal which is part of an
 /// [`ExprBytesLiteral`].
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct BytesLiteral {
     pub range: TextRange,
-    pub value: Vec<u8>,
+    pub value: Box<[u8]>,
+    pub flags: BytesLiteralFlags,
 }
 
 impl Ranged for BytesLiteral {
@@ -1618,7 +2087,7 @@ impl Deref for BytesLiteral {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        self.value.as_slice()
+        &self.value
     }
 }
 
@@ -1794,42 +2263,14 @@ pub struct ExprTuple {
     pub range: TextRange,
     pub elts: Vec<Expr>,
     pub ctx: ExprContext,
+
+    /// Whether the tuple is parenthesized in the source code.
+    pub parenthesized: bool,
 }
 
 impl From<ExprTuple> for Expr {
     fn from(payload: ExprTuple) -> Self {
         Expr::Tuple(payload)
-    }
-}
-
-impl ExprTuple {
-    /// Return `true` if a tuple is parenthesized in the source code.
-    pub fn is_parenthesized(&self, source: &str) -> bool {
-        let Some(elt) = self.elts.first() else {
-            return true;
-        };
-
-        // Count the number of open parentheses between the start of the tuple and the first element.
-        let open_parentheses_count =
-            SimpleTokenizer::new(source, TextRange::new(self.start(), elt.start()))
-                .skip_trivia()
-                .filter(|token| token.kind() == SimpleTokenKind::LParen)
-                .count();
-        if open_parentheses_count == 0 {
-            return false;
-        }
-
-        // Count the number of parentheses between the end of the first element and its trailing comma.
-        let close_parentheses_count =
-            SimpleTokenizer::new(source, TextRange::new(elt.end(), self.end()))
-                .skip_trivia()
-                .take_while(|token| token.kind() != SimpleTokenKind::Comma)
-                .filter(|token| token.kind() == SimpleTokenKind::RParen)
-                .count();
-
-        // If the number of open parentheses is greater than the number of close parentheses, the tuple
-        // is parenthesized.
-        open_parentheses_count > close_parentheses_count
     }
 }
 
@@ -2985,8 +3426,8 @@ pub struct ParameterWithDefault {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arguments {
     pub range: TextRange,
-    pub args: Vec<Expr>,
-    pub keywords: Vec<Keyword>,
+    pub args: Box<[Expr]>,
+    pub keywords: Box<[Keyword]>,
 }
 
 /// An entry in the argument list of a function call.
@@ -3560,7 +4001,7 @@ impl Ranged for crate::nodes::ExprBoolOp {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprNamedExpr {
+impl Ranged for crate::nodes::ExprNamed {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -3580,7 +4021,7 @@ impl Ranged for crate::nodes::ExprLambda {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprIfExp {
+impl Ranged for crate::nodes::ExprIf {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -3610,7 +4051,7 @@ impl Ranged for crate::nodes::ExprDictComp {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprGeneratorExp {
+impl Ranged for crate::nodes::ExprGenerator {
     fn range(&self) -> TextRange {
         self.range
     }
@@ -3689,17 +4130,17 @@ impl Ranged for crate::Expr {
     fn range(&self) -> TextRange {
         match self {
             Self::BoolOp(node) => node.range(),
-            Self::NamedExpr(node) => node.range(),
+            Self::Named(node) => node.range(),
             Self::BinOp(node) => node.range(),
             Self::UnaryOp(node) => node.range(),
             Self::Lambda(node) => node.range(),
-            Self::IfExp(node) => node.range(),
+            Self::If(node) => node.range(),
             Self::Dict(node) => node.range(),
             Self::Set(node) => node.range(),
             Self::ListComp(node) => node.range(),
             Self::SetComp(node) => node.range(),
             Self::DictComp(node) => node.range(),
-            Self::GeneratorExp(node) => node.range(),
+            Self::Generator(node) => node.range(),
             Self::Await(node) => node.range(),
             Self::Yield(node) => node.range(),
             Self::YieldFrom(node) => node.range(),
@@ -3880,18 +4321,55 @@ impl Ranged for crate::nodes::ParameterWithDefault {
     }
 }
 
-#[cfg(target_pointer_width = "64")]
-mod size_assertions {
-    use static_assertions::assert_eq_size;
-
+#[cfg(test)]
+mod tests {
     #[allow(clippy::wildcard_imports)]
     use super::*;
 
-    assert_eq_size!(Stmt, [u8; 144]);
-    assert_eq_size!(StmtFunctionDef, [u8; 144]);
-    assert_eq_size!(StmtClassDef, [u8; 104]);
-    assert_eq_size!(StmtTry, [u8; 112]);
-    assert_eq_size!(Expr, [u8; 80]);
-    assert_eq_size!(Pattern, [u8; 96]);
-    assert_eq_size!(Mod, [u8; 32]);
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn size() {
+        assert!(std::mem::size_of::<Stmt>() <= 144);
+        assert!(std::mem::size_of::<StmtFunctionDef>() <= 144);
+        assert!(std::mem::size_of::<StmtClassDef>() <= 104);
+        assert!(std::mem::size_of::<StmtTry>() <= 112);
+        assert!(std::mem::size_of::<Mod>() <= 32);
+        // 96 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<Pattern>(), 88 | 96));
+
+        assert_eq!(std::mem::size_of::<Expr>(), 64);
+        assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
+        assert_eq!(std::mem::size_of::<ExprAwait>(), 16);
+        assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
+        assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 12);
+        assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 40);
+        assert_eq!(std::mem::size_of::<ExprCall>(), 56);
+        assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
+        assert_eq!(std::mem::size_of::<ExprDict>(), 56);
+        assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
+        assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 8);
+        // 56 for Rustc < 1.76
+        assert!(matches!(std::mem::size_of::<ExprFString>(), 48 | 56));
+        assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
+        assert_eq!(std::mem::size_of::<ExprIf>(), 32);
+        assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
+        assert_eq!(std::mem::size_of::<ExprLambda>(), 24);
+        assert_eq!(std::mem::size_of::<ExprList>(), 40);
+        assert_eq!(std::mem::size_of::<ExprListComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprName>(), 40);
+        assert_eq!(std::mem::size_of::<ExprNamed>(), 24);
+        assert_eq!(std::mem::size_of::<ExprNoneLiteral>(), 8);
+        assert_eq!(std::mem::size_of::<ExprNumberLiteral>(), 32);
+        assert_eq!(std::mem::size_of::<ExprSet>(), 32);
+        assert_eq!(std::mem::size_of::<ExprSetComp>(), 40);
+        assert_eq!(std::mem::size_of::<ExprSlice>(), 32);
+        assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
+        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 48);
+        assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
+        assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
+        assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
+        assert_eq!(std::mem::size_of::<ExprYield>(), 16);
+        assert_eq!(std::mem::size_of::<ExprYieldFrom>(), 16);
+    }
 }

@@ -73,8 +73,8 @@ pub fn format_range(
 
     let (tokens, comment_ranges) =
         tokens_and_ranges(source, options.source_type()).map_err(|err| ParseError {
-            offset: err.location,
-            error: ParseErrorType::Lexical(err.error),
+            offset: err.location(),
+            error: ParseErrorType::Lexical(err.into_error()),
         })?;
 
     assert_valid_char_boundaries(range, source);
@@ -214,9 +214,9 @@ impl<'ast> PreorderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
         // Don't pick potential docstrings as the closest enclosing node because `suite.rs` than fails to identify them as
         // docstrings and docstring formatting won't kick in.
         // Format the enclosing node instead and slice the formatted docstring from the result.
-        let is_maybe_docstring = node
-            .as_stmt_expr()
-            .is_some_and(|stmt| DocstringStmt::is_docstring_statement(stmt));
+        let is_maybe_docstring = node.as_stmt_expr().is_some_and(|stmt| {
+            DocstringStmt::is_docstring_statement(stmt, self.context.options().source_type())
+        });
 
         if is_maybe_docstring {
             return TraversalSignal::Skip;
@@ -648,17 +648,17 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
             AnyNodeRef::ElifElseClause(node) => node.format().fmt(f),
 
             AnyNodeRef::ExprBoolOp(_)
-            | AnyNodeRef::ExprNamedExpr(_)
+            | AnyNodeRef::ExprNamed(_)
             | AnyNodeRef::ExprBinOp(_)
             | AnyNodeRef::ExprUnaryOp(_)
             | AnyNodeRef::ExprLambda(_)
-            | AnyNodeRef::ExprIfExp(_)
+            | AnyNodeRef::ExprIf(_)
             | AnyNodeRef::ExprDict(_)
             | AnyNodeRef::ExprSet(_)
             | AnyNodeRef::ExprListComp(_)
             | AnyNodeRef::ExprSetComp(_)
             | AnyNodeRef::ExprDictComp(_)
-            | AnyNodeRef::ExprGeneratorExp(_)
+            | AnyNodeRef::ExprGenerator(_)
             | AnyNodeRef::ExprAwait(_)
             | AnyNodeRef::ExprYield(_)
             | AnyNodeRef::ExprYieldFrom(_)
@@ -666,6 +666,7 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::FStringExpressionElement(_)
             | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringFormatSpec(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)

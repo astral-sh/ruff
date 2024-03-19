@@ -129,6 +129,11 @@ impl LineIndex {
         self.line_starts().len()
     }
 
+    /// Returns `true` if the text only consists of ASCII characters
+    pub fn is_ascii(&self) -> bool {
+        self.kind().is_ascii()
+    }
+
     /// Returns the row number for a given offset.
     ///
     /// ## Examples
@@ -212,6 +217,34 @@ impl LineIndex {
                 self.line_start(line, contents),
                 self.line_start(line.saturating_add(1), contents),
             )
+        }
+    }
+
+    /// Returns the [byte offset](TextSize) at `line` and `column`.
+    pub fn offset(&self, line: OneIndexed, column: OneIndexed, contents: &str) -> TextSize {
+        // If start-of-line position after last line
+        if line.to_zero_indexed() > self.line_starts().len() {
+            return contents.text_len();
+        }
+
+        let line_range = self.line_range(line, contents);
+
+        match self.kind() {
+            IndexKind::Ascii => {
+                line_range.start()
+                    + TextSize::try_from(column.get())
+                        .unwrap_or(line_range.len())
+                        .clamp(TextSize::new(0), line_range.len())
+            }
+            IndexKind::Utf8 => {
+                let rest = &contents[line_range];
+                let column_offset: TextSize = rest
+                    .chars()
+                    .take(column.get())
+                    .map(ruff_text_size::TextLen::text_len)
+                    .sum();
+                line_range.start() + column_offset
+            }
         }
     }
 

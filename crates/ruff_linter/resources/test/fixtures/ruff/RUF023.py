@@ -188,6 +188,10 @@ class BezierBuilder4:
         ,
     )
 
+    __slots__ = {"foo", "bar",
+                 "baz", "bingo"
+                 }
+
 ###################################
 # These should all not get flagged:
 ###################################

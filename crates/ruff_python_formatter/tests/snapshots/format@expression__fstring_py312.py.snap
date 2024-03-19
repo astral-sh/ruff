@@ -1,0 +1,51 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/fstring_py312.py
+---
+## Input
+```python
+# This file contains test cases only for cases where the logic tests for whether
+# the target version is 3.12 or later. A user can have 3.12 syntax even if the target
+# version isn't set.
+
+# Quotes reuse
+f"{'a'}"
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py312
+source_type                = Python
+```
+
+```python
+# This file contains test cases only for cases where the logic tests for whether
+# the target version is 3.12 or later. A user can have 3.12 syntax even if the target
+# version isn't set.
+
+# Quotes reuse
+f"{'a'}"
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -3,4 +3,4 @@
+ # version isn't set.
+ 
+ # Quotes reuse
+-f"{'a'}"
++f"{"a"}"
+```

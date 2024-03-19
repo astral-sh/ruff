@@ -1,9 +1,8 @@
-use ruff_python_ast::{self as ast, Decorator, Expr, ParameterWithDefault, Parameters};
-
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::collect_call_path;
+use ruff_python_ast::name::UnqualifiedName;
+use ruff_python_ast::{self as ast, Decorator, Expr, ParameterWithDefault, Parameters};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -136,8 +135,8 @@ pub(crate) fn boolean_type_hint_positional_argument(
 
         // Allow Boolean type hints in setters.
         if decorator_list.iter().any(|decorator| {
-            collect_call_path(&decorator.expression)
-                .is_some_and(|call_path| call_path.as_slice() == [name, "setter"])
+            UnqualifiedName::from_expr(&decorator.expression)
+                .is_some_and(|unqualified_name| unqualified_name.segments() == [name, "setter"])
         }) {
             return;
         }
@@ -196,11 +195,10 @@ fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel)
                 return false;
             }
 
-            let call_path = semantic.resolve_call_path(value);
-            if call_path
-                .as_ref()
-                .is_some_and(|call_path| semantic.match_typing_call_path(call_path, "Union"))
-            {
+            let qualified_name = semantic.resolve_qualified_name(value);
+            if qualified_name.as_ref().is_some_and(|qualified_name| {
+                semantic.match_typing_qualified_name(qualified_name, "Union")
+            }) {
                 if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                     elts.iter()
                         .any(|elt| match_annotation_to_complex_bool(elt, semantic))
@@ -208,10 +206,9 @@ fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel)
                     // Union with a single type is an invalid type annotation
                     false
                 }
-            } else if call_path
-                .as_ref()
-                .is_some_and(|call_path| semantic.match_typing_call_path(call_path, "Optional"))
-            {
+            } else if qualified_name.as_ref().is_some_and(|qualified_name| {
+                semantic.match_typing_qualified_name(qualified_name, "Optional")
+            }) {
                 match_annotation_to_complex_bool(slice, semantic)
             } else {
                 false

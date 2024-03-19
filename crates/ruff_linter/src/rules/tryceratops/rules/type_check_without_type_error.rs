@@ -1,7 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtIf};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -50,11 +52,8 @@ struct ControlFlowVisitor<'a> {
     continues: Vec<&'a Stmt>,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for ControlFlowVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> StatementVisitor<'a> for ControlFlowVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
@@ -78,10 +77,10 @@ fn has_control_flow(stmt: &Stmt) -> bool {
 fn check_type_check_call(checker: &mut Checker, call: &Expr) -> bool {
     checker
         .semantic()
-        .resolve_call_path(call)
-        .is_some_and(|call_path| {
+        .resolve_qualified_name(call)
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.as_slice(),
+                qualified_name.segments(),
                 ["", "isinstance" | "issubclass" | "callable"]
             )
         })
@@ -99,14 +98,35 @@ fn check_type_check_test(checker: &mut Checker, test: &Expr) -> bool {
     }
 }
 
-/// Returns `true` if `exc` is a reference to a builtin exception.
-fn is_builtin_exception(checker: &mut Checker, exc: &Expr) -> bool {
-    return checker
-        .semantic()
-        .resolve_call_path(exc)
-        .is_some_and(|call_path| {
+fn check_raise(checker: &mut Checker, exc: &Expr, item: &Stmt) {
+    if is_builtin_exception(exc, checker.semantic()) {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(TypeCheckWithoutTypeError, item.range()));
+    }
+}
+
+/// Search the body of an if-condition for raises.
+fn check_body(checker: &mut Checker, body: &[Stmt]) {
+    for item in body {
+        if has_control_flow(item) {
+            return;
+        }
+        if let Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) = &item {
+            check_raise(checker, exc, item);
+        }
+    }
+}
+
+/// Returns `true` if the given expression is a builtin exception.
+///
+/// This function only matches to a subset of the builtin exceptions, and omits `TypeError`.
+fn is_builtin_exception(expr: &Expr, semantic: &SemanticModel) -> bool {
+    semantic
+        .resolve_qualified_name(map_callable(expr))
+        .is_some_and(|qualified_name| {
             matches!(
-                call_path.as_slice(),
+                qualified_name.segments(),
                 [
                     "",
                     "ArithmeticError"
@@ -126,42 +146,7 @@ fn is_builtin_exception(checker: &mut Checker, exc: &Expr) -> bool {
                         | "ValueError"
                 ]
             )
-        });
-}
-
-/// Returns `true` if an [`Expr`] is a reference to a builtin exception.
-fn check_raise_type(checker: &mut Checker, exc: &Expr) -> bool {
-    match exc {
-        Expr::Name(_) => is_builtin_exception(checker, exc),
-        Expr::Call(ast::ExprCall { func, .. }) => {
-            if let Expr::Name(_) = func.as_ref() {
-                is_builtin_exception(checker, func)
-            } else {
-                false
-            }
-        }
-        _ => false,
-    }
-}
-
-fn check_raise(checker: &mut Checker, exc: &Expr, item: &Stmt) {
-    if check_raise_type(checker, exc) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(TypeCheckWithoutTypeError, item.range()));
-    }
-}
-
-/// Search the body of an if-condition for raises.
-fn check_body(checker: &mut Checker, body: &[Stmt]) {
-    for item in body {
-        if has_control_flow(item) {
-            return;
-        }
-        if let Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) = &item {
-            check_raise(checker, exc, item);
-        }
-    }
+        })
 }
 
 /// TRY004

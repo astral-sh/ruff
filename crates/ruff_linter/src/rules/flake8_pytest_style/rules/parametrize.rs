@@ -103,9 +103,9 @@ impl Violation for PytestParametrizeNamesWrongType {
 /// of values.
 ///
 /// The style for the list of values rows can be configured via the
-/// the [`lint.flake8-pytest-style.parametrize-values-type`] setting, while the
+/// [`lint.flake8-pytest-style.parametrize-values-type`] setting, while the
 /// style for each row of values can be configured via the
-/// the [`lint.flake8-pytest-style.parametrize-values-row-type`] setting.
+/// [`lint.flake8-pytest-style.parametrize-values-row-type`] setting.
 ///
 /// For example, [`lint.flake8-pytest-style.parametrize-values-type`] will lead to
 /// the following expectations:
@@ -182,10 +182,17 @@ pub struct PytestParametrizeValuesWrongType {
 }
 
 impl Violation for PytestParametrizeValuesWrongType {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let PytestParametrizeValuesWrongType { values, row } = self;
         format!("Wrong values type in `@pytest.mark.parametrize` expected `{values}` of `{row}`")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let PytestParametrizeValuesWrongType { values, row } = self;
+        Some(format!("Use `{values}` of `{row}` for parameter values"))
     }
 }
 
@@ -257,15 +264,18 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
     }
 
     let node = Expr::from(ast::StringLiteral {
-        value: elts.iter().fold(String::new(), |mut acc, elt| {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
-                if !acc.is_empty() {
-                    acc.push(',');
+        value: elts
+            .iter()
+            .fold(String::new(), |mut acc, elt| {
+                if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
+                    if !acc.is_empty() {
+                        acc.push(',');
+                    }
+                    acc.push_str(value.to_str());
                 }
-                acc.push_str(value.to_str());
-            }
-            acc
-        }),
+                acc
+            })
+            .into_boxed_str(),
         ..ast::StringLiteral::default()
     });
     Some(generator.expr(&node))
@@ -327,13 +337,14 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 .iter()
                                 .map(|name| {
                                     Expr::from(ast::StringLiteral {
-                                        value: (*name).to_string(),
+                                        value: (*name).to_string().into_boxed_str(),
                                         ..ast::StringLiteral::default()
                                     })
                                 })
                                 .collect(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            parenthesized: true,
                         });
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             format!("({})", checker.generator().expr(&node)),
@@ -360,7 +371,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 .iter()
                                 .map(|name| {
                                     Expr::from(ast::StringLiteral {
-                                        value: (*name).to_string(),
+                                        value: (*name).to_string().into_boxed_str(),
                                         ..ast::StringLiteral::default()
                                     })
                                 })
@@ -441,6 +452,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             elts: elts.clone(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            parenthesized: true,
                         });
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             format!("({})", checker.generator().expr(&node)),
@@ -488,13 +500,46 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
     match values {
         Expr::List(ast::ExprList { elts, .. }) => {
             if values_type != types::ParametrizeValuesType::List {
-                checker.diagnostics.push(Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
                     },
                     values.range(),
-                ));
+                );
+                diagnostic.set_fix({
+                    // Determine whether the last element has a trailing comma. Single-element
+                    // tuples _require_ a trailing comma, so this is a single-element list
+                    // _without_ a trailing comma, we need to insert one.
+                    let needs_trailing_comma = if let [item] = elts.as_slice() {
+                        SimpleTokenizer::new(
+                            checker.locator().contents(),
+                            TextRange::new(item.end(), values.end()),
+                        )
+                        .all(|token| token.kind != SimpleTokenKind::Comma)
+                    } else {
+                        false
+                    };
+
+                    // Replace `[` with `(`.
+                    let values_start = Edit::replacement(
+                        "(".into(),
+                        values.start(),
+                        values.start() + TextSize::from(1),
+                    );
+                    // Replace `]` with `)` or `,)`.
+                    let values_end = Edit::replacement(
+                        if needs_trailing_comma {
+                            "),".into()
+                        } else {
+                            ")".into()
+                        },
+                        values.end() - TextSize::from(1),
+                        values.end(),
+                    );
+                    Fix::unsafe_edits(values_start, [values_end])
+                });
+                checker.diagnostics.push(diagnostic);
             }
 
             if is_multi_named {
@@ -503,14 +548,48 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
         }
         Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             if values_type != types::ParametrizeValuesType::Tuple {
-                checker.diagnostics.push(Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
                     },
                     values.range(),
-                ));
+                );
+                diagnostic.set_fix({
+                    // Determine whether a trailing comma is present due to the _requirement_
+                    // that a single-element tuple must have a trailing comma, e.g., `(1,)`.
+                    //
+                    // If the trailing comma is on its own line, we intentionally ignore it,
+                    // since the expression is already split over multiple lines, as in:
+                    // ```python
+                    // @pytest.mark.parametrize(
+                    //     (
+                    //         "x",
+                    //     ),
+                    // )
+                    // ```
+                    let has_trailing_comma = elts.len() == 1
+                        && checker.locator().up_to(values.end()).chars().rev().nth(1) == Some(',');
+
+                    // Replace `(` with `[`.
+                    let values_start = Edit::replacement(
+                        "[".into(),
+                        values.start(),
+                        values.start() + TextSize::from(1),
+                    );
+                    // Replace `)` or `,)` with `]`.
+                    let start = if has_trailing_comma {
+                        values.end() - TextSize::from(2)
+                    } else {
+                        values.end() - TextSize::from(1)
+                    };
+                    let values_end = Edit::replacement("]".into(), start, values.end());
+
+                    Fix::unsafe_edits(values_start, [values_end])
+                });
+                checker.diagnostics.push(diagnostic);
             }
+
             if is_multi_named {
                 handle_value_rows(checker, elts, values_type, values_row_type);
             }
@@ -599,26 +678,91 @@ fn handle_value_rows(
 ) {
     for elt in elts {
         match elt {
-            Expr::Tuple(_) => {
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 if values_row_type != types::ParametrizeValuesRowType::Tuple {
-                    checker.diagnostics.push(Diagnostic::new(
+                    let mut diagnostic = Diagnostic::new(
                         PytestParametrizeValuesWrongType {
                             values: values_type,
                             row: values_row_type,
                         },
                         elt.range(),
-                    ));
+                    );
+                    diagnostic.set_fix({
+                        // Determine whether a trailing comma is present due to the _requirement_
+                        // that a single-element tuple must have a trailing comma, e.g., `(1,)`.
+                        //
+                        // If the trailing comma is on its own line, we intentionally ignore it,
+                        // since the expression is already split over multiple lines, as in:
+                        // ```python
+                        // @pytest.mark.parametrize(
+                        //     (
+                        //         "x",
+                        //     ),
+                        // )
+                        // ```
+                        let has_trailing_comma = elts.len() == 1
+                            && checker.locator().up_to(elt.end()).chars().rev().nth(1) == Some(',');
+
+                        // Replace `(` with `[`.
+                        let elt_start = Edit::replacement(
+                            "[".into(),
+                            elt.start(),
+                            elt.start() + TextSize::from(1),
+                        );
+                        // Replace `)` or `,)` with `]`.
+                        let start = if has_trailing_comma {
+                            elt.end() - TextSize::from(2)
+                        } else {
+                            elt.end() - TextSize::from(1)
+                        };
+                        let elt_end = Edit::replacement("]".into(), start, elt.end());
+                        Fix::unsafe_edits(elt_start, [elt_end])
+                    });
+                    checker.diagnostics.push(diagnostic);
                 }
             }
-            Expr::List(_) => {
+            Expr::List(ast::ExprList { elts, .. }) => {
                 if values_row_type != types::ParametrizeValuesRowType::List {
-                    checker.diagnostics.push(Diagnostic::new(
+                    let mut diagnostic = Diagnostic::new(
                         PytestParametrizeValuesWrongType {
                             values: values_type,
                             row: values_row_type,
                         },
                         elt.range(),
-                    ));
+                    );
+                    diagnostic.set_fix({
+                        // Determine whether the last element has a trailing comma. Single-element
+                        // tuples _require_ a trailing comma, so this is a single-element list
+                        // _without_ a trailing comma, we need to insert one.
+                        let needs_trailing_comma = if let [item] = elts.as_slice() {
+                            SimpleTokenizer::new(
+                                checker.locator().contents(),
+                                TextRange::new(item.end(), elt.end()),
+                            )
+                            .all(|token| token.kind != SimpleTokenKind::Comma)
+                        } else {
+                            false
+                        };
+
+                        // Replace `[` with `(`.
+                        let elt_start = Edit::replacement(
+                            "(".into(),
+                            elt.start(),
+                            elt.start() + TextSize::from(1),
+                        );
+                        // Replace `]` with `)` or `,)`.
+                        let elt_end = Edit::replacement(
+                            if needs_trailing_comma {
+                                ",)".into()
+                            } else {
+                                ")".into()
+                            },
+                            elt.end() - TextSize::from(1),
+                            elt.end(),
+                        );
+                        Fix::unsafe_edits(elt_start, [elt_end])
+                    });
+                    checker.diagnostics.push(diagnostic);
                 }
             }
             _ => {}
@@ -635,17 +779,17 @@ pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Decorator]) {
             }) = &decorator.expression
             {
                 if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
-                    if let [names, ..] = args.as_slice() {
+                    if let [names, ..] = &**args {
                         check_names(checker, decorator, names);
                     }
                 }
                 if checker.enabled(Rule::PytestParametrizeValuesWrongType) {
-                    if let [names, values, ..] = args.as_slice() {
+                    if let [names, values, ..] = &**args {
                         check_values(checker, names, values);
                     }
                 }
                 if checker.enabled(Rule::PytestDuplicateParametrizeTestCases) {
-                    if let [_, values, ..] = args.as_slice() {
+                    if let [_, values, ..] = &**args {
                         check_duplicates(checker, values);
                     }
                 }

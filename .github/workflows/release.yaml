@@ -52,13 +52,13 @@ jobs:
           ruff --help
           python -m ruff --help
       - name: "Upload sdist"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-sdist
           path: dist
 
   macos-x86_64:
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -74,10 +74,15 @@ jobs:
         with:
           target: x86_64
           args: --release --locked --out dist
+      - name: "Test wheel - x86_64"
+        run: |
+          pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
+          ruff --help
+          python -m ruff --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-macos-x86_64
           path: dist
       - name: "Archive binary"
         run: |
@@ -85,15 +90,15 @@ jobs:
           tar czvf $ARCHIVE_FILE -C target/x86_64-apple-darwin/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: binaries
+          name: binaries-macos-x86_64
           path: |
             *.tar.gz
             *.sha256
 
   macos-universal:
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -114,9 +119,9 @@ jobs:
           ruff --help
           python -m ruff --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-aarch64-apple-darwin
           path: dist
       - name: "Archive binary"
         run: |
@@ -124,9 +129,9 @@ jobs:
           tar czvf $ARCHIVE_FILE -C target/aarch64-apple-darwin/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: binaries
+          name: binaries-aarch64-apple-darwin
           path: |
             *.tar.gz
             *.sha256
@@ -165,9 +170,9 @@ jobs:
           ruff --help
           python -m ruff --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-${{ matrix.platform.target }}
           path: dist
       - name: "Archive binary"
         shell: bash
@@ -176,9 +181,9 @@ jobs:
           7z a $ARCHIVE_FILE ./target/${{ matrix.platform.target }}/release/ruff.exe
           sha256sum $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: binaries
+          name: binaries-${{ matrix.platform.target }}
           path: |
             *.zip
             *.sha256
@@ -213,9 +218,9 @@ jobs:
           ruff --help
           python -m ruff --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-${{ matrix.target }}
           path: dist
       - name: "Archive binary"
         run: |
@@ -223,9 +228,9 @@ jobs:
           tar czvf $ARCHIVE_FILE -C target/${{ matrix.target }}/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: binaries
+          name: binaries-${{ matrix.target }}
           path: |
             *.tar.gz
             *.sha256
@@ -246,8 +251,12 @@ jobs:
             arch: s390x
           - target: powerpc64le-unknown-linux-gnu
             arch: ppc64le
+            # see https://github.com/astral-sh/ruff/issues/10073
+            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: powerpc64-unknown-linux-gnu
             arch: ppc64
+            # see https://github.com/astral-sh/ruff/issues/10073
+            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
 
     steps:
       - uses: actions/checkout@v4
@@ -280,9 +289,9 @@ jobs:
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
             ruff --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-${{ matrix.platform.target }}
           path: dist
       - name: "Archive binary"
         run: |
@@ -290,9 +299,9 @@ jobs:
           tar czvf $ARCHIVE_FILE -C target/${{ matrix.platform.target }}/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: binaries
+          name: binaries-${{ matrix.platform.target }}
           path: |
             *.tar.gz
             *.sha256
@@ -332,9 +341,9 @@ jobs:
             .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
             .venv/bin/ruff check --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-${{ matrix.target }}
           path: dist
       - name: "Archive binary"
         run: |
@@ -342,9 +351,9 @@ jobs:
           tar czvf $ARCHIVE_FILE -C target/${{ matrix.target }}/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: binaries
+          name: binaries-${{ matrix.target }}
           path: |
             *.tar.gz
             *.sha256
@@ -389,9 +398,9 @@ jobs:
             .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
             .venv/bin/ruff check --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheels-${{ matrix.platform.target }}
           path: dist
       - name: "Archive binary"
         run: |
@@ -399,9 +408,9 @@ jobs:
           tar czvf $ARCHIVE_FILE -C target/${{ matrix.platform.target }}/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: binaries
+          name: binaries-${{ matrix.platform.target }}
           path: |
             *.tar.gz
             *.sha256
@@ -458,10 +467,11 @@ jobs:
       # For pypi trusted publishing
       id-token: write
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: wheels
+          pattern: wheels-*
           path: wheels
+          merge-multiple: true
       - name: Publish to PyPi
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
@@ -501,12 +511,13 @@ jobs:
       # For GitHub release publishing
       contents: write
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: binaries
+          pattern: binaries-*
           path: binaries
+          merge-multiple: true
       - name: "Publish to GitHub"
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           draft: true
           files: binaries/*

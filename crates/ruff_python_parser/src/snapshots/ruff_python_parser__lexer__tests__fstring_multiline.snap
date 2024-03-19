@@ -4,13 +4,27 @@ expression: lex_source(source)
 ---
 [
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: true,
+                quote_style: Double,
+            },
+        ),
         0..4,
     ),
     (
         FStringMiddle {
             value: "\nhello\n    world\n",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: true,
+                quote_style: Double,
+            },
         },
         4..21,
     ),
@@ -19,13 +33,27 @@ expression: lex_source(source)
         21..24,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: true,
+                quote_style: Single,
+            },
+        ),
         25..29,
     ),
     (
         FStringMiddle {
             value: "\n    world\nhello\n",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: true,
+                quote_style: Single,
+            },
         },
         29..46,
     ),
@@ -34,13 +62,27 @@ expression: lex_source(source)
         46..49,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: false,
+                quote_style: Double,
+            },
+        ),
         50..52,
     ),
     (
         FStringMiddle {
             value: "some ",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: false,
+                quote_style: Double,
+            },
         },
         52..57,
     ),
@@ -49,13 +91,27 @@ expression: lex_source(source)
         57..58,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: true,
+                quote_style: Double,
+            },
+        ),
         58..62,
     ),
     (
         FStringMiddle {
             value: "multiline\nallowed ",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: true,
+                quote_style: Double,
+            },
         },
         62..80,
     ),
@@ -84,7 +140,13 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " string",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: false,
+                quote_style: Double,
+            },
         },
         87..94,
     ),

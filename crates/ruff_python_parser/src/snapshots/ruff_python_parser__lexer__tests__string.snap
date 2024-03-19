@@ -6,72 +6,119 @@ expression: lex_source(source)
     (
         String {
             value: "double",
-            kind: String,
-            triple_quoted: false,
+            kind: StringKind {
+                prefix: Regular(
+                    Empty,
+                ),
+                triple_quoted: false,
+                quote_style: Double,
+            },
         },
         0..8,
     ),
     (
         String {
             value: "single",
-            kind: String,
-            triple_quoted: false,
+            kind: StringKind {
+                prefix: Regular(
+                    Empty,
+                ),
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         9..17,
     ),
     (
         String {
             value: "can\\'t",
-            kind: String,
-            triple_quoted: false,
+            kind: StringKind {
+                prefix: Regular(
+                    Empty,
+                ),
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         18..26,
     ),
     (
         String {
             value: "\\\\\\\"",
-            kind: String,
-            triple_quoted: false,
+            kind: StringKind {
+                prefix: Regular(
+                    Empty,
+                ),
+                triple_quoted: false,
+                quote_style: Double,
+            },
         },
         27..33,
     ),
     (
         String {
             value: "\\t\\r\\n",
-            kind: String,
-            triple_quoted: false,
+            kind: StringKind {
+                prefix: Regular(
+                    Empty,
+                ),
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         34..42,
     ),
     (
         String {
             value: "\\g",
-            kind: String,
-            triple_quoted: false,
+            kind: StringKind {
+                prefix: Regular(
+                    Empty,
+                ),
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         43..47,
     ),
     (
         String {
             value: "raw\\'",
-            kind: RawString,
-            triple_quoted: false,
+            kind: StringKind {
+                prefix: Regular(
+                    Raw {
+                        uppercase: false,
+                    },
+                ),
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         48..56,
     ),
     (
         String {
             value: "\\420",
-            kind: String,
-            triple_quoted: false,
+            kind: StringKind {
+                prefix: Regular(
+                    Empty,
+                ),
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         57..63,
     ),
     (
         String {
             value: "\\200\\0a",
-            kind: String,
-            triple_quoted: false,
+            kind: StringKind {
+                prefix: Regular(
+                    Empty,
+                ),
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         64..73,
     ),

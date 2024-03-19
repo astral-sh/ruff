@@ -4,8 +4,9 @@ use ruff_python_ast::StmtImportFrom;
 use ruff_text_size::Ranged;
 
 use crate::builders::{parenthesize_if_expands, PyFormatterExtensions, TrailingComma};
-use crate::comments::{SourceComment, SuppressionKind};
+use crate::comments::SourceComment;
 use crate::expression::parentheses::parenthesized;
+use crate::has_skip_comment;
 use crate::other::identifier::DotDelimitedIdentifier;
 use crate::prelude::*;
 
@@ -86,6 +87,6 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
         trailing_comments: &[SourceComment],
         context: &PyFormatContext,
     ) -> bool {
-        SuppressionKind::has_skip_comment(trailing_comments, context.source())
+        has_skip_comment(trailing_comments, context.source())
     }
 }

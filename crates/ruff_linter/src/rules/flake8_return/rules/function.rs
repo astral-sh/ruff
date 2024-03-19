@@ -151,7 +151,7 @@ impl AlwaysFixableViolation for ImplicitReturn {
 /// assigned variable.
 ///
 /// ## Why is this bad?
-/// The variable assignment is not necessary as the value can be returned
+/// The variable assignment is not necessary, as the value can be returned
 /// directly.
 ///
 /// ## Example
@@ -400,16 +400,19 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
 fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
     // First, look for known functions that never return from the standard library and popular
     // libraries.
-    if semantic.resolve_call_path(func).is_some_and(|call_path| {
-        matches!(
-            call_path.as_slice(),
-            ["" | "builtins" | "sys" | "_thread" | "pytest", "exit"]
-                | ["" | "builtins", "quit"]
-                | ["os" | "posix", "_exit" | "abort"]
-                | ["_winapi", "ExitProcess"]
-                | ["pytest", "fail" | "skip" | "xfail"]
-        ) || semantic.match_typing_call_path(&call_path, "assert_never")
-    }) {
+    if semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["" | "builtins" | "sys" | "_thread" | "pytest", "exit"]
+                    | ["" | "builtins", "quit"]
+                    | ["os" | "posix", "_exit" | "abort"]
+                    | ["_winapi", "ExitProcess"]
+                    | ["pytest", "fail" | "skip" | "xfail"]
+            ) || semantic.match_typing_qualified_name(&qualified_name, "assert_never")
+        })
+    {
         return true;
     }
 
@@ -430,11 +433,11 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    let Some(call_path) = semantic.resolve_call_path(returns) else {
+    let Some(qualified_name) = semantic.resolve_qualified_name(returns) else {
         return false;
     };
 
-    semantic.match_typing_call_path(&call_path, "NoReturn")
+    semantic.match_typing_qualified_name(&qualified_name, "NoReturn")
 }
 
 /// RET503

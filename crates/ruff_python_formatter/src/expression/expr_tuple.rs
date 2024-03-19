@@ -116,6 +116,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             elts,
             ctx: _,
             range: _,
+            parenthesized: is_parenthesized,
         } = item;
 
         let comments = f.context().comments().clone();
@@ -136,7 +137,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 return empty_parenthesized("(", dangling, ")").fmt(f);
             }
             [single] => match self.parentheses {
-                TupleParentheses::Preserve if !item.is_parenthesized(f.context().source()) => {
+                TupleParentheses::Preserve if !is_parenthesized => {
                     write!(f, [single.format(), token(",")])
                 }
                 _ =>
@@ -152,7 +153,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             //
             // Unlike other expression parentheses, tuple parentheses are part of the range of the
             // tuple itself.
-            _ if item.is_parenthesized(f.context().source())
+            _ if *is_parenthesized
                 && !(self.parentheses == TupleParentheses::NeverPreserve
                     && dangling.is_empty()) =>
             {

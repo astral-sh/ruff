@@ -44,7 +44,7 @@ sections.py:120:5: D413 [*] Missing blank line after last section ("Returns")
 122 122 |     Returns
 123 123 |     -------
 124 124 |     A value of some sort.
-    125 |+    
+    125 |+
 125 126 |     """
 126 127 | 
 127 128 | 
@@ -67,7 +67,7 @@ sections.py:170:5: D413 [*] Missing blank line after last section ("Returns")
 171 171 | 
 172 172 |     Returns
 173 173 |         -------
-    174 |+    
+    174 |+
 174 175 |     """
 175 176 | 
 176 177 | 
@@ -89,7 +89,7 @@ sections.py:519:5: D413 [*] Missing blank line after last section ("Parameters")
 520 520 | 
 521 521 |     Parameters
 522 522 |     ==========
-    523 |+    
+    523 |+
 523 524 |     """
 524 525 | 
 525 526 | 
@@ -111,7 +111,7 @@ sections.py:527:5: D413 [*] Missing blank line after last section ("Parameters")
 528 528 | 
 529 529 |     Parameters
 530 530 |     ===========
-    531 |+    
+    531 |+
 531 532 |     """
 532 533 | 
 533 534 | 
@@ -135,7 +135,7 @@ sections.py:548:5: D413 [*] Missing blank line after last section ("Args")
 551 551 |         Here's a note.
 552 552 | 
 553 553 |         returns:
-    554 |+    
+    554 |+
 554 555 |     """
 555 556 | 
 556 557 | 
@@ -159,7 +159,33 @@ sections.py:558:5: D413 [*] Missing blank line after last section ("Returns")
 561 561 |         Here's a note.
 562 562 | 
 563 563 |         Returns:
-    564 |+    
+    564 |+
 564 565 |     """
+565 566 | 
+566 567 | 
 
+sections.py:588:5: D413 [*] Missing blank line after last section ("Parameters")
+    |
+587 |   def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213
+588 |       """Test that lower case subsection header is valid even if it has the same name as section kind.
+    |  _____^
+589 | | 
+590 | |     Parameters:
+591 | |     ----------
+592 | |     parameters:
+593 | |         A list of string parameters
+594 | |     value:
+595 | |         Some value
+596 | |     """
+    | |_______^ D413
+    |
+    = help: Add blank line after "Parameters"
 
+ℹ Safe fix
+593 593 |         A list of string parameters
+594 594 |     value:
+595 595 |         Some value
+    596 |+
+596 597 |     """
+597 598 | 
+598 599 |

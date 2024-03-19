@@ -2,11 +2,13 @@
 
 use std::fs::File;
 use std::io::{self, stdout, BufWriter, Write};
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
 use anyhow::Result;
+use args::{GlobalConfigArgs, ServerCommand};
 use clap::CommandFactory;
 use colored::Colorize;
 use log::warn;
@@ -18,7 +20,7 @@ use ruff_linter::settings::types::SerializationFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
-use crate::args::{Args, CheckCommand, Command, FormatCommand, HelpFormat};
+use crate::args::{Args, CheckCommand, Command, FormatCommand};
 use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
@@ -114,20 +116,12 @@ fn resolve_default_files(files: Vec<PathBuf>, is_stdin: bool) -> Vec<PathBuf> {
     }
 }
 
-/// Get the actual value of the `format` desired from either `output_format`
-/// or `format`, and warn the user if they're using the deprecated form.
-fn resolve_help_output_format(output_format: HelpFormat, format: Option<HelpFormat>) -> HelpFormat {
-    if format.is_some() {
-        warn_user!("The `--format` argument is deprecated. Use `--output-format` instead.");
-    }
-    format.unwrap_or(output_format)
-}
-
 pub fn run(
     Args {
         command,
-        log_level_args,
+        global_options,
     }: Args,
+    deprecated_alias_warning: Option<&'static str>,
 ) -> Result<ExitStatus> {
     {
         let default_panic_hook = std::panic::take_hook();
@@ -155,8 +149,11 @@ pub fn run(
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
-    let log_level = LogLevel::from(&log_level_args);
-    set_up_logging(&log_level)?;
+    set_up_logging(global_options.log_level())?;
+
+    if let Some(deprecated_alias_warning) = deprecated_alias_warning {
+        warn_user!("{}", deprecated_alias_warning);
+    }
 
     match command {
         Command::Version { output_format } => {
@@ -166,10 +163,8 @@ pub fn run(
         Command::Rule {
             rule,
             all,
-            format,
-            mut output_format,
+            output_format,
         } => {
-            output_format = resolve_help_output_format(output_format, format);
             if all {
                 commands::rule::rules(output_format)?;
             }
@@ -182,48 +177,51 @@ pub fn run(
             commands::config::config(option.as_deref())?;
             Ok(ExitStatus::Success)
         }
-        Command::Linter {
-            format,
-            mut output_format,
-        } => {
-            output_format = resolve_help_output_format(output_format, format);
+        Command::Linter { output_format } => {
             commands::linter::linter(output_format)?;
             Ok(ExitStatus::Success)
         }
         Command::Clean => {
-            commands::clean::clean(log_level)?;
+            commands::clean::clean(global_options.log_level())?;
             Ok(ExitStatus::Success)
         }
         Command::GenerateShellCompletion { shell } => {
             shell.generate(&mut Args::command(), &mut stdout());
             Ok(ExitStatus::Success)
         }
-        Command::Check(args) => check(args, log_level),
-        Command::Format(args) => format(args, log_level),
+        Command::Check(args) => check(args, global_options),
+        Command::Format(args) => format(args, global_options),
+        Command::Server(args) => server(args, global_options.log_level()),
     }
 }
 
-fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    let (cli, overrides) = args.partition();
+fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
+    let (cli, config_arguments) = args.partition(global_options)?;
 
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
-        commands::format_stdin::format_stdin(&cli, &overrides)
+        commands::format_stdin::format_stdin(&cli, &config_arguments)
     } else {
-        commands::format::format(cli, &overrides, log_level)
+        commands::format::format(cli, &config_arguments)
     }
 }
 
-pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    let (cli, overrides) = args.partition();
+fn server(args: ServerCommand, log_level: LogLevel) -> Result<ExitStatus> {
+    let ServerCommand { preview } = args;
+    // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
+    let worker_threads = num_cpus::get().max(4);
+    commands::server::run_server(
+        preview,
+        NonZeroUsize::try_from(worker_threads).expect("a non-zero worker thread count"),
+        log_level,
+    )
+}
+
+pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
+    let (cli, config_arguments) = args.partition(global_options)?;
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let pyproject_config = resolve::resolve(
-        cli.isolated,
-        cli.config.as_deref(),
-        &overrides,
-        cli.stdin_filename.as_deref(),
-    )?;
+    let pyproject_config = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
 
     let mut writer: Box<dyn Write> = match cli.output_file {
         Some(path) if !cli.watch => {
@@ -239,11 +237,21 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     let files = resolve_default_files(cli.files, is_stdin);
 
     if cli.show_settings {
-        commands::show_settings::show_settings(&files, &pyproject_config, &overrides, &mut writer)?;
+        commands::show_settings::show_settings(
+            &files,
+            &pyproject_config,
+            &config_arguments,
+            &mut writer,
+        )?;
         return Ok(ExitStatus::Success);
     }
     if cli.show_files {
-        commands::show_files::show_files(&files, &pyproject_config, &overrides, &mut writer)?;
+        commands::show_files::show_files(
+            &files,
+            &pyproject_config,
+            &config_arguments,
+            &mut writer,
+        )?;
         return Ok(ExitStatus::Success);
     }
 
@@ -302,8 +310,9 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         if !fix_mode.is_generate() {
             warn_user!("--fix is incompatible with --add-noqa.");
         }
-        let modifications = commands::add_noqa::add_noqa(&files, &pyproject_config, &overrides)?;
-        if modifications > 0 && log_level >= LogLevel::Default {
+        let modifications =
+            commands::add_noqa::add_noqa(&files, &pyproject_config, &config_arguments)?;
+        if modifications > 0 && config_arguments.log_level >= LogLevel::Default {
             let s = if modifications == 1 { "" } else { "s" };
             #[allow(clippy::print_stderr)]
             {
@@ -315,7 +324,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
 
     let printer = Printer::new(
         output_format,
-        log_level,
+        config_arguments.log_level,
         fix_mode,
         unsafe_fixes,
         printer_flags,
@@ -352,7 +361,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         let messages = commands::check::check(
             &files,
             &pyproject_config,
-            &overrides,
+            &config_arguments,
             cache.into(),
             noqa.into(),
             fix_mode,
@@ -372,12 +381,8 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                     };
 
                     if matches!(change_kind, ChangeKind::Configuration) {
-                        pyproject_config = resolve::resolve(
-                            cli.isolated,
-                            cli.config.as_deref(),
-                            &overrides,
-                            cli.stdin_filename.as_deref(),
-                        )?;
+                        pyproject_config =
+                            resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
                     }
                     Printer::clear_screen()?;
                     printer.write_to_user("File change detected...\n");
@@ -385,7 +390,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                     let messages = commands::check::check(
                         &files,
                         &pyproject_config,
-                        &overrides,
+                        &config_arguments,
                         cache.into(),
                         noqa.into(),
                         fix_mode,
@@ -402,7 +407,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             commands::check_stdin::check_stdin(
                 cli.stdin_filename.map(fs::normalize_path).as_deref(),
                 &pyproject_config,
-                &overrides,
+                &config_arguments,
                 noqa.into(),
                 fix_mode,
             )?
@@ -410,7 +415,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             commands::check::check(
                 &files,
                 &pyproject_config,
-                &overrides,
+                &config_arguments,
                 cache.into(),
                 noqa.into(),
                 fix_mode,

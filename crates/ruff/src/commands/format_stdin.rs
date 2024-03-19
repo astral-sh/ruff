@@ -9,7 +9,7 @@ use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{match_exclusion, python_file_at_path, Resolver};
 use ruff_workspace::FormatterSettings;
 
-use crate::args::{CliOverrides, FormatArguments};
+use crate::args::{ConfigArguments, FormatArguments, FormatRange};
 use crate::commands::format::{
     format_source, warn_incompatible_formatter_settings, FormatCommandError, FormatMode,
     FormatResult, FormattedSource,
@@ -19,13 +19,11 @@ use crate::stdin::{parrot_stdin, read_from_stdin};
 use crate::ExitStatus;
 
 /// Run the formatter over a single file, read from `stdin`.
-pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> Result<ExitStatus> {
-    let pyproject_config = resolve(
-        cli.isolated,
-        cli.config.as_deref(),
-        overrides,
-        cli.stdin_filename.as_deref(),
-    )?;
+pub(crate) fn format_stdin(
+    cli: &FormatArguments,
+    config_arguments: &ConfigArguments,
+) -> Result<ExitStatus> {
+    let pyproject_config = resolve(config_arguments, cli.stdin_filename.as_deref())?;
 
     let mut resolver = Resolver::new(&pyproject_config);
     warn_incompatible_formatter_settings(&resolver);
@@ -34,7 +32,7 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
 
     if resolver.force_exclude() {
         if let Some(filename) = cli.stdin_filename.as_deref() {
-            if !python_file_at_path(filename, &mut resolver, overrides)? {
+            if !python_file_at_path(filename, &mut resolver, config_arguments)? {
                 if mode.is_write() {
                     parrot_stdin()?;
                 }
@@ -69,7 +67,7 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
     };
 
     // Format the file.
-    match format_source_code(path, settings, source_type, mode) {
+    match format_source_code(path, cli.range, settings, source_type, mode) {
         Ok(result) => match mode {
             FormatMode::Write => Ok(ExitStatus::Success),
             FormatMode::Check | FormatMode::Diff => {
@@ -90,6 +88,7 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
 /// Format source code read from `stdin`.
 fn format_source_code(
     path: Option<&Path>,
+    range: Option<FormatRange>,
     settings: &FormatterSettings,
     source_type: PySourceType,
     mode: FormatMode,
@@ -107,7 +106,7 @@ fn format_source_code(
     };
 
     // Format the source.
-    let formatted = format_source(&source_kind, source_type, path, settings)?;
+    let formatted = format_source(&source_kind, source_type, path, settings, range)?;
 
     match &formatted {
         FormattedSource::Formatted(formatted) => match mode {
@@ -119,9 +118,13 @@ fn format_source_code(
             }
             FormatMode::Check => {}
             FormatMode::Diff => {
-                source_kind
-                    .diff(formatted, path, &mut stdout().lock())
-                    .map_err(|err| FormatCommandError::Diff(path.map(Path::to_path_buf), err))?;
+                use std::io::Write;
+                write!(
+                    &mut stdout().lock(),
+                    "{}",
+                    source_kind.diff(formatted, path).unwrap()
+                )
+                .map_err(|err| FormatCommandError::Diff(path.map(Path::to_path_buf), err))?;
             }
         },
         FormattedSource::Unchanged => {

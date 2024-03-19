@@ -282,7 +282,7 @@ pub(crate) fn typing_only_runtime_import(
             let qualified_name = import.qualified_name();
 
             if is_exempt(
-                qualified_name.as_str(),
+                &qualified_name.to_string(),
                 &checker
                     .settings
                     .flake8_type_checking
@@ -296,7 +296,7 @@ pub(crate) fn typing_only_runtime_import(
 
             // Categorize the import, using coarse-grained categorization.
             let import_type = match categorize(
-                qualified_name.as_str(),
+                &qualified_name.to_string(),
                 None,
                 &checker.settings.src,
                 checker.package(),
@@ -304,6 +304,8 @@ pub(crate) fn typing_only_runtime_import(
                 &checker.settings.isort.known_modules,
                 checker.settings.target_version,
                 checker.settings.isort.no_sections,
+                &checker.settings.isort.section_order,
+                &checker.settings.isort.default_section,
             ) {
                 ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
                     ImportType::FirstParty
@@ -363,8 +365,10 @@ pub(crate) fn typing_only_runtime_import(
             ..
         } in imports
         {
-            let mut diagnostic =
-                Diagnostic::new(diagnostic_for(import_type, import.qualified_name()), range);
+            let mut diagnostic = Diagnostic::new(
+                diagnostic_for(import_type, import.qualified_name().to_string()),
+                range,
+            );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
             }
@@ -385,8 +389,10 @@ pub(crate) fn typing_only_runtime_import(
             ..
         } in imports
         {
-            let mut diagnostic =
-                Diagnostic::new(diagnostic_for(import_type, import.qualified_name()), range);
+            let mut diagnostic = Diagnostic::new(
+                diagnostic_for(import_type, import.qualified_name().to_string()),
+                range,
+            );
             if let Some(range) = parent_range {
                 diagnostic.set_parent(range.start());
             }
@@ -493,7 +499,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
             .flat_map(|ImportBinding { binding, .. }| {
                 binding.references.iter().filter_map(|reference_id| {
                     let reference = checker.semantic().reference(*reference_id);
-                    if reference.context().is_runtime() {
+                    if reference.in_runtime_context() {
                         Some(quote_annotation(
                             reference.expression_id()?,
                             checker.semantic(),

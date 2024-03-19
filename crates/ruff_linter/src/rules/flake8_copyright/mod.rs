@@ -38,6 +38,20 @@ import os
     }
 
     #[test]
+    fn notice_with_unicode_c() {
+        let diagnostics = test_snippet(
+            r"
+# Copyright © 2023
+
+import os
+"
+            .trim(),
+            &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
+        );
+        assert_messages!(diagnostics);
+    }
+
+    #[test]
     fn notice_with_caps() {
         let diagnostics = test_snippet(
             r"

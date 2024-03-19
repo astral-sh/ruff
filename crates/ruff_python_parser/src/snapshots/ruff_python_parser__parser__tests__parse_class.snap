@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser.rs
-expression: "parse_suite(source, \"<test>\").unwrap()"
+expression: parse_suite(source).unwrap()
 ---
 [
     ClassDef(
@@ -121,7 +121,11 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                                         StringLiteral {
                                                             range: 80..89,
                                                             value: "default",
-                                                            unicode: false,
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Single,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                            },
                                                         },
                                                     ),
                                                 },

@@ -6,8 +6,8 @@ expression: parse_ast
     If(
         StmtIf {
             range: 0..14,
-            test: NamedExpr(
-                ExprNamedExpr {
+            test: Named(
+                ExprNamed {
                     range: 3..8,
                     target: Name(
                         ExprName {

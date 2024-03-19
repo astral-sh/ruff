@@ -134,23 +134,23 @@ impl InferredMemberType {
 /// single-line tuple literals *can* be unparenthesized.
 /// We keep the original AST node around for the
 /// Tuple variant so that this can be queried later.
-#[derive(Debug)]
-pub(super) enum SequenceKind<'a> {
+#[derive(Copy, Clone, Debug)]
+pub(super) enum SequenceKind {
     List,
     Set,
-    Tuple(&'a ast::ExprTuple),
+    Tuple { parenthesized: bool },
 }
 
-impl SequenceKind<'_> {
+impl SequenceKind {
     // N.B. We only need the source code for the Tuple variant here,
     // but if you already have a `Locator` instance handy,
     // getting the source code is very cheap.
-    fn surrounding_brackets(&self, source: &str) -> (&'static str, &'static str) {
+    fn surrounding_brackets(self) -> (&'static str, &'static str) {
         match self {
             Self::List => ("[", "]"),
             Self::Set => ("{", "}"),
-            Self::Tuple(ast_node) => {
-                if ast_node.is_parenthesized(source) {
+            Self::Tuple { parenthesized } => {
+                if parenthesized {
                     ("(", ")")
                 } else {
                     ("", "")
@@ -159,19 +159,19 @@ impl SequenceKind<'_> {
         }
     }
 
-    const fn opening_token_for_multiline_definition(&self) -> TokenKind {
+    const fn opening_token_for_multiline_definition(self) -> TokenKind {
         match self {
             Self::List => TokenKind::Lsqb,
             Self::Set => TokenKind::Lbrace,
-            Self::Tuple(_) => TokenKind::Lpar,
+            Self::Tuple { .. } => TokenKind::Lpar,
         }
     }
 
-    const fn closing_token_for_multiline_definition(&self) -> TokenKind {
+    const fn closing_token_for_multiline_definition(self) -> TokenKind {
         match self {
             Self::List => TokenKind::Rsqb,
             Self::Set => TokenKind::Rbrace,
-            Self::Tuple(_) => TokenKind::Rpar,
+            Self::Tuple { .. } => TokenKind::Rpar,
         }
     }
 }
@@ -217,7 +217,7 @@ impl<'a> SequenceElements<'a> {
 /// that can be inserted into the
 /// source code as a `range_replacement` autofix.
 pub(super) fn sort_single_line_elements_sequence(
-    kind: &SequenceKind,
+    kind: SequenceKind,
     elts: &[ast::Expr],
     elements: &[&str],
     locator: &Locator,
@@ -225,7 +225,7 @@ pub(super) fn sort_single_line_elements_sequence(
 ) -> String {
     let element_pairs = SequenceElements::new(elements, elts);
     let last_item_index = element_pairs.last_item_index();
-    let (opening_paren, closing_paren) = kind.surrounding_brackets(locator.contents());
+    let (opening_paren, closing_paren) = kind.surrounding_brackets();
     let mut result = String::from(opening_paren);
     // We grab the original source-code ranges using `locator.slice()`
     // rather than using the expression generator, as this approach allows
@@ -334,7 +334,7 @@ impl MultilineStringSequenceValue {
     /// Return `None` if the analysis fails for whatever reason.
     pub(super) fn from_source_range(
         range: TextRange,
-        kind: &SequenceKind,
+        kind: SequenceKind,
         locator: &Locator,
     ) -> Option<MultilineStringSequenceValue> {
         // Parse the multiline string sequence using the raw tokens.
@@ -486,7 +486,7 @@ impl Ranged for MultilineStringSequenceValue {
 /// in the original source code.
 fn collect_string_sequence_lines(
     range: TextRange,
-    kind: &SequenceKind,
+    kind: SequenceKind,
     locator: &Locator,
 ) -> Option<(Vec<StringSequenceLine>, bool)> {
     // These first two variables are used for keeping track of state
@@ -559,14 +559,14 @@ fn collect_string_sequence_lines(
 /// `self` and produces the classification for the line.
 #[derive(Debug, Default)]
 struct LineState {
-    first_item_in_line: Option<(String, TextRange)>,
-    following_items_in_line: Vec<(String, TextRange)>,
+    first_item_in_line: Option<(Box<str>, TextRange)>,
+    following_items_in_line: Vec<(Box<str>, TextRange)>,
     comment_range_start: Option<TextSize>,
     comment_in_line: Option<TextRange>,
 }
 
 impl LineState {
-    fn visit_string_token(&mut self, token_value: String, token_range: TextRange) {
+    fn visit_string_token(&mut self, token_value: Box<str>, token_range: TextRange) {
         if self.first_item_in_line.is_none() {
             self.first_item_in_line = Some((token_value, token_range));
         } else {
@@ -631,8 +631,8 @@ struct LineWithItems {
     // For elements in the list, we keep track of the value of the
     // value of the element as well as the source-code range of the element.
     // (We need to know the actual value so that we can sort the items.)
-    first_item: (String, TextRange),
-    following_items: Vec<(String, TextRange)>,
+    first_item: (Box<str>, TextRange),
+    following_items: Vec<(Box<str>, TextRange)>,
     // For comments, we only need to keep track of the source-code range.
     trailing_comment_range: Option<TextRange>,
 }
@@ -753,7 +753,7 @@ fn collect_string_sequence_items(
 /// source-code range of `"a"`.
 #[derive(Debug)]
 struct StringSequenceItem {
-    value: String,
+    value: Box<str>,
     preceding_comment_ranges: Vec<TextRange>,
     element_range: TextRange,
     // total_range incorporates the ranges of preceding comments
@@ -766,7 +766,7 @@ struct StringSequenceItem {
 
 impl StringSequenceItem {
     fn new(
-        value: String,
+        value: Box<str>,
         preceding_comment_ranges: Vec<TextRange>,
         element_range: TextRange,
         end_of_line_comments: Option<TextRange>,
@@ -787,7 +787,7 @@ impl StringSequenceItem {
         }
     }
 
-    fn with_no_comments(value: String, element_range: TextRange) -> Self {
+    fn with_no_comments(value: Box<str>, element_range: TextRange) -> Self {
         Self::new(value, vec![], element_range, None)
     }
 }
@@ -895,6 +895,27 @@ fn multiline_string_sequence_postlude<'a>(
     };
     let postlude = locator.slice(TextRange::new(postlude_start, dunder_all_range_end));
 
+    // If the postlude consists solely of a closing parenthesis
+    // (not preceded by any whitespace/newlines),
+    // plus possibly a single trailing comma prior to the parenthesis,
+    // fixup the postlude so that the parenthesis appears on its own line,
+    // and so that the final item has a trailing comma.
+    // This produces formatting more similar
+    // to that which the formatter would produce.
+    if postlude.len() <= 2 {
+        let mut reversed_postlude_chars = postlude.chars().rev();
+        if let Some(closing_paren @ (')' | '}' | ']')) = reversed_postlude_chars.next() {
+            if reversed_postlude_chars.next().map_or(true, |c| c == ',') {
+                return Cow::Owned(format!(",{newline}{leading_indent}{closing_paren}"));
+            }
+        }
+    }
+
+    let newline_chars = ['\r', '\n'];
+    if !postlude.starts_with(newline_chars) {
+        return Cow::Borrowed(postlude);
+    }
+
     // The rest of this function uses heuristics to
     // avoid very long indents for the closing paren
     // that don't match the style for the rest of the
@@ -920,10 +941,6 @@ fn multiline_string_sequence_postlude<'a>(
     //     "y",
     //            ]
     // ```
-    let newline_chars = ['\r', '\n'];
-    if !postlude.starts_with(newline_chars) {
-        return Cow::Borrowed(postlude);
-    }
     if TextSize::of(leading_indentation(
         postlude.trim_start_matches(newline_chars),
     )) <= TextSize::of(item_indent)
@@ -931,7 +948,7 @@ fn multiline_string_sequence_postlude<'a>(
         return Cow::Borrowed(postlude);
     }
     let trimmed_postlude = postlude.trim_start();
-    if trimmed_postlude.starts_with([']', ')']) {
+    if trimmed_postlude.starts_with([']', ')', '}']) {
         return Cow::Owned(format!("{newline}{leading_indent}{trimmed_postlude}"));
     }
     Cow::Borrowed(postlude)

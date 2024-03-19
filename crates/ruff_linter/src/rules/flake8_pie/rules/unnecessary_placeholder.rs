@@ -1,6 +1,7 @@
 use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::whitespace::trailing_comment_start_offset;
 use ruff_python_ast::Stmt;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
@@ -86,6 +87,12 @@ pub(crate) fn unnecessary_placeholder(checker: &mut Checker, body: &[Stmt]) {
         let kind = match stmt {
             Stmt::Pass(_) => Placeholder::Pass,
             Stmt::Expr(expr) if expr.value.is_ellipsis_literal_expr() => {
+                // In a type-checking block, a trailing ellipsis might be meaningful. A
+                // user might be using the type-checking context to declare a stub.
+                if checker.semantic().in_type_checking_block() {
+                    return;
+                }
+
                 // Ellipses are significant in protocol methods and abstract methods. Specifically,
                 // Pyright uses the presence of an ellipsis to indicate that a method is a stub,
                 // rather than a default implementation.
@@ -132,7 +139,7 @@ fn in_protocol_or_abstract_method(semantic: &SemanticModel) -> bool {
         ScopeKind::Class(class_def) => class_def
             .bases()
             .iter()
-            .any(|base| semantic.match_typing_expr(base, "Protocol")),
+            .any(|base| semantic.match_typing_expr(map_subscript(base), "Protocol")),
         ScopeKind::Function(function_def) => {
             ruff_python_semantic::analyze::visibility::is_abstract(
                 &function_def.decorator_list,

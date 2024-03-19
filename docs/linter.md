@@ -11,15 +11,17 @@ and more.
 directories, and lints all discovered Python files, optionally fixing any fixable errors:
 
 ```shell
-ruff check .          # Lint all files in the current directory.
-ruff check . --fix    # Lint all files in the current directory, and fix any fixable errors.
-ruff check . --watch  # Lint all files in the current directory, and re-lint on change.
+ruff check                  # Lint all files in the current directory.
+ruff check --fix            # Lint all files in the current directory, and fix any fixable errors.
+ruff check --watch          # Lint all files in the current directory, and re-lint on change.
+ruff check path/to/code/    # Lint all files in `path/to/code` (and any subdirectories).
 ```
 
 For the full list of supported options, run `ruff check --help`.
 
 !!! note
     As of Ruff v0.1.7 the `ruff check` command uses the current working directory (`.`) as the default path to check.
+    On older versions, you must provide this manually e.g. `ruff check .`.
     See [the file discovery documentation](configuration.md#python-file-discovery) for details.
 
 ## Rule selection
@@ -150,7 +152,7 @@ imports, reformat docstrings, rewrite type annotations to use newer Python synta
 To enable fixes, pass the `--fix` flag to `ruff check`:
 
 ```shell
-ruff check . --fix
+ruff check --fix
 ```
 
 By default, Ruff will fix all violations for which safe fixes are available; to determine
@@ -197,16 +199,16 @@ Ruff only enables safe fixes by default. Unsafe fixes can be enabled by settings
 
 ```shell
 # Show unsafe fixes
-ruff check . --unsafe-fixes
+ruff check --unsafe-fixes
 
 # Apply unsafe fixes
-ruff check . --fix --unsafe-fixes
+ruff check --fix --unsafe-fixes
 ```
 
 By default, Ruff will display a hint when unsafe fixes are available but not enabled. The suggestion can be silenced
 by setting the [`unsafe-fixes`](settings.md#unsafe-fixes) setting to `false` or using the `--no-unsafe-fixes` flag.
 
-The safety of fixes can be adjusted per rule using the [`extend-safe-fixes`](settings.md#extend-safe-fixes) and [`extend-unsafe-fixes`](settings.md#extend-unsafe-fixes) settings.
+The safety of fixes can be adjusted per rule using the [`lint.extend-safe-fixes`](settings.md#lint_extend-safe-fixes) and [`lint.extend-unsafe-fixes`](settings.md#lint_extend-unsafe-fixes) settings.
 
 For example, the following configuration would promote unsafe fixes for `F601` to safe fixes and demote safe fixes for `UP034` to unsafe fixes:
 

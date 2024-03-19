@@ -13,7 +13,7 @@ use crate::rules::flake8_comprehensions::settings::Settings;
 /// rewritten as empty literals.
 ///
 /// ## Why is this bad?
-/// It's unnecessary to call e.g., `dict()` as opposed to using an empty
+/// It's unnecessary to call, e.g., `dict()` as opposed to using an empty
 /// literal (`{}`). The former is slower because the name `dict` must be
 /// looked up in the global scope in case it has been rebound.
 ///
@@ -36,6 +36,9 @@ use crate::rules::flake8_comprehensions::settings::Settings;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
+///
+/// ## Options
+/// - `lint.flake8-comprehensions.allow-dict-calls-with-keyword-arguments`
 #[violation]
 pub struct UnnecessaryCollectionCall {
     obj_type: String,

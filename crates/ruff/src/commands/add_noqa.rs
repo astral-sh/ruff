@@ -12,17 +12,17 @@ use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, ResolvedFile};
 
-use crate::args::CliOverrides;
+use crate::args::ConfigArguments;
 
 /// Add `noqa` directives to a collection of files.
 pub(crate) fn add_noqa(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    overrides: &CliOverrides,
+    config_arguments: &ConfigArguments,
 ) -> Result<usize> {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = python_files_in_path(files, pyproject_config, overrides)?;
+    let (paths, resolver) = python_files_in_path(files, pyproject_config, config_arguments)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 

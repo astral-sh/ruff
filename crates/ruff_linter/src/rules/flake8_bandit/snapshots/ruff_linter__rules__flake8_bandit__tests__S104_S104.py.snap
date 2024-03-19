@@ -42,4 +42,23 @@ S104.py:19:9: S104 Possible binding to all interfaces
 20 |     print(x)
    |
 
+S104.py:24:1: S104 Possible binding to all interfaces
+   |
+23 | # Implicit string concatenation
+24 | "0.0.0.0" f"0.0.0.0{expr}0.0.0.0"
+   | ^^^^^^^^^ S104
+   |
 
+S104.py:24:13: S104 Possible binding to all interfaces
+   |
+23 | # Implicit string concatenation
+24 | "0.0.0.0" f"0.0.0.0{expr}0.0.0.0"
+   |             ^^^^^^^ S104
+   |
+
+S104.py:24:26: S104 Possible binding to all interfaces
+   |
+23 | # Implicit string concatenation
+24 | "0.0.0.0" f"0.0.0.0{expr}0.0.0.0"
+   |                          ^^^^^^^ S104
+   |

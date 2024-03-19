@@ -1634,12 +1634,13 @@ fn common_section(
     let line_end = checker.stylist().line_ending().as_str();
 
     if let Some(next) = next {
-        if context
-            .following_lines()
-            .last()
-            .map_or(true, |line| !line.trim().is_empty())
-        {
-            if checker.enabled(Rule::NoBlankLineAfterSection) {
+        if checker.enabled(Rule::NoBlankLineAfterSection) {
+            let num_blank_lines = context
+                .following_lines()
+                .rev()
+                .take_while(|line| line.trim().is_empty())
+                .count();
+            if num_blank_lines < 2 {
                 let mut diagnostic = Diagnostic::new(
                     NoBlankLineAfterSection {
                         name: context.section_name().to_string(),
@@ -1657,28 +1658,37 @@ fn common_section(
     } else {
         // The first blank line is the line containing the closing triple quotes, so we need at
         // least two.
-        let num_blank_lines = context
-            .following_lines()
-            .rev()
-            .take_while(|line| line.trim().is_empty())
-            .count();
-        if num_blank_lines < 2 {
-            if checker.enabled(Rule::BlankLineAfterLastSection) {
+        if checker.enabled(Rule::BlankLineAfterLastSection) {
+            let num_blank_lines = context
+                .following_lines()
+                .rev()
+                .take_while(|line| line.trim().is_empty())
+                .count();
+            if num_blank_lines < 2 {
+                let del_len = if num_blank_lines == 1 {
+                    // SAFETY: Guaranteed to not be None, because `num_blank_lines`is 1.
+                    context.following_lines().next_back().unwrap().text_len()
+                } else {
+                    TextSize::new(0)
+                };
+
+                let edit = Edit::replacement(
+                    format!(
+                        "{}{}",
+                        line_end.repeat(2 - num_blank_lines),
+                        docstring.indentation
+                    ),
+                    context.end() - del_len,
+                    context.end(),
+                );
+
                 let mut diagnostic = Diagnostic::new(
                     BlankLineAfterLastSection {
                         name: context.section_name().to_string(),
                     },
                     docstring.range(),
                 );
-                // Add a newline after the section.
-                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    format!(
-                        "{}{}",
-                        line_end.repeat(2 - num_blank_lines),
-                        docstring.indentation
-                    ),
-                    context.end(),
-                )));
+                diagnostic.set_fix(Fix::safe_edit(edit));
                 checker.diagnostics.push(diagnostic);
             }
         }

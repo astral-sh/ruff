@@ -251,8 +251,8 @@ fn generate_range_len_call(name: &str, generator: Generator) -> String {
             .into(),
         ),
         arguments: Arguments {
-            args: vec![var.into()],
-            keywords: vec![],
+            args: Box::from([var.into()]),
+            keywords: Box::from([]),
             range: TextRange::default(),
         },
         range: TextRange::default(),
@@ -268,8 +268,8 @@ fn generate_range_len_call(name: &str, generator: Generator) -> String {
             .into(),
         ),
         arguments: Arguments {
-            args: vec![len.into()],
-            keywords: vec![],
+            args: Box::from([len.into()]),
+            keywords: Box::from([]),
             range: TextRange::default(),
         },
         range: TextRange::default(),
