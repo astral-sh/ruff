@@ -4,7 +4,7 @@ input_file: crates/ruff_python_parser/resources/valid/statement/with.py
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
         range: 0..22,
@@ -48,4 +48,3 @@ Module(
     },
 )
 ```
-
