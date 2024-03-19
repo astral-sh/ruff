@@ -1293,6 +1293,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ManualDictComprehension) {
                 perflint::rules::manual_dict_comprehension(checker, target, body);
             }
+            if checker.enabled(Rule::ModifiedIteratingSet) {
+                pylint::rules::modified_iterating_set(checker, for_stmt);
+            }
             if checker.enabled(Rule::UnnecessaryListCast) {
                 perflint::rules::unnecessary_list_cast(checker, iter, body);
             }
