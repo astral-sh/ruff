@@ -28,7 +28,7 @@ fn invalid_syntax() {
 
         let mut output = String::new();
         writeln!(&mut output, "## AST").unwrap();
-        writeln!(&mut output, "\n ```\n{:#?}\n```", program.ast()).unwrap();
+        writeln!(&mut output, "\n```\n{:#?}\n```", program.ast()).unwrap();
 
         writeln!(&mut output, "## Errors\n").unwrap();
 
@@ -93,7 +93,7 @@ fn valid_syntax() {
 
         let mut output = String::new();
         writeln!(&mut output, "## AST").unwrap();
-        writeln!(&mut output, "\n ```\n{:#?}\n```", program.ast()).unwrap();
+        writeln!(&mut output, "\n```\n{:#?}\n```", program.ast()).unwrap();
 
         insta::with_settings!({
             omit_expression => true,
