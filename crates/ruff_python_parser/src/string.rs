@@ -112,14 +112,15 @@ impl StringParser {
     fn parse_unicode_literal(&mut self, literal_number: usize) -> Result<char, LexicalError> {
         let mut p: u32 = 0u32;
         for i in 1..=literal_number {
+            let start = self.position();
             match self.next_char() {
                 Some(c) => match c.to_digit(16) {
                     Some(d) => p += d << ((literal_number - i) * 4),
                     None => {
                         return Err(LexicalError::new(
                             LexicalErrorType::UnicodeError,
-                            TextRange::empty(self.position()),
-                        ))
+                            TextRange::at(start, TextSize::try_from(c.len_utf8()).unwrap()),
+                        ));
                     }
                 },
                 None => {
@@ -183,7 +184,10 @@ impl StringParser {
                 LexicalErrorType::UnicodeError,
                 // The cursor is right after the `}` character, so we subtract 1 to get the correct
                 // range of the unicode name.
-                TextRange::new(start_pos, self.compute_position(self.cursor - 1)),
+                TextRange::new(
+                    start_pos,
+                    self.compute_position(self.cursor - '}'.len_utf8()),
+                ),
             )
         })
     }
@@ -223,16 +227,7 @@ impl StringParser {
 
                 return Ok(None);
             }
-            _ => {
-                if self.kind.is_byte_string() && !first_char.is_ascii() {
-                    return Err(LexicalError::new(
-                        LexicalErrorType::InvalidByteLiteral,
-                        TextRange::empty(self.position()),
-                    ));
-                }
-
-                return Ok(Some(EscapedChar::Escape(first_char)));
-            }
+            _ => return Ok(Some(EscapedChar::Escape(first_char))),
         };
 
         Ok(Some(EscapedChar::Literal(new_char)))
@@ -328,9 +323,13 @@ impl StringParser {
 
     fn parse_bytes(mut self) -> Result<StringType, LexicalError> {
         if let Some(index) = self.source.as_bytes().find_non_ascii_byte() {
+            let ch = self.source.chars().nth(index).unwrap();
             return Err(LexicalError::new(
                 LexicalErrorType::InvalidByteLiteral,
-                TextRange::empty(self.compute_position(index)),
+                TextRange::at(
+                    self.compute_position(index),
+                    TextSize::try_from(ch.len_utf8()).unwrap(),
+                ),
             ));
         }
 
@@ -881,6 +880,14 @@ mod tests {
         let parse_ast = parse_suite(source).unwrap();
 
         insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_invalid_unicode_literal() {
+        let source = r"'\x1ó34'";
+        let error = parse_suite(source).unwrap_err();
+
+        insta::assert_debug_snapshot!(error);
     }
 
     #[test]

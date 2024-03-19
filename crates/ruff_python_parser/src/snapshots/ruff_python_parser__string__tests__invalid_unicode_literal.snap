@@ -4,7 +4,7 @@ expression: error
 ---
 ParseError {
     error: Lexical(
-        InvalidByteLiteral,
+        UnicodeError,
     ),
-    location: 6..10,
+    location: 4..6,
 }
