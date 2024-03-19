@@ -1,4 +1,5 @@
 import os
+import subprocess
 
 import commands
 import popen2
@@ -16,6 +17,8 @@ popen2.Popen3("true")
 popen2.Popen4("true")
 commands.getoutput("true")
 commands.getstatusoutput("true")
+subprocess.getoutput("true")
+subprocess.getstatusoutput("true")
 
 
 # Check command argument looks unsafe.

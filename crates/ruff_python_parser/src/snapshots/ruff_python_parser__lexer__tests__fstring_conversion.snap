@@ -6,7 +6,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Double,
             },
@@ -41,7 +43,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: " ",
             kind: StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Double,
             },
@@ -80,7 +84,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: " ",
             kind: StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Double,
             },
@@ -105,7 +111,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: ".3f!r",
             kind: StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Double,
             },
@@ -120,7 +128,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: " {x!r}",
             kind: StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Double,
             },

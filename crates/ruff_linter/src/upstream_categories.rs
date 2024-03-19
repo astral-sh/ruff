@@ -8,29 +8,19 @@ pub struct UpstreamCategoryAndPrefix {
     pub prefix: &'static str,
 }
 
-const PLC: UpstreamCategoryAndPrefix = UpstreamCategoryAndPrefix {
+const C: UpstreamCategoryAndPrefix = UpstreamCategoryAndPrefix {
     category: "Convention",
-    prefix: "PLC",
-};
-
-const PLE: UpstreamCategoryAndPrefix = UpstreamCategoryAndPrefix {
-    category: "Error",
-    prefix: "PLE",
-};
-
-const PLR: UpstreamCategoryAndPrefix = UpstreamCategoryAndPrefix {
-    category: "Refactor",
-    prefix: "PLR",
-};
-
-const PLW: UpstreamCategoryAndPrefix = UpstreamCategoryAndPrefix {
-    category: "Warning",
-    prefix: "PLW",
+    prefix: "C",
 };
 
 const E: UpstreamCategoryAndPrefix = UpstreamCategoryAndPrefix {
     category: "Error",
     prefix: "E",
+};
+
+const R: UpstreamCategoryAndPrefix = UpstreamCategoryAndPrefix {
+    category: "Refactor",
+    prefix: "R",
 };
 
 const W: UpstreamCategoryAndPrefix = UpstreamCategoryAndPrefix {
@@ -52,14 +42,14 @@ impl Rule {
                 }
             }
             Linter::Pylint => {
-                if code.starts_with("PLC") {
-                    Some(PLC)
-                } else if code.starts_with("PLE") {
-                    Some(PLE)
-                } else if code.starts_with("PLR") {
-                    Some(PLR)
-                } else if code.starts_with("PLW") {
-                    Some(PLW)
+                if code.starts_with('C') {
+                    Some(C)
+                } else if code.starts_with('E') {
+                    Some(E)
+                } else if code.starts_with('R') {
+                    Some(R)
+                } else if code.starts_with('W') {
+                    Some(W)
                 } else {
                     None
                 }
@@ -73,7 +63,7 @@ impl Linter {
     pub const fn upstream_categories(&self) -> Option<&'static [UpstreamCategoryAndPrefix]> {
         match self {
             Linter::Pycodestyle => Some(&[E, W]),
-            Linter::Pylint => Some(&[PLC, PLE, PLR, PLW]),
+            Linter::Pylint => Some(&[C, E, R, W]),
             _ => None,
         }
     }

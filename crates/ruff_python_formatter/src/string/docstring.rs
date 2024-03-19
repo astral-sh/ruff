@@ -8,6 +8,7 @@ use std::{borrow::Cow, collections::VecDeque};
 use itertools::Itertools;
 
 use ruff_formatter::printer::SourceMapGeneration;
+use ruff_python_ast::str::Quote;
 use ruff_python_parser::ParseError;
 use {once_cell::sync::Lazy, regex::Regex};
 use {
@@ -19,7 +20,7 @@ use {
 
 use crate::{prelude::*, DocstringCodeLineWidth, FormatModuleError};
 
-use super::{NormalizedString, QuoteChar};
+use super::NormalizedString;
 
 /// Format a docstring by trimming whitespace and adjusting the indentation.
 ///
@@ -253,7 +254,7 @@ struct DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     already_normalized: bool,
 
     /// The quote character used by the docstring being printed.
-    quote_char: QuoteChar,
+    quote_char: Quote,
 
     /// The current code example detected in the docstring.
     code_example: CodeExample<'src>,
@@ -550,8 +551,8 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
         // remove this check. See the `doctest_invalid_skipped` tests in
         // `docstring_code_examples.py` for when this check is relevant.
         let wrapped = match self.quote_char {
-            QuoteChar::Single => std::format!("'''{}'''", printed.as_code()),
-            QuoteChar::Double => {
+            Quote::Single => std::format!("'''{}'''", printed.as_code()),
+            Quote::Double => {
                 std::format!(r#""""{}""""#, printed.as_code())
             }
         };
@@ -1542,7 +1543,7 @@ enum CodeExampleAddAction<'src> {
 /// inside of a docstring.
 fn docstring_format_source(
     options: crate::PyFormatOptions,
-    docstring_quote_style: QuoteChar,
+    docstring_quote_style: Quote,
     source: &str,
 ) -> Result<Printed, FormatModuleError> {
     use ruff_python_parser::AsMode;

@@ -255,6 +255,7 @@ impl Renamer {
             | BindingKind::ClassDefinition(_)
             | BindingKind::FunctionDefinition(_)
             | BindingKind::Deletion
+            | BindingKind::ConditionalDeletion(_)
             | BindingKind::UnboundException(_) => {
                 Some(Edit::range_replacement(target.to_string(), binding.range()))
             }

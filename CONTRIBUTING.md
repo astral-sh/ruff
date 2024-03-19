@@ -329,13 +329,13 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 
 ### Creating a new release
 
-We use an experimental in-house tool for managing releases.
-
-1. Install `rooster`: `pip install git+https://github.com/zanieb/rooster@main`
-1. Run `rooster release`; this command will:
+1. Install `uv`: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+1. Run `./scripts/release/bump.sh`; this command will:
+    - Generate a temporary virtual environment with `rooster`
     - Generate a changelog entry in `CHANGELOG.md`
     - Update versions in `pyproject.toml` and `Cargo.toml`
     - Update references to versions in the `README.md` and documentation
+    - Display contributors for the release
 1. The changelog should then be editorialized for consistency
     - Often labels will be missing from pull requests they will need to be manually organized into the proper section
     - Changes should be edited to be user-facing descriptions, avoiding internal details
@@ -359,7 +359,7 @@ We use an experimental in-house tool for managing releases.
     1. Open the draft release in the GitHub release section
     1. Copy the changelog for the release into the GitHub release
         - See previous releases for formatting of section headers
-    1. Generate the contributor list with `rooster contributors` and add to the release notes
+    1. Append the contributors from the `bump.sh` script
 1. If needed, [update the schemastore](https://github.com/astral-sh/ruff/blob/main/scripts/update_schemastore.py).
     1. One can determine if an update is needed when
         `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.

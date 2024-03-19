@@ -6,7 +6,9 @@ expression: fstring_single_quote_escape_eol(WINDOWS_EOL)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Single,
             },
@@ -17,7 +19,9 @@ expression: fstring_single_quote_escape_eol(WINDOWS_EOL)
         FStringMiddle {
             value: "text \\\r\n more text",
             kind: StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Single,
             },

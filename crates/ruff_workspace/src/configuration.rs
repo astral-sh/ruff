@@ -237,6 +237,7 @@ impl Configuration {
                 project_root: project_root.to_path_buf(),
             },
 
+            #[allow(deprecated)]
             linter: LinterSettings {
                 rules: lint.as_rule_table(lint_preview)?,
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
@@ -253,7 +254,7 @@ impl Configuration {
                     .dummy_variable_rgx
                     .unwrap_or_else(|| DUMMY_VARIABLE_RGX.clone()),
                 external: lint.external.unwrap_or_default(),
-                ignore_init_module_imports: lint.ignore_init_module_imports.unwrap_or_default(),
+                ignore_init_module_imports: lint.ignore_init_module_imports.unwrap_or(true),
                 line_length,
                 tab_size: self.indent_width.unwrap_or_default(),
                 namespace_packages: self.namespace_packages.unwrap_or_default(),
@@ -650,6 +651,10 @@ impl LintConfiguration {
             .flatten()
             .chain(options.common.extend_unfixable.into_iter().flatten())
             .collect();
+
+        #[allow(deprecated)]
+        let ignore_init_module_imports = options.common.ignore_init_module_imports;
+
         Ok(LintConfiguration {
             exclude: options.exclude.map(|paths| {
                 paths
@@ -692,7 +697,7 @@ impl LintConfiguration {
                 })
                 .unwrap_or_default(),
             external: options.common.external,
-            ignore_init_module_imports: options.common.ignore_init_module_imports,
+            ignore_init_module_imports,
             explicit_preview_rules: options.common.explicit_preview_rules,
             per_file_ignores: options.common.per_file_ignores.map(|per_file_ignores| {
                 per_file_ignores
@@ -1316,6 +1321,7 @@ fn warn_about_deprecated_top_level_lint_options(
         used_options.push("extend-unsafe-fixes");
     }
 
+    #[allow(deprecated)]
     if top_level_options.ignore_init_module_imports.is_some() {
         used_options.push("ignore-init-module-imports");
     }

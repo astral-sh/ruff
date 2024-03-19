@@ -100,11 +100,7 @@ fn contains_message(expr: &Expr) -> bool {
                         }
                     }
                     ast::FStringPart::FString(f_string) => {
-                        for literal in f_string
-                            .elements
-                            .iter()
-                            .filter_map(|element| element.as_literal())
-                        {
+                        for literal in f_string.literals() {
                             if literal.chars().any(char::is_whitespace) {
                                 return true;
                             }

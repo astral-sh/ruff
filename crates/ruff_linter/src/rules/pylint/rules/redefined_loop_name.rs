@@ -29,7 +29,7 @@ use crate::checkers::ast::Checker;
 /// into the remainder of the enclosing loop.
 ///
 /// While this mistake is easy to spot in small examples, it can be hidden
-/// in larger blocks of code where the definition and redefinition of the
+/// in larger blocks of code, where the definition and redefinition of the
 /// variable may not be visible at the same time.
 ///
 /// ## Example

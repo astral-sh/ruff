@@ -132,7 +132,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
         diagnostics.extend(crate::checkers::logical_lines::check_logical_lines(
-            &tokens, locator, stylist, settings,
+            &tokens, locator, indexer, stylist, settings,
         ));
     }
 

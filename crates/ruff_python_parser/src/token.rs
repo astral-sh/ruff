@@ -16,6 +16,9 @@ pub enum Tok {
     /// Token value for a name, commonly known as an identifier.
     Name {
         /// The name value.
+        ///
+        /// Unicode names are NFKC-normalized by the lexer,
+        /// matching [the behaviour of Python's lexer](https://docs.python.org/3/reference/lexical_analysis.html#identifiers)
         name: Box<str>,
     },
     /// Token value for an integer.

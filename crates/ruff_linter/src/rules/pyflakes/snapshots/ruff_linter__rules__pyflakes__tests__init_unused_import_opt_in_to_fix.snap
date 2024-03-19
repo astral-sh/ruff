@@ -1,0 +1,17 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+__init__.py:1:8: F401 [*] `os` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+  |
+1 | import os
+  |        ^^ F401
+2 | 
+3 | print(__path__)
+  |
+  = help: Remove unused import: `os`
+
+ℹ Unsafe fix
+1   |-import os
+2 1 | 
+3 2 | print(__path__)
+4 3 |

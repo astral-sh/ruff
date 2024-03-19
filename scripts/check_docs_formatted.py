@@ -69,6 +69,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "over-indented",
     "pass-statement-stub-body",
     "prohibited-trailing-comma",
+    "redundant-backslash",
     "shebang-leading-whitespace",
     "surrounding-whitespace",
     "tab-indentation",
@@ -104,6 +105,7 @@ KNOWN_PARSE_ERRORS = [
     "tab-after-operator",
     "tab-before-keyword",
     "tab-before-operator",
+    "too-many-newlines-at-end-of-file",
     "trailing-whitespace",
     "unexpected-indentation",
 ]

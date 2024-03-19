@@ -24,7 +24,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Single,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: false,
                                     },
                                 },

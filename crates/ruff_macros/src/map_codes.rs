@@ -391,8 +391,10 @@ fn generate_iter_impl(
             pub fn iter() -> impl Iterator<Item = RuleCodePrefix> {
                 use strum::IntoEnumIterator;
 
-                std::iter::empty()
-                    #(.chain(#linter_idents::iter().map(|x| Self::#linter_idents(x))))*
+                let mut prefixes = Vec::new();
+
+                #(prefixes.extend(#linter_idents::iter().map(|x| Self::#linter_idents(x)));)*
+                prefixes.into_iter()
             }
         }
     }

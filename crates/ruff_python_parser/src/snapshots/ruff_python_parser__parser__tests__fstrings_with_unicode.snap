@@ -18,7 +18,7 @@ expression: parse_ast
                                         value: "foo",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
-                                            prefix: "u",
+                                            prefix: Unicode,
                                             triple_quoted: false,
                                         },
                                     },
@@ -45,7 +45,7 @@ expression: parse_ast
                                         ],
                                         flags: FStringFlags {
                                             quote_style: Double,
-                                            raw: false,
+                                            prefix: Regular,
                                             triple_quoted: false,
                                         },
                                     },
@@ -56,7 +56,7 @@ expression: parse_ast
                                         value: "baz",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
-                                            prefix: "",
+                                            prefix: Empty,
                                             triple_quoted: false,
                                         },
                                     },
@@ -67,7 +67,7 @@ expression: parse_ast
                                         value: " some",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
-                                            prefix: "",
+                                            prefix: Empty,
                                             triple_quoted: false,
                                         },
                                     },
@@ -94,7 +94,7 @@ expression: parse_ast
                                         value: "foo",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
-                                            prefix: "",
+                                            prefix: Empty,
                                             triple_quoted: false,
                                         },
                                     },
@@ -121,7 +121,7 @@ expression: parse_ast
                                         ],
                                         flags: FStringFlags {
                                             quote_style: Double,
-                                            raw: false,
+                                            prefix: Regular,
                                             triple_quoted: false,
                                         },
                                     },
@@ -132,7 +132,7 @@ expression: parse_ast
                                         value: "baz",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
-                                            prefix: "u",
+                                            prefix: Unicode,
                                             triple_quoted: false,
                                         },
                                     },
@@ -143,7 +143,7 @@ expression: parse_ast
                                         value: " some",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
-                                            prefix: "",
+                                            prefix: Empty,
                                             triple_quoted: false,
                                         },
                                     },
@@ -170,7 +170,7 @@ expression: parse_ast
                                         value: "foo",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
-                                            prefix: "",
+                                            prefix: Empty,
                                             triple_quoted: false,
                                         },
                                     },
@@ -197,7 +197,7 @@ expression: parse_ast
                                         ],
                                         flags: FStringFlags {
                                             quote_style: Double,
-                                            raw: false,
+                                            prefix: Regular,
                                             triple_quoted: false,
                                         },
                                     },
@@ -208,7 +208,7 @@ expression: parse_ast
                                         value: "baz",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
-                                            prefix: "",
+                                            prefix: Empty,
                                             triple_quoted: false,
                                         },
                                     },
@@ -219,7 +219,7 @@ expression: parse_ast
                                         value: " some",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
-                                            prefix: "u",
+                                            prefix: Unicode,
                                             triple_quoted: false,
                                         },
                                     },
@@ -246,7 +246,7 @@ expression: parse_ast
                                         value: "foo",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
-                                            prefix: "u",
+                                            prefix: Unicode,
                                             triple_quoted: false,
                                         },
                                     },
@@ -285,7 +285,7 @@ expression: parse_ast
                                         ],
                                         flags: FStringFlags {
                                             quote_style: Double,
-                                            raw: false,
+                                            prefix: Regular,
                                             triple_quoted: false,
                                         },
                                     },
@@ -296,7 +296,7 @@ expression: parse_ast
                                         value: "bar",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
-                                            prefix: "u",
+                                            prefix: Unicode,
                                             triple_quoted: false,
                                         },
                                     },
@@ -307,7 +307,7 @@ expression: parse_ast
                                         value: "no",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
-                                            prefix: "",
+                                            prefix: Empty,
                                             triple_quoted: false,
                                         },
                                     },

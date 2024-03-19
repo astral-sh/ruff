@@ -3,6 +3,7 @@ use bitflags::bitflags;
 pub(crate) use any::AnyString;
 pub(crate) use normalize::{normalize_string, NormalizedString, StringNormalizer};
 use ruff_formatter::format_args;
+use ruff_python_ast::str::Quote;
 use ruff_source_file::Locator;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
@@ -187,7 +188,7 @@ impl Format<PyFormatContext<'_>> for StringPrefix {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct StringQuotes {
     triple: bool,
-    quote_char: QuoteChar,
+    quote_char: Quote,
 }
 
 impl StringQuotes {
@@ -195,7 +196,7 @@ impl StringQuotes {
         let mut chars = input.chars();
 
         let quote_char = chars.next()?;
-        let quote = QuoteChar::try_from(quote_char).ok()?;
+        let quote = Quote::try_from(quote_char).ok()?;
 
         let triple = chars.next() == Some(quote_char) && chars.next() == Some(quote_char);
 
@@ -221,69 +222,33 @@ impl StringQuotes {
 impl Format<PyFormatContext<'_>> for StringQuotes {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let quotes = match (self.quote_char, self.triple) {
-            (QuoteChar::Single, false) => "'",
-            (QuoteChar::Single, true) => "'''",
-            (QuoteChar::Double, false) => "\"",
-            (QuoteChar::Double, true) => "\"\"\"",
+            (Quote::Single, false) => "'",
+            (Quote::Single, true) => "'''",
+            (Quote::Double, false) => "\"",
+            (Quote::Double, true) => "\"\"\"",
         };
 
         token(quotes).fmt(f)
     }
 }
 
-/// The quotation character used to quote a string, byte, or fstring literal.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum QuoteChar {
-    /// A single quote: `'`
-    Single,
-
-    /// A double quote: '"'
-    Double,
-}
-
-impl QuoteChar {
-    pub const fn as_char(self) -> char {
-        match self {
-            QuoteChar::Single => '\'',
-            QuoteChar::Double => '"',
-        }
-    }
-
-    #[must_use]
-    pub const fn invert(self) -> QuoteChar {
-        match self {
-            QuoteChar::Single => QuoteChar::Double,
-            QuoteChar::Double => QuoteChar::Single,
-        }
-    }
-
-    #[must_use]
-    pub const fn from_style(style: QuoteStyle) -> Option<QuoteChar> {
-        match style {
-            QuoteStyle::Single => Some(QuoteChar::Single),
-            QuoteStyle::Double => Some(QuoteChar::Double),
-            QuoteStyle::Preserve => None,
-        }
-    }
-}
-
-impl From<QuoteChar> for QuoteStyle {
-    fn from(value: QuoteChar) -> Self {
-        match value {
-            QuoteChar::Single => QuoteStyle::Single,
-            QuoteChar::Double => QuoteStyle::Double,
-        }
-    }
-}
-
-impl TryFrom<char> for QuoteChar {
+impl TryFrom<QuoteStyle> for Quote {
     type Error = ();
 
-    fn try_from(value: char) -> Result<Self, Self::Error> {
+    fn try_from(style: QuoteStyle) -> Result<Quote, ()> {
+        match style {
+            QuoteStyle::Single => Ok(Quote::Single),
+            QuoteStyle::Double => Ok(Quote::Double),
+            QuoteStyle::Preserve => Err(()),
+        }
+    }
+}
+
+impl From<Quote> for QuoteStyle {
+    fn from(value: Quote) -> Self {
         match value {
-            '\'' => Ok(QuoteChar::Single),
-            '"' => Ok(QuoteChar::Double),
-            _ => Err(()),
+            Quote::Single => QuoteStyle::Single,
+            Quote::Double => QuoteStyle::Double,
         }
     }
 }

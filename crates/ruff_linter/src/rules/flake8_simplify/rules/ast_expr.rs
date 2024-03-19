@@ -221,9 +221,9 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         value: capital_env_var.into_boxed_str(),
         flags: StringLiteralFlags::default().with_prefix({
             if env_var.is_unicode() {
-                StringLiteralPrefix::UString
+                StringLiteralPrefix::Unicode
             } else {
-                StringLiteralPrefix::None
+                StringLiteralPrefix::Empty
             }
         }),
         ..ast::StringLiteral::default()

@@ -11,7 +11,7 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::rules::flake8_import_conventions::settings::default_aliases;
+    use crate::rules::flake8_import_conventions::settings::{default_aliases, BannedAliases};
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
@@ -57,17 +57,20 @@ mod tests {
                     banned_aliases: FxHashMap::from_iter([
                         (
                             "typing".to_string(),
-                            vec!["t".to_string(), "ty".to_string()],
+                            BannedAliases::from_iter(["t".to_string(), "ty".to_string()]),
                         ),
                         (
                             "numpy".to_string(),
-                            vec!["nmp".to_string(), "npy".to_string()],
+                            BannedAliases::from_iter(["nmp".to_string(), "npy".to_string()]),
                         ),
                         (
                             "tensorflow.keras.backend".to_string(),
-                            vec!["K".to_string()],
+                            BannedAliases::from_iter(["K".to_string()]),
                         ),
-                        ("torch.nn.functional".to_string(), vec!["F".to_string()]),
+                        (
+                            "torch.nn.functional".to_string(),
+                            BannedAliases::from_iter(["F".to_string()]),
+                        ),
                     ]),
                     banned_from: FxHashSet::default(),
                 },

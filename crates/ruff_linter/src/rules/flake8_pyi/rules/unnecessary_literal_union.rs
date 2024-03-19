@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 /// Checks for the presence of multiple literal types in a union.
 ///
 /// ## Why is this bad?
-/// Literal types accept multiple arguments and it is clearer to specify them
+/// Literal types accept multiple arguments, and it is clearer to specify them
 /// as a single literal.
 ///
 /// ## Example

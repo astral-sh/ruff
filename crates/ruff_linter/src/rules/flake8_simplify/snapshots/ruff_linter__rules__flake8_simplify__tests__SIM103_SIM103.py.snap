@@ -142,5 +142,3 @@ SIM103.py:83:5: SIM103 Return the condition `a` directly
    | |____________________^ SIM103
    |
    = help: Inline condition
-
-

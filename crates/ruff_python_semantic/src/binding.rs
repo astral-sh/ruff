@@ -75,6 +75,11 @@ impl<'a> Binding<'a> {
         self.flags.intersects(BindingFlags::GLOBAL)
     }
 
+    /// Return `true` if this [`Binding`] was deleted.
+    pub const fn is_deleted(&self) -> bool {
+        self.flags.intersects(BindingFlags::DELETED)
+    }
+
     /// Return `true` if this [`Binding`] represents an assignment to `__all__` with an invalid
     /// value (e.g., `__all__ = "Foo"`).
     pub const fn is_invalid_all_format(&self) -> bool {
@@ -165,6 +170,7 @@ impl<'a> Binding<'a> {
             // Deletions, annotations, `__future__` imports, and builtins are never considered
             // redefinitions.
             BindingKind::Deletion
+            | BindingKind::ConditionalDeletion(_)
             | BindingKind::Annotation
             | BindingKind::FutureImport
             | BindingKind::Builtin => {
@@ -265,6 +271,19 @@ bitflags! {
         /// ```
         const GLOBAL = 1 << 4;
 
+        /// The binding was deleted (i.e., the target of a `del` statement).
+        ///
+        /// For example, the binding could be `x` in:
+        /// ```python
+        /// del x
+        /// ```
+        ///
+        /// The semantic model will typically shadow a deleted binding via an additional binding
+        /// with [`BindingKind::Deletion`]; however, conditional deletions (e.g.,
+        /// `if condition: del x`) do _not_ generate a shadow binding. This flag is thus used to
+        /// detect whether a binding was _ever_ deleted, even conditionally.
+        const DELETED = 1 << 5;
+
         /// The binding represents an export via `__all__`, but the assigned value uses an invalid
         /// expression (i.e., a non-container type).
         ///
@@ -272,7 +291,7 @@ bitflags! {
         /// ```python
         /// __all__ = 1
         /// ```
-        const INVALID_ALL_FORMAT = 1 << 5;
+        const INVALID_ALL_FORMAT = 1 << 6;
 
         /// The binding represents an export via `__all__`, but the assigned value contains an
         /// invalid member (i.e., a non-string).
@@ -281,7 +300,7 @@ bitflags! {
         /// ```python
         /// __all__ = [1]
         /// ```
-        const INVALID_ALL_OBJECT = 1 << 6;
+        const INVALID_ALL_OBJECT = 1 << 7;
 
         /// The binding represents a private declaration.
         ///
@@ -289,7 +308,7 @@ bitflags! {
         /// ```python
         /// _T = "This is a private variable"
         /// ```
-        const PRIVATE_DECLARATION = 1 << 7;
+        const PRIVATE_DECLARATION = 1 << 8;
 
         /// The binding represents an unpacked assignment.
         ///
@@ -297,7 +316,7 @@ bitflags! {
         /// ```python
         /// (x, y) = 1, 2
         /// ```
-        const UNPACKED_ASSIGNMENT = 1 << 8;
+        const UNPACKED_ASSIGNMENT = 1 << 9;
     }
 }
 
@@ -511,6 +530,13 @@ pub enum BindingKind<'a> {
     /// del x
     /// ```
     Deletion,
+
+    /// A binding for a deletion, like `x` in:
+    /// ```python
+    /// if x > 0:
+    ///     del x
+    /// ```
+    ConditionalDeletion(BindingId),
 
     /// A binding to bind an exception to a local variable, like `x` in:
     /// ```python

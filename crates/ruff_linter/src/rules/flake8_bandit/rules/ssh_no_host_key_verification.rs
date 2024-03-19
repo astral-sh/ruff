@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 /// Checks for uses of policies disabling SSH verification in Paramiko.
 ///
 /// ## Why is this bad?
-/// By default, Paramiko checks the identity of remote host when establishing
+/// By default, Paramiko checks the identity of the remote host when establishing
 /// an SSH connection. Disabling the verification might lead to the client
 /// connecting to a malicious host, without the client knowing.
 ///

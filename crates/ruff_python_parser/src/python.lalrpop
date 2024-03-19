@@ -1936,7 +1936,7 @@ Comma<T>: Vec<T> = {
     }
 };
 
-/// One ore more items that are separated by a comma.
+/// One or more items that are separated by a comma.
 OneOrMore<T>: Vec<T> = {
     <e:T> => vec![e],
     <mut v: OneOrMore<T>> "," <e:T> => {

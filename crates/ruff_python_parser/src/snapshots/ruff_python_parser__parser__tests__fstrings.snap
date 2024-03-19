@@ -28,7 +28,7 @@ expression: parse_ast
                                                                     value: " f",
                                                                     flags: StringLiteralFlags {
                                                                         quote_style: Double,
-                                                                        prefix: "",
+                                                                        prefix: Empty,
                                                                         triple_quoted: false,
                                                                     },
                                                                 },
@@ -44,7 +44,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Double,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: false,
                                     },
                                 },
@@ -85,7 +85,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Double,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: false,
                                     },
                                 },
@@ -136,7 +136,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Double,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: false,
                                     },
                                 },
@@ -201,7 +201,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Double,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: false,
                                     },
                                 },
@@ -254,7 +254,7 @@ expression: parse_ast
                                                                                         value: "}",
                                                                                         flags: StringLiteralFlags {
                                                                                             quote_style: Double,
-                                                                                            prefix: "",
+                                                                                            prefix: Empty,
                                                                                             triple_quoted: false,
                                                                                         },
                                                                                     },
@@ -281,7 +281,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Single,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: false,
                                     },
                                 },
@@ -334,7 +334,7 @@ expression: parse_ast
                                                                                         value: "{",
                                                                                         flags: StringLiteralFlags {
                                                                                             quote_style: Double,
-                                                                                            prefix: "",
+                                                                                            prefix: Empty,
                                                                                             triple_quoted: false,
                                                                                         },
                                                                                     },
@@ -361,7 +361,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Single,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: false,
                                     },
                                 },
@@ -407,7 +407,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Double,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: false,
                                     },
                                 },
@@ -465,7 +465,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Double,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: false,
                                     },
                                 },
@@ -511,7 +511,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Double,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: false,
                                     },
                                 },
@@ -575,7 +575,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Double,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: false,
                                     },
                                 },
@@ -646,7 +646,7 @@ expression: parse_ast
                                                                         ],
                                                                         flags: FStringFlags {
                                                                             quote_style: Double,
-                                                                            raw: false,
+                                                                            prefix: Regular,
                                                                             triple_quoted: false,
                                                                         },
                                                                     },
@@ -675,7 +675,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Single,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: false,
                                     },
                                 },
@@ -706,7 +706,7 @@ expression: parse_ast
                                                         value: "foo ",
                                                         flags: StringLiteralFlags {
                                                             quote_style: Double,
-                                                            prefix: "",
+                                                            prefix: Empty,
                                                             triple_quoted: false,
                                                         },
                                                     },
@@ -758,7 +758,7 @@ expression: parse_ast
                                                         ],
                                                         flags: FStringFlags {
                                                             quote_style: Double,
-                                                            raw: false,
+                                                            prefix: Regular,
                                                             triple_quoted: false,
                                                         },
                                                     },
@@ -769,7 +769,7 @@ expression: parse_ast
                                                         value: "baz",
                                                         flags: StringLiteralFlags {
                                                             quote_style: Double,
-                                                            prefix: "",
+                                                            prefix: Empty,
                                                             triple_quoted: false,
                                                         },
                                                     },
@@ -821,7 +821,7 @@ expression: parse_ast
                                                 value: "one",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -857,7 +857,7 @@ expression: parse_ast
                                                         value: "implicitly ",
                                                         flags: StringLiteralFlags {
                                                             quote_style: Double,
-                                                            prefix: "",
+                                                            prefix: Empty,
                                                             triple_quoted: false,
                                                         },
                                                     },
@@ -866,7 +866,7 @@ expression: parse_ast
                                                         value: "concatenated",
                                                         flags: StringLiteralFlags {
                                                             quote_style: Double,
-                                                            prefix: "",
+                                                            prefix: Empty,
                                                             triple_quoted: false,
                                                         },
                                                     },
@@ -960,7 +960,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Double,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: false,
                                     },
                                 },
@@ -992,7 +992,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Double,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: false,
                                     },
                                 },
@@ -1045,7 +1045,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Double,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: true,
                                     },
                                 },
@@ -1091,7 +1091,7 @@ expression: parse_ast
                                     ],
                                     flags: FStringFlags {
                                         quote_style: Double,
-                                        raw: false,
+                                        prefix: Regular,
                                         triple_quoted: false,
                                     },
                                 },

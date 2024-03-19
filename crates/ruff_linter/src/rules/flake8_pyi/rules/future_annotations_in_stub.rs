@@ -10,9 +10,10 @@ use crate::checkers::ast::Checker;
 /// statement in stub files.
 ///
 /// ## Why is this bad?
-/// Stub files are already evaluated under `annotations` semantics. As such,
-/// the `from __future__ import annotations` import statement has no effect
-/// and should be omitted.
+/// Stub files natively support forward references in all contexts, as stubs are
+/// never executed at runtime. (They should be thought of as "data files" for
+/// type checkers.) As such, the `from __future__ import annotations` import
+/// statement has no effect and should be omitted.
 ///
 /// ## References
 /// - [Static Typing with Python: Type Stubs](https://typing.readthedocs.io/en/latest/source/stubs.html)

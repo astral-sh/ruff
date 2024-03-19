@@ -632,6 +632,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             ]) {
                 flake8_bandit::rules::shell_injection(checker, call);
             }
+            if checker.enabled(Rule::DjangoExtra) {
+                flake8_bandit::rules::django_extra(checker, call);
+            }
             if checker.enabled(Rule::DjangoRawSql) {
                 flake8_bandit::rules::django_raw_sql(checker, call);
             }
