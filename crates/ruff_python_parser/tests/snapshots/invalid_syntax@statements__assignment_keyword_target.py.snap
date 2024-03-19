@@ -4,7 +4,7 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/assignment_ke
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
         range: 0..44,
@@ -144,6 +144,3 @@ Module(
 6 | 
 7 | a + b
   |
-
-
-

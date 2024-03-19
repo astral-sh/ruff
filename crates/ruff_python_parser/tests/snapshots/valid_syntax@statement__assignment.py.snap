@@ -4,10 +4,10 @@ input_file: crates/ruff_python_parser/resources/valid/statement/assignment.py
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
-        range: 0..692,
+        range: 0..734,
         body: [
             Assign(
                 StmtAssign {
@@ -824,6 +824,126 @@ Module(
                             value: Int(
                                 42,
                             ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 693..703,
+                    targets: [
+                        List(
+                            ExprList {
+                                range: 693..695,
+                                elts: [],
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Starred(
+                        ExprStarred {
+                            range: 698..703,
+                            value: Name(
+                                ExprName {
+                                    range: 699..703,
+                                    id: "data",
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 704..714,
+                    targets: [
+                        Tuple(
+                            ExprTuple {
+                                range: 704..706,
+                                elts: [],
+                                ctx: Store,
+                                parenthesized: true,
+                            },
+                        ),
+                    ],
+                    value: Starred(
+                        ExprStarred {
+                            range: 709..714,
+                            value: Name(
+                                ExprName {
+                                    range: 710..714,
+                                    id: "data",
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 715..724,
+                    targets: [
+                        Tuple(
+                            ExprTuple {
+                                range: 715..719,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            range: 715..716,
+                                            id: "a",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 718..719,
+                                            id: "b",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ],
+                                ctx: Store,
+                                parenthesized: false,
+                            },
+                        ),
+                    ],
+                    value: Name(
+                        ExprName {
+                            range: 722..724,
+                            id: "ab",
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 725..734,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 725..726,
+                                id: "a",
+                                ctx: Store,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 729..730,
+                                id: "b",
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Name(
+                        ExprName {
+                            range: 733..734,
+                            id: "c",
+                            ctx: Load,
                         },
                     ),
                 },
