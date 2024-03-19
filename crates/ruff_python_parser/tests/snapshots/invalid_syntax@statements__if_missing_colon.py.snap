@@ -4,7 +4,7 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/if_missing_co
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
         range: 0..25,
@@ -63,6 +63,3 @@ Module(
 3 | 
 4 | a = 10
   |
-
-
-

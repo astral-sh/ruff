@@ -1,0 +1,422 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/named.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..142,
+        body: [
+            If(
+                StmtIf {
+                    range: 0..19,
+                    test: Named(
+                        ExprNamed {
+                            range: 3..9,
+                            target: Name(
+                                ExprName {
+                                    range: 3..4,
+                                    id: "x",
+                                    ctx: Store,
+                                },
+                            ),
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 8..9,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 15..19,
+                            },
+                        ),
+                    ],
+                    elif_else_clauses: [],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 21..29,
+                    value: Named(
+                        ExprNamed {
+                            range: 22..28,
+                            target: Name(
+                                ExprName {
+                                    range: 22..23,
+                                    id: "x",
+                                    ctx: Store,
+                                },
+                            ),
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 27..28,
+                                    value: Int(
+                                        5,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 30..44,
+                    value: Named(
+                        ExprNamed {
+                            range: 31..43,
+                            target: Name(
+                                ExprName {
+                                    range: 31..32,
+                                    id: "x",
+                                    ctx: Store,
+                                },
+                            ),
+                            value: BinOp(
+                                ExprBinOp {
+                                    range: 37..42,
+                                    left: Name(
+                                        ExprName {
+                                            range: 37..38,
+                                            id: "y",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    op: Mult,
+                                    right: Name(
+                                        ExprName {
+                                            range: 41..42,
+                                            id: "z",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 45..53,
+                    value: Set(
+                        ExprSet {
+                            range: 45..53,
+                            elts: [
+                                Named(
+                                    ExprNamed {
+                                        range: 46..52,
+                                        target: Name(
+                                            ExprName {
+                                                range: 46..47,
+                                                id: "x",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 51..52,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 54..62,
+                    value: List(
+                        ExprList {
+                            range: 54..62,
+                            elts: [
+                                Named(
+                                    ExprNamed {
+                                        range: 55..61,
+                                        target: Name(
+                                            ExprName {
+                                                range: 55..56,
+                                                id: "x",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 60..61,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 63..75,
+                    value: Named(
+                        ExprNamed {
+                            range: 64..74,
+                            target: Name(
+                                ExprName {
+                                    range: 64..65,
+                                    id: "x",
+                                    ctx: Store,
+                                },
+                            ),
+                            value: BinOp(
+                                ExprBinOp {
+                                    range: 69..74,
+                                    left: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 69..70,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    op: Add,
+                                    right: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 73..74,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 76..93,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 76..93,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 77..78,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Named(
+                                    ExprNamed {
+                                        range: 80..92,
+                                        target: Name(
+                                            ExprName {
+                                                range: 80..81,
+                                                id: "y",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: BoolOp(
+                                            ExprBoolOp {
+                                                range: 85..92,
+                                                op: And,
+                                                values: [
+                                                    Name(
+                                                        ExprName {
+                                                            range: 85..86,
+                                                            id: "a",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    Name(
+                                                        ExprName {
+                                                            range: 91..92,
+                                                            id: "b",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 94..109,
+                    value: Set(
+                        ExprSet {
+                            range: 94..109,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 95..96,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Named(
+                                    ExprNamed {
+                                        range: 98..108,
+                                        target: Name(
+                                            ExprName {
+                                                range: 98..99,
+                                                id: "y",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: Compare(
+                                            ExprCompare {
+                                                range: 103..108,
+                                                left: Name(
+                                                    ExprName {
+                                                        range: 103..104,
+                                                        id: "a",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ops: [
+                                                    Lt,
+                                                ],
+                                                comparators: [
+                                                    Name(
+                                                        ExprName {
+                                                            range: 107..108,
+                                                            id: "b",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 110..123,
+                    value: List(
+                        ExprList {
+                            range: 110..123,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 111..112,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Named(
+                                    ExprNamed {
+                                        range: 114..122,
+                                        target: Name(
+                                            ExprName {
+                                                range: 114..115,
+                                                id: "y",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 119..122,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 124..141,
+                    value: Call(
+                        ExprCall {
+                            range: 124..141,
+                            func: Name(
+                                ExprName {
+                                    range: 124..125,
+                                    id: "f",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 125..141,
+                                args: [
+                                    Named(
+                                        ExprNamed {
+                                            range: 126..132,
+                                            target: Name(
+                                                ExprName {
+                                                    range: 126..127,
+                                                    id: "a",
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                            value: Name(
+                                                ExprName {
+                                                    range: 131..132,
+                                                    id: "b",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                    Named(
+                                        ExprNamed {
+                                            range: 134..140,
+                                            target: Name(
+                                                ExprName {
+                                                    range: 134..135,
+                                                    id: "c",
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                            value: Name(
+                                                ExprName {
+                                                    range: 139..140,
+                                                    id: "d",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
