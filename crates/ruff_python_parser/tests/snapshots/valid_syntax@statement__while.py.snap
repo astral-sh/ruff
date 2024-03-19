@@ -1,0 +1,274 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/statement/while.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..169,
+        body: [
+            While(
+                StmtWhile {
+                    range: 0..16,
+                    test: Name(
+                        ExprName {
+                            range: 6..7,
+                            id: "x",
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 13..16,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 13..16,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            While(
+                StmtWhile {
+                    range: 17..60,
+                    test: BoolOp(
+                        ExprBoolOp {
+                            range: 23..36,
+                            op: And,
+                            values: [
+                                Compare(
+                                    ExprCompare {
+                                        range: 24..29,
+                                        left: Name(
+                                            ExprName {
+                                                range: 24..25,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ops: [
+                                            Gt,
+                                        ],
+                                        comparators: [
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 28..29,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 35..36,
+                                        id: "y",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 42..46,
+                            },
+                        ),
+                    ],
+                    orelse: [
+                        Expr(
+                            StmtExpr {
+                                range: 57..60,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 57..60,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            While(
+                StmtWhile {
+                    range: 61..150,
+                    test: BoolOp(
+                        ExprBoolOp {
+                            range: 67..74,
+                            op: And,
+                            values: [
+                                Name(
+                                    ExprName {
+                                        range: 67..68,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 73..74,
+                                        id: "y",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 80..83,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 80..83,
+                                    },
+                                ),
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                range: 88..109,
+                                value: Call(
+                                    ExprCall {
+                                        range: 88..109,
+                                        func: Name(
+                                            ExprName {
+                                                range: 88..93,
+                                                id: "print",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 93..109,
+                                            args: [
+                                                StringLiteral(
+                                                    ExprStringLiteral {
+                                                        range: 94..108,
+                                                        value: StringLiteralValue {
+                                                            inner: Single(
+                                                                StringLiteral {
+                                                                    range: 94..108,
+                                                                    value: "Hello World!",
+                                                                    flags: StringLiteralFlags {
+                                                                        quote_style: Single,
+                                                                        prefix: "",
+                                                                        triple_quoted: false,
+                                                                    },
+                                                                },
+                                                            ),
+                                                        },
+                                                    },
+                                                ),
+                                            ],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [
+                        Expr(
+                            StmtExpr {
+                                range: 121..142,
+                                value: Call(
+                                    ExprCall {
+                                        range: 121..142,
+                                        func: Name(
+                                            ExprName {
+                                                range: 121..126,
+                                                id: "print",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 126..142,
+                                            args: [
+                                                StringLiteral(
+                                                    ExprStringLiteral {
+                                                        range: 127..141,
+                                                        value: StringLiteralValue {
+                                                            inner: Single(
+                                                                StringLiteral {
+                                                                    range: 127..141,
+                                                                    value: "Olá, Mundo!",
+                                                                    flags: StringLiteralFlags {
+                                                                        quote_style: Single,
+                                                                        prefix: "",
+                                                                        triple_quoted: false,
+                                                                    },
+                                                                },
+                                                            ),
+                                                        },
+                                                    },
+                                                ),
+                                            ],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                range: 147..150,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 147..150,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            While(
+                StmtWhile {
+                    range: 151..168,
+                    test: Named(
+                        ExprNamed {
+                            range: 157..163,
+                            target: Name(
+                                ExprName {
+                                    range: 157..158,
+                                    id: "a",
+                                    ctx: Store,
+                                },
+                            ),
+                            value: Name(
+                                ExprName {
+                                    range: 162..163,
+                                    id: "b",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 165..168,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 165..168,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+        ],
+    },
+)
+```
