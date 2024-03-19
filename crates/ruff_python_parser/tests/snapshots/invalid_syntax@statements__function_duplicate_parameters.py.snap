@@ -4,7 +4,7 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/function_dupl
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
         range: 0..225,
@@ -398,6 +398,3 @@ Module(
 12 | def f6(a, a: str): pass
    |           ^^^^^^ Syntax Error: duplicate argument 'a' in function definition
    |
-
-
-

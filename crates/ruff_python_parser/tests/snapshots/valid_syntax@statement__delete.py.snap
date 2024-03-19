@@ -4,10 +4,10 @@ input_file: crates/ruff_python_parser/resources/valid/statement/delete.py
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
-        range: 0..23,
+        range: 0..50,
         body: [
             Delete(
                 StmtDelete {
@@ -25,21 +25,86 @@ Module(
             ),
             Delete(
                 StmtDelete {
-                    range: 6..13,
+                    range: 6..15,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 10..11,
+                                id: "a",
+                                ctx: Del,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 13..14,
+                                id: "b",
+                                ctx: Del,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Delete(
+                StmtDelete {
+                    range: 16..32,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 20..21,
+                                id: "a",
+                                ctx: Del,
+                            },
+                        ),
+                        Tuple(
+                            ExprTuple {
+                                range: 23..29,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            range: 24..25,
+                                            id: "b",
+                                            ctx: Del,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 27..28,
+                                            id: "c",
+                                            ctx: Del,
+                                        },
+                                    ),
+                                ],
+                                ctx: Del,
+                                parenthesized: true,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 31..32,
+                                id: "d",
+                                ctx: Del,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Delete(
+                StmtDelete {
+                    range: 33..40,
                     targets: [
                         Attribute(
                             ExprAttribute {
-                                range: 10..13,
+                                range: 37..40,
                                 value: Name(
                                     ExprName {
-                                        range: 10..11,
+                                        range: 37..38,
                                         id: "x",
                                         ctx: Load,
                                     },
                                 ),
                                 attr: Identifier {
                                     id: "y",
-                                    range: 12..13,
+                                    range: 39..40,
                                 },
                                 ctx: Del,
                             },
@@ -49,21 +114,21 @@ Module(
             ),
             Delete(
                 StmtDelete {
-                    range: 14..22,
+                    range: 41..49,
                     targets: [
                         Subscript(
                             ExprSubscript {
-                                range: 18..22,
+                                range: 45..49,
                                 value: Name(
                                     ExprName {
-                                        range: 18..19,
+                                        range: 45..46,
                                         id: "x",
                                         ctx: Load,
                                     },
                                 ),
                                 slice: Name(
                                     ExprName {
-                                        range: 20..21,
+                                        range: 47..48,
                                         id: "y",
                                         ctx: Load,
                                     },
@@ -78,4 +143,3 @@ Module(
     },
 )
 ```
-
