@@ -20,7 +20,7 @@ expression: parse_ast
                                 flags: BytesLiteralFlags {
                                     quote_style: Single,
                                     prefix: Raw {
-                                        uppercase_r: true,
+                                        uppercase_r: false,
                                     },
                                     triple_quoted: false,
                                 },
