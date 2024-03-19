@@ -73,6 +73,7 @@ use super::helpers::{is_pytest_parametrize, split_names};
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[violation]
 pub struct PytestParametrizeNamesWrongType {
+    single_argument: bool,
     expected: types::ParametrizeNameType,
 }
 
@@ -81,12 +82,24 @@ impl Violation for PytestParametrizeNamesWrongType {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestParametrizeNamesWrongType { expected } = self;
-        format!("Wrong name(s) type in `@pytest.mark.parametrize`, expected `{expected}`")
+        let PytestParametrizeNamesWrongType {
+            single_argument,
+            expected,
+        } = self;
+        if *single_argument {
+            return format!("Wrong name format in `@pytest.mark.parametrize`, expected `string`");
+        }
+        format!("Wrong names type in `@pytest.mark.parametrize`, expected `{expected}`")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let PytestParametrizeNamesWrongType { expected } = self;
+        let PytestParametrizeNamesWrongType {
+            single_argument,
+            expected,
+        } = self;
+        if *single_argument {
+            return Some(format!("Use a `string` for parameter name"));
+        }
         Some(format!("Use a `{expected}` for parameter names"))
     }
 }
@@ -328,6 +341,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         .unwrap_or(expr.range());
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
+                                single_argument: false,
                                 expected: names_type,
                             },
                             name_range,
@@ -362,6 +376,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         .unwrap_or(expr.range());
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
+                                single_argument: false,
                                 expected: names_type,
                             },
                             name_range,
@@ -400,6 +415,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                     types::ParametrizeNameType::List => {
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
+                                single_argument: false,
                                 expected: names_type,
                             },
                             expr.range(),
@@ -418,6 +434,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                     types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
+                                single_argument: false,
                                 expected: names_type,
                             },
                             expr.range(),
@@ -444,6 +461,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                     types::ParametrizeNameType::Tuple => {
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
+                                single_argument: false,
                                 expected: names_type,
                             },
                             expr.range(),
@@ -463,6 +481,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                     types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
+                                single_argument: false,
                                 expected: names_type,
                             },
                             expr.range(),
@@ -657,6 +676,7 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
 fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
     let mut diagnostic = Diagnostic::new(
         PytestParametrizeNamesWrongType {
+            single_argument: true,
             expected: types::ParametrizeNameType::Csv,
         },
         expr.range(),
