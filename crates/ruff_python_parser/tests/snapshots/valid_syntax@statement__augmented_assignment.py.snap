@@ -4,10 +4,10 @@ input_file: crates/ruff_python_parser/resources/valid/statement/augmented_assign
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
-        range: 0..181,
+        range: 0..212,
         body: [
             AugAssign(
                 StmtAugAssign {
@@ -418,8 +418,67 @@ Module(
                     ),
                 },
             ),
+            AugAssign(
+                StmtAugAssign {
+                    range: 190..212,
+                    target: Name(
+                        ExprName {
+                            range: 190..191,
+                            id: "a",
+                            ctx: Store,
+                        },
+                    ),
+                    op: FloorDiv,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 196..212,
+                            left: BinOp(
+                                ExprBinOp {
+                                    range: 197..202,
+                                    left: Name(
+                                        ExprName {
+                                            range: 197..198,
+                                            id: "a",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    op: Add,
+                                    right: Name(
+                                        ExprName {
+                                            range: 201..202,
+                                            id: "b",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            op: Sub,
+                            right: BinOp(
+                                ExprBinOp {
+                                    range: 206..212,
+                                    left: Name(
+                                        ExprName {
+                                            range: 206..207,
+                                            id: "c",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    op: Pow,
+                                    right: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 211..212,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
 ```
-
