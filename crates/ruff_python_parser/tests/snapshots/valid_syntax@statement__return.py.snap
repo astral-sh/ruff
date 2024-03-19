@@ -1,0 +1,199 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/statement/return.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..93,
+        body: [
+            Return(
+                StmtReturn {
+                    range: 0..6,
+                    value: None,
+                },
+            ),
+            Return(
+                StmtReturn {
+                    range: 7..21,
+                    value: Some(
+                        BoolOp(
+                            ExprBoolOp {
+                                range: 14..21,
+                                op: And,
+                                values: [
+                                    Name(
+                                        ExprName {
+                                            range: 14..15,
+                                            id: "a",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 20..21,
+                                            id: "b",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ),
+                },
+            ),
+            Return(
+                StmtReturn {
+                    range: 22..34,
+                    value: Some(
+                        Compare(
+                            ExprCompare {
+                                range: 29..34,
+                                left: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 29..30,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                ops: [
+                                    Lt,
+                                ],
+                                comparators: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 33..34,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ),
+                },
+            ),
+            Return(
+                StmtReturn {
+                    range: 35..46,
+                    value: Some(
+                        NoneLiteral(
+                            ExprNoneLiteral {
+                                range: 42..46,
+                            },
+                        ),
+                    ),
+                },
+            ),
+            Return(
+                StmtReturn {
+                    range: 47..59,
+                    value: Some(
+                        Tuple(
+                            ExprTuple {
+                                range: 54..59,
+                                elts: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 54..55,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 57..58,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: false,
+                            },
+                        ),
+                    ),
+                },
+            ),
+            Return(
+                StmtReturn {
+                    range: 60..68,
+                    value: Some(
+                        Name(
+                            ExprName {
+                                range: 67..68,
+                                id: "x",
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                },
+            ),
+            Return(
+                StmtReturn {
+                    range: 69..79,
+                    value: Some(
+                        Call(
+                            ExprCall {
+                                range: 76..79,
+                                func: Name(
+                                    ExprName {
+                                        range: 76..77,
+                                        id: "f",
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 77..79,
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    ),
+                },
+            ),
+            Return(
+                StmtReturn {
+                    range: 80..92,
+                    value: Some(
+                        Call(
+                            ExprCall {
+                                range: 87..92,
+                                func: Attribute(
+                                    ExprAttribute {
+                                        range: 87..90,
+                                        value: Name(
+                                            ExprName {
+                                                range: 87..88,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        attr: Identifier {
+                                            id: "f",
+                                            range: 89..90,
+                                        },
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 90..92,
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

@@ -4,7 +4,7 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/call_invalid
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
         range: 0..67,
@@ -191,6 +191,3 @@ Module(
 6 | f(a=20, a=30)
   |         ^^^^ Syntax Error: keyword argument repeated: a
   |
-
-
-

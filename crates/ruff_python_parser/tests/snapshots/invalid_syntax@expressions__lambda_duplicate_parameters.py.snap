@@ -4,7 +4,7 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/lambda_dupli
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
         range: 0..91,
@@ -328,6 +328,3 @@ Module(
 9 | lambda a, *, **a: 1
   |                ^ Syntax Error: duplicate argument 'a' in function definition
   |
-
-
-

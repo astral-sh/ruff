@@ -4,7 +4,7 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/import_from.p
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
         range: 0..98,
@@ -220,6 +220,3 @@ Module(
 11 | a + b
    |       Syntax Error: unexpected EOF while parsing
    |
-
-
-
