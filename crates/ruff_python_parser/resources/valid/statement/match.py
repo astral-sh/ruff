@@ -164,6 +164,7 @@ match w := x,:
         z = 0
 
 match x:
+    # F-strings aren't allowed as patterns but it's a soft syntax error in Python.
     case f"{y}":
         pass
 match {"test": 1}:
@@ -240,6 +241,8 @@ match x:
 
 # PatternMatchAs
 match x:
+    case a:
+        ...
     case a as b:
         ...
     case 1 | 2 as two:
@@ -272,9 +275,9 @@ match x:
 
 # PatternMatchStar
 match x:
-    case *a:
+    case *a,:
         ...
-    case *_:
+    case *_,:
         ...
     case [1, 2, *rest]:
         ...

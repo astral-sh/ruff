@@ -20,6 +20,7 @@ mod expression;
 mod helpers;
 mod pattern;
 mod progress;
+mod recovery;
 mod statement;
 #[cfg(test)]
 mod tests;
@@ -989,7 +990,11 @@ impl RecoveryContextKind {
             | RecoveryContextKind::TupleElements(_) => p.at_expr(),
             RecoveryContextKind::DictElements => p.at(TokenKind::DoubleStar) || p.at_expr(),
             RecoveryContextKind::SequenceMatchPattern(_) => p.at_pattern_start(),
-            RecoveryContextKind::MatchPatternMapping => p.at_mapping_pattern_start(),
+            RecoveryContextKind::MatchPatternMapping => {
+                // A star pattern is invalid as a mapping key and is here only for
+                // better error recovery.
+                p.at(TokenKind::Star) || p.at_mapping_pattern_start()
+            }
             RecoveryContextKind::MatchPatternClassArguments => p.at_pattern_start(),
             RecoveryContextKind::Arguments => p.at_expr(),
             RecoveryContextKind::DeleteTargets => p.at_expr(),

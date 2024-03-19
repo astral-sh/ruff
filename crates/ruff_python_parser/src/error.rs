@@ -119,6 +119,8 @@ pub enum ParseErrorType {
     SimpleStmtAndCompoundStmtInSameLine,
     /// An invalid `match` case pattern was found.
     InvalidMatchPatternLiteral { pattern: TokenKind },
+    /// A star pattern was found outside a sequence pattern.
+    StarPatternUsageError,
     /// The parser expected a specific token that was not found.
     ExpectedToken {
         expected: TokenKind,
@@ -182,6 +184,9 @@ impl std::fmt::Display for ParseErrorType {
             }
             ParseErrorType::InvalidMatchPatternLiteral { pattern } => {
                 write!(f, "invalid pattern `{pattern:?}`")
+            }
+            ParseErrorType::StarPatternUsageError => {
+                write!(f, "Star pattern cannot be used here")
             }
             ParseErrorType::UnexpectedIndentation => write!(f, "unexpected indentation"),
             ParseErrorType::InvalidAssignmentTarget => write!(f, "invalid assignment target"),
