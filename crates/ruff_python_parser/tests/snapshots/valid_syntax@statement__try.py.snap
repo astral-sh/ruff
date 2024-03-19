@@ -1,0 +1,1193 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/statement/try.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..813,
+        body: [
+            Try(
+                StmtTry {
+                    range: 0..28,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 9..12,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 9..12,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 13..28,
+                                type_: None,
+                                name: None,
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 25..28,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 25..28,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 30..106,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 39..42,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 39..42,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 43..74,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 50..60,
+                                            id: "Exception1",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: Some(
+                                    Identifier {
+                                        id: "e",
+                                        range: 64..65,
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 71..74,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 71..74,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 75..106,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 82..92,
+                                            id: "Exception2",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: Some(
+                                    Identifier {
+                                        id: "e",
+                                        range: 96..97,
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 103..106,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 103..106,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 108..184,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 117..120,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 117..120,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 121..151,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 128..137,
+                                            id: "Exception",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: Some(
+                                    Identifier {
+                                        id: "e",
+                                        range: 141..142,
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 148..151,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 148..151,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 152..167,
+                                type_: None,
+                                name: None,
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 164..167,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 164..167,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [
+                        Expr(
+                            StmtExpr {
+                                range: 181..184,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 181..184,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    is_star: false,
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 186..228,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 195..198,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 195..198,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 199..214,
+                                type_: None,
+                                name: None,
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 211..214,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 211..214,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [
+                        Expr(
+                            StmtExpr {
+                                range: 225..228,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 225..228,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 230..289,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 239..242,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 239..242,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 243..258,
+                                type_: None,
+                                name: None,
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 255..258,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 255..258,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [
+                        Expr(
+                            StmtExpr {
+                                range: 269..272,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 269..272,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    finalbody: [
+                        Expr(
+                            StmtExpr {
+                                range: 286..289,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 286..289,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    is_star: false,
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 291..320,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 300..303,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 300..303,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    handlers: [],
+                    orelse: [],
+                    finalbody: [
+                        Expr(
+                            StmtExpr {
+                                range: 317..320,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 317..320,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    is_star: false,
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 322..365,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 331..334,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 331..334,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    handlers: [],
+                    orelse: [
+                        Expr(
+                            StmtExpr {
+                                range: 345..348,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 345..348,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    finalbody: [
+                        Expr(
+                            StmtExpr {
+                                range: 362..365,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 362..365,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    is_star: false,
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 367..422,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 376..379,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 376..379,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 380..403,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 388..389,
+                                            id: "a",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: Some(
+                                    Identifier {
+                                        id: "A",
+                                        range: 393..394,
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 400..403,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 400..403,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 404..422,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 412..413,
+                                            id: "b",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 419..422,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 419..422,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: true,
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 424..558,
+                    body: [
+                        Raise(
+                            StmtRaise {
+                                range: 433..452,
+                                exc: Some(
+                                    Call(
+                                        ExprCall {
+                                            range: 439..452,
+                                            func: Name(
+                                                ExprName {
+                                                    range: 439..449,
+                                                    id: "ValueError",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 449..452,
+                                                args: [
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 450..451,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                                keywords: [],
+                                            },
+                                        },
+                                    ),
+                                ),
+                                cause: None,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 453..506,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 460..469,
+                                            id: "TypeError",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: Some(
+                                    Identifier {
+                                        id: "e",
+                                        range: 473..474,
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 480..506,
+                                            value: Call(
+                                                ExprCall {
+                                                    range: 480..506,
+                                                    func: Name(
+                                                        ExprName {
+                                                            range: 480..485,
+                                                            id: "print",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    arguments: Arguments {
+                                                        range: 485..506,
+                                                        args: [
+                                                            FString(
+                                                                ExprFString {
+                                                                    range: 486..505,
+                                                                    value: FStringValue {
+                                                                        inner: Single(
+                                                                            FString(
+                                                                                FString {
+                                                                                    range: 486..505,
+                                                                                    elements: [
+                                                                                        Literal(
+                                                                                            FStringLiteralElement {
+                                                                                                range: 488..495,
+                                                                                                value: "caught ",
+                                                                                            },
+                                                                                        ),
+                                                                                        Expression(
+                                                                                            FStringExpressionElement {
+                                                                                                range: 495..504,
+                                                                                                expression: Call(
+                                                                                                    ExprCall {
+                                                                                                        range: 496..503,
+                                                                                                        func: Name(
+                                                                                                            ExprName {
+                                                                                                                range: 496..500,
+                                                                                                                id: "type",
+                                                                                                                ctx: Load,
+                                                                                                            },
+                                                                                                        ),
+                                                                                                        arguments: Arguments {
+                                                                                                            range: 500..503,
+                                                                                                            args: [
+                                                                                                                Name(
+                                                                                                                    ExprName {
+                                                                                                                        range: 501..502,
+                                                                                                                        id: "e",
+                                                                                                                        ctx: Load,
+                                                                                                                    },
+                                                                                                                ),
+                                                                                                            ],
+                                                                                                            keywords: [],
+                                                                                                        },
+                                                                                                    },
+                                                                                                ),
+                                                                                                debug_text: None,
+                                                                                                conversion: None,
+                                                                                                format_spec: None,
+                                                                                            },
+                                                                                        ),
+                                                                                    ],
+                                                                                    flags: FStringFlags {
+                                                                                        quote_style: Double,
+                                                                                        raw: false,
+                                                                                        triple_quoted: false,
+                                                                                    },
+                                                                                },
+                                                                            ),
+                                                                        ),
+                                                                    },
+                                                                },
+                                                            ),
+                                                        ],
+                                                        keywords: [],
+                                                    },
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 507..558,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 514..521,
+                                            id: "OSError",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: Some(
+                                    Identifier {
+                                        id: "e",
+                                        range: 525..526,
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 532..558,
+                                            value: Call(
+                                                ExprCall {
+                                                    range: 532..558,
+                                                    func: Name(
+                                                        ExprName {
+                                                            range: 532..537,
+                                                            id: "print",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    arguments: Arguments {
+                                                        range: 537..558,
+                                                        args: [
+                                                            FString(
+                                                                ExprFString {
+                                                                    range: 538..557,
+                                                                    value: FStringValue {
+                                                                        inner: Single(
+                                                                            FString(
+                                                                                FString {
+                                                                                    range: 538..557,
+                                                                                    elements: [
+                                                                                        Literal(
+                                                                                            FStringLiteralElement {
+                                                                                                range: 540..547,
+                                                                                                value: "caught ",
+                                                                                            },
+                                                                                        ),
+                                                                                        Expression(
+                                                                                            FStringExpressionElement {
+                                                                                                range: 547..556,
+                                                                                                expression: Call(
+                                                                                                    ExprCall {
+                                                                                                        range: 548..555,
+                                                                                                        func: Name(
+                                                                                                            ExprName {
+                                                                                                                range: 548..552,
+                                                                                                                id: "type",
+                                                                                                                ctx: Load,
+                                                                                                            },
+                                                                                                        ),
+                                                                                                        arguments: Arguments {
+                                                                                                            range: 552..555,
+                                                                                                            args: [
+                                                                                                                Name(
+                                                                                                                    ExprName {
+                                                                                                                        range: 553..554,
+                                                                                                                        id: "e",
+                                                                                                                        ctx: Load,
+                                                                                                                    },
+                                                                                                                ),
+                                                                                                            ],
+                                                                                                            keywords: [],
+                                                                                                        },
+                                                                                                    },
+                                                                                                ),
+                                                                                                debug_text: None,
+                                                                                                conversion: None,
+                                                                                                format_spec: None,
+                                                                                            },
+                                                                                        ),
+                                                                                    ],
+                                                                                    flags: FStringFlags {
+                                                                                        quote_style: Double,
+                                                                                        raw: false,
+                                                                                        triple_quoted: false,
+                                                                                    },
+                                                                                },
+                                                                            ),
+                                                                        ),
+                                                                    },
+                                                                },
+                                                            ),
+                                                        ],
+                                                        keywords: [],
+                                                    },
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 560..812,
+                    body: [
+                        Raise(
+                            StmtRaise {
+                                range: 569..650,
+                                exc: Some(
+                                    Call(
+                                        ExprCall {
+                                            range: 575..650,
+                                            func: Name(
+                                                ExprName {
+                                                    range: 575..589,
+                                                    id: "ExceptionGroup",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 589..650,
+                                                args: [
+                                                    StringLiteral(
+                                                        ExprStringLiteral {
+                                                            range: 590..594,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 590..594,
+                                                                        value: "eg",
+                                                                        flags: StringLiteralFlags {
+                                                                            quote_style: Double,
+                                                                            prefix: "",
+                                                                            triple_quoted: false,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            },
+                                                        },
+                                                    ),
+                                                    List(
+                                                        ExprList {
+                                                            range: 596..649,
+                                                            elts: [
+                                                                Call(
+                                                                    ExprCall {
+                                                                        range: 597..610,
+                                                                        func: Name(
+                                                                            ExprName {
+                                                                                range: 597..607,
+                                                                                id: "ValueError",
+                                                                                ctx: Load,
+                                                                            },
+                                                                        ),
+                                                                        arguments: Arguments {
+                                                                            range: 607..610,
+                                                                            args: [
+                                                                                NumberLiteral(
+                                                                                    ExprNumberLiteral {
+                                                                                        range: 608..609,
+                                                                                        value: Int(
+                                                                                            1,
+                                                                                        ),
+                                                                                    },
+                                                                                ),
+                                                                            ],
+                                                                            keywords: [],
+                                                                        },
+                                                                    },
+                                                                ),
+                                                                Call(
+                                                                    ExprCall {
+                                                                        range: 612..624,
+                                                                        func: Name(
+                                                                            ExprName {
+                                                                                range: 612..621,
+                                                                                id: "TypeError",
+                                                                                ctx: Load,
+                                                                            },
+                                                                        ),
+                                                                        arguments: Arguments {
+                                                                            range: 621..624,
+                                                                            args: [
+                                                                                NumberLiteral(
+                                                                                    ExprNumberLiteral {
+                                                                                        range: 622..623,
+                                                                                        value: Int(
+                                                                                            2,
+                                                                                        ),
+                                                                                    },
+                                                                                ),
+                                                                            ],
+                                                                            keywords: [],
+                                                                        },
+                                                                    },
+                                                                ),
+                                                                Call(
+                                                                    ExprCall {
+                                                                        range: 626..636,
+                                                                        func: Name(
+                                                                            ExprName {
+                                                                                range: 626..633,
+                                                                                id: "OSError",
+                                                                                ctx: Load,
+                                                                            },
+                                                                        ),
+                                                                        arguments: Arguments {
+                                                                            range: 633..636,
+                                                                            args: [
+                                                                                NumberLiteral(
+                                                                                    ExprNumberLiteral {
+                                                                                        range: 634..635,
+                                                                                        value: Int(
+                                                                                            3,
+                                                                                        ),
+                                                                                    },
+                                                                                ),
+                                                                            ],
+                                                                            keywords: [],
+                                                                        },
+                                                                    },
+                                                                ),
+                                                                Call(
+                                                                    ExprCall {
+                                                                        range: 638..648,
+                                                                        func: Name(
+                                                                            ExprName {
+                                                                                range: 638..645,
+                                                                                id: "OSError",
+                                                                                ctx: Load,
+                                                                            },
+                                                                        ),
+                                                                        arguments: Arguments {
+                                                                            range: 645..648,
+                                                                            args: [
+                                                                                NumberLiteral(
+                                                                                    ExprNumberLiteral {
+                                                                                        range: 646..647,
+                                                                                        value: Int(
+                                                                                            4,
+                                                                                        ),
+                                                                                    },
+                                                                                ),
+                                                                            ],
+                                                                            keywords: [],
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            ],
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ],
+                                                keywords: [],
+                                            },
+                                        },
+                                    ),
+                                ),
+                                cause: None,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 651..732,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 659..668,
+                                            id: "TypeError",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: Some(
+                                    Identifier {
+                                        id: "e",
+                                        range: 672..673,
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 679..732,
+                                            value: Call(
+                                                ExprCall {
+                                                    range: 679..732,
+                                                    func: Name(
+                                                        ExprName {
+                                                            range: 679..684,
+                                                            id: "print",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    arguments: Arguments {
+                                                        range: 684..732,
+                                                        args: [
+                                                            FString(
+                                                                ExprFString {
+                                                                    range: 685..731,
+                                                                    value: FStringValue {
+                                                                        inner: Single(
+                                                                            FString(
+                                                                                FString {
+                                                                                    range: 685..731,
+                                                                                    elements: [
+                                                                                        Literal(
+                                                                                            FStringLiteralElement {
+                                                                                                range: 687..694,
+                                                                                                value: "caught ",
+                                                                                            },
+                                                                                        ),
+                                                                                        Expression(
+                                                                                            FStringExpressionElement {
+                                                                                                range: 694..703,
+                                                                                                expression: Call(
+                                                                                                    ExprCall {
+                                                                                                        range: 695..702,
+                                                                                                        func: Name(
+                                                                                                            ExprName {
+                                                                                                                range: 695..699,
+                                                                                                                id: "type",
+                                                                                                                ctx: Load,
+                                                                                                            },
+                                                                                                        ),
+                                                                                                        arguments: Arguments {
+                                                                                                            range: 699..702,
+                                                                                                            args: [
+                                                                                                                Name(
+                                                                                                                    ExprName {
+                                                                                                                        range: 700..701,
+                                                                                                                        id: "e",
+                                                                                                                        ctx: Load,
+                                                                                                                    },
+                                                                                                                ),
+                                                                                                            ],
+                                                                                                            keywords: [],
+                                                                                                        },
+                                                                                                    },
+                                                                                                ),
+                                                                                                debug_text: None,
+                                                                                                conversion: None,
+                                                                                                format_spec: None,
+                                                                                            },
+                                                                                        ),
+                                                                                        Literal(
+                                                                                            FStringLiteralElement {
+                                                                                                range: 703..716,
+                                                                                                value: " with nested ",
+                                                                                            },
+                                                                                        ),
+                                                                                        Expression(
+                                                                                            FStringExpressionElement {
+                                                                                                range: 716..730,
+                                                                                                expression: Attribute(
+                                                                                                    ExprAttribute {
+                                                                                                        range: 717..729,
+                                                                                                        value: Name(
+                                                                                                            ExprName {
+                                                                                                                range: 717..718,
+                                                                                                                id: "e",
+                                                                                                                ctx: Load,
+                                                                                                            },
+                                                                                                        ),
+                                                                                                        attr: Identifier {
+                                                                                                            id: "exceptions",
+                                                                                                            range: 719..729,
+                                                                                                        },
+                                                                                                        ctx: Load,
+                                                                                                    },
+                                                                                                ),
+                                                                                                debug_text: None,
+                                                                                                conversion: None,
+                                                                                                format_spec: None,
+                                                                                            },
+                                                                                        ),
+                                                                                    ],
+                                                                                    flags: FStringFlags {
+                                                                                        quote_style: Double,
+                                                                                        raw: false,
+                                                                                        triple_quoted: false,
+                                                                                    },
+                                                                                },
+                                                                            ),
+                                                                        ),
+                                                                    },
+                                                                },
+                                                            ),
+                                                        ],
+                                                        keywords: [],
+                                                    },
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 733..812,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 741..748,
+                                            id: "OSError",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: Some(
+                                    Identifier {
+                                        id: "e",
+                                        range: 752..753,
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 759..812,
+                                            value: Call(
+                                                ExprCall {
+                                                    range: 759..812,
+                                                    func: Name(
+                                                        ExprName {
+                                                            range: 759..764,
+                                                            id: "print",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    arguments: Arguments {
+                                                        range: 764..812,
+                                                        args: [
+                                                            FString(
+                                                                ExprFString {
+                                                                    range: 765..811,
+                                                                    value: FStringValue {
+                                                                        inner: Single(
+                                                                            FString(
+                                                                                FString {
+                                                                                    range: 765..811,
+                                                                                    elements: [
+                                                                                        Literal(
+                                                                                            FStringLiteralElement {
+                                                                                                range: 767..774,
+                                                                                                value: "caught ",
+                                                                                            },
+                                                                                        ),
+                                                                                        Expression(
+                                                                                            FStringExpressionElement {
+                                                                                                range: 774..783,
+                                                                                                expression: Call(
+                                                                                                    ExprCall {
+                                                                                                        range: 775..782,
+                                                                                                        func: Name(
+                                                                                                            ExprName {
+                                                                                                                range: 775..779,
+                                                                                                                id: "type",
+                                                                                                                ctx: Load,
+                                                                                                            },
+                                                                                                        ),
+                                                                                                        arguments: Arguments {
+                                                                                                            range: 779..782,
+                                                                                                            args: [
+                                                                                                                Name(
+                                                                                                                    ExprName {
+                                                                                                                        range: 780..781,
+                                                                                                                        id: "e",
+                                                                                                                        ctx: Load,
+                                                                                                                    },
+                                                                                                                ),
+                                                                                                            ],
+                                                                                                            keywords: [],
+                                                                                                        },
+                                                                                                    },
+                                                                                                ),
+                                                                                                debug_text: None,
+                                                                                                conversion: None,
+                                                                                                format_spec: None,
+                                                                                            },
+                                                                                        ),
+                                                                                        Literal(
+                                                                                            FStringLiteralElement {
+                                                                                                range: 783..796,
+                                                                                                value: " with nested ",
+                                                                                            },
+                                                                                        ),
+                                                                                        Expression(
+                                                                                            FStringExpressionElement {
+                                                                                                range: 796..810,
+                                                                                                expression: Attribute(
+                                                                                                    ExprAttribute {
+                                                                                                        range: 797..809,
+                                                                                                        value: Name(
+                                                                                                            ExprName {
+                                                                                                                range: 797..798,
+                                                                                                                id: "e",
+                                                                                                                ctx: Load,
+                                                                                                            },
+                                                                                                        ),
+                                                                                                        attr: Identifier {
+                                                                                                            id: "exceptions",
+                                                                                                            range: 799..809,
+                                                                                                        },
+                                                                                                        ctx: Load,
+                                                                                                    },
+                                                                                                ),
+                                                                                                debug_text: None,
+                                                                                                conversion: None,
+                                                                                                format_spec: None,
+                                                                                            },
+                                                                                        ),
+                                                                                    ],
+                                                                                    flags: FStringFlags {
+                                                                                        quote_style: Double,
+                                                                                        raw: false,
+                                                                                        triple_quoted: false,
+                                                                                    },
+                                                                                },
+                                                                            ),
+                                                                        ),
+                                                                    },
+                                                                },
+                                                            ),
+                                                        ],
+                                                        keywords: [],
+                                                    },
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: true,
+                },
+            ),
+        ],
+    },
+)
+```
