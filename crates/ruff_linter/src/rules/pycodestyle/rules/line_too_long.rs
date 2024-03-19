@@ -27,6 +27,9 @@ use crate::settings::LinterSettings;
 ///    line-length threshold. That is, a line will not be flagged as
 ///    overlong if a pragma comment _causes_ it to exceed the line length.
 ///    (This behavior aligns with that of the Ruff formatter.)
+/// 4. Ignores SPDX license identifiers and copyright notices
+///    (e.g., `# SPDX-License-Identifier: MIT`), which are machine-readable
+///    and should _not_ wrap over multiple lines.
 ///
 /// If [`lint.pycodestyle.ignore-overlong-task-comments`] is `true`, this rule will
 /// also ignore comments that start with any of the specified [`lint.task-tags`]
