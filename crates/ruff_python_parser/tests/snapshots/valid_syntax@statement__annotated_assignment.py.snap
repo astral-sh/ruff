@@ -4,14 +4,14 @@ input_file: crates/ruff_python_parser/resources/valid/statement/annotated_assign
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
-        range: 0..11,
+        range: 0..55,
         body: [
             AnnAssign(
                 StmtAnnAssign {
-                    range: 0..10,
+                    range: 0..6,
                     target: Name(
                         ExprName {
                             range: 0..1,
@@ -26,13 +26,135 @@ Module(
                             ctx: Load,
                         },
                     ),
+                    value: None,
+                    simple: true,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 7..17,
+                    target: Name(
+                        ExprName {
+                            range: 7..8,
+                            id: "x",
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 10..13,
+                            id: "int",
+                            ctx: Load,
+                        },
+                    ),
                     value: Some(
                         NumberLiteral(
                             ExprNumberLiteral {
-                                range: 9..10,
+                                range: 16..17,
                                 value: Int(
                                     1,
                                 ),
+                            },
+                        ),
+                    ),
+                    simple: true,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 18..28,
+                    target: Name(
+                        ExprName {
+                            range: 19..20,
+                            id: "x",
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: BinOp(
+                        ExprBinOp {
+                            range: 23..28,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 23..24,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 27..28,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                    value: None,
+                    simple: false,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 29..55,
+                    target: Name(
+                        ExprName {
+                            range: 29..30,
+                            id: "x",
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: BinOp(
+                        ExprBinOp {
+                            range: 32..48,
+                            left: Subscript(
+                                ExprSubscript {
+                                    range: 32..42,
+                                    value: Name(
+                                        ExprName {
+                                            range: 32..37,
+                                            id: "tuple",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    slice: Name(
+                                        ExprName {
+                                            range: 38..41,
+                                            id: "int",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: BitOr,
+                            right: Name(
+                                ExprName {
+                                    range: 45..48,
+                                    id: "int",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    value: Some(
+                        Tuple(
+                            ExprTuple {
+                                range: 51..55,
+                                elts: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 52..53,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: true,
                             },
                         ),
                     ),
@@ -43,4 +165,3 @@ Module(
     },
 )
 ```
-

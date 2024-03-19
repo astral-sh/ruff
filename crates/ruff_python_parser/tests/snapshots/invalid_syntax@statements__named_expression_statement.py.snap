@@ -4,7 +4,7 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/named_express
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
         range: 0..129,
