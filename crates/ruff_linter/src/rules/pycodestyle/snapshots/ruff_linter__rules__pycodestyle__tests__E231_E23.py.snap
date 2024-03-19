@@ -139,6 +139,87 @@ E23.py:47:37: E231 [*] Missing whitespace after ':'
    47 |+{len(f's3://{self.s3_bucket_name}/'): 1}
 48 48 | 
 49 49 | #: Okay
-50 50 | a = (1,
+50 50 | a = (1,)
 
+E23.py:60:13: E231 [*] Missing whitespace after ':'
+   |
+58 |     results = {
+59 |         "k1": [1],
+60 |         "k2":[2],
+   |             ^ E231
+61 |     }
+62 |     results_in_tuple = (
+   |
+   = help: Add missing whitespace
 
+ℹ Safe fix
+57 57 |     """Primary function."""
+58 58 |     results = {
+59 59 |         "k1": [1],
+60    |-        "k2":[2],
+   60 |+        "k2": [2],
+61 61 |     }
+62 62 |     results_in_tuple = (
+63 63 |         {
+
+E23.py:65:17: E231 [*] Missing whitespace after ':'
+   |
+63 |         {
+64 |             "k1": [1],
+65 |             "k2":[2],
+   |                 ^ E231
+66 |         },
+67 |     )
+   |
+   = help: Add missing whitespace
+
+ℹ Safe fix
+62 62 |     results_in_tuple = (
+63 63 |         {
+64 64 |             "k1": [1],
+65    |-            "k2":[2],
+   65 |+            "k2": [2],
+66 66 |         },
+67 67 |     )
+68 68 |     results_in_list = [
+
+E23.py:71:17: E231 [*] Missing whitespace after ':'
+   |
+69 |         {
+70 |             "k1": [1],
+71 |             "k2":[2],
+   |                 ^ E231
+72 |         }
+73 |     ]
+   |
+   = help: Add missing whitespace
+
+ℹ Safe fix
+68 68 |     results_in_list = [
+69 69 |         {
+70 70 |             "k1": [1],
+71    |-            "k2":[2],
+   71 |+            "k2": [2],
+72 72 |         }
+73 73 |     ]
+74 74 |     results_in_list_first = [
+
+E23.py:76:17: E231 [*] Missing whitespace after ':'
+   |
+74 |     results_in_list_first = [
+75 |         {
+76 |             "k2":[2],
+   |                 ^ E231
+77 |         }
+78 |     ]
+   |
+   = help: Add missing whitespace
+
+ℹ Safe fix
+73 73 |     ]
+74 74 |     results_in_list_first = [
+75 75 |         {
+76    |-            "k2":[2],
+   76 |+            "k2": [2],
+77 77 |         }
+78 78 |     ]

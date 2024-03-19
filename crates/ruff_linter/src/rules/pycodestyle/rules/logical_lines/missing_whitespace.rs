@@ -53,10 +53,9 @@ impl AlwaysFixableViolation for MissingWhitespace {
 
 /// E231
 pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesContext) {
-    let mut open_parentheses = 0u32;
     let mut fstrings = 0u32;
-    let mut prev_lsqb = TextSize::default();
-    let mut prev_lbrace = TextSize::default();
+    let mut lsqb_stack = vec![TextSize::default()];
+    let mut lbrace_stack = vec![TextSize::default()];
     let mut iter = line.tokens().iter().peekable();
 
     while let Some(token) = iter.next() {
@@ -65,14 +64,16 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesC
             TokenKind::FStringStart => fstrings += 1,
             TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
             TokenKind::Lsqb if fstrings == 0 => {
-                open_parentheses = open_parentheses.saturating_add(1);
-                prev_lsqb = token.start();
+                lsqb_stack.push(token.start());
             }
             TokenKind::Rsqb if fstrings == 0 => {
-                open_parentheses = open_parentheses.saturating_sub(1);
+                lsqb_stack.pop();
             }
             TokenKind::Lbrace if fstrings == 0 => {
-                prev_lbrace = token.start();
+                lbrace_stack.push(token.start());
+            }
+            TokenKind::Rbrace if fstrings == 0 => {
+                lbrace_stack.pop();
             }
             TokenKind::Colon if fstrings > 0 => {
                 // Colon in f-string, no space required. This will yield false
@@ -96,9 +97,7 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesC
                 {
                     if let Some(next_token) = iter.peek() {
                         match (kind, next_token.kind()) {
-                            (TokenKind::Colon, _)
-                                if open_parentheses > 0 && prev_lsqb > prev_lbrace =>
-                            {
+                            (TokenKind::Colon, _) if lsqb_stack.last() > lbrace_stack.last() => {
                                 continue; // Slice syntax, no space required
                             }
                             (TokenKind::Comma, TokenKind::Rpar | TokenKind::Rsqb) => {

@@ -47,4 +47,32 @@ snapshot.file_uri[len(f's3://{self.s3_bucket_name}/'):]
 {len(f's3://{self.s3_bucket_name}/'):1}
 
 #: Okay
-a = (1,
+a = (1,)
+
+
+# https://github.com/astral-sh/ruff/issues/10113
+"""Minimal repo."""
+
+def main() -> None:
+    """Primary function."""
+    results = {
+        "k1": [1],
+        "k2":[2],
+    }
+    results_in_tuple = (
+        {
+            "k1": [1],
+            "k2":[2],
+        },
+    )
+    results_in_list = [
+        {
+            "k1": [1],
+            "k2":[2],
+        }
+    ]
+    results_in_list_first = [
+        {
+            "k2":[2],
+        }
+    ]
