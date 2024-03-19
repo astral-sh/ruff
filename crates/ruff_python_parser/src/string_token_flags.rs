@@ -168,10 +168,10 @@ impl StringPrefix {
         // bytestrings
         if flags.contains(StringFlags::B_PREFIX) {
             if flags.contains(StringFlags::R_PREFIX_LOWER) {
-                return Self::Bytes(ByteStringPrefix::Raw { uppercase_r: true });
-            }
-            if flags.contains(StringFlags::R_PREFIX_LOWER) {
                 return Self::Bytes(ByteStringPrefix::Raw { uppercase_r: false });
+            }
+            if flags.contains(StringFlags::R_PREFIX_UPPER) {
+                return Self::Bytes(ByteStringPrefix::Raw { uppercase_r: true });
             }
             return Self::Bytes(ByteStringPrefix::Regular);
         }
