@@ -282,24 +282,22 @@ impl StringParser {
                 // This is still an invalid escape sequence, but we don't want to
                 // raise a syntax error as is done by the CPython parser. It might
                 // be supported in the future, refer to point 3: https://peps.python.org/pep-0701/#rejected-ideas
-                b'\\' if !self.kind.is_raw_string() && self.peek_byte().is_some() => {
-                    match self.parse_escaped_char()? {
-                        None => {}
-                        Some(EscapedChar::Literal(c)) => value.push(c),
-                        Some(EscapedChar::Escape(c)) => {
-                            value.push('\\');
-                            value.push(c);
+                b'\\' => {
+                    if !self.kind.is_raw_string() && self.peek_byte().is_some() {
+                        match self.parse_escaped_char()? {
+                            None => {}
+                            Some(EscapedChar::Literal(c)) => value.push(c),
+                            Some(EscapedChar::Escape(c)) => {
+                                value.push('\\');
+                                value.push(c);
+                            }
                         }
+                    } else {
+                        value.push('\\');
                     }
                 }
                 ch => {
-                    if !ch.is_ascii() {
-                        return Err(LexicalError::new(
-                            LexicalErrorType::InvalidByteLiteral,
-                            TextRange::empty(self.position()),
-                        ));
-                    }
-                    value.push(char::from(*ch));
+                    unreachable!("Expected '{{', '}}', or '\\' but got {:?}", ch);
                 }
             }
 
