@@ -823,7 +823,7 @@ Module(
                                                     ],
                                                     flags: FStringFlags {
                                                         quote_style: Double,
-                                                        raw: false,
+                                                        prefix: Regular,
                                                         triple_quoted: false,
                                                     },
                                                 },
@@ -896,7 +896,7 @@ Module(
                                                     ],
                                                     flags: FStringFlags {
                                                         quote_style: Double,
-                                                        raw: false,
+                                                        prefix: Regular,
                                                         triple_quoted: false,
                                                     },
                                                 },
