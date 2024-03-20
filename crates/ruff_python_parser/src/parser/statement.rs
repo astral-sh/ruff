@@ -1568,7 +1568,7 @@ impl<'src> Parser<'src> {
             TokenKind::Class => {
                 Stmt::ClassDef(self.parse_class_definition(decorators, start_offset))
             }
-            TokenKind::Async if self.peek_nth(1) == TokenKind::Def => {
+            TokenKind::Async if self.peek() == TokenKind::Def => {
                 self.bump(TokenKind::Async);
 
                 Stmt::FunctionDef(ast::StmtFunctionDef {
