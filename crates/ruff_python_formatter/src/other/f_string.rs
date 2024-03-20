@@ -1,6 +1,5 @@
 use ruff_formatter::write;
-use ruff_python_ast::FString;
-use ruff_python_parser::StringKind;
+use ruff_python_ast::{AnyStringKind, FString};
 use ruff_source_file::Locator;
 
 use crate::prelude::*;
@@ -84,16 +83,16 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct FStringContext {
-    kind: StringKind,
+    kind: AnyStringKind,
     layout: FStringLayout,
 }
 
 impl FStringContext {
-    const fn new(kind: StringKind, layout: FStringLayout) -> Self {
+    const fn new(kind: AnyStringKind, layout: FStringLayout) -> Self {
         Self { kind, layout }
     }
 
-    pub(crate) fn kind(self) -> StringKind {
+    pub(crate) fn kind(self) -> AnyStringKind {
         self.kind
     }
 

@@ -1,9 +1,8 @@
 pub(crate) use any::AnyString;
 pub(crate) use normalize::{normalize_string, NormalizedString, StringNormalizer};
 use ruff_formatter::format_args;
-use ruff_python_ast as ast;
 use ruff_python_ast::str::Quote;
-use ruff_python_parser::{StringKind, StringPrefix};
+use ruff_python_ast::{self as ast, AnyStringKind, AnyStringPrefix};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments};
@@ -54,12 +53,12 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
     }
 }
 
-impl Format<PyFormatContext<'_>> for StringPrefix {
+impl Format<PyFormatContext<'_>> for AnyStringPrefix {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         // Remove the unicode prefix `u` if any because it is meaningless in Python 3+.
         if !matches!(
             self,
-            StringPrefix::Regular(
+            AnyStringPrefix::Regular(
                 ast::StringLiteralPrefix::Empty | ast::StringLiteralPrefix::Unicode
             )
         ) {
@@ -88,8 +87,8 @@ impl Format<PyFormatContext<'_>> for StringQuotes {
     }
 }
 
-impl From<StringKind> for StringQuotes {
-    fn from(value: StringKind) -> Self {
+impl From<AnyStringKind> for StringQuotes {
+    fn from(value: AnyStringKind) -> Self {
         Self {
             triple: value.is_triple_quoted(),
             quote_char: value.quote_style(),
@@ -120,7 +119,7 @@ impl From<Quote> for QuoteStyle {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct StringPart {
-    kind: StringKind,
+    kind: AnyStringKind,
     range: TextRange,
 }
 
@@ -132,7 +131,7 @@ impl Ranged for StringPart {
 
 impl StringPart {
     /// Use the `kind()` method to retrieve information about the
-    fn kind(self) -> StringKind {
+    fn kind(self) -> AnyStringKind {
         self.kind
     }
 

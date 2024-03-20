@@ -2,8 +2,7 @@ use std::borrow::Cow;
 use std::iter::FusedIterator;
 
 use ruff_formatter::FormatContext;
-use ruff_python_ast::str::Quote;
-use ruff_python_parser::StringKind;
+use ruff_python_ast::{str::Quote, AnyStringKind};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -209,14 +208,14 @@ impl StringNormalizer {
 
 #[derive(Debug)]
 pub(crate) struct QuoteSelection {
-    kind: StringKind,
+    kind: AnyStringKind,
 
     /// Offset to the first quote character or character that needs special handling in [`normalize_string`].
     first_quote_or_normalized_char_offset: Option<usize>,
 }
 
 impl QuoteSelection {
-    pub(crate) fn kind(&self) -> StringKind {
+    pub(crate) fn kind(&self) -> AnyStringKind {
         self.kind
     }
 }
@@ -224,7 +223,7 @@ impl QuoteSelection {
 #[derive(Debug)]
 pub(crate) struct NormalizedString<'a> {
     /// Holds data about the quotes and prefix of the string
-    kind: StringKind,
+    kind: AnyStringKind,
 
     /// The range of the string's content in the source (minus prefix and quotes).
     content_range: TextRange,
@@ -238,7 +237,7 @@ impl<'a> NormalizedString<'a> {
         &self.text
     }
 
-    pub(crate) fn kind(&self) -> StringKind {
+    pub(crate) fn kind(&self) -> AnyStringKind {
         self.kind
     }
 }
@@ -272,9 +271,9 @@ impl Format<PyFormatContext<'_>> for NormalizedString<'_> {
 /// style is double quotes.
 fn choose_quotes_for_raw_string(
     input: &str,
-    kind: StringKind,
+    kind: AnyStringKind,
     preferred_quote: Quote,
-) -> StringKind {
+) -> AnyStringKind {
     let preferred_quote_char = preferred_quote.as_char();
     let mut chars = input.chars().peekable();
     let contains_unescaped_configured_quotes = loop {
@@ -325,7 +324,7 @@ fn choose_quotes_for_raw_string(
 /// For triple quoted strings, the preferred quote style is always used, unless the string contains
 /// a triplet of the quote character (e.g., if double quotes are preferred, double quotes will be
 /// used unless the string contains `"""`).
-fn choose_quotes_impl(input: &str, kind: StringKind, preferred_quote: Quote) -> StringKind {
+fn choose_quotes_impl(input: &str, kind: AnyStringKind, preferred_quote: Quote) -> AnyStringKind {
     let quote = if kind.is_triple_quoted() {
         // True if the string contains a triple quote sequence of the configured quote style.
         let mut uses_triple_quotes = false;
@@ -430,7 +429,7 @@ fn choose_quotes_impl(input: &str, kind: StringKind, preferred_quote: Quote) -> 
 pub(crate) fn normalize_string(
     input: &str,
     start_offset: usize,
-    kind: StringKind,
+    kind: AnyStringKind,
     format_fstring: bool,
 ) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
@@ -690,8 +689,7 @@ impl UnicodeEscape {
 mod tests {
     use std::borrow::Cow;
 
-    use ruff_python_ast::{str::Quote, ByteStringPrefix};
-    use ruff_python_parser::{StringKind, StringPrefix};
+    use ruff_python_ast::{str::Quote, AnyStringKind, AnyStringPrefix, ByteStringPrefix};
 
     use super::{normalize_string, UnicodeEscape};
 
@@ -712,8 +710,8 @@ mod tests {
         let normalized = normalize_string(
             input,
             0,
-            StringKind::new(
-                StringPrefix::Bytes(ByteStringPrefix::Regular),
+            AnyStringKind::new(
+                AnyStringPrefix::Bytes(ByteStringPrefix::Regular),
                 Quote::Double,
                 false,
             ),

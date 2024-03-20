@@ -1,7 +1,7 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: c98876ae871e13c1a0cabf962138ded61584185a0c3144b626dac60f707ea396
+// sha3: 4ca26eae1233cf922ef88887715de0a4ca45076324249a20b87f095e9638165d
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
+use ruff_python_ast::{self as ast, Int, IpyEscapeKind, AnyStringKind};
 use crate::{
     FStringErrorType,
     Mode,
@@ -9,7 +9,6 @@ use crate::{
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
     string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
-    string_token_flags::StringKind,
     token,
     invalid,
 };
@@ -26,7 +25,7 @@ extern crate alloc;
 mod __parse__Top {
 
     use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-    use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
+    use ruff_python_ast::{self as ast, Int, IpyEscapeKind, AnyStringKind};
     use crate::{
     FStringErrorType,
     Mode,
@@ -34,7 +33,6 @@ mod __parse__Top {
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
     string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
-    string_token_flags::StringKind,
     token,
     invalid,
 };
@@ -52,8 +50,8 @@ mod __parse__Top {
         Variant0(token::Tok),
         Variant1((f64, f64)),
         Variant2(f64),
-        Variant3((Box<str>, StringKind)),
-        Variant4(StringKind),
+        Variant3((Box<str>, AnyStringKind)),
+        Variant4(AnyStringKind),
         Variant5(Int),
         Variant6((IpyEscapeKind, Box<str>)),
         Variant7(Box<str>),
@@ -151,7 +149,7 @@ mod __parse__Top {
         Variant99(ast::TypeParams),
         Variant100(core::option::Option<ast::TypeParams>),
         Variant101(ast::UnaryOp),
-        Variant102(core::option::Option<(Box<str>, StringKind)>),
+        Variant102(core::option::Option<(Box<str>, AnyStringKind)>),
     }
     const __ACTION: &[i16] = &[
         // State 0
@@ -18322,7 +18320,7 @@ mod __parse__Top {
     fn __pop_Variant3<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, (Box<str>, StringKind), TextSize)
+    ) -> (TextSize, (Box<str>, AnyStringKind), TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant3(__v), __r)) => (__l, __v, __r),
@@ -18479,6 +18477,16 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
+    fn __pop_Variant4<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, AnyStringKind, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant4(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
     fn __pop_Variant7<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
@@ -18506,16 +18514,6 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant93(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
-    fn __pop_Variant4<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, StringKind, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant4(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -19102,7 +19100,7 @@ mod __parse__Top {
     fn __pop_Variant102<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, core::option::Option<(Box<str>, StringKind)>, TextSize)
+    ) -> (TextSize, core::option::Option<(Box<str>, AnyStringKind)>, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant102(__v), __r)) => (__l, __v, __r),
@@ -35724,7 +35722,7 @@ fn __action185<
     (_, parameters, _): (TextSize, core::option::Option<ast::Parameters>, TextSize),
     (_, end_location_args, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, fstring_middle, _): (TextSize, core::option::Option<(Box<str>, StringKind)>, TextSize),
+    (_, fstring_middle, _): (TextSize, core::option::Option<(Box<str>, AnyStringKind)>, TextSize),
     (_, body, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -36179,7 +36177,7 @@ fn __action218<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, string, _): (TextSize, (Box<str>, StringKind), TextSize),
+    (_, string, _): (TextSize, (Box<str>, AnyStringKind), TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<StringType,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -36196,7 +36194,7 @@ fn __action219<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, start, _): (TextSize, StringKind, TextSize),
+    (_, start, _): (TextSize, AnyStringKind, TextSize),
     (_, elements, _): (TextSize, alloc::vec::Vec<ast::FStringElement>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
@@ -36230,7 +36228,7 @@ fn __action221<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, fstring_middle, _): (TextSize, (Box<str>, StringKind), TextSize),
+    (_, fstring_middle, _): (TextSize, (Box<str>, AnyStringKind), TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -37185,8 +37183,8 @@ fn __action282<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, (Box<str>, StringKind), TextSize),
-) -> core::option::Option<(Box<str>, StringKind)>
+    (_, __0, _): (TextSize, (Box<str>, AnyStringKind), TextSize),
+) -> core::option::Option<(Box<str>, AnyStringKind)>
 {
     Some(__0)
 }
@@ -37199,7 +37197,7 @@ fn __action283<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<(Box<str>, StringKind)>
+) -> core::option::Option<(Box<str>, AnyStringKind)>
 {
     None
 }
@@ -47957,7 +47955,7 @@ fn __action791<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, StringKind, TextSize),
+    __0: (TextSize, AnyStringKind, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::FStringElement>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
@@ -48017,7 +48015,7 @@ fn __action793<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, (Box<str>, StringKind), TextSize),
+    __0: (TextSize, (Box<str>, AnyStringKind), TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -49121,7 +49119,7 @@ fn __action828<
     __1: (TextSize, core::option::Option<ast::Parameters>, TextSize),
     __2: (TextSize, TextSize, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, core::option::Option<(Box<str>, StringKind)>, TextSize),
+    __4: (TextSize, core::option::Option<(Box<str>, AnyStringKind)>, TextSize),
     __5: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __6: (TextSize, TextSize, TextSize),
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -52139,7 +52137,7 @@ fn __action924<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, (Box<str>, StringKind), TextSize),
+    __0: (TextSize, (Box<str>, AnyStringKind), TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> Result<StringType,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -63911,7 +63909,7 @@ fn __action1304<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, StringKind, TextSize),
+    __0: (TextSize, AnyStringKind, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::FStringElement>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
 ) -> StringType
@@ -63967,7 +63965,7 @@ fn __action1306<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, (Box<str>, StringKind), TextSize),
+    __0: (TextSize, (Box<str>, AnyStringKind), TextSize),
 ) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
@@ -64870,7 +64868,7 @@ fn __action1338<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, core::option::Option<ast::Parameters>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, core::option::Option<(Box<str>, StringKind)>, TextSize),
+    __3: (TextSize, core::option::Option<(Box<str>, AnyStringKind)>, TextSize),
     __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -69379,7 +69377,7 @@ fn __action1485<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, (Box<str>, StringKind), TextSize),
+    __0: (TextSize, (Box<str>, AnyStringKind), TextSize),
 ) -> Result<StringType,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
@@ -72279,7 +72277,7 @@ fn __action1578<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, StringKind, TextSize),
+    __0: (TextSize, AnyStringKind, TextSize),
     __1: (TextSize, token::Tok, TextSize),
 ) -> StringType
 {
@@ -72307,7 +72305,7 @@ fn __action1579<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, StringKind, TextSize),
+    __0: (TextSize, AnyStringKind, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::FStringElement>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
 ) -> StringType
@@ -76896,7 +76894,7 @@ fn __action1716<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Parameters, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, core::option::Option<(Box<str>, StringKind)>, TextSize),
+    __3: (TextSize, core::option::Option<(Box<str>, AnyStringKind)>, TextSize),
     __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -76927,7 +76925,7 @@ fn __action1717<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<(Box<str>, StringKind)>, TextSize),
+    __2: (TextSize, core::option::Option<(Box<str>, AnyStringKind)>, TextSize),
     __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -78832,7 +78830,7 @@ fn __action1774<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Parameters, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, (Box<str>, StringKind), TextSize),
+    __3: (TextSize, (Box<str>, AnyStringKind), TextSize),
     __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -78895,7 +78893,7 @@ fn __action1776<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, (Box<str>, StringKind), TextSize),
+    __2: (TextSize, (Box<str>, AnyStringKind), TextSize),
     __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {

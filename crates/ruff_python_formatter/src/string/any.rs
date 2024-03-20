@@ -3,10 +3,9 @@ use std::iter::FusedIterator;
 use memchr::memchr2;
 
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, Expr, ExprBytesLiteral, ExprFString, ExprStringLiteral, ExpressionRef,
-    StringLiteral,
+    self as ast, AnyNodeRef, AnyStringKind, Expr, ExprBytesLiteral, ExprFString, ExprStringLiteral,
+    ExpressionRef, StringLiteral,
 };
-use ruff_python_parser::StringKind;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -177,7 +176,7 @@ pub(super) enum AnyStringPart<'a> {
 }
 
 impl AnyStringPart<'_> {
-    fn kind(&self) -> StringKind {
+    fn kind(&self) -> AnyStringKind {
         match self {
             Self::String { part, .. } => part.flags.into(),
             Self::Bytes(bytes_literal) => bytes_literal.flags.into(),
