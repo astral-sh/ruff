@@ -99,7 +99,10 @@ pub(crate) struct Parser<'src> {
     /// Specify the mode in which the code will be parsed.
     mode: Mode,
 
+    /// The current token along with its range.
     current: Spanned,
+    /// The current token kind.
+    current_kind: TokenKind,
 
     /// The ID of the current token. This is used to track the progress of the parser
     /// to avoid infinite loops when the parser is stuck.
@@ -167,6 +170,7 @@ impl<'src> Parser<'src> {
             tokens,
             recovery_context: RecoveryContext::empty(),
             last_token_end: tokens_range.start(),
+            current_kind: TokenKind::from_token(&current.0),
             current,
             current_token_id: TokenId::default(),
             tokens_range,
@@ -315,6 +319,7 @@ impl<'src> Parser<'src> {
         self.current_token_id.increment();
 
         let current = std::mem::replace(&mut self.current, next);
+        self.current_kind = TokenKind::from_token(&self.current.0);
 
         if !matches!(
             current.0,
@@ -354,8 +359,7 @@ impl<'src> Parser<'src> {
     /// Returns the current token kind.
     #[inline]
     fn current_token_kind(&self) -> TokenKind {
-        // TODO: Converting the token kind over and over again can be expensive.
-        TokenKind::from_token(&self.current.0)
+        self.current_kind
     }
 
     /// Returns the range of the current token.
