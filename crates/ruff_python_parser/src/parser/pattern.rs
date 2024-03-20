@@ -357,7 +357,7 @@ impl<'src> Parser<'src> {
         parentheses: Option<SequenceMatchPatternParentheses>,
     ) -> ast::PatternMatchSequence {
         if parentheses.is_some_and(|parentheses| {
-            self.at(parentheses.closing_kind()) || self.peek_nth(1) == parentheses.closing_kind()
+            self.at(parentheses.closing_kind()) || self.peek() == parentheses.closing_kind()
         }) {
             // The comma is optional if it is a single-element sequence
             self.eat(TokenKind::Comma);
@@ -459,7 +459,7 @@ impl<'src> Parser<'src> {
                     range,
                 })
             }
-            TokenKind::Name if self.peek_nth(1) == TokenKind::Dot => {
+            TokenKind::Name if self.peek() == TokenKind::Dot => {
                 let (Tok::Name { name }, _) = self.bump(TokenKind::Name) else {
                     unreachable!()
                 };
@@ -497,7 +497,7 @@ impl<'src> Parser<'src> {
             }
             TokenKind::Minus
                 if matches!(
-                    self.peek_nth(1),
+                    self.peek(),
                     TokenKind::Int | TokenKind::Float | TokenKind::Complex
                 ) =>
             {
