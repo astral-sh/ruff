@@ -617,7 +617,7 @@ Program {
                                                                     value: "bla.txt",
                                                                     flags: StringLiteralFlags {
                                                                         quote_style: Single,
-                                                                        prefix: "",
+                                                                        prefix: Empty,
                                                                         triple_quoted: false,
                                                                     },
                                                                 },
@@ -657,7 +657,7 @@ Program {
                                                                     value: "bla.txt",
                                                                     flags: StringLiteralFlags {
                                                                         quote_style: Single,
-                                                                        prefix: "",
+                                                                        prefix: Empty,
                                                                         triple_quoted: false,
                                                                     },
                                                                 },
@@ -776,7 +776,7 @@ Program {
                                                                             value: "new_file",
                                                                             flags: StringLiteralFlags {
                                                                                 quote_style: Single,
-                                                                                prefix: "",
+                                                                                prefix: Empty,
                                                                                 triple_quoted: false,
                                                                             },
                                                                         },
@@ -806,7 +806,7 @@ Program {
                                                                     value: "wb",
                                                                     flags: StringLiteralFlags {
                                                                         quote_style: Single,
-                                                                        prefix: "",
+                                                                        prefix: Empty,
                                                                         triple_quoted: false,
                                                                     },
                                                                 },
