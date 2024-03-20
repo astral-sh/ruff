@@ -12,7 +12,7 @@ from typing import NamedTuple
 import mdformat
 import yaml
 
-from _utils import add_no_escape_text_plugin
+from _mdformat_utils import add_no_escape_text_plugin
 
 
 class Section(NamedTuple):
