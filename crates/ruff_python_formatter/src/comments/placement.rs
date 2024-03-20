@@ -262,7 +262,9 @@ fn handle_enclosed_comment<'a>(
             //     0
             // ]
             // ```
-            if comment.line_position().is_end_of_line() {
+            if comment.line_position().is_end_of_line()
+                && expr_subscript.value.end() < comment.start()
+            {
                 // Ensure that there are no tokens between the open bracket and the comment.
                 let mut lexer = SimpleTokenizer::new(
                     locator.contents(),
@@ -270,12 +272,13 @@ fn handle_enclosed_comment<'a>(
                 )
                 .skip_trivia();
 
-                // Skip the opening parenthesis.
-                let Some(paren) = lexer.next() else {
+                // Skip to after the opening parenthesis (may skip some closing parentheses of value)
+                if !lexer
+                    .by_ref()
+                    .any(|token| token.kind() == SimpleTokenKind::LBracket)
+                {
                     return CommentPlacement::Default(comment);
                 };
-
-                debug_assert_eq!(paren.kind(), SimpleTokenKind::LBracket);
 
                 // If there are no additional tokens between the open parenthesis and the comment, then
                 // it should be attached as a dangling comment on the brackets, rather than a leading
