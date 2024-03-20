@@ -31,6 +31,9 @@ use crate::registry::Rule;
 /// if sys.version_info[0] == 2:
 ///     ...
 /// ```
+///
+/// ## References
+/// - [Static typing with Python: Type Stubs: Version and Platform Checks](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
 #[violation]
 pub struct UnrecognizedVersionInfoCheck;
 
@@ -69,6 +72,9 @@ impl Violation for UnrecognizedVersionInfoCheck {
 /// if sys.version_info >= (3, 4):
 ///     ...
 /// ```
+///
+/// ## References
+/// - [Static typing with Python: Type Stubs: Version and Platform Checks](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
 #[violation]
 pub struct PatchVersionComparison;
 
@@ -104,6 +110,9 @@ impl Violation for PatchVersionComparison {
 /// if sys.version_info[0] == 3:
 ///     ...
 /// ```
+///
+/// ## References
+/// - [Static typing with Python: Type Stubs: Version and Platform Checks](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
 #[violation]
 pub struct WrongTupleLengthVersionComparison {
     expected_length: usize,

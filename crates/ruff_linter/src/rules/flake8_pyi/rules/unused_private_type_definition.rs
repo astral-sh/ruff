@@ -45,7 +45,7 @@ impl Violation for UnusedPrivateTypeVar {
 ///
 /// ## Why is this bad?
 /// A private `typing.Protocol` that is defined but not used is likely a
-/// mistake, and should either be used, made public, or removed to avoid
+/// mistake. It should either be used, made public, or removed to avoid
 /// confusion.
 ///
 /// ## Example
@@ -83,11 +83,11 @@ impl Violation for UnusedPrivateProtocol {
 }
 
 /// ## What it does
-/// Checks for the presence of unused private `typing.TypeAlias` definitions.
+/// Checks for the presence of unused private type aliases.
 ///
 /// ## Why is this bad?
-/// A private `typing.TypeAlias` that is defined but not used is likely a
-/// mistake, and should either be used, made public, or removed to avoid
+/// A private type alias that is defined but not used is likely a
+/// mistake. It should either be used, made public, or removed to avoid
 /// confusion.
 ///
 /// ## Example
@@ -125,7 +125,7 @@ impl Violation for UnusedPrivateTypeAlias {
 ///
 /// ## Why is this bad?
 /// A private `typing.TypedDict` that is defined but not used is likely a
-/// mistake, and should either be used, made public, or removed to avoid
+/// mistake. It should either be used, made public, or removed to avoid
 /// confusion.
 ///
 /// ## Example
