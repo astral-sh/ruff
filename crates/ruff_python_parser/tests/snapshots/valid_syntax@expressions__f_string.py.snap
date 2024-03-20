@@ -23,7 +23,7 @@ Module(
                                             elements: [],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -48,7 +48,7 @@ Module(
                                             elements: [],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -73,7 +73,7 @@ Module(
                                             elements: [],
                                             flags: FStringFlags {
                                                 quote_style: Single,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -98,7 +98,7 @@ Module(
                                             elements: [],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: true,
                                             },
                                         },
@@ -123,7 +123,7 @@ Module(
                                             elements: [],
                                             flags: FStringFlags {
                                                 quote_style: Single,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: true,
                                             },
                                         },
@@ -159,7 +159,7 @@ Module(
                                                                             value: " f",
                                                                             flags: StringLiteralFlags {
                                                                                 quote_style: Double,
-                                                                                prefix: "",
+                                                                                prefix: Empty,
                                                                                 triple_quoted: false,
                                                                             },
                                                                         },
@@ -175,7 +175,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -216,7 +216,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -267,7 +267,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -332,7 +332,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -385,7 +385,7 @@ Module(
                                                                                                 value: "}",
                                                                                                 flags: StringLiteralFlags {
                                                                                                     quote_style: Double,
-                                                                                                    prefix: "",
+                                                                                                    prefix: Empty,
                                                                                                     triple_quoted: false,
                                                                                                 },
                                                                                             },
@@ -412,7 +412,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Single,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -465,7 +465,7 @@ Module(
                                                                                                 value: "{",
                                                                                                 flags: StringLiteralFlags {
                                                                                                     quote_style: Double,
-                                                                                                    prefix: "",
+                                                                                                    prefix: Empty,
                                                                                                     triple_quoted: false,
                                                                                                 },
                                                                                             },
@@ -492,7 +492,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Single,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -538,7 +538,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -596,7 +596,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -642,7 +642,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -706,7 +706,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -777,7 +777,7 @@ Module(
                                                                                 ],
                                                                                 flags: FStringFlags {
                                                                                     quote_style: Double,
-                                                                                    raw: false,
+                                                                                    prefix: Regular,
                                                                                     triple_quoted: false,
                                                                                 },
                                                                             },
@@ -806,7 +806,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Single,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -837,7 +837,7 @@ Module(
                                                                 value: "foo ",
                                                                 flags: StringLiteralFlags {
                                                                     quote_style: Double,
-                                                                    prefix: "",
+                                                                    prefix: Empty,
                                                                     triple_quoted: false,
                                                                 },
                                                             },
@@ -889,7 +889,7 @@ Module(
                                                                 ],
                                                                 flags: FStringFlags {
                                                                     quote_style: Double,
-                                                                    raw: false,
+                                                                    prefix: Regular,
                                                                     triple_quoted: false,
                                                                 },
                                                             },
@@ -900,7 +900,7 @@ Module(
                                                                 value: "baz",
                                                                 flags: StringLiteralFlags {
                                                                     quote_style: Double,
-                                                                    prefix: "",
+                                                                    prefix: Empty,
                                                                     triple_quoted: false,
                                                                 },
                                                             },
@@ -952,7 +952,7 @@ Module(
                                                         value: "one",
                                                         flags: StringLiteralFlags {
                                                             quote_style: Double,
-                                                            prefix: "",
+                                                            prefix: Empty,
                                                             triple_quoted: false,
                                                         },
                                                     },
@@ -988,7 +988,7 @@ Module(
                                                                 value: "implicitly ",
                                                                 flags: StringLiteralFlags {
                                                                     quote_style: Double,
-                                                                    prefix: "",
+                                                                    prefix: Empty,
                                                                     triple_quoted: false,
                                                                 },
                                                             },
@@ -997,7 +997,7 @@ Module(
                                                                 value: "concatenated",
                                                                 flags: StringLiteralFlags {
                                                                     quote_style: Double,
-                                                                    prefix: "",
+                                                                    prefix: Empty,
                                                                     triple_quoted: false,
                                                                 },
                                                             },
@@ -1091,7 +1091,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -1123,7 +1123,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -1176,7 +1176,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: true,
                                             },
                                         },
@@ -1222,7 +1222,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -1317,7 +1317,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -1427,7 +1427,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -1486,7 +1486,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -1576,7 +1576,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -1652,7 +1652,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -1698,7 +1698,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -1744,7 +1744,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -1790,7 +1790,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -1843,7 +1843,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -1901,7 +1901,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -1954,7 +1954,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -1980,7 +1980,7 @@ Module(
                                                 value: "hello",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2007,7 +2007,7 @@ Module(
                                                 ],
                                                 flags: FStringFlags {
                                                     quote_style: Double,
-                                                    raw: false,
+                                                    prefix: Regular,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2050,7 +2050,7 @@ Module(
                                                 ],
                                                 flags: FStringFlags {
                                                     quote_style: Double,
-                                                    raw: false,
+                                                    prefix: Regular,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2077,7 +2077,7 @@ Module(
                                                 ],
                                                 flags: FStringFlags {
                                                     quote_style: Double,
-                                                    raw: false,
+                                                    prefix: Regular,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2120,7 +2120,7 @@ Module(
                                                 ],
                                                 flags: FStringFlags {
                                                     quote_style: Double,
-                                                    raw: false,
+                                                    prefix: Regular,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2131,7 +2131,7 @@ Module(
                                                 value: "world",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2201,7 +2201,7 @@ Module(
                                             ],
                                             flags: FStringFlags {
                                                 quote_style: Double,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -2227,7 +2227,7 @@ Module(
                                                 value: "foo",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2254,7 +2254,7 @@ Module(
                                                 ],
                                                 flags: FStringFlags {
                                                     quote_style: Double,
-                                                    raw: false,
+                                                    prefix: Regular,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2265,7 +2265,7 @@ Module(
                                                 value: "bar",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2299,7 +2299,7 @@ Module(
                                                 ],
                                                 flags: FStringFlags {
                                                     quote_style: Double,
-                                                    raw: false,
+                                                    prefix: Regular,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2317,7 +2317,7 @@ Module(
                                                 ],
                                                 flags: FStringFlags {
                                                     quote_style: Double,
-                                                    raw: false,
+                                                    prefix: Regular,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2328,7 +2328,7 @@ Module(
                                                 value: "c",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2346,7 +2346,9 @@ Module(
                                                 ],
                                                 flags: FStringFlags {
                                                     quote_style: Double,
-                                                    raw: true,
+                                                    prefix: Raw {
+                                                        uppercase_r: false,
+                                                    },
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2364,7 +2366,9 @@ Module(
                                                 ],
                                                 flags: FStringFlags {
                                                     quote_style: Double,
-                                                    raw: true,
+                                                    prefix: Raw {
+                                                        uppercase_r: false,
+                                                    },
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2391,7 +2395,7 @@ Module(
                                                 value: "foo",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "u",
+                                                    prefix: Unicode,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2418,7 +2422,7 @@ Module(
                                                 ],
                                                 flags: FStringFlags {
                                                     quote_style: Double,
-                                                    raw: false,
+                                                    prefix: Regular,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2429,7 +2433,7 @@ Module(
                                                 value: "baz",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2440,7 +2444,7 @@ Module(
                                                 value: " some",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2467,7 +2471,7 @@ Module(
                                                 value: "foo",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2494,7 +2498,7 @@ Module(
                                                 ],
                                                 flags: FStringFlags {
                                                     quote_style: Double,
-                                                    raw: false,
+                                                    prefix: Regular,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2505,7 +2509,7 @@ Module(
                                                 value: "baz",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "u",
+                                                    prefix: Unicode,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2516,7 +2520,7 @@ Module(
                                                 value: " some",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2543,7 +2547,7 @@ Module(
                                                 value: "foo",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2570,7 +2574,7 @@ Module(
                                                 ],
                                                 flags: FStringFlags {
                                                     quote_style: Double,
-                                                    raw: false,
+                                                    prefix: Regular,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2581,7 +2585,7 @@ Module(
                                                 value: "baz",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2592,7 +2596,7 @@ Module(
                                                 value: " some",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "u",
+                                                    prefix: Unicode,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2619,7 +2623,7 @@ Module(
                                                 value: "foo",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "u",
+                                                    prefix: Unicode,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2658,7 +2662,7 @@ Module(
                                                 ],
                                                 flags: FStringFlags {
                                                     quote_style: Double,
-                                                    raw: false,
+                                                    prefix: Regular,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2669,7 +2673,7 @@ Module(
                                                 value: "bar",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "u",
+                                                    prefix: Unicode,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -2680,7 +2684,7 @@ Module(
                                                 value: "no",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
