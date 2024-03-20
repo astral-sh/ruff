@@ -22,7 +22,7 @@ Module(
                                         value: "Hello World",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
-                                            prefix: "",
+                                            prefix: Empty,
                                             triple_quoted: false,
                                         },
                                     },
@@ -45,7 +45,7 @@ Module(
                                         value: "😎",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
-                                            prefix: "",
+                                            prefix: Empty,
                                             triple_quoted: false,
                                         },
                                     },
@@ -70,7 +70,7 @@ Module(
                                                 value: "Foo",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Single,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -79,7 +79,7 @@ Module(
                                                 value: "Bar",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Single,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -107,7 +107,7 @@ Module(
                                                 value: "A",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Single,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -116,7 +116,7 @@ Module(
                                                 value: "B",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Single,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -125,7 +125,7 @@ Module(
                                                 value: "C",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Single,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -151,7 +151,7 @@ Module(
                                         value: "Olá, Mundo!",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
-                                            prefix: "",
+                                            prefix: Empty,
                                             triple_quoted: true,
                                         },
                                     },
@@ -174,7 +174,7 @@ Module(
                                         value: "ABCDE",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
-                                            prefix: "",
+                                            prefix: Empty,
                                             triple_quoted: true,
                                         },
                                     },
@@ -199,7 +199,7 @@ Module(
                                                 value: "aB",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Single,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: true,
                                                 },
                                             },
@@ -208,7 +208,7 @@ Module(
                                                 value: "cD",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Single,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: true,
                                                 },
                                             },
@@ -246,7 +246,7 @@ Module(
                                         ],
                                         flags: BytesLiteralFlags {
                                             quote_style: Single,
-                                            raw: false,
+                                            prefix: Regular,
                                             triple_quoted: false,
                                         },
                                     },
@@ -276,7 +276,7 @@ Module(
                                             ],
                                             flags: BytesLiteralFlags {
                                                 quote_style: Single,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
@@ -298,7 +298,7 @@ Module(
                                             ],
                                             flags: BytesLiteralFlags {
                                                 quote_style: Single,
-                                                raw: false,
+                                                prefix: Regular,
                                                 triple_quoted: false,
                                             },
                                         },
