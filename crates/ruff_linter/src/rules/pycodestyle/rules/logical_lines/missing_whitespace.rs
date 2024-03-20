@@ -54,8 +54,8 @@ impl AlwaysFixableViolation for MissingWhitespace {
 /// E231
 pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesContext) {
     let mut fstrings = 0u32;
-    let mut lsqb_stack = vec![TextSize::default()];
-    let mut lbrace_stack = vec![TextSize::default()];
+    let mut lsqb_stack = Vec::new();
+    let mut lbrace_stack = Vec::new();
     let mut iter = line.tokens().iter().peekable();
 
     while let Some(token) = iter.next() {
