@@ -342,6 +342,11 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Returns the next token kind without consuming it.
+    fn peek(&self) -> TokenKind {
+        self.peek_nth(1)
+    }
+
     /// Returns the current token kind along with its range.
     ///
     /// Use `current_token_kind` or `current_token_range` to only get the kind or range
@@ -686,11 +691,44 @@ impl FunctionKind {
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 enum WithItemKind {
-    /// The `with` item is parenthesized, e.g., `with (a, b): ...`.
+    /// A list of `with` items that are surrounded by parentheses.
+    ///
+    /// ```python
+    /// with (item1, item2): ...
+    /// with (item1, item2 as foo): ...
+    /// ```
+    ///
+    /// The parentheses belongs to the `with` statement.
     Parenthesized,
-    /// The `with` item has a parenthesized expression, e.g., `with (a) as b: ...`.
+
+    /// The `with` item has a parenthesized expression.
+    ///
+    /// ```python
+    /// with (item) as foo: ...
+    /// ```
+    ///
+    /// The parentheses belongs to the context expression.
     ParenthesizedExpression,
-    /// The `with` item isn't parenthesized in any way, e.g., `with a as b: ...`.
+
+    /// A list of `with` items that has only one item which is a parenthesized
+    /// generator expression.
+    ///
+    /// ```python
+    /// with (x for x in range(10)): ...
+    /// ```
+    ///
+    /// The parentheses belongs to the generator expression.
+    SingleParenthesizedGeneratorExpression,
+
+    /// The `with` items aren't parenthesized in any way.
+    ///
+    /// ```python
+    /// with item: ...
+    /// with item as foo: ...
+    /// with item1, item2: ...
+    /// ```
+    ///
+    /// There are no parentheses around the items.
     Unparenthesized,
 }
 
@@ -699,10 +737,20 @@ impl WithItemKind {
     const fn list_terminator(self) -> TokenKind {
         match self {
             WithItemKind::Parenthesized => TokenKind::Rpar,
-            WithItemKind::Unparenthesized | WithItemKind::ParenthesizedExpression => {
-                TokenKind::Colon
-            }
+            WithItemKind::Unparenthesized
+            | WithItemKind::ParenthesizedExpression
+            | WithItemKind::SingleParenthesizedGeneratorExpression => TokenKind::Colon,
         }
+    }
+
+    /// Returns `true` if the `with` item is a parenthesized expression i.e., the
+    /// parentheses belong to the context expression.
+    const fn is_parenthesized_expression(self) -> bool {
+        matches!(
+            self,
+            WithItemKind::ParenthesizedExpression
+                | WithItemKind::SingleParenthesizedGeneratorExpression
+        )
     }
 }
 
@@ -1096,9 +1144,10 @@ bitflags! {
         const LAMBDA_PARAMETERS = 1 << 23;
         const WITH_ITEMS_PARENTHESIZED = 1 << 24;
         const WITH_ITEMS_PARENTHESIZED_EXPRESSION = 1 << 25;
-        const WITH_ITEMS_UNPARENTHESIZED = 1 << 26;
-        const F_STRING_ELEMENTS = 1 << 27;
-        const STRINGS = 1 << 28;
+        const WITH_ITEMS_SINGLE_PARENTHESIZED_GENERATOR_EXPRESSION = 1 << 26;
+        const WITH_ITEMS_UNPARENTHESIZED = 1 << 27;
+        const F_STRING_ELEMENTS = 1 << 28;
+        const STRINGS = 1 << 29;
     }
 }
 
@@ -1145,6 +1194,9 @@ impl RecoveryContext {
                 WithItemKind::Parenthesized => RecoveryContext::WITH_ITEMS_PARENTHESIZED,
                 WithItemKind::ParenthesizedExpression => {
                     RecoveryContext::WITH_ITEMS_PARENTHESIZED_EXPRESSION
+                }
+                WithItemKind::SingleParenthesizedGeneratorExpression => {
+                    RecoveryContext::WITH_ITEMS_SINGLE_PARENTHESIZED_GENERATOR_EXPRESSION
                 }
                 WithItemKind::Unparenthesized => RecoveryContext::WITH_ITEMS_UNPARENTHESIZED,
             },
@@ -1207,6 +1259,9 @@ impl RecoveryContext {
             }
             RecoveryContext::WITH_ITEMS_PARENTHESIZED_EXPRESSION => {
                 RecoveryContextKind::WithItems(WithItemKind::ParenthesizedExpression)
+            }
+            RecoveryContext::WITH_ITEMS_SINGLE_PARENTHESIZED_GENERATOR_EXPRESSION => {
+                RecoveryContextKind::WithItems(WithItemKind::SingleParenthesizedGeneratorExpression)
             }
             RecoveryContext::WITH_ITEMS_UNPARENTHESIZED => {
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized)
