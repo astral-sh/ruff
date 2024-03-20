@@ -189,8 +189,9 @@ impl RuleSelector {
     /// Return all matching rules, regardless of rule group filters like preview and deprecated.
     pub fn all_rules(&self) -> impl Iterator<Item = Rule> + '_ {
         match self {
-            RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
-
+            RuleSelector::All => {
+                RuleSelectorIter::All(Rule::iter().filter(|rule| !rule.is_deprecated()))
+            }
             #[allow(deprecated)]
             RuleSelector::Nursery => {
                 RuleSelectorIter::Nursery(Rule::iter().filter(Rule::is_nursery))
@@ -239,7 +240,7 @@ impl RuleSelector {
 }
 
 pub enum RuleSelectorIter {
-    All(RuleIter),
+    All(std::iter::Filter<RuleIter, fn(&Rule) -> bool>),
     Nursery(std::iter::Filter<RuleIter, fn(&Rule) -> bool>),
     Chain(std::iter::Chain<std::vec::IntoIter<Rule>, std::vec::IntoIter<Rule>>),
     Vec(std::vec::IntoIter<Rule>),
