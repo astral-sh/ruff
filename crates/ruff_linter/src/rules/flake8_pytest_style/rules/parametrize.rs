@@ -86,17 +86,18 @@ impl Violation for PytestParametrizeNamesWrongType {
             single_argument,
             expected,
         } = self;
-        let expected_string;
-        if *single_argument {
-            expected_string = "`str`".to_string();
-        } else {
-            match expected {
-                types::ParametrizeNameType::Csv => expected_string = format!("a {expected}"),
-                types::ParametrizeNameType::Tuple | types::ParametrizeNameType::List => {
-                    expected_string = format!("`{expected}`");
-                }
-            }
-        }
+        let expected_string = {
+	        if *single_argument {
+	            "`str`".to_string();
+	        } else {
+	            match expected {
+	                types::ParametrizeNameType::Csv => format!("a {expected}"),
+	                types::ParametrizeNameType::Tuple | types::ParametrizeNameType::List => {
+	                    format!("`{expected}`");
+	                }
+	            }
+	        }
+	    };
         format!("Wrong type passed to first argument of `@pytest.mark.parametrize`; expected {expected_string}")
     }
 
