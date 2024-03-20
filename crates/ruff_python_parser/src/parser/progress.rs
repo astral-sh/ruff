@@ -1,10 +1,19 @@
 use crate::parser::Parser;
-use crate::TokenKind;
-use ruff_text_size::TextSize;
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub(super) struct TokenId(u32);
+
+impl TokenId {
+    /// Increments the value of the token ID.
+    pub(super) fn increment(&mut self) {
+        // SAFETY: We don't support files larger than 4GB, so this should never overflow.
+        self.0 = self.0.checked_add(1).expect("TokenId overflow");
+    }
+}
 
 /// Captures the progress of the parser and allows to test if the parsing is still making progress
 #[derive(Debug, Copy, Clone, Default)]
-pub(super) struct ParserProgress(Option<(TokenKind, TextSize)>);
+pub(super) struct ParserProgress(Option<TokenId>);
 
 impl ParserProgress {
     /// Returns true if the parser has passed this position
@@ -12,7 +21,7 @@ impl ParserProgress {
     fn has_progressed(self, p: &Parser) -> bool {
         match self.0 {
             None => true,
-            Some(snapshot) => snapshot != (p.current_token_kind(), p.current_token_range().start()),
+            Some(prev_token_id) => prev_token_id != p.current_token_id(),
         }
     }
 
@@ -31,6 +40,6 @@ impl ParserProgress {
             p.current_token_range(),
         );
 
-        self.0 = Some((p.current_token_kind(), p.current_token_range().start()));
+        self.0 = Some(p.current_token_id());
     }
 }
