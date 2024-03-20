@@ -201,7 +201,7 @@ linter.allowed_confusables = []
 linter.builtins = []
 linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
 linter.external = []
-linter.ignore_init_module_imports = false
+linter.ignore_init_module_imports = true
 linter.logger_objects = []
 linter.namespace_packages = []
 linter.src = [
@@ -241,7 +241,22 @@ linter.flake8_gettext.functions_names = [
 	ngettext,
 ]
 linter.flake8_implicit_str_concat.allow_multiline = true
-linter.flake8_import_conventions.aliases = {"matplotlib": "mpl", "matplotlib.pyplot": "plt", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "networkx": "nx", "plotly.express": "px", "polars": "pl", "numpy": "np", "panel": "pn", "pyarrow": "pa", "altair": "alt", "tkinter": "tk", "holoviews": "hv"}
+linter.flake8_import_conventions.aliases = {
+	altair = alt,
+	holoviews = hv,
+	matplotlib = mpl,
+	matplotlib.pyplot = plt,
+	networkx = nx,
+	numpy = np,
+	pandas = pd,
+	panel = pn,
+	plotly.express = px,
+	polars = pl,
+	pyarrow = pa,
+	seaborn = sns,
+	tensorflow = tf,
+	tkinter = tk,
+}
 linter.flake8_import_conventions.banned_aliases = {}
 linter.flake8_import_conventions.banned_from = []
 linter.flake8_pytest_style.fixture_parentheses = true

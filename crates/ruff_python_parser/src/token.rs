@@ -4,10 +4,9 @@
 //! loosely based on the token definitions found in the [CPython source].
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h;
-use crate::string_token_flags::StringKind;
 use crate::Mode;
 
-use ruff_python_ast::{Int, IpyEscapeKind};
+use ruff_python_ast::{AnyStringKind, Int, IpyEscapeKind};
 use std::fmt;
 
 /// The set of tokens the Python source code can be tokenized in.
@@ -16,6 +15,9 @@ pub enum Tok {
     /// Token value for a name, commonly known as an identifier.
     Name {
         /// The name value.
+        ///
+        /// Unicode names are NFKC-normalized by the lexer,
+        /// matching [the behaviour of Python's lexer](https://docs.python.org/3/reference/lexical_analysis.html#identifiers)
         name: Box<str>,
     },
     /// Token value for an integer.
@@ -41,11 +43,11 @@ pub enum Tok {
         value: Box<str>,
         /// Flags that can be queried to determine the quote style
         /// and prefixes of the string
-        kind: StringKind,
+        kind: AnyStringKind,
     },
     /// Token value for the start of an f-string. This includes the `f`/`F`/`fr` prefix
     /// and the opening quote(s).
-    FStringStart(StringKind),
+    FStringStart(AnyStringKind),
     /// Token value that includes the portion of text inside the f-string that's not
     /// part of the expression part and isn't an opening or closing brace.
     FStringMiddle {
@@ -53,7 +55,7 @@ pub enum Tok {
         value: Box<str>,
         /// Flags that can be queried to determine the quote style
         /// and prefixes of the string
-        kind: StringKind,
+        kind: AnyStringKind,
     },
     /// Token value for the end of an f-string. This includes the closing quote.
     FStringEnd,

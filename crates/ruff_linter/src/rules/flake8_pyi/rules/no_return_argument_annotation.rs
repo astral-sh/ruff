@@ -9,18 +9,21 @@ use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion::Py311;
 
 /// ## What it does
-/// Checks for uses of `typing.NoReturn` (and `typing_extensions.NoReturn`) in
-/// stubs.
+/// Checks for uses of `typing.NoReturn` (and `typing_extensions.NoReturn`) for
+/// parameter annotations.
 ///
 /// ## Why is this bad?
-/// Prefer `typing.Never` (or `typing_extensions.Never`) over `typing.NoReturn`,
-/// as the former is more explicit about the intent of the annotation. This is
-/// a purely stylistic choice, as the two are semantically equivalent.
+/// Prefer `Never` over `NoReturn` for parameter annotations. `Never` has a
+/// clearer name in these contexts, since it makes little sense to talk about a
+/// parameter annotation "not returning".
+///
+/// This is a purely stylistic lint: the two types have identical semantics for
+/// type checkers. Both represent Python's "[bottom type]" (a type that has no
+/// members).
 ///
 /// ## Example
 /// ```python
 /// from typing import NoReturn
-///
 ///
 /// def foo(x: NoReturn): ...
 /// ```
@@ -29,13 +32,14 @@ use crate::settings::types::PythonVersion::Py311;
 /// ```python
 /// from typing import Never
 ///
-///
 /// def foo(x: Never): ...
 /// ```
 ///
 /// ## References
 /// - [Python documentation: `typing.Never`](https://docs.python.org/3/library/typing.html#typing.Never)
 /// - [Python documentation: `typing.NoReturn`](https://docs.python.org/3/library/typing.html#typing.NoReturn)
+///
+/// [bottom type]: https://en.wikipedia.org/wiki/Bottom_type
 #[violation]
 pub struct NoReturnArgumentAnnotationInStub {
     module: TypingModule,

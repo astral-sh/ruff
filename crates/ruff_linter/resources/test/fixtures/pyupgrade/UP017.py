@@ -1,11 +1,28 @@
-import datetime
-import datetime as dt
-from datetime import timezone
-from datetime import timezone as tz
+def func():
+    import datetime
 
-print(datetime.timezone(-1))
-print(timezone.utc)
-print(tz.utc)
+    print(datetime.timezone(-1))
 
-print(datetime.timezone.utc)
-print(dt.timezone.utc)
+
+def func():
+    from datetime import timezone
+
+    print(timezone.utc)
+
+
+def func():
+    from datetime import timezone as tz
+
+    print(tz.utc)
+
+
+def func():
+    import datetime
+
+    print(datetime.timezone.utc)
+
+
+def func():
+    import datetime as dt
+
+    print(dt.timezone.utc)

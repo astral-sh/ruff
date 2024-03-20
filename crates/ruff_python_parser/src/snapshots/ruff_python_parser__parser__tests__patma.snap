@@ -508,7 +508,7 @@ expression: parse_ast
                                                         value: "seq",
                                                         flags: StringLiteralFlags {
                                                             quote_style: Double,
-                                                            prefix: "",
+                                                            prefix: Empty,
                                                             triple_quoted: false,
                                                         },
                                                     },
@@ -547,7 +547,7 @@ expression: parse_ast
                                                         value: "map",
                                                         flags: StringLiteralFlags {
                                                             quote_style: Double,
-                                                            prefix: "",
+                                                            prefix: Empty,
                                                             triple_quoted: false,
                                                         },
                                                     },
@@ -848,7 +848,7 @@ expression: parse_ast
                                                             value: "X",
                                                             flags: StringLiteralFlags {
                                                                 quote_style: Double,
-                                                                prefix: "",
+                                                                prefix: Empty,
                                                                 triple_quoted: false,
                                                             },
                                                         },
@@ -1588,7 +1588,7 @@ expression: parse_ast
                                                     value: "foo",
                                                     flags: StringLiteralFlags {
                                                         quote_style: Double,
-                                                        prefix: "",
+                                                        prefix: Empty,
                                                         triple_quoted: false,
                                                     },
                                                 },
@@ -2518,7 +2518,7 @@ expression: parse_ast
                                                             value: "",
                                                             flags: StringLiteralFlags {
                                                                 quote_style: Double,
-                                                                prefix: "",
+                                                                prefix: Empty,
                                                                 triple_quoted: false,
                                                             },
                                                         },
@@ -2572,7 +2572,7 @@ expression: parse_ast
                                                 value: "",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },
@@ -3200,7 +3200,7 @@ expression: parse_ast
                                                             value: "X",
                                                             flags: StringLiteralFlags {
                                                                 quote_style: Double,
-                                                                prefix: "",
+                                                                prefix: Empty,
                                                                 triple_quoted: false,
                                                             },
                                                         },

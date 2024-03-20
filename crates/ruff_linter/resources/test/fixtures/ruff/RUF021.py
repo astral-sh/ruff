@@ -47,7 +47,7 @@ if (
     and some_third_reasonably_long_condition
     or some_fourth_reasonably_long_condition
     and some_fifth_reasonably_long_condition
-    # a commment
+    # a comment
     and some_sixth_reasonably_long_condition
     and some_seventh_reasonably_long_condition
     # another comment

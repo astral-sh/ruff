@@ -19,7 +19,6 @@ ruff_text_size = { path = "../ruff_text_size" }
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]
-insta = { workspace = true }
 
 [features]
 serde = ["dep:serde", "ruff_text_size/serde"]

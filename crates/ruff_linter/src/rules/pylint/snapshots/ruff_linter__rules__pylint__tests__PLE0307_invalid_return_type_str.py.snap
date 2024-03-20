@@ -1,44 +1,42 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-invalid_return_type_str.py:3:16: PLE0307 `__str__` does not return `str`
+invalid_return_type_str.py:5:16: PLE0307 `__str__` does not return `str`
   |
-1 | class Str:
-2 |     def __str__(self):
-3 |         return 1
-  |                ^ PLE0307
-4 | 
-5 | class Float:
-  |
-
-invalid_return_type_str.py:7:16: PLE0307 `__str__` does not return `str`
-  |
-5 | class Float:
-6 |     def __str__(self):
-7 |         return 3.05
+3 | class Float:
+4 |     def __str__(self):
+5 |         return 3.05
   |                ^^^^ PLE0307
-8 |     
-9 | class Int:
+6 | 
+7 | class Int:
   |
 
-invalid_return_type_str.py:11:16: PLE0307 `__str__` does not return `str`
+invalid_return_type_str.py:9:16: PLE0307 `__str__` does not return `str`
    |
- 9 | class Int:
-10 |     def __str__(self):
-11 |         return 0
+ 7 | class Int:
+ 8 |     def __str__(self):
+ 9 |         return 1
    |                ^ PLE0307
-12 |     
-13 | class Bool:
+10 | 
+11 | class Int2:
    |
 
-invalid_return_type_str.py:15:16: PLE0307 `__str__` does not return `str`
+invalid_return_type_str.py:13:16: PLE0307 `__str__` does not return `str`
    |
-13 | class Bool:
-14 |     def __str__(self):
-15 |         return False
+11 | class Int2:
+12 |     def __str__(self):
+13 |         return 0
+   |                ^ PLE0307
+14 | 
+15 | class Bool:
+   |
+
+invalid_return_type_str.py:17:16: PLE0307 `__str__` does not return `str`
+   |
+15 | class Bool:
+16 |     def __str__(self):
+17 |         return False
    |                ^^^^^ PLE0307
-16 |     
-17 | class Str2:
+18 | 
+19 | # TODO: Once Ruff has better type checking
    |
-
-

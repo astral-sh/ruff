@@ -13,7 +13,7 @@ use crate::rules::flake8_comprehensions::settings::Settings;
 /// rewritten as empty literals.
 ///
 /// ## Why is this bad?
-/// It's unnecessary to call e.g., `dict()` as opposed to using an empty
+/// It's unnecessary to call, e.g., `dict()` as opposed to using an empty
 /// literal (`{}`). The former is slower because the name `dict` must be
 /// looked up in the global scope in case it has been rebound.
 ///

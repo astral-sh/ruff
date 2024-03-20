@@ -16,7 +16,7 @@ expression: parse_ast
                                 value: "\u{8}",
                                 flags: StringLiteralFlags {
                                     quote_style: Double,
-                                    prefix: "",
+                                    prefix: Empty,
                                     triple_quoted: false,
                                 },
                             },

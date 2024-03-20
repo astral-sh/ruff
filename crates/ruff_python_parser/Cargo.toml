@@ -28,6 +28,7 @@ rustc-hash = { workspace = true }
 static_assertions = { workspace = true }
 unicode-ident = { workspace = true }
 unicode_names2 = { workspace = true }
+unicode-normalization = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

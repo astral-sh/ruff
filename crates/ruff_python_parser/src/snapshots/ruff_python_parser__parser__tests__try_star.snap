@@ -34,7 +34,7 @@ expression: parse_ast
                                                                 value: "eg",
                                                                 flags: StringLiteralFlags {
                                                                     quote_style: Double,
-                                                                    prefix: "",
+                                                                    prefix: Empty,
                                                                     triple_quoted: false,
                                                                 },
                                                             },
@@ -282,7 +282,7 @@ expression: parse_ast
                                                                             ],
                                                                             flags: FStringFlags {
                                                                                 quote_style: Single,
-                                                                                raw: false,
+                                                                                prefix: Regular,
                                                                                 triple_quoted: false,
                                                                             },
                                                                         },
@@ -418,7 +418,7 @@ expression: parse_ast
                                                                             ],
                                                                             flags: FStringFlags {
                                                                                 quote_style: Single,
-                                                                                raw: false,
+                                                                                prefix: Regular,
                                                                                 triple_quoted: false,
                                                                             },
                                                                         },

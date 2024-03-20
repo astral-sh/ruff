@@ -205,7 +205,7 @@ C413.py:14:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    14 |+sorted((i for i in range(42)), reverse=True)
 15 15 | reversed(sorted((i for i in range(42)), reverse=True))
 16 16 | 
-17 17 | 
+17 17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
 
 C413.py:15:1: C413 [*] Unnecessary `reversed` call around `sorted()`
    |
@@ -213,6 +213,8 @@ C413.py:15:1: C413 [*] Unnecessary `reversed` call around `sorted()`
 14 | reversed(sorted(i for i in range(42)))
 15 | reversed(sorted((i for i in range(42)), reverse=True))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C413
+16 | 
+17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
    |
    = help: Remove unnecessary `reversed` call
 
@@ -223,7 +225,38 @@ C413.py:15:1: C413 [*] Unnecessary `reversed` call around `sorted()`
 15    |-reversed(sorted((i for i in range(42)), reverse=True))
    15 |+sorted((i for i in range(42)), reverse=False)
 16 16 | 
-17 17 | 
-18 18 | def reversed(*args, **kwargs):
+17 17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
+18 18 | reversed(sorted([1, 2, 3], reverse=False or True))
 
+C413.py:18:1: C413 [*] Unnecessary `reversed` call around `sorted()`
+   |
+17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
+18 | reversed(sorted([1, 2, 3], reverse=False or True))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C413
+19 | reversed(sorted([1, 2, 3], reverse=(False or True)))
+   |
+   = help: Remove unnecessary `reversed` call
 
+ℹ Unsafe fix
+15 15 | reversed(sorted((i for i in range(42)), reverse=True))
+16 16 | 
+17 17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
+18    |-reversed(sorted([1, 2, 3], reverse=False or True))
+   18 |+sorted([1, 2, 3], reverse=not (False or True))
+19 19 | reversed(sorted([1, 2, 3], reverse=(False or True)))
+
+C413.py:19:1: C413 [*] Unnecessary `reversed` call around `sorted()`
+   |
+17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
+18 | reversed(sorted([1, 2, 3], reverse=False or True))
+19 | reversed(sorted([1, 2, 3], reverse=(False or True)))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C413
+   |
+   = help: Remove unnecessary `reversed` call
+
+ℹ Unsafe fix
+16 16 | 
+17 17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
+18 18 | reversed(sorted([1, 2, 3], reverse=False or True))
+19    |-reversed(sorted([1, 2, 3], reverse=(False or True)))
+   19 |+sorted([1, 2, 3], reverse=not (False or True))

@@ -1,41 +1,40 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
 ---
-LOG009.py:3:1: LOG009 [*] Use of undocumented `logging.WARN` constant
+LOG009.py:4:5: LOG009 [*] Use of undocumented `logging.WARN` constant
   |
-1 | import logging
-2 | 
-3 | logging.WARN  # LOG009
-  | ^^^^^^^^^^^^ LOG009
-4 | logging.WARNING  # OK
-  |
-  = help: Replace `logging.WARN` with `logging.WARNING`
-
-ℹ Safe fix
-1 1 | import logging
-2 2 | 
-3   |-logging.WARN  # LOG009
-  3 |+logging.WARNING  # LOG009
-4 4 | logging.WARNING  # OK
-5 5 | 
-6 6 | from logging import WARN, WARNING
-
-LOG009.py:8:1: LOG009 [*] Use of undocumented `logging.WARN` constant
-  |
-6 | from logging import WARN, WARNING
-7 | 
-8 | WARN  # LOG009
-  | ^^^^ LOG009
-9 | WARNING  # OK
+2 |     import logging
+3 | 
+4 |     logging.WARN  # LOG009
+  |     ^^^^^^^^^^^^ LOG009
+5 |     logging.WARNING  # OK
   |
   = help: Replace `logging.WARN` with `logging.WARNING`
 
 ℹ Safe fix
-5 5 | 
-6 6 | from logging import WARN, WARNING
+1 1 | def func():
+2 2 |     import logging
+3 3 | 
+4   |-    logging.WARN  # LOG009
+  4 |+    logging.WARNING  # LOG009
+5 5 |     logging.WARNING  # OK
+6 6 | 
 7 7 | 
-8   |-WARN  # LOG009
-  8 |+logging.WARNING  # LOG009
-9 9 | WARNING  # OK
 
+LOG009.py:11:5: LOG009 [*] Use of undocumented `logging.WARN` constant
+   |
+ 9 |     from logging import WARN, WARNING
+10 | 
+11 |     WARN  # LOG009
+   |     ^^^^ LOG009
+12 |     WARNING  # OK
+   |
+   = help: Replace `logging.WARN` with `logging.WARNING`
 
+ℹ Safe fix
+8  8  | def func():
+9  9  |     from logging import WARN, WARNING
+10 10 | 
+11    |-    WARN  # LOG009
+   11 |+    WARNING  # LOG009
+12 12 |     WARNING  # OK

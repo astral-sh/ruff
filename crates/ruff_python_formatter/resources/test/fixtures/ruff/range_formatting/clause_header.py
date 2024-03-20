@@ -12,7 +12,7 @@ class <RANGE_START>  Test(OtherClass<RANGE_END>)\
     def __init__( self):
         print("hello")
 
-print( "dont' format this")
+print( "don't format this")
 
 
 def  test2(<RANGE_START>a, b, c:    str, d):<RANGE_END>

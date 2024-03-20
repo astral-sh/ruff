@@ -1,5 +1,5 @@
 # No `typing.Optional` import
 
 
-def f(arg: int = None):  # RUF011
+def f(arg: int = None):  # RUF013
     pass

@@ -19,25 +19,32 @@ use crate::checkers::ast::Checker;
 /// methods.
 ///
 /// ## Why is this bad?
-/// Improperly-annotated `__exit__` and `__aexit__` methods can cause
+/// Improperly annotated `__exit__` and `__aexit__` methods can cause
 /// unexpected behavior when interacting with type checkers.
 ///
 /// ## Example
 /// ```python
+/// from types import TracebackType
+///
+///
 /// class Foo:
-///     def __exit__(self, typ, exc, tb, extra_arg) -> None:
+///     def __exit__(
+///         self, typ: BaseException, exc: BaseException, tb: TracebackType
+///     ) -> None:
 ///         ...
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from types import TracebackType
+///
+///
 /// class Foo:
 ///     def __exit__(
 ///         self,
 ///         typ: type[BaseException] | None,
 ///         exc: BaseException | None,
 ///         tb: TracebackType | None,
-///         extra_arg: int = 0,
 ///     ) -> None:
 ///         ...
 /// ```

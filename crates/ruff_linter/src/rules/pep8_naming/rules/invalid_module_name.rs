@@ -21,7 +21,7 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// > all-lowercase names, although the use of underscores is discouraged.
 /// >
 /// > When an extension module written in C or C++ has an accompanying Python module that
-/// > provides a higher level (e.g. more object oriented) interface, the C/C++ module has
+/// > provides a higher level (e.g. more object-oriented) interface, the C/C++ module has
 /// > a leading underscore (e.g. `_socket`).
 ///
 /// Further, in order for Python modules to be importable, they must be valid

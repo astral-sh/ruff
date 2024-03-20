@@ -84,3 +84,22 @@ def f():
         return True
     else:
         return False
+
+
+###
+# Positive cases (preview)
+###
+
+
+def f():
+    # SIM103
+    if a:
+        return True
+    return False
+
+
+def f():
+    # SIM103
+    if a:
+        return False
+    return True

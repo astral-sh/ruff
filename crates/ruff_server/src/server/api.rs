@@ -12,8 +12,8 @@ use self::traits::{NotificationHandler, RequestHandler};
 
 use super::{client::Responder, schedule::BackgroundSchedule, Result};
 
-/// Defines the `document_url` method for implementors of [`traits::Notification`] and [`traits::Request`],
-/// given the parameter type used by the implementor.
+/// Defines the `document_url` method for implementers of [`traits::Notification`] and [`traits::Request`],
+/// given the parameter type used by the implementer.
 macro_rules! define_document_url {
     ($params:ident: &$p:ty) => {
         fn document_url($params: &$p) -> &lsp_types::Url {

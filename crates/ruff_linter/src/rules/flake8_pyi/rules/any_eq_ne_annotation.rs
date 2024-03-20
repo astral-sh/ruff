@@ -8,28 +8,34 @@ use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for `__eq__` and `__ne__` implementations that use `typing.Any` as
-/// the type annotation for the `obj` parameter.
+/// the type annotation for their second parameter.
 ///
 /// ## Why is this bad?
 /// The Python documentation recommends the use of `object` to "indicate that a
-/// value could be any type in a typesafe manner", while `Any` should be used to
-/// "indicate that a value is dynamically typed."
+/// value could be any type in a typesafe manner". `Any`, on the other hand,
+/// should be seen as an "escape hatch when you need to mix dynamically and
+/// statically typed code". Since using `Any` allows you to write highly unsafe
+/// code, you should generally only use `Any` when the semantics of your code
+/// would otherwise be inexpressible to the type checker.
 ///
-/// The semantics of `__eq__` and `__ne__` are such that the `obj` parameter
-/// should be any type, as opposed to a dynamically typed value. Therefore, the
-/// `object` type annotation is more appropriate.
+/// The expectation in Python is that a comparison of two arbitrary objects
+/// using `==` or `!=` should never raise an exception. This contract can be
+/// fully expressed in the type system and does not involve requesting unsound
+/// behaviour from a type checker. As such, `object` is a more appropriate
+/// annotation than `Any` for the second parameter of the methods implementing
+/// these comparison operators -- `__eq__` and `__ne__`.
 ///
 /// ## Example
 /// ```python
 /// class Foo:
-///     def __eq__(self, obj: typing.Any):
+///     def __eq__(self, obj: typing.Any) -> bool:
 ///         ...
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// class Foo:
-///     def __eq__(self, obj: object):
+///     def __eq__(self, obj: object) -> bool:
 ///         ...
 /// ```
 /// ## References

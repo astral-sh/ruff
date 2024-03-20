@@ -6,8 +6,8 @@ use ruff_macros::{derive_message_formats, violation};
 /// that redefine function parameters.
 ///
 /// ## Why is this bad?
-/// Redefined variable can cause unexpected behavior because of overridden function parameter.
-/// If nested functions are declared, inner function's body can override outer function's parameter.
+/// Redefined variables can cause unexpected behavior because of overridden function parameters.
+/// If nested functions are declared, an inner function's body can override an outer function's parameters.
 ///
 /// ## Example
 /// ```python

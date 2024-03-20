@@ -6,7 +6,11 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "rf",
+                prefix: Format(
+                    Raw {
+                        uppercase_r: false,
+                    },
+                ),
                 triple_quoted: false,
                 quote_style: Double,
             },
@@ -17,7 +21,11 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\\N",
             kind: StringKind {
-                prefix: "rf",
+                prefix: Format(
+                    Raw {
+                        uppercase_r: false,
+                    },
+                ),
                 triple_quoted: false,
                 quote_style: Double,
             },
@@ -42,7 +50,11 @@ expression: lex_source(source)
         FStringMiddle {
             value: " normal",
             kind: StringKind {
-                prefix: "rf",
+                prefix: Format(
+                    Raw {
+                        uppercase_r: false,
+                    },
+                ),
                 triple_quoted: false,
                 quote_style: Double,
             },

@@ -1,6 +1,7 @@
 //! Scheduling, I/O, and API endpoints.
 
-use anyhow::anyhow;
+use std::num::NonZeroUsize;
+
 use lsp::Connection;
 use lsp_server as lsp;
 use lsp_types as types;
@@ -28,11 +29,12 @@ pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 pub struct Server {
     conn: lsp::Connection,
     threads: lsp::IoThreads,
+    worker_threads: NonZeroUsize,
     session: Session,
 }
 
 impl Server {
-    pub fn new() -> crate::Result<Self> {
+    pub fn new(worker_threads: NonZeroUsize) -> crate::Result<Self> {
         let (conn, threads) = lsp::Connection::stdio();
 
         let (id, params) = conn.initialize_start()?;
@@ -46,8 +48,12 @@ impl Server {
             .workspace_folders
             .map(|folders| folders.into_iter().map(|folder| folder.uri).collect())
             .or_else(|| init_params.root_uri.map(|u| vec![u]))
+            .or_else(|| {
+                tracing::debug!("No root URI or workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
+                Some(vec![types::Url::from_file_path(std::env::current_dir().ok()?).ok()?])
+            })
             .ok_or_else(|| {
-                anyhow!("No workspace or root URI was given in the LSP initialization parameters. The server cannot start.")
+                anyhow::anyhow!("Failed to get the current working directory while creating a default workspace.")
             })?;
 
         let initialize_data = serde_json::json!({
@@ -63,19 +69,27 @@ impl Server {
         Ok(Self {
             conn,
             threads,
+            worker_threads,
             session: Session::new(&server_capabilities, &workspaces)?,
         })
     }
 
     pub fn run(self) -> crate::Result<()> {
-        let result = event_loop_thread(move || Self::event_loop(&self.conn, self.session))?.join();
+        let result = event_loop_thread(move || {
+            Self::event_loop(&self.conn, self.session, self.worker_threads)
+        })?
+        .join();
         self.threads.join()?;
         result
     }
 
-    fn event_loop(connection: &Connection, session: Session) -> crate::Result<()> {
+    fn event_loop(
+        connection: &Connection,
+        session: Session,
+        worker_threads: NonZeroUsize,
+    ) -> crate::Result<()> {
         // TODO(jane): Make thread count configurable
-        let mut scheduler = schedule::Scheduler::new(session, 4, &connection.sender);
+        let mut scheduler = schedule::Scheduler::new(session, worker_threads, &connection.sender);
         for msg in &connection.receiver {
             let task = match msg {
                 lsp::Message::Request(req) => {

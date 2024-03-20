@@ -157,7 +157,7 @@ To see which rules are currently in preview, visit the [rules reference](rules.m
 ## Selecting single preview rules
 
 When preview mode is enabled, selecting rule categories or prefixes will include all preview rules that match.
-If you'd prefer to opt-in to each preview rule individually, you can toggle the `explicit-preview-rules`
+If you'd prefer to opt in to each preview rule individually, you can toggle the `explicit-preview-rules`
 setting in your configuration file:
 
 === "pyproject.toml"

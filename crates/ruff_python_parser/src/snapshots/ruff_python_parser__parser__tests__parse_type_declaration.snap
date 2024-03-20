@@ -88,7 +88,7 @@ expression: parse_suite(source).unwrap()
                                         value: "ForwardRefY",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
-                                            prefix: "",
+                                            prefix: Empty,
                                             triple_quoted: false,
                                         },
                                     },

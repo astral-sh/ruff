@@ -6,7 +6,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Double,
             },
@@ -60,7 +62,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: false,
                 quote_style: Double,
             },

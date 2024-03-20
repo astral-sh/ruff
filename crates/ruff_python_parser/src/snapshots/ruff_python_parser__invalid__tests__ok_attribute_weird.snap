@@ -21,7 +21,7 @@ Ok(
                                                 value: "foo",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },

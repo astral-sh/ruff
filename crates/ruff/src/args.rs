@@ -496,8 +496,12 @@ pub struct FormatCommand {
     pub range: Option<FormatRange>,
 }
 
-#[derive(Clone, Debug, clap::Parser)]
-pub struct ServerCommand;
+#[derive(Copy, Clone, Debug, clap::Parser)]
+pub struct ServerCommand {
+    /// Enable preview mode; required for regular operation
+    #[arg(long)]
+    pub(crate) preview: bool,
+}
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 pub enum HelpFormat {

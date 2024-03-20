@@ -4,7 +4,7 @@
 // See also: https://greentreesnakes.readthedocs.io/en/latest/nodes.html#keyword
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
+use ruff_python_ast::{self as ast, Int, IpyEscapeKind, AnyStringKind};
 use crate::{
     FStringErrorType,
     Mode,
@@ -12,7 +12,6 @@ use crate::{
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
     string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
-    string_token_flags::StringKind,
     token,
     invalid,
 };
@@ -1936,7 +1935,7 @@ Comma<T>: Vec<T> = {
     }
 };
 
-/// One ore more items that are separated by a comma.
+/// One or more items that are separated by a comma.
 OneOrMore<T>: Vec<T> = {
     <e:T> => vec![e],
     <mut v: OneOrMore<T>> "," <e:T> => {
@@ -1983,7 +1982,7 @@ extern {
         Dedent => token::Tok::Dedent,
         StartModule => token::Tok::StartModule,
         StartExpression => token::Tok::StartExpression,
-        fstring_start => token::Tok::FStringStart(<StringKind>),
+        fstring_start => token::Tok::FStringStart(<AnyStringKind>),
         FStringEnd => token::Tok::FStringEnd,
         "!" => token::Tok::Exclamation,
         "?" => token::Tok::Question,
@@ -2076,11 +2075,11 @@ extern {
         complex => token::Tok::Complex { real: <f64>, imag: <f64> },
         string => token::Tok::String {
             value: <Box<str>>,
-            kind: <StringKind>,
+            kind: <AnyStringKind>,
         },
         fstring_middle => token::Tok::FStringMiddle {
             value: <Box<str>>,
-            kind: <StringKind>,
+            kind: <AnyStringKind>,
         },
         name => token::Tok::Name { name: <Box<str>> },
         ipy_escape_command => token::Tok::IpyEscapeCommand {

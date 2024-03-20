@@ -53,7 +53,7 @@ impl Overlong {
         };
 
         let mut chunks = line.split_whitespace();
-        let (Some(_), Some(second_chunk)) = (chunks.next(), chunks.next()) else {
+        let (Some(first_chunk), Some(second_chunk)) = (chunks.next(), chunks.next()) else {
             // Single word / no printable chars - no way to make the line shorter.
             return None;
         };
@@ -65,6 +65,15 @@ impl Overlong {
             if width.get() - last_chunk.width() <= limit.value() as usize {
                 return None;
             }
+        }
+
+        // Do not enforce the line length limit for SPDX license headers, which are machine-readable
+        // and explicitly _not_ recommended to wrap over multiple lines.
+        if matches!(
+            (first_chunk, second_chunk),
+            ("#", "SPDX-License-Identifier:" | "SPDX-FileCopyrightText:")
+        ) {
+            return None;
         }
 
         // Obtain the start offset of the part of the line that exceeds the limit.

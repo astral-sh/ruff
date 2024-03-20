@@ -368,7 +368,7 @@ impl Violation for UndocumentedPublicPackage {
 /// ## Why is this bad?
 /// Magic methods (methods with names that start and end with double
 /// underscores) are used to implement operator overloading and other special
-/// behavior. Such methods should should be documented via docstrings to
+/// behavior. Such methods should be documented via docstrings to
 /// outline their behavior.
 ///
 /// Generally, magic method docstrings should describe the method's behavior,

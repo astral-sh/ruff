@@ -224,4 +224,55 @@ W605_1.py:48:15: W605 [*] Invalid escape sequence: `\{`
 50 50 | # Okay
 51 51 | value = rf'\{{1}}'
 
+W605_1.py:57:9: W605 [*] Invalid escape sequence: `\d`
+   |
+56 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
+57 | f"{{}}+-\d"
+   |         ^^ W605
+58 | f"\n{{}}+-\d+"
+59 | f"\n{{}}�+-\d+"
+   |
+   = help: Use a raw string literal
 
+ℹ Safe fix
+54 54 | value = f"{rf"\{1}"}"
+55 55 | 
+56 56 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
+57    |-f"{{}}+-\d"
+   57 |+rf"{{}}+-\d"
+58 58 | f"\n{{}}+-\d+"
+59 59 | f"\n{{}}�+-\d+"
+
+W605_1.py:58:11: W605 [*] Invalid escape sequence: `\d`
+   |
+56 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
+57 | f"{{}}+-\d"
+58 | f"\n{{}}+-\d+"
+   |           ^^ W605
+59 | f"\n{{}}�+-\d+"
+   |
+   = help: Add backslash to escape sequence
+
+ℹ Safe fix
+55 55 | 
+56 56 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
+57 57 | f"{{}}+-\d"
+58    |-f"\n{{}}+-\d+"
+   58 |+f"\n{{}}+-\\d+"
+59 59 | f"\n{{}}�+-\d+"
+
+W605_1.py:59:12: W605 [*] Invalid escape sequence: `\d`
+   |
+57 | f"{{}}+-\d"
+58 | f"\n{{}}+-\d+"
+59 | f"\n{{}}�+-\d+"
+   |            ^^ W605
+   |
+   = help: Add backslash to escape sequence
+
+ℹ Safe fix
+56 56 | # Regression tests for https://github.com/astral-sh/ruff/issues/10434
+57 57 | f"{{}}+-\d"
+58 58 | f"\n{{}}+-\d+"
+59    |-f"\n{{}}�+-\d+"
+   59 |+f"\n{{}}�+-\\d+"

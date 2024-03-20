@@ -413,5 +413,3 @@ PT018.py:65:5: PT018 [*] Assertion should be broken down into multiple parts
 70 72 | 
 71 73 |     assert (not self.find_graph_output(node.output[0]) or
 72 74 |             self.find_graph_input(node.input[0]))
-
-

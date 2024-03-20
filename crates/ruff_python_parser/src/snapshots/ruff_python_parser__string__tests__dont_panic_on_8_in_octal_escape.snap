@@ -25,7 +25,7 @@ expression: parse_ast
                                 value: "\u{3}8[1m",
                                 flags: StringLiteralFlags {
                                     quote_style: Single,
-                                    prefix: "",
+                                    prefix: Empty,
                                     triple_quoted: false,
                                 },
                             },

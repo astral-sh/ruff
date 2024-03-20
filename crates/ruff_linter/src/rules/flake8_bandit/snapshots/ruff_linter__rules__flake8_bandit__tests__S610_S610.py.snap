@@ -1,0 +1,105 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S610.py:4:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+  |
+3 | # Errors
+4 | User.objects.filter(username='admin').extra(dict(could_be='insecure'))
+  |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^ S610
+5 | User.objects.filter(username='admin').extra(select=dict(could_be='insecure'))
+6 | User.objects.filter(username='admin').extra(select={'test': '%secure' % 'nos'})
+  |
+
+S610.py:5:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+  |
+3 | # Errors
+4 | User.objects.filter(username='admin').extra(dict(could_be='insecure'))
+5 | User.objects.filter(username='admin').extra(select=dict(could_be='insecure'))
+  |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S610
+6 | User.objects.filter(username='admin').extra(select={'test': '%secure' % 'nos'})
+7 | User.objects.filter(username='admin').extra(select={'test': '{}secure'.format('nos')})
+  |
+
+S610.py:6:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+  |
+4 | User.objects.filter(username='admin').extra(dict(could_be='insecure'))
+5 | User.objects.filter(username='admin').extra(select=dict(could_be='insecure'))
+6 | User.objects.filter(username='admin').extra(select={'test': '%secure' % 'nos'})
+  |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S610
+7 | User.objects.filter(username='admin').extra(select={'test': '{}secure'.format('nos')})
+8 | User.objects.filter(username='admin').extra(where=['%secure' % 'nos'])
+  |
+
+S610.py:7:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+  |
+5 | User.objects.filter(username='admin').extra(select=dict(could_be='insecure'))
+6 | User.objects.filter(username='admin').extra(select={'test': '%secure' % 'nos'})
+7 | User.objects.filter(username='admin').extra(select={'test': '{}secure'.format('nos')})
+  |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S610
+8 | User.objects.filter(username='admin').extra(where=['%secure' % 'nos'])
+9 | User.objects.filter(username='admin').extra(where=['{}secure'.format('no')])
+  |
+
+S610.py:8:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+  |
+6 | User.objects.filter(username='admin').extra(select={'test': '%secure' % 'nos'})
+7 | User.objects.filter(username='admin').extra(select={'test': '{}secure'.format('nos')})
+8 | User.objects.filter(username='admin').extra(where=['%secure' % 'nos'])
+  |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^ S610
+9 | User.objects.filter(username='admin').extra(where=['{}secure'.format('no')])
+  |
+
+S610.py:9:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+   |
+ 7 | User.objects.filter(username='admin').extra(select={'test': '{}secure'.format('nos')})
+ 8 | User.objects.filter(username='admin').extra(where=['%secure' % 'nos'])
+ 9 | User.objects.filter(username='admin').extra(where=['{}secure'.format('no')])
+   |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S610
+10 | 
+11 | query = '"username") AS "username", * FROM "auth_user" WHERE 1=1 OR "username"=? --'
+   |
+
+S610.py:12:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+   |
+11 | query = '"username") AS "username", * FROM "auth_user" WHERE 1=1 OR "username"=? --'
+12 | User.objects.filter(username='admin').extra(select={'test': query})
+   |                                            ^^^^^^^^^^^^^^^^^^^^^^^^ S610
+13 | 
+14 | where_var = ['1=1) OR 1=1 AND (1=1']
+   |
+
+S610.py:15:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+   |
+14 | where_var = ['1=1) OR 1=1 AND (1=1']
+15 | User.objects.filter(username='admin').extra(where=where_var)
+   |                                            ^^^^^^^^^^^^^^^^^ S610
+16 | 
+17 | where_str = '1=1) OR 1=1 AND (1=1'
+   |
+
+S610.py:18:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+   |
+17 | where_str = '1=1) OR 1=1 AND (1=1'
+18 | User.objects.filter(username='admin').extra(where=[where_str])
+   |                                            ^^^^^^^^^^^^^^^^^^^ S610
+19 | 
+20 | tables_var = ['django_content_type" WHERE "auth_user"."username"="admin']
+   |
+
+S610.py:21:25: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+   |
+20 | tables_var = ['django_content_type" WHERE "auth_user"."username"="admin']
+21 | User.objects.all().extra(tables=tables_var).distinct()
+   |                         ^^^^^^^^^^^^^^^^^^^ S610
+22 | 
+23 | tables_str = 'django_content_type" WHERE "auth_user"."username"="admin'
+   |
+
+S610.py:24:25: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+   |
+23 | tables_str = 'django_content_type" WHERE "auth_user"."username"="admin'
+24 | User.objects.all().extra(tables=[tables_str]).distinct()
+   |                         ^^^^^^^^^^^^^^^^^^^^^ S610
+25 | 
+26 | # OK
+   |

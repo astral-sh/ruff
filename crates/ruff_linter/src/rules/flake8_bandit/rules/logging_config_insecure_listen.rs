@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// `logging.config.listen` starts a server that listens for logging
-/// configuration requests. This is insecure as parts of the configuration are
+/// configuration requests. This is insecure, as parts of the configuration are
 /// passed to the built-in `eval` function, which can be used to execute
 /// arbitrary code.
 ///

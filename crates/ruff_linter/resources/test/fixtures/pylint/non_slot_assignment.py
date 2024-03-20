@@ -54,3 +54,15 @@ class StudentE(StudentD):
 
     def setup(self):
         pass
+
+
+class StudentF(object):
+    __slots__ = ("name", "__dict__")
+
+    def __init__(self, name, middle_name):
+        self.name = name
+        self.middle_name = middle_name  # [assigning-non-slot]
+        self.setup()
+
+    def setup(self):
+        pass
