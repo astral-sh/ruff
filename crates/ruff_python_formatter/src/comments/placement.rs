@@ -251,10 +251,41 @@ fn handle_enclosed_comment<'a>(
         }
         AnyNodeRef::ExprSubscript(expr_subscript) => {
             if let Expr::Slice(expr_slice) = expr_subscript.slice.as_ref() {
-                handle_slice_comments(comment, expr_slice, comment_ranges, locator)
-            } else {
-                CommentPlacement::Default(comment)
+                return handle_slice_comments(comment, expr_slice, comment_ranges, locator);
             }
+
+            // Handle non-slice subscript end-of-line comments coming after the `[`
+            // ```python
+            // repro(
+            //     "some long string that takes up some space"
+            //  )[  # some long comment also taking up space
+            //     0
+            // ]
+            // ```
+            if comment.line_position().is_end_of_line() {
+                // Ensure that there are no tokens between the open bracket and the comment.
+                let mut lexer = SimpleTokenizer::new(
+                    locator.contents(),
+                    TextRange::new(expr_subscript.value.end(), comment.start()),
+                )
+                .skip_trivia();
+
+                // Skip the opening parenthesis.
+                let Some(paren) = lexer.next() else {
+                    return CommentPlacement::Default(comment);
+                };
+
+                debug_assert_eq!(paren.kind(), SimpleTokenKind::LBracket);
+
+                // If there are no additional tokens between the open parenthesis and the comment, then
+                // it should be attached as a dangling comment on the brackets, rather than a leading
+                // comment on the first argument.
+                if lexer.next().is_none() {
+                    return CommentPlacement::dangling(expr_subscript, comment);
+                }
+            }
+
+            CommentPlacement::Default(comment)
         }
         AnyNodeRef::ModModule(module) => {
             handle_trailing_module_comment(module, comment).or_else(|comment| {
