@@ -454,6 +454,10 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         {
                             self.is_beginning_of_cell = true;
                             cell_offsets.next();
+                            blank_lines = BlankLines::Many {
+                                count: NonZeroU32::new(1).unwrap(),
+                                range: *range,
+                            };
                             self.max_preceding_blank_lines = BlankLines::Many {
                                 count: NonZeroU32::new(1).unwrap(),
                                 range: *range,
