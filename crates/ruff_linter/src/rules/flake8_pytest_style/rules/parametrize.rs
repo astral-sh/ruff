@@ -86,12 +86,18 @@ impl Violation for PytestParametrizeNamesWrongType {
             single_argument,
             expected,
         } = self;
+        let expected_string;
         if *single_argument {
-            return format!(
-                "Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`"
-            );
+            expected_string = "`str`".to_string();
+        } else {
+            match expected {
+                types::ParametrizeNameType::Csv => expected_string = format!("a {expected}"),
+                types::ParametrizeNameType::Tuple | types::ParametrizeNameType::List => {
+                    expected_string = format!("`{expected}`");
+                }
+            }
         }
-        format!("Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `{expected}`")
+        format!("Wrong type passed to first argument of `@pytest.mark.parametrize`; expected {expected_string}")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -99,10 +105,18 @@ impl Violation for PytestParametrizeNamesWrongType {
             single_argument,
             expected,
         } = self;
+        let expected_string;
         if *single_argument {
-            return Some(format!("Use a string for the first argument"));
+            expected_string = "string".to_string();
+        } else {
+            match expected {
+                types::ParametrizeNameType::Csv => expected_string = format!("{expected}"),
+                types::ParametrizeNameType::Tuple | types::ParametrizeNameType::List => {
+                    expected_string = format!("`{expected}`");
+                }
+            }
         }
-        Some(format!("Use a `{expected}` for the first argument"))
+        Some(format!("Use a {expected_string} for the first argument"))
     }
 }
 
