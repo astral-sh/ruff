@@ -210,8 +210,8 @@ impl RuleSelector {
             rule.is_stable()
             // Enabling preview includes all preview rules unless explicit selection is turned on
             || (rule.is_preview() && preview_enabled && (self.is_exact() || !preview_require_explicit))
-            // Deprecated rules are excluded in preview mode unless explicitly selected
-            || (rule.is_deprecated() && (!preview_enabled || self.is_exact()))
+            // Deprecated rules are excluded in preview mode and with 'All' option unless explicitly selected
+            || (rule.is_deprecated() && (!preview_enabled || self.is_exact()) && !matches!(self, RuleSelector::All { .. }))
             // Removed rules are included if explicitly selected but will error downstream
             || (rule.is_removed() && self.is_exact())
         })
