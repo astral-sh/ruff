@@ -332,19 +332,11 @@ impl<'src> Parser<'src> {
         current
     }
 
-    fn peek_nth(&self, offset: usize) -> TokenKind {
-        if offset == 0 {
-            self.current_token_kind()
-        } else {
-            self.tokens
-                .peek_nth(offset - 1)
-                .map_or(TokenKind::EndOfFile, |spanned| spanned.0)
-        }
-    }
-
     /// Returns the next token kind without consuming it.
     fn peek(&self) -> TokenKind {
-        self.peek_nth(1)
+        self.tokens
+            .peek()
+            .map_or(TokenKind::EndOfFile, |spanned| spanned.0)
     }
 
     /// Returns the current token kind along with its range.
