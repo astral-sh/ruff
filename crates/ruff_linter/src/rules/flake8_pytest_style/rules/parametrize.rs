@@ -87,17 +87,17 @@ impl Violation for PytestParametrizeNamesWrongType {
             expected,
         } = self;
         let expected_string = {
-	        if *single_argument {
-	            "`str`".to_string();
-	        } else {
-	            match expected {
-	                types::ParametrizeNameType::Csv => format!("a {expected}"),
-	                types::ParametrizeNameType::Tuple | types::ParametrizeNameType::List => {
-	                    format!("`{expected}`");
-	                }
-	            }
-	        }
-	    };
+            if *single_argument {
+                "`str`".to_string()
+            } else {
+                match expected {
+                    types::ParametrizeNameType::Csv => format!("a {expected}"),
+                    types::ParametrizeNameType::Tuple | types::ParametrizeNameType::List => {
+                        format!("`{expected}`")
+                    }
+                }
+            }
+        };
         format!("Wrong type passed to first argument of `@pytest.mark.parametrize`; expected {expected_string}")
     }
 
@@ -107,17 +107,17 @@ impl Violation for PytestParametrizeNamesWrongType {
             expected,
         } = self;
         let expected_string = {
-	        if *single_argument {
-	            "string".to_string();
-	        } else {
-	            match expected {
-	                types::ParametrizeNameType::Csv => format!("{expected}"),
-	                types::ParametrizeNameType::Tuple | types::ParametrizeNameType::List => {
-	                    format!("`{expected}`");
-	                }
-	            }
-	        }
-	    };
+            if *single_argument {
+                "string".to_string()
+            } else {
+                match expected {
+                    types::ParametrizeNameType::Csv => format!("{expected}"),
+                    types::ParametrizeNameType::Tuple | types::ParametrizeNameType::List => {
+                        format!("`{expected}`")
+                    }
+                }
+            }
+        };
         Some(format!("Use a {expected_string} for the first argument"))
     }
 }
