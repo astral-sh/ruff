@@ -12,7 +12,15 @@ if TYPE_CHECKING:
 
 
 class NoEscapeTextPlugin:
-    """Overrides the default text formatting behavior of mdformat."""
+    r"""Overrides the default text formatting behavior of mdformat.
+
+    By default mdformat will escape any markdown special character found in a
+    text block, e.g., <. Some of these characters are found in our
+    documentation, and when escaped (i.e. \<) will be rendered incorrectly by
+    mkdocs, i.e., the backslash will appear in the render. Because our only
+    purpose in using mdformat is to manage the line-breaks, it makes sense to
+    override its text formatting behavior.
+    """
 
     def __init__(self: NoEscapeTextPlugin) -> None:
         self.POSTPROCESSORS = {"text": NoEscapeTextPlugin.text}
