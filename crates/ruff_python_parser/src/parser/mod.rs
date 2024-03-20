@@ -8,7 +8,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::lexer::lex;
-use crate::parser::progress::ParserProgress;
+use crate::parser::progress::{ParserProgress, TokenId};
 use crate::{
     lexer::{LexResult, Spanned},
     token_set::TokenSet,
@@ -101,6 +101,10 @@ pub(crate) struct Parser<'src> {
 
     current: Spanned,
 
+    /// The ID of the current token. This is used to track the progress of the parser
+    /// to avoid infinite loops when the parser is stuck.
+    current_token_id: TokenId,
+
     /// The end of the last processed. Used to determine a node's end.
     last_token_end: TextSize,
 
@@ -164,6 +168,7 @@ impl<'src> Parser<'src> {
             recovery_context: RecoveryContext::empty(),
             last_token_end: tokens_range.start(),
             current,
+            current_token_id: TokenId::default(),
             tokens_range,
         }
     }
@@ -307,6 +312,8 @@ impl<'src> Parser<'src> {
             .next()
             .unwrap_or_else(|| (Tok::EndOfFile, TextRange::empty(self.tokens_range.end())));
 
+        self.current_token_id.increment();
+
         let current = std::mem::replace(&mut self.current, next);
 
         if !matches!(
@@ -355,6 +362,12 @@ impl<'src> Parser<'src> {
     #[inline]
     fn current_token_range(&self) -> TextRange {
         self.current.1
+    }
+
+    /// Returns the current token ID.
+    #[inline]
+    fn current_token_id(&self) -> TokenId {
+        self.current_token_id
     }
 
     /// Eat the current token if it is of the given kind, returning `true` in
