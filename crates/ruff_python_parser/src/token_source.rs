@@ -1,7 +1,9 @@
+use std::iter::FusedIterator;
+
+use ruff_text_size::{TextRange, TextSize};
+
 use crate::lexer::{LexResult, LexicalError, Spanned};
 use crate::{Tok, TokenKind};
-use ruff_text_size::{TextRange, TextSize};
-use std::iter::FusedIterator;
 
 #[derive(Clone, Debug)]
 pub(crate) struct TokenSource {
@@ -43,7 +45,8 @@ impl TokenSource {
         Some(range.end())
     }
 
-    pub(crate) fn peek_nth(&self, mut n: usize) -> Option<(TokenKind, TextRange)> {
+    /// Returns the next token kind and its range without consuming it.
+    pub(crate) fn peek(&self) -> Option<(TokenKind, TextRange)> {
         let mut iter = self.tokens.as_slice().iter();
 
         loop {
@@ -53,14 +56,10 @@ impl TokenSource {
                 continue;
             }
 
-            if n == 0 {
-                break Some(match next {
-                    Ok((token, range)) => (TokenKind::from_token(token), *range),
-                    Err(error) => (TokenKind::Unknown, error.location()),
-                });
-            }
-
-            n -= 1;
+            break Some(match next {
+                Ok((token, range)) => (TokenKind::from_token(token), *range),
+                Err(error) => (TokenKind::Unknown, error.location()),
+            });
         }
     }
 

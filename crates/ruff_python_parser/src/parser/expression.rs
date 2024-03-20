@@ -140,7 +140,7 @@ impl<'src> Parser<'src> {
         match kind {
             TokenKind::Or => (Precedence::Or, kind, Associativity::Left),
             TokenKind::And => (Precedence::And, kind, Associativity::Left),
-            TokenKind::Not if self.peek_nth(1) == TokenKind::In => (
+            TokenKind::Not if self.peek() == TokenKind::In => (
                 Precedence::ComparisonsMembershipIdentity,
                 kind,
                 Associativity::Left,
@@ -749,7 +749,7 @@ impl<'src> Parser<'src> {
             let parsed_expr = self.parse_expression_with_precedence(op_bp);
             comparators.push(parsed_expr.expr);
 
-            if let Ok(op) = token_kind_to_cmp_op([self.current_token_kind(), self.peek_nth(1)]) {
+            if let Ok(op) = token_kind_to_cmp_op([self.current_token_kind(), self.peek()]) {
                 if matches!(op, CmpOp::IsNot | CmpOp::NotIn) {
                     self.next_token();
                 }
