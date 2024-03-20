@@ -18,9 +18,9 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// class Unicorn:
 ///     def __init__(self, x):
-///         self.x = x
 ///         if self.x > 9000:  # [access-member-before-definition]
 ///             pass
+///         self.x = x
 /// ```
 ///
 /// Use instead:
