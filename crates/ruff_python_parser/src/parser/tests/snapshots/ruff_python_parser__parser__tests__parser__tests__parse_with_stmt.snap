@@ -549,7 +549,7 @@ Program {
                         is_async: false,
                         items: [
                             WithItem {
-                                range: 291..297,
+                                range: 290..298,
                                 context_expr: Named(
                                     ExprNamed {
                                         range: 291..297,
