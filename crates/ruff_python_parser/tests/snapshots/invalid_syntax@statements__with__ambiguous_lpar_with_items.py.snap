@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/statements/ambiguous_lpar_with_items.py
+input_file: crates/ruff_python_parser/resources/invalid/statements/with/ambiguous_lpar_with_items.py
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
         range: 0..412,

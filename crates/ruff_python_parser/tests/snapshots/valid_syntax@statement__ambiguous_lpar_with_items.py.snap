@@ -4,7 +4,7 @@ input_file: crates/ruff_python_parser/resources/valid/statement/ambiguous_lpar_w
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
         range: 0..3158,

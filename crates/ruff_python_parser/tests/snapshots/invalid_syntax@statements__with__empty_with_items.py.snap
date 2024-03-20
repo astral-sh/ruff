@@ -1,10 +1,10 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/statements/empty_with_items.py
+input_file: crates/ruff_python_parser/resources/invalid/statements/with/empty_with_items.py
 ---
 ## AST
 
- ```
+```
 Module(
     ModModule {
         range: 0..105,

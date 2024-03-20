@@ -1021,14 +1021,17 @@ impl<'src> Parser<'src> {
             //
             // Here, (1) is valid and represents a parenthesized with items while (2) and (3)
             // are invalid as they are parenthesized expression. Example (3) will raise an error
-            // stating that a trailing comma isn't allowed, while (2) will raise the following
-            // error.
+            // stating that a trailing comma isn't allowed, while (2) will raise an "expected an
+            // expression" error.
             //
             // The reason that (2) expects an expression is because if it raised an error
             // similar to (3), we would be suggesting to remove the trailing comma, which would
-            // make it a parenthesized with items. This would contradict our original assumption.
-            // However, for (3), if the trailing comma is removed, it still remains a parenthesized
-            // expression.
+            // make it a parenthesized with items. This would contradict our original assumption
+            // that it's a parenthesized expression.
+            //
+            // However, for (3), the error is being raised by the list parsing logic and if the
+            // trailing comma is removed, it still remains a parenthesized expression, so it's
+            // fine to raise the error.
             if self.eat(TokenKind::Comma) && !self.at_expr() {
                 self.add_error(
                     ParseErrorType::OtherError("Expected an expression".to_string()),
@@ -1052,9 +1055,22 @@ impl<'src> Parser<'src> {
 
     /// Parse the with items coming after an ambiguous `(` token.
     ///
+    /// To understand the ambiguity, consider the following example:
+    ///
+    /// ```python
+    /// with (item1, item2): ...       # (1)
+    /// with (item1, item2) as f: ...  # (2)
+    /// ```
+    ///
+    /// When the parser is at the `(` token after the `with` keyword, it doesn't
+    /// know if it's used to parenthesize the with items or if it's part of a
+    /// parenthesized expression of the first with item. The challenge here is
+    /// that until the parser sees the matching `)` token, it can't resolve the
+    /// ambiguity.
+    ///
     /// This method is used to parse the with items when the parser has seen an
     /// ambiguous `(` token. It's used to determine if the with items are
-    /// parenthesized or it's a parenthesized expression.
+    /// parenthesized or if it's a parenthesized expression.
     ///
     /// The return value is the kind of with items parsed. Note that there could
     /// still be other with items which needs to be parsed as this method stops
@@ -1070,6 +1086,10 @@ impl<'src> Parser<'src> {
         // Keep track of any trailing comma. This is used to determine if it's a
         // tuple expression or not in the case of a single with item.
         let mut has_trailing_comma = false;
+
+        // Keep track whether any of the with items have optional variables (`as ...`).
+        // This is used to determine if the with item kind.
+        let mut has_optional_vars = false;
 
         // Start with parsing the first with item after an ambiguous `(` token
         // with the start offset.
@@ -1126,13 +1146,14 @@ impl<'src> Parser<'src> {
                 _ => {}
             }
 
+            has_optional_vars = parsed_with_item.item.optional_vars.is_some();
+
             items.push(parsed_with_item.item);
 
-            has_trailing_comma = false;
-            if !self.eat(TokenKind::Comma) {
+            has_trailing_comma = self.eat(TokenKind::Comma);
+            if !has_trailing_comma {
                 break;
             }
-            has_trailing_comma = true;
 
             // Update the with item parsing to indicate that we're no longer
             // parsing the first with item, but we haven't yet found the `)` to
@@ -1142,7 +1163,7 @@ impl<'src> Parser<'src> {
 
         // Check if our assumption is incorrect and it's actually a parenthesized
         // expression.
-        if self.at(TokenKind::Rpar) {
+        if !with_item_kind.is_parenthesized_expression() && self.at(TokenKind::Rpar) {
             if self.peek() == TokenKind::Colon {
                 // Here, the parser is at a `)` followed by a `:`.
                 match items.as_slice() {
@@ -1179,7 +1200,7 @@ impl<'src> Parser<'src> {
                     _ => {}
                 }
             } else {
-                // For any other token followed by `)`, if either of the items has
+                // For any other token followed by `)`, if any of the items has
                 // an optional variables (`as ...`), then our assumption is correct.
                 // Otherwise, treat it as a parenthesized expression. For example:
                 //
@@ -1194,7 +1215,7 @@ impl<'src> Parser<'src> {
                 // #                        ^^
                 // #                        Expecting `:` but got `as`
                 // ```
-                if items.iter().all(|item| item.optional_vars.is_none()) {
+                if !has_optional_vars {
                     with_item_kind = WithItemKind::ParenthesizedExpression;
                 }
             }
@@ -1242,11 +1263,7 @@ impl<'src> Parser<'src> {
             // considered when parsing the with item in the case. So, the parser
             // stops when it sees the `)` token and doesn't check for any postfix
             // expressions.
-            let context_expr = if self.is_current_token_postfix() {
-                self.parse_postfix_expression(lhs, start)
-            } else {
-                lhs
-            };
+            let context_expr = self.parse_postfix_expression(lhs, start);
 
             let optional_vars = self
                 .at(TokenKind::As)
@@ -1325,18 +1342,19 @@ impl<'src> Parser<'src> {
                             // # This path will not be taken for
                             // with (item, (x for x in range(10))): ...
                             // ```
-                            self.parse_generator_expression(parsed_expr.expr, start, false)
-                        };
+                            let generator_expr =
+                                self.parse_generator_expression(parsed_expr.expr, start, false);
 
-                    if !generator_expr.parenthesized {
-                        self.add_error(
-                            ParseErrorType::OtherError(
-                                "unparenthesized generator expression cannot be used here"
-                                    .to_string(),
-                            ),
-                            generator_expr.range(),
-                        );
-                    }
+                            self.add_error(
+                                ParseErrorType::OtherError(
+                                    "unparenthesized generator expression cannot be used here"
+                                        .to_string(),
+                                ),
+                                generator_expr.range(),
+                            );
+
+                            generator_expr
+                        };
 
                     Expr::Generator(generator_expr).into()
                 }
