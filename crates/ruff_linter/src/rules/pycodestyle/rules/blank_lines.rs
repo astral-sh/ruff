@@ -446,6 +446,21 @@ impl<'a> Iterator for LinePreprocessor<'a> {
 
                     self.line_start = range.end();
 
+                    // Check if we are at the beginning of a cell in a notebook.
+                    if let Some(ref mut cell_offsets) = self.cell_offsets {
+                        if cell_offsets
+                            .peek()
+                            .is_some_and(|offset| offset == &&self.line_start)
+                        {
+                            self.is_beginning_of_cell = true;
+                            cell_offsets.next();
+                            self.max_preceding_blank_lines = BlankLines::Many {
+                                count: NonZeroU32::new(1).unwrap(),
+                                range: *range,
+                            };
+                        }
+                    }
+
                     continue;
                 }
 
@@ -519,6 +534,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     // Set the start for the next logical line.
                     self.line_start = range.end();
 
+                    // Check if we are at the beginning of a cell in a notebook.
                     if let Some(ref mut cell_offsets) = self.cell_offsets {
                         if cell_offsets
                             .peek()
@@ -526,6 +542,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         {
                             self.is_beginning_of_cell = true;
                             cell_offsets.next();
+                            self.max_preceding_blank_lines = BlankLines::Zero;
                         } else if !line_is_comment_only {
                             self.is_beginning_of_cell = false;
                         }
