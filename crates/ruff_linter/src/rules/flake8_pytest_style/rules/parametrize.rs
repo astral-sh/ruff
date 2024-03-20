@@ -87,9 +87,11 @@ impl Violation for PytestParametrizeNamesWrongType {
             expected,
         } = self;
         if *single_argument {
-            return format!("Wrong name format in `@pytest.mark.parametrize`, expected `string`");
+            return format!(
+                "Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `str`"
+            );
         }
-        format!("Wrong names type in `@pytest.mark.parametrize`, expected `{expected}`")
+        format!("Wrong type passed to first argument of `@pytest.mark.parametrize`; expected `{expected}`")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -98,9 +100,9 @@ impl Violation for PytestParametrizeNamesWrongType {
             expected,
         } = self;
         if *single_argument {
-            return Some(format!("Use a `string` for parameter name"));
+            return Some(format!("Use a string for the first argument"));
         }
-        Some(format!("Use a `{expected}` for parameter names"))
+        Some(format!("Use a `{expected}` for the first argument"))
     }
 }
 
