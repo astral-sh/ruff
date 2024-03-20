@@ -2251,7 +2251,6 @@ name = "ruff_python_formatter"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "bitflags 2.4.2",
  "clap",
  "countme",
  "insta",

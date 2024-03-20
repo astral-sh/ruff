@@ -1,11 +1,10 @@
 use ruff_formatter::write;
-use ruff_python_ast::FString;
+use ruff_python_ast::{AnyStringKind, FString};
 use ruff_source_file::Locator;
-use ruff_text_size::Ranged;
 
 use crate::prelude::*;
 use crate::preview::is_f_string_formatting_enabled;
-use crate::string::{Quoting, StringNormalizer, StringPart, StringPrefix, StringQuotes};
+use crate::string::{Quoting, StringNormalizer, StringQuotes};
 
 use super::f_string_element::FormatFStringElement;
 
@@ -30,8 +29,6 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let locator = f.context().locator();
 
-        let string = StringPart::from_source(self.value.range(), &locator);
-
         let normalizer = StringNormalizer::from_context(f.context())
             .with_quoting(self.quoting)
             .with_preferred_quote_style(f.options().quote_style());
@@ -39,7 +36,7 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
         // If f-string formatting is disabled (not in preview), then we will
         // fall back to the previous behavior of normalizing the f-string.
         if !is_f_string_formatting_enabled(f.context()) {
-            let result = normalizer.normalize(&string, &locator).fmt(f);
+            let result = normalizer.normalize(self.value.into(), &locator).fmt(f);
             let comments = f.context().comments();
             self.value.elements.iter().for_each(|value| {
                 comments.mark_verbatim_node_comments_formatted(value.into());
@@ -59,16 +56,16 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
             return result;
         }
 
-        let quote_selection = normalizer.choose_quotes(&string, &locator);
+        let string_kind = normalizer.choose_quotes(self.value.into(), &locator).kind();
 
         let context = FStringContext::new(
-            string.prefix(),
-            quote_selection.quotes(),
+            string_kind,
             FStringLayout::from_f_string(self.value, &locator),
         );
 
         // Starting prefix and quote
-        write!(f, [string.prefix(), quote_selection.quotes()])?;
+        let quotes = StringQuotes::from(string_kind);
+        write!(f, [string_kind.prefix(), quotes])?;
 
         f.join()
             .entries(
@@ -80,32 +77,23 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
             .finish()?;
 
         // Ending quote
-        quote_selection.quotes().fmt(f)
+        quotes.fmt(f)
     }
 }
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct FStringContext {
-    prefix: StringPrefix,
-    quotes: StringQuotes,
+    kind: AnyStringKind,
     layout: FStringLayout,
 }
 
 impl FStringContext {
-    const fn new(prefix: StringPrefix, quotes: StringQuotes, layout: FStringLayout) -> Self {
-        Self {
-            prefix,
-            quotes,
-            layout,
-        }
+    const fn new(kind: AnyStringKind, layout: FStringLayout) -> Self {
+        Self { kind, layout }
     }
 
-    pub(crate) const fn quotes(self) -> StringQuotes {
-        self.quotes
-    }
-
-    pub(crate) const fn prefix(self) -> StringPrefix {
-        self.prefix
+    pub(crate) fn kind(self) -> AnyStringKind {
+        self.kind
     }
 
     pub(crate) const fn layout(self) -> FStringLayout {
