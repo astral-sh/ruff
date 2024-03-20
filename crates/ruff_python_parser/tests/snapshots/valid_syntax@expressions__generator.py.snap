@@ -735,7 +735,7 @@ Module(
                                                         value: " ",
                                                         flags: StringLiteralFlags {
                                                             quote_style: Double,
-                                                            prefix: "",
+                                                            prefix: Empty,
                                                             triple_quoted: false,
                                                         },
                                                     },
@@ -800,7 +800,7 @@ Module(
                                                                                                     value: "LIMIT %d",
                                                                                                     flags: StringLiteralFlags {
                                                                                                         quote_style: Double,
-                                                                                                        prefix: "",
+                                                                                                        prefix: Empty,
                                                                                                         triple_quoted: false,
                                                                                                     },
                                                                                                 },
@@ -848,7 +848,7 @@ Module(
                                                                                                     value: "OFFSET %d",
                                                                                                     flags: StringLiteralFlags {
                                                                                                         quote_style: Double,
-                                                                                                        prefix: "",
+                                                                                                        prefix: Empty,
                                                                                                         triple_quoted: false,
                                                                                                     },
                                                                                                 },

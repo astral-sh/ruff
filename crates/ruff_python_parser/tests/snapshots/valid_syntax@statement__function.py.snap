@@ -1891,7 +1891,7 @@ Module(
                                                             value: "str",
                                                             flags: StringLiteralFlags {
                                                                 quote_style: Double,
-                                                                prefix: "",
+                                                                prefix: Empty,
                                                                 triple_quoted: false,
                                                             },
                                                         },
