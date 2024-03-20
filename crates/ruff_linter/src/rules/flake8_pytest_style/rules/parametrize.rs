@@ -106,17 +106,18 @@ impl Violation for PytestParametrizeNamesWrongType {
             single_argument,
             expected,
         } = self;
-        let expected_string;
-        if *single_argument {
-            expected_string = "string".to_string();
-        } else {
-            match expected {
-                types::ParametrizeNameType::Csv => expected_string = format!("{expected}"),
-                types::ParametrizeNameType::Tuple | types::ParametrizeNameType::List => {
-                    expected_string = format!("`{expected}`");
-                }
-            }
-        }
+        let expected_string = {
+	        if *single_argument {
+	            "string".to_string();
+	        } else {
+	            match expected {
+	                types::ParametrizeNameType::Csv => format!("{expected}"),
+	                types::ParametrizeNameType::Tuple | types::ParametrizeNameType::List => {
+	                    format!("`{expected}`");
+	                }
+	            }
+	        }
+	    };
         Some(format!("Use a {expected_string} for the first argument"))
     }
 }
