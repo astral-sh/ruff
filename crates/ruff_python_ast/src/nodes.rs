@@ -1244,8 +1244,9 @@ pub struct FStringFlags(FStringFlagsInner);
 
 impl FStringFlags {
     #[must_use]
-    pub fn with_double_quotes(mut self) -> Self {
-        self.0 |= FStringFlagsInner::DOUBLE;
+    pub fn with_quote_style(mut self, quote_style: Quote) -> Self {
+        self.0
+            .set(FStringFlagsInner::DOUBLE, quote_style.is_double());
         self
     }
 
@@ -1256,18 +1257,16 @@ impl FStringFlags {
     }
 
     #[must_use]
-    pub fn with_prefix(self, prefix: FStringPrefix) -> Self {
-        let FStringFlags(flags) = self;
+    pub fn with_prefix(mut self, prefix: FStringPrefix) -> Self {
         match prefix {
             FStringPrefix::Regular => {
-                Self(flags - FStringFlagsInner::R_PREFIX_LOWER - FStringFlagsInner::R_PREFIX_UPPER)
+                Self(self.0 - FStringFlagsInner::R_PREFIX_LOWER - FStringFlagsInner::R_PREFIX_UPPER)
             }
-            FStringPrefix::Raw { uppercase_r: true } => Self(
-                (flags | FStringFlagsInner::R_PREFIX_UPPER) - FStringFlagsInner::R_PREFIX_LOWER,
-            ),
-            FStringPrefix::Raw { uppercase_r: false } => Self(
-                (flags | FStringFlagsInner::R_PREFIX_LOWER) - FStringFlagsInner::R_PREFIX_UPPER,
-            ),
+            FStringPrefix::Raw { uppercase_r } => {
+                self.0.set(FStringFlagsInner::R_PREFIX_UPPER, uppercase_r);
+                self.0.set(FStringFlagsInner::R_PREFIX_LOWER, !uppercase_r);
+                self
+            }
         }
     }
 
@@ -1582,8 +1581,9 @@ pub struct StringLiteralFlags(StringLiteralFlagsInner);
 
 impl StringLiteralFlags {
     #[must_use]
-    pub fn with_double_quotes(mut self) -> Self {
-        self.0 |= StringLiteralFlagsInner::DOUBLE;
+    pub fn with_quote_style(mut self, quote_style: Quote) -> Self {
+        self.0
+            .set(StringLiteralFlagsInner::DOUBLE, quote_style.is_double());
         self
     }
 
@@ -1996,8 +1996,9 @@ pub struct BytesLiteralFlags(BytesLiteralFlagsInner);
 
 impl BytesLiteralFlags {
     #[must_use]
-    pub fn with_double_quotes(mut self) -> Self {
-        self.0 |= BytesLiteralFlagsInner::DOUBLE;
+    pub fn with_quote_style(mut self, quote_style: Quote) -> Self {
+        self.0
+            .set(BytesLiteralFlagsInner::DOUBLE, quote_style.is_double());
         self
     }
 
@@ -2008,23 +2009,20 @@ impl BytesLiteralFlags {
     }
 
     #[must_use]
-    pub fn with_prefix(self, prefix: ByteStringPrefix) -> Self {
-        let BytesLiteralFlags(flags) = self;
+    pub fn with_prefix(mut self, prefix: ByteStringPrefix) -> Self {
         match prefix {
-            ByteStringPrefix::Regular => Self(
-                flags
-                    - BytesLiteralFlagsInner::R_PREFIX_LOWER
-                    - BytesLiteralFlagsInner::R_PREFIX_UPPER,
-            ),
-            ByteStringPrefix::Raw { uppercase_r: true } => Self(
-                (flags | BytesLiteralFlagsInner::R_PREFIX_UPPER)
-                    - BytesLiteralFlagsInner::R_PREFIX_LOWER,
-            ),
-            ByteStringPrefix::Raw { uppercase_r: false } => Self(
-                (flags | BytesLiteralFlagsInner::R_PREFIX_LOWER)
-                    - BytesLiteralFlagsInner::R_PREFIX_UPPER,
-            ),
-        }
+            ByteStringPrefix::Regular => {
+                self.0 -= BytesLiteralFlagsInner::R_PREFIX_LOWER;
+                self.0 -= BytesLiteralFlagsInner::R_PREFIX_UPPER;
+            }
+            ByteStringPrefix::Raw { uppercase_r } => {
+                self.0
+                    .set(BytesLiteralFlagsInner::R_PREFIX_UPPER, uppercase_r);
+                self.0
+                    .set(BytesLiteralFlagsInner::R_PREFIX_LOWER, !uppercase_r);
+            }
+        };
+        self
     }
 
     pub const fn prefix(self) -> ByteStringPrefix {

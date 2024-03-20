@@ -34,7 +34,7 @@ use std::{char, cmp::Ordering, str::FromStr};
 use unicode_ident::{is_xid_continue, is_xid_start};
 use unicode_normalization::UnicodeNormalization;
 
-use ruff_python_ast::{FStringPrefix, Int, IpyEscapeKind};
+use ruff_python_ast::{str::Quote, FStringPrefix, Int, IpyEscapeKind};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::lexer::cursor::{Cursor, EOF_CHAR};
@@ -560,11 +560,14 @@ impl<'source> Lexer<'source> {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), quote);
 
-        let mut kind = StringKind::from_prefix(StringPrefix::Format(prefix));
+        let mut kind = StringKind::default()
+            .with_prefix(StringPrefix::Format(prefix))
+            .with_quote_style(if quote == '"' {
+                Quote::Double
+            } else {
+                Quote::Single
+            });
 
-        if quote == '"' {
-            kind = kind.with_double_quotes();
-        }
         if self.cursor.eat_char2(quote, quote) {
             kind = kind.with_triple_quotes();
         }
@@ -712,11 +715,14 @@ impl<'source> Lexer<'source> {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), quote);
 
-        let mut kind = StringKind::from_prefix(prefix);
-
-        if quote == '"' {
-            kind = kind.with_double_quotes();
-        }
+        let mut kind =
+            StringKind::default()
+                .with_prefix(prefix)
+                .with_quote_style(if quote == '"' {
+                    Quote::Double
+                } else {
+                    Quote::Single
+                });
 
         // If the next two characters are also the quote character, then we have a triple-quoted
         // string; consume those two characters and ensure that we require a triple-quote to close

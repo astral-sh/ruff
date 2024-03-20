@@ -189,7 +189,7 @@ impl StringPrefix {
         Self::Regular(StringLiteralPrefix::Empty)
     }
 
-    const fn as_str(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Regular(regular_prefix) => regular_prefix.as_str(),
             Self::Bytes(bytestring_prefix) => bytestring_prefix.as_str(),
@@ -214,12 +214,23 @@ impl Default for StringPrefix {
 pub struct StringKind(StringFlags);
 
 impl StringKind {
-    pub(crate) const fn from_prefix(prefix: StringPrefix) -> Self {
-        Self(prefix.as_flags())
+    #[must_use]
+    pub fn with_prefix(mut self, prefix: StringPrefix) -> Self {
+        self.0 |= prefix.as_flags();
+        self
     }
 
     pub const fn prefix(self) -> StringPrefix {
         StringPrefix::from_kind(self)
+    }
+
+    pub fn new(prefix: StringPrefix, quotes: Quote, triple_quoted: bool) -> Self {
+        let new = Self::default().with_prefix(prefix).with_quote_style(quotes);
+        if triple_quoted {
+            new.with_triple_quotes()
+        } else {
+            new
+        }
     }
 
     /// Does the string have a `u` or `U` prefix?
@@ -315,8 +326,11 @@ impl StringKind {
     }
 
     #[must_use]
-    pub fn with_double_quotes(mut self) -> Self {
-        self.0 |= StringFlags::DOUBLE;
+    pub fn with_quote_style(mut self, quotes: Quote) -> Self {
+        match quotes {
+            Quote::Double => self.0 |= StringFlags::DOUBLE,
+            Quote::Single => self.0 -= StringFlags::DOUBLE,
+        };
         self
     }
 
@@ -339,57 +353,87 @@ impl fmt::Debug for StringKind {
 
 impl From<StringKind> for ruff_python_ast::StringLiteralFlags {
     fn from(value: StringKind) -> ruff_python_ast::StringLiteralFlags {
-        let mut new = ruff_python_ast::StringLiteralFlags::default();
-        if value.quote_style().is_double() {
-            new = new.with_double_quotes();
-        }
-        if value.is_triple_quoted() {
-            new = new.with_triple_quotes();
-        }
         let StringPrefix::Regular(prefix) = value.prefix() else {
             unreachable!(
                 "Should never attempt to convert {} into a regular string",
                 value.prefix()
             )
         };
-        new.with_prefix(prefix)
+        let new = ruff_python_ast::StringLiteralFlags::default()
+            .with_quote_style(value.quote_style())
+            .with_prefix(prefix);
+        if value.is_triple_quoted() {
+            new.with_triple_quotes()
+        } else {
+            new
+        }
+    }
+}
+
+impl From<ruff_python_ast::StringLiteralFlags> for StringKind {
+    fn from(value: ruff_python_ast::StringLiteralFlags) -> Self {
+        Self::new(
+            StringPrefix::Regular(value.prefix()),
+            value.quote_style(),
+            value.is_triple_quoted(),
+        )
     }
 }
 
 impl From<StringKind> for ruff_python_ast::BytesLiteralFlags {
     fn from(value: StringKind) -> ruff_python_ast::BytesLiteralFlags {
-        let mut new = ruff_python_ast::BytesLiteralFlags::default();
-        if value.quote_style().is_double() {
-            new = new.with_double_quotes();
-        }
-        if value.is_triple_quoted() {
-            new = new.with_triple_quotes();
-        }
         let StringPrefix::Bytes(bytestring_prefix) = value.prefix() else {
             unreachable!(
                 "Should never attempt to convert {} into a bytestring",
                 value.prefix()
             )
         };
-        new.with_prefix(bytestring_prefix)
+        let new = ruff_python_ast::BytesLiteralFlags::default()
+            .with_quote_style(value.quote_style())
+            .with_prefix(bytestring_prefix);
+        if value.is_triple_quoted() {
+            new.with_triple_quotes()
+        } else {
+            new
+        }
+    }
+}
+
+impl From<ruff_python_ast::BytesLiteralFlags> for StringKind {
+    fn from(value: ruff_python_ast::BytesLiteralFlags) -> Self {
+        Self::new(
+            StringPrefix::Bytes(value.prefix()),
+            value.quote_style(),
+            value.is_triple_quoted(),
+        )
     }
 }
 
 impl From<StringKind> for ruff_python_ast::FStringFlags {
     fn from(value: StringKind) -> ruff_python_ast::FStringFlags {
-        let mut new = ruff_python_ast::FStringFlags::default();
-        if value.quote_style().is_double() {
-            new = new.with_double_quotes();
-        }
-        if value.is_triple_quoted() {
-            new = new.with_triple_quotes();
-        }
         let StringPrefix::Format(fstring_prefix) = value.prefix() else {
             unreachable!(
                 "Should never attempt to convert {} into an f-string",
                 value.prefix()
             )
         };
-        new.with_prefix(fstring_prefix)
+        let new = ruff_python_ast::FStringFlags::default()
+            .with_quote_style(value.quote_style())
+            .with_prefix(fstring_prefix);
+        if value.is_triple_quoted() {
+            new.with_triple_quotes()
+        } else {
+            new
+        }
+    }
+}
+
+impl From<ruff_python_ast::FStringFlags> for StringKind {
+    fn from(value: ruff_python_ast::FStringFlags) -> Self {
+        Self::new(
+            StringPrefix::Format(value.prefix()),
+            value.quote_style(),
+            value.is_triple_quoted(),
+        )
     }
 }
