@@ -475,8 +475,7 @@ impl<'src> Parser<'src> {
                     TokenKind::Async | TokenKind::For => {
                         parsed_expr = Expr::Generator(parser.parse_generator_expression(
                             parsed_expr.expr,
-                            start,
-                            false,
+                            GeneratorExpressionInParentheses::No(start),
                         ))
                         .into();
                     }
@@ -1238,8 +1237,10 @@ impl<'src> Parser<'src> {
                 }
             }
             TokenKind::Async | TokenKind::For => {
-                let generator =
-                    Expr::Generator(self.parse_generator_expression(parsed_expr.expr, start, true));
+                let generator = Expr::Generator(self.parse_generator_expression(
+                    parsed_expr.expr,
+                    GeneratorExpressionInParentheses::Yes(start),
+                ));
 
                 ParsedExpr {
                     expr: generator,
@@ -1424,24 +1425,48 @@ impl<'src> Parser<'src> {
         generators
     }
 
+    /// Parses a generator expression.
+    ///
+    /// The given `in_parentheses` parameter is used to determine whether the generator
+    /// expression is enclosed in parentheses or not:
+    /// - `Yes`, expect the `)` token after the generator expression.
+    /// - `No`, no parentheses are expected.
+    /// - `Maybe`, consume the `)` token if it's present.
+    ///
+    /// The contained start position in each variant is used to determine the range
+    /// of the generator expression.
+    ///
     /// See: <https://docs.python.org/3/reference/expressions.html#generator-expressions>
     pub(super) fn parse_generator_expression(
         &mut self,
         element: Expr,
-        start: TextSize,
-        in_parentheses: bool,
+        in_parentheses: GeneratorExpressionInParentheses,
     ) -> ast::ExprGenerator {
         let generators = self.parse_generators();
 
-        if in_parentheses {
-            self.expect(TokenKind::Rpar);
-        }
+        let (parenthesized, start) = match in_parentheses {
+            GeneratorExpressionInParentheses::Yes(lpar_start) => {
+                self.expect(TokenKind::Rpar);
+                (true, lpar_start)
+            }
+            GeneratorExpressionInParentheses::No(expr_start) => (false, expr_start),
+            GeneratorExpressionInParentheses::Maybe {
+                lpar_start,
+                expr_start,
+            } => {
+                if self.eat(TokenKind::Rpar) {
+                    (true, lpar_start)
+                } else {
+                    (false, expr_start)
+                }
+            }
+        };
 
         ast::ExprGenerator {
             elt: Box::new(element),
             generators,
             range: self.node_range(start),
-            parenthesized: in_parentheses,
+            parenthesized,
         }
     }
 
@@ -1780,4 +1805,24 @@ impl Precedence {
             Precedence::Unknown | Precedence::Initial => unreachable!(),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum GeneratorExpressionInParentheses {
+    /// The generator expression is in parentheses. The given [`TextSize`] is the
+    /// start of the left parenthesis. E.g., `(x for x in range(10))`.
+    Yes(TextSize),
+
+    /// The generator expression is not in parentheses. The given [`TextSize`] is the
+    /// start of the expression. E.g., `x for x in range(10)`.
+    No(TextSize),
+
+    /// The generator expression may or may not be in parentheses. The given [`TextSize`]s
+    /// are the start of the left parenthesis and the start of the expression, respectively.
+    Maybe {
+        /// The start of the left parenthesis.
+        lpar_start: TextSize,
+        /// The start of the expression.
+        expr_start: TextSize,
+    },
 }

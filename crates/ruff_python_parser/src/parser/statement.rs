@@ -5,7 +5,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextSize};
 
-use crate::parser::expression::ParsedExpr;
+use crate::parser::expression::{GeneratorExpressionInParentheses, ParsedExpr};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
     helpers, FunctionKind, Parser, ParserCtxFlags, RecoveryContext, RecoveryContextKind,
@@ -1328,8 +1328,15 @@ impl<'src> Parser<'src> {
                             // with (x for x in range(10)): ...
                             // with (x for x in range(10)), item: ...
                             // ```
-                            used_ambiguous_lpar = true;
-                            self.parse_generator_expression(parsed_expr.expr, lpar_start, true)
+                            let generator_expr = self.parse_generator_expression(
+                                parsed_expr.expr,
+                                GeneratorExpressionInParentheses::Maybe {
+                                    lpar_start,
+                                    expr_start: start,
+                                },
+                            );
+                            used_ambiguous_lpar = generator_expr.parenthesized;
+                            generator_expr
                         } else {
                             // For better error recovery. We would not take this path if the
                             // expression was parenthesized as it would be parsed as a generator
@@ -1342,19 +1349,21 @@ impl<'src> Parser<'src> {
                             // # This path will not be taken for
                             // with (item, (x for x in range(10))): ...
                             // ```
-                            let generator_expr =
-                                self.parse_generator_expression(parsed_expr.expr, start, false);
-
-                            self.add_error(
-                                ParseErrorType::OtherError(
-                                    "unparenthesized generator expression cannot be used here"
-                                        .to_string(),
-                                ),
-                                generator_expr.range(),
-                            );
-
-                            generator_expr
+                            self.parse_generator_expression(
+                                parsed_expr.expr,
+                                GeneratorExpressionInParentheses::No(start),
+                            )
                         };
+
+                    if !generator_expr.parenthesized {
+                        self.add_error(
+                            ParseErrorType::OtherError(
+                                "unparenthesized generator expression cannot be used here"
+                                    .to_string(),
+                            ),
+                            generator_expr.range(),
+                        );
+                    }
 
                     Expr::Generator(generator_expr).into()
                 }
