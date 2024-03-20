@@ -319,10 +319,10 @@ Module(
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 340..361,
+                            range: 341..361,
                             context_expr: Generator(
                                 ExprGenerator {
-                                    range: 340..361,
+                                    range: 341..361,
                                     elt: Name(
                                         ExprName {
                                             range: 341..342,
@@ -370,7 +370,7 @@ Module(
                                             is_async: false,
                                         },
                                     ],
-                                    parenthesized: true,
+                                    parenthesized: false,
                                 },
                             ),
                             optional_vars: None,
@@ -558,16 +558,7 @@ Module(
  8 | with (item := 10 as f): ...
  9 | with (item1, item2 := 10 as f): ...
 10 | with (x for x in range(10), item): ...
-   |                           ^ Syntax Error: expected Rpar, found Comma
-11 | with (item, x for x in range(10)): ...
-   |
-
-
-   |
- 8 | with (item := 10 as f): ...
- 9 | with (item1, item2 := 10 as f): ...
-10 | with (x for x in range(10), item): ...
-   |                                 ^ Syntax Error: expected Comma, found Rpar
+   |       ^^^^^^^^^^^^^^^^^^^^ Syntax Error: unparenthesized generator expression cannot be used here
 11 | with (item, x for x in range(10)): ...
    |
 
