@@ -155,7 +155,7 @@ Module(
                                                 value: "x",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Single,
-                                                    prefix: "",
+                                                    prefix: Empty,
                                                     triple_quoted: false,
                                                 },
                                             },

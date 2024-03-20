@@ -160,7 +160,7 @@ Module(
                                                                     value: "Hello World!",
                                                                     flags: StringLiteralFlags {
                                                                         quote_style: Single,
-                                                                        prefix: "",
+                                                                        prefix: Empty,
                                                                         triple_quoted: false,
                                                                     },
                                                                 },
@@ -203,7 +203,7 @@ Module(
                                                                     value: "Olá, Mundo!",
                                                                     flags: StringLiteralFlags {
                                                                         quote_style: Single,
-                                                                        prefix: "",
+                                                                        prefix: Empty,
                                                                         triple_quoted: false,
                                                                     },
                                                                 },
