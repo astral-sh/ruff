@@ -2,6 +2,7 @@
 
 use std::fs::File;
 use std::io::{self, stdout, BufWriter, Write};
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
@@ -204,10 +205,15 @@ fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitS
     }
 }
 
-#[allow(clippy::needless_pass_by_value)] // TODO: remove once we start taking arguments from here
 fn server(args: ServerCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    let ServerCommand {} = args;
-    commands::server::run_server(log_level)
+    let ServerCommand { preview } = args;
+    // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
+    let worker_threads = num_cpus::get().max(4);
+    commands::server::run_server(
+        preview,
+        NonZeroUsize::try_from(worker_threads).expect("a non-zero worker thread count"),
+        log_level,
+    )
 }
 
 pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {

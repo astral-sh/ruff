@@ -8,6 +8,7 @@ use strum::IntoEnumIterator;
 
 use ruff_formatter::IndentStyle;
 use ruff_linter::line_width::{IndentWidth, LineLength};
+use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
@@ -595,7 +596,7 @@ pub struct LintCommonOptions {
         default = "[]",
         value_type = "list[RuleSelector]",
         example = r#"
-            # On top of the default `select` (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            # On top of the default `select` (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
             extend-select = ["B", "Q"]
         "#
     )]
@@ -692,11 +693,14 @@ pub struct LintCommonOptions {
     /// imports will still be flagged, but with a dedicated message suggesting
     /// that the import is either added to the module's `__all__` symbol, or
     /// re-exported with a redundant alias (e.g., `import os as os`).
+    ///
+    /// This option is enabled by default, but you can opt-in to removal of imports
+    /// via an unsafe fix.
     #[option(
-        default = "false",
+        default = "true",
         value_type = "bool",
         example = r#"
-            ignore-init-module-imports = true
+            ignore-init-module-imports = false
         "#
     )]
     pub ignore_init_module_imports: Option<bool>,
@@ -1309,7 +1313,7 @@ pub struct Flake8ImportConventionsOptions {
             "tensorflow.keras.backend" = ["K"]
     "#
     )]
-    pub banned_aliases: Option<FxHashMap<String, Vec<String>>>,
+    pub banned_aliases: Option<FxHashMap<String, BannedAliases>>,
 
     /// A list of modules that should not be imported from using the
     /// `from ... import ...` syntax.
@@ -2383,7 +2387,7 @@ impl IsortOptions {
             case_sensitive: self.case_sensitive.unwrap_or(false),
             force_wrap_aliases: self.force_wrap_aliases.unwrap_or(false),
             detect_same_package: self.detect_same_package.unwrap_or(true),
-            force_to_top: BTreeSet::from_iter(self.force_to_top.unwrap_or_default()),
+            force_to_top: FxHashSet::from_iter(self.force_to_top.unwrap_or_default()),
             known_modules: isort::categorize::KnownModules::new(
                 known_first_party,
                 known_third_party,
@@ -2393,14 +2397,14 @@ impl IsortOptions {
             ),
             order_by_type: self.order_by_type.unwrap_or(true),
             relative_imports_order: self.relative_imports_order.unwrap_or_default(),
-            single_line_exclusions: BTreeSet::from_iter(
+            single_line_exclusions: FxHashSet::from_iter(
                 self.single_line_exclusions.unwrap_or_default(),
             ),
             split_on_trailing_comma: self.split_on_trailing_comma.unwrap_or(true),
-            classes: BTreeSet::from_iter(self.classes.unwrap_or_default()),
-            constants: BTreeSet::from_iter(self.constants.unwrap_or_default()),
-            variables: BTreeSet::from_iter(self.variables.unwrap_or_default()),
-            no_lines_before: BTreeSet::from_iter(no_lines_before),
+            classes: FxHashSet::from_iter(self.classes.unwrap_or_default()),
+            constants: FxHashSet::from_iter(self.constants.unwrap_or_default()),
+            variables: FxHashSet::from_iter(self.variables.unwrap_or_default()),
+            no_lines_before: FxHashSet::from_iter(no_lines_before),
             lines_after_imports: self.lines_after_imports.unwrap_or(-1),
             lines_between_types,
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),

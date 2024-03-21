@@ -424,7 +424,7 @@
       }
     },
     "ignore-init-module-imports": {
-      "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).",
+      "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).\n\nThis option is enabled by default, but you can opt-in to removal of imports via an unsafe fix.",
       "deprecated": true,
       "type": [
         "boolean",
@@ -755,6 +755,12 @@
       },
       "additionalProperties": false
     },
+    "BannedAliases": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "ConstantType": {
       "type": "string",
       "enum": [
@@ -1036,10 +1042,7 @@
             "null"
           ],
           "additionalProperties": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "$ref": "#/definitions/BannedAliases"
           }
         },
         "banned-from": {
@@ -2076,7 +2079,7 @@
           }
         },
         "ignore-init-module-imports": {
-          "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).",
+          "description": "Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).\n\nThis option is enabled by default, but you can opt-in to removal of imports via an unsafe fix.",
           "type": [
             "boolean",
             "null"
@@ -3205,6 +3208,7 @@
         "PLE0100",
         "PLE0101",
         "PLE011",
+        "PLE0115",
         "PLE0116",
         "PLE0117",
         "PLE0118",
@@ -3216,6 +3220,7 @@
         "PLE03",
         "PLE030",
         "PLE0302",
+        "PLE0304",
         "PLE0307",
         "PLE06",
         "PLE060",
@@ -3248,6 +3253,8 @@
         "PLE1507",
         "PLE151",
         "PLE1519",
+        "PLE152",
+        "PLE1520",
         "PLE17",
         "PLE170",
         "PLE1700",
@@ -3328,6 +3335,7 @@
         "PLW012",
         "PLW0120",
         "PLW0127",
+        "PLW0128",
         "PLW0129",
         "PLW013",
         "PLW0131",

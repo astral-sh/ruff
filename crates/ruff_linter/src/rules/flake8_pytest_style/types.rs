@@ -24,7 +24,7 @@ impl Default for ParametrizeNameType {
 impl Display for ParametrizeNameType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Csv => write!(f, "csv"),
+            Self::Csv => write!(f, "string of comma-separated values"),
             Self::Tuple => write!(f, "tuple"),
             Self::List => write!(f, "list"),
         }

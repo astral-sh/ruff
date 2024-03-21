@@ -22,11 +22,11 @@ impl Default for Quote {
     }
 }
 
-impl From<ruff_python_ast::str::QuoteStyle> for Quote {
-    fn from(value: ruff_python_ast::str::QuoteStyle) -> Self {
+impl From<ruff_python_ast::str::Quote> for Quote {
+    fn from(value: ruff_python_ast::str::Quote) -> Self {
         match value {
-            ruff_python_ast::str::QuoteStyle::Double => Self::Double,
-            ruff_python_ast::str::QuoteStyle::Single => Self::Single,
+            ruff_python_ast::str::Quote::Double => Self::Double,
+            ruff_python_ast::str::Quote::Single => Self::Single,
         }
     }
 }

@@ -30,7 +30,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }));
             }
         }
-        Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
+        Stmt::Nonlocal(nonlocal @ ast::StmtNonlocal { names, range: _ }) => {
             if checker.enabled(Rule::AmbiguousVariableName) {
                 checker.diagnostics.extend(names.iter().filter_map(|name| {
                     pycodestyle::rules::ambiguous_variable_name(name, name.range())
@@ -49,6 +49,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         }
                     }
                 }
+            }
+            if checker.enabled(Rule::NonlocalAndGlobal) {
+                pylint::rules::nonlocal_and_global(checker, nonlocal);
             }
         }
         Stmt::Break(_) => {
@@ -90,6 +93,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if let Some(diagnostic) = pycodestyle::rules::ambiguous_function_name(name) {
                     checker.diagnostics.push(diagnostic);
                 }
+            }
+            if checker.enabled(Rule::InvalidBoolReturnType) {
+                pylint::rules::invalid_bool_return(checker, name, body);
             }
             if checker.enabled(Rule::InvalidStrReturnType) {
                 pylint::rules::invalid_str_return(checker, name, body);
@@ -1076,7 +1082,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_simplify::rules::if_with_same_arms(checker, if_);
             }
             if checker.enabled(Rule::NeedlessBool) {
-                flake8_simplify::rules::needless_bool(checker, if_);
+                flake8_simplify::rules::needless_bool(checker, stmt);
             }
             if checker.enabled(Rule::IfElseBlockInsteadOfDictLookup) {
                 flake8_simplify::rules::if_else_block_instead_of_dict_lookup(checker, if_);
@@ -1386,6 +1392,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
+            if checker.enabled(Rule::RedeclaredAssignedName) {
+                pylint::rules::redeclared_assigned_name(checker, targets);
+            }
             if checker.enabled(Rule::LambdaAssignment) {
                 if let [target] = &targets[..] {
                     pycodestyle::rules::lambda_assignment(checker, target, value, None, stmt);

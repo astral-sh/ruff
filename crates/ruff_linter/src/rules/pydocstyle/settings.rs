@@ -97,8 +97,8 @@ impl fmt::Display for Settings {
             namespace = "linter.pydocstyle",
             fields = [
                 self.convention | optional,
-                self.ignore_decorators | debug,
-                self.property_decorators | debug
+                self.ignore_decorators | set,
+                self.property_decorators | set
             ]
         }
         Ok(())
