@@ -50,6 +50,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             || (checker.settings.target_version >= PythonVersion::Py37
                                 && checker.semantic.future_annotations()
                                 && checker.semantic.in_annotation()
+                                && !checker.semantic.in_runtime_evaluated_annotation()
                                 && !checker.settings.pyupgrade.keep_runtime_typing)
                         {
                             pyupgrade::rules::use_pep604_annotation(checker, expr, slice, operator);
@@ -202,6 +203,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                     || (checker.settings.target_version >= PythonVersion::Py37
                                         && checker.semantic.future_annotations()
                                         && checker.semantic.in_annotation()
+                                        && !checker.semantic.in_runtime_evaluated_annotation()
                                         && !checker.settings.pyupgrade.keep_runtime_typing)
                                 {
                                     pyupgrade::rules::use_pep585_annotation(

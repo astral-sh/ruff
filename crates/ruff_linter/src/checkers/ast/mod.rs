@@ -709,9 +709,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.visit_type_params(type_params);
                 }
 
+                let class_flags_snapshot = self.semantic.flags;
+                self.semantic.flags |= SemanticModelFlags::RUNTIME_EVALUATED_ANNOTATION;
                 if let Some(arguments) = arguments {
                     self.visit_arguments(arguments);
                 }
+                self.semantic.flags = class_flags_snapshot;
 
                 let definition = docstrings::extraction::extract_definition(
                     ExtractionTarget::Class(class_def),
@@ -827,11 +830,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 if let Some(expr) = value {
+                    let snapshot = self.semantic.flags;
+                    self.semantic.flags |= SemanticModelFlags::RUNTIME_EVALUATED_ANNOTATION;
                     if self.semantic.match_typing_expr(annotation, "TypeAlias") {
                         self.visit_type_definition(expr);
                     } else {
                         self.visit_expr(expr);
                     }
+                    self.semantic.flags = snapshot;
                 }
                 self.visit_expr(target);
             }
@@ -937,7 +943,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             && !self.semantic.in_deferred_type_definition()
             && self.semantic.in_type_definition()
             && self.semantic.future_annotations()
-            && (self.semantic.in_typing_only_annotation() || self.source_type.is_stub())
+            && (!self.semantic.in_runtime_evaluated_annotation() || self.source_type.is_stub())
         {
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
                 self.visit.string_type_definitions.push((
