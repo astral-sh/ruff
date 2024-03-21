@@ -84,7 +84,7 @@ impl Server {
             // Register capabilities
             conn.sender
                 .send(lsp_server::Message::Request(lsp_server::Request {
-                    id: next_request_id.load(Ordering::Relaxed).into(),
+                    id: next_request_id.fetch_add(1, Ordering::Relaxed).into(),
                     method: "client/registerCapability".into(),
                     params: serde_json::to_value(lsp_types::RegistrationParams {
                         registrations: vec![lsp_types::Registration {
@@ -116,8 +116,6 @@ impl Server {
             let _ = conn.receiver.recv_timeout(Duration::from_secs(5)).map_err(|_| {
                 tracing::error!("Timed out while waiting for client to acknowledge registration of dynamic capabilities");
             });
-
-            next_request_id.fetch_add(1, Ordering::SeqCst);
         } else {
             tracing::warn!("LSP client does not support dynamic file watcher registration - automatic configuration reloading will not be available.")
         }
