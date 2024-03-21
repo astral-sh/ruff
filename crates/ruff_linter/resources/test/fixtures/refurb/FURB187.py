@@ -1,6 +1,6 @@
-# these should match
+# Errors
 
-# using functions to ensure `l` doesn't change type
+
 def a():
     l = []
     l = reversed(l)
@@ -18,7 +18,7 @@ def c():
 
 # False negative
 def c2():
-    class Wrapper():
+    class Wrapper:
         l: list[int]
 
     w = Wrapper()
@@ -27,7 +27,8 @@ def c2():
     w.l = reversed(w.l)
 
 
-# these should not
+# OK
+
 
 def d():
     l = []
@@ -45,7 +46,7 @@ def e():
 def f():
     d = {}
 
-    # dont warn since d is a dict and does not have a .reverse() method
+    # Don't warn: `d` is a dictionary, which doesn't have a `reverse` method.
     d = reversed(d)
 
 
