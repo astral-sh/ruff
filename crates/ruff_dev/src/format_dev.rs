@@ -134,7 +134,7 @@ impl Statistics {
         }
     }
 
-    /// We currently prefer the the similarity index, but i'd like to keep this around
+    /// We currently prefer the similarity index, but i'd like to keep this around
     #[allow(clippy::cast_precision_loss, unused)]
     pub(crate) fn jaccard_index(&self) -> f32 {
         self.intersection as f32 / (self.black_input + self.ruff_output + self.intersection) as f32
