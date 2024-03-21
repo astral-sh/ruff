@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.3.2"
+version = "0.3.4"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -15,7 +15,6 @@ license = { workspace = true }
 [dependencies]
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics", features = ["serde"] }
-ruff_index = { path = "../ruff_index" }
 ruff_notebook = { path = "../ruff_notebook" }
 ruff_macros = { path = "../ruff_macros" }
 ruff_python_ast = { path = "../ruff_python_ast", features = ["serde"] }
@@ -75,11 +74,9 @@ url = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
-pretty_assertions = { workspace = true }
 test-case = { workspace = true }
 # Disable colored output in tests
 colored = { workspace = true, features = ["no-color"] }
-tempfile = { workspace = true }
 
 [features]
 default = []

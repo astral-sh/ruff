@@ -35,6 +35,7 @@ mod tests {
     #[test_case(Rule::RedundantLogBase, Path::new("FURB163.py"))]
     #[test_case(Rule::MetaClassABCMeta, Path::new("FURB180.py"))]
     #[test_case(Rule::HashlibDigestHex, Path::new("FURB181.py"))]
+    #[test_case(Rule::ListReverseCopy, Path::new("FURB187.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

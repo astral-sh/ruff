@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Expr, Operator, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprContext, Operator, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -271,7 +271,7 @@ impl<'a> SemanticModel<'a> {
             .get(symbol)
             .map_or(true, |binding_id| {
                 // Treat the deletion of a name as a reference to that name.
-                self.add_local_reference(binding_id, range);
+                self.add_local_reference(binding_id, ExprContext::Del, range);
                 self.bindings[binding_id].is_unbound()
             });
 
@@ -296,8 +296,9 @@ impl<'a> SemanticModel<'a> {
                     let reference_id = self.resolved_references.push(
                         ScopeId::global(),
                         self.node_id,
-                        name.range,
+                        ExprContext::Load,
                         self.flags,
+                        name.range,
                     );
                     self.bindings[binding_id].references.push(reference_id);
 
@@ -308,8 +309,9 @@ impl<'a> SemanticModel<'a> {
                         let reference_id = self.resolved_references.push(
                             ScopeId::global(),
                             self.node_id,
-                            name.range,
+                            ExprContext::Load,
                             self.flags,
+                            name.range,
                         );
                         self.bindings[binding_id].references.push(reference_id);
                     }
@@ -365,8 +367,9 @@ impl<'a> SemanticModel<'a> {
                 let reference_id = self.resolved_references.push(
                     self.scope_id,
                     self.node_id,
-                    name.range,
+                    ExprContext::Load,
                     self.flags,
+                    name.range,
                 );
                 self.bindings[binding_id].references.push(reference_id);
 
@@ -377,8 +380,9 @@ impl<'a> SemanticModel<'a> {
                     let reference_id = self.resolved_references.push(
                         self.scope_id,
                         self.node_id,
-                        name.range,
+                        ExprContext::Load,
                         self.flags,
+                        name.range,
                     );
                     self.bindings[binding_id].references.push(reference_id);
                 }
@@ -393,7 +397,10 @@ impl<'a> SemanticModel<'a> {
                     //
                     // The `name` in `print(name)` should be treated as unresolved, but the `name` in
                     // `name: str` should be treated as used.
-                    BindingKind::Annotation => continue,
+                    //
+                    // Stub files are an exception. In a stub file, it _is_ considered valid to
+                    // resolve to a type annotation.
+                    BindingKind::Annotation if !self.in_stub_file() => continue,
 
                     // If it's a deletion, don't treat it as resolved, since the name is now
                     // unbound. For example, given:
@@ -426,6 +433,15 @@ impl<'a> SemanticModel<'a> {
                         return ReadResult::UnboundLocal(binding_id);
                     }
 
+                    BindingKind::ConditionalDeletion(binding_id) => {
+                        self.unresolved_references.push(
+                            name.range,
+                            self.exceptions(),
+                            UnresolvedReferenceFlags::empty(),
+                        );
+                        return ReadResult::UnboundLocal(binding_id);
+                    }
+
                     // If we hit an unbound exception that shadowed a bound name, resole to the
                     // bound name. For example, given:
                     //
@@ -446,8 +462,9 @@ impl<'a> SemanticModel<'a> {
                         let reference_id = self.resolved_references.push(
                             self.scope_id,
                             self.node_id,
-                            name.range,
+                            ExprContext::Load,
                             self.flags,
+                            name.range,
                         );
                         self.bindings[binding_id].references.push(reference_id);
 
@@ -458,8 +475,9 @@ impl<'a> SemanticModel<'a> {
                             let reference_id = self.resolved_references.push(
                                 self.scope_id,
                                 self.node_id,
-                                name.range,
+                                ExprContext::Load,
                                 self.flags,
+                                name.range,
                             );
                             self.bindings[binding_id].references.push(reference_id);
                         }
@@ -548,6 +566,7 @@ impl<'a> SemanticModel<'a> {
                 match self.bindings[binding_id].kind {
                     BindingKind::Annotation => continue,
                     BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
+                    BindingKind::ConditionalDeletion(binding_id) => return Some(binding_id),
                     BindingKind::UnboundException(Some(binding_id)) => return Some(binding_id),
                     _ => return Some(binding_id),
                 }
@@ -1315,18 +1334,28 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Add a reference to the given [`BindingId`] in the local scope.
-    pub fn add_local_reference(&mut self, binding_id: BindingId, range: TextRange) {
+    pub fn add_local_reference(
+        &mut self,
+        binding_id: BindingId,
+        ctx: ExprContext,
+        range: TextRange,
+    ) {
         let reference_id =
             self.resolved_references
-                .push(self.scope_id, self.node_id, range, self.flags);
+                .push(self.scope_id, self.node_id, ctx, self.flags, range);
         self.bindings[binding_id].references.push(reference_id);
     }
 
     /// Add a reference to the given [`BindingId`] in the global scope.
-    pub fn add_global_reference(&mut self, binding_id: BindingId, range: TextRange) {
+    pub fn add_global_reference(
+        &mut self,
+        binding_id: BindingId,
+        ctx: ExprContext,
+        range: TextRange,
+    ) {
         let reference_id =
             self.resolved_references
-                .push(ScopeId::global(), self.node_id, range, self.flags);
+                .push(ScopeId::global(), self.node_id, ctx, self.flags, range);
         self.bindings[binding_id].references.push(reference_id);
     }
 
@@ -1544,6 +1573,11 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::FUTURE_ANNOTATIONS)
     }
 
+    /// Return `true` if the model is in a stub file (i.e., a file with a `.pyi` extension).
+    pub const fn in_stub_file(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::STUB_FILE)
+    }
+
     /// Return `true` if the model is in a named expression assignment (e.g., `x := 1`).
     pub const fn in_named_expression_assignment(&self) -> bool {
         self.flags
@@ -1649,7 +1683,7 @@ bitflags! {
     /// Flags indicating the current model state.
     #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
     pub struct SemanticModelFlags: u32 {
-       /// The model is in a type annotation that will only be evaluated when running a type
+        /// The model is in a type annotation that will only be evaluated when running a type
         /// checker.
         ///
         /// For example, the model could be visiting `int` in:
@@ -1699,7 +1733,6 @@ bitflags! {
         /// forward reference (e.g., by wrapping the type in quotes), as the annotations are not
         /// only required by the Python interpreter, but by runtime type checkers too.
         const RUNTIME_REQUIRED_ANNOTATION = 1 << 2;
-
 
         /// The model is in a type definition.
         ///
@@ -1850,6 +1883,9 @@ bitflags! {
         /// ```
         const FUTURE_ANNOTATIONS = 1 << 15;
 
+        /// The model is in a Python stub file (i.e., a `.pyi` file).
+        const STUB_FILE = 1 << 16;
+
         /// The model has traversed past the module docstring.
         ///
         /// For example, the model could be visiting `x` in:
@@ -1858,7 +1894,7 @@ bitflags! {
         ///
         /// x: int = 1
         /// ```
-        const MODULE_DOCSTRING_BOUNDARY = 1 << 16;
+        const MODULE_DOCSTRING_BOUNDARY = 1 << 17;
 
         /// The model is in a type parameter definition.
         ///
@@ -1868,7 +1904,7 @@ bitflags! {
         ///
         /// Record = TypeVar("Record")
         ///
-        const TYPE_PARAM_DEFINITION = 1 << 17;
+        const TYPE_PARAM_DEFINITION = 1 << 18;
 
         /// The model is in a named expression assignment.
         ///
@@ -1876,7 +1912,7 @@ bitflags! {
         /// ```python
         /// if (x := 1): ...
         /// ```
-        const NAMED_EXPRESSION_ASSIGNMENT = 1 << 18;
+        const NAMED_EXPRESSION_ASSIGNMENT = 1 << 19;
 
         /// The model is in a comprehension variable assignment.
         ///
@@ -1884,8 +1920,7 @@ bitflags! {
         /// ```python
         /// [_ for x in range(10)]
         /// ```
-        const COMPREHENSION_ASSIGNMENT = 1 << 19;
-
+        const COMPREHENSION_ASSIGNMENT = 1 << 20;
 
         /// The model is in a module / class / function docstring.
         ///
@@ -1904,7 +1939,7 @@ bitflags! {
         ///     """Function docstring."""
         ///     pass
         /// ```
-        const DOCSTRING = 1 << 20;
+        const DOCSTRING = 1 << 21;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
@@ -1929,6 +1964,7 @@ impl SemanticModelFlags {
     pub fn new(path: &Path) -> Self {
         let mut flags = Self::default();
         if is_python_stub_file(path) {
+            flags |= Self::STUB_FILE;
             flags |= Self::FUTURE_ANNOTATIONS;
         }
         flags

@@ -23,7 +23,7 @@ fn default_options() {
         .arg("-")
         .pass_stdin(r#"
 def foo(arg1, arg2,):
-    print('Should\'t change quotes')
+    print('Shouldn\'t change quotes')
 
 
 if condition:
@@ -38,7 +38,7 @@ if condition:
         arg1,
         arg2,
     ):
-        print("Should't change quotes")
+        print("Shouldn't change quotes")
 
 
     if condition:

@@ -2,11 +2,10 @@
 
 use bstr::ByteSlice;
 
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, AnyStringKind, Expr};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::lexer::{LexicalError, LexicalErrorType};
-use crate::string_token_flags::StringKind;
 use crate::token::Tok;
 
 pub(crate) enum StringType {
@@ -43,13 +42,13 @@ enum EscapedChar {
 struct StringParser {
     source: Box<str>,
     cursor: usize,
-    kind: StringKind,
+    kind: AnyStringKind,
     offset: TextSize,
     range: TextRange,
 }
 
 impl StringParser {
-    fn new(source: Box<str>, kind: StringKind, offset: TextSize, range: TextRange) -> Self {
+    fn new(source: Box<str>, kind: AnyStringKind, offset: TextSize, range: TextRange) -> Self {
         Self {
             source,
             cursor: 0,
@@ -425,7 +424,7 @@ impl StringParser {
 
 pub(crate) fn parse_string_literal(
     source: Box<str>,
-    kind: StringKind,
+    kind: AnyStringKind,
     range: TextRange,
 ) -> Result<StringType, LexicalError> {
     StringParser::new(source, kind, range.start() + kind.opener_len(), range).parse()
@@ -433,7 +432,7 @@ pub(crate) fn parse_string_literal(
 
 pub(crate) fn parse_fstring_literal_element(
     source: Box<str>,
-    kind: StringKind,
+    kind: AnyStringKind,
     range: TextRange,
 ) -> Result<ast::FStringElement, LexicalError> {
     StringParser::new(source, kind, range.start(), range).parse_fstring_middle()

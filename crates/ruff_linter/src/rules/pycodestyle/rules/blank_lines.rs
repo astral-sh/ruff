@@ -80,9 +80,9 @@ impl AlwaysFixableViolation for BlankLineBetweenMethods {
 /// ## Why is this bad?
 /// PEP 8 recommends exactly two blank lines between top level functions and classes.
 ///
-/// Note: The rule respects the [`lint.isort.lines-after-imports`] setting when determining
-/// the required number of blank lines between top-level `import` statements and function or class definitions
-/// for compatibility with isort.
+/// The rule respects the [`lint.isort.lines-after-imports`] setting when
+/// determining the required number of blank lines between top-level `import`
+/// statements and function or class definitions for compatibility with isort.
 ///
 /// ## Example
 /// ```python
@@ -105,6 +105,9 @@ impl AlwaysFixableViolation for BlankLineBetweenMethods {
 /// ## Typing stub files (`.pyi`)
 /// The typing style guide recommends to not use blank lines between classes and functions except to group
 /// them. That's why this rule is not enabled in typing stub files.
+///
+/// ## Options
+/// - `lint.isort.lines-after-imports`
 ///
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
@@ -165,8 +168,13 @@ impl AlwaysFixableViolation for BlankLinesTopLevel {
 /// The rule allows at most one blank line in typing stub files in accordance to the typing style guide recommendation.
 ///
 /// Note: The rule respects the following `isort` settings when determining the maximum number of blank lines allowed between two statements:
+///
 /// * [`lint.isort.lines-after-imports`]: For top-level statements directly following an import statement.
 /// * [`lint.isort.lines-between-types`]: For `import` statements directly following a `from ... import ...` statement or vice versa.
+///
+/// ## Options
+/// - `lint.isort.lines-after-imports`
+/// - `lint.isort.lines-between-types`
 ///
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
@@ -241,7 +249,7 @@ impl AlwaysFixableViolation for BlankLineAfterDecorator {
 /// Checks for missing blank lines after the end of function or class.
 ///
 /// ## Why is this bad?
-/// PEP 8 recommends using blank lines as following:
+/// PEP 8 recommends using blank lines as follows:
 /// - Two blank lines are expected between functions and classes
 /// - One blank line is expected between methods of a class.
 ///
@@ -292,7 +300,7 @@ impl AlwaysFixableViolation for BlankLinesAfterFunctionOrClass {
 /// Checks for 1 blank line between nested function or class definitions.
 ///
 /// ## Why is this bad?
-/// PEP 8 recommends using blank lines as following:
+/// PEP 8 recommends using blank lines as follows:
 /// - Two blank lines are expected between functions and classes
 /// - One blank line is expected between methods of a class.
 ///
@@ -696,9 +704,7 @@ impl<'a> BlankLinesChecker<'a> {
             state.class_status.update(&logical_line);
             state.fn_status.update(&logical_line);
 
-            if state.is_not_first_logical_line {
-                self.check_line(&logical_line, &state, prev_indent_length, diagnostics);
-            }
+            self.check_line(&logical_line, &state, prev_indent_length, diagnostics);
 
             match logical_line.kind {
                 LogicalLineKind::Class => {
@@ -818,6 +824,8 @@ impl<'a> BlankLinesChecker<'a> {
             && line.kind.is_class_function_or_decorator()
             // Blank lines in stub files are used to group definitions. Don't enforce blank lines.
             && !self.source_type.is_stub()
+            // Do not expect blank lines before the first logical line.
+            && state.is_not_first_logical_line
         {
             // E302
             let mut diagnostic = Diagnostic::new(

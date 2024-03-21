@@ -15,8 +15,9 @@ use crate::registry::Rule;
 ///
 /// ## Why is this bad?
 /// Some `sys.platform` checks are too complex for type checkers to
-/// understand, and thus result in false positives. `sys.platform` checks
-/// should be simple string comparisons, like `sys.platform == "linux"`.
+/// understand, and thus result in incorrect inferences by these tools.
+/// `sys.platform` checks should be simple string comparisons, like
+/// `if sys.platform == "linux"`.
 ///
 /// ## Example
 /// ```python
@@ -39,7 +40,7 @@ use crate::registry::Rule;
 /// ```
 ///
 /// ## References
-/// - [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
+/// - [Typing stubs documentation: Version and Platform Checks](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
 #[violation]
 pub struct UnrecognizedPlatformCheck;
 
@@ -75,7 +76,7 @@ impl Violation for UnrecognizedPlatformCheck {
 /// ```
 ///
 /// ## References
-/// - [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
+/// - [Typing stubs documentation: Version and Platform Checks](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
 #[violation]
 pub struct UnrecognizedPlatformName {
     platform: String,

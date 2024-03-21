@@ -57,6 +57,9 @@ impl Violation for SnakeCaseTypeAlias {
 ///
 /// _MyType: TypeAlias = int
 /// ```
+///
+/// ## References
+/// - [PEP 484: Type Aliases](https://peps.python.org/pep-0484/#type-aliases)
 #[violation]
 pub struct TSuffixedTypeAlias {
     name: String,

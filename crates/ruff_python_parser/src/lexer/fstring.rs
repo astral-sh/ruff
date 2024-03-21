@@ -1,9 +1,9 @@
-use crate::string_token_flags::StringKind;
+use ruff_python_ast::AnyStringKind;
 
 /// The context representing the current f-string that the lexer is in.
 #[derive(Debug)]
 pub(crate) struct FStringContext {
-    kind: StringKind,
+    kind: AnyStringKind,
 
     /// The level of nesting for the lexer when it entered the current f-string.
     /// The nesting level includes all kinds of parentheses i.e., round, square,
@@ -17,7 +17,7 @@ pub(crate) struct FStringContext {
 }
 
 impl FStringContext {
-    pub(crate) const fn new(kind: StringKind, nesting: u32) -> Self {
+    pub(crate) const fn new(kind: AnyStringKind, nesting: u32) -> Self {
         debug_assert!(kind.is_f_string());
         Self {
             kind,
@@ -26,7 +26,7 @@ impl FStringContext {
         }
     }
 
-    pub(crate) const fn kind(&self) -> StringKind {
+    pub(crate) const fn kind(&self) -> AnyStringKind {
         debug_assert!(self.kind.is_f_string());
         self.kind
     }

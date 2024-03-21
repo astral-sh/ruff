@@ -278,7 +278,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use rustc_hash::FxHashMap;
+    use rustc_hash::{FxHashMap, FxHashSet};
     use test_case::test_case;
 
     use ruff_text_size::Ranged;
@@ -495,7 +495,7 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
-                    force_to_top: BTreeSet::from([
+                    force_to_top: FxHashSet::from_iter([
                         "z".to_string(),
                         "lib1".to_string(),
                         "lib3".to_string(),
@@ -575,9 +575,10 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     force_single_line: true,
-                    single_line_exclusions: vec!["os".to_string(), "logging.handlers".to_string()]
-                        .into_iter()
-                        .collect::<BTreeSet<_>>(),
+                    single_line_exclusions: FxHashSet::from_iter([
+                        "os".to_string(),
+                        "logging.handlers".to_string(),
+                    ]),
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
@@ -636,7 +637,7 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     order_by_type: true,
-                    classes: BTreeSet::from([
+                    classes: FxHashSet::from_iter([
                         "SVC".to_string(),
                         "SELU".to_string(),
                         "N_CLASS".to_string(),
@@ -664,7 +665,7 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     order_by_type: true,
-                    constants: BTreeSet::from([
+                    constants: FxHashSet::from_iter([
                         "Const".to_string(),
                         "constant".to_string(),
                         "First".to_string(),
@@ -694,7 +695,7 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     order_by_type: true,
-                    variables: BTreeSet::from([
+                    variables: FxHashSet::from_iter([
                         "VAR".to_string(),
                         "Variable".to_string(),
                         "MyVar".to_string(),
@@ -721,7 +722,7 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     force_sort_within_sections: true,
-                    force_to_top: BTreeSet::from(["z".to_string()]),
+                    force_to_top: FxHashSet::from_iter(["z".to_string()]),
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
@@ -771,7 +772,7 @@ mod tests {
             &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
-                    required_imports: BTreeSet::from([
+                    required_imports: BTreeSet::from_iter([
                         "from __future__ import annotations".to_string()
                     ]),
                     ..super::settings::Settings::default()
@@ -801,7 +802,7 @@ mod tests {
             &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
-                    required_imports: BTreeSet::from([
+                    required_imports: BTreeSet::from_iter([
                         "from __future__ import annotations as _annotations".to_string(),
                     ]),
                     ..super::settings::Settings::default()
@@ -824,7 +825,7 @@ mod tests {
             &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
-                    required_imports: BTreeSet::from([
+                    required_imports: BTreeSet::from_iter([
                         "from __future__ import annotations".to_string(),
                         "from __future__ import generator_stop".to_string(),
                     ]),
@@ -848,7 +849,7 @@ mod tests {
             &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
-                    required_imports: BTreeSet::from(["from __future__ import annotations, \
+                    required_imports: BTreeSet::from_iter(["from __future__ import annotations, \
                                                        generator_stop"
                         .to_string()]),
                     ..super::settings::Settings::default()
@@ -871,7 +872,7 @@ mod tests {
             &LinterSettings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
-                    required_imports: BTreeSet::from(["import os".to_string()]),
+                    required_imports: BTreeSet::from_iter(["import os".to_string()]),
                     ..super::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::MissingRequiredImport)
@@ -1002,7 +1003,7 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
-                    no_lines_before: BTreeSet::from([
+                    no_lines_before: FxHashSet::from_iter([
                         ImportSection::Known(ImportType::Future),
                         ImportSection::Known(ImportType::StandardLibrary),
                         ImportSection::Known(ImportType::ThirdParty),
@@ -1030,7 +1031,7 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
-                    no_lines_before: BTreeSet::from([
+                    no_lines_before: FxHashSet::from_iter([
                         ImportSection::Known(ImportType::StandardLibrary),
                         ImportSection::Known(ImportType::LocalFolder),
                     ]),

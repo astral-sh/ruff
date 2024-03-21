@@ -222,7 +222,7 @@ impl Violation for StartProcessWithNoShell {
 ///
 /// ## Why is this bad?
 /// Starting a process with a partial executable path can allow attackers to
-/// execute arbitrary executable by adjusting the `PATH` environment variable.
+/// execute an arbitrary executable by adjusting the `PATH` environment variable.
 /// Consider using a full path to the executable instead.
 ///
 /// ## Example

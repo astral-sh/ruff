@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.3.2"
+version = "0.3.4"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -41,6 +41,7 @@ is-macro = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 notify = { workspace = true }
+num_cpus = { workspace = true }
 path-absolutize = { workspace = true, features = ["once_cell_cache"] }
 rayon = { workspace = true }
 regex = { workspace = true }
@@ -53,7 +54,7 @@ tempfile = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true, features = ["log"] }
-tracing-subscriber = { workspace = true, features = ["registry"]}
+tracing-subscriber = { workspace = true, features = ["registry"] }
 tracing-tree = { workspace = true }
 walkdir = { workspace = true }
 wild = { workspace = true }
@@ -61,9 +62,8 @@ wild = { workspace = true }
 [dev-dependencies]
 # Enable test rules during development
 ruff_linter = { path = "../ruff_linter", features = ["clap", "test-rules"] }
-assert_cmd = { workspace = true }
 # Avoid writing colored snapshots when running tests from the terminal
-colored = { workspace = true, features = ["no-color"]}
+colored = { workspace = true, features = ["no-color"] }
 insta = { workspace = true, features = ["filters", "json"] }
 insta-cmd = { workspace = true }
 tempfile = { workspace = true }
