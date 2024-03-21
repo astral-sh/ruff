@@ -180,6 +180,29 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::UndefinedName, Path::new("F821_29.py"))]
+    fn rules_with_flake8_type_checking_settings_enabled(
+        rule_code: Rule,
+        path: &Path,
+    ) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pyflakes").join(path).as_path(),
+            &LinterSettings {
+                flake8_type_checking: crate::rules::flake8_type_checking::settings::Settings {
+                    runtime_required_base_classes: vec![
+                        "pydantic.BaseModel".to_string(),
+                        "sqlalchemy.orm.DeclarativeBase".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
