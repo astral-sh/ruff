@@ -17,8 +17,6 @@ use crate::checkers::ast::Checker;
 /// To determine whether a value is `NaN`, use `math.isnan` or `np.isnan`
 /// instead of comparing against `NaN` directly.
 ///
-/// To
-///
 /// ## Example
 /// ```python
 /// if x == float("NaN"):
