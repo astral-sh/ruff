@@ -4,23 +4,23 @@ import numpy as np
 from numpy import nan as npy_nan
 
 
-x = float('nan')
+x = float("nan")
 y = np.NaN
 
 # PLW0117
-if x == float('nan'):
+if x == float("nan"):
     pass
 
 # PLW0117
-if x == float('NaN'):
+if x == float("NaN"):
     pass
 
 # PLW0117
-if x == float('NAN'):
+if x == float("NAN"):
     pass
 
 # PLW0117
-if x == float('Nan'):
+if x == float("Nan"):
     pass
 
 # PLW0117
@@ -47,30 +47,30 @@ if y == np.nan:
 if y == npy_nan:
     pass
 
-# Ok
+# OK
 if math.isnan(x):
     pass
 
-# Ok
+# OK
 if np.isnan(y):
     pass
 
-# Ok
+# OK
 if x == 0:
     pass
 
-# Ok
-if x == float('32'):
+# OK
+if x == float("32"):
     pass
 
-# Ok
+# OK
 if x == float(42):
     pass
 
-# Ok
+# OK
 if y == np.inf:
     pass
 
-# Ok
-if x == 'nan':
+# OK
+if x == "nan":
     pass
