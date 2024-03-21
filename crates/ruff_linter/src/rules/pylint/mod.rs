@@ -108,7 +108,9 @@ mod tests {
         Path::new("too_many_return_statements.py")
     )]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"))]
-    #[test_case(Rule::TooManyLines, Path::new("too_many_lines.py"))]
+    #[test_case(Rule::TooManyLines, Path::new("too_many_lines_0.py"))]
+    #[test_case(Rule::TooManyLines, Path::new("too_many_lines_1.py"))]
+    #[test_case(Rule::TooManyLines, Path::new("too_many_lines_2.py"))]
     #[test_case(Rule::TypeBivariance, Path::new("type_bivariance.py"))]
     #[test_case(
         Rule::TypeNameIncorrectVariance,
@@ -379,19 +381,22 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn too_many_lines() -> Result<()> {
+    #[test_case(Rule::TooManyLines, Path::new("too_many_lines_0.py"))]
+    #[test_case(Rule::TooManyLines, Path::new("too_many_lines_1.py"))]
+    #[test_case(Rule::TooManyLines, Path::new("too_many_lines_2.py"))]
+    fn too_many_lines(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}_1999", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("pylint/too_many_lines.py"),
+            Path::new("pylint").join(path).as_path(),
             &LinterSettings {
                 pylint: pylint::settings::Settings {
-                    max_module_lines: 2001,
+                    max_module_lines: 1999,
                     ..pylint::settings::Settings::default()
                 },
                 ..LinterSettings::for_rules(vec![Rule::TooManyLines])
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 

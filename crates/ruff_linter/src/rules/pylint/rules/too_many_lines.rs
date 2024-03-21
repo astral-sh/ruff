@@ -84,8 +84,7 @@ impl Violation for TooManyLines {
 
 /// PLC0302
 pub(crate) fn too_many_lines(locator: &Locator, settings: &LinterSettings) -> Option<Diagnostic> {
-    let lines = locator.contents().universal_newlines();
-    let number_of_lines = lines.count() + 1;
+    let number_of_lines = locator.contents().universal_newlines().count();
 
     if number_of_lines > settings.pylint.max_module_lines {
         let diagnostic = Diagnostic::new(

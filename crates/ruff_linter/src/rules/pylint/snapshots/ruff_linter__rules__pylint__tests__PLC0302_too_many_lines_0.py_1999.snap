@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+too_many_lines_0.py:1:1: PLC0302 Too many lines in module (2000>1999)
+  |
+1 | def bar():
+  |  PLC0302
+2 |     pass
+  |
