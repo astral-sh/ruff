@@ -260,9 +260,7 @@ fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -
         }
         contents.push('(');
         if is_multi_line {
-            let Some(indent) = indent else {
-                return None;
-            };
+            let indent = indent?;
 
             for item in &arguments {
                 contents.push_str(stylist.line_ending().as_str());

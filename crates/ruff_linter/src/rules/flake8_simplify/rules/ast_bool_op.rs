@@ -541,7 +541,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
 
         // Create a `x in (a, b)` expression.
         let node = ast::ExprTuple {
-            elts: comparators.into_iter().map(Clone::clone).collect(),
+            elts: comparators.into_iter().cloned().collect(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
             parenthesized: true,

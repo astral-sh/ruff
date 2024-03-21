@@ -159,9 +159,7 @@ fn get_element_type(element: &Stmt, semantic: &SemanticModel) -> Option<ContentT
                     return Some(ContentType::FieldDeclaration);
                 }
             }
-            let Some(expr) = targets.first() else {
-                return None;
-            };
+            let expr = targets.first()?;
             let Expr::Name(ast::ExprName { id, .. }) = expr else {
                 return None;
             };

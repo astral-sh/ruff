@@ -274,10 +274,11 @@ fn match_loop(stmt: &Stmt) -> Option<Loop> {
     if !nested_elif_else_clauses.is_empty() {
         return None;
     }
-    let [Stmt::Return(ast::StmtReturn { value, range: _ })] = nested_body.as_slice() else {
-        return None;
-    };
-    let Some(value) = value else {
+    let [Stmt::Return(ast::StmtReturn {
+        value: Some(value),
+        range: _,
+    })] = nested_body.as_slice()
+    else {
         return None;
     };
     let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = value.as_ref() else {
