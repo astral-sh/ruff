@@ -40,10 +40,7 @@ pub(crate) fn delete_stmt(
     locator: &Locator,
     indexer: &Indexer,
 ) -> Edit {
-    if parent
-        .map(|parent| is_lone_child(stmt, parent))
-        .unwrap_or_default()
-    {
+    if parent.is_some_and(|parent| is_lone_child(stmt, parent)) {
         // If removing this node would lead to an invalid syntax tree, replace
         // it with a `pass`.
         Edit::range_replacement("pass".to_string(), stmt.range())
@@ -416,29 +413,6 @@ pub(crate) fn fits(
     tab_size: IndentWidth,
 ) -> bool {
     all_lines_fit(fix, node, locator, line_length.value() as usize, tab_size)
-}
-
-/// Returns `true` if the fix fits within the maximum configured line length, or produces lines that
-/// are shorter than the maximum length of the existing AST node.
-pub(crate) fn fits_or_shrinks(
-    fix: &str,
-    node: AnyNodeRef,
-    locator: &Locator,
-    line_length: LineLength,
-    tab_size: IndentWidth,
-) -> bool {
-    // Use the larger of the line length limit, or the longest line in the existing AST node.
-    let line_length = std::iter::once(line_length.value() as usize)
-        .chain(
-            locator
-                .slice(locator.lines_range(node.range()))
-                .universal_newlines()
-                .map(|line| LineWidthBuilder::new(tab_size).add_str(&line).get()),
-        )
-        .max()
-        .unwrap_or(line_length.value() as usize);
-
-    all_lines_fit(fix, node, locator, line_length, tab_size)
 }
 
 /// Returns `true` if all lines in the fix are shorter than the given line length.

@@ -40,4 +40,7 @@ f"\'normal\' {f"\'nested\' {"other"} 'single quotes'"} normal"  # Q004
 
 # Make sure we do not unescape quotes
 this_is_fine = "This is an \\'escaped\\' quote"
-this_should_raise_Q004 = "This is an \\\'escaped\\\' quote with an extra backslash"
+this_should_raise_Q004 = "This is an \\\'escaped\\\' quote with an extra backslash"  # Q004
+
+# Invalid escapes in bytestrings are also triggered:
+x = b"\xe7\xeb\x0c\xa1\x1b\x83tN\xce=x\xe9\xbe\x01\xb9\x13B_\xba\xe7\x0c2\xce\'rm\x0e\xcd\xe9.\xf8\xd2"  # Q004

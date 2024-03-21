@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use ruff_python_ast::{self as ast, ExceptHandler, Expr};
+use ruff_python_ast::{self as ast, ExceptHandler, Expr, Operator};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -44,30 +44,6 @@ impl Violation for ExceptWithNonExceptionClasses {
     }
 }
 
-/// Given an [`Expr`], flatten any [`Expr::Starred`] expressions.
-/// This should leave any unstarred iterables alone (subsequently raising a
-/// warning for B029).
-fn flatten_starred_iterables(expr: &Expr) -> Vec<&Expr> {
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = expr else {
-        return vec![expr];
-    };
-    let mut flattened_exprs: Vec<&Expr> = Vec::with_capacity(elts.len());
-    let mut exprs_to_process: VecDeque<&Expr> = elts.iter().collect();
-    while let Some(expr) = exprs_to_process.pop_front() {
-        match expr {
-            Expr::Starred(ast::ExprStarred { value, .. }) => match value.as_ref() {
-                Expr::Tuple(ast::ExprTuple { elts, .. })
-                | Expr::List(ast::ExprList { elts, .. }) => {
-                    exprs_to_process.append(&mut elts.iter().collect());
-                }
-                _ => flattened_exprs.push(value),
-            },
-            _ => flattened_exprs.push(expr),
-        }
-    }
-    flattened_exprs
-}
-
 /// B030
 pub(crate) fn except_with_non_exception_classes(
     checker: &mut Checker,
@@ -78,7 +54,7 @@ pub(crate) fn except_with_non_exception_classes(
     let Some(type_) = type_ else {
         return;
     };
-    for expr in flatten_starred_iterables(type_) {
+    for expr in flatten_iterables(type_) {
         if !matches!(
             expr,
             Expr::Subscript(_) | Expr::Attribute(_) | Expr::Name(_) | Expr::Call(_),
@@ -88,4 +64,62 @@ pub(crate) fn except_with_non_exception_classes(
                 .push(Diagnostic::new(ExceptWithNonExceptionClasses, expr.range()));
         }
     }
+}
+
+/// Given an [`Expr`], flatten any [`Expr::Starred`] expressions and any
+/// [`Expr::BinOp`] expressions into a flat list of expressions.
+///
+/// This should leave any unstarred iterables alone (subsequently raising a
+/// warning for B029).
+fn flatten_iterables(expr: &Expr) -> Vec<&Expr> {
+    // Unpack the top-level Tuple into queue, otherwise add as-is.
+    let mut exprs_to_process: VecDeque<&Expr> = match expr {
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().collect(),
+        _ => vec![expr].into(),
+    };
+    let mut flattened_exprs: Vec<&Expr> = Vec::with_capacity(exprs_to_process.len());
+
+    while let Some(expr) = exprs_to_process.pop_front() {
+        match expr {
+            Expr::Starred(ast::ExprStarred { value, .. }) => match value.as_ref() {
+                Expr::Tuple(ast::ExprTuple { elts, .. })
+                | Expr::List(ast::ExprList { elts, .. }) => {
+                    exprs_to_process.append(&mut elts.iter().collect());
+                }
+                Expr::BinOp(ast::ExprBinOp {
+                    op: Operator::Add, ..
+                }) => {
+                    exprs_to_process.push_back(value);
+                }
+                _ => flattened_exprs.push(value),
+            },
+            Expr::BinOp(ast::ExprBinOp {
+                left,
+                right,
+                op: Operator::Add,
+                ..
+            }) => {
+                for expr in [left, right] {
+                    // If left or right are tuples, starred, or binary operators, flatten them.
+                    match expr.as_ref() {
+                        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                            exprs_to_process.append(&mut elts.iter().collect());
+                        }
+                        Expr::Starred(ast::ExprStarred { value, .. }) => {
+                            exprs_to_process.push_back(value);
+                        }
+                        Expr::BinOp(ast::ExprBinOp {
+                            op: Operator::Add, ..
+                        }) => {
+                            exprs_to_process.push_back(expr);
+                        }
+                        _ => flattened_exprs.push(expr),
+                    }
+                }
+            }
+            _ => flattened_exprs.push(expr),
+        }
+    }
+
+    flattened_exprs
 }

@@ -80,10 +80,12 @@ enum Reason<'a> {
     Future,
     KnownStandardLibrary,
     SamePackage,
+    #[allow(dead_code)]
     SourceMatch(&'a Path),
     NoMatch,
     UserDefinedSection,
     NoSections,
+    #[allow(dead_code)]
     DisabledSection(&'a ImportSection),
 }
 

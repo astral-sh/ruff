@@ -32,7 +32,7 @@ An extremely fast Python linter and code formatter, written in Rust.
 - ⚖️ Drop-in parity with [Flake8](https://docs.astral.sh/ruff/faq/#how-does-ruff-compare-to-flake8), isort, and Black
 - 📦 Built-in caching, to avoid re-analyzing unchanged files
 - 🔧 Fix support, for automatic error correction (e.g., automatically remove unused imports)
-- 📏 Over [700 built-in rules](https://docs.astral.sh/ruff/rules/), with native re-implementations
+- 📏 Over [800 built-in rules](https://docs.astral.sh/ruff/rules/), with native re-implementations
     of popular Flake8 plugins, like flake8-bugbear
 - ⌨️ First-party [editor integrations](https://docs.astral.sh/ruff/integrations/) for
     [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
@@ -129,7 +129,7 @@ and with [a variety of other package managers](https://docs.astral.sh/ruff/insta
 To run Ruff as a linter, try any of the following:
 
 ```shell
-ruff check .                        # Lint all files in the current directory (and any subdirectories).
+ruff check                          # Lint all files in the current directory (and any subdirectories).
 ruff check path/to/code/            # Lint all files in `/path/to/code` (and any subdirectories).
 ruff check path/to/code/*.py        # Lint all `.py` files in `/path/to/code`.
 ruff check path/to/code/to/file.py  # Lint `file.py`.
@@ -139,7 +139,7 @@ ruff check @arguments.txt           # Lint using an input file, treating its con
 Or, to run Ruff as a formatter:
 
 ```shell
-ruff format .                        # Format all files in the current directory (and any subdirectories).
+ruff format                          # Format all files in the current directory (and any subdirectories).
 ruff format path/to/code/            # Format all files in `/path/to/code` (and any subdirectories).
 ruff format path/to/code/*.py        # Format all `.py` files in `/path/to/code`.
 ruff format path/to/code/to/file.py  # Format `file.py`.
@@ -151,7 +151,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.3.0
+  rev: v0.3.3
   hooks:
     # Run the linter.
     - id: ruff
@@ -183,10 +183,9 @@ Ruff can be configured through a `pyproject.toml`, `ruff.toml`, or `.ruff.toml` 
 [_Configuration_](https://docs.astral.sh/ruff/configuration/), or [_Settings_](https://docs.astral.sh/ruff/settings/)
 for a complete list of all configuration options).
 
-If left unspecified, Ruff's default configuration is equivalent to:
+If left unspecified, Ruff's default configuration is equivalent to the following `ruff.toml` file:
 
 ```toml
-[tool.ruff]
 # Exclude a variety of commonly ignored directories.
 exclude = [
     ".bzr",
@@ -224,7 +223,7 @@ indent-width = 4
 # Assume Python 3.8
 target-version = "py38"
 
-[tool.ruff.lint]
+[lint]
 # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
 select = ["E4", "E7", "E9", "F"]
 ignore = []
@@ -236,7 +235,7 @@ unfixable = []
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-[tool.ruff.format]
+[format]
 # Like Black, use double quotes for strings.
 quote-style = "double"
 
@@ -250,11 +249,20 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 ```
 
-Some configuration options can be provided via the command-line, such as those related to
-rule enablement and disablement, file discovery, and logging level:
+Note that, in a `pyproject.toml`, each section header should be prefixed with `tool.ruff`. For
+example, `[lint]` should be replaced with `[tool.ruff.lint]`.
+
+Some configuration options can be provided via dedicated command-line arguments, such as those
+related to rule enablement and disablement, file discovery, and logging level:
 
 ```shell
-ruff check path/to/code/ --select F401 --select F403 --quiet
+ruff check --select F401 --select F403 --quiet
+```
+
+The remaining configuration options can be provided through a catch-all `--config` argument:
+
+```shell
+ruff check --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
 ```
 
 See `ruff help` for more on Ruff's top-level commands, or `ruff help check` and `ruff help format`
@@ -264,7 +272,7 @@ for more on the linting and formatting commands, respectively.
 
 <!-- Begin section: Rules -->
 
-**Ruff supports over 700 lint rules**, many of which are inspired by popular tools like Flake8,
+**Ruff supports over 800 lint rules**, many of which are inspired by popular tools like Flake8,
 isort, pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
 Rust as a first-party feature.
 
@@ -421,6 +429,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Mypy](https://github.com/python/mypy)
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
 - [Neon](https://github.com/neondatabase/neon)
+- [Nokia](https://nokia.com/)
 - [NoneBot](https://github.com/nonebot/nonebot2)
 - [NumPyro](https://github.com/pyro-ppl/numpyro)
 - [ONNX](https://github.com/onnx/onnx)

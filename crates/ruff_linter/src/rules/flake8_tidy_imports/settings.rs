@@ -13,6 +13,12 @@ pub struct ApiBan {
     pub msg: String,
 }
 
+impl Display for ApiBan {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -47,7 +53,7 @@ impl Display for Settings {
             namespace = "linter.flake8_tidy_imports",
             fields = [
                 self.ban_relative_imports,
-                self.banned_api | debug,
+                self.banned_api | map,
                 self.banned_module_level_imports | array,
             ]
         }

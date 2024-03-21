@@ -103,9 +103,7 @@ impl<'a> ModuleKey<'a> {
     ) -> Self {
         let level = level.unwrap_or_default();
 
-        let force_to_top = !name
-            .map(|name| settings.force_to_top.contains(name))
-            .unwrap_or_default(); // `false` < `true` so we get forced to top first
+        let force_to_top = !name.is_some_and(|name| settings.force_to_top.contains(name)); // `false` < `true` so we get forced to top first
 
         let maybe_length = (settings.length_sort
             || (settings.length_sort_straight && style == ImportStyle::Straight))

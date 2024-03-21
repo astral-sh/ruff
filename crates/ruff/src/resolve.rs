@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::Result;
 use log::debug;
@@ -16,12 +16,11 @@ use crate::args::ConfigArguments;
 /// Resolve the relevant settings strategy and defaults for the current
 /// invocation.
 pub fn resolve(
-    isolated: bool,
     config_arguments: &ConfigArguments,
     stdin_filename: Option<&Path>,
 ) -> Result<PyprojectConfig> {
     // First priority: if we're running in isolated mode, use the default settings.
-    if isolated {
+    if config_arguments.isolated {
         let config = config_arguments.transform(Configuration::default());
         let settings = config.into_settings(&path_dedot::CWD)?;
         debug!("Isolated mode, not reading any pyproject.toml");
@@ -35,13 +34,8 @@ pub fn resolve(
     // Second priority: the user specified a `pyproject.toml` file. Use that
     // `pyproject.toml` for _all_ configuration, and resolve paths relative to the
     // current working directory. (This matches ESLint's behavior.)
-    if let Some(pyproject) = config_arguments
-        .config_file()
-        .map(|config| config.display().to_string())
-        .map(|config| shellexpand::full(&config).map(|config| PathBuf::from(config.as_ref())))
-        .transpose()?
-    {
-        let settings = resolve_root_settings(&pyproject, Relativity::Cwd, config_arguments)?;
+    if let Some(pyproject) = config_arguments.config_file() {
+        let settings = resolve_root_settings(pyproject, Relativity::Cwd, config_arguments)?;
         debug!(
             "Using user-specified configuration file at: {}",
             pyproject.display()
@@ -49,7 +43,7 @@ pub fn resolve(
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Fixed,
             settings,
-            Some(pyproject),
+            Some(pyproject.to_path_buf()),
         ));
     }
 

@@ -496,6 +496,7 @@ ignore = ["D203", "D212"]
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     warning: No Python files found under the given path(s)
@@ -522,7 +523,7 @@ fn nonexistent_config_file() {
            option
 
     It looks like you were trying to pass a path to a configuration file.
-    The path `foo.toml` does not exist
+    The path `foo.toml` does not point to a configuration file
 
     For more information, try '--help'.
     "###);
@@ -833,6 +834,7 @@ fn complex_config_setting_overridden_via_cli() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###);
@@ -849,7 +851,7 @@ fn deprecated_config_option_overridden_via_cli() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:7: N801 Class name `lowercase` should use CapWords convention 
+    -:1:7: N801 Class name `lowercase` should use CapWords convention
     Found 1 error.
 
     ----- stderr -----
@@ -969,6 +971,200 @@ import os
     warning: Invalid rule code provided to `# ruff: noqa` at -:2: BBB102
     "###);
     });
+
+    Ok(())
+}
+
+#[test]
+fn required_version_exact_mismatch() -> Result<()> {
+    let version = env!("CARGO_PKG_VERSION");
+
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+required-version = "0.1.0"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (version, "[VERSION]")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+import os
+"#), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Required version `==0.1.0` does not match the running version `[VERSION]`
+    "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn required_version_exact_match() -> Result<()> {
+    let version = env!("CARGO_PKG_VERSION");
+
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        format!(
+            r#"
+required-version = "{version}"
+"#
+        ),
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (version, "[VERSION]")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+import os
+"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:2:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn required_version_bound_mismatch() -> Result<()> {
+    let version = env!("CARGO_PKG_VERSION");
+
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        format!(
+            r#"
+required-version = ">{version}"
+"#
+        ),
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (version, "[VERSION]")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+import os
+"#), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Required version `>[VERSION]` does not match the running version `[VERSION]`
+    "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn required_version_bound_match() -> Result<()> {
+    let version = env!("CARGO_PKG_VERSION");
+
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+required-version = ">=0.1.0"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/"), (version, "[VERSION]")]
+    }, {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+import os
+"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:2:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    });
+
+    Ok(())
+}
+
+/// Expand environment variables in `--config` paths provided via the CLI.
+#[test]
+fn config_expand() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        ruff_toml,
+        r#"
+[lint]
+select = ["F"]
+ignore = ["F841"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg("${NAME}.toml")
+        .env("NAME", "ruff")
+        .arg("-")
+        .current_dir(tempdir.path())
+        .pass_stdin(r#"
+import os
+
+def func():
+    x = 1
+"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:2:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
 
     Ok(())
 }

@@ -80,7 +80,7 @@ impl Violation for FutureRewritableTypeAnnotation {
 pub(crate) fn future_rewritable_type_annotation(checker: &mut Checker, expr: &Expr) {
     let name = checker
         .semantic()
-        .resolve_call_path(expr)
+        .resolve_qualified_name(expr)
         .map(|binding| binding.to_string());
 
     if let Some(name) = name {

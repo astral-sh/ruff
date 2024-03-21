@@ -87,7 +87,7 @@ where
                     }
                 }
             }
-            Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => {
+            Expr::Named(ast::ExprNamed { value, .. }) => {
                 // Allow, e.g., `__all__ += (value := ["A", "B"])`.
                 return extract_elts(value, is_builtin);
             }

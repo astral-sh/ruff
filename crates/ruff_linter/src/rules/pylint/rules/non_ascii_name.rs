@@ -67,6 +67,7 @@ pub(crate) fn non_ascii_name(binding: &Binding, locator: &Locator) -> Option<Dia
         | BindingKind::FromImport(_)
         | BindingKind::SubmoduleImport(_)
         | BindingKind::Deletion
+        | BindingKind::ConditionalDeletion(_)
         | BindingKind::UnboundException(_) => {
             return None;
         }

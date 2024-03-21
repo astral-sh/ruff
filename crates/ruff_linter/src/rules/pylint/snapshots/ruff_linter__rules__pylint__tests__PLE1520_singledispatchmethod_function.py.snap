@@ -1,0 +1,49 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+singledispatchmethod_function.py:4:1: PLE1520 [*] `@singledispatchmethod` decorator should not be used on non-method functions
+  |
+4 | @singledispatchmethod  # [singledispatchmethod-function]
+  | ^^^^^^^^^^^^^^^^^^^^^ PLE1520
+5 | def convert_position(position):
+6 |     pass
+  |
+  = help: Replace with `@singledispatch`
+
+ℹ Unsafe fix
+1   |-from functools import singledispatchmethod
+  1 |+from functools import singledispatchmethod, singledispatch
+2 2 | 
+3 3 | 
+4   |-@singledispatchmethod  # [singledispatchmethod-function]
+  4 |+@singledispatch  # [singledispatchmethod-function]
+5 5 | def convert_position(position):
+6 6 |     pass
+7 7 | 
+
+singledispatchmethod_function.py:20:5: PLE1520 [*] `@singledispatchmethod` decorator should not be used on non-method functions
+   |
+18 |         pass
+19 | 
+20 |     @singledispatchmethod  # [singledispatchmethod-function]
+   |     ^^^^^^^^^^^^^^^^^^^^^ PLE1520
+21 |     @staticmethod
+22 |     def do(position):
+   |
+   = help: Replace with `@singledispatch`
+
+ℹ Unsafe fix
+1     |-from functools import singledispatchmethod
+   1  |+from functools import singledispatchmethod, singledispatch
+2  2  | 
+3  3  | 
+4  4  | @singledispatchmethod  # [singledispatchmethod-function]
+--------------------------------------------------------------------------------
+17 17 |     def move(self, position):
+18 18 |         pass
+19 19 | 
+20    |-    @singledispatchmethod  # [singledispatchmethod-function]
+   20 |+    @singledispatch  # [singledispatchmethod-function]
+21 21 |     @staticmethod
+22 22 |     def do(position):
+23 23 |         pass

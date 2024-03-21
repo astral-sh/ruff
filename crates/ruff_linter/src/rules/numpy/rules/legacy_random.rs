@@ -64,18 +64,19 @@ pub(crate) fn legacy_random(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if let Some(method_name) = checker
-        .semantic()
-        .resolve_call_path(expr)
-        .and_then(|call_path| {
-            // seeding state
-            if matches!(
-                call_path.segments(),
-                [
-                    "numpy",
-                    "random",
-                    // Seeds
-                    "seed" |
+    if let Some(method_name) =
+        checker
+            .semantic()
+            .resolve_qualified_name(expr)
+            .and_then(|qualified_name| {
+                // seeding state
+                if matches!(
+                    qualified_name.segments(),
+                    [
+                        "numpy",
+                        "random",
+                        // Seeds
+                        "seed" |
                     "get_state" |
                     "set_state" |
                     // Simple random data
@@ -128,13 +129,13 @@ pub(crate) fn legacy_random(checker: &mut Checker, expr: &Expr) {
                     "wald" |
                     "weibull" |
                     "zipf"
-                ]
-            ) {
-                Some(call_path.segments()[2])
-            } else {
-                None
-            }
-        })
+                    ]
+                ) {
+                    Some(qualified_name.segments()[2])
+                } else {
+                    None
+                }
+            })
     {
         checker.diagnostics.push(Diagnostic::new(
             NumpyLegacyRandom {

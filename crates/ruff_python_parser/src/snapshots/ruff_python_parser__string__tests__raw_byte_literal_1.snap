@@ -19,6 +19,13 @@ expression: parse_ast
                                     49,
                                     122,
                                 ],
+                                flags: BytesLiteralFlags {
+                                    quote_style: Single,
+                                    prefix: Raw {
+                                        uppercase_r: false,
+                                    },
+                                    triple_quoted: false,
+                                },
                             },
                         ),
                     },

@@ -9,7 +9,10 @@ import subprocess
 from pathlib import Path
 from typing import NamedTuple
 
+import mdformat
 import yaml
+
+from _mdformat_utils import add_no_escape_text_plugin
 
 
 class Section(NamedTuple):
@@ -108,7 +111,7 @@ def main() -> None:
         if not generated:
             continue
 
-        with Path(f"docs/{filename}").open("w+") as f:
+        with Path(f"docs/{filename}").open("w+", encoding="utf8") as f:
             if filename == "contributing.md":
                 # Copy the CONTRIBUTING.md.
                 shutil.copy("CONTRIBUTING.md", "docs/contributing.md")
@@ -139,6 +142,11 @@ def main() -> None:
                     )
 
             f.write(clean_file_content(file_content, title))
+
+    # Format rules docs
+    add_no_escape_text_plugin()
+    for rule_doc in Path("docs/rules").glob("*.md"):
+        mdformat.file(rule_doc, extensions=["mkdocs", "admonition", "no-escape-text"])
 
     with Path("mkdocs.template.yml").open(encoding="utf8") as fp:
         config = yaml.safe_load(fp)
@@ -173,7 +181,7 @@ def main() -> None:
     # Add the nav section to mkdocs.yml.
     config["nav"] = [{section.title: section.filename} for section in SECTIONS]
 
-    with Path("mkdocs.generated.yml").open("w+") as fp:
+    with Path("mkdocs.generated.yml").open("w+", encoding="utf8") as fp:
         yaml.safe_dump(config, fp)
 
 

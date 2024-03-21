@@ -127,8 +127,7 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
         // check if the comment is inside of an expression.
         if comment
             .enclosing
-            .map(|n| !is_valid_enclosing_node(n))
-            .unwrap_or_default()
+            .is_some_and(|n| !is_valid_enclosing_node(n))
         {
             return Err(IgnoredReason::InNonStatement);
         }
@@ -279,17 +278,17 @@ const fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
         | AnyNodeRef::ElifElseClause(_) => true,
 
         AnyNodeRef::ExprBoolOp(_)
-        | AnyNodeRef::ExprNamedExpr(_)
+        | AnyNodeRef::ExprNamed(_)
         | AnyNodeRef::ExprBinOp(_)
         | AnyNodeRef::ExprUnaryOp(_)
         | AnyNodeRef::ExprLambda(_)
-        | AnyNodeRef::ExprIfExp(_)
+        | AnyNodeRef::ExprIf(_)
         | AnyNodeRef::ExprDict(_)
         | AnyNodeRef::ExprSet(_)
         | AnyNodeRef::ExprListComp(_)
         | AnyNodeRef::ExprSetComp(_)
         | AnyNodeRef::ExprDictComp(_)
-        | AnyNodeRef::ExprGeneratorExp(_)
+        | AnyNodeRef::ExprGenerator(_)
         | AnyNodeRef::ExprAwait(_)
         | AnyNodeRef::ExprYield(_)
         | AnyNodeRef::ExprYieldFrom(_)

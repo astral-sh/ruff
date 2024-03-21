@@ -35,9 +35,7 @@ impl Violation for ImportSelf {
 
 /// PLW0406
 pub(crate) fn import_self(alias: &Alias, module_path: Option<&[String]>) -> Option<Diagnostic> {
-    let Some(module_path) = module_path else {
-        return None;
-    };
+    let module_path = module_path?;
 
     if alias.name.split('.').eq(module_path) {
         return Some(Diagnostic::new(
@@ -58,13 +56,8 @@ pub(crate) fn import_from_self(
     names: &[Alias],
     module_path: Option<&[String]>,
 ) -> Option<Diagnostic> {
-    let Some(module_path) = module_path else {
-        return None;
-    };
-    let Some(imported_module_path) = resolve_imported_module_path(level, module, Some(module_path))
-    else {
-        return None;
-    };
+    let module_path = module_path?;
+    let imported_module_path = resolve_imported_module_path(level, module, Some(module_path))?;
 
     if imported_module_path
         .split('.')
