@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821_28.py:9:7: F821 Undefined name `𝒟`
+  |
+7 | print(C == 𝑪 == 𝒞 == 𝓒 == 𝕮)
+8 | 
+9 | print(𝒟)  # F821
+  |       ^ F821
+  |

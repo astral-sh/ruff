@@ -102,16 +102,15 @@ fn process_documentation(documentation: &str, out: &mut String, rule_name: &str)
     // a non-CommonMark-compliant Markdown parser, which doesn't support code
     // tags in link definitions
     // (see https://github.com/Python-Markdown/markdown/issues/280).
-    let documentation = Regex::new(r"\[`([^`]*?)`]($|[^\[])").unwrap().replace_all(
-        documentation,
-        |caps: &Captures| {
+    let documentation = Regex::new(r"\[`([^`]*?)`]($|[^\[\(])")
+        .unwrap()
+        .replace_all(documentation, |caps: &Captures| {
             format!(
                 "[`{option}`][{option}]{sep}",
                 option = &caps[1],
                 sep = &caps[2]
             )
-        },
-    );
+        });
 
     for line in documentation.split_inclusive('\n') {
         if line.starts_with("## ") {
@@ -159,7 +158,7 @@ mod tests {
         process_documentation(
             "
 See also [`lint.mccabe.max-complexity`] and [`lint.task-tags`].
-Something [`else`][other].
+Something [`else`][other]. Some [link](https://example.com).
 
 ## Options
 
@@ -174,7 +173,7 @@ Something [`else`][other].
             output,
             "
 See also [`lint.mccabe.max-complexity`][lint.mccabe.max-complexity] and [`lint.task-tags`][lint.task-tags].
-Something [`else`][other].
+Something [`else`][other]. Some [link](https://example.com).
 
 ## Options
 

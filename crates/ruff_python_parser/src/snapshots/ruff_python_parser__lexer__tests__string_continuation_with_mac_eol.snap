@@ -7,7 +7,9 @@ expression: string_continuation_with_eol(MAC_EOL)
         String {
             value: "abc\\\rdef",
             kind: StringKind {
-                prefix: "",
+                prefix: Regular(
+                    Empty,
+                ),
                 triple_quoted: false,
                 quote_style: Double,
             },

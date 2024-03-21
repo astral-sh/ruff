@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use anyhow::Result;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::{AnyImport, Exceptions, Imported, NodeId, Scope};
 use ruff_text_size::{Ranged, TextRange};
@@ -36,6 +36,11 @@ enum UnusedImportContext {
 /// ```python
 /// from module import member as member
 /// ```
+///
+/// ## Fix safety
+///
+/// When `ignore_init_module_imports` is disabled, fixes can remove for unused imports in `__init__` files.
+/// These fixes are considered unsafe because they can change the public interface.
 ///
 /// ## Example
 /// ```python
@@ -90,7 +95,7 @@ impl Violation for UnusedImport {
             }
             Some(UnusedImportContext::Init) => {
                 format!(
-                    "`{name}` imported but unused; consider adding to `__all__` or using a redundant alias"
+                    "`{name}` imported but unused; consider removing, adding to `__all__`, or using a redundant alias"
                 )
             }
             None => format!("`{name}` imported but unused"),
@@ -154,8 +159,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         }
     }
 
-    let in_init =
-        checker.settings.ignore_init_module_imports && checker.path().ends_with("__init__.py");
+    let in_init = checker.path().ends_with("__init__.py");
+    let fix_init = !checker.settings.ignore_init_module_imports;
 
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
@@ -164,8 +169,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             exceptions.intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
         let multiple = imports.len() > 1;
 
-        let fix = if !in_init && !in_except_handler {
-            fix_imports(checker, node_id, &imports).ok()
+        let fix = if (!in_init || fix_init) && !in_except_handler {
+            fix_imports(checker, node_id, &imports, in_init).ok()
         } else {
             None
         };
@@ -243,7 +248,12 @@ impl Ranged for ImportBinding<'_> {
 }
 
 /// Generate a [`Fix`] to remove unused imports from a statement.
-fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
+fn fix_imports(
+    checker: &Checker,
+    node_id: NodeId,
+    imports: &[ImportBinding],
+    in_init: bool,
+) -> Result<Fix> {
     let statement = checker.semantic().statement(node_id);
     let parent = checker.semantic().parent_statement(node_id);
 
@@ -261,7 +271,15 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
         checker.stylist(),
         checker.indexer(),
     )?;
-    Ok(Fix::safe_edit(edit).isolate(Checker::isolation(
-        checker.semantic().parent_statement_id(node_id),
-    )))
+    // It's unsafe to remove things from `__init__.py` because it can break public interfaces
+    let applicability = if in_init {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+    Ok(
+        Fix::applicable_edit(edit, applicability).isolate(Checker::isolation(
+            checker.semantic().parent_statement_id(node_id),
+        )),
+    )
 }

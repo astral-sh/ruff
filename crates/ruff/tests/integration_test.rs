@@ -101,6 +101,7 @@ fn stdin_success() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###);
@@ -222,6 +223,7 @@ fn stdin_source_type_pyi() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###);
@@ -590,6 +592,7 @@ fn stdin_fix_when_no_issues_should_still_print_contents() {
     print(sys.version)
 
     ----- stderr -----
+    All checks passed!
     "###);
 }
 
@@ -1023,6 +1026,7 @@ fn preview_disabled_direct() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     warning: Selection `RUF911` has no effect because preview is not enabled.
@@ -1039,6 +1043,7 @@ fn preview_disabled_prefix_empty() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     warning: Selection `RUF91` has no effect because preview is not enabled.
@@ -1055,6 +1060,7 @@ fn preview_disabled_does_not_warn_for_empty_ignore_selections() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###);
@@ -1070,6 +1076,7 @@ fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###);
@@ -1175,6 +1182,7 @@ fn removed_indirect() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###);
@@ -1205,6 +1213,7 @@ fn redirect_indirect() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###);
@@ -1307,6 +1316,7 @@ fn deprecated_indirect_preview_enabled() {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###);
@@ -1383,6 +1393,7 @@ fn unreadable_dir() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     warning: Encountered error: Permission denied (os error 13)
@@ -1897,6 +1908,7 @@ def log(x, base) -> float:
     success: true
     exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     "###

@@ -1,15 +1,13 @@
 //! Detect code style from Python source code.
 
-use std::fmt;
 use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
-use ruff_python_literal::escape::Quote as StrQuote;
+
+use ruff_python_ast::str::Quote;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
-use ruff_source_file::{find_newline, LineEnding};
-
-use ruff_source_file::Locator;
+use ruff_source_file::{find_newline, LineEnding, Locator};
 
 #[derive(Debug, Clone)]
 pub struct Stylist<'a> {
@@ -52,10 +50,8 @@ impl<'a> Stylist<'a> {
 fn detect_quote(tokens: &[LexResult]) -> Quote {
     for (token, _) in tokens.iter().flatten() {
         match token {
-            Tok::String { kind, .. } if !kind.is_triple_quoted() => {
-                return kind.quote_style().into()
-            }
-            Tok::FStringStart(kind) => return kind.quote_style().into(),
+            Tok::String { kind, .. } if !kind.is_triple_quoted() => return kind.quote_style(),
+            Tok::FStringStart(kind) => return kind.quote_style(),
             _ => continue,
         }
     }
@@ -91,50 +87,6 @@ fn detect_indention(tokens: &[LexResult], locator: &Locator) -> Indentation {
         Indentation(whitespace.to_string())
     } else {
         Indentation::default()
-    }
-}
-
-/// The quotation style used in Python source code.
-#[derive(Debug, Default, PartialEq, Eq, Copy, Clone)]
-pub enum Quote {
-    Single,
-    #[default]
-    Double,
-}
-
-impl From<ruff_python_ast::str::QuoteStyle> for Quote {
-    fn from(value: ruff_python_ast::str::QuoteStyle) -> Self {
-        match value {
-            ruff_python_ast::str::QuoteStyle::Double => Self::Double,
-            ruff_python_ast::str::QuoteStyle::Single => Self::Single,
-        }
-    }
-}
-
-impl From<Quote> for char {
-    fn from(val: Quote) -> Self {
-        match val {
-            Quote::Single => '\'',
-            Quote::Double => '"',
-        }
-    }
-}
-
-impl From<Quote> for StrQuote {
-    fn from(val: Quote) -> Self {
-        match val {
-            Quote::Single => StrQuote::Single,
-            Quote::Double => StrQuote::Double,
-        }
-    }
-}
-
-impl fmt::Display for Quote {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Quote::Single => write!(f, "\'"),
-            Quote::Double => write!(f, "\""),
-        }
     }
 }
 
