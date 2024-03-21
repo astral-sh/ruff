@@ -1056,6 +1056,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "177") => (RuleGroup::Preview, rules::refurb::rules::ImplicitCwd),
         (Refurb, "180") => (RuleGroup::Preview, rules::refurb::rules::MetaClassABCMeta),
         (Refurb, "181") => (RuleGroup::Preview, rules::refurb::rules::HashlibDigestHex),
+        (Refurb, "187") => (RuleGroup::Preview, rules::refurb::rules::ListAssignReversed),
 
         // flake8-logging
         (Flake8Logging, "001") => (RuleGroup::Stable, rules::flake8_logging::rules::DirectLoggerInstantiation),
