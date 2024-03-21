@@ -66,22 +66,35 @@ use crate::settings::LinterSettings;
 /// ## Options
 /// - `lint.pylint.max-module-lines`
 #[violation]
-pub struct TooManyLines;
+pub struct TooManyLines {
+    number_of_lines: usize,
+    max_module_lines: usize,
+}
 
 impl Violation for TooManyLines {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Too many lines in module")
+        let TooManyLines {
+            number_of_lines,
+            max_module_lines,
+        } = self;
+        format!("Too many lines in module ({number_of_lines}>{max_module_lines})")
     }
 }
 
 /// PLC0302
 pub(crate) fn too_many_lines(locator: &Locator, settings: &LinterSettings) -> Option<Diagnostic> {
     let lines = locator.contents().universal_newlines();
-    let length = lines.count() + 1;
+    let number_of_lines = lines.count() + 1;
 
-    if length > settings.pylint.max_module_lines {
-        let diagnostic = Diagnostic::new(TooManyLines, TextRange::default());
+    if number_of_lines > settings.pylint.max_module_lines {
+        let diagnostic = Diagnostic::new(
+            TooManyLines {
+                number_of_lines,
+                max_module_lines: settings.pylint.max_module_lines,
+            },
+            TextRange::default(),
+        );
         return Some(diagnostic);
     }
 
