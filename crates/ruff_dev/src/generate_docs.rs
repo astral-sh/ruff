@@ -1,6 +1,7 @@
 //! Generate Markdown documentation for applicable rules.
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 
@@ -97,6 +98,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
 fn process_documentation(documentation: &str, out: &mut String, rule_name: &str) {
     let mut in_options = false;
     let mut after = String::new();
+    let mut options = HashSet::new();
 
     // HACK: This is an ugly regex hack that's necessary because mkdocs uses
     // a non-CommonMark-compliant Markdown parser, which doesn't support code
@@ -134,6 +136,7 @@ fn process_documentation(documentation: &str, out: &mut String, rule_name: &str)
                 let anchor = option.replace('.', "_");
                 out.push_str(&format!("- [`{option}`][{option}]\n"));
                 after.push_str(&format!("[{option}]: ../settings.md#{anchor}\n"));
+                options.insert(option);
 
                 continue;
             }
@@ -141,6 +144,27 @@ fn process_documentation(documentation: &str, out: &mut String, rule_name: &str)
 
         out.push_str(line);
     }
+
+    let re = Regex::new(r"\[`([^`]*?)`]\[(.*?)]").unwrap();
+    for (_, [option, _]) in re.captures_iter(&documentation).map(|c| c.extract()) {
+        match Options::metadata().find(option) {
+            Some(OptionEntry::Field(field)) => {
+                if !options.contains(option) {
+                    let anchor = option.replace('.', "_");
+                    after.push_str(&format!("[{option}]: ../settings.md#{anchor}\n"));
+                    options.insert(option);
+                }
+                if field.deprecated.is_some() {
+                    eprintln!("Rule {rule_name} references deprecated option {option}.");
+                }
+            }
+            Some(_) => {}
+            None => {
+                panic!("Unknown option {option} referenced by rule {rule_name}");
+            }
+        }
+    }
+
     if !after.is_empty() {
         out.push('\n');
         out.push('\n');
