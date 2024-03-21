@@ -236,7 +236,7 @@ fn is_package_with_cache<'a>(
 
 /// Applies a transformation to a [`Configuration`].
 ///
-/// Used to override options with the the values provided by the CLI.
+/// Used to override options with the values provided by the CLI.
 pub trait ConfigurationTransformer: Sync {
     fn transform(&self, config: Configuration) -> Configuration;
 }

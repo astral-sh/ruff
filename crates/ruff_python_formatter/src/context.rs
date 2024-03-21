@@ -248,7 +248,7 @@ where
 
 /// The current indent level of the formatter.
 ///
-/// One can determine the the width of the indent itself (in number of ASCII
+/// One can determine the width of the indent itself (in number of ASCII
 /// space characters) by multiplying the indent level by the configured indent
 /// width.
 ///
