@@ -147,20 +147,14 @@ fn process_documentation(documentation: &str, out: &mut String, rule_name: &str)
 
     let re = Regex::new(r"\[`([^`]*?)`]\[(.*?)]").unwrap();
     for (_, [option, _]) in re.captures_iter(&documentation).map(|c| c.extract()) {
-        match Options::metadata().find(option) {
-            Some(OptionEntry::Field(field)) => {
-                if !options.contains(option) {
-                    let anchor = option.replace('.', "_");
-                    after.push_str(&format!("[{option}]: ../settings.md#{anchor}\n"));
-                    options.insert(option);
-                }
-                if field.deprecated.is_some() {
-                    eprintln!("Rule {rule_name} references deprecated option {option}.");
-                }
+        if let Some(OptionEntry::Field(field)) = Options::metadata().find(option) {
+            if !options.contains(option) {
+                let anchor = option.replace('.', "_");
+                after.push_str(&format!("[{option}]: ../settings.md#{anchor}\n"));
+                options.insert(option);
             }
-            Some(_) => {}
-            None => {
-                panic!("Unknown option {option} referenced by rule {rule_name}");
+            if field.deprecated.is_some() {
+                eprintln!("Rule {rule_name} references deprecated option {option}.");
             }
         }
     }
