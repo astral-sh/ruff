@@ -7,11 +7,11 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/match/invalid
 ```
 Module(
     ModModule {
-        range: 0..584,
+        range: 0..616,
         body: [
             Match(
                 StmtMatch {
-                    range: 0..260,
+                    range: 0..292,
                     subject: Name(
                         ExprName {
                             range: 6..25,
@@ -348,31 +348,77 @@ Module(
                                 ),
                             ],
                         },
+                        MatchCase {
+                            range: 265..292,
+                            pattern: MatchValue(
+                                PatternMatchValue {
+                                    range: 270..278,
+                                    value: BinOp(
+                                        ExprBinOp {
+                                            range: 270..278,
+                                            left: UnaryOp(
+                                                ExprUnaryOp {
+                                                    range: 270..273,
+                                                    op: USub,
+                                                    operand: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 271..273,
+                                                            value: Complex {
+                                                                real: 0.0,
+                                                                imag: 1.0,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                            op: Add,
+                                            right: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 276..278,
+                                                    value: Complex {
+                                                        real: 0.0,
+                                                        imag: 2.0,
+                                                    },
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        range: 288..292,
+                                    },
+                                ),
+                            ],
+                        },
                     ],
                 },
             ),
             Match(
                 StmtMatch {
-                    range: 262..514,
+                    range: 294..546,
                     subject: Name(
                         ExprName {
-                            range: 268..287,
+                            range: 300..319,
                             id: "invalid_rhs_pattern",
                             ctx: Load,
                         },
                     ),
                     cases: [
                         MatchCase {
-                            range: 293..321,
+                            range: 325..353,
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 298..307,
+                                    range: 330..339,
                                     value: BinOp(
                                         ExprBinOp {
-                                            range: 298..307,
+                                            range: 330..339,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 298..299,
+                                                    range: 330..331,
                                                     value: Int(
                                                         1,
                                                     ),
@@ -381,16 +427,16 @@ Module(
                                             op: Add,
                                             right: Call(
                                                 ExprCall {
-                                                    range: 302..307,
+                                                    range: 334..339,
                                                     func: Name(
                                                         ExprName {
-                                                            range: 302..305,
+                                                            range: 334..337,
                                                             id: "Foo",
                                                             ctx: Load,
                                                         },
                                                     ),
                                                     arguments: Arguments {
-                                                        range: 305..307,
+                                                        range: 337..339,
                                                         args: [],
                                                         keywords: [],
                                                     },
@@ -404,22 +450,22 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        range: 317..321,
+                                        range: 349..353,
                                     },
                                 ),
                             ],
                         },
                         MatchCase {
-                            range: 326..350,
+                            range: 358..382,
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 331..336,
+                                    range: 363..368,
                                     value: BinOp(
                                         ExprBinOp {
-                                            range: 331..336,
+                                            range: 363..368,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 331..332,
+                                                    range: 363..364,
                                                     value: Int(
                                                         2,
                                                     ),
@@ -428,7 +474,7 @@ Module(
                                             op: Add,
                                             right: Name(
                                                 ExprName {
-                                                    range: 335..336,
+                                                    range: 367..368,
                                                     id: "x",
                                                     ctx: Store,
                                                 },
@@ -441,22 +487,22 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        range: 346..350,
+                                        range: 378..382,
                                     },
                                 ),
                             ],
                         },
                         MatchCase {
-                            range: 355..379,
+                            range: 387..411,
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 360..365,
+                                    range: 392..397,
                                     value: BinOp(
                                         ExprBinOp {
-                                            range: 360..365,
+                                            range: 392..397,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 360..361,
+                                                    range: 392..393,
                                                     value: Int(
                                                         3,
                                                     ),
@@ -465,7 +511,7 @@ Module(
                                             op: Add,
                                             right: Name(
                                                 ExprName {
-                                                    range: 364..365,
+                                                    range: 396..397,
                                                     id: "_",
                                                     ctx: Store,
                                                 },
@@ -478,22 +524,22 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        range: 375..379,
+                                        range: 407..411,
                                     },
                                 ),
                             ],
                         },
                         MatchCase {
-                            range: 384..414,
+                            range: 416..446,
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 389..400,
+                                    range: 421..432,
                                     value: BinOp(
                                         ExprBinOp {
-                                            range: 389..400,
+                                            range: 421..432,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 389..390,
+                                                    range: 421..422,
                                                     value: Int(
                                                         4,
                                                     ),
@@ -502,10 +548,10 @@ Module(
                                             op: Add,
                                             right: BinOp(
                                                 ExprBinOp {
-                                                    range: 394..399,
+                                                    range: 426..431,
                                                     left: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 394..395,
+                                                            range: 426..427,
                                                             value: Int(
                                                                 1,
                                                             ),
@@ -514,7 +560,7 @@ Module(
                                                     op: BitOr,
                                                     right: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 398..399,
+                                                            range: 430..431,
                                                             value: Int(
                                                                 2,
                                                             ),
@@ -530,22 +576,22 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        range: 410..414,
+                                        range: 442..446,
                                     },
                                 ),
                             ],
                         },
                         MatchCase {
-                            range: 419..448,
+                            range: 451..480,
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 424..434,
+                                    range: 456..466,
                                     value: BinOp(
                                         ExprBinOp {
-                                            range: 424..434,
+                                            range: 456..466,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 424..425,
+                                                    range: 456..457,
                                                     value: Int(
                                                         5,
                                                     ),
@@ -554,11 +600,11 @@ Module(
                                             op: Add,
                                             right: List(
                                                 ExprList {
-                                                    range: 428..434,
+                                                    range: 460..466,
                                                     elts: [
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 429..430,
+                                                                range: 461..462,
                                                                 value: Int(
                                                                     1,
                                                                 ),
@@ -566,7 +612,7 @@ Module(
                                                         ),
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 432..433,
+                                                                range: 464..465,
                                                                 value: Int(
                                                                     2,
                                                                 ),
@@ -584,22 +630,22 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        range: 444..448,
+                                        range: 476..480,
                                     },
                                 ),
                             ],
                         },
                         MatchCase {
-                            range: 453..485,
+                            range: 485..517,
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 458..471,
+                                    range: 490..503,
                                     value: BinOp(
                                         ExprBinOp {
-                                            range: 458..471,
+                                            range: 490..503,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 458..459,
+                                                    range: 490..491,
                                                     value: Int(
                                                         6,
                                                     ),
@@ -608,12 +654,12 @@ Module(
                                             op: Add,
                                             right: Dict(
                                                 ExprDict {
-                                                    range: 462..471,
+                                                    range: 494..503,
                                                     keys: [
                                                         Some(
                                                             BooleanLiteral(
                                                                 ExprBooleanLiteral {
-                                                                    range: 463..467,
+                                                                    range: 495..499,
                                                                     value: true,
                                                                 },
                                                             ),
@@ -622,7 +668,7 @@ Module(
                                                     values: [
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 469..470,
+                                                                range: 501..502,
                                                                 value: Int(
                                                                     1,
                                                                 ),
@@ -639,22 +685,22 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        range: 481..485,
+                                        range: 513..517,
                                     },
                                 ),
                             ],
                         },
                         MatchCase {
-                            range: 490..514,
+                            range: 522..546,
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 495..500,
+                                    range: 527..532,
                                     value: BinOp(
                                         ExprBinOp {
-                                            range: 495..500,
+                                            range: 527..532,
                                             left: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 495..496,
+                                                    range: 527..528,
                                                     value: Int(
                                                         1,
                                                     ),
@@ -663,7 +709,7 @@ Module(
                                             op: Add,
                                             right: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 499..500,
+                                                    range: 531..532,
                                                     value: Int(
                                                         2,
                                                     ),
@@ -677,7 +723,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        range: 510..514,
+                                        range: 542..546,
                                     },
                                 ),
                             ],
@@ -687,35 +733,35 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    range: 516..583,
+                    range: 548..615,
                     subject: Name(
                         ExprName {
-                            range: 522..545,
+                            range: 554..577,
                             id: "invalid_lhs_rhs_pattern",
                             ctx: Load,
                         },
                     ),
                     cases: [
                         MatchCase {
-                            range: 551..583,
+                            range: 583..615,
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 556..569,
+                                    range: 588..601,
                                     value: BinOp(
                                         ExprBinOp {
-                                            range: 556..569,
+                                            range: 588..601,
                                             left: Call(
                                                 ExprCall {
-                                                    range: 556..561,
+                                                    range: 588..593,
                                                     func: Name(
                                                         ExprName {
-                                                            range: 556..559,
+                                                            range: 588..591,
                                                             id: "Foo",
                                                             ctx: Load,
                                                         },
                                                     ),
                                                     arguments: Arguments {
-                                                        range: 559..561,
+                                                        range: 591..593,
                                                         args: [],
                                                         keywords: [],
                                                     },
@@ -724,16 +770,16 @@ Module(
                                             op: Add,
                                             right: Call(
                                                 ExprCall {
-                                                    range: 564..569,
+                                                    range: 596..601,
                                                     func: Name(
                                                         ExprName {
-                                                            range: 564..567,
+                                                            range: 596..599,
                                                             id: "Bar",
                                                             ctx: Load,
                                                         },
                                                     ),
                                                     arguments: Arguments {
-                                                        range: 567..569,
+                                                        range: 599..601,
                                                         args: [],
                                                         keywords: [],
                                                     },
@@ -747,7 +793,7 @@ Module(
                             body: [
                                 Pass(
                                     StmtPass {
-                                        range: 579..583,
+                                        range: 611..615,
                                     },
                                 ),
                             ],
@@ -826,88 +872,98 @@ Module(
 14 |     case 1j + 2j:
    |          ^^ Syntax Error: real number required in complex literal
 15 |         pass
+16 |     case -1j + 2j:
    |
 
 
    |
-17 | match invalid_rhs_pattern:
-18 |     case 1 + Foo():
+14 |     case 1j + 2j:
+15 |         pass
+16 |     case -1j + 2j:
+   |          ^^^ Syntax Error: real number required in complex literal
+17 |         pass
+   |
+
+
+   |
+19 | match invalid_rhs_pattern:
+20 |     case 1 + Foo():
    |              ^^^^^ Syntax Error: invalid rhs pattern
-19 |         pass
-20 |     case 2 + x:
-   |
-
-
-   |
-18 |     case 1 + Foo():
-19 |         pass
-20 |     case 2 + x:
-   |              ^ Syntax Error: invalid rhs pattern
 21 |         pass
-22 |     case 3 + _:
+22 |     case 2 + x:
    |
 
 
    |
-20 |     case 2 + x:
+20 |     case 1 + Foo():
 21 |         pass
-22 |     case 3 + _:
+22 |     case 2 + x:
    |              ^ Syntax Error: invalid rhs pattern
 23 |         pass
-24 |     case 4 + (1 | 2):
+24 |     case 3 + _:
    |
 
 
    |
-22 |     case 3 + _:
+22 |     case 2 + x:
 23 |         pass
-24 |     case 4 + (1 | 2):
+24 |     case 3 + _:
+   |              ^ Syntax Error: invalid rhs pattern
+25 |         pass
+26 |     case 4 + (1 | 2):
+   |
+
+
+   |
+24 |     case 3 + _:
+25 |         pass
+26 |     case 4 + (1 | 2):
    |               ^^^^^ Syntax Error: invalid rhs pattern
-25 |         pass
-26 |     case 5 + [1, 2]:
+27 |         pass
+28 |     case 5 + [1, 2]:
    |
 
 
    |
-24 |     case 4 + (1 | 2):
-25 |         pass
-26 |     case 5 + [1, 2]:
+26 |     case 4 + (1 | 2):
+27 |         pass
+28 |     case 5 + [1, 2]:
    |              ^^^^^^ Syntax Error: invalid rhs pattern
-27 |         pass
-28 |     case 6 + {True: 1}:
+29 |         pass
+30 |     case 6 + {True: 1}:
    |
 
 
    |
-26 |     case 5 + [1, 2]:
-27 |         pass
-28 |     case 6 + {True: 1}:
+28 |     case 5 + [1, 2]:
+29 |         pass
+30 |     case 6 + {True: 1}:
    |              ^^^^^^^^^ Syntax Error: invalid rhs pattern
-29 |         pass
-30 |     case 1 + 2:
-   |
-
-
-   |
-28 |     case 6 + {True: 1}:
-29 |         pass
-30 |     case 1 + 2:
-   |              ^ Syntax Error: imaginary number required in complex literal
 31 |         pass
+32 |     case 1 + 2:
    |
 
 
    |
-33 | match invalid_lhs_rhs_pattern:
-34 |     case Foo() + Bar():
+30 |     case 6 + {True: 1}:
+31 |         pass
+32 |     case 1 + 2:
+   |              ^ Syntax Error: imaginary number required in complex literal
+33 |         pass
+   |
+
+
+   |
+35 | match invalid_lhs_rhs_pattern:
+36 |     case Foo() + Bar():
    |          ^^^^^ Syntax Error: invalid lhs pattern
-35 |         pass
+37 |         pass
    |
 
 
    |
-33 | match invalid_lhs_rhs_pattern:
-34 |     case Foo() + Bar():
+35 | match invalid_lhs_rhs_pattern:
+36 |     case Foo() + Bar():
    |                  ^^^^^ Syntax Error: invalid rhs pattern
-35 |         pass
+37 |         pass
    |

@@ -532,19 +532,19 @@ impl<'src> Parser<'src> {
 
         let lhs_value = if let Pattern::MatchValue(lhs) = lhs {
             match &*lhs.value {
-                Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: ast::Number::Complex { .. },
+                expr @ (Expr::NumberLiteral(_)
+                | Expr::UnaryOp(ast::ExprUnaryOp {
+                    op: ast::UnaryOp::USub,
                     ..
-                }) => {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "real number required in complex literal".to_string(),
-                        ),
-                        &lhs,
-                    );
-                }
-                Expr::NumberLiteral(_) | Expr::UnaryOp(_) => {
-                    // Valid
+                })) => {
+                    if !is_real_number(expr) {
+                        self.add_error(
+                            ParseErrorType::OtherError(
+                                "real number required in complex literal".to_string(),
+                            ),
+                            &lhs,
+                        );
+                    }
                 }
                 _ => {
                     self.add_error(
@@ -745,5 +745,17 @@ enum AllowStarPattern {
 impl AllowStarPattern {
     const fn is_no(self) -> bool {
         matches!(self, AllowStarPattern::No)
+    }
+}
+
+/// Returns `true` if the given expression is a real number.
+const fn is_real_number(expr: &Expr) -> bool {
+    match expr {
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(_) | ast::Number::Float(_),
+            ..
+        }) => true,
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_real_number(operand),
+        _ => false,
     }
 }

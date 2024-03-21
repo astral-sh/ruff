@@ -13,6 +13,8 @@ match invalid_lhs_pattern:
         pass
     case 1j + 2j:
         pass
+    case -1j + 2j:
+        pass
 
 match invalid_rhs_pattern:
     case 1 + Foo():
