@@ -33,7 +33,7 @@ use crate::registry::Rule;
 /// ```
 ///
 /// ## References
-/// - [Static typing with Python: Type Stubs: Version and Platform Checks](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
+/// - [Typing stubs documentation: Version and Platform Checks](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
 #[violation]
 pub struct UnrecognizedVersionInfoCheck;
 
@@ -74,7 +74,7 @@ impl Violation for UnrecognizedVersionInfoCheck {
 /// ```
 ///
 /// ## References
-/// - [Static typing with Python: Type Stubs: Version and Platform Checks](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
+/// - [Typing stubs documentation: Version and Platform Checks](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
 #[violation]
 pub struct PatchVersionComparison;
 
@@ -112,7 +112,7 @@ impl Violation for PatchVersionComparison {
 /// ```
 ///
 /// ## References
-/// - [Static typing with Python: Type Stubs: Version and Platform Checks](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
+/// - [Typing stubs documentation: Version and Platform Checks](https://typing.readthedocs.io/en/latest/source/stubs.html#version-and-platform-checks)
 #[violation]
 pub struct WrongTupleLengthVersionComparison {
     expected_length: usize,
