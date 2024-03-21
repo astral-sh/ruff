@@ -4,7 +4,6 @@
 //! and subject to change drastically.
 //!
 //! [Ruff]: https://github.com/astral-sh/ruff
-#![recursion_limit = "256"]
 
 #[cfg(feature = "clap")]
 pub use registry::clap_completion::RuleParser;
