@@ -54,8 +54,7 @@ impl AlwaysFixableViolation for MissingWhitespace {
 /// E231
 pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesContext) {
     let mut fstrings = 0u32;
-    let mut lsqb_stack = Vec::new();
-    let mut lbrace_stack = Vec::new();
+    let mut brackets = Vec::new();
     let mut iter = line.tokens().iter().peekable();
 
     while let Some(token) = iter.next() {
@@ -64,16 +63,16 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesC
             TokenKind::FStringStart => fstrings += 1,
             TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
             TokenKind::Lsqb if fstrings == 0 => {
-                lsqb_stack.push(token.start());
+                brackets.push(kind);
             }
             TokenKind::Rsqb if fstrings == 0 => {
-                lsqb_stack.pop();
+                brackets.pop();
             }
             TokenKind::Lbrace if fstrings == 0 => {
-                lbrace_stack.push(token.start());
+                brackets.push(kind);
             }
             TokenKind::Rbrace if fstrings == 0 => {
-                lbrace_stack.pop();
+                brackets.pop();
             }
             TokenKind::Colon if fstrings > 0 => {
                 // Colon in f-string, no space required. This will yield false
@@ -97,7 +96,9 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesC
                 {
                     if let Some(next_token) = iter.peek() {
                         match (kind, next_token.kind()) {
-                            (TokenKind::Colon, _) if lsqb_stack.last() > lbrace_stack.last() => {
+                            (TokenKind::Colon, _)
+                                if matches!(brackets.last(), Some(TokenKind::Lsqb)) =>
+                            {
                                 continue; // Slice syntax, no space required
                             }
                             (TokenKind::Comma, TokenKind::Rpar | TokenKind::Rsqb) => {
