@@ -117,7 +117,7 @@ impl Server {
                 tracing::error!("Timed out while waiting for client to acknowledge registration of dynamic capabilities");
             });
         } else {
-            tracing::warn!("LSP client does not support dynamic file watcher registration - automatic configuration reloading will not be available.")
+            tracing::warn!("LSP client does not support dynamic file watcher registration - automatic configuration reloading will not be available.");
         }
 
         Ok(Self {
