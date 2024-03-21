@@ -278,9 +278,7 @@ impl<'a> Insertion<'a> {
 /// Find the end of the last docstring.
 fn match_docstring_end(body: &[Stmt]) -> Option<TextSize> {
     let mut iter = body.iter();
-    let Some(mut stmt) = iter.next() else {
-        return None;
-    };
+    let mut stmt = iter.next()?;
     if !is_docstring_stmt(stmt) {
         return None;
     }

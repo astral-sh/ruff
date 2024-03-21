@@ -1836,7 +1836,7 @@ impl<'a> Checker<'a> {
         if matches!(
             parent,
             Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
-        ) && !(self.semantic.in_annotation() || self.source_type.is_stub())
+        ) && !self.semantic.in_annotation()
         {
             self.add_binding(id, expr.range(), BindingKind::Annotation, flags);
             return;

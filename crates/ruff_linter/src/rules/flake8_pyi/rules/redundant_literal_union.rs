@@ -148,10 +148,7 @@ fn match_builtin_type(expr: &Expr, semantic: &SemanticModel) -> Option<ExprType>
 /// Return the [`ExprType`] of an [`Expr`] if it is a literal (e.g., an `int`, like `1`, or a
 /// `bool`, like `True`).
 fn match_literal_type(expr: &Expr) -> Option<ExprType> {
-    let Some(literal_expr) = expr.as_literal_expr() else {
-        return None;
-    };
-    let result = match literal_expr {
+    Some(match expr.as_literal_expr()? {
         LiteralExpressionRef::BooleanLiteral(_) => ExprType::Bool,
         LiteralExpressionRef::StringLiteral(_) => ExprType::Str,
         LiteralExpressionRef::BytesLiteral(_) => ExprType::Bytes,
@@ -163,6 +160,5 @@ fn match_literal_type(expr: &Expr) -> Option<ExprType> {
         LiteralExpressionRef::NoneLiteral(_) | LiteralExpressionRef::EllipsisLiteral(_) => {
             return None;
         }
-    };
-    Some(result)
+    })
 }
