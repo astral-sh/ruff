@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
-assertion_line: 42
 ---
 C409.py:1:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
   |
@@ -195,6 +194,7 @@ C409.py:24:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite a
 24 | t6 = tuple([1])
    |      ^^^^^^^^^^ C409
 25 | t7 = tuple((1,))
+26 | t8 = tuple([1,])
    |
    = help: Rewrite as a `tuple` literal
 
@@ -205,13 +205,14 @@ C409.py:24:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite a
 24    |-t6 = tuple([1])
    24 |+t6 = (1,)
 25 25 | t7 = tuple((1,))
-26 26 | 
+26 26 | t8 = tuple([1,])
 
 C409.py:25:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)
    |
 24 | t6 = tuple([1])
 25 | t7 = tuple((1,))
    |      ^^^^^^^^^^^ C409
+26 | t8 = tuple([1,])
    |
    = help: Remove outer `tuple` call
 
@@ -221,4 +222,20 @@ C409.py:25:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove t
 24 24 | t6 = tuple([1])
 25    |-t7 = tuple((1,))
    25 |+t7 = (1,)
-26 26 |
+26 26 | t8 = tuple([1,])
+
+C409.py:26:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
+   |
+24 | t6 = tuple([1])
+25 | t7 = tuple((1,))
+26 | t8 = tuple([1,])
+   |      ^^^^^^^^^^^ C409
+   |
+   = help: Rewrite as a `tuple` literal
+
+ℹ Unsafe fix
+23 23 | 
+24 24 | t6 = tuple([1])
+25 25 | t7 = tuple((1,))
+26    |-t8 = tuple([1,])
+   26 |+t8 = (1,)

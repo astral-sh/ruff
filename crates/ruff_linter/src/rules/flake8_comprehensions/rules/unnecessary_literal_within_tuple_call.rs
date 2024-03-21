@@ -98,13 +98,13 @@ pub(crate) fn unnecessary_literal_within_tuple_call(checker: &mut Checker, call:
 
     // Convert `tuple([1, 2])` to `(1, 2)`
     diagnostic.set_fix({
-        let elts: Vec<Expr> = match argument {
-            Expr::List(list_expr) => list_expr.elts.clone(),
-            Expr::Tuple(tuple_expr) => tuple_expr.elts.clone(),
+        let elts = match argument {
+            Expr::List(ast::ExprList { elts, .. }) => elts.as_slice(),
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.as_slice(),
             _ => return,
         };
 
-        let needs_trailing_comma = if let [item] = elts.as_slice() {
+        let needs_trailing_comma = if let [item] = elts {
             SimpleTokenizer::new(
                 checker.locator().contents(),
                 TextRange::new(item.end(), call.end()),
