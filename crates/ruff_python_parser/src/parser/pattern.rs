@@ -131,7 +131,8 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-closed_pattern>
     fn parse_match_pattern_lhs(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern {
         let start = self.node_start();
-        let lhs = match self.current_token_kind() {
+
+        let mut lhs = match self.current_token_kind() {
             TokenKind::Lbrace => Pattern::MatchMapping(self.parse_match_pattern_mapping()),
             TokenKind::Star => {
                 let star_pattern = self.parse_match_pattern_star();
@@ -144,13 +145,18 @@ impl<'src> Parser<'src> {
             _ => self.parse_match_pattern_literal(),
         };
 
-        match self.current_token_kind() {
-            TokenKind::Lpar => Pattern::MatchClass(self.parse_match_pattern_class(lhs, start)),
-            TokenKind::Plus | TokenKind::Minus => {
-                Pattern::MatchValue(self.parse_complex_literal_pattern(lhs, start))
-            }
-            _ => lhs,
+        if self.at(TokenKind::Lpar) {
+            lhs = Pattern::MatchClass(self.parse_match_pattern_class(lhs, start));
         }
+
+        if matches!(
+            self.current_token_kind(),
+            TokenKind::Plus | TokenKind::Minus
+        ) {
+            lhs = Pattern::MatchValue(self.parse_complex_literal_pattern(lhs, start));
+        }
+
+        lhs
     }
 
     /// Parses a mapping pattern.
