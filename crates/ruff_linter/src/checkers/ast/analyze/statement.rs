@@ -1503,7 +1503,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
             }
-            if checker.enabled(Rule::ListAssignReversed) {
+            if checker.enabled(Rule::ListReverseCopy) {
                 refurb::rules::list_assign_reversed(checker, assign);
             }
         }

@@ -39,19 +39,19 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: More on Lists](https://docs.python.org/3/tutorial/datastructures.html#more-on-lists)
 #[violation]
-pub struct ListAssignReversed {
+pub struct ListReverseCopy {
     name: String,
 }
 
-impl AlwaysFixableViolation for ListAssignReversed {
+impl AlwaysFixableViolation for ListReverseCopy {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ListAssignReversed { name } = self;
+        let ListReverseCopy { name } = self;
         format!("Use of assignment of `reversed` on list `{name}`")
     }
 
     fn fix_title(&self) -> String {
-        let ListAssignReversed { name } = self;
+        let ListReverseCopy { name } = self;
         format!("Replace with `{name}.reverse()`")
     }
 }
@@ -83,7 +83,7 @@ pub(crate) fn list_assign_reversed(checker: &mut Checker, assign: &StmtAssign) {
 
     checker.diagnostics.push(
         Diagnostic::new(
-            ListAssignReversed {
+            ListReverseCopy {
                 name: target_expr.id.to_string(),
             },
             assign.range(),
