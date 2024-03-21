@@ -80,9 +80,9 @@ impl AlwaysFixableViolation for BlankLineBetweenMethods {
 /// ## Why is this bad?
 /// PEP 8 recommends exactly two blank lines between top level functions and classes.
 ///
-/// Note: The rule respects the [`lint.isort.lines-after-imports`] setting when determining
-/// the required number of blank lines between top-level `import` statements and function or class definitions
-/// for compatibility with isort.
+/// The rule respects the [`lint.isort.lines-after-imports`] setting when
+/// determining the required number of blank lines between top-level `import`
+/// statements and function or class definitions for compatibility with isort.
 ///
 /// ## Example
 /// ```python
@@ -105,6 +105,9 @@ impl AlwaysFixableViolation for BlankLineBetweenMethods {
 /// ## Typing stub files (`.pyi`)
 /// The typing style guide recommends to not use blank lines between classes and functions except to group
 /// them. That's why this rule is not enabled in typing stub files.
+///
+/// ## Options
+/// - `lint.isort.lines-after-imports`
 ///
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
@@ -165,8 +168,13 @@ impl AlwaysFixableViolation for BlankLinesTopLevel {
 /// The rule allows at most one blank line in typing stub files in accordance to the typing style guide recommendation.
 ///
 /// Note: The rule respects the following `isort` settings when determining the maximum number of blank lines allowed between two statements:
+///
 /// * [`lint.isort.lines-after-imports`]: For top-level statements directly following an import statement.
 /// * [`lint.isort.lines-between-types`]: For `import` statements directly following a `from ... import ...` statement or vice versa.
+///
+/// ## Options
+/// - `lint.isort.lines-after-imports`
+/// - `lint.isort.lines-between-types`
 ///
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
