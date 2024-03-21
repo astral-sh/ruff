@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.3.4
+
+### Preview features
+
+- \[`flake8-simplify`\] Detect implicit `else` cases in `needless-bool` (`SIM103`) ([#10414](https://github.com/astral-sh/ruff/pull/10414))
+- \[`pylint`\] Implement `nan-comparison` (`PLW0117`) ([#10401](https://github.com/astral-sh/ruff/pull/10401))
+- \[`pylint`\] Implement `nonlocal-and-global` (`E115`) ([#10407](https://github.com/astral-sh/ruff/pull/10407))
+- \[`pylint`\] Implement `singledispatchmethod-function` (`PLE5120`) ([#10428](https://github.com/astral-sh/ruff/pull/10428))
+- \[`refurb`\] Implement `list-reverse-copy` (`FURB187`) ([#10212](https://github.com/astral-sh/ruff/pull/10212))
+
+### Rule changes
+
+- \[`flake8-pytest-style`\] Add automatic fix for `pytest-parametrize-values-wrong-type` (`PT007`) ([#10461](https://github.com/astral-sh/ruff/pull/10461))
+- \[`pycodestyle`\] Allow SPDX license headers to exceed the line length (`E501`) ([#10481](https://github.com/astral-sh/ruff/pull/10481))
+
+### Formatter
+
+- Fix unstable formatting for trailing subscript end-of-line comment ([#10492](https://github.com/astral-sh/ruff/pull/10492))
+
+### Bug fixes
+
+- Avoid code comment detection in PEP 723 script tags ([#10464](https://github.com/astral-sh/ruff/pull/10464))
+- Avoid incorrect tuple transformation in single-element case (`C409`) ([#10491](https://github.com/astral-sh/ruff/pull/10491))
+- Bug fix: Prevent fully defined links [`name`](link) from being reformatted ([#10442](https://github.com/astral-sh/ruff/pull/10442))
+- Consider raw source code for `W605` ([#10480](https://github.com/astral-sh/ruff/pull/10480))
+- Docs: Link inline settings when not part of options section ([#10499](https://github.com/astral-sh/ruff/pull/10499))
+- Don't treat annotations as redefinitions in `.pyi` files ([#10512](https://github.com/astral-sh/ruff/pull/10512))
+- Fix `E231` bug: Inconsistent catch compared to pycodestyle, such as when dict nested in list ([#10469](https://github.com/astral-sh/ruff/pull/10469))
+- Fix pylint upstream categories not showing in docs ([#10441](https://github.com/astral-sh/ruff/pull/10441))
+- Add missing `Options` references to blank line docs ([#10498](https://github.com/astral-sh/ruff/pull/10498))
+- 'Revert "F821: Fix false negatives in .py files when `from __future__ import annotations` is active (#10362)"' ([#10513](https://github.com/astral-sh/ruff/pull/10513))
+- Apply NFKC normalization to unicode identifiers in the lexer ([#10412](https://github.com/astral-sh/ruff/pull/10412))
+- Avoid failures due to non-deterministic binding ordering ([#10478](https://github.com/astral-sh/ruff/pull/10478))
+- \[`flake8-bugbear`\] Allow tuples of exceptions (`B030`) ([#10437](https://github.com/astral-sh/ruff/pull/10437))
+- \[`flake8-quotes`\] Avoid syntax errors due to invalid quotes (`Q000, Q002`) ([#10199](https://github.com/astral-sh/ruff/pull/10199))
+
 ## 0.3.3
 
 ### Preview features
