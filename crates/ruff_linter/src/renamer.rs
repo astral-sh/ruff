@@ -4,10 +4,9 @@ use anyhow::{anyhow, Result};
 use itertools::Itertools;
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::str::raw_contents_range;
+use ruff_python_codegen::Stylist;
 use ruff_python_semantic::{Binding, BindingKind, Scope, ScopeId, SemanticModel};
-use ruff_source_file::Locator;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextSize};
 
 pub(crate) struct Renamer;
 
@@ -106,7 +105,7 @@ impl Renamer {
         target: &str,
         scope: &Scope,
         semantic: &SemanticModel,
-        locator: &Locator,
+        stylist: &Stylist,
     ) -> Result<(Edit, Vec<Edit>)> {
         let mut edits = vec![];
 
@@ -134,7 +133,7 @@ impl Renamer {
 
         let scope = scope_id.map_or(scope, |scope_id| &semantic.scopes[scope_id]);
         edits.extend(Renamer::rename_in_scope(
-            name, target, scope, semantic, locator,
+            name, target, scope, semantic, stylist,
         ));
 
         // Find any scopes in which the symbol is referenced as `nonlocal` or `global`. For example,
@@ -166,7 +165,7 @@ impl Renamer {
         {
             let scope = &semantic.scopes[scope_id];
             edits.extend(Renamer::rename_in_scope(
-                name, target, scope, semantic, locator,
+                name, target, scope, semantic, stylist,
             ));
         }
 
@@ -187,7 +186,7 @@ impl Renamer {
         target: &str,
         scope: &Scope,
         semantic: &SemanticModel,
-        locator: &Locator,
+        stylist: &Stylist,
     ) -> Vec<Edit> {
         let mut edits = vec![];
 
@@ -210,21 +209,17 @@ impl Renamer {
                 // Rename the references to the binding.
                 edits.extend(binding.references().map(|reference_id| {
                     let reference = semantic.reference(reference_id);
-                    let range_to_replace = {
+                    let replacement = {
                         if reference.in_dunder_all_definition() {
-                            let reference_source = locator.slice(reference.range());
-                            let relative_range = raw_contents_range(reference_source)
-                                .expect(
-                                    "Expected all references on the r.h.s. of an `__all__` definition to be strings"
-                                );
-                            debug_assert!(!relative_range.is_empty());
-                            relative_range + reference.start()
+                            debug_assert!(!reference.range().is_empty());
+                            let quote = stylist.quote();
+                            format!("{quote}{target}{quote}")
                         } else {
-                            debug_assert!(locator.slice(reference.range()).contains(name));
-                            reference.range()
+                            debug_assert_eq!(TextSize::of(name), reference.range().len());
+                            target.to_string()
                         }
                     };
-                    Edit::range_replacement(target.to_string(), range_to_replace)
+                    Edit::range_replacement(replacement, reference.range())
                 }));
             }
         }

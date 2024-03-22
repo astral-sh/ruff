@@ -9,3 +9,6 @@ if True:
 
 if 1:
     __all__ += ["S" "e" "t"]
+
+if not False:
+    __all__ += ["Se" 't']

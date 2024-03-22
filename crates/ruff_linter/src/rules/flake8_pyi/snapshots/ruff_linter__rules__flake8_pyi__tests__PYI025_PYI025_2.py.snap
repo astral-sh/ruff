@@ -23,8 +23,12 @@ PYI025_2.py:3:29: PYI025 [*] Use `from collections.abc import Set as AbstractSet
 6  6  | 
 7  7  | if True:
 8     |-    __all__ += [r'''Set''']
-   8  |+    __all__ += [r'''AbstractSet''']
+   8  |+    __all__ += ["AbstractSet"]
 9  9  | 
 10 10 | if 1:
 11    |-    __all__ += ["S" "e" "t"]
    11 |+    __all__ += ["AbstractSet"]
+12 12 | 
+13 13 | if not False:
+14    |-    __all__ += ["Se" 't']
+   14 |+    __all__ += ["AbstractSet"]
