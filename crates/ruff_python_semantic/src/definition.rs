@@ -202,7 +202,7 @@ impl<'a> Definitions<'a> {
                             let parent = &definitions[member.parent];
                             if parent.visibility.is_private()
                                 || exports.is_some_and(|exports| {
-                                    !exports.iter().any(|export| export.name == member.name())
+                                    !exports.iter().any(|export| export.name() == member.name())
                                 })
                             {
                                 Visibility::Private
@@ -224,7 +224,7 @@ impl<'a> Definitions<'a> {
                             let parent = &definitions[member.parent];
                             if parent.visibility.is_private()
                                 || exports.is_some_and(|exports| {
-                                    !exports.iter().any(|export| export.name == member.name())
+                                    !exports.iter().any(|export| export.name() == member.name())
                                 })
                             {
                                 Visibility::Private

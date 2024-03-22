@@ -2110,7 +2110,8 @@ impl<'a> Checker<'a> {
             .flatten()
             .collect();
 
-        for DunderAllName { name, range } in exports {
+        for export in exports {
+            let (name, range) = (export.name(), export.range());
             if let Some(binding_id) = self.semantic.global_scope().get(name) {
                 // Mark anything referenced in `__all__` as used.
                 self.semantic
@@ -2120,7 +2121,7 @@ impl<'a> Checker<'a> {
                     if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
                         self.diagnostics.push(Diagnostic::new(
                             pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                                name: (*name).to_string(),
+                                name: name.to_string(),
                             },
                             range,
                         ));
@@ -2130,7 +2131,7 @@ impl<'a> Checker<'a> {
                         if !self.path.ends_with("__init__.py") {
                             self.diagnostics.push(Diagnostic::new(
                                 pyflakes::rules::UndefinedExport {
-                                    name: (*name).to_string(),
+                                    name: name.to_string(),
                                 },
                                 range,
                             ));

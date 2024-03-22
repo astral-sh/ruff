@@ -21,10 +21,16 @@ bitflags! {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DunderAllName<'a> {
     /// The value of the string inside the `__all__` definition
-    pub name: &'a str,
+    name: &'a str,
 
     /// The range of the string inside the `__all__` definition
-    pub range: TextRange,
+    range: TextRange,
+}
+
+impl DunderAllName<'_> {
+    pub fn name(&self) -> &str {
+        self.name
+    }
 }
 
 impl Ranged for DunderAllName<'_> {
