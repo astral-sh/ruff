@@ -2114,9 +2114,11 @@ impl<'a> Checker<'a> {
         for export in exports {
             let (name, range) = (export.name(), export.range());
             if let Some(binding_id) = self.semantic.global_scope().get(name) {
+                self.semantic.flags |= SemanticModelFlags::DUNDER_ALL_DEFINITION;
                 // Mark anything referenced in `__all__` as used.
                 self.semantic
                     .add_global_reference(binding_id, ExprContext::Load, range);
+                self.semantic.flags -= SemanticModelFlags::DUNDER_ALL_DEFINITION;
             } else {
                 if self.semantic.global_scope().uses_star_imports() {
                     if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
