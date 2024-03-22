@@ -1,8 +1,11 @@
+use std::fmt::{Debug, Display, Formatter};
+
 use anyhow::Result;
+use itertools::Itertools;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprSlice, ExprSubscript, ExprTuple, Parameters, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -39,7 +42,7 @@ use crate::importer::{ImportRequest, Importer};
 /// ## References
 #[violation]
 pub struct ReimplementedOperator {
-    operator: &'static str,
+    operator: Operator,
     target: FunctionLikeKind,
 }
 
@@ -71,9 +74,10 @@ pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLik
         return;
     };
     let Some(body) = target.body() else { return };
-    let Some(operator) = get_operator(body, params) else {
+    let Some(operator) = get_operator(checker, body, params) else {
         return;
     };
+    let fix = target.try_fix(&operator, checker.importer(), checker.semantic());
     let mut diagnostic = Diagnostic::new(
         ReimplementedOperator {
             operator,
@@ -81,8 +85,7 @@ pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLik
         },
         target.range(),
     );
-    diagnostic
-        .try_set_optional_fix(|| target.try_fix(operator, checker.importer(), checker.semantic()));
+    diagnostic.try_set_optional_fix(|| fix);
     checker.diagnostics.push(diagnostic);
 }
 
@@ -149,19 +152,24 @@ impl FunctionLike<'_> {
     /// function from `operator` module.
     fn try_fix(
         &self,
-        operator: &'static str,
+        operator: &Operator,
         importer: &Importer,
         semantic: &SemanticModel,
     ) -> Result<Option<Fix>> {
         match self {
             Self::Lambda(_) => {
                 let (edit, binding) = importer.get_or_import_symbol(
-                    &ImportRequest::import("operator", operator),
+                    &ImportRequest::import("operator", operator.name),
                     self.start(),
                     semantic,
                 )?;
+                let content = if let Some(args) = operator.args.as_ref() {
+                    format!("{binding}({args})")
+                } else {
+                    binding
+                };
                 Ok(Some(Fix::safe_edits(
-                    Edit::range_replacement(binding, self.range()),
+                    Edit::range_replacement(content, self.range()),
                     [edit],
                 )))
             }
@@ -170,12 +178,121 @@ impl FunctionLike<'_> {
     }
 }
 
-/// Return the name of the `operator` implemented by the given expression.
-fn get_operator(expr: &Expr, params: &ast::Parameters) -> Option<&'static str> {
+/// Convert the slice expression to the string representation of `slice` call.
+/// For example, expression `1:2` will be `slice(1, 2)`, and `:` will be `slice(None)`.
+fn slice_expr_to_slice_call(checker: &mut Checker, expr_slice: &ExprSlice) -> String {
+    let stringify =
+        |x: Option<&Box<Expr>>| x.map_or("None".into(), |x| checker.generator().expr(x));
+    match (
+        expr_slice.lower.as_ref(),
+        expr_slice.upper.as_ref(),
+        expr_slice.step.as_ref(),
+    ) {
+        (l, u, s @ Some(_)) => format!(
+            "slice({}, {}, {})",
+            stringify(l),
+            stringify(u),
+            stringify(s)
+        ),
+        (None, u, None) => format!("slice({})", stringify(u)),
+        (l @ Some(_), u, None) => format!("slice({}, {})", stringify(l), stringify(u)),
+    }
+}
+
+/// Convert the given expression to a string representation, suitable to be a function argument.
+fn subscript_slice_to_string(checker: &mut Checker, expr: &Expr) -> String {
+    if let Expr::Slice(expr_slice) = expr {
+        slice_expr_to_slice_call(checker, expr_slice)
+    } else {
+        checker.generator().expr(expr)
+    }
+}
+
+/// Return the `operator` implemented by given subscript expression.
+fn itemgetter_op(
+    checker: &mut Checker,
+    expr: &ExprSubscript,
+    params: &Parameters,
+) -> Option<Operator> {
+    let [arg] = params.args.as_slice() else {
+        return None;
+    };
+    if !is_same_expression(arg, &expr.value) {
+        return None;
+    };
+    Some(Operator {
+        name: "itemgetter",
+        args: Some(subscript_slice_to_string(checker, expr.slice.as_ref())),
+    })
+}
+
+/// Return the `operator` implemented by given tuple expression.
+fn itemgetter_op_tuple(
+    checker: &mut Checker,
+    expr: &ExprTuple,
+    params: &Parameters,
+) -> Option<Operator> {
+    let [arg] = params.args.as_slice() else {
+        return None;
+    };
+    if expr.elts.is_empty() {
+        return None;
+    }
+    if !expr.elts.iter().all(|expr| {
+        expr.as_subscript_expr()
+            .is_some_and(|expr| is_same_expression(arg, &expr.value))
+    }) {
+        return None;
+    }
+    Some(Operator {
+        name: "itemgetter",
+        args: Some(
+            expr.elts
+                .iter()
+                .map(|expr| {
+                    subscript_slice_to_string(
+                        checker,
+                        // unwrap is safe, because we check that all elts are subscripts
+                        expr.as_subscript_expr().unwrap().slice.as_ref(),
+                    )
+                })
+                .join(", "),
+        ),
+    })
+}
+
+#[derive(Eq, PartialEq, Debug)]
+struct Operator {
+    name: &'static str,
+    args: Option<String>,
+}
+
+impl From<&'static str> for Operator {
+    fn from(value: &'static str) -> Self {
+        Self {
+            name: value,
+            args: None,
+        }
+    }
+}
+
+impl Display for Operator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)?;
+        self.args
+            .as_ref()
+            .map_or(Ok(()), |args| write!(f, "({args})"))
+    }
+}
+
+/// Return the `operator` implemented by the given expression.
+fn get_operator(checker: &mut Checker, expr: &Expr, params: &ast::Parameters) -> Option<Operator> {
     match expr {
-        Expr::UnaryOp(expr) => unary_op(expr, params),
-        Expr::BinOp(expr) => bin_op(expr, params),
-        Expr::Compare(expr) => cmp_op(expr, params),
+        Expr::UnaryOp(expr) => unary_op(expr, params).map(Into::into),
+        Expr::BinOp(expr) => bin_op(expr, params).map(Into::into),
+        Expr::Compare(expr) => cmp_op(expr, params).map(Into::into),
+        Expr::Subscript(expr) => itemgetter_op(checker, expr, params),
+        Expr::Tuple(expr) => itemgetter_op_tuple(checker, expr, params),
         _ => None,
     }
 }
