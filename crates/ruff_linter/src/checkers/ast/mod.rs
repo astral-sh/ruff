@@ -937,6 +937,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             && !self.semantic.in_deferred_type_definition()
             && self.semantic.in_type_definition()
             && self.semantic.future_annotations()
+            && (self.semantic.in_annotation() || self.source_type.is_stub())
         {
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
                 self.visit.string_type_definitions.push((
