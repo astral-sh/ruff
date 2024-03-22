@@ -18,6 +18,7 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="Snowflake-Labs", name="snowcli", ref="main")),
     Project(repo=Repository(owner="aiven", name="aiven-client", ref="main")),
     Project(repo=Repository(owner="alteryx", name="featuretools", ref="main")),
+    Project(repo=Repository(owner="PlasmaPy", name="PlasmaPy", ref="main")),
     Project(
         repo=Repository(owner="apache", name="airflow", ref="main"),
         check_options=CheckOptions(select="ALL"),
