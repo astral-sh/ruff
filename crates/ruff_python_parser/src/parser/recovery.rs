@@ -16,12 +16,14 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 /// - `PatternMatchAs`: The pattern itself or the name
 /// - `PatternMatchOr`: Binary expression with `|` operator
 ///
-/// The conversion is done with best effort and there are certain limitations:
-/// 1. The sequence pattern is always converted to a list literal even it was
-///    surrounded by parentheses.
-/// 2. The `as` pattern cannot be converted to an expression if both the pattern
-///    and name are present e.g., `case x as y:`. This is because there's no way
-///    to represent this in an expression.
+/// Note that the sequence pattern is always converted to a list literal even
+/// if it was surrounded by parentheses.
+///
+/// # Panics
+///
+/// If the given pattern is a `PatternMatchAs` with both the pattern and name present.
+/// It cannot be converted to an expression without dropping one of them. The caller
+/// needs to handle this case, if it ever occurs.
 pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
     match pattern {
         Pattern::MatchSingleton(ast::PatternMatchSingleton { range, value }) => match value {
@@ -120,23 +122,22 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
             range,
             pattern,
             name,
-        }) => {
-            if let Some(pattern) = pattern {
-                pattern_to_expr(*pattern)
-            } else if let Some(name) = name {
-                Expr::Name(ast::ExprName {
-                    range: name.range,
-                    id: name.id,
-                    ctx: ExprContext::Store,
-                })
-            } else {
-                Expr::Name(ast::ExprName {
-                    range,
-                    id: "_".to_string(),
-                    ctx: ExprContext::Store,
-                })
+        }) => match (pattern, name) {
+            (Some(_), Some(_)) => {
+                panic!("Cannot convert `as` pattern with both pattern and name.")
             }
-        }
+            (Some(pattern), None) => pattern_to_expr(*pattern),
+            (None, Some(name)) => Expr::Name(ast::ExprName {
+                range: name.range,
+                id: name.id,
+                ctx: ExprContext::Store,
+            }),
+            (None, None) => Expr::Name(ast::ExprName {
+                range,
+                id: "_".to_string(),
+                ctx: ExprContext::Store,
+            }),
+        },
         Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
             let to_bin_expr = |left: Pattern, right: Pattern| ast::ExprBinOp {
                 range: TextRange::new(left.start(), right.end()),
