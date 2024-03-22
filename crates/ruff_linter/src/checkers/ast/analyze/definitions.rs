@@ -93,7 +93,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
     }
 
     // Compute visibility of all definitions.
-    let exports: Vec<DunderAllName> = {
+    let exports: Option<Vec<DunderAllName>> = {
         checker
             .semantic
             .global_scope()
@@ -106,7 +106,6 @@ pub(crate) fn definitions(checker: &mut Checker) {
             .fold(None, |acc, names| {
                 Some(acc.into_iter().flatten().chain(names).collect())
             })
-            .unwrap_or_default()
     };
 
     let definitions = std::mem::take(&mut checker.semantic.definitions);
@@ -114,7 +113,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
     for ContextualizedDefinition {
         definition,
         visibility,
-    } in definitions.resolve(&exports).iter()
+    } in definitions.resolve(exports.as_deref()).iter()
     {
         let docstring = docstrings::extraction::extract_docstring(definition);
 
