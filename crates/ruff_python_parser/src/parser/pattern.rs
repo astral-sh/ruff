@@ -15,6 +15,7 @@ const LITERAL_PATTERN_START_SET: TokenSet = TokenSet::new([
     TokenKind::Int,
     TokenKind::Float,
     TokenKind::Complex,
+    TokenKind::Minus, // Unary minus
 ]);
 
 /// The set of tokens that can start a pattern.
@@ -68,7 +69,7 @@ impl<'src> Parser<'src> {
         if self.at(TokenKind::Comma) {
             Pattern::MatchSequence(self.parse_sequence_match_pattern(pattern, start, None))
         } else {
-            // We know it's not a sequenc pattern now, so check for star pattern usage.
+            // We know it's not a sequence pattern now, so check for star pattern usage.
             if pattern.is_match_star() {
                 self.add_error(ParseErrorType::StarPatternUsageError, &pattern);
             }
@@ -470,19 +471,27 @@ impl<'src> Parser<'src> {
                     },
                 })
             }
-            TokenKind::Minus
+            // The `+` is only for better error recovery.
+            TokenKind::Minus | TokenKind::Plus
                 if matches!(
                     self.peek(),
                     TokenKind::Int | TokenKind::Float | TokenKind::Complex
                 ) =>
             {
-                // TODO(dhruvmanila): Shouldn't this be `parse_unary_expression`?
-                let parsed_expr = self.parse_lhs_expression();
+                let unary_expr = self.parse_unary_expression();
 
-                let range = self.node_range(start);
+                if unary_expr.op.is_u_add() {
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "Unary plus is not allowed as a literal pattern".to_string(),
+                        ),
+                        &unary_expr,
+                    );
+                }
+
                 Pattern::MatchValue(ast::PatternMatchValue {
-                    value: Box::new(parsed_expr.expr),
-                    range,
+                    value: Box::new(Expr::UnaryOp(unary_expr)),
+                    range: self.node_range(start),
                 })
             }
             kind => {
@@ -531,59 +540,23 @@ impl<'src> Parser<'src> {
         };
 
         let lhs_value = if let Pattern::MatchValue(lhs) = lhs {
-            match &*lhs.value {
-                expr @ (Expr::NumberLiteral(_)
-                | Expr::UnaryOp(ast::ExprUnaryOp {
-                    op: ast::UnaryOp::USub,
-                    ..
-                })) => {
-                    if !is_real_number(expr) {
-                        self.add_error(
-                            ParseErrorType::OtherError(
-                                "real number required in complex literal".to_string(),
-                            ),
-                            &lhs,
-                        );
-                    }
-                }
-                _ => {
-                    self.add_error(
-                        ParseErrorType::OtherError("invalid lhs pattern".to_string()),
-                        &lhs,
-                    );
-                }
+            if !is_real_number(&lhs.value) {
+                self.add_error(ParseErrorType::ExpectedRealNumber, &lhs);
             }
             lhs.value
         } else {
-            self.add_error(
-                ParseErrorType::OtherError("invalid lhs pattern".to_string()),
-                &lhs,
-            );
+            self.add_error(ParseErrorType::ExpectedRealNumber, &lhs);
             Box::new(recovery::pattern_to_expr(lhs))
         };
 
         let rhs_pattern = self.parse_match_pattern_lhs(AllowStarPattern::No);
         let rhs_value = if let Pattern::MatchValue(rhs) = rhs_pattern {
-            if !matches!(
-                &*rhs.value,
-                Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: ast::Number::Complex { .. },
-                    ..
-                })
-            ) {
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "imaginary number required in complex literal".to_string(),
-                    ),
-                    &rhs,
-                );
+            if !is_complex_number(&rhs.value) {
+                self.add_error(ParseErrorType::ExpectedImaginaryNumber, &rhs);
             }
             rhs.value
         } else {
-            self.add_error(
-                ParseErrorType::OtherError("invalid rhs pattern".to_string()),
-                rhs_pattern.range(),
-            );
+            self.add_error(ParseErrorType::ExpectedImaginaryNumber, &rhs_pattern);
             Box::new(recovery::pattern_to_expr(rhs_pattern))
         };
 
@@ -676,36 +649,33 @@ impl<'src> Parser<'src> {
                     has_seen_pattern = false;
                     has_seen_keyword_pattern = true;
 
-                    let value_pattern = parser.parse_match_pattern(AllowStarPattern::No);
-
-                    // Key can only be an identifier
-                    if let Pattern::MatchAs(ast::PatternMatchAs {
+                    let key = if let Pattern::MatchAs(ast::PatternMatchAs {
                         pattern: None,
-                        name: Some(attr),
+                        name: Some(name),
                         ..
                     }) = pattern
                     {
-                        keywords.push(ast::PatternKeyword {
-                            attr,
-                            pattern: value_pattern,
-                            range: parser.node_range(pattern_start),
-                        });
+                        name
                     } else {
-                        // In case it's not a valid keyword pattern, we'll add an empty identifier
-                        // to indicate that. This is to avoid dropping the parsed value pattern.
-                        keywords.push(ast::PatternKeyword {
-                            attr: ast::Identifier {
-                                id: String::new(),
-                                range: parser.missing_node_range(),
-                            },
-                            pattern: value_pattern,
-                            range: parser.node_range(pattern_start),
-                        });
                         parser.add_error(
-                            ParseErrorType::OtherError("Invalid keyword pattern".to_string()),
-                            parser.node_range(pattern_start),
+                            ParseErrorType::OtherError(
+                                "Expected an identifier for the keyword pattern".to_string(),
+                            ),
+                            &pattern,
                         );
-                    }
+                        ast::Identifier {
+                            id: String::new(),
+                            range: parser.missing_node_range(),
+                        }
+                    };
+
+                    let value_pattern = parser.parse_match_pattern(AllowStarPattern::No);
+
+                    keywords.push(ast::PatternKeyword {
+                        attr: key,
+                        pattern: value_pattern,
+                        range: parser.node_range(pattern_start),
+                    });
                 } else {
                     has_seen_pattern = true;
                     patterns.push(pattern);
@@ -748,14 +718,30 @@ impl AllowStarPattern {
     }
 }
 
-/// Returns `true` if the given expression is a real number.
+/// Returns `true` if the given expression is a real number literal or a unary
+/// addition or subtraction of a real number literal.
 const fn is_real_number(expr: &Expr) -> bool {
     match expr {
         Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Int(_) | ast::Number::Float(_),
             ..
         }) => true,
-        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_real_number(operand),
+        Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::UAdd | ast::UnaryOp::USub,
+            operand,
+            ..
+        }) => is_real_number(operand),
         _ => false,
     }
+}
+
+/// Returns `true` if the given expression is a complex number literal.
+const fn is_complex_number(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Complex { .. },
+            ..
+        })
+    )
 }

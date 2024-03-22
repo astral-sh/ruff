@@ -117,10 +117,16 @@ pub enum ParseErrorType {
     DefaultArgumentError,
     /// A simple statement and a compound statement was found in the same line.
     SimpleStmtAndCompoundStmtInSameLine,
+
     /// An invalid `match` case pattern was found.
     InvalidMatchPatternLiteral { pattern: TokenKind },
     /// A star pattern was found outside a sequence pattern.
     StarPatternUsageError,
+    /// Expected a real number for a complex literal pattern.
+    ExpectedRealNumber,
+    /// Expected an imaginary number for a complex literal pattern.
+    ExpectedImaginaryNumber,
+
     /// The parser expected a specific token that was not found.
     ExpectedToken {
         expected: TokenKind,
@@ -187,6 +193,12 @@ impl std::fmt::Display for ParseErrorType {
             }
             ParseErrorType::StarPatternUsageError => {
                 write!(f, "Star pattern cannot be used here")
+            }
+            ParseErrorType::ExpectedRealNumber => {
+                write!(f, "Expected a real number in complex literal pattern")
+            }
+            ParseErrorType::ExpectedImaginaryNumber => {
+                write!(f, "Expected an imaginary number in complex literal pattern")
             }
             ParseErrorType::UnexpectedIndentation => write!(f, "unexpected indentation"),
             ParseErrorType::InvalidAssignmentTarget => write!(f, "invalid assignment target"),

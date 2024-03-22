@@ -40,7 +40,7 @@ Module(
                                                 range: 72..82,
                                                 attr: Identifier {
                                                     id: "",
-                                                    range: 82..82,
+                                                    range: 80..80,
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
@@ -89,7 +89,7 @@ Module(
                                                 range: 111..120,
                                                 attr: Identifier {
                                                     id: "",
-                                                    range: 120..120,
+                                                    range: 118..118,
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
@@ -138,7 +138,7 @@ Module(
                                                 range: 149..159,
                                                 attr: Identifier {
                                                     id: "",
-                                                    range: 159..159,
+                                                    range: 157..157,
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
@@ -187,7 +187,7 @@ Module(
                                                 range: 188..202,
                                                 attr: Identifier {
                                                     id: "",
-                                                    range: 202..202,
+                                                    range: 200..200,
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
@@ -236,7 +236,7 @@ Module(
                                                 range: 231..234,
                                                 attr: Identifier {
                                                     id: "",
-                                                    range: 234..234,
+                                                    range: 233..233,
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
@@ -285,7 +285,7 @@ Module(
                                                 range: 263..270,
                                                 attr: Identifier {
                                                     id: "",
-                                                    range: 270..270,
+                                                    range: 269..269,
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
@@ -327,7 +327,7 @@ Module(
 1 | # Invalid keyword pattern in class argument
 2 | match subject:
 3 |     case Foo(x as y = 1):
-  |              ^^^^^^^^^^ Syntax Error: Invalid keyword pattern
+  |              ^^^^^^ Syntax Error: Expected an identifier for the keyword pattern
 4 |         pass
 5 |     case Foo(x | y = 1):
   |
@@ -337,7 +337,7 @@ Module(
 3 |     case Foo(x as y = 1):
 4 |         pass
 5 |     case Foo(x | y = 1):
-  |              ^^^^^^^^^ Syntax Error: Invalid keyword pattern
+  |              ^^^^^ Syntax Error: Expected an identifier for the keyword pattern
 6 |         pass
 7 |     case Foo([x, y] = 1):
   |
@@ -347,7 +347,7 @@ Module(
 5 |     case Foo(x | y = 1):
 6 |         pass
 7 |     case Foo([x, y] = 1):
-  |              ^^^^^^^^^^ Syntax Error: Invalid keyword pattern
+  |              ^^^^^^ Syntax Error: Expected an identifier for the keyword pattern
 8 |         pass
 9 |     case Foo({False: 0} = 1):
   |
@@ -357,7 +357,7 @@ Module(
  7 |     case Foo([x, y] = 1):
  8 |         pass
  9 |     case Foo({False: 0} = 1):
-   |              ^^^^^^^^^^^^^^ Syntax Error: Invalid keyword pattern
+   |              ^^^^^^^^^^ Syntax Error: Expected an identifier for the keyword pattern
 10 |         pass
 11 |     case Foo(1=1):
    |
@@ -367,7 +367,7 @@ Module(
  9 |     case Foo({False: 0} = 1):
 10 |         pass
 11 |     case Foo(1=1):
-   |              ^^^ Syntax Error: Invalid keyword pattern
+   |              ^ Syntax Error: Expected an identifier for the keyword pattern
 12 |         pass
 13 |     case Foo(Bar()=1):
    |
@@ -377,7 +377,7 @@ Module(
 11 |     case Foo(1=1):
 12 |         pass
 13 |     case Foo(Bar()=1):
-   |              ^^^^^^^ Syntax Error: Invalid keyword pattern
+   |              ^^^^^ Syntax Error: Expected an identifier for the keyword pattern
 14 |         pass
 15 |     # Positional pattern cannot follow keyword pattern
    |
