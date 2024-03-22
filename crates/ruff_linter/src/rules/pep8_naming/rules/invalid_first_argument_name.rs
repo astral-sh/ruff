@@ -6,6 +6,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::ParameterWithDefault;
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
+use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -239,6 +240,7 @@ pub(crate) fn invalid_first_argument_name(
             parameters,
             checker.semantic(),
             function_type,
+            checker.locator(),
         )
     });
     diagnostics.push(diagnostic);
@@ -251,6 +253,7 @@ fn rename_parameter(
     parameters: &ast::Parameters,
     semantic: &SemanticModel<'_>,
     function_type: FunctionType,
+    locator: &Locator,
 ) -> Result<Option<Fix>> {
     // Don't fix if another parameter has the valid name.
     if parameters
@@ -272,6 +275,7 @@ fn rename_parameter(
         function_type.valid_first_argument_name(),
         scope,
         semantic,
+        locator,
     )?;
     Ok(Some(Fix::unsafe_edits(edit, rest)))
 }

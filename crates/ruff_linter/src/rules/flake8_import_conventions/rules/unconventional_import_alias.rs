@@ -64,8 +64,9 @@ pub(crate) fn unconventional_import_alias(
     let import = binding.as_any_import()?;
     let qualified_name = import.qualified_name().to_string();
     let expected_alias = conventions.get(qualified_name.as_str())?;
+    let locator = checker.locator();
 
-    let name = binding.name(checker.locator());
+    let name = binding.name(locator);
     if binding.is_alias() && name == expected_alias {
         return None;
     }
@@ -82,7 +83,7 @@ pub(crate) fn unconventional_import_alias(
             diagnostic.try_set_fix(|| {
                 let scope = &checker.semantic().scopes[binding.scope];
                 let (edit, rest) =
-                    Renamer::rename(name, expected_alias, scope, checker.semantic())?;
+                    Renamer::rename(name, expected_alias, scope, checker.semantic(), locator)?;
                 Ok(Fix::unsafe_edits(edit, rest))
             });
         }

@@ -4,7 +4,9 @@ use anyhow::{anyhow, Result};
 use itertools::Itertools;
 
 use ruff_diagnostics::Edit;
+use ruff_python_ast::str::raw_contents_range;
 use ruff_python_semantic::{Binding, BindingKind, Scope, ScopeId, SemanticModel};
+use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 pub(crate) struct Renamer;
@@ -104,6 +106,7 @@ impl Renamer {
         target: &str,
         scope: &Scope,
         semantic: &SemanticModel,
+        locator: &Locator,
     ) -> Result<(Edit, Vec<Edit>)> {
         let mut edits = vec![];
 
@@ -130,7 +133,9 @@ impl Renamer {
         });
 
         let scope = scope_id.map_or(scope, |scope_id| &semantic.scopes[scope_id]);
-        edits.extend(Renamer::rename_in_scope(name, target, scope, semantic));
+        edits.extend(Renamer::rename_in_scope(
+            name, target, scope, semantic, locator,
+        ));
 
         // Find any scopes in which the symbol is referenced as `nonlocal` or `global`. For example,
         // given:
@@ -160,7 +165,9 @@ impl Renamer {
             .copied()
         {
             let scope = &semantic.scopes[scope_id];
-            edits.extend(Renamer::rename_in_scope(name, target, scope, semantic));
+            edits.extend(Renamer::rename_in_scope(
+                name, target, scope, semantic, locator,
+            ));
         }
 
         // Deduplicate any edits.
@@ -180,6 +187,7 @@ impl Renamer {
         target: &str,
         scope: &Scope,
         semantic: &SemanticModel,
+        locator: &Locator,
     ) -> Vec<Edit> {
         let mut edits = vec![];
 
@@ -202,7 +210,21 @@ impl Renamer {
                 // Rename the references to the binding.
                 edits.extend(binding.references().map(|reference_id| {
                     let reference = semantic.reference(reference_id);
-                    Edit::range_replacement(target.to_string(), reference.range())
+                    let range_to_replace = {
+                        if reference.in_dunder_all_definition() {
+                            let reference_source = locator.slice(reference.range());
+                            let relative_range = raw_contents_range(reference_source)
+                                .expect(
+                                    "Expected all references on the r.h.s. of an `__all__` definition to be strings"
+                                );
+                            debug_assert!(!relative_range.is_empty());
+                            relative_range + reference.start()
+                        } else {
+                            debug_assert!(locator.slice(reference.range()).contains(name));
+                            reference.range()
+                        }
+                    };
+                    Edit::range_replacement(target.to_string(), range_to_replace)
                 }));
             }
         }

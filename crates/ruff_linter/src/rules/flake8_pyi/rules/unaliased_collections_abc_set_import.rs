@@ -68,7 +68,8 @@ pub(crate) fn unaliased_collections_abc_set_import(
         return None;
     }
 
-    let name = binding.name(checker.locator());
+    let locator = checker.locator();
+    let name = binding.name(locator);
     if name == "AbstractSet" {
         return None;
     }
@@ -77,7 +78,8 @@ pub(crate) fn unaliased_collections_abc_set_import(
     if checker.semantic().is_available("AbstractSet") {
         diagnostic.try_set_fix(|| {
             let scope = &checker.semantic().scopes[binding.scope];
-            let (edit, rest) = Renamer::rename(name, "AbstractSet", scope, checker.semantic())?;
+            let (edit, rest) =
+                Renamer::rename(name, "AbstractSet", scope, checker.semantic(), locator)?;
             Ok(Fix::applicable_edits(
                 edit,
                 rest,
