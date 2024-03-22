@@ -1131,15 +1131,15 @@ impl Flake8ComprehensionsOptions {
 pub struct Flake8CopyrightOptions {
     /// The regular expression used to match the copyright notice, compiled
     /// with the [`regex`](https://docs.rs/regex/latest/regex/) crate.
-    /// Defaults to `(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}([-,]\d{4})*`, which matches
+    /// Defaults to `(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*`, which matches
     /// the following:
     /// - `Copyright 2023`
     /// - `Copyright (C) 2023`
     /// - `Copyright 2021-2023`
     /// - `Copyright (C) 2021-2023`
-    /// - `Copyright (C) 2021,2023`
+    /// - `Copyright (C) 2021, 2023`
     #[option(
-        default = r#"(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}([-,]\d{4})*"#,
+        default = r#"(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*"#,
         value_type = "str",
         example = r#"notice-rgx = "(?i)Copyright \\(C\\) \\d{4}""#
     )]
