@@ -658,7 +658,7 @@ impl<'src> Parser<'src> {
         })
     }
 
-    fn parse_unary_expression(&mut self) -> ast::ExprUnaryOp {
+    pub(super) fn parse_unary_expression(&mut self) -> ast::ExprUnaryOp {
         let start = self.node_start();
 
         let op = UnaryOp::try_from(self.current_token_kind())

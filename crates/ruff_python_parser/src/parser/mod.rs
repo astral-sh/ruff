@@ -989,7 +989,10 @@ impl RecoveryContextKind {
             | RecoveryContextKind::SetElements
             | RecoveryContextKind::TupleElements(_) => p.at_expr(),
             RecoveryContextKind::DictElements => p.at(TokenKind::DoubleStar) || p.at_expr(),
-            RecoveryContextKind::SequenceMatchPattern(_) => p.at_pattern_start(),
+            RecoveryContextKind::SequenceMatchPattern(_) => {
+                // `+` doesn't start any pattern but is here for better error recovery.
+                p.at(TokenKind::Plus) || p.at_pattern_start()
+            }
             RecoveryContextKind::MatchPatternMapping => {
                 // A star pattern is invalid as a mapping key and is here only for
                 // better error recovery.
