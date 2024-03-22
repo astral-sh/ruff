@@ -142,7 +142,38 @@ impl<'src> Parser<'src> {
                 }
                 Pattern::MatchStar(star_pattern)
             }
-            TokenKind::Lpar | TokenKind::Lsqb => self.parse_delimited_match_pattern(),
+            TokenKind::Lpar | TokenKind::Lsqb => {
+                let pattern = self.parse_parenthesized_or_sequence_pattern();
+
+                if matches!(
+                    pattern,
+                    Pattern::MatchAs(ast::PatternMatchAs {
+                        pattern: Some(_),
+                        name: Some(_),
+                        ..
+                    })
+                ) {
+                    // If the pattern is an `as` pattern with both a pattern and a name,
+                    // then it's a parenthesized `as` pattern. For example:
+                    //
+                    // ```python
+                    // match subject:
+                    //     case (x as y):
+                    //         pass
+                    // ```
+                    //
+                    // In this case, we should return early as it's not a valid value
+                    // for the class and complex literal pattern. This would lead to
+                    // panic when trying to convert it to an expression because there's
+                    // no way to represent it in the AST.
+                    //
+                    // We exit early in this case, while in others we continue parsing,
+                    // even if it's invalid because we can recover from it.
+                    return pattern;
+                }
+
+                pattern
+            }
             _ => self.parse_match_pattern_literal(),
         };
 
@@ -188,9 +219,10 @@ impl<'src> Parser<'src> {
                         parser.node_range(mapping_item_start),
                     );
                 }
-                // It's not possible to retain multiple double starred patterns because
-                // of the way the mapping node is represented in the grammar. The last
-                // value will always win.
+                // TODO(dhruvmanila): It's not possible to retain multiple double starred
+                // patterns because of the way the mapping node is represented in the grammar.
+                // The last value will always win. Update the AST representation.
+                // See: https://github.com/astral-sh/ruff/pull/10477#discussion_r1535143536
                 rest = Some(identifier);
             } else {
                 let key = match parser.parse_match_pattern_lhs(AllowStarPattern::No) {
@@ -212,6 +244,10 @@ impl<'src> Parser<'src> {
                             ParseErrorType::OtherError("invalid mapping pattern key".to_string()),
                             &pattern,
                         );
+                        // SAFETY: The `parse_match_pattern_lhs` function can only return
+                        // an `as` pattern if it's parenthesized and the recovery context
+                        // makes sure that this closure is never called in that case.
+                        // This is because `(` is not in the `MAPPING_PATTERN_START_SET`.
                         recovery::pattern_to_expr(pattern)
                     }
                 };
@@ -265,14 +301,14 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Entry point to start parsing a sequence pattern.
+    /// Parses a parenthesized pattern or a sequence pattern.
     ///
     /// # Panics
     ///
     /// If the parser isn't positioned at a `(` or `[` token.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#sequence-patterns>
-    fn parse_delimited_match_pattern(&mut self) -> Pattern {
+    fn parse_parenthesized_or_sequence_pattern(&mut self) -> Pattern {
         let start = self.node_start();
         let parentheses = if self.eat(TokenKind::Lpar) {
             SequenceMatchPatternParentheses::Tuple
