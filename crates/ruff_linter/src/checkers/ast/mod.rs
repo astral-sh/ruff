@@ -31,8 +31,9 @@ use std::path::Path;
 use itertools::Itertools;
 use log::debug;
 use ruff_python_ast::{
-    self as ast, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext, Keyword,
-    MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt, Suite, UnaryOp,
+    self as ast, all::DunderAllName, Comprehension, ElifElseClause, ExceptHandler, Expr,
+    ExprContext, Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt,
+    Suite, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -2097,25 +2098,21 @@ impl<'a> Checker<'a> {
     fn visit_exports(&mut self) {
         let snapshot = self.semantic.snapshot();
 
-        let exports: Vec<(&str, TextRange)> = self
+        let exports: Vec<DunderAllName> = self
             .semantic
             .global_scope()
             .get_all("__all__")
             .map(|binding_id| &self.semantic.bindings[binding_id])
             .filter_map(|binding| match &binding.kind {
-                BindingKind::Export(Export { names }) => {
-                    Some(names.iter().map(|name| (*name, binding.range())))
-                }
+                BindingKind::Export(Export { names }) => Some(names.iter().copied()),
                 _ => None,
             })
             .flatten()
             .collect();
 
-        for (name, range) in exports {
+        for DunderAllName { name, range } in exports {
             if let Some(binding_id) = self.semantic.global_scope().get(name) {
                 // Mark anything referenced in `__all__` as used.
-                // TODO(charlie): `range` here should be the range of the name in `__all__`, not
-                // the range of `__all__` itself.
                 self.semantic
                     .add_global_reference(binding_id, ExprContext::Load, range);
             } else {
