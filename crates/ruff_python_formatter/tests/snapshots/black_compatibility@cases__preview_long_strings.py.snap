@@ -2032,5 +2032,3 @@ log.info(
     f"""Skipping: {'a' == 'b'} {desc['ms_name']} {money=} {dte=} {pos_share=} {desc['status']} {desc['exposure_max']}"""
 )
 ```
-
-

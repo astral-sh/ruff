@@ -1,0 +1,105 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D413.py:1:1: D413 [*] Missing blank line after last section ("Returns")
+  |
+1 | / """Do something.
+2 | | 
+3 | | Args:
+4 | |     x: the value
+5 | |         with a hanging indent
+6 | | 
+7 | | Returns:
+8 | |     the value
+9 | | """
+  | |___^ D413
+  |
+  = help: Add blank line after "Returns"
+
+ℹ Safe fix
+6  6  | 
+7  7  | Returns:
+8  8  |     the value
+   9  |+
+9  10 | """
+10 11 | 
+11 12 | 
+
+D413.py:13:5: D413 [*] Missing blank line after last section ("Returns")
+   |
+12 |   def func():
+13 |       """Do something.
+   |  _____^
+14 | | 
+15 | |     Args:
+16 | |         x: the value
+17 | |             with a hanging indent
+18 | | 
+19 | |     Returns:
+20 | |         the value
+21 | |     """
+   | |_______^ D413
+   |
+   = help: Add blank line after "Returns"
+
+ℹ Safe fix
+18 18 | 
+19 19 |     Returns:
+20 20 |         the value
+   21 |+
+21 22 |     """
+22 23 | 
+23 24 | 
+
+D413.py:52:5: D413 [*] Missing blank line after last section ("Returns")
+   |
+51 |   def func():
+52 |       """Do something.
+   |  _____^
+53 | | 
+54 | |     Args:
+55 | |         x: the value
+56 | |             with a hanging indent
+57 | | 
+58 | |     Returns:
+59 | |         the value"""
+   | |____________________^ D413
+   |
+   = help: Add blank line after "Returns"
+
+ℹ Safe fix
+56 56 |             with a hanging indent
+57 57 | 
+58 58 |     Returns:
+59    |-        the value"""
+   59 |+        the value
+   60 |+
+   61 |+    """
+60 62 | 
+61 63 | 
+62 64 | def func():
+
+D413.py:63:5: D413 [*] Missing blank line after last section ("Returns")
+   |
+62 |   def func():
+63 |       """Do something.
+   |  _____^
+64 | | 
+65 | |     Args:
+66 | |         x: the value
+67 | |             with a hanging indent
+68 | | 
+69 | |     Returns:
+70 | |         the value
+71 | |         """
+   | |___________^ D413
+   |
+   = help: Add blank line after "Returns"
+
+ℹ Safe fix
+68 68 | 
+69 69 |     Returns:
+70 70 |         the value
+71    |-        """
+   71 |+
+   72 |+    """

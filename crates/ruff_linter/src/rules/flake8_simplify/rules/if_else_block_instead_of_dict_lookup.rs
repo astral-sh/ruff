@@ -64,10 +64,10 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_i
     let Expr::Name(ast::ExprName { id: target, .. }) = left.as_ref() else {
         return;
     };
-    if ops != &[CmpOp::Eq] {
+    if **ops != [CmpOp::Eq] {
         return;
     }
-    let [expr] = comparators.as_slice() else {
+    let [expr] = &**comparators else {
         return;
     };
     let Some(literal_expr) = expr.as_literal_expr() else {
@@ -127,10 +127,10 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_i
                 let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
                     return;
                 };
-                if id != target || ops != &[CmpOp::Eq] {
+                if id != target || **ops != [CmpOp::Eq] {
                     return;
                 }
-                let [expr] = comparators.as_slice() else {
+                let [expr] = &**comparators else {
                     return;
                 };
                 let Some(literal_expr) = expr.as_literal_expr() else {

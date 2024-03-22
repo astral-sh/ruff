@@ -14,9 +14,25 @@
 /// assert!(!is_lowercase("ABC"));
 /// assert!(is_lowercase(""));
 /// assert!(is_lowercase("_"));
+/// assert!(is_lowercase("αbc"));
+/// assert!(!is_lowercase("αBC"));
+/// assert!(!is_lowercase("Ωbc"));
 /// ```
 pub fn is_lowercase(s: &str) -> bool {
-    s.chars().all(|c| !c.is_alphabetic() || c.is_lowercase())
+    for (i, &c) in s.as_bytes().iter().enumerate() {
+        match c {
+            // Match against ASCII uppercase characters.
+            b'A'..=b'Z' => return false,
+            _ if c.is_ascii() => {}
+            // If the character is non-ASCII, fallback to slow path.
+            _ => {
+                return s[i..]
+                    .chars()
+                    .all(|c| c.is_lowercase() || !c.is_alphabetic())
+            }
+        }
+    }
+    true
 }
 
 /// Return `true` if a string is uppercase.
@@ -35,9 +51,25 @@ pub fn is_lowercase(s: &str) -> bool {
 /// assert!(!is_uppercase("abc"));
 /// assert!(is_uppercase(""));
 /// assert!(is_uppercase("_"));
+/// assert!(is_uppercase("ΩBC"));
+/// assert!(!is_uppercase("Ωbc"));
+/// assert!(!is_uppercase("αBC"));
 /// ```
 pub fn is_uppercase(s: &str) -> bool {
-    s.chars().all(|c| !c.is_alphabetic() || c.is_uppercase())
+    for (i, &c) in s.as_bytes().iter().enumerate() {
+        match c {
+            // Match against ASCII lowercase characters.
+            b'a'..=b'z' => return false,
+            _ if c.is_ascii() => {}
+            // If the character is non-ASCII, fallback to slow path.
+            _ => {
+                return s[i..]
+                    .chars()
+                    .all(|c| c.is_uppercase() || !c.is_alphabetic())
+            }
+        }
+    }
+    true
 }
 
 /// Return `true` if a string is _cased_ as lowercase.

@@ -631,7 +631,7 @@ pub struct ComparableStringLiteral<'a> {
 impl<'a> From<&'a ast::StringLiteral> for ComparableStringLiteral<'a> {
     fn from(string_literal: &'a ast::StringLiteral) -> Self {
         Self {
-            value: string_literal.value.as_str(),
+            value: &string_literal.value,
         }
     }
 }
@@ -644,7 +644,7 @@ pub struct ComparableBytesLiteral<'a> {
 impl<'a> From<&'a ast::BytesLiteral> for ComparableBytesLiteral<'a> {
     fn from(bytes_literal: &'a ast::BytesLiteral) -> Self {
         Self {
-            value: bytes_literal.value.as_slice(),
+            value: &bytes_literal.value,
         }
     }
 }
@@ -656,7 +656,7 @@ pub struct ExprBoolOp<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprNamedExpr<'a> {
+pub struct ExprNamed<'a> {
     target: Box<ComparableExpr<'a>>,
     value: Box<ComparableExpr<'a>>,
 }
@@ -681,7 +681,7 @@ pub struct ExprLambda<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprIfExp<'a> {
+pub struct ExprIf<'a> {
     test: Box<ComparableExpr<'a>>,
     body: Box<ComparableExpr<'a>>,
     orelse: Box<ComparableExpr<'a>>,
@@ -718,7 +718,7 @@ pub struct ExprDictComp<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprGeneratorExp<'a> {
+pub struct ExprGenerator<'a> {
     elt: Box<ComparableExpr<'a>>,
     generators: Vec<ComparableComprehension<'a>>,
 }
@@ -832,17 +832,17 @@ pub struct ExprIpyEscapeCommand<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ComparableExpr<'a> {
     BoolOp(ExprBoolOp<'a>),
-    NamedExpr(ExprNamedExpr<'a>),
+    NamedExpr(ExprNamed<'a>),
     BinOp(ExprBinOp<'a>),
     UnaryOp(ExprUnaryOp<'a>),
     Lambda(ExprLambda<'a>),
-    IfExp(ExprIfExp<'a>),
+    IfExp(ExprIf<'a>),
     Dict(ExprDict<'a>),
     Set(ExprSet<'a>),
     ListComp(ExprListComp<'a>),
     SetComp(ExprSetComp<'a>),
     DictComp(ExprDictComp<'a>),
-    GeneratorExp(ExprGeneratorExp<'a>),
+    GeneratorExp(ExprGenerator<'a>),
     Await(ExprAwait<'a>),
     Yield(ExprYield<'a>),
     YieldFrom(ExprYieldFrom<'a>),
@@ -889,11 +889,11 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 op: (*op).into(),
                 values: values.iter().map(Into::into).collect(),
             }),
-            ast::Expr::NamedExpr(ast::ExprNamedExpr {
+            ast::Expr::Named(ast::ExprNamed {
                 target,
                 value,
                 range: _,
-            }) => Self::NamedExpr(ExprNamedExpr {
+            }) => Self::NamedExpr(ExprNamed {
                 target: target.into(),
                 value: value.into(),
             }),
@@ -923,12 +923,12 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 parameters: parameters.as_ref().map(Into::into),
                 body: body.into(),
             }),
-            ast::Expr::IfExp(ast::ExprIfExp {
+            ast::Expr::If(ast::ExprIf {
                 test,
                 body,
                 orelse,
                 range: _,
-            }) => Self::IfExp(ExprIfExp {
+            }) => Self::IfExp(ExprIf {
                 test: test.into(),
                 body: body.into(),
                 orelse: orelse.into(),
@@ -973,11 +973,12 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 value: value.into(),
                 generators: generators.iter().map(Into::into).collect(),
             }),
-            ast::Expr::GeneratorExp(ast::ExprGeneratorExp {
+            ast::Expr::Generator(ast::ExprGenerator {
                 elt,
                 generators,
                 range: _,
-            }) => Self::GeneratorExp(ExprGeneratorExp {
+                parenthesized: _,
+            }) => Self::GeneratorExp(ExprGenerator {
                 elt: elt.into(),
                 generators: generators.iter().map(Into::into).collect(),
             }),
@@ -1072,6 +1073,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 elts,
                 ctx: _,
                 range: _,
+                parenthesized: _,
             }) => Self::Tuple(ExprTuple {
                 elts: elts.iter().map(Into::into).collect(),
             }),
@@ -1089,10 +1091,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 kind,
                 value,
                 range: _,
-            }) => Self::IpyEscapeCommand(ExprIpyEscapeCommand {
-                kind: *kind,
-                value: value.as_str(),
-            }),
+            }) => Self::IpyEscapeCommand(ExprIpyEscapeCommand { kind: *kind, value }),
         }
     }
 }
@@ -1537,10 +1536,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 kind,
                 value,
                 range: _,
-            }) => Self::IpyEscapeCommand(StmtIpyEscapeCommand {
-                kind: *kind,
-                value: value.as_str(),
-            }),
+            }) => Self::IpyEscapeCommand(StmtIpyEscapeCommand { kind: *kind, value }),
             ast::Stmt::Expr(ast::StmtExpr { value, range: _ }) => Self::Expr(StmtExpr {
                 value: value.into(),
             }),

@@ -34,6 +34,25 @@ use crate::checkers::ast::Checker;
 ///     ...
 /// ```
 ///
+/// Exceptions that are re-raised will _not_ be flagged, as they're expected to
+/// be caught elsewhere:
+/// ```python
+/// try:
+///     foo()
+/// except BaseException:
+///     raise
+/// ```
+///
+/// Exceptions that are logged via `logging.exception()` or `logging.error()`
+/// with `exc_info` enabled will _not_ be flagged, as this is a common pattern
+/// for propagating exception traces:
+/// ```python
+/// try:
+///     foo()
+/// except BaseException:
+///     logging.exception("Something went wrong")
+/// ```
+///
 /// ## References
 /// - [Python documentation: The `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
 /// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
@@ -121,8 +140,8 @@ pub(crate) fn blind_except(
                     Expr::Name(ast::ExprName { .. }) => {
                         if checker
                             .semantic()
-                            .resolve_call_path(func.as_ref())
-                            .is_some_and(|call_path| match call_path.as_slice() {
+                            .resolve_qualified_name(func.as_ref())
+                            .is_some_and(|qualified_name| match qualified_name.segments() {
                                 ["logging", "exception"] => true,
                                 ["logging", "error"] => {
                                     if let Some(keyword) = arguments.find_keyword("exc_info") {

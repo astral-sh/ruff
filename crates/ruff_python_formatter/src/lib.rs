@@ -1,8 +1,9 @@
 use thiserror::Error;
 use tracing::Level;
 
+pub use range::format_range;
 use ruff_formatter::prelude::*;
-use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
+use ruff_formatter::{format, write, FormatError, Formatted, PrintError, Printed, SourceCode};
 use ruff_python_ast::AstNode;
 use ruff_python_ast::Mod;
 use ruff_python_index::tokens_and_ranges;
@@ -11,13 +12,15 @@ use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
 use crate::comments::{
-    dangling_comments, leading_comments, trailing_comments, Comments, SourceComment,
+    dangling_comments, has_skip_comment, leading_comments, trailing_comments, Comments,
+    SourceComment,
 };
 pub use crate::context::PyFormatContext;
 pub use crate::options::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
     PythonVersion, QuoteStyle,
 };
+use crate::range::is_logical_line;
 pub use crate::shared_traits::{AsFormat, FormattedIter, FormattedIterExt, IntoFormat};
 use crate::verbatim::suppressed_node;
 
@@ -33,6 +36,7 @@ pub(crate) mod other;
 pub(crate) mod pattern;
 mod prelude;
 mod preview;
+mod range;
 mod shared_traits;
 pub(crate) mod statement;
 pub(crate) mod string;
@@ -57,19 +61,27 @@ where
         } else {
             leading_comments(node_comments.leading).fmt(f)?;
 
-            let is_source_map_enabled = f.options().source_map_generation().is_enabled();
+            let node_ref = node.as_any_node_ref();
 
-            if is_source_map_enabled {
-                source_position(node.start()).fmt(f)?;
-            }
+            // Emit source map information for nodes that are valid "narrowing" targets
+            // in range formatting. Never emit source map information if they're disabled
+            // for performance reasons.
+            let emit_source_position = (is_logical_line(node_ref) || node_ref.is_mod_module())
+                && f.options().source_map_generation().is_enabled();
+
+            emit_source_position
+                .then_some(source_position(node.start()))
+                .fmt(f)?;
 
             self.fmt_fields(node, f)?;
 
-            if is_source_map_enabled {
-                source_position(node.end()).fmt(f)?;
-            }
-
-            trailing_comments(node_comments.trailing).fmt(f)
+            write!(
+                f,
+                [
+                    emit_source_position.then_some(source_position(node.end())),
+                    trailing_comments(node_comments.trailing)
+                ]
+            )
         }
     }
 
@@ -123,8 +135,8 @@ pub fn format_module_source(
     let source_type = options.source_type();
     let (tokens, comment_ranges) =
         tokens_and_ranges(source, source_type).map_err(|err| ParseError {
-            offset: err.location,
-            error: ParseErrorType::Lexical(err.error),
+            offset: err.location(),
+            error: ParseErrorType::Lexical(err.into_error()),
         })?;
     let module = parse_tokens(tokens, source, source_type.as_mode())?;
     let formatted = format_module_ast(&module, &comment_ranges, source, options)?;
@@ -170,8 +182,9 @@ mod tests {
     use ruff_python_ast::PySourceType;
     use ruff_python_index::tokens_and_ranges;
     use ruff_python_parser::{parse_tokens, AsMode};
+    use ruff_text_size::{TextRange, TextSize};
 
-    use crate::{format_module_ast, format_module_source, PyFormatOptions};
+    use crate::{format_module_ast, format_module_source, format_range, PyFormatOptions};
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]
@@ -242,6 +255,57 @@ def main() -> None:
         );
     }
 
+    /// Use this test to quickly debug some formatting issue.
+    #[ignore]
+    #[test]
+    fn range_formatting_quick_test() {
+        let source = r#"def convert_str(value: str) -> str:  # Trailing comment
+    """Return a string as-is."""
+
+<RANGE_START>
+
+    return value  # Trailing comment
+<RANGE_END>"#;
+
+        let mut source = source.to_string();
+
+        let start = TextSize::try_from(
+            source
+                .find("<RANGE_START>")
+                .expect("Start marker not found"),
+        )
+        .unwrap();
+
+        source.replace_range(
+            start.to_usize()..start.to_usize() + "<RANGE_START>".len(),
+            "",
+        );
+
+        let end =
+            TextSize::try_from(source.find("<RANGE_END>").expect("End marker not found")).unwrap();
+
+        source.replace_range(end.to_usize()..end.to_usize() + "<RANGE_END>".len(), "");
+
+        let source_type = PySourceType::Python;
+        let options = PyFormatOptions::from_source_type(source_type);
+        let printed = format_range(&source, TextRange::new(start, end), options).unwrap();
+
+        let mut formatted = source.to_string();
+        formatted.replace_range(
+            std::ops::Range::<usize>::from(printed.source_range()),
+            printed.as_code(),
+        );
+
+        assert_eq!(
+            formatted,
+            r#"print ( "format me" )
+print("format me")
+print("format me")
+print ( "format me" )
+print ( "format me" )"#
+        );
+    }
+
     #[test]
     fn string_processing() {
         use crate::prelude::*;
@@ -269,7 +333,7 @@ def main() -> None:
                     while let Some(word) = words.next() {
                         let is_last = words.peek().is_none();
                         let format_word = format_with(|f| {
-                            write!(f, [text(word, None)])?;
+                            write!(f, [text(word)])?;
 
                             if is_last {
                                 write!(f, [token("\"")])?;

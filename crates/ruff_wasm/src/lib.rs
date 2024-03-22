@@ -4,6 +4,7 @@ use js_sys::Error;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
+use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{FormatResult, Formatted, IndentStyle};
 use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
@@ -17,7 +18,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
 use ruff_python_index::{CommentRangesBuilder, Indexer};
 use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{parse_tokens, AsMode, Mode};
+use ruff_python_parser::{parse_tokens, tokenize_all, AsMode, Mode};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, SourceLocation};
 use ruff_text_size::Ranged;
@@ -108,7 +109,8 @@ impl Workspace {
     pub fn new(options: JsValue) -> Result<Workspace, Error> {
         let options: Options = serde_wasm_bindgen::from_value(options).map_err(into_error)?;
         let configuration =
-            Configuration::from_options(options, Path::new(".")).map_err(into_error)?;
+            Configuration::from_options(options, Some(Path::new(".")), Path::new("."))
+                .map_err(into_error)?;
         let settings = configuration
             .into_settings(Path::new("."))
             .map_err(into_error)?;
@@ -272,7 +274,7 @@ struct ParsedModule<'a> {
 
 impl<'a> ParsedModule<'a> {
     fn from_source(source_code: &'a str) -> Result<Self, Error> {
-        let tokens: Vec<_> = ruff_python_parser::lexer::lex(source_code, Mode::Module).collect();
+        let tokens: Vec<_> = tokenize_all(source_code, Mode::Module);
         let mut comment_ranges = CommentRangesBuilder::default();
 
         for (token, range) in tokens.iter().flatten() {
@@ -292,7 +294,8 @@ impl<'a> ParsedModule<'a> {
         // TODO(konstin): Add an options for py/pyi to the UI (2/2)
         let options = settings
             .formatter
-            .to_format_options(PySourceType::default(), self.source_code);
+            .to_format_options(PySourceType::default(), self.source_code)
+            .with_source_map_generation(SourceMapGeneration::Enabled);
 
         format_module_ast(
             &self.module,

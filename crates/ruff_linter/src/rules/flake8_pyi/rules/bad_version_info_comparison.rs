@@ -69,14 +69,14 @@ pub(crate) fn bad_version_info_comparison(checker: &mut Checker, test: &Expr) {
         return;
     };
 
-    let ([op], [_right]) = (ops.as_slice(), comparators.as_slice()) else {
+    let ([op], [_right]) = (&**ops, &**comparators) else {
         return;
     };
 
     if !checker
         .semantic()
-        .resolve_call_path(left)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["sys", "version_info"]))
+        .resolve_qualified_name(left)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["sys", "version_info"]))
     {
         return;
     }

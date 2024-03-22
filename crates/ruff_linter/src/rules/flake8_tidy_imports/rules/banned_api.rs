@@ -2,7 +2,7 @@ use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::from_qualified_name;
+use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -13,18 +13,17 @@ use crate::rules::flake8_tidy_imports::matchers::NameMatchPolicy;
 ///
 /// ## Why is this bad?
 /// Projects may want to ensure that specific modules or module members are
-/// not be imported or accessed.
+/// not imported or accessed.
 ///
 /// Security or other company policies may be a reason to impose
 /// restrictions on importing external Python libraries. In some cases,
 /// projects may adopt conventions around the use of certain modules or
 /// module members that are not enforceable by the language itself.
 ///
-/// This rule enforces certain import conventions project-wide in an
-/// automatic way.
+/// This rule enforces certain import conventions project-wide automatically.
 ///
 /// ## Options
-/// - `flake8-tidy-imports.banned-api`
+/// - `lint.flake8-tidy-imports.banned-api`
 #[violation]
 pub struct BannedApi {
     name: String,
@@ -58,14 +57,18 @@ pub(crate) fn banned_api<T: Ranged>(checker: &mut Checker, policy: &NameMatchPol
 /// TID251
 pub(crate) fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
     let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
+    if banned_api.is_empty() {
+        return;
+    }
+
     if let Some((banned_path, ban)) =
         checker
             .semantic()
-            .resolve_call_path(expr)
-            .and_then(|call_path| {
-                banned_api
-                    .iter()
-                    .find(|(banned_path, ..)| call_path == from_qualified_name(banned_path))
+            .resolve_qualified_name(expr)
+            .and_then(|qualified_name| {
+                banned_api.iter().find(|(banned_path, ..)| {
+                    qualified_name == QualifiedName::from_dotted_name(banned_path)
+                })
             })
     {
         checker.diagnostics.push(Diagnostic::new(

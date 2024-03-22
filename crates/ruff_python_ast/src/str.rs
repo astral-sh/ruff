@@ -1,4 +1,65 @@
+use std::fmt;
+
+use aho_corasick::{AhoCorasick, AhoCorasickKind, Anchored, Input, MatchKind, StartKind};
+use once_cell::sync::Lazy;
+
 use ruff_text_size::{TextLen, TextRange};
+
+/// Enumeration of the two kinds of quotes that can be used
+/// for Python string/f-string/bytestring literals
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq, is_macro::Is)]
+pub enum Quote {
+    /// E.g. `'`
+    Single,
+    /// E.g. `"`
+    #[default]
+    Double,
+}
+
+impl Quote {
+    #[inline]
+    pub const fn as_char(self) -> char {
+        match self {
+            Self::Single => '\'',
+            Self::Double => '"',
+        }
+    }
+
+    #[must_use]
+    #[inline]
+    pub const fn opposite(self) -> Self {
+        match self {
+            Self::Single => Self::Double,
+            Self::Double => Self::Single,
+        }
+    }
+
+    #[inline]
+    pub const fn as_byte(self) -> u8 {
+        match self {
+            Self::Single => b'\'',
+            Self::Double => b'"',
+        }
+    }
+}
+
+impl fmt::Display for Quote {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_char())
+    }
+}
+
+impl TryFrom<char> for Quote {
+    type Error = ();
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        match value {
+            '\'' => Ok(Quote::Single),
+            '"' => Ok(Quote::Double),
+            _ => Err(()),
+        }
+    }
+}
 
 /// Includes all permutations of `r`, `u`, `f`, and `fr` (`ur` is invalid, as is `uf`). This
 /// includes all possible orders, and all possible casings, for both single and triple quotes.
@@ -124,18 +185,6 @@ pub const SINGLE_QUOTE_BYTE_PREFIXES: &[&str] = &[
     "b'",
 ];
 
-#[rustfmt::skip]
-const TRIPLE_QUOTE_SUFFIXES: &[&str] = &[
-    "\"\"\"",
-    "'''",
-];
-
-#[rustfmt::skip]
-const SINGLE_QUOTE_SUFFIXES: &[&str] = &[
-    "\"",
-    "'",
-];
-
 /// Strip the leading and trailing quotes from a string.
 /// Assumes that the string is a valid string literal, but does not verify that the string
 /// is a "simple" string literal (i.e., that it does not contain any implicit concatenations).
@@ -155,28 +204,41 @@ pub fn raw_contents_range(contents: &str) -> Option<TextRange> {
     ))
 }
 
+/// An [`AhoCorasick`] matcher for string and byte literal prefixes.
+static PREFIX_MATCHER: Lazy<AhoCorasick> = Lazy::new(|| {
+    AhoCorasick::builder()
+        .start_kind(StartKind::Anchored)
+        .match_kind(MatchKind::LeftmostLongest)
+        .kind(Some(AhoCorasickKind::DFA))
+        .build(
+            TRIPLE_QUOTE_STR_PREFIXES
+                .iter()
+                .chain(TRIPLE_QUOTE_BYTE_PREFIXES)
+                .chain(SINGLE_QUOTE_STR_PREFIXES)
+                .chain(SINGLE_QUOTE_BYTE_PREFIXES),
+        )
+        .unwrap()
+});
+
 /// Return the leading quote for a string or byte literal (e.g., `"""`).
 pub fn leading_quote(content: &str) -> Option<&str> {
-    TRIPLE_QUOTE_STR_PREFIXES
-        .iter()
-        .chain(TRIPLE_QUOTE_BYTE_PREFIXES)
-        .chain(SINGLE_QUOTE_STR_PREFIXES)
-        .chain(SINGLE_QUOTE_BYTE_PREFIXES)
-        .find_map(|pattern| {
-            if content.starts_with(pattern) {
-                Some(*pattern)
-            } else {
-                None
-            }
-        })
+    let mat = PREFIX_MATCHER.find(Input::new(content).anchored(Anchored::Yes))?;
+    Some(&content[mat.start()..mat.end()])
 }
 
 /// Return the trailing quote string for a string or byte literal (e.g., `"""`).
-pub fn trailing_quote(content: &str) -> Option<&&str> {
-    TRIPLE_QUOTE_SUFFIXES
-        .iter()
-        .chain(SINGLE_QUOTE_SUFFIXES)
-        .find(|&pattern| content.ends_with(pattern))
+pub fn trailing_quote(content: &str) -> Option<&str> {
+    if content.ends_with("'''") {
+        Some("'''")
+    } else if content.ends_with("\"\"\"") {
+        Some("\"\"\"")
+    } else if content.ends_with('\'') {
+        Some("'")
+    } else if content.ends_with('\"') {
+        Some("\"")
+    } else {
+        None
+    }
 }
 
 /// Return `true` if the string is a triple-quote string or byte prefix.

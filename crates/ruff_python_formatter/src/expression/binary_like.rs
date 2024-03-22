@@ -20,7 +20,6 @@ use crate::expression::parentheses::{
 };
 use crate::expression::OperatorPrecedence;
 use crate::prelude::*;
-use crate::preview::is_fix_power_op_line_length_enabled;
 use crate::string::{AnyString, FormatStringContinuation};
 
 #[derive(Copy, Clone, Debug)]
@@ -722,9 +721,7 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
                 {
                     hard_line_break().fmt(f)?;
                 } else if is_pow {
-                    if is_fix_power_op_line_length_enabled(f.context()) {
-                        in_parentheses_only_if_group_breaks(&space()).fmt(f)?;
-                    }
+                    in_parentheses_only_if_group_breaks(&space()).fmt(f)?;
                 } else {
                     space().fmt(f)?;
                 }

@@ -154,7 +154,7 @@ class TabbedIndent:
 		"""check for correct tabbed formatting
 		                            ^^^^^^^^^^
 		Normal indented line
-		  	- autor
+		  	- author
 		"""
 
 
@@ -176,6 +176,7 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -329,7 +330,7 @@ class TabbedIndent:
         """check for correct tabbed formatting
                                     ^^^^^^^^^^
         Normal indented line
-                - autor
+                - author
         """
 
 
@@ -351,6 +352,7 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -504,7 +506,7 @@ class TabbedIndent:
     """check for correct tabbed formatting
                                 ^^^^^^^^^^
     Normal indented line
-            - autor
+            - author
     """
 
 
@@ -526,6 +528,7 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -679,7 +682,7 @@ class TabbedIndent:
 		"""check for correct tabbed formatting
 		                            ^^^^^^^^^^
 		Normal indented line
-		        - autor
+		        - author
 		"""
 
 
@@ -701,6 +704,7 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -854,7 +858,7 @@ class TabbedIndent:
 		"""check for correct tabbed formatting
 		                            ^^^^^^^^^^
 		Normal indented line
-		        - autor
+		        - author
 		"""
 
 
@@ -876,6 +880,7 @@ docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 target_version             = Py38
+source_type                = Python
 ```
 
 ```python
@@ -1029,7 +1034,7 @@ class TabbedIndent:
         """check for correct tabbed formatting
                                     ^^^^^^^^^^
         Normal indented line
-                - autor
+                - author
         """
 
 
@@ -1037,6 +1042,3 @@ def single_quoted():
     "content\ "
     return
 ```
-
-
-

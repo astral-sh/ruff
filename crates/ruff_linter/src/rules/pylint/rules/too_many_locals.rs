@@ -9,7 +9,7 @@ use crate::checkers::ast::Checker;
 /// Checks for functions that include too many local variables.
 ///
 /// By default, this rule allows up to fifteen locals, as configured by the
-/// [`pylint.max-locals`] option.
+/// [`lint.pylint.max-locals`] option.
 ///
 /// ## Why is this bad?
 /// Functions with many local variables are harder to understand and maintain.
@@ -18,7 +18,7 @@ use crate::checkers::ast::Checker;
 /// functions with fewer assignments.
 ///
 /// ## Options
-/// - `pylint.max-locals`
+/// - `lint.pylint.max-locals`
 #[violation]
 pub struct TooManyLocals {
     current_amount: usize,

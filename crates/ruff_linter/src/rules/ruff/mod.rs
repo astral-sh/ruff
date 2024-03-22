@@ -27,10 +27,10 @@ mod tests {
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_0.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_1.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_2.py"))]
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_3.py"))]
     #[test_case(Rule::MutableClassDefault, Path::new("RUF012.py"))]
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
     #[test_case(Rule::PairwiseOverZipped, Path::new("RUF007.py"))]
-    #[test_case(Rule::StaticKeyDictComprehension, Path::new("RUF011.py"))]
     #[test_case(
         Rule::UnnecessaryIterableAllocationForFirstElement,
         Path::new("RUF015.py")
@@ -42,6 +42,15 @@ mod tests {
     #[test_case(Rule::UnnecessaryKeyCheck, Path::new("RUF019.py"))]
     #[test_case(Rule::NeverUnion, Path::new("RUF020.py"))]
     #[test_case(Rule::ParenthesizeChainedOperators, Path::new("RUF021.py"))]
+    #[test_case(Rule::UnsortedDunderAll, Path::new("RUF022.py"))]
+    #[test_case(Rule::UnsortedDunderSlots, Path::new("RUF023.py"))]
+    #[test_case(Rule::MutableFromkeysValue, Path::new("RUF024.py"))]
+    #[test_case(Rule::UnnecessaryDictComprehensionForIterable, Path::new("RUF025.py"))]
+    #[test_case(Rule::DefaultFactoryKwarg, Path::new("RUF026.py"))]
+    #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_0.py"))]
+    #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_1.py"))]
+    #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_2.py"))]
+    #[test_case(Rule::InvalidFormatterSuppressionComment, Path::new("RUF028.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

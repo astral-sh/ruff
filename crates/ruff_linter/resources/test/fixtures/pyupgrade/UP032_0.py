@@ -252,3 +252,10 @@ raise ValueError(
 
 # The dictionary should be parenthesized.
 "{}".format({0: 1}())
+
+# The string shouldn't be converted, since it would require repeating the function call.
+"{x} {x}".format(x=foo())
+"{0} {0}".format(foo())
+
+# The string _should_ be converted, since the function call is repeated in the arguments.
+"{0} {1}".format(foo(), foo())

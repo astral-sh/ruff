@@ -1,0 +1,697 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF023.py:6:17: RUF023 [*] `Klass.__slots__` is not sorted
+  |
+5 | class Klass:
+6 |     __slots__ = ["d", "c", "b", "a"]  # a comment that is untouched
+  |                 ^^^^^^^^^^^^^^^^^^^^ RUF023
+7 |     __slots__ = ("d", "c", "b", "a")
+  |
+  = help: Apply a natural sort to `Klass.__slots__`
+
+ℹ Safe fix
+3 3 | #########################
+4 4 | 
+5 5 | class Klass:
+6   |-    __slots__ = ["d", "c", "b", "a"]  # a comment that is untouched
+  6 |+    __slots__ = ["a", "b", "c", "d"]  # a comment that is untouched
+7 7 |     __slots__ = ("d", "c", "b", "a")
+8 8 | 
+9 9 |     # Quoting style is retained,
+
+RUF023.py:7:17: RUF023 [*] `Klass.__slots__` is not sorted
+  |
+5 | class Klass:
+6 |     __slots__ = ["d", "c", "b", "a"]  # a comment that is untouched
+7 |     __slots__ = ("d", "c", "b", "a")
+  |                 ^^^^^^^^^^^^^^^^^^^^ RUF023
+8 | 
+9 |     # Quoting style is retained,
+  |
+  = help: Apply a natural sort to `Klass.__slots__`
+
+ℹ Safe fix
+4 4 | 
+5 5 | class Klass:
+6 6 |     __slots__ = ["d", "c", "b", "a"]  # a comment that is untouched
+7   |-    __slots__ = ("d", "c", "b", "a")
+  7 |+    __slots__ = ("a", "b", "c", "d")
+8 8 | 
+9 9 |     # Quoting style is retained,
+10 10 |     # but unnecessary parens are not
+
+RUF023.py:11:22: RUF023 [*] `Klass.__slots__` is not sorted
+   |
+ 9 |     # Quoting style is retained,
+10 |     # but unnecessary parens are not
+11 |     __slots__: set = {'b', "c", ((('a')))}
+   |                      ^^^^^^^^^^^^^^^^^^^^^ RUF023
+12 |     # Trailing commas are also not retained for single-line definitions
+13 |     # (but they are in multiline definitions)
+   |
+   = help: Apply a natural sort to `Klass.__slots__`
+
+ℹ Safe fix
+8  8  | 
+9  9  |     # Quoting style is retained,
+10 10 |     # but unnecessary parens are not
+11    |-    __slots__: set = {'b', "c", ((('a')))}
+   11 |+    __slots__: set = {'a', 'b', "c"}
+12 12 |     # Trailing commas are also not retained for single-line definitions
+13 13 |     # (but they are in multiline definitions)
+14 14 |     __slots__: tuple = ("b", "c", "a",)
+
+RUF023.py:14:24: RUF023 [*] `Klass.__slots__` is not sorted
+   |
+12 |     # Trailing commas are also not retained for single-line definitions
+13 |     # (but they are in multiline definitions)
+14 |     __slots__: tuple = ("b", "c", "a",)
+   |                        ^^^^^^^^^^^^^^^^ RUF023
+15 | 
+16 | class Klass2:
+   |
+   = help: Apply a natural sort to `Klass.__slots__`
+
+ℹ Safe fix
+11 11 |     __slots__: set = {'b', "c", ((('a')))}
+12 12 |     # Trailing commas are also not retained for single-line definitions
+13 13 |     # (but they are in multiline definitions)
+14    |-    __slots__: tuple = ("b", "c", "a",)
+   14 |+    __slots__: tuple = ("a", "b", "c")
+15 15 | 
+16 16 | class Klass2:
+17 17 |     if bool():
+
+RUF023.py:18:21: RUF023 [*] `Klass2.__slots__` is not sorted
+   |
+16 | class Klass2:
+17 |     if bool():
+18 |         __slots__ = {"x": "docs for x", "m": "docs for m", "a": "docs for a"}
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023
+19 |     else:
+20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+   |
+   = help: Apply a natural sort to `Klass2.__slots__`
+
+ℹ Safe fix
+15 15 | 
+16 16 | class Klass2:
+17 17 |     if bool():
+18    |-        __slots__ = {"x": "docs for x", "m": "docs for m", "a": "docs for a"}
+   18 |+        __slots__ = {"a": "docs for a", "m": "docs for m", "x": "docs for x"}
+19 19 |     else:
+20 20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+21 21 | 
+
+RUF023.py:20:21: RUF023 [*] `Klass2.__slots__` is not sorted
+   |
+18 |         __slots__ = {"x": "docs for x", "m": "docs for m", "a": "docs for a"}
+19 |     else:
+20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+   |                     ^^^^^^^^^^^^^^^^^^^^^^ RUF023
+21 | 
+22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
+   |
+   = help: Apply a natural sort to `Klass2.__slots__`
+
+ℹ Safe fix
+17 17 |     if bool():
+18 18 |         __slots__ = {"x": "docs for x", "m": "docs for m", "a": "docs for a"}
+19 19 |     else:
+20    |-        __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+   20 |+        __slots__ = "foo1", "foo2", "foo3"  # NB: an implicit tuple (without parens)
+21 21 | 
+22 22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
+23 23 |     __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
+
+RUF023.py:22:28: RUF023 [*] `Klass2.__slots__` is not sorted
+   |
+20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+21 | 
+22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023
+23 |     __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
+24 |     # we use natural sort,
+   |
+   = help: Apply a natural sort to `Klass2.__slots__`
+
+ℹ Safe fix
+19 19 |     else:
+20 20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+21 21 | 
+22    |-    __slots__: list[str] = ["the", "three", "little", "pigs"]
+   22 |+    __slots__: list[str] = ["little", "pigs", "the", "three"]
+23 23 |     __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
+24 24 |     # we use natural sort,
+25 25 |     # not alphabetical sort or "isort-style" sort
+
+RUF023.py:23:17: RUF023 [*] `Klass2.__slots__` is not sorted
+   |
+22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
+23 |     __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023
+24 |     # we use natural sort,
+25 |     # not alphabetical sort or "isort-style" sort
+   |
+   = help: Apply a natural sort to `Klass2.__slots__`
+
+ℹ Safe fix
+20 20 |         __slots__ = "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+21 21 | 
+22 22 |     __slots__: list[str] = ["the", "three", "little", "pigs"]
+23    |-    __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
+   23 |+    __slots__ = "an_unparenthesized_tuple", "in", "parenthesized_item"
+24 24 |     # we use natural sort,
+25 25 |     # not alphabetical sort or "isort-style" sort
+26 26 |     __slots__ = {"aadvark237", "aadvark10092", "aadvark174", "aadvark532"}
+
+RUF023.py:26:17: RUF023 [*] `Klass2.__slots__` is not sorted
+   |
+24 |     # we use natural sort,
+25 |     # not alphabetical sort or "isort-style" sort
+26 |     __slots__ = {"aadvark237", "aadvark10092", "aadvark174", "aadvark532"}
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023
+27 | 
+28 | ############################
+   |
+   = help: Apply a natural sort to `Klass2.__slots__`
+
+ℹ Safe fix
+23 23 |     __slots__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
+24 24 |     # we use natural sort,
+25 25 |     # not alphabetical sort or "isort-style" sort
+26    |-    __slots__ = {"aadvark237", "aadvark10092", "aadvark174", "aadvark532"}
+   26 |+    __slots__ = {"aadvark174", "aadvark237", "aadvark532", "aadvark10092"}
+27 27 | 
+28 28 | ############################
+29 29 | # Neat multiline definitions
+
+RUF023.py:33:17: RUF023 [*] `Klass3.__slots__` is not sorted
+   |
+32 |   class Klass3:
+33 |       __slots__ = (
+   |  _________________^
+34 | |         "d0",
+35 | |         "c0",  # a comment regarding 'c0'
+36 | |         "b0",
+37 | |         # a comment regarding 'a0':
+38 | |         "a0"
+39 | |     )
+   | |_____^ RUF023
+40 |       __slots__ = [
+41 |           "d",
+   |
+   = help: Apply a natural sort to `Klass3.__slots__`
+
+ℹ Safe fix
+31 31 | 
+32 32 | class Klass3:
+33 33 |     __slots__ = (
+34    |-        "d0",
+   34 |+        # a comment regarding 'a0':
+   35 |+        "a0",
+   36 |+        "b0",
+35 37 |         "c0",  # a comment regarding 'c0'
+36    |-        "b0",
+37    |-        # a comment regarding 'a0':
+38    |-        "a0"
+   38 |+        "d0"
+39 39 |     )
+40 40 |     __slots__ = [
+41 41 |         "d",
+
+RUF023.py:40:17: RUF023 [*] `Klass3.__slots__` is not sorted
+   |
+38 |           "a0"
+39 |       )
+40 |       __slots__ = [
+   |  _________________^
+41 | |         "d",
+42 | |         "c",  # a comment regarding 'c'
+43 | |         "b",
+44 | |         # a comment regarding 'a':
+45 | |         "a"
+46 | |     ]
+   | |_____^ RUF023
+47 |   
+48 |   ##################################
+   |
+   = help: Apply a natural sort to `Klass3.__slots__`
+
+ℹ Safe fix
+38 38 |         "a0"
+39 39 |     )
+40 40 |     __slots__ = [
+41    |-        "d",
+   41 |+        # a comment regarding 'a':
+   42 |+        "a",
+   43 |+        "b",
+42 44 |         "c",  # a comment regarding 'c'
+43    |-        "b",
+44    |-        # a comment regarding 'a':
+45    |-        "a"
+   45 |+        "d"
+46 46 |     ]
+47 47 | 
+48 48 | ##################################
+
+RUF023.py:54:17: RUF023 [*] `Klass4.__slots__` is not sorted
+   |
+52 |   class Klass4:
+53 |       # comment0
+54 |       __slots__ = ("d", "a",  # comment1
+   |  _________________^
+55 | |             # comment2
+56 | |             "f", "b",
+57 | |                                             "strangely",  # comment3
+58 | |                 # comment4
+59 | |         "formatted",
+60 | |         # comment5
+61 | |     )  # comment6
+   | |_____^ RUF023
+62 |       # comment7
+   |
+   = help: Apply a natural sort to `Klass4.__slots__`
+
+ℹ Safe fix
+51 51 | 
+52 52 | class Klass4:
+53 53 |     # comment0
+54    |-    __slots__ = ("d", "a",  # comment1
+55    |-            # comment2
+56    |-            "f", "b",
+57    |-                                            "strangely",  # comment3
+58    |-                # comment4
+   54 |+    __slots__ = (
+   55 |+        "a",
+   56 |+        "b",
+   57 |+        "d",  # comment1
+   58 |+        # comment2
+   59 |+        "f",
+   60 |+        # comment4
+59 61 |         "formatted",
+   62 |+        "strangely",  # comment3
+60 63 |         # comment5
+61 64 |     )  # comment6
+62 65 |     # comment7
+
+RUF023.py:64:17: RUF023 [*] `Klass4.__slots__` is not sorted
+   |
+62 |       # comment7
+63 |   
+64 |       __slots__ = [  # comment0
+   |  _________________^
+65 | |         # comment1
+66 | |         # comment2
+67 | |         "dx", "cx", "bx", "ax"  # comment3
+68 | |         # comment4
+69 | |         # comment5
+70 | |         # comment6
+71 | |     ]  # comment7
+   | |_____^ RUF023
+72 |   
+73 |   # from cpython/Lib/pathlib/__init__.py
+   |
+   = help: Apply a natural sort to `Klass4.__slots__`
+
+ℹ Safe fix
+62 62 |     # comment7
+63 63 | 
+64 64 |     __slots__ = [  # comment0
+   65 |+        "ax",
+   66 |+        "bx",
+   67 |+        "cx",
+65 68 |         # comment1
+66 69 |         # comment2
+67    |-        "dx", "cx", "bx", "ax"  # comment3
+   70 |+        "dx"  # comment3
+68 71 |         # comment4
+69 72 |         # comment5
+70 73 |         # comment6
+
+RUF023.py:75:17: RUF023 [*] `PurePath.__slots__` is not sorted
+    |
+ 73 |   # from cpython/Lib/pathlib/__init__.py
+ 74 |   class PurePath:
+ 75 |       __slots__ = (
+    |  _________________^
+ 76 | |         # The `_raw_paths` slot stores unnormalized string paths. This is set
+ 77 | |         # in the `__init__()` method.
+ 78 | |         '_raw_paths',
+ 79 | | 
+ 80 | |         # The `_drv`, `_root` and `_tail_cached` slots store parsed and
+ 81 | |         # normalized parts of the path. They are set when any of the `drive`,
+ 82 | |         # `root` or `_tail` properties are accessed for the first time. The
+ 83 | |         # three-part division corresponds to the result of
+ 84 | |         # `os.path.splitroot()`, except that the tail is further split on path
+ 85 | |         # separators (i.e. it is a list of strings), and that the root and
+ 86 | |         # tail are normalized.
+ 87 | |         '_drv', '_root', '_tail_cached',
+ 88 | | 
+ 89 | |         # The `_str` slot stores the string representation of the path,
+ 90 | |         # computed from the drive, root and tail when `__str__()` is called
+ 91 | |         # for the first time. It's used to implement `_str_normcase`
+ 92 | |         '_str',
+ 93 | | 
+ 94 | |         # The `_str_normcase_cached` slot stores the string path with
+ 95 | |         # normalized case. It is set when the `_str_normcase` property is
+ 96 | |         # accessed for the first time. It's used to implement `__eq__()`
+ 97 | |         # `__hash__()`, and `_parts_normcase`
+ 98 | |         '_str_normcase_cached',
+ 99 | | 
+100 | |         # The `_parts_normcase_cached` slot stores the case-normalized
+101 | |         # string path after splitting on path separators. It's set when the
+102 | |         # `_parts_normcase` property is accessed for the first time. It's used
+103 | |         # to implement comparison methods like `__lt__()`.
+104 | |         '_parts_normcase_cached',
+105 | | 
+106 | |         # The `_hash` slot stores the hash of the case-normalized string
+107 | |         # path. It's set when `__hash__()` is called for the first time.
+108 | |         '_hash',
+109 | |     )
+    | |_____^ RUF023
+110 |   
+111 |   # From cpython/Lib/pickletools.py
+    |
+    = help: Apply a natural sort to `PurePath.__slots__`
+
+ℹ Safe fix
+73  73  | # from cpython/Lib/pathlib/__init__.py
+74  74  | class PurePath:
+75  75  |     __slots__ = (
+76      |-        # The `_raw_paths` slot stores unnormalized string paths. This is set
+77      |-        # in the `__init__()` method.
+78      |-        '_raw_paths',
+79      |-
+80  76  |         # The `_drv`, `_root` and `_tail_cached` slots store parsed and
+81  77  |         # normalized parts of the path. They are set when any of the `drive`,
+82  78  |         # `root` or `_tail` properties are accessed for the first time. The
+--------------------------------------------------------------------------------
+84  80  |         # `os.path.splitroot()`, except that the tail is further split on path
+85  81  |         # separators (i.e. it is a list of strings), and that the root and
+86  82  |         # tail are normalized.
+87      |-        '_drv', '_root', '_tail_cached',
+88      |-
+    83  |+        '_drv',
+    84  |+        # The `_hash` slot stores the hash of the case-normalized string
+    85  |+        # path. It's set when `__hash__()` is called for the first time.
+    86  |+        '_hash',
+    87  |+        # The `_parts_normcase_cached` slot stores the case-normalized
+    88  |+        # string path after splitting on path separators. It's set when the
+    89  |+        # `_parts_normcase` property is accessed for the first time. It's used
+    90  |+        # to implement comparison methods like `__lt__()`.
+    91  |+        '_parts_normcase_cached',
+    92  |+        # The `_raw_paths` slot stores unnormalized string paths. This is set
+    93  |+        # in the `__init__()` method.
+    94  |+        '_raw_paths',
+    95  |+        '_root',
+89  96  |         # The `_str` slot stores the string representation of the path,
+90  97  |         # computed from the drive, root and tail when `__str__()` is called
+91  98  |         # for the first time. It's used to implement `_str_normcase`
+92  99  |         '_str',
+93      |-
+94  100 |         # The `_str_normcase_cached` slot stores the string path with
+95  101 |         # normalized case. It is set when the `_str_normcase` property is
+96  102 |         # accessed for the first time. It's used to implement `__eq__()`
+97  103 |         # `__hash__()`, and `_parts_normcase`
+98  104 |         '_str_normcase_cached',
+99      |-
+100     |-        # The `_parts_normcase_cached` slot stores the case-normalized
+101     |-        # string path after splitting on path separators. It's set when the
+102     |-        # `_parts_normcase` property is accessed for the first time. It's used
+103     |-        # to implement comparison methods like `__lt__()`.
+104     |-        '_parts_normcase_cached',
+105     |-
+106     |-        # The `_hash` slot stores the hash of the case-normalized string
+107     |-        # path. It's set when `__hash__()` is called for the first time.
+108     |-        '_hash',
+    105 |+        '_tail_cached',
+109 106 |     )
+110 107 | 
+111 108 | # From cpython/Lib/pickletools.py
+
+RUF023.py:113:17: RUF023 [*] `ArgumentDescriptor.__slots__` is not sorted
+    |
+111 |   # From cpython/Lib/pickletools.py
+112 |   class ArgumentDescriptor(object):
+113 |       __slots__ = (
+    |  _________________^
+114 | |         # name of descriptor record, also a module global name; a string
+115 | |         'name',
+116 | | 
+117 | |         # length of argument, in bytes; an int; UP_TO_NEWLINE and
+118 | |         # TAKEN_FROM_ARGUMENT{1,4,8} are negative values for variable-length
+119 | |         # cases
+120 | |         'n',
+121 | | 
+122 | |         # a function taking a file-like object, reading this kind of argument
+123 | |         # from the object at the current position, advancing the current
+124 | |         # position by n bytes, and returning the value of the argument
+125 | |         'reader',
+126 | | 
+127 | |         # human-readable docs for this arg descriptor; a string
+128 | |         'doc',
+129 | |     )
+    | |_____^ RUF023
+130 |   
+131 |   ####################################
+    |
+    = help: Apply a natural sort to `ArgumentDescriptor.__slots__`
+
+ℹ Safe fix
+111 111 | # From cpython/Lib/pickletools.py
+112 112 | class ArgumentDescriptor(object):
+113 113 |     __slots__ = (
+114     |-        # name of descriptor record, also a module global name; a string
+115     |-        'name',
+116     |-
+    114 |+        # human-readable docs for this arg descriptor; a string
+    115 |+        'doc',
+117 116 |         # length of argument, in bytes; an int; UP_TO_NEWLINE and
+118 117 |         # TAKEN_FROM_ARGUMENT{1,4,8} are negative values for variable-length
+119 118 |         # cases
+120 119 |         'n',
+121     |-
+    120 |+        # name of descriptor record, also a module global name; a string
+    121 |+        'name',
+122 122 |         # a function taking a file-like object, reading this kind of argument
+123 123 |         # from the object at the current position, advancing the current
+124 124 |         # position by n bytes, and returning the value of the argument
+125 125 |         'reader',
+126     |-
+127     |-        # human-readable docs for this arg descriptor; a string
+128     |-        'doc',
+129 126 |     )
+130 127 | 
+131 128 | ####################################
+
+RUF023.py:138:17: RUF023 `SlotUser.__slots__` is not sorted
+    |
+136 |   # Multiline dicts are out of scope.
+137 |   class SlotUser:
+138 |       __slots__ = {'power': 'measured in kilowatts',
+    |  _________________^
+139 | |                  'distance': 'measured in kilometers'}
+    | |______________________________________________________^ RUF023
+140 |   
+141 |   class Klass5:
+    |
+    = help: Apply a natural sort to `SlotUser.__slots__`
+
+RUF023.py:142:17: RUF023 `Klass5.__slots__` is not sorted
+    |
+141 |   class Klass5:
+142 |       __slots__ = (
+    |  _________________^
+143 | |         "look",
+144 | |         (
+145 | |             "a_veeeeeeeeeeeeeeeeeeery_long_parenthesized_item"
+146 | |         ),
+147 | |     )
+    | |_____^ RUF023
+148 |       __slots__ = (
+149 |           "b",
+    |
+    = help: Apply a natural sort to `Klass5.__slots__`
+
+RUF023.py:148:17: RUF023 `Klass5.__slots__` is not sorted
+    |
+146 |           ),
+147 |       )
+148 |       __slots__ = (
+    |  _________________^
+149 | |         "b",
+150 | |         ((
+151 | |             "c"
+152 | |         )),
+153 | |         "a"
+154 | |     )
+    | |_____^ RUF023
+155 |       __slots__ = ("don't" "care" "about", "__slots__" "with", "concatenated" "strings")
+    |
+    = help: Apply a natural sort to `Klass5.__slots__`
+
+RUF023.py:155:17: RUF023 `Klass5.__slots__` is not sorted
+    |
+153 |         "a"
+154 |     )
+155 |     __slots__ = ("don't" "care" "about", "__slots__" "with", "concatenated" "strings")
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF023
+156 | 
+157 | ############################################################
+    |
+    = help: Apply a natural sort to `Klass5.__slots__`
+
+RUF023.py:162:17: RUF023 [*] `BezierBuilder.__slots__` is not sorted
+    |
+161 |   class BezierBuilder:
+162 |       __slots__ = ('xp', 'yp',
+    |  _________________^
+163 | |                  'canvas',)
+    | |___________________________^ RUF023
+164 |   
+165 |   class BezierBuilder2:
+    |
+    = help: Apply a natural sort to `BezierBuilder.__slots__`
+
+ℹ Safe fix
+159 159 | ############################################################
+160 160 | 
+161 161 | class BezierBuilder:
+162     |-    __slots__ = ('xp', 'yp',
+163     |-                 'canvas',)
+    162 |+    __slots__ = (
+    163 |+        'canvas',
+    164 |+        'xp',
+    165 |+        'yp',
+    166 |+    )
+164 167 | 
+165 168 | class BezierBuilder2:
+166 169 |     __slots__ = {'xp', 'yp',
+
+RUF023.py:166:17: RUF023 [*] `BezierBuilder2.__slots__` is not sorted
+    |
+165 |   class BezierBuilder2:
+166 |       __slots__ = {'xp', 'yp',
+    |  _________________^
+167 | |                  'canvas'      ,          }
+    | |___________________________________________^ RUF023
+168 |   
+169 |   class BezierBuilder3:
+    |
+    = help: Apply a natural sort to `BezierBuilder2.__slots__`
+
+ℹ Safe fix
+163 163 |                  'canvas',)
+164 164 | 
+165 165 | class BezierBuilder2:
+166     |-    __slots__ = {'xp', 'yp',
+167     |-                 'canvas'      ,          }
+    166 |+    __slots__ = {
+    167 |+        'canvas',
+    168 |+        'xp',
+    169 |+        'yp'      ,          }
+168 170 | 
+169 171 | class BezierBuilder3:
+170 172 |     __slots__ = ['xp', 'yp',
+
+RUF023.py:170:17: RUF023 [*] `BezierBuilder3.__slots__` is not sorted
+    |
+169 |   class BezierBuilder3:
+170 |       __slots__ = ['xp', 'yp',
+    |  _________________^
+171 | |                  'canvas'
+172 | | 
+173 | |                  # very strangely placed comment
+174 | | 
+175 | |                  ,
+176 | | 
+177 | |                  # another strangely placed comment
+178 | |                  ]
+    | |__________________^ RUF023
+179 |   
+180 |   class BezierBuilder4:
+    |
+    = help: Apply a natural sort to `BezierBuilder3.__slots__`
+
+ℹ Safe fix
+167 167 |                  'canvas'      ,          }
+168 168 | 
+169 169 | class BezierBuilder3:
+170     |-    __slots__ = ['xp', 'yp',
+171     |-                 'canvas'
+    170 |+    __slots__ = [
+    171 |+        'canvas',
+    172 |+        'xp',
+    173 |+        'yp'
+172 174 | 
+173 175 |                  # very strangely placed comment
+174 176 | 
+
+RUF023.py:181:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
+    |
+180 |   class BezierBuilder4:
+181 |       __slots__ = (
+    |  _________________^
+182 | |         "foo"
+183 | |         # strange comment 1
+184 | |         ,
+185 | |         # comment about bar
+186 | |         "bar"
+187 | |         # strange comment 2
+188 | |         ,
+189 | |     )
+    | |_____^ RUF023
+190 |   
+191 |       __slots__ = {"foo", "bar",
+    |
+    = help: Apply a natural sort to `BezierBuilder4.__slots__`
+
+ℹ Safe fix
+179 179 | 
+180 180 | class BezierBuilder4:
+181 181 |     __slots__ = (
+182     |-        "foo"
+183 182 |         # strange comment 1
+184     |-        ,
+185 183 |         # comment about bar
+186     |-        "bar"
+    184 |+        "bar",
+    185 |+        "foo"
+187 186 |         # strange comment 2
+188 187 |         ,
+189 188 |     )
+
+RUF023.py:191:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
+    |
+189 |       )
+190 |   
+191 |       __slots__ = {"foo", "bar",
+    |  _________________^
+192 | |                  "baz", "bingo"
+193 | |                  }
+    | |__________________^ RUF023
+194 |   
+195 |   ###################################
+    |
+    = help: Apply a natural sort to `BezierBuilder4.__slots__`
+
+ℹ Safe fix
+188 188 |         ,
+189 189 |     )
+190 190 | 
+191     |-    __slots__ = {"foo", "bar",
+192     |-                 "baz", "bingo"
+193     |-                 }
+    191 |+    __slots__ = {
+    192 |+        "bar",
+    193 |+        "baz",
+    194 |+        "bingo",
+    195 |+        "foo"
+    196 |+    }
+194 197 | 
+195 198 | ###################################
+196 199 | # These should all not get flagged:
+
+

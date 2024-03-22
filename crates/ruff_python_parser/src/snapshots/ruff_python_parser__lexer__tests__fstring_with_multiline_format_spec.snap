@@ -4,13 +4,27 @@ expression: lex_source(source)
 ---
 [
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: true,
+                quote_style: Single,
+            },
+        ),
         0..4,
     ),
     (
         FStringMiddle {
             value: "__",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: true,
+                quote_style: Single,
+            },
         },
         4..6,
     ),
@@ -35,7 +49,13 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "d\n",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: true,
+                quote_style: Single,
+            },
         },
         14..16,
     ),
@@ -46,7 +66,13 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "__",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: true,
+                quote_style: Single,
+            },
         },
         17..19,
     ),
@@ -59,13 +85,27 @@ expression: lex_source(source)
         22..23,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: true,
+                quote_style: Single,
+            },
+        ),
         23..27,
     ),
     (
         FStringMiddle {
             value: "__",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: true,
+                quote_style: Single,
+            },
         },
         27..29,
     ),
@@ -90,7 +130,13 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "a\n        b\n          c\n",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: true,
+                quote_style: Single,
+            },
         },
         37..61,
     ),
@@ -101,7 +147,13 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "__",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: true,
+                quote_style: Single,
+            },
         },
         62..64,
     ),
@@ -114,13 +166,27 @@ expression: lex_source(source)
         67..68,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: false,
+                quote_style: Single,
+            },
+        ),
         68..70,
     ),
     (
         FStringMiddle {
             value: "__",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         70..72,
     ),
@@ -145,7 +211,13 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "d",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         80..81,
     ),
@@ -160,7 +232,13 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "__",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         83..85,
     ),
@@ -173,13 +251,27 @@ expression: lex_source(source)
         86..87,
     ),
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: false,
+                quote_style: Single,
+            },
+        ),
         87..89,
     ),
     (
         FStringMiddle {
             value: "__",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         89..91,
     ),
@@ -204,7 +296,13 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "a",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         99..100,
     ),
@@ -229,7 +327,13 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: "__",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: false,
+                quote_style: Single,
+            },
         },
         112..114,
     ),

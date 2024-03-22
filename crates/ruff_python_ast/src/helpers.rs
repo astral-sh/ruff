@@ -2,13 +2,12 @@ use std::borrow::Cow;
 use std::path::Path;
 
 use rustc_hash::FxHashMap;
-use smallvec::SmallVec;
 
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::{indentation_at_offset, CommentRanges, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::call_path::CallPath;
+use crate::name::{QualifiedName, QualifiedNameBuilder};
 use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::StatementVisitor;
 use crate::visitor::Visitor;
@@ -52,12 +51,12 @@ where
         // Accept empty initializers.
         if let Expr::Call(ast::ExprCall {
             func,
-            arguments: Arguments { args, keywords, .. },
+            arguments,
             range: _,
         }) = expr
         {
             // Ex) `list()`
-            if args.is_empty() && keywords.is_empty() {
+            if arguments.is_empty() {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if !is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
                         return true;
@@ -116,7 +115,7 @@ where
             Expr::Await(_)
                 | Expr::Call(_)
                 | Expr::DictComp(_)
-                | Expr::GeneratorExp(_)
+                | Expr::Generator(_)
                 | Expr::ListComp(_)
                 | Expr::SetComp(_)
                 | Expr::Subscript(_)
@@ -140,7 +139,7 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         Expr::FString(ast::ExprFString { value, .. }) => value
             .elements()
             .any(|expr| any_over_f_string_element(expr, func)),
-        Expr::NamedExpr(ast::ExprNamedExpr {
+        Expr::Named(ast::ExprNamed {
             target,
             value,
             range: _,
@@ -150,7 +149,7 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         }
         Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => any_over_expr(operand, func),
         Expr::Lambda(ast::ExprLambda { body, .. }) => any_over_expr(body, func),
-        Expr::IfExp(ast::ExprIfExp {
+        Expr::If(ast::ExprIf {
             test,
             body,
             orelse,
@@ -179,10 +178,11 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
             generators,
             range: _,
         })
-        | Expr::GeneratorExp(ast::ExprGeneratorExp {
+        | Expr::Generator(ast::ExprGenerator {
             elt,
             generators,
             range: _,
+            parenthesized: _,
         }) => {
             any_over_expr(elt, func)
                 || generators.iter().any(|generator| {
@@ -221,14 +221,14 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         }) => any_over_expr(left, func) || comparators.iter().any(|expr| any_over_expr(expr, func)),
         Expr::Call(ast::ExprCall {
             func: call_func,
-            arguments: Arguments { args, keywords, .. },
+            arguments,
             range: _,
         }) => {
             any_over_expr(call_func, func)
                 // Note that this is the evaluation order but not necessarily the declaration order
                 // (e.g. for `f(*args, a=2, *args2, **kwargs)` it's not)
-                || args.iter().any(|expr| any_over_expr(expr, func))
-                || keywords
+                || arguments.args.iter().any(|expr| any_over_expr(expr, func))
+                || arguments.keywords
                     .iter()
                     .any(|keyword| any_over_expr(&keyword.value, func))
         }
@@ -792,16 +792,16 @@ pub fn to_module_path(package: &Path, path: &Path) -> Option<Vec<String>> {
 /// ```rust
 /// # use ruff_python_ast::helpers::collect_import_from_member;
 ///
-/// assert_eq!(collect_import_from_member(None, None, "bar").as_slice(), ["bar"]);
-/// assert_eq!(collect_import_from_member(Some(1), None, "bar").as_slice(), [".", "bar"]);
-/// assert_eq!(collect_import_from_member(Some(1), Some("foo"), "bar").as_slice(), [".", "foo", "bar"]);
+/// assert_eq!(collect_import_from_member(None, None, "bar").segments(), ["bar"]);
+/// assert_eq!(collect_import_from_member(Some(1), None, "bar").segments(), [".", "bar"]);
+/// assert_eq!(collect_import_from_member(Some(1), Some("foo"), "bar").segments(), [".", "foo", "bar"]);
 /// ```
 pub fn collect_import_from_member<'a>(
     level: Option<u32>,
     module: Option<&'a str>,
     member: &'a str,
-) -> CallPath<'a> {
-    let mut call_path: CallPath = SmallVec::with_capacity(
+) -> QualifiedName<'a> {
+    let mut qualified_name_builder = QualifiedNameBuilder::with_capacity(
         level.unwrap_or_default() as usize
             + module
                 .map(|module| module.split('.').count())
@@ -813,20 +813,20 @@ pub fn collect_import_from_member<'a>(
     if let Some(level) = level {
         if level > 0 {
             for _ in 0..level {
-                call_path.push(".");
+                qualified_name_builder.push(".");
             }
         }
     }
 
     // Add the remaining segments.
     if let Some(module) = module {
-        call_path.extend(module.split('.'));
+        qualified_name_builder.extend(module.split('.'));
     }
 
     // Add the member.
-    call_path.push(member);
+    qualified_name_builder.push(member);
 
-    call_path
+    qualified_name_builder.build()
 }
 
 /// Format the call path for a relative import, or `None` if the relative import extends beyond
@@ -838,28 +838,29 @@ pub fn from_relative_import<'a>(
     import: &[&'a str],
     // The remaining segments to the call path (e.g., given `bar.baz`, `["baz"]`).
     tail: &[&'a str],
-) -> Option<CallPath<'a>> {
-    let mut call_path: CallPath = SmallVec::with_capacity(module.len() + import.len() + tail.len());
+) -> Option<QualifiedName<'a>> {
+    let mut qualified_name_builder =
+        QualifiedNameBuilder::with_capacity(module.len() + import.len() + tail.len());
 
     // Start with the module path.
-    call_path.extend(module.iter().map(String::as_str));
+    qualified_name_builder.extend(module.iter().map(String::as_str));
 
     // Remove segments based on the number of dots.
     for segment in import {
         if *segment == "." {
-            if call_path.is_empty() {
+            if qualified_name_builder.is_empty() {
                 return None;
             }
-            call_path.pop();
+            qualified_name_builder.pop();
         } else {
-            call_path.push(segment);
+            qualified_name_builder.push(segment);
         }
     }
 
     // Add the remaining segments.
-    call_path.extend_from_slice(tail);
+    qualified_name_builder.extend_from_slice(tail);
 
-    Some(call_path)
+    Some(qualified_name_builder.build())
 }
 
 /// Given an imported module (based on its relative import level and module name), return the
@@ -877,9 +878,7 @@ pub fn resolve_imported_module_path<'a>(
         return Some(Cow::Borrowed(module.unwrap_or("")));
     }
 
-    let Some(module_path) = module_path else {
-        return None;
-    };
+    let module_path = module_path?;
 
     if level as usize >= module_path.len() {
         return None;
@@ -902,10 +901,7 @@ pub struct NameFinder<'a> {
     pub names: FxHashMap<&'a str, &'a ast::ExprName>,
 }
 
-impl<'a, 'b> Visitor<'b> for NameFinder<'a>
-where
-    'b: 'a,
-{
+impl<'a> Visitor<'a> for NameFinder<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         if let Expr::Name(name) = expr {
             self.names.insert(&name.id, name);
@@ -921,10 +917,7 @@ pub struct StoredNameFinder<'a> {
     pub names: FxHashMap<&'a str, &'a ast::ExprName>,
 }
 
-impl<'a, 'b> Visitor<'b> for StoredNameFinder<'a>
-where
-    'b: 'a,
-{
+impl<'a> Visitor<'a> for StoredNameFinder<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         if let Expr::Name(name) = expr {
             if name.ctx.is_store() {
@@ -935,18 +928,15 @@ where
     }
 }
 
-/// A [`StatementVisitor`] that collects all `return` statements in a function or method.
+/// A [`Visitor`] that collects all `return` statements in a function or method.
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
     pub returns: Vec<&'a ast::StmtReturn>,
     pub is_generator: bool,
 }
 
-impl<'a, 'b> Visitor<'b> for ReturnStatementVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> Visitor<'a> for ReturnStatementVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
@@ -956,7 +946,7 @@ where
         }
     }
 
-    fn visit_expr(&mut self, expr: &'b Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr) {
         if let Expr::Yield(_) | Expr::YieldFrom(_) = expr {
             self.is_generator = true;
         } else {
@@ -971,11 +961,8 @@ pub struct RaiseStatementVisitor<'a> {
     pub raises: Vec<(TextRange, Option<&'a Expr>, Option<&'a Expr>)>,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for RaiseStatementVisitor<'b>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Raise(ast::StmtRaise {
                 exc,
@@ -1021,6 +1008,12 @@ impl Visitor<'_> for AwaitVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => (),
+            Stmt::With(ast::StmtWith { is_async: true, .. }) => {
+                self.seen_await = true;
+            }
+            Stmt::For(ast::StmtFor { is_async: true, .. }) => {
+                self.seen_await = true;
+            }
             _ => crate::visitor::walk_stmt(self, stmt),
         }
     }
@@ -1050,7 +1043,7 @@ pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -
             return true;
         }
         if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = parent {
-            if value.is_if_exp_expr() {
+            if value.is_if_expr() {
                 return true;
             }
         }
@@ -1221,18 +1214,16 @@ impl Truthiness {
                 }
             }
             Expr::Call(ast::ExprCall {
-                func,
-                arguments: Arguments { args, keywords, .. },
-                ..
+                func, arguments, ..
             }) => {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
-                        if args.is_empty() && keywords.is_empty() {
+                        if arguments.is_empty() {
                             // Ex) `list()`
                             Self::Falsey
-                        } else if args.len() == 1 && keywords.is_empty() {
+                        } else if arguments.args.len() == 1 && arguments.keywords.is_empty() {
                             // Ex) `list([1, 2, 3])`
-                            Self::from_expr(&args[0], is_builtin)
+                            Self::from_expr(&arguments.args[0], is_builtin)
                         } else {
                             Self::Unknown
                         }
@@ -1277,14 +1268,14 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
             Expr::Tuple(_) => true,
 
             // These expressions must resolve to the inner expression.
-            Expr::IfExp(ast::ExprIfExp { body, orelse, .. }) => inner(body) && inner(orelse),
-            Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => inner(value),
+            Expr::If(ast::ExprIf { body, orelse, .. }) => inner(body) && inner(orelse),
+            Expr::Named(ast::ExprNamed { value, .. }) => inner(value),
 
             // These expressions are complex. We can't determine whether they're empty or not.
             Expr::BoolOp(ast::ExprBoolOp { .. }) => false,
             Expr::BinOp(ast::ExprBinOp { .. }) => false,
             Expr::UnaryOp(ast::ExprUnaryOp { .. }) => false,
-            Expr::GeneratorExp(_) => false,
+            Expr::Generator(_) => false,
             Expr::Await(_) => false,
             Expr::Yield(_) => false,
             Expr::YieldFrom(_) => false,
@@ -1419,6 +1410,7 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
             elts: vec![],
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            parenthesized: true,
         }),
         [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts),
         [elt] => elt.clone(),
@@ -1453,6 +1445,7 @@ pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
                 elts: vec![],
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
+                parenthesized: true,
             }),
             [Expr::Tuple(ast::ExprTuple { elts, .. })] => typing_union(elts, binding),
             [elt] => elt.clone(),
@@ -1475,6 +1468,80 @@ pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
         ctx: ExprContext::Load,
         range: TextRange::default(),
     })
+}
+
+/// Determine the indentation level of an own-line comment, defined as the minimum indentation of
+/// all comments between the preceding node and the comment, including the comment itself. In
+/// other words, we don't allow successive comments to ident _further_ than any preceding comments.
+///
+/// For example, given:
+/// ```python
+/// if True:
+///     pass
+///     # comment
+/// ```
+///
+/// The indentation would be 4, as the comment is indented by 4 spaces.
+///
+/// Given:
+/// ```python
+/// if True:
+///     pass
+/// # comment
+/// else:
+///     pass
+/// ```
+///
+/// The indentation would be 0, as the comment is not indented at all.
+///
+/// Given:
+/// ```python
+/// if True:
+///     pass
+///     # comment
+///         # comment
+/// ```
+///
+/// Both comments would be marked as indented at 4 spaces, as the indentation of the first comment
+/// is used for the second comment.
+///
+/// This logic avoids pathological cases like:
+/// ```python
+/// try:
+///     if True:
+///         if True:
+///             pass
+///
+///         # a
+///             # b
+///         # c
+/// except Exception:
+///     pass
+/// ```
+///
+/// If we don't use the minimum indentation of any preceding comments, we would mark `# b` as
+/// indented to the same depth as `pass`, which could in turn lead to us treating it as a trailing
+/// comment of `pass`, despite there being a comment between them that "resets" the indentation.
+pub fn comment_indentation_after(
+    preceding: AnyNodeRef,
+    comment_range: TextRange,
+    locator: &Locator,
+) -> TextSize {
+    let tokenizer = SimpleTokenizer::new(
+        locator.contents(),
+        TextRange::new(locator.full_line_end(preceding.end()), comment_range.end()),
+    );
+
+    tokenizer
+        .filter_map(|token| {
+            if token.kind() == SimpleTokenKind::Comment {
+                indentation_at_offset(token.start(), locator).map(TextLen::text_len)
+            } else {
+                None
+            }
+        })
+        .min()
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

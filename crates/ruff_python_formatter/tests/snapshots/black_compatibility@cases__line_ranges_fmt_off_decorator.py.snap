@@ -5,6 +5,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/lin
 ## Input
 
 ```python
+# flags: --line-ranges=12-12 --line-ranges=21-21
 # NOTE: If you need to modify this file, pay special attention to the --line-ranges=
 # flag above as it's formatting specifically these lines.
 
@@ -32,15 +33,7 @@ class MyClass:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,15 +1,13 @@
--# flags: --line-ranges=12-12 --line-ranges=21-21
- # NOTE: If you need to modify this file, pay special attention to the --line-ranges=
- # flag above as it's formatting specifically these lines.
- 
- # Regression test for an edge case involving decorators and fmt: off/on.
- class MyClass:
--
-     # fmt: off
+@@ -9,7 +9,7 @@
      @decorator  (  )
      # fmt: on
      def method():
@@ -49,7 +42,7 @@ class MyClass:
  
      @decor(
          a=1,
-@@ -18,4 +16,4 @@
+@@ -18,4 +18,4 @@
          # fmt: on
      )
      def func():
@@ -60,11 +53,13 @@ class MyClass:
 ## Ruff Output
 
 ```python
+# flags: --line-ranges=12-12 --line-ranges=21-21
 # NOTE: If you need to modify this file, pay special attention to the --line-ranges=
 # flag above as it's formatting specifically these lines.
 
 # Regression test for an edge case involving decorators and fmt: off/on.
 class MyClass:
+
     # fmt: off
     @decorator  (  )
     # fmt: on

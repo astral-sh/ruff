@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E303_first_line_statement.py:5:1: E303 [*] Too many blank lines (3)
+  |
+5 | def fn():
+  | ^^^ E303
+6 |     pass
+  |
+  = help: Remove extraneous blank line(s)
+
+ℹ Safe fix
+1 1 | print("Test where the first line is a statement, and the rule violation follows it.")
+2 2 | 
+3 3 | 
+4   |-
+5 4 | def fn():
+6 5 |     pass

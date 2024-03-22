@@ -7,7 +7,7 @@ use std::string::ToString;
 
 use anyhow::{bail, Result};
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
-use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
+use pep440_rs::{Version as Pep440Version, VersionSpecifier, VersionSpecifiers};
 use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
@@ -492,6 +492,8 @@ impl FromIterator<ExtensionPair> for ExtensionMapping {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum SerializationFormat {
     Text,
+    Concise,
+    Full,
     Json,
     JsonLines,
     Junit,
@@ -507,6 +509,8 @@ impl Display for SerializationFormat {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Text => write!(f, "text"),
+            Self::Concise => write!(f, "concise"),
+            Self::Full => write!(f, "full"),
             Self::Json => write!(f, "json"),
             Self::JsonLines => write!(f, "json_lines"),
             Self::Junit => write!(f, "junit"),
@@ -520,30 +524,56 @@ impl Display for SerializationFormat {
     }
 }
 
-impl Default for SerializationFormat {
-    fn default() -> Self {
-        Self::Text
+impl SerializationFormat {
+    pub fn default(preview: bool) -> Self {
+        if preview {
+            Self::Full
+        } else {
+            Self::Concise
+        }
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(try_from = "String")]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct Version(String);
+pub struct RequiredVersion(VersionSpecifiers);
 
-impl TryFrom<String> for Version {
-    type Error = semver::Error;
+impl TryFrom<String> for RequiredVersion {
+    type Error = pep440_rs::Pep440Error;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        semver::Version::parse(&value).map(|_| Self(value))
+        // Treat `0.3.1` as `==0.3.1`, for backwards compatibility.
+        if let Ok(version) = pep440_rs::Version::from_str(&value) {
+            Ok(Self(VersionSpecifiers::from(
+                VersionSpecifier::equals_version(version),
+            )))
+        } else {
+            Ok(Self(VersionSpecifiers::from_str(&value)?))
+        }
     }
 }
 
-impl Deref for Version {
-    type Target = str;
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for RequiredVersion {
+    fn schema_name() -> String {
+        "RequiredVersion".to_string()
+    }
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        gen.subschema_for::<String>()
+    }
+}
+
+impl RequiredVersion {
+    /// Return `true` if the given version is required.
+    pub fn contains(&self, version: &pep440_rs::Version) -> bool {
+        self.0.contains(version)
+    }
+}
+
+impl Display for RequiredVersion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0, f)
     }
 }
 

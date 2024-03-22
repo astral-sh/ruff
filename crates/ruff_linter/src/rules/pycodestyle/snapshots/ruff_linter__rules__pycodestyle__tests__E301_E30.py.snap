@@ -1,0 +1,83 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E30.py:453:5: E301 [*] Expected 1 blank line, found 0
+    |
+451 |     def func1():
+452 |         pass
+453 |     def func2():
+    |     ^^^ E301
+454 |         pass
+455 | # end
+    |
+    = help: Add missing blank line
+
+ℹ Safe fix
+450 450 | 
+451 451 |     def func1():
+452 452 |         pass
+    453 |+
+453 454 |     def func2():
+454 455 |         pass
+455 456 | # end
+
+E30.py:464:5: E301 [*] Expected 1 blank line, found 0
+    |
+462 |         pass
+463 |     # comment
+464 |     def fn2():
+    |     ^^^ E301
+465 |         pass
+466 | # end
+    |
+    = help: Add missing blank line
+
+ℹ Safe fix
+460 460 | 
+461 461 |     def fn1():
+462 462 |         pass
+    463 |+
+463 464 |     # comment
+464 465 |     def fn2():
+465 466 |         pass
+
+E30.py:474:5: E301 [*] Expected 1 blank line, found 0
+    |
+473 |     columns = []
+474 |     @classmethod
+    |     ^ E301
+475 |     def cls_method(cls) -> None:
+476 |         pass
+    |
+    = help: Add missing blank line
+
+ℹ Safe fix
+471 471 |     """Class for minimal repo."""
+472 472 | 
+473 473 |     columns = []
+    474 |+
+474 475 |     @classmethod
+475 476 |     def cls_method(cls) -> None:
+476 477 |         pass
+
+E30.py:486:5: E301 [*] Expected 1 blank line, found 0
+    |
+484 |     def method(cls) -> None:
+485 |         pass
+486 |     @classmethod
+    |     ^ E301
+487 |     def cls_method(cls) -> None:
+488 |         pass
+    |
+    = help: Add missing blank line
+
+ℹ Safe fix
+483 483 | 
+484 484 |     def method(cls) -> None:
+485 485 |         pass
+    486 |+
+486 487 |     @classmethod
+487 488 |     def cls_method(cls) -> None:
+488 489 |         pass
+
+

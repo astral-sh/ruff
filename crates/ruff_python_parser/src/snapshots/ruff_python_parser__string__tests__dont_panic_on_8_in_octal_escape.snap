@@ -23,7 +23,11 @@ expression: parse_ast
                             StringLiteral {
                                 range: 7..16,
                                 value: "\u{3}8[1m",
-                                unicode: false,
+                                flags: StringLiteralFlags {
+                                    quote_style: Single,
+                                    prefix: Empty,
+                                    triple_quoted: false,
+                                },
                             },
                         ),
                     },

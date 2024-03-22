@@ -111,6 +111,10 @@ impl Violation for MissingTypeKwargs {
     }
 }
 
+/// ## Deprecation
+/// This rule is commonly disabled because type checkers can infer this type without annotation.
+/// It will be removed in a future release.
+///
 /// ## What it does
 /// Checks that instance method `self` arguments have type annotations.
 ///
@@ -148,6 +152,10 @@ impl Violation for MissingTypeSelf {
     }
 }
 
+/// ## Deprecation
+/// This rule is commonly disabled because type checkers can infer this type without annotation.
+/// It will be removed in a future release.
+///
 /// ## What it does
 /// Checks that class method `cls` arguments have type annotations.
 ///
@@ -286,7 +294,7 @@ impl Violation for MissingReturnTypePrivateFunction {
 ///
 /// Note that type checkers often allow you to omit the return type annotation for
 /// `__init__` methods, as long as at least one argument has a type annotation. To
-/// opt-in to this behavior, use the `mypy-init-return` setting in your `pyproject.toml`
+/// opt in to this behavior, use the `mypy-init-return` setting in your `pyproject.toml`
 /// or `ruff.toml` file:
 ///
 /// ```toml

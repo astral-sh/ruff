@@ -1,0 +1,102 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E30.py:742:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
+    |
+741 |     # another comment
+742 | fn()
+    | ^^ E305
+743 | # end
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+739 739 |     # comment
+740 740 | 
+741 741 |     # another comment
+    742 |+
+    743 |+
+742 744 | fn()
+743 745 | # end
+744 746 | 
+
+E30.py:753:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
+    |
+752 |     # another comment
+753 | a = 1
+    | ^ E305
+754 | # end
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+750 750 |     # comment
+751 751 | 
+752 752 |     # another comment
+    753 |+
+    754 |+
+753 755 | a = 1
+754 756 | # end
+755 757 | 
+
+E30.py:765:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
+    |
+763 |     # another comment
+764 | 
+765 | try:
+    | ^^^ E305
+766 |     fn()
+767 | except Exception:
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+762 762 | 
+763 763 |     # another comment
+764 764 | 
+    765 |+
+765 766 | try:
+766 767 |     fn()
+767 768 | except Exception:
+
+E30.py:777:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
+    |
+776 | # Two spaces before comments, too.
+777 | if a():
+    | ^^ E305
+778 |     a()
+779 | # end
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+774 774 |     print()
+775 775 | 
+776 776 | # Two spaces before comments, too.
+    777 |+
+    778 |+
+777 779 | if a():
+778 780 |     a()
+779 781 | # end
+
+E30.py:790:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
+    |
+788 |     blah, blah
+789 | 
+790 | if __name__ == '__main__':
+    | ^^ E305
+791 |     main()
+792 | # end
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+787 787 | def main():
+788 788 |     blah, blah
+789 789 | 
+    790 |+
+790 791 | if __name__ == '__main__':
+791 792 |     main()
+792 793 | # end
+
+

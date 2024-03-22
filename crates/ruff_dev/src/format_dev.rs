@@ -27,8 +27,8 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
-use ruff_cli::args::{CliOverrides, FormatArguments, FormatCommand, LogLevelArgs};
-use ruff_cli::resolve::resolve;
+use ruff::args::{ConfigArguments, FormatArguments, FormatCommand, GlobalConfigArgs, LogLevelArgs};
+use ruff::resolve::resolve;
 use ruff_formatter::{FormatError, LineWidth, PrintError};
 use ruff_linter::logging::LogLevel;
 use ruff_linter::settings::types::{FilePattern, FilePatternSet};
@@ -38,26 +38,21 @@ use ruff_python_formatter::{
 use ruff_python_parser::ParseError;
 use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, ResolvedFile, Resolver};
 
-fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, CliOverrides)> {
+fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, ConfigArguments)> {
     let args_matches = FormatCommand::command()
         .no_binary_name(true)
         .get_matches_from(dirs);
     let arguments: FormatCommand = FormatCommand::from_arg_matches(&args_matches)?;
-    let (cli, overrides) = arguments.partition();
-    Ok((cli, overrides))
+    let (cli, config_arguments) = arguments.partition(GlobalConfigArgs::default())?;
+    Ok((cli, config_arguments))
 }
 
 /// Find the [`PyprojectConfig`] to use for formatting.
 fn find_pyproject_config(
     cli: &FormatArguments,
-    overrides: &CliOverrides,
+    config_arguments: &ConfigArguments,
 ) -> anyhow::Result<PyprojectConfig> {
-    let mut pyproject_config = resolve(
-        cli.isolated,
-        cli.config.as_deref(),
-        overrides,
-        cli.stdin_filename.as_deref(),
-    )?;
+    let mut pyproject_config = resolve(config_arguments, cli.stdin_filename.as_deref())?;
     // We don't want to format pyproject.toml
     pyproject_config.settings.file_resolver.include = FilePatternSet::try_from_iter([
         FilePattern::Builtin("*.py"),
@@ -67,14 +62,14 @@ fn find_pyproject_config(
     Ok(pyproject_config)
 }
 
-/// Find files that ruff would check so we can format them. Adapted from `ruff_cli`.
+/// Find files that ruff would check so we can format them. Adapted from `ruff`.
 #[allow(clippy::type_complexity)]
 fn ruff_check_paths<'a>(
     pyproject_config: &'a PyprojectConfig,
     cli: &FormatArguments,
-    overrides: &CliOverrides,
+    config_arguments: &ConfigArguments,
 ) -> anyhow::Result<(Vec<Result<ResolvedFile, ignore::Error>>, Resolver<'a>)> {
-    let (paths, resolver) = python_files_in_path(&cli.files, pyproject_config, overrides)?;
+    let (paths, resolver) = python_files_in_path(&cli.files, pyproject_config, config_arguments)?;
     Ok((paths, resolver))
 }
 
@@ -139,7 +134,7 @@ impl Statistics {
         }
     }
 
-    /// We currently prefer the the similarity index, but i'd like to keep this around
+    /// We currently prefer the similarity index, but i'd like to keep this around
     #[allow(clippy::cast_precision_loss, unused)]
     pub(crate) fn jaccard_index(&self) -> f32 {
         self.intersection as f32 / (self.black_input + self.ruff_output + self.intersection) as f32
@@ -287,7 +282,7 @@ fn setup_logging(log_level_args: &LogLevelArgs, log_file: Option<&Path>) -> io::
         LogLevel::Quiet => tracing::Level::WARN,
         LogLevel::Silent => tracing::Level::ERROR,
     };
-    // 1. `RUST_LOG=`, 2. explicit CLI log level, 3. info, the ruff_cli default
+    // 1. `RUST_LOG=`, 2. explicit CLI log level, 3. info, the ruff default
     let filter_layer = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         EnvFilter::builder()
             .with_default_directive(log_level.into())
@@ -461,7 +456,7 @@ fn format_dev_project(
 
     // TODO(konstin): Respect black's excludes.
 
-    // Find files to check (or in this case, format twice). Adapted from ruff_cli
+    // Find files to check (or in this case, format twice). Adapted from ruff
     // First argument is ignored
     let (cli, overrides) = parse_cli(files)?;
     let pyproject_config = find_pyproject_config(&cli, &overrides)?;

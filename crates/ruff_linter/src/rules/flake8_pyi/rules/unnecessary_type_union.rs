@@ -12,17 +12,17 @@ use crate::checkers::ast::Checker;
 /// Checks for the presence of multiple `type`s in a union.
 ///
 /// ## Why is this bad?
-/// The `type` built-in function accepts unions, and it is clearer to
-/// explicitly specify them as a single `type`.
+/// `type[T | S]` has identical semantics to `type[T] | type[S]` in a type
+/// annotation, but is cleaner and more concise.
 ///
 /// ## Example
 /// ```python
-/// field: type[int] | type[float]
+/// field: type[int] | type[float] | str
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// field: type[int | float]
+/// field: type[int | float] | str
 /// ```
 #[violation]
 pub struct UnnecessaryTypeUnion {
@@ -80,8 +80,10 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
             let unwrapped = subscript.unwrap();
             if checker
                 .semantic()
-                .resolve_call_path(unwrapped.value.as_ref())
-                .is_some_and(|call_path| matches!(call_path.as_slice(), ["" | "builtins", "type"]))
+                .resolve_qualified_name(unwrapped.value.as_ref())
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["" | "builtins", "type"])
+                })
             {
                 type_exprs.push(unwrapped.slice.as_ref());
             } else {
@@ -130,6 +132,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
                                 .collect(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            parenthesized: true,
                         })),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
@@ -151,6 +154,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
                             elts: exprs.into_iter().cloned().collect(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            parenthesized: true,
                         })),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),

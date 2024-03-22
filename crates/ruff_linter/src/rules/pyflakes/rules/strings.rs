@@ -537,7 +537,7 @@ pub(crate) fn percent_format_expected_mapping(
             | Expr::Set(_)
             | Expr::ListComp(_)
             | Expr::SetComp(_)
-            | Expr::GeneratorExp(_) => checker
+            | Expr::Generator(_) => checker
                 .diagnostics
                 .push(Diagnostic::new(PercentFormatExpectedMapping, location)),
             _ => {}

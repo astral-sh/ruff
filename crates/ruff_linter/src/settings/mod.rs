@@ -123,6 +123,9 @@ macro_rules! display_settings {
     (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | debug) => {
         writeln!($fmt, "{}{} = {:?}", $prefix, stringify!($field), $settings.$field)?;
     };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | path) => {
+        writeln!($fmt, "{}{} = \"{}\"", $prefix, stringify!($field), $settings.$field.display())?;
+    };
     (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | quoted) => {
         writeln!($fmt, "{}{} = \"{}\"", $prefix, stringify!($field), $settings.$field)?;
     };
@@ -147,6 +150,52 @@ macro_rules! display_settings {
                 writeln!($fmt, "[")?;
                 for elem in &$settings.$field {
                     writeln!($fmt, "\t{elem},")?;
+                }
+                writeln!($fmt, "]")?;
+            }
+        }
+    };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | map) => {
+        {
+            use itertools::Itertools;
+
+            write!($fmt, "{}{} = ", $prefix, stringify!($field))?;
+            if $settings.$field.is_empty() {
+                writeln!($fmt, "{{}}")?;
+            } else {
+                writeln!($fmt, "{{")?;
+                for (key, value) in $settings.$field.iter().sorted_by(|(left, _), (right, _)| left.cmp(right)) {
+                    writeln!($fmt, "\t{key} = {value},")?;
+                }
+                writeln!($fmt, "}}")?;
+            }
+        }
+    };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | set) => {
+        {
+            use itertools::Itertools;
+
+            write!($fmt, "{}{} = ", $prefix, stringify!($field))?;
+            if $settings.$field.is_empty() {
+                writeln!($fmt, "[]")?;
+            } else {
+                writeln!($fmt, "[")?;
+                for elem in $settings.$field.iter().sorted_by(|left, right| left.cmp(right)) {
+                    writeln!($fmt, "\t{elem},")?;
+                }
+                writeln!($fmt, "]")?;
+            }
+        }
+    };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | paths) => {
+        {
+            write!($fmt, "{}{} = ", $prefix, stringify!($field))?;
+            if $settings.$field.is_empty() {
+                writeln!($fmt, "[]")?;
+            } else {
+                writeln!($fmt, "[")?;
+                for elem in &$settings.$field {
+                    writeln!($fmt, "\t\"{}\",", elem.display())?;
                 }
                 writeln!($fmt, "]")?;
             }
@@ -220,7 +269,7 @@ impl Display for LinterSettings {
             namespace = "linter",
             fields = [
                 self.exclude,
-                self.project_root | debug,
+                self.project_root | path,
 
                 self.rules | nested,
                 self.per_file_ignores,
@@ -238,7 +287,7 @@ impl Display for LinterSettings {
                 self.ignore_init_module_imports,
                 self.logger_objects | array,
                 self.namespace_packages | debug,
-                self.src | debug,
+                self.src | paths,
                 self.tab_size,
                 self.line_length,
                 self.task_tags | array,
@@ -334,7 +383,7 @@ impl LinterSettings {
             dummy_variable_rgx: DUMMY_VARIABLE_RGX.clone(),
 
             external: vec![],
-            ignore_init_module_imports: false,
+            ignore_init_module_imports: true,
             logger_objects: vec![],
             namespace_packages: vec![],
 

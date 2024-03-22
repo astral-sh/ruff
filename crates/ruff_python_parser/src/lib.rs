@@ -78,14 +78,14 @@
 //! These tokens can be directly fed into the `ruff_python_parser` to generate an AST:
 //!
 //! ```
-//! use ruff_python_parser::{lexer::lex, Mode, parse_tokens};
+//! use ruff_python_parser::{Mode, parse_tokens, tokenize_all};
 //!
 //! let python_source = r#"
 //! def is_odd(i):
 //!    return bool(i & 1)
 //! "#;
-//! let tokens = lex(python_source, Mode::Module);
-//! let ast = parse_tokens(tokens.collect(), python_source, Mode::Module);
+//! let tokens = tokenize_all(python_source, Mode::Module);
+//! let ast = parse_tokens(tokens, python_source, Mode::Module);
 //!
 //! assert!(ast.is_ok());
 //! ```
@@ -115,14 +115,14 @@ pub use parser::{
 };
 use ruff_python_ast::{Mod, PySourceType, Suite};
 pub use string::FStringErrorType;
-pub use token::{StringKind, Tok, TokenKind};
+pub use token::{Tok, TokenKind};
 
 use crate::lexer::LexResult;
 
-mod function;
-// Skip flattening lexer to distinguish from full ruff_python_parser
 mod context;
+mod function;
 mod invalid;
+// Skip flattening lexer to distinguish from full ruff_python_parser
 pub mod lexer;
 mod parser;
 mod soft_keywords;
@@ -133,7 +133,7 @@ pub mod typing;
 
 /// Collect tokens up to and including the first error.
 pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {
-    let mut tokens: Vec<LexResult> = vec![];
+    let mut tokens: Vec<LexResult> = allocate_tokens_vec(contents);
     for tok in lexer::lex(contents, mode) {
         let is_err = tok.is_err();
         tokens.push(tok);
@@ -141,7 +141,33 @@ pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {
             break;
         }
     }
+
     tokens
+}
+
+/// Tokenizes all tokens.
+///
+/// It differs from [`tokenize`] in that it tokenizes all tokens and doesn't stop
+/// after the first `Err`.
+pub fn tokenize_all(contents: &str, mode: Mode) -> Vec<LexResult> {
+    let mut tokens = allocate_tokens_vec(contents);
+    for token in lexer::lex(contents, mode) {
+        tokens.push(token);
+    }
+    tokens
+}
+
+/// Allocates a [`Vec`] with an approximated capacity to fit all tokens
+/// of `contents`.
+///
+/// See [#9546](https://github.com/astral-sh/ruff/pull/9546) for a more detailed explanation.
+pub fn allocate_tokens_vec(contents: &str) -> Vec<LexResult> {
+    Vec::with_capacity(approximate_tokens_lower_bound(contents))
+}
+
+/// Approximates the number of tokens when lexing `contents`.
+fn approximate_tokens_lower_bound(contents: &str) -> usize {
+    contents.len().saturating_mul(15) / 100
 }
 
 /// Parse a full Python program from its tokens.

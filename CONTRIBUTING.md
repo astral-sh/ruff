@@ -26,6 +26,10 @@ Welcome! We're happy to have you here. Thank you in advance for your contributio
 - [`cargo dev`](#cargo-dev)
 - [Subsystems](#subsystems)
     - [Compilation Pipeline](#compilation-pipeline)
+    - [Import Categorization](#import-categorization)
+        - [Project root](#project-root)
+        - [Package root](#package-root)
+        - [Import categorization](#import-categorization-1)
 
 ## The Basics
 
@@ -35,7 +39,7 @@ For small changes (e.g., bug fixes), feel free to submit a PR.
 
 For larger changes (e.g., new lint rules, new functionality, new configuration options), consider
 creating an [**issue**](https://github.com/astral-sh/ruff/issues) outlining your proposed change.
-You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5) to discuss your idea with the
+You can also join us on [**Discord**](https://discord.com/invite/astral-sh) to discuss your idea with the
 community. We've labeled [beginner-friendly tasks](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
 in the issue tracker, along with [bugs](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Abug)
 and [improvements](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Aaccepted)
@@ -63,7 +67,7 @@ You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
 cargo install cargo-insta
 ```
 
-and pre-commit to run some validation checks:
+And you'll need pre-commit to run some validation checks:
 
 ```shell
 pipx install pre-commit  # or `pip install pre-commit` if you have a virtualenv
@@ -76,12 +80,22 @@ when making a commit:
 pre-commit install
 ```
 
+We recommend [nextest](https://nexte.st/) to run Ruff's test suite (via `cargo nextest run`),
+though it's not strictly necessary:
+
+```shell
+cargo install cargo-nextest --locked
+```
+
+Throughout this guide, any usages of `cargo test` can be replaced with `cargo nextest run`,
+if you choose to install `nextest`.
+
 ### Development
 
 After cloning the repository, run Ruff locally from the repository root with:
 
 ```shell
-cargo run -p ruff_cli -- check /path/to/file.py --no-cache
+cargo run -p ruff -- check /path/to/file.py --no-cache
 ```
 
 Prior to opening a pull request, ensure that your code has been auto-formatted,
@@ -120,7 +134,7 @@ At the time of writing, the repository includes the following crates:
     If you're working on a rule, this is the crate for you.
 - `crates/ruff_benchmark`: binary crate for running micro-benchmarks.
 - `crates/ruff_cache`: library crate for caching lint results.
-- `crates/ruff_cli`: binary crate containing Ruff's command-line interface.
+- `crates/ruff`: binary crate containing Ruff's command-line interface.
 - `crates/ruff_dev`: binary crate containing utilities used in the development of Ruff itself (e.g.,
     `cargo dev generate-all`), see the [`cargo dev`](#cargo-dev) section below.
 - `crates/ruff_diagnostics`: library crate for the rule-independent abstractions in the lint
@@ -231,7 +245,7 @@ Once you've completed the code for the rule itself, you can define tests with th
     For example, if you're adding a new rule named `E402`, you would run:
 
     ```shell
-    cargo run -p ruff_cli -- check crates/ruff_linter/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402
+    cargo run -p ruff -- check crates/ruff_linter/resources/test/fixtures/pycodestyle/E402.py --no-cache --preview --select E402
     ```
 
     **Note:** Only a subset of rules are enabled by default. When testing a new rule, ensure that
@@ -252,7 +266,7 @@ Once you've completed the code for the rule itself, you can define tests with th
 
 Ruff's user-facing settings live in a few different places.
 
-First, the command-line options are defined via the `Args` struct in `crates/ruff_cli/src/args.rs`.
+First, the command-line options are defined via the `Args` struct in `crates/ruff/src/args.rs`.
 
 Second, the `pyproject.toml` options are defined in `crates/ruff_workspace/src/options.rs` (via the
 `Options` struct), `crates/ruff_workspace/src/configuration.rs` (via the `Configuration` struct),
@@ -302,7 +316,7 @@ To preview any changes to the documentation locally:
     ```
 
 The documentation should then be available locally at
-[http://127.0.0.1:8000/docs/](http://127.0.0.1:8000/docs/).
+[http://127.0.0.1:8000/ruff/](http://127.0.0.1:8000/ruff/).
 
 ## Release Process
 
@@ -315,13 +329,13 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 
 ### Creating a new release
 
-We use an experimental in-house tool for managing releases.
-
-1. Install `rooster`: `pip install git+https://github.com/zanieb/rooster@main`
-1. Run `rooster release`; this command will:
+1. Install `uv`: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+1. Run `./scripts/release/bump.sh`; this command will:
+    - Generate a temporary virtual environment with `rooster`
     - Generate a changelog entry in `CHANGELOG.md`
     - Update versions in `pyproject.toml` and `Cargo.toml`
     - Update references to versions in the `README.md` and documentation
+    - Display contributors for the release
 1. The changelog should then be editorialized for consistency
     - Often labels will be missing from pull requests they will need to be manually organized into the proper section
     - Changes should be edited to be user-facing descriptions, avoiding internal details
@@ -345,7 +359,7 @@ We use an experimental in-house tool for managing releases.
     1. Open the draft release in the GitHub release section
     1. Copy the changelog for the release into the GitHub release
         - See previous releases for formatting of section headers
-    1. Generate the contributor list with `rooster contributors` and add to the release notes
+    1. Append the contributors from the `bump.sh` script
 1. If needed, [update the schemastore](https://github.com/astral-sh/ruff/blob/main/scripts/update_schemastore.py).
     1. One can determine if an update is needed when
         `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
@@ -372,6 +386,11 @@ We have several ways of benchmarking and profiling Ruff:
 - Our main performance benchmark comparing Ruff with other tools on the CPython codebase
 - Microbenchmarks which run the linter or the formatter on individual files. These run on pull requests.
 - Profiling the linter on either the microbenchmarks or entire projects
+
+> \[!NOTE\]
+> When running benchmarks, ensure that your CPU is otherwise idle (e.g., close any background
+> applications, like web browsers). You may also want to switch your CPU to a "performance"
+> mode, if it exists, especially when benchmarking short-lived processes.
 
 ### CPython Benchmark
 
@@ -518,10 +537,10 @@ if the benchmark improved/regressed compared to that baseline.
 
 ```shell
 # Run once on your "baseline" code
-cargo benchmark --save-baseline=main
+cargo bench -p ruff_benchmark -- --save-baseline=main
 
 # Then iterate with
-cargo benchmark --baseline=main
+cargo bench -p ruff_benchmark -- --baseline=main
 ```
 
 #### PR Summary
@@ -531,10 +550,10 @@ This is useful to illustrate the improvements of a PR.
 
 ```shell
 # On main
-cargo benchmark --save-baseline=main
+cargo bench -p ruff_benchmark -- --save-baseline=main
 
 # After applying your changes
-cargo benchmark --save-baseline=pr
+cargo bench -p ruff_benchmark -- --save-baseline=pr
 
 critcmp main pr
 ```
@@ -547,10 +566,10 @@ cargo install critcmp
 
 #### Tips
 
-- Use `cargo benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark linter/pydantic`
-    to only run the pydantic tests.
-- Use `cargo benchmark --quiet` for a more cleaned up output (without statistical relevance)
-- Use `cargo benchmark --quick` to get faster results (more prone to noise)
+- Use `cargo bench -p ruff_benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark lexer`
+    to only run the lexer benchmarks.
+- Use `cargo bench -p ruff_benchmark -- --quiet` for a more cleaned up output (without statistical relevance)
+- Use `cargo bench -p ruff_benchmark -- --quick` to get faster results (more prone to noise)
 
 ### Profiling Projects
 
@@ -618,7 +637,7 @@ Otherwise, follow the instructions from the linux section.
 utils with it:
 
 - `cargo dev print-ast <file>`: Print the AST of a python file using the
-    [RustPython parser](https://github.com/astral-sh/RustPython-Parser/tree/main/parser) that is
+    [RustPython parser](https://github.com/astral-sh/ruff/tree/main/crates/ruff_python_parser) that is
     mainly used in Ruff. For `if True: pass # comment`, you can see the syntax tree, the byte offsets
     for start and stop of each node and also how the `:` token, the comment and whitespace are not
     represented anymore:

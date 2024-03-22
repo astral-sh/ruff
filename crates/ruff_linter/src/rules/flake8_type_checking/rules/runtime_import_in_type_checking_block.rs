@@ -22,7 +22,7 @@ use crate::rules::flake8_type_checking::imports::ImportBinding;
 /// The type-checking block is not executed at runtime, so the import will not
 /// be available at runtime.
 ///
-/// If [`flake8-type-checking.quote-annotations`] is set to `true`,
+/// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
 /// annotations will be wrapped in quotes if doing so would enable the
 /// corresponding import to remain in the type-checking block.
 ///
@@ -48,7 +48,7 @@ use crate::rules::flake8_type_checking::imports::ImportBinding;
 /// ```
 ///
 /// ## Options
-/// - `flake8-type-checking.quote-annotations`
+/// - `lint.flake8-type-checking.quote-annotations`
 ///
 /// ## References
 /// - [PEP 535](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -121,8 +121,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 checker
                     .semantic()
                     .reference(reference_id)
-                    .context()
-                    .is_runtime()
+                    .in_runtime_context()
             })
         {
             let Some(node_id) = binding.source else {
@@ -155,8 +154,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 if checker.settings.flake8_type_checking.quote_annotations
                     && binding.references().all(|reference_id| {
                         let reference = checker.semantic().reference(reference_id);
-                        reference.context().is_typing()
-                            || reference.in_runtime_evaluated_annotation()
+                        reference.in_typing_context() || reference.in_runtime_evaluated_annotation()
                     })
                 {
                     actions
@@ -189,7 +187,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 {
                     let mut diagnostic = Diagnostic::new(
                         RuntimeImportInTypeCheckingBlock {
-                            qualified_name: import.qualified_name(),
+                            qualified_name: import.qualified_name().to_string(),
                             strategy: Strategy::MoveImport,
                         },
                         range,
@@ -218,7 +216,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 {
                     let mut diagnostic = Diagnostic::new(
                         RuntimeImportInTypeCheckingBlock {
-                            qualified_name: import.qualified_name(),
+                            qualified_name: import.qualified_name().to_string(),
                             strategy: Strategy::QuoteUsages,
                         },
                         range,
@@ -245,7 +243,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 {
                     let mut diagnostic = Diagnostic::new(
                         RuntimeImportInTypeCheckingBlock {
-                            qualified_name: import.qualified_name(),
+                            qualified_name: import.qualified_name().to_string(),
                             strategy: Strategy::MoveImport,
                         },
                         range,
@@ -268,7 +266,7 @@ fn quote_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) 
             .flat_map(|ImportBinding { binding, .. }| {
                 binding.references.iter().filter_map(|reference_id| {
                     let reference = checker.semantic().reference(*reference_id);
-                    if reference.context().is_runtime() {
+                    if reference.in_runtime_context() {
                         Some(quote_annotation(
                             reference.expression_id()?,
                             checker.semantic(),

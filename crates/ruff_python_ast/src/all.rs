@@ -60,16 +60,14 @@ where
                 }
             }
             Expr::Call(ast::ExprCall {
-                func,
-                arguments: ast::Arguments { args, keywords, .. },
-                ..
+                func, arguments, ..
             }) => {
                 // Allow `tuple()`, `list()`, and their generic forms, like `list[int]()`.
-                if keywords.is_empty() && args.len() <= 1 {
+                if arguments.keywords.is_empty() && arguments.args.len() <= 1 {
                     if let Expr::Name(ast::ExprName { id, .. }) = map_subscript(func) {
                         let id = id.as_str();
                         if matches!(id, "tuple" | "list") && is_builtin(id) {
-                            let [arg] = args.as_slice() else {
+                            let [arg] = arguments.args.as_ref() else {
                                 return (None, DunderAllFlags::empty());
                             };
                             match arg {
@@ -89,7 +87,7 @@ where
                     }
                 }
             }
-            Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => {
+            Expr::Named(ast::ExprNamed { value, .. }) => {
                 // Allow, e.g., `__all__ += (value := ["A", "B"])`.
                 return extract_elts(value, is_builtin);
             }

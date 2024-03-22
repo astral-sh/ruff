@@ -2,6 +2,7 @@ use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -48,10 +49,14 @@ impl Violation for UndocumentedWarn {
 
 /// LOG009
 pub(crate) fn undocumented_warn(checker: &mut Checker, expr: &Expr) {
+    if !checker.semantic().seen_module(Modules::LOGGING) {
+        return;
+    }
+
     if checker
         .semantic()
-        .resolve_call_path(expr)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "WARN"]))
+        .resolve_qualified_name(expr)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["logging", "WARN"]))
     {
         let mut diagnostic = Diagnostic::new(UndocumentedWarn, expr.range());
         diagnostic.try_set_fix(|| {

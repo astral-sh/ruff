@@ -1,0 +1,59 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB187.py:6:5: FURB187 [*] Use of assignment of `reversed` on list `l`
+  |
+4 | def a():
+5 |     l = []
+6 |     l = reversed(l)
+  |     ^^^^^^^^^^^^^^^ FURB187
+  |
+  = help: Replace with `l.reverse()`
+
+ℹ Safe fix
+3 3 | 
+4 4 | def a():
+5 5 |     l = []
+6   |-    l = reversed(l)
+  6 |+    l.reverse()
+7 7 | 
+8 8 | 
+9 9 | def b():
+
+FURB187.py:11:5: FURB187 [*] Use of assignment of `reversed` on list `l`
+   |
+ 9 | def b():
+10 |     l = []
+11 |     l = list(reversed(l))
+   |     ^^^^^^^^^^^^^^^^^^^^^ FURB187
+   |
+   = help: Replace with `l.reverse()`
+
+ℹ Safe fix
+8  8  | 
+9  9  | def b():
+10 10 |     l = []
+11    |-    l = list(reversed(l))
+   11 |+    l.reverse()
+12 12 | 
+13 13 | 
+14 14 | def c():
+
+FURB187.py:16:5: FURB187 [*] Use of assignment of `reversed` on list `l`
+   |
+14 | def c():
+15 |     l = []
+16 |     l = l[::-1]
+   |     ^^^^^^^^^^^ FURB187
+   |
+   = help: Replace with `l.reverse()`
+
+ℹ Safe fix
+13 13 | 
+14 14 | def c():
+15 15 |     l = []
+16    |-    l = l[::-1]
+   16 |+    l.reverse()
+17 17 | 
+18 18 | 
+19 19 | # False negative

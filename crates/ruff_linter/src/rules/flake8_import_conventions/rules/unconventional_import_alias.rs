@@ -32,8 +32,8 @@ use crate::renamer::Renamer;
 /// ```
 ///
 /// ## Options
-/// - `flake8-import-conventions.aliases`
-/// - `flake8-import-conventions.extend-aliases`
+/// - `lint.flake8-import-conventions.aliases`
+/// - `lint.flake8-import-conventions.extend-aliases`
 #[violation]
 pub struct UnconventionalImportAlias {
     name: String,
@@ -61,15 +61,9 @@ pub(crate) fn unconventional_import_alias(
     binding: &Binding,
     conventions: &FxHashMap<String, String>,
 ) -> Option<Diagnostic> {
-    let Some(import) = binding.as_any_import() else {
-        return None;
-    };
-
-    let qualified_name = import.qualified_name();
-
-    let Some(expected_alias) = conventions.get(qualified_name.as_str()) else {
-        return None;
-    };
+    let import = binding.as_any_import()?;
+    let qualified_name = import.qualified_name().to_string();
+    let expected_alias = conventions.get(qualified_name.as_str())?;
 
     let name = binding.name(checker.locator());
     if binding.is_alias() && name == expected_alias {

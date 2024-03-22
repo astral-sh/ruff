@@ -4,13 +4,27 @@ expression: lex_source(source)
 ---
 [
     (
-        FStringStart,
+        FStringStart(
+            StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: true,
+                quote_style: Double,
+            },
+        ),
         0..4,
     ),
     (
         FStringMiddle {
             value: "\n# not a comment ",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: true,
+                quote_style: Double,
+            },
         },
         4..21,
     ),
@@ -45,7 +59,13 @@ expression: lex_source(source)
     (
         FStringMiddle {
             value: " # not a comment\n",
-            is_raw: false,
+            kind: StringKind {
+                prefix: Format(
+                    Regular,
+                ),
+                triple_quoted: true,
+                quote_style: Double,
+            },
         },
         42..59,
     ),

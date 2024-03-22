@@ -99,32 +99,34 @@ fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    semantic.resolve_call_path(func).is_some_and(|call_path| {
-        match call_path.as_slice() {
-            ["itertools", "cycle" | "count"] => true,
-            ["itertools", "repeat"] => {
-                // Ex) `itertools.repeat(1)`
-                if keywords.is_empty() && args.len() == 1 {
-                    return true;
-                }
+    semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| {
+            match qualified_name.segments() {
+                ["itertools", "cycle" | "count"] => true,
+                ["itertools", "repeat"] => {
+                    // Ex) `itertools.repeat(1)`
+                    if keywords.is_empty() && args.len() == 1 {
+                        return true;
+                    }
 
-                // Ex) `itertools.repeat(1, None)`
-                if args.len() == 2 && args[1].is_none_literal_expr() {
-                    return true;
-                }
+                    // Ex) `itertools.repeat(1, None)`
+                    if args.len() == 2 && args[1].is_none_literal_expr() {
+                        return true;
+                    }
 
-                // Ex) `iterools.repeat(1, times=None)`
-                for keyword in keywords {
-                    if keyword.arg.as_ref().is_some_and(|name| name == "times") {
-                        if keyword.value.is_none_literal_expr() {
-                            return true;
+                    // Ex) `iterools.repeat(1, times=None)`
+                    for keyword in keywords.iter() {
+                        if keyword.arg.as_ref().is_some_and(|name| name == "times") {
+                            if keyword.value.is_none_literal_expr() {
+                                return true;
+                            }
                         }
                     }
-                }
 
-                false
+                    false
+                }
+                _ => false,
             }
-            _ => false,
-        }
-    })
+        })
 }

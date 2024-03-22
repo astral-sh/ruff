@@ -11,6 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [lib]
+doctest = false
 
 [dependencies]
 ruff_diagnostics = { path = "../ruff_diagnostics" }
@@ -28,7 +29,6 @@ uuid = { workspace = true }
 rand = { workspace = true }
 
 [dev-dependencies]
-insta = { workspace = true }
 test-case = { workspace = true }
 
 [lints]
