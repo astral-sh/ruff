@@ -1,0 +1,145 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+simplifiable_if_statement.py:4:5: PLR1703 [*] Assign the condition directly
+  |
+2 |   def is_flying_animal(an_object):
+3 |       # PLR1703
+4 |       if isinstance(an_object, Animal) and an_object in FLYING_THINGS:
+  |  _____^
+5 | |         is_flying = True
+6 | |     else:
+7 | |         is_flying = False
+  | |_________________________^ PLR1703
+  |
+  = help: Assign condition inline
+
+ℹ Unsafe fix
+1 1 | 
+2 2 | def is_flying_animal(an_object):
+3 3 |     # PLR1703
+4   |-    if isinstance(an_object, Animal) and an_object in FLYING_THINGS:
+5   |-        is_flying = True
+6   |-    else:
+7   |-        is_flying = False
+  4 |+    is_flying = bool(isinstance(an_object, Animal) and an_object in FLYING_THINGS)
+8 5 | 
+9 6 | 
+10 7 | def f():
+
+simplifiable_if_statement.py:12:5: PLR1703 [*] Assign the condition `a` directly
+   |
+10 |   def f():
+11 |       # PLR1703
+12 |       if a:
+   |  _____^
+13 | |         x = True
+14 | |     else:
+15 | |         x = False
+   | |_________________^ PLR1703
+   |
+   = help: Replace with `x = bool(a)`
+
+ℹ Unsafe fix
+9  9  | 
+10 10 | def f():
+11 11 |     # PLR1703
+12    |-    if a:
+13    |-        x = True
+14    |-    else:
+15    |-        x = False
+   12 |+    x = bool(a)
+16 13 | 
+17 14 | 
+18 15 | def f():
+
+simplifiable_if_statement.py:20:5: PLR1703 [*] Assign the condition `a == b` directly
+   |
+18 |   def f():
+19 |       # PLR1703
+20 |       if a == b:
+   |  _____^
+21 | |         x = True
+22 | |     else:
+23 | |         x = False
+   | |_________________^ PLR1703
+   |
+   = help: Replace with `x = a == b`
+
+ℹ Unsafe fix
+17 17 | 
+18 18 | def f():
+19 19 |     # PLR1703
+20    |-    if a == b:
+21    |-        x = True
+22    |-    else:
+23    |-        x = False
+   20 |+    x = a == b
+24 21 | 
+25 22 | 
+26 23 | def f():
+
+simplifiable_if_statement.py:41:9: PLR1703 [*] Assign the condition `b` directly
+   |
+39 |       else:
+40 |           # PLR1703
+41 |           if b:
+   |  _________^
+42 | |             x = False
+43 | |         else:
+44 | |             x = True
+   | |____________________^ PLR1703
+   |
+   = help: Replace with `x = not b`
+
+ℹ Unsafe fix
+38 38 |         x = 1
+39 39 |     else:
+40 40 |         # PLR1703
+41    |-        if b:
+42    |-            x = False
+43    |-        else:
+44    |-            x = True
+   41 |+        x = not b
+45 42 | 
+46 43 | 
+47 44 | def f():
+
+simplifiable_if_statement.py:66:5: PLR1703 [*] Assign the condition `a` directly
+   |
+64 |   def f():
+65 |       # PLR1703
+66 |       if a:
+   |  _____^
+67 | |         x = False
+68 | |     else:
+69 | |         x = True
+   | |________________^ PLR1703
+   |
+   = help: Replace with `x = not a`
+
+ℹ Unsafe fix
+63 63 | 
+64 64 | def f():
+65 65 |     # PLR1703
+66    |-    if a:
+67    |-        x = False
+68    |-    else:
+69    |-        x = True
+   66 |+    x = not a
+70 67 | 
+71 68 | 
+72 69 | def f():
+
+simplifiable_if_statement.py:93:5: PLR1703 Assign the condition `a` directly
+   |
+91 |       # Won't fix
+92 |       # PLR1703
+93 |       if a:
+   |  _____^
+94 | |         x = True
+95 | |     else:
+96 | |         x = False
+   | |_________________^ PLR1703
+   |
+   = help: Assign condition inline
