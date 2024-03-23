@@ -31,8 +31,9 @@ use std::path::Path;
 use itertools::Itertools;
 use log::debug;
 use ruff_python_ast::{
-    self as ast, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext, Keyword,
-    MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt, Suite, UnaryOp,
+    self as ast, all::DunderAllName, Comprehension, ElifElseClause, ExceptHandler, Expr,
+    ExprContext, Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt,
+    Suite, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -937,6 +938,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             && !self.semantic.in_deferred_type_definition()
             && self.semantic.in_type_definition()
             && self.semantic.future_annotations()
+            && (self.semantic.in_annotation() || self.source_type.is_stub())
         {
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
                 self.visit.string_type_definitions.push((
@@ -2097,33 +2099,32 @@ impl<'a> Checker<'a> {
     fn visit_exports(&mut self) {
         let snapshot = self.semantic.snapshot();
 
-        let exports: Vec<(&str, TextRange)> = self
+        let exports: Vec<DunderAllName> = self
             .semantic
             .global_scope()
             .get_all("__all__")
             .map(|binding_id| &self.semantic.bindings[binding_id])
             .filter_map(|binding| match &binding.kind {
-                BindingKind::Export(Export { names }) => {
-                    Some(names.iter().map(|name| (*name, binding.range())))
-                }
+                BindingKind::Export(Export { names }) => Some(names.iter().copied()),
                 _ => None,
             })
             .flatten()
             .collect();
 
-        for (name, range) in exports {
+        for export in exports {
+            let (name, range) = (export.name(), export.range());
             if let Some(binding_id) = self.semantic.global_scope().get(name) {
+                self.semantic.flags |= SemanticModelFlags::DUNDER_ALL_DEFINITION;
                 // Mark anything referenced in `__all__` as used.
-                // TODO(charlie): `range` here should be the range of the name in `__all__`, not
-                // the range of `__all__` itself.
                 self.semantic
                     .add_global_reference(binding_id, ExprContext::Load, range);
+                self.semantic.flags -= SemanticModelFlags::DUNDER_ALL_DEFINITION;
             } else {
                 if self.semantic.global_scope().uses_star_imports() {
                     if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
                         self.diagnostics.push(Diagnostic::new(
                             pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                                name: (*name).to_string(),
+                                name: name.to_string(),
                             },
                             range,
                         ));
@@ -2133,7 +2134,7 @@ impl<'a> Checker<'a> {
                         if !self.path.ends_with("__init__.py") {
                             self.diagnostics.push(Diagnostic::new(
                                 pyflakes::rules::UndefinedExport {
-                                    name: (*name).to_string(),
+                                    name: name.to_string(),
                                 },
                                 range,
                             ));

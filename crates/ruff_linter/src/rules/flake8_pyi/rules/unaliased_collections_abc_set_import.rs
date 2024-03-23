@@ -77,7 +77,13 @@ pub(crate) fn unaliased_collections_abc_set_import(
     if checker.semantic().is_available("AbstractSet") {
         diagnostic.try_set_fix(|| {
             let scope = &checker.semantic().scopes[binding.scope];
-            let (edit, rest) = Renamer::rename(name, "AbstractSet", scope, checker.semantic())?;
+            let (edit, rest) = Renamer::rename(
+                name,
+                "AbstractSet",
+                scope,
+                checker.semantic(),
+                checker.stylist(),
+            )?;
             Ok(Fix::applicable_edits(
                 edit,
                 rest,
