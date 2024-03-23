@@ -207,7 +207,7 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                     self.visit_expr(expr);
                 }
             }
-            Stmt::Break(_) | Stmt::Continue(_) => {
+            Stmt::Continue(_) | Stmt::Break(_) => {
                 self.reset_usage_count();
             }
             Stmt::Return(ast::StmtReturn { value, range: _ }) => {
