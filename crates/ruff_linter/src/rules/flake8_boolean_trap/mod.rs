@@ -60,7 +60,6 @@ mod tests {
                         "deploy".to_string(),
                         "used".to_string(),
                     ],
-                    ..super::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::BooleanPositionalValueInCall)
             },
