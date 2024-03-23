@@ -1,0 +1,189 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB157.py:7:1: FURB157 [*] Verbose expression in `Decimal` constructor
+  |
+5 | # Positive cases
+6 | 
+7 | Decimal("0")
+  | ^^^^^^^^^^^^ FURB157
+8 | Decimal("-42")
+9 | Decimal(float("Infinity"))
+  |
+  = help: Replace Decimal("0") with Decimal(0)
+
+ℹ Unsafe fix
+4 4 | 
+5 5 | # Positive cases
+6 6 | 
+7   |-Decimal("0")
+  7 |+Decimal(0)
+8 8 | Decimal("-42")
+9 9 | Decimal(float("Infinity"))
+10 10 | Decimal(float("-Infinity"))
+
+FURB157.py:8:1: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+ 7 | Decimal("0")
+ 8 | Decimal("-42")
+   | ^^^^^^^^^^^^^^ FURB157
+ 9 | Decimal(float("Infinity"))
+10 | Decimal(float("-Infinity"))
+   |
+   = help: Replace Decimal("-42") with Decimal(-42)
+
+ℹ Unsafe fix
+5 5 | # Positive cases
+6 6 | 
+7 7 | Decimal("0")
+8   |-Decimal("-42")
+  8 |+Decimal(-42)
+9 9 | Decimal(float("Infinity"))
+10 10 | Decimal(float("-Infinity"))
+11 11 | Decimal(float("inf"))
+
+FURB157.py:9:1: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+ 7 | Decimal("0")
+ 8 | Decimal("-42")
+ 9 | Decimal(float("Infinity"))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB157
+10 | Decimal(float("-Infinity"))
+11 | Decimal(float("inf"))
+   |
+   = help: Replace float("Infinity") with "Infinity"
+
+ℹ Unsafe fix
+6  6  | 
+7  7  | Decimal("0")
+8  8  | Decimal("-42")
+9     |-Decimal(float("Infinity"))
+   9  |+Decimal("Infinity")
+10 10 | Decimal(float("-Infinity"))
+11 11 | Decimal(float("inf"))
+12 12 | Decimal(float("-inf"))
+
+FURB157.py:10:1: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+ 8 | Decimal("-42")
+ 9 | Decimal(float("Infinity"))
+10 | Decimal(float("-Infinity"))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB157
+11 | Decimal(float("inf"))
+12 | Decimal(float("-inf"))
+   |
+   = help: Replace float("-Infinity") with "-Infinity"
+
+ℹ Unsafe fix
+7  7  | Decimal("0")
+8  8  | Decimal("-42")
+9  9  | Decimal(float("Infinity"))
+10    |-Decimal(float("-Infinity"))
+   10 |+Decimal("-Infinity")
+11 11 | Decimal(float("inf"))
+12 12 | Decimal(float("-inf"))
+13 13 | Decimal(float("nan"))
+
+FURB157.py:11:1: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+ 9 | Decimal(float("Infinity"))
+10 | Decimal(float("-Infinity"))
+11 | Decimal(float("inf"))
+   | ^^^^^^^^^^^^^^^^^^^^^ FURB157
+12 | Decimal(float("-inf"))
+13 | Decimal(float("nan"))
+   |
+   = help: Replace float("inf") with "inf"
+
+ℹ Unsafe fix
+8  8  | Decimal("-42")
+9  9  | Decimal(float("Infinity"))
+10 10 | Decimal(float("-Infinity"))
+11    |-Decimal(float("inf"))
+   11 |+Decimal("inf")
+12 12 | Decimal(float("-inf"))
+13 13 | Decimal(float("nan"))
+14 14 | decimal.Decimal("0")
+
+FURB157.py:12:1: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+10 | Decimal(float("-Infinity"))
+11 | Decimal(float("inf"))
+12 | Decimal(float("-inf"))
+   | ^^^^^^^^^^^^^^^^^^^^^^ FURB157
+13 | Decimal(float("nan"))
+14 | decimal.Decimal("0")
+   |
+   = help: Replace float("-inf") with "-inf"
+
+ℹ Unsafe fix
+9  9  | Decimal(float("Infinity"))
+10 10 | Decimal(float("-Infinity"))
+11 11 | Decimal(float("inf"))
+12    |-Decimal(float("-inf"))
+   12 |+Decimal("-inf")
+13 13 | Decimal(float("nan"))
+14 14 | decimal.Decimal("0")
+15 15 | dc("0")
+
+FURB157.py:13:1: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+11 | Decimal(float("inf"))
+12 | Decimal(float("-inf"))
+13 | Decimal(float("nan"))
+   | ^^^^^^^^^^^^^^^^^^^^^ FURB157
+14 | decimal.Decimal("0")
+15 | dc("0")
+   |
+   = help: Replace float("nan") with "nan"
+
+ℹ Unsafe fix
+10 10 | Decimal(float("-Infinity"))
+11 11 | Decimal(float("inf"))
+12 12 | Decimal(float("-inf"))
+13    |-Decimal(float("nan"))
+   13 |+Decimal("nan")
+14 14 | decimal.Decimal("0")
+15 15 | dc("0")
+16 16 | 
+
+FURB157.py:14:1: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+12 | Decimal(float("-inf"))
+13 | Decimal(float("nan"))
+14 | decimal.Decimal("0")
+   | ^^^^^^^^^^^^^^^^^^^^ FURB157
+15 | dc("0")
+   |
+   = help: Replace decimal.Decimal("0") with decimal.Decimal(0)
+
+ℹ Unsafe fix
+11 11 | Decimal(float("inf"))
+12 12 | Decimal(float("-inf"))
+13 13 | Decimal(float("nan"))
+14    |-decimal.Decimal("0")
+   14 |+decimal.Decimal(0)
+15 15 | dc("0")
+16 16 | 
+17 17 | # Negative cases
+
+FURB157.py:15:1: FURB157 [*] Verbose expression in `Decimal` constructor
+   |
+13 | Decimal(float("nan"))
+14 | decimal.Decimal("0")
+15 | dc("0")
+   | ^^^^^^^ FURB157
+16 | 
+17 | # Negative cases
+   |
+   = help: Replace dc("0") with dc(0)
+
+ℹ Unsafe fix
+12 12 | Decimal(float("-inf"))
+13 13 | Decimal(float("nan"))
+14 14 | decimal.Decimal("0")
+15    |-dc("0")
+   15 |+dc(0)
+16 16 | 
+17 17 | # Negative cases
+18 18 |
