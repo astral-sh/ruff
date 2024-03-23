@@ -1,3 +1,4 @@
+use crate::settings::LinterSettings;
 use ruff_python_ast::{self as ast, Expr};
 
 /// Returns `true` if a function call is allowed to use a boolean trap.
@@ -43,6 +44,14 @@ pub(super) fn is_allowed_func_call(name: &str) -> bool {
     )
 }
 
+/// Returns `true` if a function call is allowed by the user to use a boolean trap.
+pub(super) fn is_user_allowed_func_call(name: &str, settings: &LinterSettings) -> bool {
+    settings
+        .flake8_boolean_trap
+        .extend_allowed_calls
+        .contains(&name.to_string())
+}
+
 /// Returns `true` if a function definition is allowed to use a boolean trap.
 pub(super) fn is_allowed_func_def(name: &str) -> bool {
     matches!(name, "__setitem__" | "__post_init__")
@@ -51,7 +60,7 @@ pub(super) fn is_allowed_func_def(name: &str) -> bool {
 /// Returns `true` if an argument is allowed to use a boolean trap. To return
 /// `true`, the function name must be explicitly allowed, and the argument must
 /// be either the first or second argument in the call.
-pub(super) fn allow_boolean_trap(call: &ast::ExprCall) -> bool {
+pub(super) fn allow_boolean_trap(call: &ast::ExprCall, settings: &LinterSettings) -> bool {
     let func_name = match call.func.as_ref() {
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr.as_str(),
         Expr::Name(ast::ExprName { id, .. }) => id.as_str(),
@@ -74,6 +83,12 @@ pub(super) fn allow_boolean_trap(call: &ast::ExprCall) -> bool {
         {
             return true;
         }
+    }
+
+    // If the function name is explicitly allowed by the user, then the boolean trap is
+    // allowed.
+    if is_user_allowed_func_call(func_name, settings) {
+        return true;
     }
 
     false

@@ -1,6 +1,7 @@
 //! Rules from [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/).
 mod helpers;
 pub(crate) mod rules;
+pub mod settings;
 
 #[cfg(test)]
 mod tests {
@@ -11,6 +12,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::settings::types::PreviewMode;
+    use crate::settings::LinterSettings;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -42,6 +44,28 @@ mod tests {
             },
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn extend_allowed_callable() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_boolean_trap/FBT.py"),
+            &LinterSettings {
+                flake8_boolean_trap: super::settings::Settings {
+                    extend_allowed_calls: vec![
+                        "Value".to_string(),
+                        "Field".to_string(),
+                        "settings".to_string(),
+                        "deploy".to_string(),
+                        "used".to_string(),
+                    ],
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::BooleanPositionalValueInCall)
+            },
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 }

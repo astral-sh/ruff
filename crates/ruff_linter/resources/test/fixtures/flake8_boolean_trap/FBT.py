@@ -132,3 +132,26 @@ class Fit:
         print(force)
 
 Fit(force=True)
+
+
+# https://github.com/astral-sh/ruff/issues/10356
+from django.db.models import Case, Q, Value, When
+
+
+qs.annotate(
+    is_foo_or_bar=Case(
+        When(Q(is_foo=True) | Q(is_bar=True)),
+        then=Value(True),
+    ),
+    default=Value(False),
+)
+
+
+# https://github.com/astral-sh/ruff/issues/10485
+from pydantic import Field
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+
+    foo: bool = Field(True, exclude=True)

@@ -226,6 +226,18 @@
         }
       ]
     },
+    "flake8-boolean-trap": {
+      "description": "Options for the `flake8-boolean-trap` plugin.",
+      "deprecated": true,
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8BooleanTrapOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-bugbear": {
       "description": "Options for the `flake8-bugbear` plugin.",
       "deprecated": true,
@@ -883,6 +895,22 @@
         },
         "hardcoded-tmp-directory-extend": {
           "description": "A list of directories to consider temporary, in addition to those specified by `hardcoded-tmp-directory`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8BooleanTrapOptions": {
+      "type": "object",
+      "properties": {
+        "extend-allowed-calls": {
+          "description": "A list of calls with which to allow a boolean trap.",
           "type": [
             "array",
             "null"
@@ -1908,6 +1936,17 @@
           "anyOf": [
             {
               "$ref": "#/definitions/Flake8BanditOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-boolean-trap": {
+          "description": "Options for the `flake8-boolean-trap` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8BooleanTrapOptions"
             },
             {
               "type": "null"
