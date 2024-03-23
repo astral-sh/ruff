@@ -150,7 +150,7 @@ fn get_base_attribute(call: &ast::ExprCall) -> Option<&ast::ExprAttribute> {
     while let ast::Expr::Call(ast::ExprCall { func, .. }) = attr.value.as_ref() {
         attr = func.as_attribute_expr()?;
     }
-    return Some(attr);
+    Some(attr)
 }
 
 /// Returns `true` if the given method accepts an `inplace` argument when used on a Pandas

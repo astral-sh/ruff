@@ -36,3 +36,5 @@ torch.m.ReLU(inplace=True)  # safe because this isn't a pandas call
 x.rotate_z(45, inplace=True)
 
 x.reorder_levels().sort_index(inplace=True)
+
+x.drop(["a"], axis=1, inplace=True).sort_index(inplace=True)
