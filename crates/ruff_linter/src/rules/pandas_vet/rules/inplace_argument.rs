@@ -119,7 +119,8 @@ fn convert_inplace_argument_to_assignment(
     locator: &Locator,
 ) -> Option<Fix> {
     // Add the assignment.
-    let attr = call.func.as_attribute_expr()?;
+    // let attr = call.func.as_attribute_expr()?;
+    let attr = get_base_attribute(call)?;
     let insert_assignment = Edit::insertion(
         format!("{name} = ", name = locator.slice(attr.value.range())),
         parenthesized_range(
@@ -142,6 +143,14 @@ fn convert_inplace_argument_to_assignment(
     .ok()?;
 
     Some(Fix::unsafe_edits(insert_assignment, [remove_argument]))
+}
+
+fn get_base_attribute(call: &ast::ExprCall) -> Option<&ast::ExprAttribute> {
+    let mut attr = call.func.as_attribute_expr()?;
+    while let ast::Expr::Call(ast::ExprCall { func, .. }) = attr.value.as_ref() {
+        attr = func.as_attribute_expr()?;
+    }
+    return Some(attr);
 }
 
 /// Returns `true` if the given method accepts an `inplace` argument when used on a Pandas

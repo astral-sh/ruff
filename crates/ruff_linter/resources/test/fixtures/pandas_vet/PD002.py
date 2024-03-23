@@ -34,3 +34,5 @@ torch.m.ReLU(inplace=True)  # safe because this isn't a pandas call
 
 # This method doesn't take exist in Pandas, so ignore it.
 x.rotate_z(45, inplace=True)
+
+x.reorder_levels().sort_index(inplace=True)

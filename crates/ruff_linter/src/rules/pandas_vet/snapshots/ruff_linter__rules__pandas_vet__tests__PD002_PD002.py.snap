@@ -179,4 +179,18 @@ PD002.py:33:24: PD002 [*] `inplace=True` should be avoided; it has inconsistent 
 35 35 | # This method doesn't take exist in Pandas, so ignore it.
 36 36 | x.rotate_z(45, inplace=True)
 
+PD002.py:38:31: PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
+   |
+36 | x.rotate_z(45, inplace=True)
+37 | 
+38 | x.reorder_levels().sort_index(inplace=True)
+   |                               ^^^^^^^^^^^^ PD002
+   |
+   = help: Assign to variable; remove `inplace` arg
 
+ℹ Unsafe fix
+35 35 | # This method doesn't take exist in Pandas, so ignore it.
+36 36 | x.rotate_z(45, inplace=True)
+37 37 | 
+38    |-x.reorder_levels().sort_index(inplace=True)
+   38 |+x = x.reorder_levels().sort_index()
