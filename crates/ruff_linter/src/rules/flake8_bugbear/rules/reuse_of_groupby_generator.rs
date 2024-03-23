@@ -100,6 +100,16 @@ impl<'a> GroupNameFinder<'a> {
             self.usage_count += value;
         }
     }
+
+    /// Reset the usage count for the group name by the given value.
+    /// This function is called when there is a continue, break, return statement.
+    fn reset_usage_count(&mut self) {
+        if let Some(last) = self.counter_stack.last_mut() {
+            *last.last_mut().unwrap() = 0;
+        } else {
+            self.usage_count = 0;
+        }
+    }
 }
 
 impl<'a> Visitor<'a> for GroupNameFinder<'a> {
