@@ -83,6 +83,8 @@ mod tests {
     #[test_case(Rule::UnaliasedCollectionsAbcSetImport, Path::new("PYI025_1.pyi"))]
     #[test_case(Rule::UnaliasedCollectionsAbcSetImport, Path::new("PYI025_2.py"))]
     #[test_case(Rule::UnaliasedCollectionsAbcSetImport, Path::new("PYI025_2.pyi"))]
+    #[test_case(Rule::UnaliasedCollectionsAbcSetImport, Path::new("PYI025_3.py"))]
+    #[test_case(Rule::UnaliasedCollectionsAbcSetImport, Path::new("PYI025_3.pyi"))]
     #[test_case(Rule::UnannotatedAssignmentInStub, Path::new("PYI052.py"))]
     #[test_case(Rule::UnannotatedAssignmentInStub, Path::new("PYI052.pyi"))]
     #[test_case(Rule::UnassignedSpecialVariableInStub, Path::new("PYI035.py"))]
