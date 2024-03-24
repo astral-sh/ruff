@@ -293,8 +293,8 @@ pub struct Options {
     pub builtins: Option<Vec<String>>,
 
     /// Mark the specified directories as namespace packages. For the purpose of
-    /// module resolution, Ruff will treat those directories as if they
-    /// contained an `__init__.py` file.
+    /// module resolution, Ruff will treat those directories and all their subdirectories
+    /// as if they contained an `__init__.py` file.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
