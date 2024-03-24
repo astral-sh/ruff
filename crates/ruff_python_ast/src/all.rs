@@ -1,4 +1,5 @@
 use bitflags::bitflags;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::helpers::map_subscript;
 use crate::{self as ast, Expr, Stmt};
@@ -15,17 +16,47 @@ bitflags! {
     }
 }
 
+/// Abstraction for a string inside an `__all__` definition,
+/// e.g. `"foo"` in `__all__ = ["foo"]`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DunderAllName<'a> {
+    /// The value of the string inside the `__all__` definition
+    name: &'a str,
+
+    /// The range of the string inside the `__all__` definition
+    range: TextRange,
+}
+
+impl DunderAllName<'_> {
+    pub fn name(&self) -> &str {
+        self.name
+    }
+}
+
+impl Ranged for DunderAllName<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 /// Extract the names bound to a given __all__ assignment.
 ///
 /// Accepts a closure that determines whether a given name (e.g., `"list"`) is a Python builtin.
-pub fn extract_all_names<F>(stmt: &Stmt, is_builtin: F) -> (Vec<&str>, DunderAllFlags)
+pub fn extract_all_names<F>(stmt: &Stmt, is_builtin: F) -> (Vec<DunderAllName>, DunderAllFlags)
 where
     F: Fn(&str) -> bool,
 {
-    fn add_to_names<'a>(elts: &'a [Expr], names: &mut Vec<&'a str>, flags: &mut DunderAllFlags) {
+    fn add_to_names<'a>(
+        elts: &'a [Expr],
+        names: &mut Vec<DunderAllName<'a>>,
+        flags: &mut DunderAllFlags,
+    ) {
         for elt in elts {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
-                names.push(value.to_str());
+            if let Expr::StringLiteral(ast::ExprStringLiteral { value, range }) = elt {
+                names.push(DunderAllName {
+                    name: value.to_str(),
+                    range: *range,
+                });
             } else {
                 *flags |= DunderAllFlags::INVALID_OBJECT;
             }
@@ -96,7 +127,7 @@ where
         (None, DunderAllFlags::INVALID_FORMAT)
     }
 
-    let mut names: Vec<&str> = vec![];
+    let mut names: Vec<DunderAllName> = vec![];
     let mut flags = DunderAllFlags::empty();
 
     if let Some(value) = match stmt {

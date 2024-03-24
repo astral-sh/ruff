@@ -93,6 +93,12 @@ impl ResolvedReference {
         self.flags
             .intersects(SemanticModelFlags::TYPE_CHECKING_BLOCK)
     }
+
+    /// Return `true` if the context is in the r.h.s. of an `__all__` definition.
+    pub const fn in_dunder_all_definition(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::DUNDER_ALL_DEFINITION)
+    }
 }
 
 impl Ranged for ResolvedReference {

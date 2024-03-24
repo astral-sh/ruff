@@ -1590,6 +1590,13 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::COMPREHENSION_ASSIGNMENT)
     }
 
+    /// Return `true` if the model is visiting the r.h.s. of an `__all__` definition
+    /// (e.g. `"foo"` in `__all__ = ["foo"]`)
+    pub const fn in_dunder_all_definition(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::DUNDER_ALL_DEFINITION)
+    }
+
     /// Return an iterator over all bindings shadowed by the given [`BindingId`], within the
     /// containing scope, and across scopes.
     pub fn shadowed_bindings(
@@ -1940,6 +1947,18 @@ bitflags! {
         ///     pass
         /// ```
         const DOCSTRING = 1 << 21;
+
+        /// The model is visiting the r.h.s. of a module-level `__all__` definition.
+        ///
+        /// This could be any module-level statement that assigns or alters `__all__`,
+        /// for example:
+        /// ```python
+        /// __all__ = ["foo"]
+        /// __all__: str = ["foo"]
+        /// __all__ = ("bar",)
+        /// __all__ += ("baz,")
+        /// ```
+        const DUNDER_ALL_DEFINITION = 1 << 22;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

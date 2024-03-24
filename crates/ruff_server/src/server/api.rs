@@ -65,6 +65,9 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
         notification::DidChangeConfiguration::METHOD => {
             local_notification_task::<notification::DidChangeConfiguration>(notif)
         }
+        notification::DidChangeWatchedFiles::METHOD => {
+            local_notification_task::<notification::DidChangeWatchedFiles>(notif)
+        }
         notification::DidChangeWorkspace::METHOD => {
             local_notification_task::<notification::DidChangeWorkspace>(notif)
         }

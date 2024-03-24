@@ -1,6 +1,9 @@
 //! Scheduling, I/O, and API endpoints.
 
 use std::num::NonZeroUsize;
+use std::sync::atomic::AtomicI32;
+use std::sync::atomic::Ordering;
+use std::time::Duration;
 
 use lsp::Connection;
 use lsp_server as lsp;
@@ -9,6 +12,8 @@ use types::ClientCapabilities;
 use types::CodeActionKind;
 use types::CodeActionOptions;
 use types::DiagnosticOptions;
+use types::DidChangeWatchedFilesRegistrationOptions;
+use types::FileSystemWatcher;
 use types::OneOf;
 use types::TextDocumentSyncCapability;
 use types::TextDocumentSyncKind;
@@ -31,6 +36,7 @@ pub struct Server {
     threads: lsp::IoThreads,
     worker_threads: NonZeroUsize,
     session: Session,
+    next_request_id: AtomicI32,
 }
 
 impl Server {
@@ -43,6 +49,12 @@ impl Server {
 
         let client_capabilities = init_params.capabilities;
         let server_capabilities = Self::server_capabilities(&client_capabilities);
+
+        let dynamic_registration = client_capabilities
+            .workspace
+            .and_then(|workspace| workspace.did_change_watched_files)
+            .and_then(|watched_files| watched_files.dynamic_registration)
+            .unwrap_or_default();
 
         let workspaces = init_params
             .workspace_folders
@@ -64,31 +76,80 @@ impl Server {
             }
         });
 
+        let next_request_id = AtomicI32::from(1);
+
         conn.initialize_finish(id, initialize_data)?;
+
+        if dynamic_registration {
+            // Register capabilities
+            conn.sender
+                .send(lsp_server::Message::Request(lsp_server::Request {
+                    id: next_request_id.fetch_add(1, Ordering::Relaxed).into(),
+                    method: "client/registerCapability".into(),
+                    params: serde_json::to_value(lsp_types::RegistrationParams {
+                        registrations: vec![lsp_types::Registration {
+                            id: "ruff-server-watch".into(),
+                            method: "workspace/didChangeWatchedFiles".into(),
+                            register_options: Some(serde_json::to_value(
+                                DidChangeWatchedFilesRegistrationOptions {
+                                    watchers: vec![
+                                        FileSystemWatcher {
+                                            glob_pattern: types::GlobPattern::String(
+                                                "**/.?ruff.toml".into(),
+                                            ),
+                                            kind: None,
+                                        },
+                                        FileSystemWatcher {
+                                            glob_pattern: types::GlobPattern::String(
+                                                "**/pyproject.toml".into(),
+                                            ),
+                                            kind: None,
+                                        },
+                                    ],
+                                },
+                            )?),
+                        }],
+                    })?,
+                }))?;
+
+            // Flush response from the client (to avoid an unexpected response appearing in the event loop)
+            let _ = conn.receiver.recv_timeout(Duration::from_secs(5)).map_err(|_| {
+                tracing::error!("Timed out while waiting for client to acknowledge registration of dynamic capabilities");
+            });
+        } else {
+            tracing::warn!("LSP client does not support dynamic file watcher registration - automatic configuration reloading will not be available.");
+        }
 
         Ok(Self {
             conn,
             threads,
             worker_threads,
             session: Session::new(&server_capabilities, &workspaces)?,
+            next_request_id,
         })
     }
 
     pub fn run(self) -> crate::Result<()> {
         let result = event_loop_thread(move || {
-            Self::event_loop(&self.conn, self.session, self.worker_threads)
+            Self::event_loop(
+                &self.conn,
+                self.session,
+                self.worker_threads,
+                self.next_request_id,
+            )
         })?
         .join();
         self.threads.join()?;
         result
     }
 
+    #[allow(clippy::needless_pass_by_value)] // this is because we aren't using `next_request_id` yet.
     fn event_loop(
         connection: &Connection,
         session: Session,
         worker_threads: NonZeroUsize,
+        _next_request_id: AtomicI32,
     ) -> crate::Result<()> {
-        // TODO(jane): Make thread count configurable
         let mut scheduler = schedule::Scheduler::new(session, worker_threads, &connection.sender);
         for msg in &connection.receiver {
             let task = match msg {
