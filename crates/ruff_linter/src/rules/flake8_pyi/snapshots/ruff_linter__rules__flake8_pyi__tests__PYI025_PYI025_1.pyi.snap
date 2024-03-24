@@ -87,7 +87,7 @@ PYI025_1.pyi:33:29: PYI025 [*] Use `from collections.abc import Set as AbstractS
    |
    = help: Alias `Set` to `AbstractSet`
 
-ℹ Unsafe fix
+ℹ Safe fix
 17 17 |     else:
 18 18 |         Set = 1
 19 19 | 
