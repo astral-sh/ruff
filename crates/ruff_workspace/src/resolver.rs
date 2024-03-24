@@ -210,7 +210,7 @@ impl<'a> Resolver<'a> {
 /// A wrapper around `detect_package_root` to cache filesystem lookups.
 fn detect_package_root_with_cache<'a>(
     path: &'a Path,
-    namespace_packages: &'a [PathBuf],
+    namespace_packages: &[PathBuf],
     package_cache: &mut FxHashMap<&'a Path, bool>,
 ) -> Option<&'a Path> {
     let mut current = None;
@@ -226,7 +226,7 @@ fn detect_package_root_with_cache<'a>(
 /// A wrapper around `is_package` to cache filesystem lookups.
 fn is_package_with_cache<'a>(
     path: &'a Path,
-    namespace_packages: &'a [PathBuf],
+    namespace_packages: &[PathBuf],
     package_cache: &mut FxHashMap<&'a Path, bool>,
 ) -> bool {
     *package_cache

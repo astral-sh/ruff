@@ -26,17 +26,14 @@ use std::path::{Path, PathBuf};
 /// Return `true` if the directory at the given `Path` appears to be a Python
 /// package.
 pub fn is_package(path: &Path, namespace_packages: &[PathBuf]) -> bool {
-    path.join("__init__.py").is_file()
-        || namespace_packages
-            .iter()
-            .any(|namespace_package| namespace_package == path)
+    namespace_packages
+        .iter()
+        .any(|namespace_package| path.starts_with(namespace_package))
+        || path.join("__init__.py").is_file()
 }
 
-/// Return the package root for the given Python file.
-pub fn detect_package_root<'a>(
-    path: &'a Path,
-    namespace_packages: &'a [PathBuf],
-) -> Option<&'a Path> {
+/// Return the package root for the given path to a directory with Python file.
+pub fn detect_package_root<'a>(path: &'a Path, namespace_packages: &[PathBuf]) -> Option<&'a Path> {
     let mut current = None;
     for parent in path.ancestors() {
         if !is_package(parent, namespace_packages) {
