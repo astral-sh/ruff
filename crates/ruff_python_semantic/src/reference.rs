@@ -220,3 +220,31 @@ impl Deref for UnresolvedReferences {
         &self.0
     }
 }
+
+/// An unresolved attribute reference to a name in a program.
+/// e.g. `x` in `self.x`
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub struct UnresolvedAttribute {
+    /// The range of the reference in the source code.
+    pub range: TextRange,
+
+    /// The scope in which the attribute is being resolved.
+    pub scope_id: ScopeId,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct UnresolvedAttributes(Vec<UnresolvedAttribute>);
+
+impl UnresolvedAttributes {
+    pub(crate) fn push(&mut self, range: TextRange, scope_id: ScopeId) {
+        self.0.push(UnresolvedAttribute { range, scope_id });
+    }
+}
+
+impl Deref for UnresolvedAttributes {
+    type Target = Vec<UnresolvedAttribute>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}

@@ -20,7 +20,9 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
+    #[test_case(Rule::AccessMemberBeforeDefinition, Path::new("E0203.py"))]
     #[test_case(Rule::SingledispatchMethod, Path::new("singledispatch_method.py"))]
+    #[test_case(Rule::AndOrTernary, Path::new("and_or_ternary.py"))]
     #[test_case(
         Rule::SingledispatchmethodFunction,
         Path::new("singledispatchmethod_function.py")

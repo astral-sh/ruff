@@ -317,7 +317,11 @@ bitflags! {
         /// ```python
         /// (x, y) = 1, 2
         /// ```
-        const UNPACKED_ASSIGNMENT = 1 << 9;
+        const UNPACKED_ASSIGNMENT = 1 << 8;
+      
+        /// The binding represents an instance atttribute assinged to the self variable in class.
+        const INSTANCE_ATTRIBUTE = 1 << 9;
+
     }
 }
 
