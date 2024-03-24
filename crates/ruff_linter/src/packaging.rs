@@ -84,4 +84,39 @@ mod tests {
             None,
         );
     }
+
+    #[test]
+    fn package_detection_with_namespace_packages() {
+        assert_eq!(
+            detect_package_root(&test_resource_path("project/python_modules/core/core"), &[],),
+            Some(test_resource_path("project/python_modules/core/core").as_path())
+        );
+
+        assert_eq!(
+            detect_package_root(
+                &test_resource_path("project/python_modules/core/core"),
+                &[test_resource_path("project/python_modules/core"),],
+            ),
+            Some(test_resource_path("project/python_modules/core").as_path())
+        );
+
+        assert_eq!(
+            detect_package_root(
+                &test_resource_path("project/python_modules/core/core"),
+                &[
+                    test_resource_path("project/python_modules/core"),
+                    test_resource_path("project/python_modules"),
+                ],
+            ),
+            Some(test_resource_path("project/python_modules").as_path())
+        );
+
+        assert_eq!(
+            detect_package_root(
+                &test_resource_path("project/python_modules/core/core"),
+                &[test_resource_path("project/python_modules"),],
+            ),
+            Some(test_resource_path("project/python_modules").as_path())
+        );
+    }
 }
