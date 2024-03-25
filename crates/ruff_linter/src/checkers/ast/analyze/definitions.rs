@@ -1,4 +1,4 @@
-use ruff_python_ast::str::raw_contents_range;
+use ruff_python_ast::{all::DunderAllName, str::raw_contents_range};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_python_semantic::{
@@ -93,7 +93,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
     }
 
     // Compute visibility of all definitions.
-    let exports: Option<Vec<&str>> = {
+    let exports: Option<Vec<DunderAllName>> = {
         checker
             .semantic
             .global_scope()

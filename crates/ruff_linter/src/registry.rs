@@ -257,9 +257,6 @@ impl Rule {
             | Rule::TrailingWhitespace => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AvoidableEscapedQuote
-            | Rule::BadQuotesDocstring
-            | Rule::BadQuotesInlineString
-            | Rule::BadQuotesMultilineString
             | Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
             | Rule::BlankLineAfterDecorator

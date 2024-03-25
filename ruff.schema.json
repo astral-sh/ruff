@@ -509,7 +509,7 @@
       ]
     },
     "namespace-packages": {
-      "description": "Mark the specified directories as namespace packages. For the purpose of module resolution, Ruff will treat those directories as if they contained an `__init__.py` file.",
+      "description": "Mark the specified directories as namespace packages. For the purpose of module resolution, Ruff will treat those directories and all their subdirectories as if they contained an `__init__.py` file.",
       "type": [
         "array",
         "null"
@@ -959,7 +959,7 @@
           "minimum": 0.0
         },
         "notice-rgx": {
-          "description": "The regular expression used to match the copyright notice, compiled with the [`regex`](https://docs.rs/regex/latest/regex/) crate.\n\nDefaults to `(?i)Copyright\\s+((?:\\(C\\)|©)\\s+)?\\d{4}(-\\d{4})*`, which matches the following: - `Copyright 2023` - `Copyright (C) 2023` - `Copyright 2021-2023` - `Copyright (C) 2021-2023`",
+          "description": "The regular expression used to match the copyright notice, compiled with the [`regex`](https://docs.rs/regex/latest/regex/) crate. Defaults to `(?i)Copyright\\s+((?:\\(C\\)|©)\\s+)?\\d{4}((-|,\\s)\\d{4})*`, which matches the following: - `Copyright 2023` - `Copyright (C) 2023` - `Copyright 2021-2023` - `Copyright (C) 2021-2023` - `Copyright (C) 2021, 2023`",
           "type": [
             "string",
             "null"
@@ -3018,6 +3018,7 @@
         "FURB148",
         "FURB15",
         "FURB152",
+        "FURB157",
         "FURB16",
         "FURB161",
         "FURB163",
@@ -3030,6 +3031,7 @@
         "FURB18",
         "FURB180",
         "FURB181",
+        "FURB187",
         "G",
         "G0",
         "G00",
@@ -3330,6 +3332,8 @@
         "PLW01",
         "PLW010",
         "PLW0108",
+        "PLW011",
+        "PLW0117",
         "PLW012",
         "PLW0120",
         "PLW0127",

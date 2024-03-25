@@ -16,7 +16,7 @@ expression: parse_ast
                                 value: "Hello world",
                                 flags: StringLiteralFlags {
                                     quote_style: Single,
-                                    prefix: "",
+                                    prefix: Empty,
                                     triple_quoted: false,
                                 },
                             },

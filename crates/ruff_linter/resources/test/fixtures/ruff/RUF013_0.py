@@ -1,4 +1,3 @@
-import typing
 from typing import Annotated, Any, Literal, Optional, Tuple, Union, Hashable
 
 
@@ -26,10 +25,6 @@ def f(arg: str = None):  # RUF013
     pass
 
 
-def f(arg: typing.List[str] = None):  # RUF013
-    pass
-
-
 def f(arg: Tuple[str] = None):  # RUF013
     pass
 
@@ -38,10 +33,6 @@ def f(arg: Tuple[str] = None):  # RUF013
 
 
 def f(arg: Optional[int] = None):
-    pass
-
-
-def f(arg: typing.Optional[int] = None):
     pass
 
 
@@ -60,10 +51,6 @@ def f(arg: Union[str, None] = None):
     pass
 
 
-def f(arg: typing.Union[int, str, None] = None):
-    pass
-
-
 def f(arg: Union[int, str, Any] = None):
     pass
 
@@ -77,10 +64,6 @@ def f(arg: Union[int] = None):  # RUF013
 
 
 def f(arg: Union[int, str] = None):  # RUF013
-    pass
-
-
-def f(arg: typing.Union[int, str] = None):  # RUF013
     pass
 
 
@@ -127,10 +110,6 @@ def f(arg: Literal[1] = None):  # RUF013
 
 
 def f(arg: Literal[1, "foo"] = None):  # RUF013
-    pass
-
-
-def f(arg: typing.Literal[1, "foo", True] = None):  # RUF013
     pass
 
 

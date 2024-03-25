@@ -26,17 +26,14 @@ use std::path::{Path, PathBuf};
 /// Return `true` if the directory at the given `Path` appears to be a Python
 /// package.
 pub fn is_package(path: &Path, namespace_packages: &[PathBuf]) -> bool {
-    path.join("__init__.py").is_file()
-        || namespace_packages
-            .iter()
-            .any(|namespace_package| namespace_package == path)
+    namespace_packages
+        .iter()
+        .any(|namespace_package| path.starts_with(namespace_package))
+        || path.join("__init__.py").is_file()
 }
 
-/// Return the package root for the given Python file.
-pub fn detect_package_root<'a>(
-    path: &'a Path,
-    namespace_packages: &'a [PathBuf],
-) -> Option<&'a Path> {
+/// Return the package root for the given path to a directory with Python file.
+pub fn detect_package_root<'a>(path: &'a Path, namespace_packages: &[PathBuf]) -> Option<&'a Path> {
     let mut current = None;
     for parent in path.ancestors() {
         if !is_package(parent, namespace_packages) {
@@ -82,6 +79,41 @@ mod tests {
                 &[],
             ),
             None,
+        );
+    }
+
+    #[test]
+    fn package_detection_with_namespace_packages() {
+        assert_eq!(
+            detect_package_root(&test_resource_path("project/python_modules/core/core"), &[],),
+            Some(test_resource_path("project/python_modules/core/core").as_path())
+        );
+
+        assert_eq!(
+            detect_package_root(
+                &test_resource_path("project/python_modules/core/core"),
+                &[test_resource_path("project/python_modules/core"),],
+            ),
+            Some(test_resource_path("project/python_modules/core").as_path())
+        );
+
+        assert_eq!(
+            detect_package_root(
+                &test_resource_path("project/python_modules/core/core"),
+                &[
+                    test_resource_path("project/python_modules/core"),
+                    test_resource_path("project/python_modules"),
+                ],
+            ),
+            Some(test_resource_path("project/python_modules").as_path())
+        );
+
+        assert_eq!(
+            detect_package_root(
+                &test_resource_path("project/python_modules/core/core"),
+                &[test_resource_path("project/python_modules"),],
+            ),
+            Some(test_resource_path("project/python_modules").as_path())
         );
     }
 }

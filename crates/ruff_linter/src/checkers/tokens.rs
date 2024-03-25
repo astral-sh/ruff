@@ -126,18 +126,6 @@ pub(crate) fn check_tokens(
         flake8_quotes::rules::avoidable_escaped_quote(&mut diagnostics, tokens, locator, settings);
     }
 
-    if settings.rules.enabled(Rule::UnnecessaryEscapedQuote) {
-        flake8_quotes::rules::unnecessary_escaped_quote(&mut diagnostics, tokens, locator);
-    }
-
-    if settings.rules.any_enabled(&[
-        Rule::BadQuotesInlineString,
-        Rule::BadQuotesMultilineString,
-        Rule::BadQuotesDocstring,
-    ]) {
-        flake8_quotes::rules::check_string_quotes(&mut diagnostics, tokens, locator, settings);
-    }
-
     if settings.rules.any_enabled(&[
         Rule::SingleLineImplicitStringConcatenation,
         Rule::MultiLineImplicitStringConcatenation,

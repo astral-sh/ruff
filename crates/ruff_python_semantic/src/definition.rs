@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use std::ops::Deref;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{self as ast, all::DunderAllName, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::analyze::visibility::{
@@ -187,7 +187,7 @@ impl<'a> Definitions<'a> {
     }
 
     /// Resolve the visibility of each definition in the collection.
-    pub fn resolve(self, exports: Option<&[&str]>) -> ContextualizedDefinitions<'a> {
+    pub fn resolve(self, exports: Option<&[DunderAllName]>) -> ContextualizedDefinitions<'a> {
         let mut definitions: IndexVec<DefinitionId, ContextualizedDefinition<'a>> =
             IndexVec::with_capacity(self.len());
 
@@ -201,7 +201,9 @@ impl<'a> Definitions<'a> {
                         MemberKind::Class(class) => {
                             let parent = &definitions[member.parent];
                             if parent.visibility.is_private()
-                                || exports.is_some_and(|exports| !exports.contains(&member.name()))
+                                || exports.is_some_and(|exports| {
+                                    !exports.iter().any(|export| export.name() == member.name())
+                                })
                             {
                                 Visibility::Private
                             } else {
@@ -221,7 +223,9 @@ impl<'a> Definitions<'a> {
                         MemberKind::Function(function) => {
                             let parent = &definitions[member.parent];
                             if parent.visibility.is_private()
-                                || exports.is_some_and(|exports| !exports.contains(&member.name()))
+                                || exports.is_some_and(|exports| {
+                                    !exports.iter().any(|export| export.name() == member.name())
+                                })
                             {
                                 Visibility::Private
                             } else {

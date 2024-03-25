@@ -397,7 +397,10 @@ impl<'a> SemanticModel<'a> {
                     //
                     // The `name` in `print(name)` should be treated as unresolved, but the `name` in
                     // `name: str` should be treated as used.
-                    BindingKind::Annotation => continue,
+                    //
+                    // Stub files are an exception. In a stub file, it _is_ considered valid to
+                    // resolve to a type annotation.
+                    BindingKind::Annotation if !self.in_stub_file() => continue,
 
                     // If it's a deletion, don't treat it as resolved, since the name is now
                     // unbound. For example, given:
@@ -1570,6 +1573,11 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::FUTURE_ANNOTATIONS)
     }
 
+    /// Return `true` if the model is in a stub file (i.e., a file with a `.pyi` extension).
+    pub const fn in_stub_file(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::STUB_FILE)
+    }
+
     /// Return `true` if the model is in a named expression assignment (e.g., `x := 1`).
     pub const fn in_named_expression_assignment(&self) -> bool {
         self.flags
@@ -1580,6 +1588,13 @@ impl<'a> SemanticModel<'a> {
     pub const fn in_comprehension_assignment(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::COMPREHENSION_ASSIGNMENT)
+    }
+
+    /// Return `true` if the model is visiting the r.h.s. of an `__all__` definition
+    /// (e.g. `"foo"` in `__all__ = ["foo"]`)
+    pub const fn in_dunder_all_definition(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::DUNDER_ALL_DEFINITION)
     }
 
     /// Return an iterator over all bindings shadowed by the given [`BindingId`], within the
@@ -1675,7 +1690,7 @@ bitflags! {
     /// Flags indicating the current model state.
     #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
     pub struct SemanticModelFlags: u32 {
-       /// The model is in a type annotation that will only be evaluated when running a type
+        /// The model is in a type annotation that will only be evaluated when running a type
         /// checker.
         ///
         /// For example, the model could be visiting `int` in:
@@ -1875,6 +1890,9 @@ bitflags! {
         /// ```
         const FUTURE_ANNOTATIONS = 1 << 15;
 
+        /// The model is in a Python stub file (i.e., a `.pyi` file).
+        const STUB_FILE = 1 << 16;
+
         /// The model has traversed past the module docstring.
         ///
         /// For example, the model could be visiting `x` in:
@@ -1883,7 +1901,7 @@ bitflags! {
         ///
         /// x: int = 1
         /// ```
-        const MODULE_DOCSTRING_BOUNDARY = 1 << 16;
+        const MODULE_DOCSTRING_BOUNDARY = 1 << 17;
 
         /// The model is in a type parameter definition.
         ///
@@ -1893,7 +1911,7 @@ bitflags! {
         ///
         /// Record = TypeVar("Record")
         ///
-        const TYPE_PARAM_DEFINITION = 1 << 17;
+        const TYPE_PARAM_DEFINITION = 1 << 18;
 
         /// The model is in a named expression assignment.
         ///
@@ -1901,7 +1919,7 @@ bitflags! {
         /// ```python
         /// if (x := 1): ...
         /// ```
-        const NAMED_EXPRESSION_ASSIGNMENT = 1 << 18;
+        const NAMED_EXPRESSION_ASSIGNMENT = 1 << 19;
 
         /// The model is in a comprehension variable assignment.
         ///
@@ -1909,7 +1927,7 @@ bitflags! {
         /// ```python
         /// [_ for x in range(10)]
         /// ```
-        const COMPREHENSION_ASSIGNMENT = 1 << 19;
+        const COMPREHENSION_ASSIGNMENT = 1 << 20;
 
         /// The model is in a module / class / function docstring.
         ///
@@ -1928,7 +1946,19 @@ bitflags! {
         ///     """Function docstring."""
         ///     pass
         /// ```
-        const DOCSTRING = 1 << 20;
+        const DOCSTRING = 1 << 21;
+
+        /// The model is visiting the r.h.s. of a module-level `__all__` definition.
+        ///
+        /// This could be any module-level statement that assigns or alters `__all__`,
+        /// for example:
+        /// ```python
+        /// __all__ = ["foo"]
+        /// __all__: str = ["foo"]
+        /// __all__ = ("bar",)
+        /// __all__ += ("baz,")
+        /// ```
+        const DUNDER_ALL_DEFINITION = 1 << 22;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
@@ -1953,6 +1983,7 @@ impl SemanticModelFlags {
     pub fn new(path: &Path) -> Self {
         let mut flags = Self::default();
         if is_python_stub_file(path) {
+            flags |= Self::STUB_FILE;
             flags |= Self::FUTURE_ANNOTATIONS;
         }
         flags

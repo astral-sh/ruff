@@ -32,7 +32,7 @@ An extremely fast Python linter and code formatter, written in Rust.
 - ⚖️ Drop-in parity with [Flake8](https://docs.astral.sh/ruff/faq/#how-does-ruff-compare-to-flake8), isort, and Black
 - 📦 Built-in caching, to avoid re-analyzing unchanged files
 - 🔧 Fix support, for automatic error correction (e.g., automatically remove unused imports)
-- 📏 Over [700 built-in rules](https://docs.astral.sh/ruff/rules/), with native re-implementations
+- 📏 Over [800 built-in rules](https://docs.astral.sh/ruff/rules/), with native re-implementations
     of popular Flake8 plugins, like flake8-bugbear
 - ⌨️ First-party [editor integrations](https://docs.astral.sh/ruff/integrations/) for
     [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
@@ -151,7 +151,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.3.3
+  rev: v0.3.4
   hooks:
     # Run the linter.
     - id: ruff
@@ -272,7 +272,7 @@ for more on the linting and formatting commands, respectively.
 
 <!-- Begin section: Rules -->
 
-**Ruff supports over 700 lint rules**, many of which are inspired by popular tools like Flake8,
+**Ruff supports over 800 lint rules**, many of which are inspired by popular tools like Flake8,
 isort, pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
 Rust as a first-party feature.
 
@@ -429,6 +429,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Mypy](https://github.com/python/mypy)
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
 - [Neon](https://github.com/neondatabase/neon)
+- [Nokia](https://nokia.com/)
 - [NoneBot](https://github.com/nonebot/nonebot2)
 - [NumPyro](https://github.com/pyro-ppl/numpyro)
 - [ONNX](https://github.com/onnx/onnx)

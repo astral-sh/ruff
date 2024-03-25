@@ -293,8 +293,8 @@ pub struct Options {
     pub builtins: Option<Vec<String>>,
 
     /// Mark the specified directories as namespace packages. For the purpose of
-    /// module resolution, Ruff will treat those directories as if they
-    /// contained an `__init__.py` file.
+    /// module resolution, Ruff will treat those directories and all their subdirectories
+    /// as if they contained an `__init__.py` file.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -596,7 +596,7 @@ pub struct LintCommonOptions {
         default = "[]",
         value_type = "list[RuleSelector]",
         example = r#"
-            # On top of the default `select` (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            # On top of the default `select` (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
             extend-select = ["B", "Q"]
         "#
     )]
@@ -1131,15 +1131,15 @@ impl Flake8ComprehensionsOptions {
 pub struct Flake8CopyrightOptions {
     /// The regular expression used to match the copyright notice, compiled
     /// with the [`regex`](https://docs.rs/regex/latest/regex/) crate.
-    ///
-    /// Defaults to `(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}(-\d{4})*`, which matches
+    /// Defaults to `(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*`, which matches
     /// the following:
     /// - `Copyright 2023`
     /// - `Copyright (C) 2023`
     /// - `Copyright 2021-2023`
     /// - `Copyright (C) 2021-2023`
+    /// - `Copyright (C) 2021, 2023`
     #[option(
-        default = r#"(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}([-,]\d{4})*"#,
+        default = r#"(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*"#,
         value_type = "str",
         example = r#"notice-rgx = "(?i)Copyright \\(C\\) \\d{4}""#
     )]

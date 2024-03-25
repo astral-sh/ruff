@@ -6,7 +6,9 @@ expression: lex_source(source)
     (
         FStringStart(
             StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: true,
                 quote_style: Double,
             },
@@ -17,7 +19,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: "\n# not a comment ",
             kind: StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: true,
                 quote_style: Double,
             },
@@ -56,7 +60,9 @@ expression: lex_source(source)
         FStringMiddle {
             value: " # not a comment\n",
             kind: StringKind {
-                prefix: "f",
+                prefix: Format(
+                    Regular,
+                ),
                 triple_quoted: true,
                 quote_style: Double,
             },

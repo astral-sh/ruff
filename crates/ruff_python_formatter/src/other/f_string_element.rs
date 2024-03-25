@@ -56,13 +56,7 @@ impl<'a> FormatFStringLiteralElement<'a> {
 impl Format<PyFormatContext<'_>> for FormatFStringLiteralElement<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let literal_content = f.context().locator().slice(self.element.range());
-        let normalized = normalize_string(
-            literal_content,
-            0,
-            self.context.quotes(),
-            self.context.prefix(),
-            true,
-        );
+        let normalized = normalize_string(literal_content, 0, self.context.kind(), true);
         match &normalized {
             Cow::Borrowed(_) => source_text_slice(self.element.range()).fmt(f),
             Cow::Owned(normalized) => text(normalized).fmt(f),

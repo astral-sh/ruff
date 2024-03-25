@@ -21,7 +21,9 @@ expression: parse_ast
                                 ],
                                 flags: BytesLiteralFlags {
                                     quote_style: Single,
-                                    raw: true,
+                                    prefix: Raw {
+                                        uppercase_r: false,
+                                    },
                                     triple_quoted: false,
                                 },
                             },

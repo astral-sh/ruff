@@ -496,7 +496,7 @@ pub struct FormatCommand {
     pub range: Option<FormatRange>,
 }
 
-#[derive(Clone, Debug, clap::Parser)]
+#[derive(Copy, Clone, Debug, clap::Parser)]
 pub struct ServerCommand {
     /// Enable preview mode; required for regular operation
     #[arg(long)]

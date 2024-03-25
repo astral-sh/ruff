@@ -86,9 +86,7 @@ impl<'a> FormatSummaryValues<'a> {
                 value,
                 range: _,
             } = keyword;
-            let Some(key) = arg else {
-                return None;
-            };
+            let key = arg.as_ref()?;
             if contains_quotes(locator.slice(value)) || locator.contains_line_break(value.range()) {
                 return None;
             }

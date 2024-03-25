@@ -878,9 +878,7 @@ pub fn resolve_imported_module_path<'a>(
         return Some(Cow::Borrowed(module.unwrap_or("")));
     }
 
-    let Some(module_path) = module_path else {
-        return None;
-    };
+    let module_path = module_path?;
 
     if level as usize >= module_path.len() {
         return None;
