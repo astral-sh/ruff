@@ -432,6 +432,12 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
 
 /// Generate `flake8-quote` diagnostics from a token stream.
 pub(crate) fn check_string_quotes(checker: &mut Checker, string_like: StringLike) {
+    // Ignore if the string is part of a forward reference. For example,
+    // `x: "Literal['foo', 'bar']"`.
+    if checker.semantic().in_string_type_definition() {
+        return;
+    }
+
     // If the string is part of a f-string, ignore it.
     if checker
         .indexer()
