@@ -2,7 +2,7 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "dependencyDashboard": true,
   "suppressNotifications": ["prEditedNotification"],
-  "extends": ["config:base"],
+  "extends": ["config:recommended"],
   "labels": ["internal"],
   "schedule": ["before 4am on Monday"],
   "separateMajorMinor": false,
@@ -26,16 +26,13 @@
   "pre-commit": {
     "enabled": true,
   },
-  "ignoreDeps": [
-    // The latest versions of these are not compatible with our release workflow
-    "actions/upload-artifact",
-    "actions/download-artifact",
-  ],
   "packageRules": [
     {
-      "groupName": "GitHub Actions",
+      // Group upload/download artifact updates, the versions are dependent
+      "groupName": "Artifact GitHub Actions dependencies",
       "matchManagers": ["github-actions"],
-      "description": "Weekly update of GitHub Action dependencies",
+      "matchPackagePatterns": ["actions/.*-artifact"],
+      "description": "Weekly update of artifact-related GitHub Actions dependencies",
     },
     {
       "groupName": "pre-commit dependencies",
