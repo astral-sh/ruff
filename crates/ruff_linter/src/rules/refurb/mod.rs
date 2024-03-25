@@ -22,6 +22,7 @@ mod tests {
     #[test_case(Rule::CheckAndRemoveFromSet, Path::new("FURB132.py"))]
     #[test_case(Rule::IfExprMinMax, Path::new("FURB136.py"))]
     #[test_case(Rule::ReimplementedStarmap, Path::new("FURB140.py"))]
+    #[test_case(Rule::ForLoopSetMutations, Path::new("FURB142.py"))]
     #[test_case(Rule::SliceCopy, Path::new("FURB145.py"))]
     #[test_case(Rule::UnnecessaryEnumerate, Path::new("FURB148.py"))]
     #[test_case(Rule::MathConstant, Path::new("FURB152.py"))]
