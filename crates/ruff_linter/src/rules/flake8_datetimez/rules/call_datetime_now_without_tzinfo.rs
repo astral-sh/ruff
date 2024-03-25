@@ -44,6 +44,13 @@ use super::helpers;
 /// datetime.datetime.now(tz=datetime.UTC)
 /// ```
 ///
+/// ## Why can't I use `datetime.datetime.now(tz=None)`?
+/// ```python
+/// datetime.datetime.now(tz=None)  # Returns a naive datetime for the machine's timezone.
+/// # So, for a timezone-aware datetime for the machine's timezone, use:
+/// datetime.datetime.now(tz=datetime.timezone.utc).astimezone()
+/// ```
+///
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[violation]
