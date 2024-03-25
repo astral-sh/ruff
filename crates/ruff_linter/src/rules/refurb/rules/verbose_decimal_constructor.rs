@@ -1,4 +1,3 @@
-use regex::Regex;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
@@ -8,11 +7,20 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for the use of `Decimal` constructor that can be made more succinct.
-/// This includes unnecessary string literal or special literal of float.
+/// Checks for unnecessary string literal or float casts in `Decimal`
+/// constructors.
 ///
 /// ## Why is this bad?
-/// This will make code longer and harder to read.
+/// The `Decimal` constructor accepts a variety of arguments, including
+/// integers, floats, and strings. However, it's not necessary to cast
+/// integer literals to strings when passing them to the `Decimal`.
+///
+/// Similarly, `Decimal` accepts `inf`, `-inf`, and `nan` as string literals,
+/// so there's no need to wrap those values in a `float` call when passing
+/// them to the `Decimal` constructor.
+///
+/// Prefer the more concise form of argument passing for `Decimal`
+/// constructors, as it's more readable and idiomatic.
 ///
 /// ## Example
 /// ```python
@@ -26,16 +34,11 @@ use crate::checkers::ast::Checker;
 /// Decimal("Infinity")
 /// ```
 ///
-/// ## Fix safety
-/// This rule's fix is marked as unsafe, as the `Decimal` could be user-defined
-/// function or constructor, which is not intended for the fixtures like above.
-///
 /// ## References
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
 #[violation]
 pub struct VerboseDecimalConstructor {
-    replace_old: String,
-    replace_new: String,
+    replacement: String,
 }
 
 impl Violation for VerboseDecimalConstructor {
@@ -47,10 +50,8 @@ impl Violation for VerboseDecimalConstructor {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!(
-            "Replace {} with {}",
-            self.replace_old, self.replace_new
-        ))
+        let VerboseDecimalConstructor { replacement } = self;
+        Some(format!("Replace with `{replacement}`"))
     }
 }
 
@@ -63,89 +64,97 @@ pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ExprCall
     {
         return;
     }
-    let ast::Arguments { args, keywords, .. } = &call.arguments;
-    // Decimal accepts arguments of the form Decimal(value='0', context=None).
-    let Some(value) = args.first().or_else(|| {
-        keywords
-            .iter()
-            .find(|&keyword| keyword.arg.as_ref().map(ast::Identifier::as_str) == Some("value"))
-            .map(|keyword| &keyword.value)
-    }) else {
+
+    // Decimal accepts arguments of the form: `Decimal(value='0', context=None)`
+    let Some(value) = call.arguments.find_argument("value", 0) else {
         return;
     };
-
-    let decimal_constructor = checker.locator().slice(call.func.range());
 
     let diagnostic = match value {
         Expr::StringLiteral(ast::ExprStringLiteral {
             value: str_literal, ..
         }) => {
-            let trimmed = str_literal
-                .to_str()
-                .trim_whitespace()
-                .trim_start_matches('+');
-            let integer_string = Regex::new(r"^([+\-]?)0*(\d+)$").unwrap();
-            if !integer_string.is_match(trimmed) {
+            // Parse the inner string as an integer.
+            let trimmed = str_literal.to_str().trim_whitespace();
+
+            // Extract the unary sign, if any.
+            let (unary, rest) = if let Some(trimmed) = trimmed.strip_prefix('+') {
+                ("+", trimmed)
+            } else if let Some(trimmed) = trimmed.strip_prefix('-') {
+                ("-", trimmed)
+            } else {
+                ("", trimmed)
+            };
+
+            // Skip leading zeros.
+            let rest = rest.trim_start_matches('0');
+
+            // Verify that the rest of the string is a valid integer.
+            if !rest.chars().all(|c| c.is_ascii_digit()) {
                 return;
             };
 
-            let intg = integer_string.replace(trimmed, "$1$2").into_owned();
+            // If all the characters are zeros, then the value is zero.
+            let rest = if rest.is_empty() { "0" } else { rest };
 
+            let replacement = format!("{unary}{rest}");
             let mut diagnostic = Diagnostic::new(
                 VerboseDecimalConstructor {
-                    replace_old: format!("{}(\"{}\")", decimal_constructor, str_literal.to_str()),
-                    replace_new: format!("{decimal_constructor}({intg})"),
+                    replacement: replacement.clone(),
                 },
-                call.range(),
+                value.range(),
             );
 
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                format!("{decimal_constructor}({intg})"),
-                call.range(),
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                replacement,
+                value.range(),
             )));
 
             diagnostic
         }
-        Expr::Call(
-            floatcall @ ast::ExprCall {
-                func, arguments, ..
-            },
-        ) => {
+        Expr::Call(ast::ExprCall {
+            func, arguments, ..
+        }) => {
+            // Must be a call to the `float` builtin.
             let Some(func_name) = func.as_name_expr() else {
                 return;
             };
             if func_name.id != "float" {
                 return;
             };
-            if !checker.semantic().is_builtin(&func_name.id) {
-                return;
-            };
 
-            if arguments.args.len() != 1 || arguments.keywords.len() > 0 {
+            // Must have exactly one argument, which is a string literal.
+            if arguments.keywords.len() != 0 {
                 return;
             };
-            let Some(value_float) = arguments.args[0].as_string_literal_expr() else {
+            let [float] = arguments.args.as_ref() else {
                 return;
             };
-            let value_float_str = value_float.value.to_str();
+            let Some(float) = float.as_string_literal_expr() else {
+                return;
+            };
             if !matches!(
-                value_float_str.to_lowercase().as_str(),
+                float.value.to_str().to_lowercase().as_str(),
                 "inf" | "-inf" | "infinity" | "-infinity" | "nan"
             ) {
                 return;
             }
 
+            if !checker.semantic().is_builtin("float") {
+                return;
+            };
+
+            let replacement = checker.locator().slice(float).to_string();
             let mut diagnostic = Diagnostic::new(
                 VerboseDecimalConstructor {
-                    replace_old: format!("float(\"{value_float_str}\")"),
-                    replace_new: format!("\"{value_float_str}\""),
+                    replacement: replacement.clone(),
                 },
-                call.range(),
+                value.range(),
             );
 
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                format!("\"{value_float_str}\""),
-                floatcall.range(),
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                replacement,
+                value.range(),
             )));
 
             diagnostic
