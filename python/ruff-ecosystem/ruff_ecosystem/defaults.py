@@ -63,7 +63,7 @@ DEFAULT_TARGETS = [
             name="typeshed",
             ref="main",
         ),
-        check_options=CheckOptions(select="PYI"),
+        check_options=CheckOptions(select="E,F,FA,I,PYI,RUF,UP,W"),
     ),
     Project(repo=Repository(owner="python-poetry", name="poetry", ref="master")),
     Project(repo=Repository(owner="reflex-dev", name="reflex", ref="main")),
