@@ -434,7 +434,7 @@ Module(
 14 |     a + b
 15 | 
 16 | def keyword[A, await](): ...
-   |                ^^^^^ Syntax Error: Identifier expected. 'await' is a keyword that cannot be used here.
+   |                ^^^^^ Syntax Error: Expected an identifier, but found a keyword 'await' that cannot be used here
 17 | 
 18 | def not_a_type_param[A, |, B](): ...
    |
