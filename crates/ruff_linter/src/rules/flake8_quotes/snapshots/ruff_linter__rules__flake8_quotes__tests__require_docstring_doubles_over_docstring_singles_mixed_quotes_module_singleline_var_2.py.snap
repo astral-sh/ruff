@@ -17,18 +17,18 @@ docstring_singles_mixed_quotes_module_singleline_var_2.py:1:1: Q002 [*] Single q
 3 3 | def foo():
 4 4 |     pass
 
-docstring_singles_mixed_quotes_module_singleline_var_2.py:1:9: Q000 [*] Double quotes found but single quotes preferred
+docstring_singles_mixed_quotes_module_singleline_var_2.py:1:36: Q002 [*] Single quote docstring found but double quotes preferred
   |
 1 | 'Do not'" start with empty string" ' and lint docstring safely'
-  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ Q000
+  |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q002
 2 | 
 3 | def foo():
   |
-  = help: Replace double quotes with single quotes
+  = help: Replace single quotes docstring with double quotes
 
 ℹ Safe fix
 1   |-'Do not'" start with empty string" ' and lint docstring safely'
-  1 |+'Do not'' start with empty string' ' and lint docstring safely'
+  1 |+'Do not'" start with empty string" " and lint docstring safely"
 2 2 | 
 3 3 | def foo():
 4 4 |     pass
