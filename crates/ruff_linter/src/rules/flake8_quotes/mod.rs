@@ -1,4 +1,5 @@
 //! Rules from [flake8-quotes](https://pypi.org/project/flake8-quotes/).
+mod helpers;
 pub(crate) mod rules;
 pub mod settings;
 

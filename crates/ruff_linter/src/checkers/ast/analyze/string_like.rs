@@ -30,4 +30,7 @@ pub(crate) fn string_like(string_like: StringLike, checker: &mut Checker) {
     ]) {
         flake8_quotes::rules::check_string_quotes(checker, string_like);
     }
+    if checker.enabled(Rule::UnnecessaryEscapedQuote) {
+        flake8_quotes::rules::unnecessary_escaped_quote(checker, string_like);
+    }
 }
