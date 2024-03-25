@@ -268,6 +268,24 @@ ruff check --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
 See `ruff help` for more on Ruff's top-level commands, or `ruff help check` and `ruff help format`
 for more on the linting and formatting commands, respectively.
 
+### Container
+
+You can use the commands in the makefile to test how to use `ruff`.
+
+```shell
+# build the image
+make build
+
+# list the commands in the makefile
+make
+
+# run ruff to lint
+make check {files or directories want to check} {provide the absolute path to the folder where the target file exists}
+
+# run ruff to format
+make format {files or directories want to check} {provide the absolute path to the folder where the target file exists}
+```
+
 ## Rules
 
 <!-- Begin section: Rules -->
