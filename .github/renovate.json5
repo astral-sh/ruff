@@ -1,0 +1,46 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "dependencyDashboard": true,
+  "suppressNotifications": ["prEditedNotification"],
+  "extends": ["config:base"],
+  "labels": ["internal"],
+  "schedule": ["before 4am on Monday"],
+  "separateMajorMinor": false,
+  "enabledManagers": [
+    "github-actions",
+    "pre-commit",
+    "cargo",
+    "pep621",
+    "npm",
+  ],
+  "pep621": {
+    "fileMatch": [
+      "^(python|scripts)/.*pyproject\\.toml$",
+    ],
+  },
+  "npm": {
+    "fileMatch": [
+      "^playground/.*package\\.json$",
+    ],
+  },
+  "pre-commit": {
+    "enabled": true,
+  },
+  "ignoreDeps": [
+    // The latest versions of these are not compatible with our release workflow
+    "actions/upload-artifact",
+    "actions/download-artifact",
+  ],
+  "packageRules": [
+    {
+      "groupName": "GitHub Actions",
+      "matchManagers": ["github-actions"],
+      "description": "Weekly update of GitHub Action dependencies",
+    },
+    {
+      "groupName": "pre-commit dependencies",
+      "matchManagers": ["pre-commit"],
+      "description": "Weekly update of pre-commit dependencies",
+    },
+  ]
+}
