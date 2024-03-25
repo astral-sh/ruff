@@ -252,21 +252,38 @@ impl<'src> Parser<'src> {
         lhs
     }
 
+    /// Parses a name.
+    ///
+    /// For an invalid name, the `id` field will be an empty string and the `ctx`
+    /// field will be [`ExprContext::Invalid`].
+    ///
+    /// See: <https://docs.python.org/3/reference/expressions.html#atom-identifiers>
     pub(super) fn parse_name(&mut self) -> ast::ExprName {
         let identifier = self.parse_identifier();
+
+        let ctx = if identifier.is_valid() {
+            ExprContext::Load
+        } else {
+            ExprContext::Invalid
+        };
 
         ast::ExprName {
             range: identifier.range,
             id: identifier.id,
-            ctx: ExprContext::Load,
+            ctx,
         }
     }
 
+    /// Parses an identifier.
+    ///
+    /// For an invalid identifier, the `id` field will be an empty string.
+    ///
+    /// See: <https://docs.python.org/3/reference/expressions.html#atom-identifiers>
     pub(super) fn parse_identifier(&mut self) -> ast::Identifier {
         let range = self.current_token_range();
 
         if self.at(TokenKind::Name) {
-            let (Tok::Name { name }, _) = self.next_token() else {
+            let (Tok::Name { name }, _) = self.bump(TokenKind::Name) else {
                 unreachable!();
             };
             ast::Identifier {
@@ -278,7 +295,7 @@ impl<'src> Parser<'src> {
                 let (tok, range) = self.next_token();
                 self.add_error(
                     ParseErrorType::OtherError(format!(
-                        "Identifier expected. '{tok}' is a keyword that cannot be used here."
+                        "Expected an identifier, but found a keyword '{tok}' that cannot be used here"
                     )),
                     range,
                 );
@@ -289,7 +306,7 @@ impl<'src> Parser<'src> {
                 }
             } else {
                 self.add_error(
-                    ParseErrorType::OtherError("expecting an identifier".into()),
+                    ParseErrorType::OtherError("Expected an identifier".into()),
                     range,
                 );
                 ast::Identifier {
@@ -300,6 +317,8 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses an atom.
+    ///
     /// See: <https://docs.python.org/3/reference/expressions.html#atoms>
     fn parse_atom(&mut self) -> ParsedExpr {
         let start = self.node_start();
