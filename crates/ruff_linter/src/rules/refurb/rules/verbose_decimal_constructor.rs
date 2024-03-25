@@ -33,12 +33,12 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
 #[violation]
-pub struct SimplifyDecimalCtor {
+pub struct VerboseDecimalConstructor {
     replace_old: String,
     replace_new: String,
 }
 
-impl Violation for SimplifyDecimalCtor {
+impl Violation for VerboseDecimalConstructor {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
@@ -55,7 +55,7 @@ impl Violation for SimplifyDecimalCtor {
 }
 
 /// FURB157
-pub(crate) fn simplify_decimal_ctor(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn verbose_decimal_constructor(checker: &mut Checker, call: &ExprCall) {
     if !checker
         .semantic()
         .resolve_qualified_name(&call.func)
@@ -84,7 +84,7 @@ pub(crate) fn simplify_decimal_ctor(checker: &mut Checker, call: &ExprCall) {
                 .to_str()
                 .trim_whitespace()
                 .trim_start_matches('+');
-            let integer_string = Regex::new(r"^([\+\-]?)0*(\d+)$").unwrap();
+            let integer_string = Regex::new(r"^([+\-]?)0*(\d+)$").unwrap();
             if !integer_string.is_match(trimmed) {
                 return;
             };
@@ -92,7 +92,7 @@ pub(crate) fn simplify_decimal_ctor(checker: &mut Checker, call: &ExprCall) {
             let intg = integer_string.replace(trimmed, "$1$2").into_owned();
 
             let mut diagnostic = Diagnostic::new(
-                SimplifyDecimalCtor {
+                VerboseDecimalConstructor {
                     replace_old: format!("{}(\"{}\")", decimal_constructor, str_literal.to_str()),
                     replace_new: format!("{decimal_constructor}({intg})"),
                 },
@@ -136,7 +136,7 @@ pub(crate) fn simplify_decimal_ctor(checker: &mut Checker, call: &ExprCall) {
             }
 
             let mut diagnostic = Diagnostic::new(
-                SimplifyDecimalCtor {
+                VerboseDecimalConstructor {
                     replace_old: format!("float(\"{value_float_str}\")"),
                     replace_new: format!("\"{value_float_str}\""),
                 },

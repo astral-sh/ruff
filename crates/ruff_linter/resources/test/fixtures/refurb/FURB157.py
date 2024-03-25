@@ -1,9 +1,7 @@
 import decimal
 from decimal import Decimal
-from decimal import Decimal as dc
 
-# Positive cases
-
+# Errors
 Decimal("0")
 Decimal("-42")
 Decimal(float("Infinity"))
@@ -12,11 +10,8 @@ Decimal(float("inf"))
 Decimal(float("-inf"))
 Decimal(float("nan"))
 decimal.Decimal("0")
-dc("0")
 
-# Negative cases
-
+# OK
 Decimal(0)
 Decimal("Infinity")
 decimal.Decimal(0)
-dc(0)
