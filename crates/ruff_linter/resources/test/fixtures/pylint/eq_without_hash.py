@@ -5,6 +5,7 @@ class Person:  # [eq-without-hash]
     def __eq__(self, other):
         return isinstance(other, Person) and other.name == self.name
 
+
 # OK
 class Language:
     def __init__(self):
@@ -16,11 +17,13 @@ class Language:
     def __hash__(self):
         return hash(self.name)
 
+
 class MyClass:
     def __eq__(self, other):
         return True
 
     __hash__ = None
+
 
 class SingleClass:
     def __eq__(self, other):
@@ -28,6 +31,7 @@ class SingleClass:
 
     def __hash__(self):
         return 7
+
 
 class ChildClass(SingleClass):
     def __eq__(self, other):
