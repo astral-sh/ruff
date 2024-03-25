@@ -17,16 +17,17 @@ use crate::{FStringErrorType, Mode, ParseErrorType, Tok, TokenKind};
 use super::{RecoveryContextKind, TupleParenthesized};
 
 /// Tokens that can appear after an expression.
-/// FIXME: this isn't exhaustive.
 pub(super) const END_EXPR_SET: TokenSet = TokenSet::new([
+    // Ex) `expr` (without a newline)
+    TokenKind::EndOfFile,
     // Ex) `expr`
     TokenKind::Newline,
     // Ex) `expr;`
     TokenKind::Semi,
     // Ex) `data[expr:]`
+    // Ex) `def foo() -> expr:`
+    // Ex) `{expr: expr}`
     TokenKind::Colon,
-    // Ex) `expr` (without a newline)
-    TokenKind::EndOfFile,
     // Ex) `{expr}`
     TokenKind::Rbrace,
     // Ex) `[expr]`
@@ -35,41 +36,54 @@ pub(super) const END_EXPR_SET: TokenSet = TokenSet::new([
     TokenKind::Rpar,
     // Ex) `expr,`
     TokenKind::Comma,
-    // Ex) ??
+    // Ex)
+    //
+    // if True:
+    //     expr
+    //     # <- Dedent
+    // x
     TokenKind::Dedent,
     // Ex) `expr if expr else expr`
     TokenKind::If,
     TokenKind::Else,
+    // Ex) `with expr as target:`
+    // Ex) `except expr as NAME:`
     TokenKind::As,
+    // Ex) `raise expr from expr`
     TokenKind::From,
+    // Ex) `[expr for expr in iter]`
     TokenKind::For,
+    // Ex) `[expr async for expr in iter]`
     TokenKind::Async,
+    // Ex) `expr in expr`
     TokenKind::In,
+    // Ex) `name: expr = expr`
     // Ex) `f"{expr=}"`
     TokenKind::Equal,
     // Ex) `f"{expr!s}"`
     TokenKind::Exclamation,
 ]);
 
+/// Tokens that can appear at the end of a sequence.
 const END_SEQUENCE_SET: TokenSet = END_EXPR_SET.remove(TokenKind::Comma);
 
 impl<'src> Parser<'src> {
+    /// Returns `true` if the current token is the start of an expression.
     pub(super) fn at_expr(&self) -> bool {
         self.at_ts(EXPR_SET)
     }
 
-    #[allow(dead_code)]
-    pub(super) fn at_expr_end(&self) -> bool {
-        self.at_ts(END_EXPR_SET)
-    }
-
+    // Returns `true` if the current token ends a sequence.
     pub(super) fn at_sequence_end(&self) -> bool {
         self.at_ts(END_SEQUENCE_SET)
     }
 
     /// Parses every Python expression.
-    /// Matches the `expressions` rule in the Python grammar.
-    pub(super) fn parse_expression(&mut self) -> ParsedExpr {
+    ///
+    /// Matches the `expressions` rule in the [Python grammar].
+    ///
+    /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
+    pub(super) fn parse_expressions(&mut self) -> ParsedExpr {
         let start = self.node_start();
         let parsed_expr = self.parse_conditional_expression_or_higher();
 
@@ -87,10 +101,13 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses every Python expression except unparenthesized tuple.
-    /// Matches the `named_expression` rule in the Python grammar.
+    ///
+    /// Matches the `named_expression` rule in the [Python grammar].
     ///
     /// NOTE: If you have expressions separated by commas and want to parse them individually,
     /// instead of a tuple, use this function!
+    ///
+    /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     pub(super) fn parse_named_expression_or_higher(&mut self) -> ParsedExpr {
         let start = self.node_start();
         let parsed_expr = self.parse_conditional_expression_or_higher();
@@ -103,10 +120,13 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses every Python expression except unparenthesized tuple and named expressions.
-    /// Matches the `expression` rule in the Python grammar.
+    ///
+    /// Matches the `expression` rule in the [Python grammar].
     ///
     /// NOTE: If you have expressions separated by commas and want to parse them individually,
     /// instead of a tuple, use this function!
+    ///
+    /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     pub(super) fn parse_conditional_expression_or_higher(&mut self) -> ParsedExpr {
         let start = self.node_start();
         let parsed_expr = self.parse_simple_expression();
@@ -118,13 +138,17 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Parses every Python expression except unparenthesized tuples, named expressions, and `if` expression.
-    /// This is a combination of the `disjunction` and `starred_expression` rules of the Python
-    /// grammar.
+    /// Parses every Python expression except unparenthesized tuples, named expressions,
+    /// and `if` expression.
+    ///
+    /// This is a combination of the `disjunction` and `starred_expression` rules of the
+    /// [Python grammar].
     ///
     /// When parsing an AST node that only uses one of the rules (`disjunction` or `starred_expression`),
     /// you need to **explicitly** check if an invalid node for that AST node was parsed. Check the
     /// `parse_yield_from_expression` function for an example of this situation.
+    ///
+    /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_simple_expression(&mut self) -> ParsedExpr {
         self.parse_expression_with_precedence(Precedence::Initial)
     }
@@ -443,13 +467,21 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parse a call expression.
+    ///
+    /// The function name is parsed by the caller and passed as `func` along with
+    /// the `start` position of the call expression.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't position at a `(` token.
+    ///
     /// See: <https://docs.python.org/3/reference/expressions.html#calls>
-    fn parse_call_expression(&mut self, lhs: Expr, start: TextSize) -> ast::ExprCall {
-        assert_eq!(self.current_token_kind(), TokenKind::Lpar);
+    fn parse_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
         let arguments = self.parse_arguments();
 
         ast::ExprCall {
-            func: Box::new(lhs),
+            func: Box::new(func),
             arguments,
             range: self.node_range(start),
         }
@@ -1041,7 +1073,7 @@ impl<'src> Parser<'src> {
 
         self.bump(TokenKind::Lbrace);
 
-        let value = self.parse_expression();
+        let value = self.parse_expressions();
         if !value.is_parenthesized && value.expr.is_lambda_expr() {
             self.add_error(
                 ParseErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
@@ -1118,6 +1150,8 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at a `[` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/expressions.html#list-displays>
     fn parse_list_like_expression(&mut self) -> Expr {
         let start = self.node_start();
 
@@ -1404,7 +1438,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::For);
 
         let saved_context = self.set_ctx(ParserCtxFlags::FOR_TARGET);
-        let mut target = self.parse_expression();
+        let mut target = self.parse_expressions();
         self.restore_ctx(ParserCtxFlags::FOR_TARGET, saved_context);
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
@@ -1583,7 +1617,7 @@ impl<'src> Parser<'src> {
 
         let value = self
             .at_expr()
-            .then(|| Box::new(self.parse_expression().expr));
+            .then(|| Box::new(self.parse_expressions().expr));
 
         Expr::Yield(ast::ExprYield {
             value,
@@ -1593,7 +1627,7 @@ impl<'src> Parser<'src> {
 
     /// See: <https://docs.python.org/3/reference/expressions.html#yield-expressions>
     fn parse_yield_from_expression(&mut self, start: TextSize) -> Expr {
-        let parsed_expr = self.parse_expression();
+        let parsed_expr = self.parse_expressions();
 
         match &parsed_expr.expr {
             Expr::Starred(ast::ExprStarred { value, .. }) => {
