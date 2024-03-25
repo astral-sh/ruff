@@ -1133,6 +1133,7 @@ pub struct Flake8CopyrightOptions {
     /// with the [`regex`](https://docs.rs/regex/latest/regex/) crate.
     /// Defaults to `(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*`, which matches
     /// the following:
+    ///
     /// - `Copyright 2023`
     /// - `Copyright (C) 2023`
     /// - `Copyright 2021-2023`
@@ -2962,6 +2963,7 @@ pub struct FormatOptions {
     pub indent_style: Option<IndentStyle>,
 
     /// Configures the preferred quote character for strings. The recommended options are
+    ///
     /// * `double` (default): Use double quotes `"`
     /// * `single`: Use single quotes `'`
     ///
