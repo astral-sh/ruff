@@ -35,5 +35,6 @@ x = -100.0000J
 if 10 .real:
     ...
 
+# This is a type error, not a syntax error
 y = 100[no]
 y = 100(no)
