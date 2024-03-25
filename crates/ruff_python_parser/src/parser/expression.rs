@@ -1303,11 +1303,14 @@ impl<'src> Parser<'src> {
             return Expr::Dict(self.parse_dictionary_expression(None, value.expr, start));
         }
 
-        let key_or_value = self.parse_named_expression_or_higher();
+        // For dictionary expressions, the key uses the `expression` rule while for
+        // set expressions, the element uses the `star_expression` rule. So, use the
+        // one that is more general and limit it later.
+        let key_or_element = self.parse_star_expression_or_higher(AllowNamedExpression::Yes);
 
         match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
-                Expr::SetComp(self.parse_set_comprehension_expression(key_or_value.expr, start))
+                Expr::SetComp(self.parse_set_comprehension_expression(key_or_element.expr, start))
             }
             TokenKind::Colon => {
                 self.bump(TokenKind::Colon);
@@ -1315,19 +1318,19 @@ impl<'src> Parser<'src> {
 
                 if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
                     Expr::DictComp(self.parse_dictionary_comprehension_expression(
-                        key_or_value.expr,
+                        key_or_element.expr,
                         value.expr,
                         start,
                     ))
                 } else {
                     Expr::Dict(self.parse_dictionary_expression(
-                        Some(key_or_value.expr),
+                        Some(key_or_element.expr),
                         value.expr,
                         start,
                     ))
                 }
             }
-            _ => Expr::Set(self.parse_set_expression(key_or_value.expr, start)),
+            _ => Expr::Set(self.parse_set_expression(key_or_element.expr, start)),
         }
     }
 
@@ -1473,7 +1476,11 @@ impl<'src> Parser<'src> {
         let mut elts = vec![first_element];
 
         self.parse_comma_separated_list(RecoveryContextKind::SetElements, |parser| {
-            elts.push(parser.parse_named_expression_or_higher().expr);
+            elts.push(
+                parser
+                    .parse_star_expression_or_higher(AllowNamedExpression::Yes)
+                    .expr,
+            );
         });
 
         self.expect(TokenKind::Rbrace);
