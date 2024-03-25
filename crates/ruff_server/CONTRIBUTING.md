@@ -10,7 +10,7 @@ exclusive mutable access to the state and execute immediately, blocking the even
 tasks, run immediately on a thread pool with an immutable snapshot of the state, and do _not_ block the event loop unless the thread pool
 queue is full, in which case the server will block on available queue space.
 
-Snapshots of the server state use atomic reference-counted pointers (`Arc`) to prevent unnessecary cloning of large text files. If the contents
+Snapshots of the server state use atomic reference-counted pointers (`Arc`) to prevent unnecessary cloning of large text files. If the contents
 of the text file need to be updated, the state will create a new `Arc` to store it. This allows a local task to run at the same time as multiple background tasks
 without changing the state the background tasks are working with. This only applies to background tasks started _before_ the local task though, as a local task blocks
 the handling of further messages (and therefore, dispatching future tasks) until its completion.
@@ -23,7 +23,7 @@ data races and out-of-order handler execution. Our approach avoids this issue by
 
 ### Testing
 
-Most editors with LSP support will let you provide a server command for that language server. Ruff's server command is `ruff server --preview`, which will begin running a language server that listens to messages on `stdin` and responds on `stdout`. 
+Most editors with LSP support will let you provide a server command for that language server. Ruff's server command is `ruff server --preview`, which will begin running a language server that listens to messages on `stdin` and responds on `stdout`.
 
 In order to test your local server, you'll need to provide a path to your locally-built binary (usually `<path to your ruff source>/target/debug/ruff`) along with the arguments `server` and `--preview`. Make sure to (re)build the server with `cargo build -p ruff` before restarting your editor to test!
 
