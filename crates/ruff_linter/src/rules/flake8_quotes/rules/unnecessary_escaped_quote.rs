@@ -1,9 +1,8 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::str::raw_contents;
-use ruff_python_ast::{self as ast, StringLike};
+use ruff_python_ast::{self as ast, AnyStringKind, StringLike};
 use ruff_source_file::Locator;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -53,14 +52,20 @@ pub(crate) fn unnecessary_escaped_quote(checker: &mut Checker, string_like: Stri
     match string_like {
         StringLike::String(expr) => {
             for string in &expr.value {
-                if let Some(diagnostic) = check_string(locator, string) {
+                if let Some(diagnostic) = check_string_or_bytes(
+                    locator,
+                    string.range(),
+                    AnyStringKind::from(string.flags),
+                ) {
                     checker.diagnostics.push(diagnostic);
                 }
             }
         }
         StringLike::Bytes(expr) => {
             for bytes in &expr.value {
-                if let Some(diagnostic) = check_bytes(locator, bytes) {
+                if let Some(diagnostic) =
+                    check_string_or_bytes(locator, bytes.range(), AnyStringKind::from(bytes.flags))
+                {
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -68,7 +73,11 @@ pub(crate) fn unnecessary_escaped_quote(checker: &mut Checker, string_like: Stri
         StringLike::FString(expr) => {
             for part in &expr.value {
                 if let Some(diagnostic) = match part {
-                    ast::FStringPart::Literal(string) => check_string(locator, string),
+                    ast::FStringPart::Literal(string) => check_string_or_bytes(
+                        locator,
+                        string.range(),
+                        AnyStringKind::from(string.flags),
+                    ),
                     ast::FStringPart::FString(f_string) => check_f_string(locator, f_string),
                 } {
                     checker.diagnostics.push(diagnostic);
@@ -78,58 +87,39 @@ pub(crate) fn unnecessary_escaped_quote(checker: &mut Checker, string_like: Stri
     }
 }
 
-fn check_string(locator: &Locator, string: &ast::StringLiteral) -> Option<Diagnostic> {
-    let ast::StringLiteral { range, flags, .. } = string;
-    if flags.is_triple_quoted() || flags.prefix().is_raw() {
+/// Checks for unnecessary escaped quotes in a string or bytes literal.
+///
+/// # Panics
+///
+/// If the string kind is an f-string.
+fn check_string_or_bytes(
+    locator: &Locator,
+    range: TextRange,
+    kind: AnyStringKind,
+) -> Option<Diagnostic> {
+    assert!(!kind.is_f_string());
+
+    if kind.is_triple_quoted() || kind.is_raw_string() {
         return None;
     }
 
-    let contents = raw_contents(locator.slice(string))?;
-    let quote = flags.quote_style();
+    let contents = raw_contents(locator.slice(range), kind);
+    let quote = kind.quote_style();
     let opposite_quote_char = quote.opposite().as_char();
 
     if !contains_escaped_quote(contents, opposite_quote_char) {
         return None;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, *range);
+    let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, range);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        format!(
-            "{prefix}{quote}{value}{quote}",
-            prefix = flags.prefix(),
-            value = unescape_string(contents, opposite_quote_char)
-        ),
-        *range,
+        kind.format_string_contents(&unescape_string(contents, opposite_quote_char)),
+        range,
     )));
     Some(diagnostic)
 }
 
-fn check_bytes(locator: &Locator, bytes: &ast::BytesLiteral) -> Option<Diagnostic> {
-    let ast::BytesLiteral { range, flags, .. } = bytes;
-    if flags.is_triple_quoted() || flags.prefix().is_raw() {
-        return None;
-    }
-
-    let contents = raw_contents(locator.slice(bytes))?;
-    let quote = flags.quote_style();
-    let opposite_quote_char = quote.opposite().as_char();
-
-    if !contains_escaped_quote(contents, opposite_quote_char) {
-        return None;
-    }
-
-    let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, *range);
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        format!(
-            "{prefix}{quote}{value}{quote}",
-            prefix = flags.prefix(),
-            value = unescape_string(contents, opposite_quote_char)
-        ),
-        *range,
-    )));
-    Some(diagnostic)
-}
-
+/// Checks for unnecessary escaped quotes in an f-string.
 fn check_f_string(locator: &Locator, f_string: &ast::FString) -> Option<Diagnostic> {
     let ast::FString { flags, range, .. } = f_string;
     if flags.is_triple_quoted() || flags.prefix().is_raw() {
@@ -156,4 +146,10 @@ fn check_f_string(locator: &Locator, f_string: &ast::FString) -> Option<Diagnost
     let mut diagnostic = Diagnostic::new(UnnecessaryEscapedQuote, *range);
     diagnostic.set_fix(Fix::safe_edits(first, edits_iter));
     Some(diagnostic)
+}
+
+/// Returns the raw contents of the string given the string's contents and kind.
+/// This is a string without the prefix and quotes.
+fn raw_contents(contents: &str, kind: AnyStringKind) -> &str {
+    &contents[kind.opener_len().to_usize()..(contents.text_len() - kind.closer_len()).to_usize()]
 }
