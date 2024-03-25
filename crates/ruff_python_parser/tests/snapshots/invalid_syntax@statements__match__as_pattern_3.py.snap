@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/match/as_patt
 ```
 Module(
     ModModule {
-        range: 0..135,
+        range: 0..136,
         body: [
             Match(
                 StmtMatch {
@@ -150,8 +150,6 @@ Module(
 
 
   |
-3 |     #     v
 4 |     case {(x as y): 1}:
 5 |         pass
-  |              Syntax Error: Expected a statement
   |

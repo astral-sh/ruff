@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/match/as_patt
 ```
 Module(
     ModModule {
-        range: 0..186,
+        range: 0..187,
         body: [
             Match(
                 StmtMatch {
