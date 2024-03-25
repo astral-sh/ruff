@@ -74,7 +74,7 @@ pyproject-toml = { version = "0.9.0" }
 quick-junit = { version = "0.3.5" }
 quote = { version = "1.0.23" }
 rand = { version = "0.8.5" }
-rayon = { version = "1.8.1" }
+rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 result-like = { version = "0.5.0" }
 rustc-hash = { version = "1.1.0" }
