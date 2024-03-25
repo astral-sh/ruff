@@ -13,6 +13,10 @@
     "pep621",
     "npm",
   ],
+  "cargo": {
+    // See https://docs.renovatebot.com/configuration-options/#rangestrategy
+    "rangeStrategy": "update-lockfile",
+  },
   "pep621": {
     "fileMatch": [
       "^(python|scripts)/.*pyproject\\.toml$",
