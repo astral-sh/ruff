@@ -21,3 +21,16 @@ class MyClass:
         return True
 
     __hash__ = None
+
+class SingleClass:
+    def __eq__(self, other):
+        return True
+
+    def __hash__(self):
+        return 7
+
+class ChildClass(SingleClass):
+    def __eq__(self, other):
+        return True
+
+    __hash__ = SingleClass.__hash__
