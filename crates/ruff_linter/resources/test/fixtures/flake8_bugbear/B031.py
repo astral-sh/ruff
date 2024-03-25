@@ -193,6 +193,31 @@ for _section, section_items in groupby(items, key=lambda p: p[1]):
         return section_items
     collect_shop_items(shopper, section_items)
 
+# Should trigger the warning for duplicate access, even if is a return statement after.
+for _section, section_items in groupby(items, key=lambda p: p[1]):
+    if _section == "greens":
+        collect_shop_items(shopper, section_items)
+        collect_shop_items(shopper, section_items)
+        return
+
+# Should trigger the warning for duplicate access, even if is a return in another branch.
+for _section, section_items in groupby(items, key=lambda p: p[1]):
+    if _section == "greens":
+        collect_shop_items(shopper, section_items)
+        return
+    elif _section == "frozen items":
+        collect_shop_items(shopper, section_items)
+        collect_shop_items(shopper, section_items)
+
+# Should trigger, since only one branch has a return statement.
+for _section, section_items in groupby(items, key=lambda p: p[1]):
+    if _section == "greens":
+        collect_shop_items(shopper, section_items)
+        return
+    elif _section == "frozen items":
+        collect_shop_items(shopper, section_items)
+    collect_shop_items(shopper, section_items)  # B031
+
 # Let's redefine the `groupby` function to make sure we pick up the correct one.
 # NOTE: This should always be at the end of the file.
 def groupby(data, key=None):
