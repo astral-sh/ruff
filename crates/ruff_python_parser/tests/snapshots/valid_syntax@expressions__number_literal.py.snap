@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/expressions/number_literal
 ```
 Module(
     ModModule {
-        range: 0..657,
+        range: 0..700,
         body: [
             Assign(
                 StmtAssign {
@@ -949,11 +949,11 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 634..645,
+                    range: 677..688,
                     targets: [
                         Name(
                             ExprName {
-                                range: 634..635,
+                                range: 677..678,
                                 id: "y",
                                 ctx: Store,
                             },
@@ -961,10 +961,10 @@ Module(
                     ],
                     value: Subscript(
                         ExprSubscript {
-                            range: 638..645,
+                            range: 681..688,
                             value: NumberLiteral(
                                 ExprNumberLiteral {
-                                    range: 638..641,
+                                    range: 681..684,
                                     value: Int(
                                         100,
                                     ),
@@ -972,7 +972,7 @@ Module(
                             ),
                             slice: Name(
                                 ExprName {
-                                    range: 642..644,
+                                    range: 685..687,
                                     id: "no",
                                     ctx: Load,
                                 },
@@ -984,11 +984,11 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 646..657,
+                    range: 689..700,
                     targets: [
                         Name(
                             ExprName {
-                                range: 646..647,
+                                range: 689..690,
                                 id: "y",
                                 ctx: Store,
                             },
@@ -996,21 +996,21 @@ Module(
                     ],
                     value: Call(
                         ExprCall {
-                            range: 650..657,
+                            range: 693..700,
                             func: NumberLiteral(
                                 ExprNumberLiteral {
-                                    range: 650..653,
+                                    range: 693..696,
                                     value: Int(
                                         100,
                                     ),
                                 },
                             ),
                             arguments: Arguments {
-                                range: 653..657,
+                                range: 696..700,
                                 args: [
                                     Name(
                                         ExprName {
-                                            range: 654..656,
+                                            range: 697..699,
                                             id: "no",
                                             ctx: Load,
                                         },
