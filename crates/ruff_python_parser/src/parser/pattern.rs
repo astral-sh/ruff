@@ -548,8 +548,8 @@ impl<'src> Parser<'src> {
                 };
 
                 Pattern::MatchValue(ast::PatternMatchValue {
+                    range: invalid_node.range(),
                     value: Box::new(invalid_node),
-                    range: self.missing_node_range(),
                 })
             }
         }
