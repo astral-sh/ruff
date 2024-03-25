@@ -25,6 +25,26 @@ use super::super::helpers::at_last_top_level_expression_in_cell;
 /// ```python
 /// foo = 1 + 1
 /// ```
+///
+/// ## Known problems
+/// This rule ignores expression types that are commonly used for their side
+/// effects, such as function calls.
+///
+/// However, if a seemingly useless expression (like an attribute access) is
+/// needed to trigger a side effect, consider assigning it to an anonymous
+/// variable, to indicate that the return value is intentionally ignored.
+///
+/// For example, given:
+/// ```python
+/// with errors.ExceptionRaisedContext():
+///     obj.attribute
+/// ```
+///
+/// Use instead:
+/// ```python
+/// with errors.ExceptionRaisedContext():
+///     _ = obj.attribute
+/// ```
 #[violation]
 pub struct UselessExpression {
     kind: Kind,
