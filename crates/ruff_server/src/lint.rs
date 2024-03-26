@@ -4,7 +4,11 @@ use std::path::Path;
 
 use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Fix};
 use ruff_linter::{
-    directives::{extract_directives, Flags}, linter::{check_path, LinterResult, TokenSource}, registry::AsRule, settings::{flags, LinterSettings}, source_kind::SourceKind
+    directives::{extract_directives, Flags},
+    linter::{check_path, LinterResult, TokenSource},
+    registry::AsRule,
+    settings::{flags, LinterSettings},
+    source_kind::SourceKind,
 };
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
