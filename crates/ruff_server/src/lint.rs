@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{edit::ToRangeExt, PositionEncoding, DIAGNOSTIC_NAME};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct DiagnosticFix {
     pub(crate) kind: DiagnosticKind,
     pub(crate) fix: Fix,
