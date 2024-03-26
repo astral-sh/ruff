@@ -612,9 +612,8 @@ For more, see the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) c
 ## Ruff tried to fix something — but it broke my code. What's going on?
 
 Ruff labels fixes as "safe" and "unsafe". By default, Ruff will fix all violations for which safe
-fixes are available, while unsafe fixes can be enabled via the [`unsafe-fixes`](settings.md#unsafe-fixes)
-setting, or passing the [`--unsafe-fixes`](settings.md#unsafe-fixes) flag to `ruff check`. For
-more, see [the fix documentation](configuration.md#fixes).
+fixes are available, while unsafe fixes can be enabled via the `unsafe-fixes` setting, or passing 
+the `--unsafe-fixes` flag to `ruff check`. For more, see [the fix documentation](configuration.md#fixes).
 
 Even still, given the dynamic nature of Python, it's difficult to have _complete_ certainty when
 making changes to code, even for seemingly trivial fixes. If a "safe" fix breaks your code, please
