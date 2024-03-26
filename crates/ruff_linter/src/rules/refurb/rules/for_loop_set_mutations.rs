@@ -6,12 +6,14 @@ use ruff_python_semantic::analyze::typing;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for updating list with iterable object by calling `add`/`discard` on each element
-/// separately in the `for` loop.
+/// Checks for code that updates a set with the contents of an iterable by
+/// using a `for` loop to call `.add()` or `.discard()` on each element
+/// separately.
 ///
 /// ## Why is this bad?
-/// When adding/removing a batch of elements to/from a set, it's more readable to call
-/// an appropriate method, instead of add/remove elements one-by-one.
+/// When adding or removing a batch of elements to or from a set, it's more
+/// idiomatic to use a single method call rather than adding or removing
+/// elements one by one.
 ///
 /// ## Example
 /// ```python
@@ -43,11 +45,11 @@ pub struct ForLoopSetMutations {
 impl AlwaysFixableViolation for ForLoopSetMutations {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of set.{} in a for loop", self.method_name)
+        format!("Use of `set.{}()` in a for loop", self.method_name)
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace with `{}`", self.batch_method_name)
+        format!("Replace with `.{}()`", self.batch_method_name)
     }
 }
 
