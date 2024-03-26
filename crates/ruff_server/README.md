@@ -1,4 +1,4 @@
-## `ruff server`
+## The Ruff Language Server
 
 Welcome! `ruff server` is a language server that powers editor integrations with Ruff. The job of the language server is to
 listen for requests from the client, (in this case, the code editor of your choice) and call into Ruff's linter and formatter
