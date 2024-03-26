@@ -196,6 +196,7 @@ impl Server {
                     code_action_kinds: Some(vec![
                         CodeActionKind::QUICKFIX,
                         CodeActionKind::SOURCE_ORGANIZE_IMPORTS,
+                        CodeActionKind::SOURCE_FIX_ALL,
                     ]),
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: Some(true),
