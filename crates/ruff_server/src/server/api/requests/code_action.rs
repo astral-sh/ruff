@@ -145,9 +145,44 @@ fn quick_fix(fixes: &[DiagnosticFix]) -> impl Iterator<Item = CodeActionOrComman
                 document_changes: Some(types::DocumentChanges::Edits(fix.document_edits.clone())),
                 ..Default::default()
             }),
+            diagnostics: Some(vec![fix.fixed_diagnostic.clone()]),
             ..Default::default()
         })
     })
+}
+
+fn fix_all(fixes: &[DiagnosticFix]) -> Option<CodeActionOrCommand> {
+    let edits_made: Vec<_> = fixes
+        .iter()
+        .filter(|fix| fix.applicability.is_safe())
+        .collect();
+
+    if edits_made.is_empty() {
+        return None;
+    }
+
+    let diagnostics_fixed = edits_made
+        .iter()
+        .map(|fix| fix.fixed_diagnostic.clone())
+        .collect();
+
+    // TODO: return vec with additional `applyAutofix` command.
+    Some(types::CodeActionOrCommand::CodeAction(types::CodeAction {
+        title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
+        diagnostics: Some(diagnostics_fixed),
+        kind: Some(types::CodeActionKind::SOURCE_FIX_ALL),
+        edit: Some(types::WorkspaceEdit {
+            document_changes: Some(types::DocumentChanges::Edits(
+                edits_made
+                    .into_iter()
+                    .flat_map(|fixes| fixes.document_edits.iter())
+                    .cloned()
+                    .collect(),
+            )),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }))
 }
 
 impl SupportedCodeActionKind {
@@ -181,40 +216,6 @@ impl SupportedCodeActionKind {
         ]
         .into_iter()
     }
-}
-
-fn fix_all(fixes: &[DiagnosticFix]) -> Option<CodeActionOrCommand> {
-    let edits_made: Vec<_> = fixes
-        .iter()
-        .filter(|fix| fix.applicability.is_safe())
-        .collect();
-
-    if edits_made.is_empty() {
-        return None;
-    }
-
-    let diagnostics_fixed = edits_made
-        .iter()
-        .map(|fix| fix.fixed_diagnostic.clone())
-        .collect();
-
-    // TODO: return vec with `applyAutofix` command.
-    Some(types::CodeActionOrCommand::CodeAction(types::CodeAction {
-        title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
-        diagnostics: Some(diagnostics_fixed),
-        kind: Some(types::CodeActionKind::SOURCE_FIX_ALL),
-        edit: Some(types::WorkspaceEdit {
-            document_changes: Some(types::DocumentChanges::Edits(
-                edits_made
-                    .into_iter()
-                    .flat_map(|fixes| fixes.document_edits.iter())
-                    .cloned()
-                    .collect(),
-            )),
-            ..Default::default()
-        }),
-        ..Default::default()
-    }))
 }
 
 /// If `action_filter` is `None`, this returns [`SupportedCodeAction::all()`]. Otherwise,
