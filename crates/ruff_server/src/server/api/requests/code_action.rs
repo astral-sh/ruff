@@ -120,6 +120,7 @@ fn quick_fix<'d>(
     edits: impl Iterator<Item = &'d DiagnosticEdit> + 'd,
 ) -> impl Iterator<Item = CodeActionOrCommand> + 'd {
     edits.map(|edit| {
+        let code = &edit.diagnostic_fix.code;
         let title = edit
             .diagnostic_fix
             .kind
@@ -127,7 +128,7 @@ fn quick_fix<'d>(
             .clone()
             .unwrap_or(edit.diagnostic_fix.kind.name.clone());
         types::CodeActionOrCommand::CodeAction(types::CodeAction {
-            title: format!("{DIAGNOSTIC_NAME}: {title}"),
+            title: format!("{DIAGNOSTIC_NAME} ({code}): {title}"),
             kind: Some(types::CodeActionKind::QUICKFIX),
             edit: Some(types::WorkspaceEdit {
                 document_changes: Some(types::DocumentChanges::Edits(edit.document_edits.clone())),

@@ -4,11 +4,7 @@ use std::path::Path;
 
 use ruff_diagnostics::{Applicability, Diagnostic, DiagnosticKind, Fix};
 use ruff_linter::{
-    directives::{extract_directives, Flags},
-    linter::{check_path, LinterResult, TokenSource},
-    registry::AsRule,
-    settings::{flags, LinterSettings},
-    source_kind::SourceKind,
+    directives::{extract_directives, Flags}, linter::{check_path, LinterResult, TokenSource}, registry::AsRule, settings::{flags, LinterSettings}, source_kind::SourceKind
 };
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
@@ -24,6 +20,7 @@ use crate::{edit::ToRangeExt, PositionEncoding, DIAGNOSTIC_NAME};
 pub(crate) struct DiagnosticFix {
     pub(crate) kind: DiagnosticKind,
     pub(crate) fix: Fix,
+    pub(crate) code: String,
 }
 
 pub(crate) fn check(
@@ -95,6 +92,7 @@ fn to_lsp_diagnostic(
                 serde_json::to_value(&DiagnosticFix {
                     kind: kind.clone(),
                     fix,
+                    code: format!("{}", rule.noqa_code()),
                 })
                 .ok()
             })
