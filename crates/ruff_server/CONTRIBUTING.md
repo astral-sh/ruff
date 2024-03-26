@@ -23,9 +23,9 @@ data races and out-of-order handler execution. Our approach avoids this issue by
 
 ### Testing
 
-Most editors with LSP support (VS Code is a notable exception) will let you provide a server command for that language server. Ruff's server command is `<ruff binary> server --preview`, which will begin running a language server that listens to messages on `stdin` and responds on `stdout`.
+Most editors with LSP support (VS Code is a notable exception) can work with a language server by providing a server command in their respective configurations. Guides for configuring specific editors to use Ruff will be available soon.
 
-Unless you've already installed your local `ruff` build in your `PATH` (in which case you can just use `ruff server --preview` as the server command) the server command should be the path to your locally-built ruff executable (usually `<path to your ruff source>/target/debug/ruff`) along with the arguments `server` and `--preview`. Make sure to (re)build the server with `cargo build -p ruff`!
+If you want to test any changes you've made to `ruff server`, you can simply modify the editor configuration to use your debug binary. Unless you've already installed this debug build in your `PATH` (in which case you can just keep using `ruff server --preview` as the server command) the server command should be the path to your locally-built ruff executable (usually `<path to your ruff source>/target/debug/ruff`) along with the arguments `server` and `--preview`. Make sure to (re)build the server with `cargo build -p ruff`!
 
 #### Testing In VS Code
 
