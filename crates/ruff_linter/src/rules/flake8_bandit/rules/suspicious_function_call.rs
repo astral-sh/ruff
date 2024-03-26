@@ -220,7 +220,7 @@ pub struct SuspiciousInsecureCipherModeUsage;
 impl Violation for SuspiciousInsecureCipherModeUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of insecure cipher mode, replace with a known secure cipher such as AES")
+        format!("Use of insecure block cipher mode, replace with a known secure cipher such as CBC")
     }
 }
 
