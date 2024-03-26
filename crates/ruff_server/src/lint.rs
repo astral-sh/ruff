@@ -92,7 +92,7 @@ fn to_lsp_diagnostic(
                 serde_json::to_value(&DiagnosticFix {
                     kind: kind.clone(),
                     fix,
-                    code: format!("{}", rule.noqa_code()),
+                    code: rule.noqa_code().to_string(),
                 })
                 .ok()
             })
