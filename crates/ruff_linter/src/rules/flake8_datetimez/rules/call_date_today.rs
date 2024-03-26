@@ -49,10 +49,11 @@ pub struct CallDateToday;
 impl Violation for CallDateToday {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "The use of `datetime.date.today()` is not allowed, use \
-             `datetime.datetime.now(tz=).date()` instead"
-        )
+        format!("`datetime.date.today()` used")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Use `datetime.datetime.now(tz=).date()` instead".to_string())
     }
 }
 

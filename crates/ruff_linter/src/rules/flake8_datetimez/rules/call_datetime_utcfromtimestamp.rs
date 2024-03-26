@@ -53,10 +53,11 @@ pub struct CallDatetimeUtcfromtimestamp;
 impl Violation for CallDatetimeUtcfromtimestamp {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "The use of `datetime.datetime.utcfromtimestamp()` is not allowed, use \
-             `datetime.datetime.fromtimestamp(ts, tz=)` instead"
-        )
+        format!("`datetime.datetime.utcfromtimestamp()` used")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Use `datetime.datetime.fromtimestamp(ts, tz=)` instead".to_string())
     }
 }
 

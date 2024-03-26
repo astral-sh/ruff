@@ -50,12 +50,16 @@ impl Violation for CallDatetimeWithoutTzinfo {
         let CallDatetimeWithoutTzinfo(antipattern) = self;
         match antipattern {
             DatetimeModuleAntipattern::NoTzArgumentPassed => {
-                format!("The use of `datetime.datetime()` without `tzinfo` argument is not allowed")
+                format!("`datetime.datetime()` called without a `tzinfo` argument")
             }
             DatetimeModuleAntipattern::NonePassedToTzArgument => {
-                format!("Passing `tzinfo=None` if forbidden, as it creates a naive datetime object")
+                format!("`tzinfo=None` passed to `datetime.datetime()`")
             }
         }
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Pass a `datetime.timezone` object to the `tzinfo` parameter".to_string())
     }
 }
 

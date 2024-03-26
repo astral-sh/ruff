@@ -51,10 +51,11 @@ pub struct CallDatetimeUtcnow;
 impl Violation for CallDatetimeUtcnow {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "The use of `datetime.datetime.utcnow()` is not allowed, use \
-             `datetime.datetime.now(tz=)` instead"
-        )
+        format!("`datetime.datetime.utcnow()` used")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Use `datetime.datetime.now(tz=)` instead".to_string())
     }
 }
 

@@ -55,13 +55,17 @@ impl Violation for CallDatetimeFromtimestamp {
     fn message(&self) -> String {
         let CallDatetimeFromtimestamp(antipattern) = self;
         match antipattern {
-            DatetimeModuleAntipattern::NoTzArgumentPassed => format!(
-                "The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed"
-            ),
-            DatetimeModuleAntipattern::NonePassedToTzArgument => format!(
-                "Passing `tz=None` is forbidden, as it creates a naive datetime object"
-            ),
+            DatetimeModuleAntipattern::NoTzArgumentPassed => {
+                format!("`datetime.datetime.fromtimestamp()` called without a `tz` argument")
+            }
+            DatetimeModuleAntipattern::NonePassedToTzArgument => {
+                format!("`tz=None` passed to `datetime.datetime.fromtimestamp()`")
+            }
         }
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Pass a `datetime.timezone` object to the `tz` parameter".to_string())
     }
 }
 

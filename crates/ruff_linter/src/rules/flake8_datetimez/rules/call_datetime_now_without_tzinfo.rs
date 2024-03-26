@@ -54,12 +54,16 @@ impl Violation for CallDatetimeNowWithoutTzinfo {
         let CallDatetimeNowWithoutTzinfo(antipattern) = self;
         match antipattern {
             DatetimeModuleAntipattern::NoTzArgumentPassed => {
-                format!("Using `datetime.datetime.now()` without a `tz=` argument is not allowed")
+                format!("`datetime.datetime.now()` called without a `tz=` argument")
             }
             DatetimeModuleAntipattern::NonePassedToTzArgument => {
-                format!("Passing `tz=None` to `datetime.datetime.now()` is not allowed")
+                format!("`tz=None` passed to `datetime.datetime.now()`")
             }
         }
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Pass a `datetime.timezone` object to the `tz` parameter".to_string())
     }
 }
 

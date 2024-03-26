@@ -50,10 +50,11 @@ pub struct CallDateFromtimestamp;
 impl Violation for CallDateFromtimestamp {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "The use of `datetime.date.fromtimestamp()` is not allowed, use \
-             `datetime.datetime.fromtimestamp(ts, tz=).date()` instead"
-        )
+        format!("`datetime.date.fromtimestamp()` used")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Use `datetime.datetime.fromtimestamp(ts, tz=).date()` instead".to_string())
     }
 }
 
