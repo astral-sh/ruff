@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use crate::{edit::ToRangeExt, PositionEncoding, DIAGNOSTIC_NAME};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub(crate) struct DiagnosticFix {
+pub(crate) struct AssociatedDiagnosticData {
     pub(crate) kind: DiagnosticKind,
     pub(crate) fix: Fix,
     pub(crate) code: String,
@@ -93,7 +93,7 @@ fn to_lsp_diagnostic(
     let data = fix.and_then(|fix| {
         fix.applies(Applicability::Unsafe)
             .then(|| {
-                serde_json::to_value(&DiagnosticFix {
+                serde_json::to_value(&AssociatedDiagnosticData {
                     kind: kind.clone(),
                     fix,
                     code: rule.noqa_code().to_string(),
