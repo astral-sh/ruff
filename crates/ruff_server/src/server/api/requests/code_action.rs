@@ -5,8 +5,8 @@ use crate::lint::DiagnosticFix;
 use crate::server::api::LSPResult;
 use crate::server::{client::Notifier, Result};
 use crate::session::{DocumentRef, DocumentSnapshot};
-use crate::{PositionEncoding, SOURCE_FIX_ALL_RUFF, SOURCE_ORGANIZE_IMPORTS_RUFF};
 use crate::DIAGNOSTIC_NAME;
+use crate::{PositionEncoding, SOURCE_FIX_ALL_RUFF, SOURCE_ORGANIZE_IMPORTS_RUFF};
 use lsp_types::{self as types, request as req};
 use ruff_text_size::Ranged;
 use types::{CodeActionKind, CodeActionOrCommand, Url};
@@ -155,6 +155,17 @@ impl SupportedCodeAction {
             Self::SourceOrganizeImportsRuff => SOURCE_ORGANIZE_IMPORTS_RUFF,
         }
     }
+
+    fn all() -> impl Iterator<Item = Self> {
+        [
+            Self::QuickFix,
+            Self::SourceFixAll,
+            Self::SourceFixAllRuff,
+            // Self::SourceOrganizeImports,
+            // Self::SourceOrganizeImportsRuff
+        ]
+        .into_iter()
+    }
 }
 
 fn fix_all<'d>(
@@ -203,30 +214,19 @@ fn fix_all<'d>(
         .flatten()
 }
 
-/// If `action_filter` is `None`, this returns the full list of supported code actions. Otherwise,
+/// If `action_filter` is `None`, this returns [`SupportedCodeAction::all()`]. Otherwise,
 /// the list is filtered.
 fn available_code_actions(
     action_filter: Option<Vec<CodeActionKind>>,
 ) -> BTreeSet<SupportedCodeAction> {
-    const DEFAULT_ACTIONS: &[SupportedCodeAction] = &[
-        SupportedCodeAction::QuickFix,
-        SupportedCodeAction::SourceFixAll,
-        SupportedCodeAction::SourceFixAllRuff,
-        // SupportedCodeAction::OrganizeImports,
-        // SupportedCodeAction::OrganizeImportsRuff
-    ];
-
     let Some(action_filter) = action_filter else {
-        return DEFAULT_ACTIONS.iter().copied().collect();
+        return SupportedCodeAction::all().collect();
     };
-
-    DEFAULT_ACTIONS
-        .iter()
+    SupportedCodeAction::all()
         .filter(|action| {
             action_filter
                 .iter()
                 .any(|kind| action.kind().as_str().starts_with(kind.as_str()))
         })
-        .copied()
         .collect()
 }
