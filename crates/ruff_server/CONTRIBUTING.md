@@ -4,13 +4,13 @@ This is a mostly free-form guide with resources to help you get started with con
 
 ### Project Architecture
 
-`ruff_server` uses a [lock-free data model](https://github.com/astral-sh/ruff/blob/main/crates/ruff_server/src/session.rs) to represent its state. The server runs in a [continuous event loop](https://github.com/astral-sh/ruff/blob/main/crates/ruff_server/src/server.rs) by listening to incoming messages
-over `stdin` and dispatches [tasks](https://github.com/astral-sh/ruff/blob/main/crates/ruff_server/src/server/schedule/task.rs) based on the type of message. A 'task' can either be 'local' or 'background' - the former kind has
+`ruff_server` uses a [lock-free data model](https://github.com/astral-sh/ruff/blob/a28776e3aa76c18dcc1f1ad36a48aa189040860d/crates/ruff_server/src/session.rs#L17-L26) to represent its state. The server runs in a [continuous event loop](https://github.com/astral-sh/ruff/blob/a28776e3aa76c18dcc1f1ad36a48aa189040860d/crates/ruff_server/src/server.rs#L146-L173) by listening to incoming messages
+over `stdin` and dispatches [tasks](https://github.com/astral-sh/ruff/blob/a28776e3aa76c18dcc1f1ad36a48aa189040860d/crates/ruff_server/src/server/schedule/task.rs#L29-L40) based on the type of message. A 'task' can either be 'local' or 'background' - the former kind has
 exclusive mutable access to the state and execute immediately, blocking the event loop until their completion. The latter kind, background
 tasks, run immediately on a thread pool with an immutable snapshot of the state, and do _not_ block the event loop unless the thread pool
 queue is full, in which case the server will block on available queue space.
 
-[Snapshots of the server state](https://github.com/astral-sh/ruff/blob/main/crates/ruff_server/src/session.rs) use atomic reference-counted pointers (`Arc`) to prevent unnecessary cloning of large text files. If the contents
+[Snapshots of the server state](https://github.com/astral-sh/ruff/blob/a28776e3aa76c18dcc1f1ad36a48aa189040860d/crates/ruff_server/src/session.rs#L28-L35) use atomic reference-counted pointers (`Arc`) to prevent unnecessary cloning of large text files. If the contents
 of the text file need to be updated, the state will create a new `Arc` to store it. This allows a local task to run at the same time as multiple background tasks
 without changing the state the background tasks are working with. This only applies to background tasks started _before_ the local task though, as a local task blocks
 the handling of further messages (and therefore, dispatching future tasks) until its completion.
