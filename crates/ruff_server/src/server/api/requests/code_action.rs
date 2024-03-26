@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use crate::edit::{DocumentVersion, ToRangeExt};
 use crate::lint::DiagnosticFix;
 use crate::server::api::LSPResult;
@@ -11,16 +9,16 @@ use lsp_types::{self as types, request as req};
 use ruff_text_size::Ranged;
 use types::{CodeActionKind, CodeActionOrCommand, Url};
 
-pub(crate) struct CodeAction;
-
-impl super::RequestHandler for CodeAction {
-    type RequestType = req::CodeActionRequest;
+bitflags::bitflags! {
+    struct AvailableCodeActions: u8 {
+        const QUICK_FIX = 0b0000_0001;
+        const SOURCE_FIX_ALL = 0b0000_0010;
+        const SOURCE_ORGANIZE_IMPORTS = 0b0000_0100;
+    }
 }
 
-// The order for the variants here determines the order we
-// add their results to the code action response
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-enum SupportedCodeAction {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SupportedCodeActionKind {
     QuickFix,
     SourceFixAll,
     SourceFixAllRuff,
@@ -37,7 +35,13 @@ struct DiagnosticEdit {
     document_edits: Vec<types::TextDocumentEdit>,
 }
 
-impl super::BackgroundDocumentRequestHandler for CodeAction {
+pub(crate) struct CodeActions;
+
+impl super::RequestHandler for CodeActions {
+    type RequestType = req::CodeActionRequest;
+}
+
+impl super::BackgroundDocumentRequestHandler for CodeActions {
     super::define_document_url!(params: &types::CodeActionParams);
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
@@ -63,17 +67,16 @@ impl super::BackgroundDocumentRequestHandler for CodeAction {
 
         let mut response: types::CodeActionResponse = types::CodeActionResponse::default();
 
-        for action in available_actions {
-            match action {
-                SupportedCodeAction::QuickFix => response.extend(quick_fix(edits.iter())),
-                SupportedCodeAction::SourceFixAll | SupportedCodeAction::SourceFixAllRuff => {
-                    response.extend(fix_all(edits.iter()));
-                }
-                SupportedCodeAction::SourceOrganizeImports
-                | SupportedCodeAction::SourceOrganizeImportsRuff => {
-                    todo!("Implement the `source.organizeImports` code action")
-                }
-            }
+        if available_actions.contains(AvailableCodeActions::QUICK_FIX) {
+            response.extend(quick_fix(edits.iter()));
+        }
+
+        if available_actions.contains(AvailableCodeActions::SOURCE_FIX_ALL) {
+            response.extend(fix_all(edits.iter()));
+        }
+
+        if available_actions.contains(AvailableCodeActions::SOURCE_ORGANIZE_IMPORTS) {
+            todo!("Implement the `source.organizeImports` code action");
         }
 
         Ok(Some(response))
@@ -145,7 +148,7 @@ fn quick_fix<'d>(
     })
 }
 
-impl SupportedCodeAction {
+impl SupportedCodeActionKind {
     fn kind(self) -> CodeActionKind {
         match self {
             Self::QuickFix => CodeActionKind::QUICKFIX,
@@ -153,6 +156,16 @@ impl SupportedCodeAction {
             Self::SourceFixAllRuff => SOURCE_FIX_ALL_RUFF,
             Self::SourceOrganizeImports => CodeActionKind::SOURCE_ORGANIZE_IMPORTS,
             Self::SourceOrganizeImportsRuff => SOURCE_ORGANIZE_IMPORTS_RUFF,
+        }
+    }
+
+    fn makes_available(self) -> AvailableCodeActions {
+        match self {
+            Self::QuickFix => AvailableCodeActions::QUICK_FIX,
+            Self::SourceFixAll | Self::SourceFixAllRuff => AvailableCodeActions::SOURCE_FIX_ALL,
+            Self::SourceOrganizeImports | Self::SourceOrganizeImportsRuff => {
+                AvailableCodeActions::SOURCE_ORGANIZE_IMPORTS
+            }
         }
     }
 
@@ -216,17 +229,21 @@ fn fix_all<'d>(
 
 /// If `action_filter` is `None`, this returns [`SupportedCodeAction::all()`]. Otherwise,
 /// the list is filtered.
-fn available_code_actions(
-    action_filter: Option<Vec<CodeActionKind>>,
-) -> BTreeSet<SupportedCodeAction> {
+fn available_code_actions(action_filter: Option<Vec<CodeActionKind>>) -> AvailableCodeActions {
     let Some(action_filter) = action_filter else {
-        return SupportedCodeAction::all().collect();
+        return SupportedCodeActionKind::all()
+            .fold(AvailableCodeActions::empty(), |available, kind| {
+                available | kind.makes_available()
+            });
     };
-    SupportedCodeAction::all()
+
+    SupportedCodeActionKind::all()
         .filter(|action| {
             action_filter
                 .iter()
                 .any(|kind| action.kind().as_str().starts_with(kind.as_str()))
         })
-        .collect()
+        .fold(AvailableCodeActions::empty(), |available, kind| {
+            available | kind.makes_available()
+        })
 }

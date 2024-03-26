@@ -28,7 +28,7 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
     let id = req.id.clone();
 
     match req.method.as_str() {
-        request::CodeAction::METHOD => background_request_task::<request::CodeAction>(
+        request::CodeActions::METHOD => background_request_task::<request::CodeActions>(
             req,
             BackgroundSchedule::LatencySensitive,
         ),
