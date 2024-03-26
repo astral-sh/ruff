@@ -10,7 +10,7 @@ DTZ001.py:4:1: DTZ001 The use of `datetime.datetime()` without `tzinfo` argument
 6 | # none args
   |
 
-DTZ001.py:7:1: DTZ001 The use of `datetime.datetime()` without `tzinfo` argument is not allowed
+DTZ001.py:7:1: DTZ001 Passing `tzinfo=None` if forbidden, as it creates a naive datetime object
   |
 6 | # none args
 7 | datetime.datetime(2000, 1, 1, 0, 0, 0, 0, None)
@@ -28,7 +28,7 @@ DTZ001.py:13:1: DTZ001 The use of `datetime.datetime()` without `tzinfo` argumen
 15 | # none kwargs
    |
 
-DTZ001.py:16:1: DTZ001 The use of `datetime.datetime()` without `tzinfo` argument is not allowed
+DTZ001.py:16:1: DTZ001 Passing `tzinfo=None` if forbidden, as it creates a naive datetime object
    |
 15 | # none kwargs
 16 | datetime.datetime(2000, 1, 1, tzinfo=None)
@@ -45,5 +45,3 @@ DTZ001.py:21:1: DTZ001 The use of `datetime.datetime()` without `tzinfo` argumen
 22 | 
 23 | # uses `astimezone` method
    |
-
-

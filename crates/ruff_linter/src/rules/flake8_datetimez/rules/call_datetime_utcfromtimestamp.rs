@@ -19,15 +19,16 @@ use super::helpers;
 /// datetime objects. Since this can lead to errors, it is recommended to
 /// always use timezone-aware objects.
 ///
-/// `datetime.datetime.utcfromtimestamp()` returns a naive datetime object;
-/// instead, use `datetime.datetime.fromtimestamp(ts, tz=)` to return a
+/// `datetime.datetime.utcfromtimestamp()` or
+/// `datetime.datetime.utcfromtimestamp(tz=None)` returns a naive datetime
+/// object; instead, use `datetime.datetime.fromtimestamp(ts, tz=)` to return a
 /// timezone-aware object.
 ///
 /// ## Example
 /// ```python
 /// import datetime
 ///
-/// datetime.datetime.utcfromtimestamp()
+/// datetime.datetime.utcfromtimestamp(946684800)
 /// ```
 ///
 /// Use instead:
@@ -37,7 +38,7 @@ use super::helpers;
 /// datetime.datetime.fromtimestamp(946684800, tz=datetime.timezone.utc)
 /// ```
 ///
-/// Or, for Python 3.11 and later:
+/// Or, on Python 3.11 and later:
 /// ```python
 /// import datetime
 ///

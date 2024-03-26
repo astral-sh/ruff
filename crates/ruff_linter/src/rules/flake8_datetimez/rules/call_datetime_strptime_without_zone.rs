@@ -2,10 +2,10 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
+
+use super::helpers::DatetimeModuleAntipattern;
 
 /// ## What it does
 /// Checks for uses of `datetime.datetime.strptime()` that lead to naive
@@ -51,15 +51,22 @@ use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 /// - [Python documentation: `strftime()` and `strptime()` Behavior](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-behavior)
 #[violation]
-pub struct CallDatetimeStrptimeWithoutZone;
+pub struct CallDatetimeStrptimeWithoutZone(DatetimeModuleAntipattern);
 
 impl Violation for CallDatetimeStrptimeWithoutZone {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "The use of `datetime.datetime.strptime()` without %z must be followed by \
-             `.replace(tzinfo=)` or `.astimezone()`"
-        )
+        let CallDatetimeStrptimeWithoutZone(antipattern) = self;
+        match antipattern {
+            DatetimeModuleAntipattern::NoTzArgumentPassed => format!(
+                "The use of `datetime.datetime.strptime()` without %z must be followed by \
+                `.replace(tzinfo=)` or `.astimezone()`"
+            ),
+            DatetimeModuleAntipattern::NonePassedToTzArgument => format!(
+                "Passing `tzinfo=None` to `datetime.datetime.replace()` is forbidden, \
+                as it creates a naive datetime object"
+            ),
+        }
     }
 }
 
@@ -91,36 +98,44 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &mut Checker, call: &
         }
     };
 
-    let (Some(grandparent), Some(parent)) = (
-        checker.semantic().current_expression_grandparent(),
-        checker.semantic().current_expression_parent(),
-    ) else {
+    let semantic = checker.semantic();
+    if let Some(antipattern) = find_antipattern(
+        semantic.current_expression_grandparent(),
+        semantic.current_expression_parent(),
+    ) {
         checker.diagnostics.push(Diagnostic::new(
-            CallDatetimeStrptimeWithoutZone,
-            call.range(),
+            CallDatetimeStrptimeWithoutZone(antipattern),
+            call.range,
         ));
-        return;
-    };
-
-    if let Expr::Call(ast::ExprCall { arguments, .. }) = grandparent {
-        if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = parent {
-            let attr = attr.as_str();
-            // Ex) `datetime.strptime(...).astimezone()`
-            if attr == "astimezone" {
-                return;
-            }
-
-            // Ex) `datetime.strptime(...).replace(tzinfo=UTC)`
-            if attr == "replace" {
-                if has_non_none_keyword(arguments, "tzinfo") {
-                    return;
-                }
-            }
-        }
     }
+}
 
-    checker.diagnostics.push(Diagnostic::new(
-        CallDatetimeStrptimeWithoutZone,
-        call.range(),
-    ));
+fn find_antipattern(
+    grandparent: Option<&Expr>,
+    parent: Option<&Expr>,
+) -> Option<DatetimeModuleAntipattern> {
+    let Some(Expr::Call(ast::ExprCall { arguments, .. })) = grandparent else {
+        return Some(DatetimeModuleAntipattern::NoTzArgumentPassed);
+    };
+    let Some(Expr::Attribute(ast::ExprAttribute { attr, .. })) = parent else {
+        return Some(DatetimeModuleAntipattern::NoTzArgumentPassed);
+    };
+    // Ex) `datetime.strptime(...).astimezone()`
+    if attr == "astimezone" {
+        return None;
+    }
+    if attr != "replace" {
+        return Some(DatetimeModuleAntipattern::NoTzArgumentPassed);
+    }
+    match arguments.find_keyword("tzinfo") {
+        // Ex) `datetime.strptime(...).replace(tz=None)`
+        Some(ast::Keyword {
+            value: Expr::NoneLiteral(_),
+            ..
+        }) => Some(DatetimeModuleAntipattern::NonePassedToTzArgument),
+        // Ex) `datetime.strptime(...).replace(tz=...)`
+        Some(_) => None,
+        // Ex) `datetime.strptime(...).replace(...)` with no tz= argument
+        None => Some(DatetimeModuleAntipattern::NoTzArgumentPassed),
+    }
 }

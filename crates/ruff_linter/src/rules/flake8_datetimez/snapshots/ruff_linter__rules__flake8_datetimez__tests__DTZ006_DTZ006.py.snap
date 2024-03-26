@@ -19,7 +19,7 @@ DTZ006.py:7:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz
 9 | # none args
   |
 
-DTZ006.py:10:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
+DTZ006.py:10:1: DTZ006 Passing `tz=None` is forbidden, as it creates a naive datetime object
    |
  9 | # none args
 10 | datetime.datetime.fromtimestamp(1234, None)
@@ -28,7 +28,7 @@ DTZ006.py:10:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `t
 12 | # none keywords
    |
 
-DTZ006.py:13:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
+DTZ006.py:13:1: DTZ006 Passing `tz=None` is forbidden, as it creates a naive datetime object
    |
 12 | # none keywords
 13 | datetime.datetime.fromtimestamp(1234, tz=None)
@@ -45,5 +45,3 @@ DTZ006.py:18:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `t
 19 | 
 20 | # uses `astimezone` method
    |
-
-

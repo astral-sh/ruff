@@ -1,14 +1,12 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
 
-use super::helpers;
+use super::helpers::{self, DatetimeModuleAntipattern};
 
 /// ## What it does
 /// Checks for usages of `datetime.datetime.now()` that do not specify a timezone.
@@ -48,12 +46,20 @@ use super::helpers;
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[violation]
-pub struct CallDatetimeNowWithoutTzinfo;
+pub struct CallDatetimeNowWithoutTzinfo(DatetimeModuleAntipattern);
 
 impl Violation for CallDatetimeNowWithoutTzinfo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using `datetime.datetime.now()` without specifying a timezone is not allowed")
+        let CallDatetimeNowWithoutTzinfo(antipattern) = self;
+        match antipattern {
+            DatetimeModuleAntipattern::NoTzArgumentPassed => {
+                format!("Using `datetime.datetime.now()` without a `tz=` argument is not allowed")
+            }
+            DatetimeModuleAntipattern::NonePassedToTzArgument => {
+                format!("Passing `tz=None` to `datetime.datetime.now()` is not allowed")
+            }
+        }
     }
 }
 
@@ -76,31 +82,14 @@ pub(crate) fn call_datetime_now_without_tzinfo(checker: &mut Checker, call: &ast
         return;
     }
 
-    // no args / no args unqualified
-    if call.arguments.args.is_empty() && call.arguments.keywords.is_empty() {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDatetimeNowWithoutTzinfo, call.range()));
-        return;
-    }
+    let antipattern = match call.arguments.find_argument("tz", 0) {
+        Some(ast::Expr::NoneLiteral(_)) => DatetimeModuleAntipattern::NonePassedToTzArgument,
+        Some(_) => return,
+        None => DatetimeModuleAntipattern::NoTzArgumentPassed,
+    };
 
-    // none args
-    if call
-        .arguments
-        .args
-        .first()
-        .is_some_and(Expr::is_none_literal_expr)
-    {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDatetimeNowWithoutTzinfo, call.range()));
-        return;
-    }
-
-    // wrong keywords / none keyword
-    if !call.arguments.keywords.is_empty() && !has_non_none_keyword(&call.arguments, "tz") {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(CallDatetimeNowWithoutTzinfo, call.range()));
-    }
+    checker.diagnostics.push(Diagnostic::new(
+        CallDatetimeNowWithoutTzinfo(antipattern),
+        call.range,
+    ));
 }

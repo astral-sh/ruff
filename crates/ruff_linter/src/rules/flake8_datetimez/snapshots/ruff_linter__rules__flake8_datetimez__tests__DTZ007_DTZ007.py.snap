@@ -28,7 +28,7 @@ DTZ007.py:10:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must
 12 | # none replace
    |
 
-DTZ007.py:13:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`
+DTZ007.py:13:1: DTZ007 Passing `tzinfo=None` to `datetime.datetime.replace()` is forbidden, as it creates a naive datetime object
    |
 12 | # none replace
 13 | datetime.datetime.strptime("something", "something").replace(tzinfo=None)
@@ -43,5 +43,3 @@ DTZ007.py:35:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must
 35 | datetime.strptime("something", "something")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ007
    |
-
-
