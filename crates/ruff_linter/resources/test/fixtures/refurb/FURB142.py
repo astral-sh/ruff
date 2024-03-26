@@ -25,6 +25,11 @@ num = 123
 for x in (1, 2, 3):
     s.add(num)
 
+for x in (1, 2, 3):
+    s.add((num, x))
+
+for x in (1, 2, 3):
+    s.add(x + num)
 
 # False negative
 
