@@ -53,7 +53,7 @@ pub struct CallDatetimeNowWithoutTzinfo;
 impl Violation for CallDatetimeNowWithoutTzinfo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("The use of `datetime.datetime.now()` without `tz` argument is not allowed")
+        format!("The use of `datetime.datetime.now()` without specifying a timezone is not allowed"")
     }
 }
 
