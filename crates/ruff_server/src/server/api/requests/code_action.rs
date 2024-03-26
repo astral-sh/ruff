@@ -5,7 +5,7 @@ use crate::lint::DiagnosticFix;
 use crate::server::api::LSPResult;
 use crate::server::{client::Notifier, Result};
 use crate::session::{DocumentRef, DocumentSnapshot};
-use crate::PositionEncoding;
+use crate::{PositionEncoding, SOURCE_FIX_ALL_RUFF, SOURCE_ORGANIZE_IMPORTS_RUFF};
 use crate::DIAGNOSTIC_NAME;
 use lsp_types::{self as types, request as req};
 use ruff_text_size::Ranged;
@@ -22,9 +22,12 @@ impl super::RequestHandler for CodeAction {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum SupportedCodeAction {
     QuickFix,
-    FixAll,
+    SourceFixAll,
+    SourceFixAllRuff,
     #[allow(dead_code)] // TODO: remove
-    OrganizeImports,
+    SourceOrganizeImports,
+    #[allow(dead_code)] // TODO: remove
+    SourceOrganizeImportsRuff,
 }
 
 #[derive(Clone, Debug)]
@@ -63,8 +66,11 @@ impl super::BackgroundDocumentRequestHandler for CodeAction {
         for action in available_actions {
             match action {
                 SupportedCodeAction::QuickFix => response.extend(quick_fix(edits.iter())),
-                SupportedCodeAction::FixAll => response.extend(fix_all(edits.iter())),
-                SupportedCodeAction::OrganizeImports => {
+                SupportedCodeAction::SourceFixAll | SupportedCodeAction::SourceFixAllRuff => {
+                    response.extend(fix_all(edits.iter()));
+                }
+                SupportedCodeAction::SourceOrganizeImports
+                | SupportedCodeAction::SourceOrganizeImportsRuff => {
                     todo!("Implement the `source.organizeImports` code action")
                 }
             }
@@ -143,8 +149,10 @@ impl SupportedCodeAction {
     fn kind(self) -> CodeActionKind {
         match self {
             Self::QuickFix => CodeActionKind::QUICKFIX,
-            Self::FixAll => CodeActionKind::SOURCE_FIX_ALL,
-            Self::OrganizeImports => CodeActionKind::SOURCE_ORGANIZE_IMPORTS,
+            Self::SourceFixAll => CodeActionKind::SOURCE_FIX_ALL,
+            Self::SourceFixAllRuff => SOURCE_FIX_ALL_RUFF,
+            Self::SourceOrganizeImports => CodeActionKind::SOURCE_ORGANIZE_IMPORTS,
+            Self::SourceOrganizeImportsRuff => SOURCE_ORGANIZE_IMPORTS_RUFF,
         }
     }
 }
@@ -202,8 +210,10 @@ fn available_code_actions(
 ) -> BTreeSet<SupportedCodeAction> {
     const DEFAULT_ACTIONS: &[SupportedCodeAction] = &[
         SupportedCodeAction::QuickFix,
-        SupportedCodeAction::FixAll,
-        // SupportedCodeAction::OrganizeImports
+        SupportedCodeAction::SourceFixAll,
+        SupportedCodeAction::SourceFixAllRuff,
+        // SupportedCodeAction::OrganizeImports,
+        // SupportedCodeAction::OrganizeImportsRuff
     ];
 
     let Some(action_filter) = action_filter else {
