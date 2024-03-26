@@ -11,7 +11,7 @@ use crate::rules::flake8_datetimez::rules::helpers::has_non_none_keyword;
 use super::helpers;
 
 /// ## What it does
-/// Checks for usage of `datetime.datetime.now()` without a `tz` argument.
+/// Checks for usages of `datetime.datetime.now()` that do not specify a timezone.
 ///
 /// ## Why is this bad?
 /// Python datetime objects can be naive or timezone-aware. While an aware
@@ -20,8 +20,9 @@ use super::helpers;
 /// datetime objects. Since this can lead to errors, it is recommended to
 /// always use timezone-aware objects.
 ///
-/// `datetime.datetime.now()` returns a naive datetime object. Instead, use
-/// `datetime.datetime.now(tz=)` to return a timezone-aware object.
+/// `datetime.datetime.now()` or `datetime.datetime.now(tz=None)` returns a naive
+/// datetime object. Instead, use `datetime.datetime.now(tz=)` to return a
+/// timezone-aware object.
 ///
 /// ## Example
 /// ```python
@@ -42,13 +43,6 @@ use super::helpers;
 /// import datetime
 ///
 /// datetime.datetime.now(tz=datetime.UTC)
-/// ```
-///
-/// ## Why can't I use `datetime.datetime.now(tz=None)`?
-/// ```python
-/// datetime.datetime.now(tz=None)  # Returns a naive datetime for the machine's timezone.
-/// # So, for a timezone-aware datetime for the machine's timezone, use:
-/// datetime.datetime.now(tz=datetime.timezone.utc).astimezone()
 /// ```
 ///
 /// ## References
