@@ -61,18 +61,18 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
             snapshot.url(),
             snapshot.encoding(),
             document.version(),
-            params.context.diagnostics.into_iter(),
+            params.context.diagnostics,
         )
         .collect::<Result<Vec<_>>>()?;
 
         let mut response: types::CodeActionResponse = types::CodeActionResponse::default();
 
         if available_actions.contains(AvailableCodeActions::QUICK_FIX) {
-            response.extend(quick_fix(edits.iter()));
+            response.extend(quick_fix(edits.as_slice()));
         }
 
         if available_actions.contains(AvailableCodeActions::SOURCE_FIX_ALL) {
-            response.extend(fix_all(edits.iter()));
+            response.extend(fix_all(edits.as_slice()));
         }
 
         if available_actions.contains(AvailableCodeActions::SOURCE_ORGANIZE_IMPORTS) {
@@ -88,9 +88,10 @@ fn diagnostic_edits<'d>(
     url: &'d Url,
     encoding: PositionEncoding,
     version: DocumentVersion,
-    diagnostics: impl Iterator<Item = types::Diagnostic> + 'd,
+    diagnostics: Vec<types::Diagnostic>,
 ) -> impl Iterator<Item = crate::server::Result<DiagnosticEdit>> + 'd {
     diagnostics
+        .into_iter()
         .map(move |diagnostic| {
             let Some(data) = diagnostic.data.clone() else {
                 return Ok(None);
@@ -125,17 +126,15 @@ fn diagnostic_edits<'d>(
         .filter_map(Result::transpose)
 }
 
-fn quick_fix<'d>(
-    edits: impl Iterator<Item = &'d DiagnosticEdit> + 'd,
-) -> impl Iterator<Item = CodeActionOrCommand> + 'd {
-    edits.map(|edit| {
+fn quick_fix(edits: &[DiagnosticEdit]) -> impl Iterator<Item = CodeActionOrCommand> + '_ {
+    edits.iter().map(|edit| {
         let code = &edit.diagnostic_fix.code;
         let title = edit
             .diagnostic_fix
             .kind
             .suggestion
-            .clone()
-            .unwrap_or(edit.diagnostic_fix.kind.name.clone());
+            .as_deref()
+            .unwrap_or(&edit.diagnostic_fix.kind.name);
         types::CodeActionOrCommand::CodeAction(types::CodeAction {
             title: format!("{DIAGNOSTIC_NAME} ({code}): {title}"),
             kind: Some(types::CodeActionKind::QUICKFIX),
@@ -181,50 +180,42 @@ impl SupportedCodeActionKind {
     }
 }
 
-fn fix_all<'d>(
-    edits: impl Iterator<Item = &'d DiagnosticEdit> + 'd,
-) -> impl Iterator<Item = CodeActionOrCommand> + 'd {
+fn fix_all(edits: &[DiagnosticEdit]) -> Option<CodeActionOrCommand> {
     let edits_made: Vec<_> = edits
+        .iter()
         .filter(|edit| {
             edit.diagnostic_fix
                 .fix
                 .applies(ruff_diagnostics::Applicability::Safe)
         })
         .collect();
+
+    if edits_made.is_empty() {
+        return None;
+    }
+
     let diagnostics_fixed = edits_made
         .iter()
         .map(|edit| edit.original_diagnostic.clone())
         .collect();
 
-    (!edits_made.is_empty())
-        .then(move || {
-            edits_made
-                .into_iter()
-                .flat_map(|edit| edit.document_edits.iter())
-        })
-        .map(|changes| {
-            vec![
-                types::CodeActionOrCommand::CodeAction(types::CodeAction {
-                    title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
-                    diagnostics: Some(diagnostics_fixed),
-                    kind: Some(types::CodeActionKind::SOURCE_FIX_ALL),
-                    edit: Some(types::WorkspaceEdit {
-                        document_changes: Some(types::DocumentChanges::Edits(
-                            changes.cloned().collect(),
-                        )),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                }), // TODO: implement command handler for the server
-                    /*
-                    types::CodeActionOrCommand::Command(types::Command {
-                        ...
-                    }
-                     */
-            ]
-        })
-        .into_iter()
-        .flatten()
+    // TODO: return vec with `applyAutofix` command.
+    Some(types::CodeActionOrCommand::CodeAction(types::CodeAction {
+        title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
+        diagnostics: Some(diagnostics_fixed),
+        kind: Some(types::CodeActionKind::SOURCE_FIX_ALL),
+        edit: Some(types::WorkspaceEdit {
+            document_changes: Some(types::DocumentChanges::Edits(
+                edits_made
+                    .into_iter()
+                    .flat_map(|edit| edit.document_edits.iter())
+                    .cloned()
+                    .collect(),
+            )),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }))
 }
 
 /// If `action_filter` is `None`, this returns [`SupportedCodeAction::all()`]. Otherwise,
