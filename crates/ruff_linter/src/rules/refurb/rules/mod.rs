@@ -1,6 +1,7 @@
 pub(crate) use bit_count::*;
 pub(crate) use check_and_remove_from_set::*;
 pub(crate) use delete_full_slice::*;
+pub(crate) use for_loop_set_mutations::*;
 pub(crate) use hashlib_digest_hex::*;
 pub(crate) use if_expr_min_max::*;
 pub(crate) use implicit_cwd::*;
@@ -25,6 +26,7 @@ pub(crate) use verbose_decimal_constructor::*;
 mod bit_count;
 mod check_and_remove_from_set;
 mod delete_full_slice;
+mod for_loop_set_mutations;
 mod hashlib_digest_hex;
 mod if_expr_min_max;
 mod implicit_cwd;
