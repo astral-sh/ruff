@@ -371,7 +371,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                             }
                         },
                     },
-                    NodeLevel::CompoundStatement => match lines_after(end, source) {
+                    NodeLevel::CompoundStatement => match lines_after_ignoring_end_of_line_trivia(end, source) {
                         0 | 1 => hard_line_break().fmt(f)?,
                         _ => empty_line().fmt(f)?,
                     },
