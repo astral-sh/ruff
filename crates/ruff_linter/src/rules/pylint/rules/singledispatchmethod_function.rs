@@ -85,10 +85,7 @@ pub(crate) fn singledispatchmethod_function(
         &checker.settings.pep8_naming.classmethod_decorators,
         &checker.settings.pep8_naming.staticmethod_decorators,
     );
-    if !matches!(
-        type_,
-        function_type::FunctionType::Function | function_type::FunctionType::StaticMethod
-    ) {
+    if !matches!(type_, function_type::FunctionType::Function) {
         return;
     }
 

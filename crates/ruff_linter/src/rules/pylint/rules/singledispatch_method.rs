@@ -88,7 +88,9 @@ pub(crate) fn singledispatch_method(
     );
     if !matches!(
         type_,
-        function_type::FunctionType::Method | function_type::FunctionType::ClassMethod
+        function_type::FunctionType::Method
+            | function_type::FunctionType::ClassMethod
+            | function_type::FunctionType::StaticMethod
     ) {
         return;
     }
