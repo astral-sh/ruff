@@ -177,7 +177,7 @@ impl<'src> Parser<'src> {
     pub(crate) fn parse_program(mut self) -> Program {
         let ast = if self.mode == Mode::Expression {
             let start = self.node_start();
-            let parsed_expr = self.parse_expressions();
+            let parsed_expr = self.parse_expression_list();
             let mut progress = ParserProgress::default();
 
             // TODO: How should error recovery work here? Just truncate after the expression?

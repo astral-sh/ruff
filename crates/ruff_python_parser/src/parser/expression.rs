@@ -83,7 +83,7 @@ impl<'src> Parser<'src> {
     /// Matches the `expressions` rule in the [Python grammar].
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    pub(super) fn parse_expressions(&mut self) -> ParsedExpr {
+    pub(super) fn parse_expression_list(&mut self) -> ParsedExpr {
         let start = self.node_start();
         let parsed_expr = self.parse_conditional_expression_or_higher();
 
@@ -97,6 +97,49 @@ impl<'src> Parser<'src> {
             .into()
         } else {
             parsed_expr
+        }
+    }
+
+    /// Parses every Python expression.
+    ///
+    /// Matches the `star_expressions` rule in the [Python grammar].
+    ///
+    /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
+    #[allow(dead_code)]
+    pub(super) fn parse_star_expression_list(&mut self) -> ParsedExpr {
+        let start = self.node_start();
+        let parsed_expr = self.parse_star_expression_or_higher(AllowNamedExpression::No);
+
+        if self.at(TokenKind::Comma) {
+            Expr::Tuple(self.parse_tuple_expression(
+                parsed_expr.expr,
+                start,
+                TupleParenthesized::No,
+                |parser| parser.parse_star_expression_or_higher(AllowNamedExpression::No),
+            ))
+            .into()
+        } else {
+            parsed_expr
+        }
+    }
+
+    /// Parses a star expression or any other expression.
+    ///
+    /// Matches either the `star_expression` or `star_named_expression` rule in
+    /// the [Python grammar] depending on whether named expressions are allowed.
+    ///
+    /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
+    #[allow(dead_code)]
+    pub(super) fn parse_star_expression_or_higher(
+        &mut self,
+        allow_named_expression: AllowNamedExpression,
+    ) -> ParsedExpr {
+        if self.at(TokenKind::Star) {
+            Expr::Starred(self.parse_starred_expression(StarredExpressionPrecedence::BitOr)).into()
+        } else if allow_named_expression.is_yes() {
+            self.parse_named_expression_or_higher()
+        } else {
+            self.parse_conditional_expression_or_higher()
         }
     }
 
@@ -263,7 +306,10 @@ impl<'src> Parser<'src> {
             TokenKind::Plus | TokenKind::Minus | TokenKind::Not | TokenKind::Tilde => {
                 Expr::UnaryOp(self.parse_unary_expression()).into()
             }
-            TokenKind::Star => Expr::Starred(self.parse_starred_expression()).into(),
+            TokenKind::Star => Expr::Starred(
+                self.parse_starred_expression(StarredExpressionPrecedence::Conditional),
+            )
+            .into(),
             TokenKind::Await => Expr::Await(self.parse_await_expression()).into(),
             TokenKind::Lambda => Expr::Lambda(self.parse_lambda_expr()).into(),
             _ => self.parse_atom(),
@@ -274,6 +320,47 @@ impl<'src> Parser<'src> {
         }
 
         lhs
+    }
+
+    /// Parses a bitwise `or` expression or higher.
+    ///
+    /// Matches the `bitwise_or` rule in the [Python grammar].
+    ///
+    /// This method delegates the parsing to [`Parser::parse_expression_with_precedence`]
+    /// with the minimum binding power of [`Precedence::BitOr`]. The main purpose of this
+    /// method is to report an error when certain expressions are parsed successfully
+    /// but are not allowed here.
+    ///
+    /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
+    fn parse_expression_with_bitwise_or_precedence(&mut self) -> ParsedExpr {
+        let parsed_expr = self.parse_expression_with_precedence(Precedence::BitOr);
+
+        // Parenthesized expressions have a higher precedence than bitwise `or` expressions,
+        // so they're allowed here.
+        if parsed_expr.is_parenthesized {
+            return parsed_expr;
+        }
+
+        match parsed_expr.expr {
+            Expr::UnaryOp(ast::ExprUnaryOp {
+                op: ast::UnaryOp::Not,
+                ..
+            }) => {
+                self.add_error(
+                    ParseErrorType::OtherError("unary `not` expression cannot be used here".into()),
+                    &parsed_expr,
+                );
+            }
+            Expr::Lambda(_) => {
+                self.add_error(
+                    ParseErrorType::OtherError("lambda expression cannot be used here".into()),
+                    &parsed_expr,
+                );
+            }
+            _ => {}
+        }
+
+        parsed_expr
     }
 
     /// Parses a name.
@@ -1073,7 +1160,7 @@ impl<'src> Parser<'src> {
 
         self.bump(TokenKind::Lbrace);
 
-        let value = self.parse_expressions();
+        let value = self.parse_expression_list();
         if !value.is_parenthesized && value.expr.is_lambda_expr() {
             self.add_error(
                 ParseErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
@@ -1438,7 +1525,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::For);
 
         let saved_context = self.set_ctx(ParserCtxFlags::FOR_TARGET);
-        let mut target = self.parse_expressions();
+        let mut target = self.parse_expression_list();
         self.restore_ctx(ParserCtxFlags::FOR_TARGET, saved_context);
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
@@ -1573,10 +1660,33 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_starred_expression(&mut self) -> ast::ExprStarred {
+    /// Parses a starred expression with the given precedence.
+    ///
+    /// If the precedence is bitwise or, the expression is parsed using the `bitwise_or`
+    /// rule. Otherwise, it's parsed using the `expression` rule. Refer to the
+    /// [Python grammar] for more information.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `*` token.
+    ///
+    /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
+    #[allow(dead_code)]
+    fn parse_starred_expression(
+        &mut self,
+        precedence: StarredExpressionPrecedence,
+    ) -> ast::ExprStarred {
         let start = self.node_start();
         self.bump(TokenKind::Star);
-        let parsed_expr = self.parse_conditional_expression_or_higher();
+
+        let parsed_expr = match precedence {
+            StarredExpressionPrecedence::BitOr => {
+                self.parse_expression_with_bitwise_or_precedence()
+            }
+            StarredExpressionPrecedence::Conditional => {
+                self.parse_conditional_expression_or_higher()
+            }
+        };
 
         ast::ExprStarred {
             value: Box::new(parsed_expr.expr),
@@ -1617,7 +1727,7 @@ impl<'src> Parser<'src> {
 
         let value = self
             .at_expr()
-            .then(|| Box::new(self.parse_expressions().expr));
+            .then(|| Box::new(self.parse_expression_list().expr));
 
         Expr::Yield(ast::ExprYield {
             value,
@@ -1625,9 +1735,13 @@ impl<'src> Parser<'src> {
         })
     }
 
+    /// Parses a `yield from` expression.
+    ///
     /// See: <https://docs.python.org/3/reference/expressions.html#yield-expressions>
     fn parse_yield_from_expression(&mut self, start: TextSize) -> Expr {
-        let parsed_expr = self.parse_expressions();
+        // The grammar rule to use here is `expression` but we're using `expressions`
+        // for better error recovery.
+        let parsed_expr = self.parse_expression_list();
 
         match &parsed_expr.expr {
             Expr::Starred(ast::ExprStarred { value, .. }) => {
@@ -1878,4 +1992,24 @@ pub(super) enum GeneratorExpressionInParentheses {
         /// The start of the expression.
         expr_start: TextSize,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+enum StarredExpressionPrecedence {
+    BitOr,
+    Conditional,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+pub(super) enum AllowNamedExpression {
+    Yes,
+    No,
+}
+
+impl AllowNamedExpression {
+    const fn is_yes(self) -> bool {
+        matches!(self, AllowNamedExpression::Yes)
+    }
 }
