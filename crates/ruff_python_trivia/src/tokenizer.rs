@@ -1035,7 +1035,10 @@ mod tests {
     use ruff_python_parser::{Mode, Tok};
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
-    use crate::tokenizer::{lines_after, lines_before, SimpleToken, SimpleTokenizer};
+    use crate::tokenizer::{
+        lines_after, lines_after_ignoring_end_of_line_trivia, lines_before, SimpleToken,
+        SimpleTokenizer,
+    };
     use crate::{BackwardsTokenizer, SimpleTokenKind};
 
     struct TokenizationTestCase {
@@ -1447,5 +1450,16 @@ mod tests {
                 }
             );
         }
+    }
+
+    #[test]
+    fn lines_after_ignoring_end_of_line_trivia_multiline_string_semi_delimiter() {
+        assert_eq!(
+            lines_after_ignoring_end_of_line_trivia(
+                TextSize::new(19),
+                "a=\"\"\"hello world\"\"\";\n\n\nb = 10"
+            ),
+            3
+        );
     }
 }
