@@ -14,3 +14,12 @@ x = [y for y in (1, 2, 3)]
 [i for i in (await x if True else X) if F]
 [i for i in await (x if True else X) if F]
 [f for f in c(x if True else [])]
+
+# Non-parenthesized iter/if for the following expressions aren't allowed, so make sure
+# it parses correctly for the parenthesized cases
+[x for x in (yield y)]
+[x for x in (yield from y)]
+[x for x in (lambda y: y)]
+[x for x in data if (yield y)]
+[x for x in data if (yield from y)]
+[x for x in data if (lambda y: y)]

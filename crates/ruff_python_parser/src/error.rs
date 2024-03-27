@@ -117,6 +117,8 @@ pub enum ParseErrorType {
     DefaultArgumentError,
     /// A simple statement and a compound statement was found in the same line.
     SimpleStmtAndCompoundStmtInSameLine,
+    /// An invalid usage of iterable unpacking in a comprehension was found.
+    IterableUnpackingInComprehension,
 
     /// An invalid `match` case pattern was found.
     InvalidMatchPatternLiteral { pattern: TokenKind },
@@ -177,6 +179,9 @@ impl std::fmt::Display for ParseErrorType {
                     f,
                     "iterable argument unpacking follows keyword argument unpacking"
                 )
+            }
+            ParseErrorType::IterableUnpackingInComprehension => {
+                write!(f, "iterable unpacking cannot be used in a comprehension")
             }
             ParseErrorType::PositionalArgumentError => {
                 write!(f, "positional argument follows keyword argument unpacking")
