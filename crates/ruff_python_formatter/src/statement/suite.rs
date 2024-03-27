@@ -359,7 +359,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     .map_or(preceding.end(), |comment| comment.slice().end());
 
                 match node_level {
-                    NodeLevel::TopLevel(_) => match lines_after(end, source) {
+                    NodeLevel::TopLevel(_) => match lines_after_ignoring_end_of_line_trivia(end, source) {
                         0 | 1 => hard_line_break().fmt(f)?,
                         2 => empty_line().fmt(f)?,
                         _ => match source_type {

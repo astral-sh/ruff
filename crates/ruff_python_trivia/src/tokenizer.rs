@@ -119,7 +119,7 @@ pub fn lines_after_ignoring_end_of_line_trivia(offset: TextSize, code: &str) -> 
     SimpleTokenizer::starts_at(offset, code)
         .skip_while(|token| token.kind != SimpleTokenKind::Newline && token.kind.is_trivia())
         .take_while(|token| {
-            token.kind == SimpleTokenKind::Newline || token.kind == SimpleTokenKind::Whitespace
+            token.kind == SimpleTokenKind::Newline || token.kind == SimpleTokenKind::Whitespace || token.kind == SimpleTokenKind::Semi
         })
         .filter(|token| token.kind == SimpleTokenKind::Newline)
         .count() as u32
