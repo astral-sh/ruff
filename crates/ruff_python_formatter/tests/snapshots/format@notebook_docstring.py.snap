@@ -10,6 +10,17 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/notebook_d
 """;
 
 "another normal string"
+
+
+def raw_docstring():
+
+    a = """
+    This looks like a docstring but is not in a notebook because notebooks can't be imported as a module.
+    Ruff should leave it as is
+    """;
+
+    b = "another normal string"
+    pass
 ```
 
 ## Outputs
@@ -35,6 +46,16 @@ source_type                = Ipynb
 """
 
 "another normal string"
+
+
+def raw_docstring():
+    a = """
+    This looks like a docstring but is not in a notebook because notebooks can't be imported as a module.
+    Ruff should leave it as is
+    """
+
+    b = "another normal string"
+    pass
 ```
 
 
@@ -60,7 +81,14 @@ Ruff should leave it as is
 """
 
 "another normal string"
+
+
+def raw_docstring():
+    a = """
+    This looks like a docstring but is not in a notebook because notebooks can't be imported as a module.
+    Ruff should leave it as is
+    """
+
+    b = "another normal string"
+    pass
 ```
-
-
-
