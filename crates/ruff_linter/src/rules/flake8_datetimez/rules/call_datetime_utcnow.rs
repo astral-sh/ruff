@@ -20,7 +20,7 @@ use super::helpers;
 /// always use timezone-aware objects.
 ///
 /// `datetime.datetime.utcnow()` returns a naive datetime object; instead, use
-/// `datetime.datetime.now(tz=)` to return a timezone-aware object.
+/// `datetime.datetime.now(tz=...)` to create a timezone-aware object.
 ///
 /// ## Example
 /// ```python
@@ -55,7 +55,7 @@ impl Violation for CallDatetimeUtcnow {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Use `datetime.datetime.now(tz=)` instead".to_string())
+        Some("Use `datetime.datetime.now(tz=...)` instead".to_string())
     }
 }
 

@@ -18,7 +18,7 @@ use crate::checkers::ast::Checker;
 /// always use timezone-aware objects.
 ///
 /// `datetime.date.today` returns a naive datetime object. Instead, use
-/// `datetime.datetime.now(tz=).date()` to return a timezone-aware object.
+/// `datetime.datetime.now(tz=...).date()` to create a timezone-aware object.
 ///
 /// ## Example
 /// ```python
@@ -53,7 +53,7 @@ impl Violation for CallDateToday {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Use `datetime.datetime.now(tz=).date()` instead".to_string())
+        Some("Use `datetime.datetime.now(tz=...).date()` instead".to_string())
     }
 }
 

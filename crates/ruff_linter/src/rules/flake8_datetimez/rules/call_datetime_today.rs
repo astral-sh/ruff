@@ -20,7 +20,7 @@ use super::helpers;
 /// time, unlike "naive" objects.
 ///
 /// `datetime.datetime.today()` creates a "naive" object; instead, use
-/// `datetime.datetime.now(tz=)` to create a timezone-aware object.
+/// `datetime.datetime.now(tz=...)` to create a timezone-aware object.
 ///
 /// ## Example
 /// ```python
@@ -52,7 +52,7 @@ impl Violation for CallDatetimeToday {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Use `datetime.datetime.now(tz=)` instead".to_string())
+        Some("Use `datetime.datetime.now(tz=...)` instead".to_string())
     }
 }
 

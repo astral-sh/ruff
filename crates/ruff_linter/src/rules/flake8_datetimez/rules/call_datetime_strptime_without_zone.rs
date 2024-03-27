@@ -19,7 +19,7 @@ use super::helpers::DatetimeModuleAntipattern;
 /// always use timezone-aware objects.
 ///
 /// `datetime.datetime.strptime()` without `%z` returns a naive datetime
-/// object. Follow it with `.replace(tzinfo=)` or `.astimezone()`.
+/// object. Follow it with `.replace(tzinfo=<timezone>)` or `.astimezone()`.
 ///
 /// ## Example
 /// ```python
@@ -28,7 +28,7 @@ use super::helpers::DatetimeModuleAntipattern;
 /// datetime.datetime.strptime("2022/01/31", "%Y/%m/%d")
 /// ```
 ///
-/// Instead, use `.replace(tzinfo=)`:
+/// Instead, use `.replace(tzinfo=<timezone>)`:
 /// ```python
 /// import datetime
 ///
@@ -71,11 +71,12 @@ impl Violation for CallDatetimeStrptimeWithoutZone {
         let CallDatetimeStrptimeWithoutZone(antipattern) = self;
         match antipattern {
             DatetimeModuleAntipattern::NoTzArgumentPassed => Some(
-                "Call `.replace(tzinfo=)` or `.astimezone()` to convert to an aware datetime"
+                "Call `.replace(tzinfo=<timezone>)` or `.astimezone()` \
+                to convert to an aware datetime"
                     .to_string(),
             ),
             DatetimeModuleAntipattern::NonePassedToTzArgument => {
-                Some("Pass a `datetime.timezone` object to `tzinfo=`".to_string())
+                Some("Pass a `datetime.timezone` object to the `tzinfo` parameter".to_string())
             }
         }
     }
@@ -139,14 +140,14 @@ fn find_antipattern(
         return Some(DatetimeModuleAntipattern::NoTzArgumentPassed);
     }
     match arguments.find_keyword("tzinfo") {
-        // Ex) `datetime.strptime(...).replace(tz=None)`
+        // Ex) `datetime.strptime(...).replace(tzinfo=None)`
         Some(ast::Keyword {
             value: Expr::NoneLiteral(_),
             ..
         }) => Some(DatetimeModuleAntipattern::NonePassedToTzArgument),
-        // Ex) `datetime.strptime(...).replace(tz=...)`
+        // Ex) `datetime.strptime(...).replace(tzinfo=...)`
         Some(_) => None,
-        // Ex) `datetime.strptime(...).replace(...)` with no tz= argument
+        // Ex) `datetime.strptime(...).replace(...)` with no `tzinfo` argument
         None => Some(DatetimeModuleAntipattern::NoTzArgumentPassed),
     }
 }

@@ -19,10 +19,9 @@ use super::helpers;
 /// datetime objects. Since this can lead to errors, it is recommended to
 /// always use timezone-aware objects.
 ///
-/// `datetime.datetime.utcfromtimestamp()` or
-/// `datetime.datetime.utcfromtimestamp(tz=None)` returns a naive datetime
-/// object; instead, use `datetime.datetime.fromtimestamp(ts, tz=)` to return a
-/// timezone-aware object.
+/// `datetime.datetime.utcfromtimestamp()` returns a naive datetime
+/// object; instead, use `datetime.datetime.fromtimestamp(ts, tz=...)`
+/// to create a timezone-aware object.
 ///
 /// ## Example
 /// ```python
@@ -57,7 +56,7 @@ impl Violation for CallDatetimeUtcfromtimestamp {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Use `datetime.datetime.fromtimestamp(ts, tz=)` instead".to_string())
+        Some("Use `datetime.datetime.fromtimestamp(ts, tz=...)` instead".to_string())
     }
 }
 

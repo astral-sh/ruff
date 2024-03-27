@@ -9,7 +9,7 @@ DTZ004.py:4:1: DTZ004 `datetime.datetime.utcfromtimestamp()` used
 5 | 
 6 | from datetime import datetime
   |
-  = help: Use `datetime.datetime.fromtimestamp(ts, tz=)` instead
+  = help: Use `datetime.datetime.fromtimestamp(ts, tz=...)` instead
 
 DTZ004.py:9:1: DTZ004 `datetime.datetime.utcfromtimestamp()` used
    |
@@ -19,4 +19,4 @@ DTZ004.py:9:1: DTZ004 `datetime.datetime.utcfromtimestamp()` used
 10 | 
 11 | # uses `astimezone` method
    |
-   = help: Use `datetime.datetime.fromtimestamp(ts, tz=)` instead
+   = help: Use `datetime.datetime.fromtimestamp(ts, tz=...)` instead

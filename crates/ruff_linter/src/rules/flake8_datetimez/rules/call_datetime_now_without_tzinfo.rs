@@ -19,8 +19,8 @@ use super::helpers::{self, DatetimeModuleAntipattern};
 /// always use timezone-aware objects.
 ///
 /// `datetime.datetime.now()` or `datetime.datetime.now(tz=None)` returns a naive
-/// datetime object. Instead, use `datetime.datetime.now(tz=)` to return a
-/// timezone-aware object.
+/// datetime object. Instead, use `datetime.datetime.now(tz=<timezone>)` to create
+/// a timezone-aware object.
 ///
 /// ## Example
 /// ```python
@@ -54,7 +54,7 @@ impl Violation for CallDatetimeNowWithoutTzinfo {
         let CallDatetimeNowWithoutTzinfo(antipattern) = self;
         match antipattern {
             DatetimeModuleAntipattern::NoTzArgumentPassed => {
-                format!("`datetime.datetime.now()` called without a `tz=` argument")
+                format!("`datetime.datetime.now()` called without a `tz` argument")
             }
             DatetimeModuleAntipattern::NonePassedToTzArgument => {
                 format!("`tz=None` passed to `datetime.datetime.now()`")

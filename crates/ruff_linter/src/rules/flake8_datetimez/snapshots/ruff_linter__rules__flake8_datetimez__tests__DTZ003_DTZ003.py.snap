@@ -9,7 +9,7 @@ DTZ003.py:4:1: DTZ003 `datetime.datetime.utcnow()` used
 5 | 
 6 | from datetime import datetime
   |
-  = help: Use `datetime.datetime.now(tz=)` instead
+  = help: Use `datetime.datetime.now(tz=...)` instead
 
 DTZ003.py:9:1: DTZ003 `datetime.datetime.utcnow()` used
    |
@@ -19,4 +19,4 @@ DTZ003.py:9:1: DTZ003 `datetime.datetime.utcnow()` used
 10 | 
 11 | # uses `astimezone` method
    |
-   = help: Use `datetime.datetime.now(tz=)` instead
+   = help: Use `datetime.datetime.now(tz=...)` instead

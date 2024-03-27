@@ -18,7 +18,7 @@ use crate::checkers::ast::Checker;
 /// always use timezone-aware objects.
 ///
 /// `datetime.date.fromtimestamp(ts)` returns a naive datetime object.
-/// Instead, use `datetime.datetime.fromtimestamp(ts, tz=)` to return a
+/// Instead, use `datetime.datetime.fromtimestamp(ts, tz=...)` to create a
 /// timezone-aware object.
 ///
 /// ## Example
@@ -54,7 +54,7 @@ impl Violation for CallDateFromtimestamp {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Use `datetime.datetime.fromtimestamp(ts, tz=).date()` instead".to_string())
+        Some("Use `datetime.datetime.fromtimestamp(ts, tz=...).date()` instead".to_string())
     }
 }
 

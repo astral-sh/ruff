@@ -21,8 +21,8 @@ use super::helpers::{self, DatetimeModuleAntipattern};
 ///
 /// `datetime.datetime.fromtimestamp(ts)` or
 /// `datetime.datetime.fromtimestampe(ts, tz=None)` returns a naive datetime
-/// object. Instead, use `datetime.datetime.fromtimestamp(ts, tz=)` to return a
-/// timezone-aware object.
+/// object. Instead, use `datetime.datetime.fromtimestamp(ts, tz=<timezone>)`
+/// to create a timezone-aware object.
 ///
 /// ## Example
 /// ```python
