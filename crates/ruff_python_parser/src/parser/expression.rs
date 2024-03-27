@@ -183,12 +183,11 @@ impl<'src> Parser<'src> {
     /// Parses every Python expression except unparenthesized tuples, named expressions,
     /// and `if` expression.
     ///
-    /// This is a combination of the `disjunction` and `starred_expression` rules of the
-    /// [Python grammar].
+    /// This is a combination of the `disjunction`, `starred_expression`, `yield_expr`
+    /// and `lambdef` rules of the [Python grammar].
     ///
-    /// When parsing an AST node that only uses one of the rules (`disjunction` or `starred_expression`),
-    /// you need to **explicitly** check if an invalid node for that AST node was parsed. Check the
-    /// `parse_yield_from_expression` function for an example of this situation.
+    /// When parsing an AST node that only uses some of the above mentioned rules,
+    /// you need to **explicitly** check if an invalid node for that AST node was parsed.
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_simple_expression(&mut self) -> ParsedExpr {
@@ -1568,42 +1567,13 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// See: <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
-    fn parse_comprehension(&mut self) -> ast::Comprehension {
-        let start = self.node_start();
-
-        let is_async = self.eat(TokenKind::Async);
-
-        self.bump(TokenKind::For);
-
-        let saved_context = self.set_ctx(ParserCtxFlags::FOR_TARGET);
-        let mut target = self.parse_expression_list();
-        self.restore_ctx(ParserCtxFlags::FOR_TARGET, saved_context);
-
-        helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
-
-        self.expect(TokenKind::In);
-
-        let iter = self.parse_simple_expression();
-
-        let mut ifs = vec![];
-        let mut progress = ParserProgress::default();
-
-        while self.eat(TokenKind::If) {
-            progress.assert_progressing(self);
-            ifs.push(self.parse_simple_expression().expr);
-        }
-
-        ast::Comprehension {
-            range: self.node_range(start),
-            target: target.expr,
-            iter: iter.expr,
-            ifs,
-            is_async,
-        }
-    }
-
-    pub(super) fn parse_generators(&mut self) -> Vec<ast::Comprehension> {
+    /// Parses a list of comprehension generators.
+    ///
+    /// These are the `for` and `async for` clauses in a comprehension, optionally
+    /// followed by `if` clauses.
+    ///
+    /// See: <https://docs.python.org/3/reference/expressions.html#grammar-token-python-grammar-comp_for>
+    fn parse_generators(&mut self) -> Vec<ast::Comprehension> {
         const GENERATOR_SET: TokenSet = TokenSet::new([TokenKind::For, TokenKind::Async]);
 
         let mut generators = vec![];
@@ -1615,6 +1585,93 @@ impl<'src> Parser<'src> {
         }
 
         generators
+    }
+
+    /// Parses a comprehension.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at an `async` or `for` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
+    fn parse_comprehension(&mut self) -> ast::Comprehension {
+        let start = self.node_start();
+
+        let is_async = self.eat(TokenKind::Async);
+        self.bump(TokenKind::For);
+
+        let saved_context = self.set_ctx(ParserCtxFlags::FOR_TARGET);
+        let mut target = self.parse_expression_list();
+        self.restore_ctx(ParserCtxFlags::FOR_TARGET, saved_context);
+
+        helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
+        if !helpers::is_valid_assignment_target(&target.expr) {
+            self.add_error(ParseErrorType::InvalidAssignmentTarget, &target);
+        }
+
+        self.expect(TokenKind::In);
+        let iter = self.parse_simple_expression();
+        self.validate_comprehension_iter_and_if_expr(&iter);
+
+        let mut ifs = vec![];
+        let mut progress = ParserProgress::default();
+
+        while self.eat(TokenKind::If) {
+            progress.assert_progressing(self);
+
+            let parsed_expr = self.parse_simple_expression();
+            self.validate_comprehension_iter_and_if_expr(&parsed_expr);
+
+            ifs.push(parsed_expr.expr);
+        }
+
+        ast::Comprehension {
+            range: self.node_range(start),
+            target: target.expr,
+            iter: iter.expr,
+            ifs,
+            is_async,
+        }
+    }
+
+    /// Helper function to validate the comprehension iter and `if` expressions.
+    fn validate_comprehension_iter_and_if_expr(&mut self, parsed_expr: &ParsedExpr) {
+        let ParsedExpr {
+            expr,
+            is_parenthesized,
+        } = parsed_expr;
+
+        if *is_parenthesized {
+            return;
+        }
+
+        match expr {
+            Expr::Starred(_) => {
+                self.add_error(
+                    ParseErrorType::OtherError(
+                        "starred expression cannot be used here".to_string(),
+                    ),
+                    expr,
+                );
+            }
+            Expr::Yield(_) | Expr::YieldFrom(_) => {
+                self.add_error(
+                    ParseErrorType::OtherError(
+                        "unparenthesized yield expression cannot be used here".to_string(),
+                    ),
+                    expr,
+                );
+            }
+            Expr::Lambda(_) => {
+                self.add_error(
+                    ParseErrorType::OtherError(
+                        "unparenthesized lambda expression cannot be used here".to_string(),
+                    ),
+                    expr,
+                );
+            }
+            _ => {}
+        }
     }
 
     /// Parses a generator expression.
