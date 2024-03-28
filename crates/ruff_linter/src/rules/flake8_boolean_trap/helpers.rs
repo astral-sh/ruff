@@ -1,4 +1,5 @@
-use crate::settings::LinterSettings;
+use crate::checkers::ast::Checker;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 
 /// Returns `true` if a function call is allowed to use a boolean trap.
@@ -44,12 +45,24 @@ pub(super) fn is_allowed_func_call(name: &str) -> bool {
     )
 }
 
-/// Returns `true` if a function call is allowed by the user to use a boolean trap.
-pub(super) fn is_user_allowed_func_call(name: &str, settings: &LinterSettings) -> bool {
-    settings
+/// Returns `true` if a call is allowed by the user to use a boolean trap.
+pub(super) fn is_user_allowed_func_call(call: &ast::ExprCall, checker: &Checker) -> bool {
+    let extend_immutable_calls: Vec<QualifiedName> = checker
+        .settings
         .flake8_boolean_trap
         .extend_allowed_calls
-        .contains(&name.to_string())
+        .iter()
+        .map(|target| QualifiedName::from_dotted_name(target))
+        .collect();
+
+    checker
+        .semantic()
+        .resolve_qualified_name(call.func.as_ref())
+        .is_some_and(|qualified_name| {
+            extend_immutable_calls
+                .iter()
+                .any(|target| qualified_name == *target)
+        })
 }
 
 /// Returns `true` if a function definition is allowed to use a boolean trap.
@@ -60,7 +73,7 @@ pub(super) fn is_allowed_func_def(name: &str) -> bool {
 /// Returns `true` if an argument is allowed to use a boolean trap. To return
 /// `true`, the function name must be explicitly allowed, and the argument must
 /// be either the first or second argument in the call.
-pub(super) fn allow_boolean_trap(call: &ast::ExprCall, settings: &LinterSettings) -> bool {
+pub(super) fn allow_boolean_trap(call: &ast::ExprCall, checker: &Checker) -> bool {
     let func_name = match call.func.as_ref() {
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr.as_str(),
         Expr::Name(ast::ExprName { id, .. }) => id.as_str(),
@@ -85,9 +98,8 @@ pub(super) fn allow_boolean_trap(call: &ast::ExprCall, settings: &LinterSettings
         }
     }
 
-    // If the function name is explicitly allowed by the user, then the boolean trap is
-    // allowed.
-    if is_user_allowed_func_call(func_name, settings) {
+    // If the call is explicitly allowed by the user, then the boolean trap is allowed.
+    if is_user_allowed_func_call(call, checker) {
         return true;
     }
 

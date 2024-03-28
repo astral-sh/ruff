@@ -54,11 +54,8 @@ mod tests {
             &LinterSettings {
                 flake8_boolean_trap: super::settings::Settings {
                     extend_allowed_calls: vec![
-                        "Value".to_string(),
-                        "Field".to_string(),
-                        "settings".to_string(),
-                        "deploy".to_string(),
-                        "used".to_string(),
+                        "django.db.models.Value".to_string(),
+                        "pydantic.Field".to_string(),
                     ],
                 },
                 ..LinterSettings::for_rule(Rule::BooleanPositionalValueInCall)

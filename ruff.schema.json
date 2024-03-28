@@ -910,7 +910,7 @@
       "type": "object",
       "properties": {
         "extend-allowed-calls": {
-          "description": "A list of calls with which to allow a boolean trap.",
+          "description": "Additional callable functions with which to allow boolean traps.\n\nExpects to receive a list of fully-qualified names (e.g., `pydantic.Field`, rather than `Field`).",
           "type": [
             "array",
             "null"

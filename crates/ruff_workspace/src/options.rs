@@ -1056,11 +1056,14 @@ impl Flake8BanditOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8BooleanTrapOptions {
-    /// A list of calls with which to allow a boolean trap.
+    /// Additional callable functions with which to allow boolean traps.
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `pydantic.Field`, rather than
+    /// `Field`).
     #[option(
         default = "[]",
         value_type = "list[str]",
-        example = "extend-allowed-calls = [\"Field\", \"Value\"]"
+        example = "extend-allowed-calls = [\"pydantic.Field\", \"django.db.models.Value\"]"
     )]
     pub extend_allowed_calls: Option<Vec<String>>,
 }

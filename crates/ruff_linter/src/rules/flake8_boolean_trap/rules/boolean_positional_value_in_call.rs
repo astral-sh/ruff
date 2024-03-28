@@ -52,7 +52,7 @@ impl Violation for BooleanPositionalValueInCall {
 }
 
 pub(crate) fn boolean_positional_value_in_call(checker: &mut Checker, call: &ast::ExprCall) {
-    if allow_boolean_trap(call, checker.settings) {
+    if allow_boolean_trap(call, checker) {
         return;
     }
     for arg in call
