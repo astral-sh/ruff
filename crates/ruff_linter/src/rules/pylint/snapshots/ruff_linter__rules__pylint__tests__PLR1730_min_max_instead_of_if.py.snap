@@ -1,0 +1,130 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+min_max_instead_of_if.py:8:1: PLR1730 Consider using `value = max(value, 10)` instead of unnecessary if block
+   |
+ 7 |   # Positive
+ 8 | / if value < 10:  # [max-instead-of-if]
+ 9 | |     value = 10
+   | |______________^ PLR1730
+10 |   
+11 |   if value <= 10:  # [max-instead-of-if]
+   |
+
+min_max_instead_of_if.py:11:1: PLR1730 Consider using `value = max(value, 10)` instead of unnecessary if block
+   |
+ 9 |       value = 10
+10 |   
+11 | / if value <= 10:  # [max-instead-of-if]
+12 | |     value = 10
+   | |______________^ PLR1730
+13 |   
+14 |   if value < value2:  # [max-instead-of-if]
+   |
+
+min_max_instead_of_if.py:14:1: PLR1730 Consider using `value = max(value, value2)` instead of unnecessary if block
+   |
+12 |       value = 10
+13 |   
+14 | / if value < value2:  # [max-instead-of-if]
+15 | |     value = value2
+   | |__________________^ PLR1730
+16 |   
+17 |   if value > 10:  # [min-instead-of-if]
+   |
+
+min_max_instead_of_if.py:17:1: PLR1730 Consider using `value = min(value, 10)` instead of unnecessary if block
+   |
+15 |       value = value2
+16 |   
+17 | / if value > 10:  # [min-instead-of-if]
+18 | |     value = 10
+   | |______________^ PLR1730
+19 |   
+20 |   if value >= 10:  # [min-instead-of-if]
+   |
+
+min_max_instead_of_if.py:20:1: PLR1730 Consider using `value = min(value, 10)` instead of unnecessary if block
+   |
+18 |       value = 10
+19 |   
+20 | / if value >= 10:  # [min-instead-of-if]
+21 | |     value = 10
+   | |______________^ PLR1730
+22 |   
+23 |   if value > value2:  # [min-instead-of-if]
+   |
+
+min_max_instead_of_if.py:23:1: PLR1730 Consider using `value = min(value, value2)` instead of unnecessary if block
+   |
+21 |       value = 10
+22 |   
+23 | / if value > value2:  # [min-instead-of-if]
+24 | |     value = value2
+   | |__________________^ PLR1730
+   |
+
+min_max_instead_of_if.py:33:1: PLR1730 Consider using `A1.value = max(A1.value, 10)` instead of unnecessary if block
+   |
+32 |   A1 = A()
+33 | / if A1.value < 10:  # [max-instead-of-if]
+34 | |     A1.value = 10
+   | |_________________^ PLR1730
+35 |   
+36 |   if A1.value > 10:  # [min-instead-of-if]
+   |
+
+min_max_instead_of_if.py:36:1: PLR1730 Consider using `A1.value = min(A1.value, 10)` instead of unnecessary if block
+   |
+34 |       A1.value = 10
+35 |   
+36 | / if A1.value > 10:  # [min-instead-of-if]
+37 | |     A1.value = 10
+   | |_________________^ PLR1730
+   |
+
+min_max_instead_of_if.py:60:1: PLR1730 Consider using `A2 = max(A2, A1)` instead of unnecessary if block
+   |
+58 |   A2 = AA(3)
+59 |   
+60 | / if A2 < A1:  # [max-instead-of-if]
+61 | |     A2 = A1
+   | |___________^ PLR1730
+62 |   
+63 |   if A2 <= A1:  # [max-instead-of-if]
+   |
+
+min_max_instead_of_if.py:63:1: PLR1730 Consider using `A2 = max(A2, A1)` instead of unnecessary if block
+   |
+61 |       A2 = A1
+62 |   
+63 | / if A2 <= A1:  # [max-instead-of-if]
+64 | |     A2 = A1
+   | |___________^ PLR1730
+65 |   
+66 |   if A2 > A1:  # [min-instead-of-if]
+   |
+
+min_max_instead_of_if.py:66:1: PLR1730 Consider using `A2 = min(A2, A1)` instead of unnecessary if block
+   |
+64 |       A2 = A1
+65 |   
+66 | / if A2 > A1:  # [min-instead-of-if]
+67 | |     A2 = A1
+   | |___________^ PLR1730
+68 |   
+69 |   if A2 >= A1:  # [min-instead-of-if]
+   |
+
+min_max_instead_of_if.py:69:1: PLR1730 Consider using `A2 = min(A2, A1)` instead of unnecessary if block
+   |
+67 |       A2 = A1
+68 |   
+69 | / if A2 >= A1:  # [min-instead-of-if]
+70 | |     A2 = A1
+   | |___________^ PLR1730
+71 |   
+72 |   # Negative
+   |
+
+
