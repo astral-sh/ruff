@@ -18,6 +18,7 @@ use crate::noqa::Directive;
 /// ```
 ///
 /// Use instead:
+/// ```python
 /// x = 2  # noqa: X600
 /// ```
 ///
@@ -31,12 +32,12 @@ impl AlwaysFixableViolation for MultipleSpacesAfterNoqaColon {
     }
 
     fn fix_title(&self) -> String {
-        "Remove extra space(s) after colon".to_string()
+        "Remove extra space(s) after the colon".to_string()
     }
 }
 
 /// ## What it does
-/// Checks for `noqa` directives no space after the colon.
+/// Checks for `noqa` directives with no space after the colon.
 ///
 /// ## Why is this bad?
 /// Not having a space after the colon makes the directive harder to read.
@@ -47,6 +48,7 @@ impl AlwaysFixableViolation for MultipleSpacesAfterNoqaColon {
 /// ```
 ///
 /// Use instead:
+/// ```python
 /// x = 2  # noqa: X600
 /// ```
 ///
@@ -60,7 +62,7 @@ impl AlwaysFixableViolation for MissingSpaceAfterNoqaColon {
     }
 
     fn fix_title(&self) -> String {
-        "Add missing space after colon".to_string()
+        "Add missing space after the colon".to_string()
     }
 }
 
