@@ -71,7 +71,7 @@ pub(crate) fn noqa_style(diagnostics: &mut Vec<Diagnostic>, indexer: &Indexer, l
         let offset = range.start();
         if let Ok(Some(Directive::Codes(codes))) = Directive::try_extract(line, TextSize::new(0)) {
             let mut cursor = codes.range().start().to_usize();
-            cursor += find_noqa_end(line).unwrap();
+            cursor += find_noqa_end(&line[cursor..]).unwrap();
             let num_spaces = leading_whitespace_len(&line[cursor..]);
 
             // RUF030
