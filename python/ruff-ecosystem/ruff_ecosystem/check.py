@@ -20,6 +20,7 @@ from ruff_ecosystem.markdown import (
     markdown_plus_minus,
     markdown_project_section,
 )
+from ruff_ecosystem.projects import ConfigOverrides
 from ruff_ecosystem.types import (
     Comparison,
     Diff,
@@ -31,7 +32,6 @@ if TYPE_CHECKING:
     from ruff_ecosystem.projects import (
         CheckOptions,
         ClonedRepository,
-        ConfigOverrides,
         Project,
     )
 
@@ -485,24 +485,25 @@ async def compare_check(
     config_overrides: ConfigOverrides,
     cloned_repo: ClonedRepository,
 ) -> Comparison:
-    with config_overrides.patch_config(cloned_repo.path, options.preview):
-        async with asyncio.TaskGroup() as tg:
-            baseline_task = tg.create_task(
-                ruff_check(
-                    executable=ruff_baseline_executable.resolve(),
-                    path=cloned_repo.path,
-                    name=cloned_repo.fullname,
-                    options=options,
-                ),
-            )
-            comparison_task = tg.create_task(
-                ruff_check(
-                    executable=ruff_comparison_executable.resolve(),
-                    path=cloned_repo.path,
-                    name=cloned_repo.fullname,
-                    options=options,
-                ),
-            )
+    async with asyncio.TaskGroup() as tg:
+        baseline_task = tg.create_task(
+            ruff_check(
+                executable=ruff_baseline_executable.resolve(),
+                path=cloned_repo.path,
+                name=cloned_repo.fullname,
+                options=options,
+                config_overrides=config_overrides,
+            ),
+        )
+        comparison_task = tg.create_task(
+            ruff_check(
+                executable=ruff_comparison_executable.resolve(),
+                path=cloned_repo.path,
+                name=cloned_repo.fullname,
+                options=options,
+                config_overrides=config_overrides,
+            ),
+        )
 
     baseline_output, comparison_output = (
         baseline_task.result(),
@@ -515,10 +516,15 @@ async def compare_check(
 
 
 async def ruff_check(
-    *, executable: Path, path: Path, name: str, options: CheckOptions
+    *,
+    executable: Path,
+    path: Path,
+    name: str,
+    options: CheckOptions,
+    config_overrides: ConfigOverrides,
 ) -> Sequence[str]:
     """Run the given ruff binary against the specified path."""
-    ruff_args = options.to_ruff_args()
+    ruff_args = options.to_ruff_args() + config_overrides.to_ruff_args(options.preview)
     logger.debug(f"Checking {name} with {executable} " + " ".join(ruff_args))
 
     start = time.time()
