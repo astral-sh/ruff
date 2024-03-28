@@ -1,81 +1,131 @@
-use crate::edit::ToRangeExt;
 use crate::server::api::LSPResult;
 use crate::server::{client::Notifier, Result};
+use crate::server::{AvailableCodeActions, SupportedCodeActionKind};
 use crate::session::DocumentSnapshot;
+use crate::DIAGNOSTIC_NAME;
+use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
-use ruff_text_size::Ranged;
+use types::{CodeActionKind, CodeActionOrCommand};
 
-pub(crate) struct CodeAction;
+use super::code_action_resolve::resolve_edit_for_fix_all;
 
-impl super::RequestHandler for CodeAction {
+pub(crate) struct CodeActions;
+
+impl super::RequestHandler for CodeActions {
     type RequestType = req::CodeActionRequest;
 }
 
-impl super::BackgroundDocumentRequestHandler for CodeAction {
+impl super::BackgroundDocumentRequestHandler for CodeActions {
     super::define_document_url!(params: &types::CodeActionParams);
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
         _notifier: Notifier,
         params: types::CodeActionParams,
     ) -> Result<Option<types::CodeActionResponse>> {
-        let document = snapshot.document();
-        let url = snapshot.url();
-        let encoding = snapshot.encoding();
-        let version = document.version();
-        let actions: Result<Vec<_>> = params
-            .context
-            .diagnostics
-            .into_iter()
-            .map(|diagnostic| {
-                let Some(data) = diagnostic.data else {
-                    return Ok(None);
-                };
-                let diagnostic_fix: crate::lint::DiagnosticFix = serde_json::from_value(data)
-                    .map_err(|err| anyhow::anyhow!("failed to deserialize diagnostic data: {err}"))
-                    .with_failure_code(lsp_server::ErrorCode::ParseError)?;
-                let edits = diagnostic_fix
-                    .fix
-                    .edits()
-                    .iter()
-                    .map(|edit| types::TextEdit {
-                        range: edit.range().to_range(
-                            document.contents(),
-                            document.index(),
-                            encoding,
-                        ),
-                        new_text: edit.content().unwrap_or_default().to_string(),
-                    });
+        let available_actions = available_code_actions(params.context.only);
+        // fast path - return early if no actions are available
+        if available_actions.is_empty() {
+            return Ok(None);
+        }
 
-                let changes = vec![types::TextDocumentEdit {
-                    text_document: types::OptionalVersionedTextDocumentIdentifier::new(
-                        url.clone(),
-                        version,
-                    ),
-                    edits: edits.map(types::OneOf::Left).collect(),
-                }];
+        let mut response: types::CodeActionResponse = types::CodeActionResponse::default();
 
-                let title = diagnostic_fix
-                    .kind
-                    .suggestion
-                    .unwrap_or(diagnostic_fix.kind.name);
-                Ok(Some(types::CodeAction {
-                    title,
-                    kind: Some(types::CodeActionKind::QUICKFIX),
-                    edit: Some(types::WorkspaceEdit {
-                        document_changes: Some(types::DocumentChanges::Edits(changes)),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                }))
-            })
-            .collect();
+        if available_actions.contains(AvailableCodeActions::QUICK_FIX) {
+            response.extend(
+                quick_fix(&snapshot, params.context.diagnostics)
+                    .with_failure_code(ErrorCode::InternalError)?,
+            );
+        }
 
-        Ok(Some(
-            actions?
-                .into_iter()
-                .flatten()
-                .map(types::CodeActionOrCommand::CodeAction)
-                .collect(),
-        ))
+        if available_actions.contains(AvailableCodeActions::SOURCE_FIX_ALL) {
+            response.push(fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
+        }
+
+        if available_actions.contains(AvailableCodeActions::SOURCE_ORGANIZE_IMPORTS) {
+            todo!("Implement the `source.organizeImports` code action");
+        }
+
+        Ok(Some(response))
     }
+}
+
+fn quick_fix(
+    snapshot: &DocumentSnapshot,
+    diagnostics: Vec<types::Diagnostic>,
+) -> crate::Result<impl Iterator<Item = CodeActionOrCommand> + '_> {
+    let document = snapshot.document();
+
+    let fixes = crate::lint::fixes_for_diagnostics(
+        document,
+        snapshot.url(),
+        snapshot.encoding(),
+        document.version(),
+        diagnostics,
+    )
+    .collect::<crate::Result<Vec<_>>>()?;
+
+    Ok(fixes.into_iter().map(|fix| {
+        types::CodeActionOrCommand::CodeAction(types::CodeAction {
+            title: format!("{DIAGNOSTIC_NAME} ({}): {}", fix.code, fix.title),
+            kind: Some(types::CodeActionKind::QUICKFIX),
+            edit: Some(types::WorkspaceEdit {
+                document_changes: Some(types::DocumentChanges::Edits(fix.document_edits.clone())),
+                ..Default::default()
+            }),
+            diagnostics: Some(vec![fix.fixed_diagnostic.clone()]),
+            data: Some(serde_json::to_value(snapshot.url()).expect("document url to serialize")),
+            ..Default::default()
+        })
+    }))
+}
+
+fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
+    let mut action = types::CodeAction {
+        title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
+        kind: Some(types::CodeActionKind::SOURCE_FIX_ALL),
+        // This will be resolved later
+        edit: None,
+        data: Some(serde_json::to_value(snapshot.url()).expect("document url to serialize")),
+        ..Default::default()
+    };
+
+    if !snapshot
+        .server_settings()
+        .capabilities
+        .code_action_deferred_edit_resolution
+    {
+        let document = snapshot.document();
+
+        // We need to resolve the `edit` field now if we can't defer resolution to later
+        action = resolve_edit_for_fix_all(
+            action,
+            document,
+            snapshot.url(),
+            &snapshot.configuration().linter,
+            snapshot.encoding(),
+        )?;
+    }
+
+    Ok(types::CodeActionOrCommand::CodeAction(action))
+}
+
+/// If `action_filter` is `None`, this returns [`SupportedCodeAction::all()`]. Otherwise,
+/// the list is filtered.
+fn available_code_actions(action_filter: Option<Vec<CodeActionKind>>) -> AvailableCodeActions {
+    let Some(action_filter) = action_filter else {
+        return SupportedCodeActionKind::all()
+            .fold(AvailableCodeActions::empty(), |available, kind| {
+                available | kind.makes_available()
+            });
+    };
+
+    SupportedCodeActionKind::all()
+        .filter(|action| {
+            action_filter
+                .iter()
+                .any(|kind| action.kind().as_str().starts_with(kind.as_str()))
+        })
+        .fold(AvailableCodeActions::empty(), |available, kind| {
+            available | kind.makes_available()
+        })
 }
