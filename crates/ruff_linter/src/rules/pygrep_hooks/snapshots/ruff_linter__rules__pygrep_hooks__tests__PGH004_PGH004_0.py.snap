@@ -29,4 +29,97 @@ PGH004_0.py:4:1: PGH004 Use specific rule codes when using `noqa`
 6 | # noqa:F401,W203
   |
 
+PGH004_0.py:20:8: PGH004 [*] Use a colon when specifying `noqa` rule codes
+   |
+19 | # PGH004
+20 | x = 2  # noqa X100
+   |        ^^^^^^^ PGH004
+21 | 
+22 | # PGH004
+   |
+   = help: Add missing colon
 
+ℹ Unsafe fix
+17 17 | x = 2  # noqa:X100
+18 18 | 
+19 19 | # PGH004
+20    |-x = 2  # noqa X100
+   20 |+x = 2  # noqa: X100
+21 21 | 
+22 22 | # PGH004
+23 23 | x = 2  # noqa X100, X200
+
+PGH004_0.py:23:8: PGH004 [*] Use a colon when specifying `noqa` rule codes
+   |
+22 | # PGH004
+23 | x = 2  # noqa X100, X200
+   |        ^^^^^^^ PGH004
+24 | 
+25 | # PGH004
+   |
+   = help: Add missing colon
+
+ℹ Unsafe fix
+20 20 | x = 2  # noqa X100
+21 21 | 
+22 22 | # PGH004
+23    |-x = 2  # noqa X100, X200
+   23 |+x = 2  # noqa: X100, X200
+24 24 | 
+25 25 | # PGH004
+26 26 | x = 2  # noqa : X300
+
+PGH004_0.py:26:8: PGH004 [*] Do not add spaces between `noqa` and its colon
+   |
+25 | # PGH004
+26 | x = 2  # noqa : X300
+   |        ^^^^^^^ PGH004
+27 | 
+28 | # PGH004
+   |
+   = help: Remove space(s) before colon
+
+ℹ Unsafe fix
+23 23 | x = 2  # noqa X100, X200
+24 24 | 
+25 25 | # PGH004
+26    |-x = 2  # noqa : X300
+   26 |+x = 2  # noqa: X300
+27 27 | 
+28 28 | # PGH004
+29 29 | x = 2  # noqa  : X400
+
+PGH004_0.py:29:8: PGH004 [*] Do not add spaces between `noqa` and its colon
+   |
+28 | # PGH004
+29 | x = 2  # noqa  : X400
+   |        ^^^^^^^^ PGH004
+30 | 
+31 | # PGH004
+   |
+   = help: Remove space(s) before colon
+
+ℹ Unsafe fix
+26 26 | x = 2  # noqa : X300
+27 27 | 
+28 28 | # PGH004
+29    |-x = 2  # noqa  : X400
+   29 |+x = 2  # noqa: X400
+30 30 | 
+31 31 | # PGH004
+32 32 | x = 2  # noqa :X500
+
+PGH004_0.py:32:8: PGH004 [*] Do not add spaces between `noqa` and its colon
+   |
+31 | # PGH004
+32 | x = 2  # noqa :X500
+   |        ^^^^^^^ PGH004
+   |
+   = help: Remove space(s) before colon
+
+ℹ Unsafe fix
+29 29 | x = 2  # noqa  : X400
+30 30 | 
+31 31 | # PGH004
+32    |-x = 2  # noqa :X500
+   32 |+x = 2  # noqa:X500
