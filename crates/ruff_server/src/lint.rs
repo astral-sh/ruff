@@ -106,6 +106,7 @@ fn to_lsp_diagnostic(
     lsp_types::Diagnostic {
         range: range.to_range(document.contents(), document.index(), encoding),
         severity: Some(severity(&code)),
+        tags: tags(&code),
         code: Some(lsp_types::NumberOrString::String(code)),
         code_description: rule.url().and_then(|url| {
             Some(lsp_types::CodeDescription {
@@ -115,7 +116,6 @@ fn to_lsp_diagnostic(
         source: Some(DIAGNOSTIC_NAME.into()),
         message: kind.body,
         related_information: None,
-        tags: None,
         data,
     }
 }
@@ -127,5 +127,14 @@ fn severity(code: &str) -> lsp_types::DiagnosticSeverity {
         // E999: SyntaxError
         "F821" | "E902" | "E999" => lsp_types::DiagnosticSeverity::ERROR,
         _ => lsp_types::DiagnosticSeverity::WARNING,
+    }
+}
+
+fn tags(code: &str) -> Option<Vec<lsp_types::DiagnosticTag>> {
+    match code {
+        // F401: <module> imported but unused
+        // F841: local variable <name> is assigned to but never used
+        "F401" | "F841" => Some(vec![lsp_types::DiagnosticTag::UNNECESSARY]),
+        _ => None,
     }
 }
