@@ -119,9 +119,7 @@ pub fn lines_after_ignoring_end_of_line_trivia(offset: TextSize, code: &str) -> 
     SimpleTokenizer::starts_at(offset, code)
         .skip_while(|token| token.kind != SimpleTokenKind::Newline && token.kind.is_trivia())
         .take_while(|token| {
-            token.kind == SimpleTokenKind::Newline
-                || token.kind == SimpleTokenKind::Whitespace
-                || token.kind == SimpleTokenKind::Semi
+            token.kind == SimpleTokenKind::Newline || token.kind == SimpleTokenKind::Whitespace
         })
         .filter(|token| token.kind == SimpleTokenKind::Newline)
         .count() as u32
@@ -1035,10 +1033,7 @@ mod tests {
     use ruff_python_parser::{Mode, Tok};
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
-    use crate::tokenizer::{
-        lines_after, lines_after_ignoring_end_of_line_trivia, lines_before, SimpleToken,
-        SimpleTokenizer,
-    };
+    use crate::tokenizer::{lines_after, lines_before, SimpleToken, SimpleTokenizer};
     use crate::{BackwardsTokenizer, SimpleTokenKind};
 
     struct TokenizationTestCase {
@@ -1450,16 +1445,5 @@ mod tests {
                 }
             );
         }
-    }
-
-    #[test]
-    fn lines_after_ignoring_end_of_line_trivia_multiline_string_semi_delimiter() {
-        assert_eq!(
-            lines_after_ignoring_end_of_line_trivia(
-                TextSize::new(19),
-                "a=\"\"\"hello world\"\"\";\n\n\nb = 10"
-            ),
-            3
-        );
     }
 }

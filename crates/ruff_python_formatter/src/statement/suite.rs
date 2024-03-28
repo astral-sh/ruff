@@ -359,26 +359,22 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     .map_or(preceding.end(), |comment| comment.slice().end());
 
                 match node_level {
-                    NodeLevel::TopLevel(_) => {
-                        match lines_after_ignoring_end_of_line_trivia(end, source) {
-                            0 | 1 => hard_line_break().fmt(f)?,
-                            2 => empty_line().fmt(f)?,
-                            _ => match source_type {
-                                PySourceType::Stub => {
-                                    empty_line().fmt(f)?;
-                                }
-                                PySourceType::Python | PySourceType::Ipynb => {
-                                    write!(f, [empty_line(), empty_line()])?;
-                                }
-                            },
-                        }
-                    }
-                    NodeLevel::CompoundStatement => {
-                        match lines_after_ignoring_end_of_line_trivia(end, source) {
-                            0 | 1 => hard_line_break().fmt(f)?,
-                            _ => empty_line().fmt(f)?,
-                        }
-                    }
+                    NodeLevel::TopLevel(_) => match lines_after(end, source) {
+                        0 | 1 => hard_line_break().fmt(f)?,
+                        2 => empty_line().fmt(f)?,
+                        _ => match source_type {
+                            PySourceType::Stub => {
+                                empty_line().fmt(f)?;
+                            }
+                            PySourceType::Python | PySourceType::Ipynb => {
+                                write!(f, [empty_line(), empty_line()])?;
+                            }
+                        },
+                    },
+                    NodeLevel::CompoundStatement => match lines_after(end, source) {
+                        0 | 1 => hard_line_break().fmt(f)?,
+                        _ => empty_line().fmt(f)?,
+                    },
                     NodeLevel::Expression(_) | NodeLevel::ParenthesizedExpression => {
                         hard_line_break().fmt(f)?;
                     }
