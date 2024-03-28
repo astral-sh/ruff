@@ -189,6 +189,10 @@ mod tests {
         Path::new("useless_exception_statement.py")
     )]
     #[test_case(Rule::NanComparison, Path::new("nan_comparison.py"))]
+    #[test_case(
+        Rule::SimplifiableIfStatement,
+        Path::new("simplifiable_if_statement.py")
+    )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
