@@ -992,6 +992,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 ExprContext::Load => self.handle_node_load(expr),
                 ExprContext::Store => self.handle_node_store(id, expr),
                 ExprContext::Del => self.handle_node_delete(expr),
+                ExprContext::Invalid => {}
             },
             _ => {}
         }

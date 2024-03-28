@@ -1,0 +1,398 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/compare.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..129,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..6,
+                    value: Compare(
+                        ExprCompare {
+                            range: 0..6,
+                            left: Name(
+                                ExprName {
+                                    range: 0..1,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                Eq,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 5..6,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 7..12,
+                    value: Compare(
+                        ExprCompare {
+                            range: 7..12,
+                            left: Name(
+                                ExprName {
+                                    range: 7..8,
+                                    id: "b",
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                Lt,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 11..12,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 13..18,
+                    value: Compare(
+                        ExprCompare {
+                            range: 13..18,
+                            left: Name(
+                                ExprName {
+                                    range: 13..14,
+                                    id: "b",
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                Gt,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 17..18,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 19..25,
+                    value: Compare(
+                        ExprCompare {
+                            range: 19..25,
+                            left: Name(
+                                ExprName {
+                                    range: 19..20,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                GtE,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 24..25,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 26..32,
+                    value: Compare(
+                        ExprCompare {
+                            range: 26..32,
+                            left: Name(
+                                ExprName {
+                                    range: 26..27,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                LtE,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 31..32,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 33..39,
+                    value: Compare(
+                        ExprCompare {
+                            range: 33..39,
+                            left: Name(
+                                ExprName {
+                                    range: 33..34,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                NotEq,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 38..39,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 40..46,
+                    value: Compare(
+                        ExprCompare {
+                            range: 40..46,
+                            left: Name(
+                                ExprName {
+                                    range: 40..41,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                Is,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 45..46,
+                                        id: "c",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 47..53,
+                    value: Compare(
+                        ExprCompare {
+                            range: 47..53,
+                            left: Name(
+                                ExprName {
+                                    range: 47..48,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                In,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 52..53,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 54..64,
+                    value: Compare(
+                        ExprCompare {
+                            range: 54..64,
+                            left: Name(
+                                ExprName {
+                                    range: 54..55,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                NotIn,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 63..64,
+                                        id: "c",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 65..75,
+                    value: Compare(
+                        ExprCompare {
+                            range: 65..75,
+                            left: Name(
+                                ExprName {
+                                    range: 65..66,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                IsNot,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 74..75,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 76..128,
+                    value: Compare(
+                        ExprCompare {
+                            range: 76..128,
+                            left: Name(
+                                ExprName {
+                                    range: 76..77,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                Lt,
+                                Eq,
+                                Gt,
+                                Is,
+                                NotIn,
+                                IsNot,
+                                LtE,
+                                GtE,
+                                NotEq,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 80..81,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 85..86,
+                                        id: "c",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 89..90,
+                                        id: "d",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 94..95,
+                                        id: "e",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 103..104,
+                                        id: "f",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 112..113,
+                                        id: "g",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 117..118,
+                                        id: "h",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 122..123,
+                                        id: "i",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 127..128,
+                                        id: "j",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

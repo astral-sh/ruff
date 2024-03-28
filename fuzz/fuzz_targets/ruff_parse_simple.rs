@@ -17,8 +17,8 @@ fn do_fuzz(case: &[u8]) -> Corpus {
     let locator = Locator::new(code);
     let python_ast = match parse_suite(code) {
         Ok(stmts) => stmts,
-        Err(ParseError { offset, .. }) => {
-            let offset = offset.to_usize();
+        Err(ParseError { location, .. }) => {
+            let offset = location.start().to_usize();
             assert!(
                 code.is_char_boundary(offset),
                 "Invalid error location {} (not at char boundary)",
@@ -47,7 +47,7 @@ fn do_fuzz(case: &[u8]) -> Corpus {
                 );
             }
             Err(err) => {
-                let offset = err.location().to_usize();
+                let offset = err.location().start().to_usize();
                 assert!(
                     code.is_char_boundary(offset),
                     "Invalid error location {} (not at char boundary)",

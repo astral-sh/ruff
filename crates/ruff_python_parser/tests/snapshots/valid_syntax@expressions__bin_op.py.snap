@@ -1,0 +1,423 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/bin_op.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..102,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..5,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 0..5,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 0..1,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 4..5,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 6..15,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 6..15,
+                            left: BinOp(
+                                ExprBinOp {
+                                    range: 6..11,
+                                    left: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 6..7,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    op: Add,
+                                    right: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 10..11,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            op: Sub,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 14..15,
+                                    value: Int(
+                                        3,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 16..29,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 16..29,
+                            left: BinOp(
+                                ExprBinOp {
+                                    range: 16..25,
+                                    left: BinOp(
+                                        ExprBinOp {
+                                            range: 16..21,
+                                            left: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 16..17,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                            op: Add,
+                                            right: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 20..21,
+                                                    value: Int(
+                                                        2,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                    op: Sub,
+                                    right: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 24..25,
+                                            value: Int(
+                                                3,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 28..29,
+                                    value: Int(
+                                        4,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 30..35,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 30..35,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 30..31,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                            op: Mult,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 34..35,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 36..45,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 36..45,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 36..37,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: BinOp(
+                                ExprBinOp {
+                                    range: 40..45,
+                                    left: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 40..41,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                    op: Mult,
+                                    right: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 44..45,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 46..52,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 46..52,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 46..47,
+                                    value: Int(
+                                        3,
+                                    ),
+                                },
+                            ),
+                            op: Pow,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 51..52,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 53..63,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 53..63,
+                            left: BinOp(
+                                ExprBinOp {
+                                    range: 53..59,
+                                    left: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 53..54,
+                                            value: Int(
+                                                3,
+                                            ),
+                                        },
+                                    ),
+                                    op: Pow,
+                                    right: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 58..59,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            op: Mult,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 62..63,
+                                    value: Int(
+                                        5,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 64..75,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 64..75,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 64..65,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: BinOp(
+                                ExprBinOp {
+                                    range: 69..74,
+                                    left: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 69..70,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                    op: Add,
+                                    right: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 73..74,
+                                            value: Int(
+                                                3,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 76..82,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 76..82,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 76..77,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: LShift,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 81..82,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 83..89,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 83..89,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 83..84,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: RShift,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 88..89,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 90..95,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 90..95,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 90..91,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: BitOr,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 94..95,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 96..101,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 96..101,
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 96..97,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            op: BitXor,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 100..101,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

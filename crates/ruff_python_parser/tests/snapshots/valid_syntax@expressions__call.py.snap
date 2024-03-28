@@ -1,0 +1,596 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/call.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..291,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..6,
+                    value: Call(
+                        ExprCall {
+                            range: 0..6,
+                            func: Name(
+                                ExprName {
+                                    range: 0..4,
+                                    id: "call",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 4..6,
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 7..17,
+                    value: Call(
+                        ExprCall {
+                            range: 7..17,
+                            func: Name(
+                                ExprName {
+                                    range: 7..11,
+                                    id: "call",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 11..17,
+                                args: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 12..13,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 15..16,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 18..38,
+                    value: Call(
+                        ExprCall {
+                            range: 18..38,
+                            func: Name(
+                                ExprName {
+                                    range: 18..22,
+                                    id: "call",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 22..38,
+                                args: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 23..24,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 26..27,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                keywords: [
+                                    Keyword {
+                                        range: 29..32,
+                                        arg: Some(
+                                            Identifier {
+                                                id: "x",
+                                                range: 29..30,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 31..32,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    Keyword {
+                                        range: 34..37,
+                                        arg: Some(
+                                            Identifier {
+                                                id: "y",
+                                                range: 34..35,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 36..37,
+                                                value: Int(
+                                                    4,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 39..47,
+                    value: Call(
+                        ExprCall {
+                            range: 39..47,
+                            func: Name(
+                                ExprName {
+                                    range: 39..43,
+                                    id: "call",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 43..47,
+                                args: [
+                                    Starred(
+                                        ExprStarred {
+                                            range: 44..46,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 45..46,
+                                                    id: "l",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 48..57,
+                    value: Call(
+                        ExprCall {
+                            range: 48..57,
+                            func: Name(
+                                ExprName {
+                                    range: 48..52,
+                                    id: "call",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 52..57,
+                                args: [],
+                                keywords: [
+                                    Keyword {
+                                        range: 53..56,
+                                        arg: None,
+                                        value: Name(
+                                            ExprName {
+                                                range: 55..56,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 58..74,
+                    value: Call(
+                        ExprCall {
+                            range: 58..74,
+                            func: Name(
+                                ExprName {
+                                    range: 58..62,
+                                    id: "call",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 62..74,
+                                args: [
+                                    Starred(
+                                        ExprStarred {
+                                            range: 63..65,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 64..65,
+                                                    id: "a",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 67..68,
+                                            id: "b",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [
+                                    Keyword {
+                                        range: 70..73,
+                                        arg: None,
+                                        value: Name(
+                                            ExprName {
+                                                range: 72..73,
+                                                id: "l",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 75..87,
+                    value: Call(
+                        ExprCall {
+                            range: 75..87,
+                            func: Name(
+                                ExprName {
+                                    range: 75..79,
+                                    id: "call",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 79..87,
+                                args: [
+                                    Starred(
+                                        ExprStarred {
+                                            range: 80..82,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 81..82,
+                                                    id: "a",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Starred(
+                                        ExprStarred {
+                                            range: 84..86,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 85..86,
+                                                    id: "b",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 88..139,
+                    value: Call(
+                        ExprCall {
+                            range: 88..139,
+                            func: Name(
+                                ExprName {
+                                    range: 88..92,
+                                    id: "call",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 92..139,
+                                args: [
+                                    ListComp(
+                                        ExprListComp {
+                                            range: 98..136,
+                                            elt: List(
+                                                ExprList {
+                                                    range: 108..111,
+                                                    elts: [
+                                                        Name(
+                                                            ExprName {
+                                                                range: 109..110,
+                                                                id: "a",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            generators: [
+                                                Comprehension {
+                                                    range: 120..130,
+                                                    target: Name(
+                                                        ExprName {
+                                                            range: 124..125,
+                                                            id: "d",
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    iter: Name(
+                                                        ExprName {
+                                                            range: 129..130,
+                                                            id: "f",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ifs: [],
+                                                    is_async: false,
+                                                },
+                                            ],
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 140..191,
+                    value: Call(
+                        ExprCall {
+                            range: 140..191,
+                            func: Name(
+                                ExprName {
+                                    range: 140..144,
+                                    id: "call",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 144..191,
+                                args: [
+                                    SetComp(
+                                        ExprSetComp {
+                                            range: 150..188,
+                                            elt: List(
+                                                ExprList {
+                                                    range: 160..163,
+                                                    elts: [
+                                                        Name(
+                                                            ExprName {
+                                                                range: 161..162,
+                                                                id: "a",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            generators: [
+                                                Comprehension {
+                                                    range: 172..182,
+                                                    target: Name(
+                                                        ExprName {
+                                                            range: 176..177,
+                                                            id: "d",
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    iter: Name(
+                                                        ExprName {
+                                                            range: 181..182,
+                                                            id: "f",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ifs: [],
+                                                    is_async: false,
+                                                },
+                                            ],
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 192..246,
+                    value: Call(
+                        ExprCall {
+                            range: 192..246,
+                            func: Name(
+                                ExprName {
+                                    range: 192..196,
+                                    id: "call",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 196..246,
+                                args: [
+                                    DictComp(
+                                        ExprDictComp {
+                                            range: 202..243,
+                                            key: Name(
+                                                ExprName {
+                                                    range: 212..213,
+                                                    id: "A",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            value: List(
+                                                ExprList {
+                                                    range: 215..218,
+                                                    elts: [
+                                                        Name(
+                                                            ExprName {
+                                                                range: 216..217,
+                                                                id: "a",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            generators: [
+                                                Comprehension {
+                                                    range: 227..237,
+                                                    target: Name(
+                                                        ExprName {
+                                                            range: 231..232,
+                                                            id: "d",
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    iter: Name(
+                                                        ExprName {
+                                                            range: 236..237,
+                                                            id: "f",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ifs: [],
+                                                    is_async: false,
+                                                },
+                                            ],
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 247..290,
+                    value: Call(
+                        ExprCall {
+                            range: 247..290,
+                            func: Name(
+                                ExprName {
+                                    range: 247..251,
+                                    id: "call",
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 251..290,
+                                args: [],
+                                keywords: [
+                                    Keyword {
+                                        range: 257..278,
+                                        arg: Some(
+                                            Identifier {
+                                                id: "a",
+                                                range: 257..258,
+                                            },
+                                        ),
+                                        value: If(
+                                            ExprIf {
+                                                range: 259..278,
+                                                test: BooleanLiteral(
+                                                    ExprBooleanLiteral {
+                                                        range: 264..268,
+                                                        value: true,
+                                                    },
+                                                ),
+                                                body: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 259..260,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                                orelse: NoneLiteral(
+                                                    ExprNoneLiteral {
+                                                        range: 274..278,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    Keyword {
+                                        range: 284..287,
+                                        arg: Some(
+                                            Identifier {
+                                                id: "x",
+                                                range: 284..285,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 286..287,
+                                                value: Int(
+                                                    0,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

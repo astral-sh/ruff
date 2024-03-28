@@ -194,7 +194,7 @@ impl DisplayParseError {
         // Translate the byte offset to a location in the originating source.
         let location =
             if let Some(jupyter_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
-                let source_location = source_code.source_location(error.offset);
+                let source_location = source_code.source_location(error.location.start());
 
                 ErrorLocation::Cell(
                     jupyter_index
@@ -208,7 +208,7 @@ impl DisplayParseError {
                     },
                 )
             } else {
-                ErrorLocation::File(source_code.source_location(error.offset))
+                ErrorLocation::File(source_code.source_location(error.location.start()))
             };
 
         Self {
@@ -275,27 +275,7 @@ impl<'a> DisplayParseErrorType<'a> {
 
 impl Display for DisplayParseErrorType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.0 {
-            ParseErrorType::Eof => write!(f, "Expected token but reached end of file."),
-            ParseErrorType::ExtraToken(ref tok) => write!(
-                f,
-                "Got extraneous token: {tok}",
-                tok = TruncateAtNewline(&tok)
-            ),
-            ParseErrorType::InvalidToken => write!(f, "Got invalid token"),
-            ParseErrorType::UnrecognizedToken(ref tok, ref expected) => {
-                if let Some(expected) = expected.as_ref() {
-                    write!(
-                        f,
-                        "Expected '{expected}', but got {tok}",
-                        tok = TruncateAtNewline(&tok)
-                    )
-                } else {
-                    write!(f, "Unexpected token {tok}", tok = TruncateAtNewline(&tok))
-                }
-            }
-            ParseErrorType::Lexical(ref error) => write!(f, "{error}"),
-        }
+        write!(f, "{}", TruncateAtNewline(&self.0))
     }
 }
 

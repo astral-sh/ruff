@@ -146,7 +146,7 @@ where
                     Tok::NonLogicalNewline | Tok::Comment { .. } => {
                         // Nothing to do.
                     }
-                    Tok::StartModule | Tok::Newline | Tok::Indent | Tok::Dedent => {
+                    Tok::Newline | Tok::Indent | Tok::Dedent => {
                         self.position = Position::Statement;
                     }
                     // If we see a semicolon, assume we're at the start of a simple statement, as in:

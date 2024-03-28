@@ -48,7 +48,7 @@ expression: tokens
     Err(
         LexicalError {
             error: IndentationError,
-            location: 20,
+            location: 18..20,
         },
     ),
     Ok(

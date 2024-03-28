@@ -1,0 +1,454 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/tuple.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..102,
+        body: [
+            Assign(
+                StmtAssign {
+                    range: 0..11,
+                    targets: [
+                        Tuple(
+                            ExprTuple {
+                                range: 0..4,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            range: 0..1,
+                                            id: "a",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 3..4,
+                                            id: "b",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ],
+                                ctx: Store,
+                                parenthesized: false,
+                            },
+                        ),
+                    ],
+                    value: Tuple(
+                        ExprTuple {
+                            range: 7..11,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 7..8,
+                                        value: Int(
+                                            4,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 10..11,
+                                        value: Int(
+                                            5,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 13..16,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 13..16,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 13..14,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 15..16,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 17..22,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 17..22,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 18..19,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 20..21,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 23..25,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 23..25,
+                            elts: [],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 26..30,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 26..30,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 27..28,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 31..38,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 32..37,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 33..34,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 35..36,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 40..44,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 40..44,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 40..41,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 43..44,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 45..51,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 45..51,
+                            elts: [
+                                BinOp(
+                                    ExprBinOp {
+                                        range: 45..50,
+                                        left: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 45..46,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                        op: Add,
+                                        right: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 49..50,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 52..60,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 52..60,
+                            elts: [
+                                BoolOp(
+                                    ExprBoolOp {
+                                        range: 52..59,
+                                        op: And,
+                                        values: [
+                                            Name(
+                                                ExprName {
+                                                    range: 52..53,
+                                                    id: "x",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 58..59,
+                                                    id: "y",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 61..68,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 61..68,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 62..63,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 65..66,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 69..78,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 69..78,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 70..71,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 72..73,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 74..75,
+                                        value: Int(
+                                            3,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 76..77,
+                                        value: Int(
+                                            4,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 79..90,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 79..90,
+                            elts: [
+                                BinOp(
+                                    ExprBinOp {
+                                        range: 80..85,
+                                        left: Name(
+                                            ExprName {
+                                                range: 80..81,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        op: Add,
+                                        right: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 84..85,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 87..88,
+                                        id: "l",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 91..101,
+                    value: Tuple(
+                        ExprTuple {
+                            range: 91..101,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 91..92,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 94..95,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 97..98,
+                                        value: Int(
+                                            3,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 100..101,
+                                        value: Int(
+                                            4,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use tiny_keccak::{Hasher, Sha3};
 
 fn main() {
-    const SOURCE: &str = "src/python.lalrpop";
+    const SOURCE: &str = "src/lalrpop/python.lalrpop";
     println!("cargo:rerun-if-changed={SOURCE}");
 
     let target;
@@ -14,12 +14,12 @@ fn main() {
     #[cfg(feature = "lalrpop")]
     {
         let out_dir = PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
-        target = out_dir.join("src/python.rs");
+        target = out_dir.join("src/lalrpop/python.rs");
     }
     #[cfg(not(feature = "lalrpop"))]
     {
-        target = PathBuf::from("src/python.rs");
-        error = "python.lalrpop and src/python.rs doesn't match. This is a ruff_python_parser bug. Please report it unless you are editing ruff_python_parser. Run `lalrpop src/python.lalrpop` to build ruff_python_parser again.";
+        target = PathBuf::from("src/lalrpop/python.rs");
+        error = "python.lalrpop and src/lalrpop/python.rs doesn't match. This is a ruff_python_parser bug. Please report it unless you are editing ruff_python_parser. Run `lalrpop src/lalrpop/python.lalrpop` to build ruff_python_parser again.";
     }
 
     let Some(message) = requires_lalrpop(SOURCE, &target) else {

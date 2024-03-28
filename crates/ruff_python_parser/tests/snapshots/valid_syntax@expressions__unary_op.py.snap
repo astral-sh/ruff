@@ -1,0 +1,154 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/unary_op.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..28,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..2,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 0..2,
+                            op: USub,
+                            operand: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 1..2,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 3..5,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 3..5,
+                            op: UAdd,
+                            operand: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 4..5,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 6..8,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 6..8,
+                            op: Invert,
+                            operand: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 7..8,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 9..15,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 9..15,
+                            left: UnaryOp(
+                                ExprUnaryOp {
+                                    range: 9..11,
+                                    op: USub,
+                                    operand: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 10..11,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            op: Add,
+                            right: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 14..15,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 16..20,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 16..20,
+                            op: USub,
+                            operand: UnaryOp(
+                                ExprUnaryOp {
+                                    range: 17..20,
+                                    op: USub,
+                                    operand: UnaryOp(
+                                        ExprUnaryOp {
+                                            range: 18..20,
+                                            op: USub,
+                                            operand: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 19..20,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 21..26,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 21..26,
+                            op: Not,
+                            operand: Name(
+                                ExprName {
+                                    range: 25..26,
+                                    id: "x",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

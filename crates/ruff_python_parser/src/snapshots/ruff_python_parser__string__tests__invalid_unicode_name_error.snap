@@ -1,0 +1,10 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: error
+---
+ParseError {
+    error: Lexical(
+        UnicodeError,
+    ),
+    location: 4..11,
+}
