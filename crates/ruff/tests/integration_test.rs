@@ -882,10 +882,8 @@ fn nursery_all() {
     -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
     -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
     -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    -:1:1: RUF920 Hey this is a deprecated test rule.
-    -:1:1: RUF921 Hey this is another deprecated test rule.
     -:1:1: RUF950 Hey this is a test rule that was redirected from another.
-    Found 8 errors.
+    Found 6 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
     ----- stderr -----
