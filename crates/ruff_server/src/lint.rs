@@ -100,12 +100,13 @@ fn to_lsp_diagnostic(
             })
             .flatten()
     });
+
+    let code = rule.noqa_code().to_string();
+
     lsp_types::Diagnostic {
         range: range.to_range(document.contents(), document.index(), encoding),
-        severity: Some(lsp_types::DiagnosticSeverity::ERROR),
-        code: Some(lsp_types::NumberOrString::String(
-            rule.noqa_code().to_string(),
-        )),
+        severity: Some(severity(&code)),
+        code: Some(lsp_types::NumberOrString::String(code)),
         code_description: rule.url().and_then(|url| {
             Some(lsp_types::CodeDescription {
                 href: lsp_types::Url::parse(&url).ok()?,
@@ -116,5 +117,15 @@ fn to_lsp_diagnostic(
         related_information: None,
         tags: None,
         data,
+    }
+}
+
+fn severity(code: &str) -> lsp_types::DiagnosticSeverity {
+    match code {
+        // F821: undefined name <name>
+        // E902: IOError
+        // E999: SyntaxError
+        "F821" | "E902" | "E999" => lsp_types::DiagnosticSeverity::ERROR,
+        _ => lsp_types::DiagnosticSeverity::WARNING,
     }
 }
