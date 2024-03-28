@@ -73,10 +73,10 @@ impl Server {
 
         Ok(Self {
             conn,
-            client_capabilities,
             threads,
             worker_threads,
-            session: Session::new(&server_capabilities, &workspaces)?,
+            session: Session::new(&client_capabilities, &server_capabilities, &workspaces)?,
+            client_capabilities,
         })
     }
 
@@ -193,15 +193,15 @@ impl Server {
             position_encoding: Some(position_encoding.into()),
             code_action_provider: Some(types::CodeActionProviderCapability::Options(
                 CodeActionOptions {
-                    code_action_kinds: Some(vec![
-                        CodeActionKind::QUICKFIX,
-                        CodeActionKind::SOURCE_ORGANIZE_IMPORTS,
-                        CodeActionKind::SOURCE_FIX_ALL,
-                    ]),
+                    code_action_kinds: Some(
+                        SupportedCodeActionKind::all()
+                            .map(SupportedCodeActionKind::kind)
+                            .collect(),
+                    ),
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: Some(true),
                     },
-                    resolve_provider: Some(false),
+                    resolve_provider: Some(true),
                 },
             )),
             workspace: Some(types::WorkspaceServerCapabilities {
@@ -235,5 +235,71 @@ impl Server {
             )),
             ..Default::default()
         }
+    }
+}
+
+bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    struct AvailableCodeActions: u8 {
+        const QUICK_FIX = 0b0000_0001;
+        const SOURCE_FIX_ALL = 0b0000_0010;
+        const SOURCE_ORGANIZE_IMPORTS = 0b0000_0100;
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SupportedCodeActionKind {
+    QuickFix,
+    SourceFixAll,
+    SourceFixAllRuff,
+    #[allow(dead_code)] // TODO: remove
+    SourceOrganizeImports,
+    #[allow(dead_code)] // TODO: remove
+    SourceOrganizeImportsRuff,
+}
+
+impl SupportedCodeActionKind {
+    fn kind(self) -> CodeActionKind {
+        match self {
+            Self::QuickFix => CodeActionKind::QUICKFIX,
+            Self::SourceFixAll => CodeActionKind::SOURCE_FIX_ALL,
+            Self::SourceFixAllRuff => crate::SOURCE_FIX_ALL_RUFF,
+            Self::SourceOrganizeImports => CodeActionKind::SOURCE_ORGANIZE_IMPORTS,
+            Self::SourceOrganizeImportsRuff => crate::SOURCE_ORGANIZE_IMPORTS_RUFF,
+        }
+    }
+
+    fn makes_available(self) -> AvailableCodeActions {
+        match self {
+            Self::QuickFix => AvailableCodeActions::QUICK_FIX,
+            Self::SourceFixAll | Self::SourceFixAllRuff => AvailableCodeActions::SOURCE_FIX_ALL,
+            Self::SourceOrganizeImports | Self::SourceOrganizeImportsRuff => {
+                AvailableCodeActions::SOURCE_ORGANIZE_IMPORTS
+            }
+        }
+    }
+
+    fn all() -> impl Iterator<Item = Self> {
+        [
+            Self::QuickFix,
+            Self::SourceFixAll,
+            Self::SourceFixAllRuff,
+            // Self::SourceOrganizeImports,
+            // Self::SourceOrganizeImportsRuff
+        ]
+        .into_iter()
+    }
+}
+
+impl TryFrom<CodeActionKind> for SupportedCodeActionKind {
+    type Error = ();
+
+    fn try_from(kind: CodeActionKind) -> std::result::Result<Self, Self::Error> {
+        for supported_kind in Self::all() {
+            if kind == supported_kind.kind() {
+                return Ok(supported_kind);
+            }
+        }
+        Err(())
     }
 }

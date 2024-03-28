@@ -16,8 +16,8 @@ use super::{client::Responder, schedule::BackgroundSchedule, Result};
 /// given the parameter type used by the implementer.
 macro_rules! define_document_url {
     ($params:ident: &$p:ty) => {
-        fn document_url($params: &$p) -> &lsp_types::Url {
-            &$params.text_document.uri
+        fn document_url($params: &$p) -> std::borrow::Cow<lsp_types::Url> {
+            std::borrow::Cow::Borrowed(&$params.text_document.uri)
         }
     };
 }
@@ -32,6 +32,9 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
             req,
             BackgroundSchedule::LatencySensitive,
         ),
+        request::CodeActionResolve::METHOD => {
+            background_request_task::<request::CodeActionResolve>(req, BackgroundSchedule::Worker)
+        }
         request::DocumentDiagnostic::METHOD => {
             background_request_task::<request::DocumentDiagnostic>(
                 req,
@@ -102,7 +105,7 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         // TODO(jane): we should log an error if we can't take a snapshot.
-        let Some(snapshot) = session.take_snapshot(R::document_url(&params)) else {
+        let Some(snapshot) = session.take_snapshot(&R::document_url(&params)) else {
             return Box::new(|_, _| {});
         };
         Box::new(move |notifier, responder| {
@@ -131,7 +134,7 @@ fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationH
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         // TODO(jane): we should log an error if we can't take a snapshot.
-        let Some(snapshot) = session.take_snapshot(N::document_url(&params)) else {
+        let Some(snapshot) = session.take_snapshot(&N::document_url(&params)) else {
             return Box::new(|_, _| {});
         };
         Box::new(move |notifier, _| {

@@ -1,18 +1,20 @@
 //! Data model, state management, and configuration resolution.
 
-mod types;
+mod settings;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::{ops::Deref, sync::Arc};
 
 use anyhow::anyhow;
-use lsp_types::{ServerCapabilities, Url};
+use lsp_types::{ClientCapabilities, ServerCapabilities, Url};
 use ruff_workspace::resolver::{ConfigurationTransformer, Relativity};
 use rustc_hash::FxHashMap;
 
 use crate::edit::{Document, DocumentVersion};
 use crate::PositionEncoding;
+
+use self::settings::ServerSettings;
 
 /// The global state for the LSP
 pub(crate) struct Session {
@@ -20,15 +22,16 @@ pub(crate) struct Session {
     workspaces: Workspaces,
     /// The global position encoding, negotiated during LSP initialization.
     position_encoding: PositionEncoding,
-    /// Extension-specific settings, set by the client, that apply to all workspace folders.
-    #[allow(dead_code)]
-    lsp_settings: types::ExtensionSettings,
+    /// Extension-specific settings, provided by the client, that apply to all workspace folders.
+    /// Some settings are also derived from client capabilities.
+    server_settings: Arc<settings::ServerSettings>,
 }
 
 /// An immutable snapshot of `Session` that references
 /// a specific document.
 pub(crate) struct DocumentSnapshot {
     configuration: Arc<RuffConfiguration>,
+    server_settings: Arc<ServerSettings>,
     document_ref: DocumentRef,
     position_encoding: PositionEncoding,
     url: Url,
@@ -70,6 +73,7 @@ pub(crate) struct DocumentRef {
 
 impl Session {
     pub(crate) fn new(
+        client_capabilities: &ClientCapabilities,
         server_capabilities: &ServerCapabilities,
         workspaces: &[Url],
     ) -> crate::Result<Self> {
@@ -79,7 +83,7 @@ impl Session {
                 .as_ref()
                 .and_then(|encoding| encoding.try_into().ok())
                 .unwrap_or_default(),
-            lsp_settings: types::ExtensionSettings,
+            server_settings: Arc::new(settings::ServerSettings::new(client_capabilities)),
             workspaces: Workspaces::new(workspaces)?,
         })
     }
@@ -87,6 +91,7 @@ impl Session {
     pub(crate) fn take_snapshot(&self, url: &Url) -> Option<DocumentSnapshot> {
         Some(DocumentSnapshot {
             configuration: self.workspaces.configuration(url)?.clone(),
+            server_settings: self.server_settings.clone(),
             document_ref: self.workspaces.snapshot(url)?,
             position_encoding: self.position_encoding,
             url: url.clone(),
@@ -194,6 +199,10 @@ impl Deref for DocumentRef {
 impl DocumentSnapshot {
     pub(crate) fn configuration(&self) -> &RuffConfiguration {
         &self.configuration
+    }
+
+    pub(crate) fn server_settings(&self) -> &ServerSettings {
+        &self.server_settings
     }
 
     pub(crate) fn document(&self) -> &DocumentRef {
