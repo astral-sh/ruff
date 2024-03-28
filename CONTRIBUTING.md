@@ -813,8 +813,8 @@ To understand Ruff's import categorization system, we first need to define two c
     "project root".)
 - "Package root": The top-most directory defining the Python package that includes a given Python
     file. To find the package root for a given Python file, traverse up its parent directories until
-    you reach a parent directory that doesn't contain an `__init__.py` file (and isn't marked as
-    a [namespace package](https://docs.astral.sh/ruff/settings/#namespace-packages)); take the directory
+    you reach a parent directory that doesn't contain an `__init__.py` file (and isn't in a subtree
+    marked as a [namespace package](https://docs.astral.sh/ruff/settings/#namespace-packages)); take the directory
     just before that, i.e., the first directory in the package.
 
 For example, given:

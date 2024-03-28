@@ -180,21 +180,14 @@ impl<'a> Resolver<'a> {
         let mut package_roots: FxHashMap<&Path, Option<&Path>> = FxHashMap::default();
         for file in files {
             if let Some(package) = file.parent() {
-                match package_roots.entry(package) {
-                    std::collections::hash_map::Entry::Occupied(_) => continue,
-                    std::collections::hash_map::Entry::Vacant(entry) => {
-                        let namespace_packages = if has_namespace_packages {
-                            self.resolve(file).linter.namespace_packages.as_slice()
-                        } else {
-                            &[]
-                        };
-                        entry.insert(detect_package_root_with_cache(
-                            package,
-                            namespace_packages,
-                            &mut package_cache,
-                        ));
-                    }
-                }
+                package_roots.entry(package).or_insert_with(|| {
+                    let namespace_packages = if has_namespace_packages {
+                        self.resolve(file).linter.namespace_packages.as_slice()
+                    } else {
+                        &[]
+                    };
+                    detect_package_root_with_cache(package, namespace_packages, &mut package_cache)
+                });
             }
         }
 
@@ -210,7 +203,7 @@ impl<'a> Resolver<'a> {
 /// A wrapper around `detect_package_root` to cache filesystem lookups.
 fn detect_package_root_with_cache<'a>(
     path: &'a Path,
-    namespace_packages: &'a [PathBuf],
+    namespace_packages: &[PathBuf],
     package_cache: &mut FxHashMap<&'a Path, bool>,
 ) -> Option<&'a Path> {
     let mut current = None;
@@ -226,7 +219,7 @@ fn detect_package_root_with_cache<'a>(
 /// A wrapper around `is_package` to cache filesystem lookups.
 fn is_package_with_cache<'a>(
     path: &'a Path,
-    namespace_packages: &'a [PathBuf],
+    namespace_packages: &[PathBuf],
     package_cache: &mut FxHashMap<&'a Path, bool>,
 ) -> bool {
     *package_cache

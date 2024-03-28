@@ -81,8 +81,13 @@ pub(crate) fn unconventional_import_alias(
         if checker.semantic().is_available(expected_alias) {
             diagnostic.try_set_fix(|| {
                 let scope = &checker.semantic().scopes[binding.scope];
-                let (edit, rest) =
-                    Renamer::rename(name, expected_alias, scope, checker.semantic())?;
+                let (edit, rest) = Renamer::rename(
+                    name,
+                    expected_alias,
+                    scope,
+                    checker.semantic(),
+                    checker.stylist(),
+                )?;
                 Ok(Fix::unsafe_edits(edit, rest))
             });
         }

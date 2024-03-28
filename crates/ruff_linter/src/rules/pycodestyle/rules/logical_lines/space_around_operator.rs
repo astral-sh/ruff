@@ -21,7 +21,7 @@ use super::{LogicalLine, Whitespace};
 ///
 /// Use instead:
 /// ```python
-/// a = 12 + 3
+/// a = 4 + 5
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
@@ -53,7 +53,7 @@ impl AlwaysFixableViolation for TabBeforeOperator {
 ///
 /// Use instead:
 /// ```python
-/// a = 12 + 3
+/// a = 4 + 5
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
@@ -85,7 +85,7 @@ impl AlwaysFixableViolation for MultipleSpacesBeforeOperator {
 ///
 /// Use instead:
 /// ```python
-/// a = 12 + 3
+/// a = 4 + 5
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
@@ -117,7 +117,7 @@ impl AlwaysFixableViolation for TabAfterOperator {
 ///
 /// Use instead:
 /// ```python
-/// a = 12 + 3
+/// a = 4 + 5
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
@@ -148,7 +148,7 @@ impl AlwaysFixableViolation for MultipleSpacesAfterOperator {
 ///
 /// Use instead:
 /// ```python
-/// a = 4, 3
+/// a = 4, 5
 /// ```
 ///
 #[violation]

@@ -745,7 +745,7 @@ function defineFirLanguage(monaco: Monaco) {
         // Whitespace
         [/[ \t\r\n]+/, "white"],
 
-        [/[{}()[\]<>]/, "@brackets"],
+        [/[()[\]<>]/, "@brackets"],
 
         // Strings
         [/"/, { token: "string.quote", bracket: "@open", next: "@string" }],

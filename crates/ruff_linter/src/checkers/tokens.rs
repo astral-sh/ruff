@@ -42,7 +42,7 @@ pub(crate) fn check_tokens(
         Rule::BlankLinesAfterFunctionOrClass,
         Rule::BlankLinesBeforeNestedDefinition,
     ]) {
-        BlankLinesChecker::new(locator, stylist, settings, source_type)
+        BlankLinesChecker::new(locator, stylist, settings, source_type, cell_offsets)
             .check_lines(tokens, &mut diagnostics);
     }
 
@@ -125,18 +125,6 @@ pub(crate) fn check_tokens(
 
     if settings.rules.enabled(Rule::AvoidableEscapedQuote) && settings.flake8_quotes.avoid_escape {
         flake8_quotes::rules::avoidable_escaped_quote(&mut diagnostics, tokens, locator, settings);
-    }
-
-    if settings.rules.enabled(Rule::UnnecessaryEscapedQuote) {
-        flake8_quotes::rules::unnecessary_escaped_quote(&mut diagnostics, tokens, locator);
-    }
-
-    if settings.rules.any_enabled(&[
-        Rule::BadQuotesInlineString,
-        Rule::BadQuotesMultilineString,
-        Rule::BadQuotesDocstring,
-    ]) {
-        flake8_quotes::rules::check_string_quotes(&mut diagnostics, tokens, locator, settings);
     }
 
     if settings.rules.any_enabled(&[
