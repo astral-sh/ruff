@@ -100,3 +100,14 @@ def f():
 
     Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
     """  # noqa
+
+
+# Check duplicate code detection
+def foo():
+    x = 2  # noqa: F841, X200, F841, X200, X300
+
+    y = 2  # noqa: F841, X200, F841, X250, X300
+
+    z = 2  # noqa: F841 F841  F841, F841, F841
+
+    return
