@@ -54,7 +54,10 @@ impl Violation for VerboseDecimalFractionConstruction {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Verbose method `{}` when constructing `{}`", self.method_name, self.constructor)
+        format!(
+            "Verbose method `{}` when constructing `{}`",
+            self.method_name, self.constructor
+        )
     }
 
     fn fix_title(&self) -> Option<String> {
