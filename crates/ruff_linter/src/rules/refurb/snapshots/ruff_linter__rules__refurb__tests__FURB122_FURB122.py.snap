@@ -1,0 +1,142 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB122.py:8:5: FURB122 [*] Use of `f.write` in a for loop
+   |
+ 7 |   with open("file", "w") as f:
+ 8 |       for line in lines:
+   |  _____^
+ 9 | |         f.write(line)
+   | |_____________________^ FURB122
+10 |   
+11 |   other_line = "other line"
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+5  5  | # Errors
+6  6  | 
+7  7  | with open("file", "w") as f:
+8     |-    for line in lines:
+9     |-        f.write(line)
+   8  |+    f.writelines(lines)
+10 9  | 
+11 10 | other_line = "other line"
+12 11 | with Path("file").open("w") as f:
+
+FURB122.py:13:5: FURB122 [*] Use of `f.write` in a for loop
+   |
+11 |   other_line = "other line"
+12 |   with Path("file").open("w") as f:
+13 |       for line in lines:
+   |  _____^
+14 | |         f.write(other_line)
+   | |___________________________^ FURB122
+15 |   
+16 |   with Path("file").open("w") as f:
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+10 10 | 
+11 11 | other_line = "other line"
+12 12 | with Path("file").open("w") as f:
+13    |-    for line in lines:
+14    |-        f.write(other_line)
+   13 |+    f.writelines(other_line for line in lines)
+15 14 | 
+16 15 | with Path("file").open("w") as f:
+17 16 |     for line in lines:
+
+FURB122.py:17:5: FURB122 [*] Use of `f.write` in a for loop
+   |
+16 |   with Path("file").open("w") as f:
+17 |       for line in lines:
+   |  _____^
+18 | |         f.write(line)
+   | |_____________________^ FURB122
+19 |   
+20 |   with Path("file").open("wb") as f:
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+14 14 |         f.write(other_line)
+15 15 | 
+16 16 | with Path("file").open("w") as f:
+17    |-    for line in lines:
+18    |-        f.write(line)
+   17 |+    f.writelines(lines)
+19 18 | 
+20 19 | with Path("file").open("wb") as f:
+21 20 |     for line in lines:
+
+FURB122.py:21:5: FURB122 [*] Use of `f.write` in a for loop
+   |
+20 |   with Path("file").open("wb") as f:
+21 |       for line in lines:
+   |  _____^
+22 | |         f.write(line.encode())
+   | |______________________________^ FURB122
+23 |   
+24 |   with Path("file").open("w") as f:
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+18 18 |         f.write(line)
+19 19 | 
+20 20 | with Path("file").open("wb") as f:
+21    |-    for line in lines:
+22    |-        f.write(line.encode())
+   21 |+    f.writelines(line.encode() for line in lines)
+23 22 | 
+24 23 | with Path("file").open("w") as f:
+25 24 |     for line in lines:
+
+FURB122.py:25:5: FURB122 [*] Use of `f.write` in a for loop
+   |
+24 |   with Path("file").open("w") as f:
+25 |       for line in lines:
+   |  _____^
+26 | |         f.write(line.upper())
+   | |_____________________________^ FURB122
+27 |   
+28 |   with Path("file").open("w") as f:
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+22 22 |         f.write(line.encode())
+23 23 | 
+24 24 | with Path("file").open("w") as f:
+25    |-    for line in lines:
+26    |-        f.write(line.upper())
+   25 |+    f.writelines(line.upper() for line in lines)
+27 26 | 
+28 27 | with Path("file").open("w") as f:
+29 28 |     pass
+
+FURB122.py:31:5: FURB122 [*] Use of `f.write` in a for loop
+   |
+29 |       pass
+30 |   
+31 |       for line in lines:
+   |  _____^
+32 | |         f.write(line)
+   | |_____________________^ FURB122
+33 |   
+34 |   # OK
+   |
+   = help: Replace with `f.writelines`
+
+ℹ Safe fix
+28 28 | with Path("file").open("w") as f:
+29 29 |     pass
+30 30 | 
+31    |-    for line in lines:
+32    |-        f.write(line)
+   31 |+    f.writelines(lines)
+33 32 | 
+34 33 | # OK
+35 34 |
