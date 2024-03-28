@@ -7,10 +7,10 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::noqa::Directive;
 
 /// ## What it does
-/// Checks for `noqa` directives with multiple spaces between the colon and the codes.
+/// Checks for `noqa` directives with multiple spaces after the colon.
 ///
 /// ## Why is this bad?
-/// Multiple spaces between the colon and the codes are redundant and lead to longer lines.
+/// Multiple spaces after the colon are redundant and lead to longer lines.
 ///
 /// ## Example
 /// ```python
@@ -22,24 +22,24 @@ use crate::noqa::Directive;
 /// ```
 ///
 #[violation]
-pub struct MultipleSpacesBeforeNOQACode;
+pub struct MultipleSpacesAfterNoqaColon;
 
-impl AlwaysFixableViolation for MultipleSpacesBeforeNOQACode {
+impl AlwaysFixableViolation for MultipleSpacesAfterNoqaColon {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`noqa` directives should only have one space before the code(s)")
+        format!("`noqa` directives should only have one space after the colon")
     }
 
     fn fix_title(&self) -> String {
-        "Remove extra space(s) before code(s)".to_string()
+        "Remove extra space(s) after colon".to_string()
     }
 }
 
 /// ## What it does
-/// Checks for `noqa` directives no space between the colon and the codes.
+/// Checks for `noqa` directives no space after the colon.
 ///
 /// ## Why is this bad?
-/// Missing space between the colon and the code(s) reduces makes the directive harder to read.
+/// Not having a space after the colon makes the directive harder to read.
 ///
 /// ## Example
 /// ```python
@@ -51,16 +51,16 @@ impl AlwaysFixableViolation for MultipleSpacesBeforeNOQACode {
 /// ```
 ///
 #[violation]
-pub struct MissingSpaceBeforeNOQACode;
+pub struct MissingSpaceAfterNoqaColon;
 
-impl AlwaysFixableViolation for MissingSpaceBeforeNOQACode {
+impl AlwaysFixableViolation for MissingSpaceAfterNoqaColon {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`noqa` directives should have one space before the code(s)")
+        format!("`noqa` directives should have one space after the colon")
     }
 
     fn fix_title(&self) -> String {
-        "Add missing space before code(s)".to_string()
+        "Add missing space after colon".to_string()
     }
 }
 
@@ -79,7 +79,7 @@ pub(crate) fn noqa_style(diagnostics: &mut Vec<Diagnostic>, indexer: &Indexer, l
                 let start = offset + TextSize::new(u32::try_from(cursor - 1).unwrap());
                 let end = start + TextSize::new(1);
                 let mut diagnostic =
-                    Diagnostic::new(MissingSpaceBeforeNOQACode, TextRange::new(start, end));
+                    Diagnostic::new(MissingSpaceAfterNoqaColon, TextRange::new(start, end));
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(' '.to_string(), end)));
                 diagnostics.push(diagnostic);
             }
@@ -88,7 +88,7 @@ pub(crate) fn noqa_style(diagnostics: &mut Vec<Diagnostic>, indexer: &Indexer, l
                 let start = offset + TextSize::new(u32::try_from(cursor + 1).unwrap());
                 let end = start + TextSize::new(u32::try_from(num_spaces - 1).unwrap());
                 let mut diagnostic =
-                    Diagnostic::new(MultipleSpacesBeforeNOQACode, TextRange::new(start, end));
+                    Diagnostic::new(MultipleSpacesAfterNoqaColon, TextRange::new(start, end));
                 diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
                 diagnostics.push(diagnostic);
             }

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF029.py:5:16: RUF029 [*] `noqa` directives should only have one space before the code(s)
+RUF029.py:5:16: RUF029 [*] `noqa` directives should only have one space after the colon
   |
 4 | # RUF029
 5 | x = 2  # noqa:  X600
@@ -9,7 +9,7 @@ RUF029.py:5:16: RUF029 [*] `noqa` directives should only have one space before t
 6 | x = 2  # noqa:   X700, X800
 7 | x = 2  # noqa:                X100 X100 X100, X100, X100
   |
-  = help: Remove extra space(s) before code(s)
+  = help: Remove extra space(s) after colon
 
 ℹ Safe fix
 2 2 | x = 2  # noqa: X100
@@ -20,7 +20,7 @@ RUF029.py:5:16: RUF029 [*] `noqa` directives should only have one space before t
 6 6 | x = 2  # noqa:   X700, X800
 7 7 | x = 2  # noqa:                X100 X100 X100, X100, X100
 
-RUF029.py:6:16: RUF029 [*] `noqa` directives should only have one space before the code(s)
+RUF029.py:6:16: RUF029 [*] `noqa` directives should only have one space after the colon
   |
 4 | # RUF029
 5 | x = 2  # noqa:  X600
@@ -28,7 +28,7 @@ RUF029.py:6:16: RUF029 [*] `noqa` directives should only have one space before t
   |                ^^ RUF029
 7 | x = 2  # noqa:                X100 X100 X100, X100, X100
   |
-  = help: Remove extra space(s) before code(s)
+  = help: Remove extra space(s) after colon
 
 ℹ Safe fix
 3 3 | 
@@ -38,14 +38,14 @@ RUF029.py:6:16: RUF029 [*] `noqa` directives should only have one space before t
   6 |+x = 2  # noqa: X700, X800
 7 7 | x = 2  # noqa:                X100 X100 X100, X100, X100
 
-RUF029.py:7:16: RUF029 [*] `noqa` directives should only have one space before the code(s)
+RUF029.py:7:16: RUF029 [*] `noqa` directives should only have one space after the colon
   |
 5 | x = 2  # noqa:  X600
 6 | x = 2  # noqa:   X700, X800
 7 | x = 2  # noqa:                X100 X100 X100, X100, X100
   |                ^^^^^^^^^^^^^^^ RUF029
   |
-  = help: Remove extra space(s) before code(s)
+  = help: Remove extra space(s) after colon
 
 ℹ Safe fix
 4 4 | # RUF029

@@ -50,8 +50,8 @@ pub(crate) fn check_tokens(
     }
 
     if settings.rules.any_enabled(&[
-        Rule::MultipleSpacesBeforeNOQACode,
-        Rule::MissingSpaceBeforeNOQACode,
+        Rule::MultipleSpacesAfterNoqaColon,
+        Rule::MissingSpaceAfterNoqaColon,
     ]) {
         ruff::rules::noqa_style(&mut diagnostics, indexer, locator);
     }
