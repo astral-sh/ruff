@@ -105,7 +105,6 @@ impl<'src> Parser<'src> {
     /// Matches the `star_expressions` rule in the [Python grammar].
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    #[allow(dead_code)]
     pub(super) fn parse_star_expression_list(&mut self) -> ParsedExpr {
         let start = self.node_start();
         let parsed_expr = self.parse_star_expression_or_higher(AllowNamedExpression::No);
@@ -1375,10 +1374,12 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses an expression in parentheses, a tuple expression, or a generator expression.
+    ///
+    /// Matches the `(tuple | group | genexp)` rule in the [Python grammar].
+    ///
+    /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_parenthesized_expression(&mut self) -> ParsedExpr {
         let start = self.node_start();
-        let saved_context = self.set_ctx(ParserCtxFlags::PARENTHESIZED_EXPR);
-
         self.bump(TokenKind::Lpar);
 
         // Nice error message when having a unclosed open parenthesis `(`
@@ -1392,8 +1393,6 @@ impl<'src> Parser<'src> {
 
         // Return an empty `TupleExpr` when finding a `)` right after the `(`
         if self.eat(TokenKind::Rpar) {
-            self.restore_ctx(ParserCtxFlags::PARENTHESIZED_EXPR, saved_context);
-
             return Expr::Tuple(ast::ExprTuple {
                 elts: vec![],
                 ctx: ExprContext::Load,
@@ -1403,15 +1402,18 @@ impl<'src> Parser<'src> {
             .into();
         }
 
-        let mut parsed_expr = self.parse_named_expression_or_higher();
+        // Use the more general rule of the three to parse the first element
+        // and limit it later.
+        let mut parsed_expr = self.parse_star_expression_or_higher(AllowNamedExpression::Yes);
 
-        let parsed = match self.current_token_kind() {
+        match self.current_token_kind() {
             TokenKind::Comma => {
+                // grammar: `tuple`
                 let tuple = self.parse_tuple_expression(
                     parsed_expr.expr,
                     start,
                     TupleParenthesized::Yes,
-                    Parser::parse_named_expression_or_higher,
+                    |parser| parser.parse_star_expression_or_higher(AllowNamedExpression::Yes),
                 );
 
                 ParsedExpr {
@@ -1420,6 +1422,14 @@ impl<'src> Parser<'src> {
                 }
             }
             TokenKind::Async | TokenKind::For => {
+                // grammar: `genexp`
+                if !parsed_expr.is_parenthesized && parsed_expr.expr.is_starred_expr() {
+                    self.add_error(
+                        ParseErrorType::IterableUnpackingInComprehension,
+                        &parsed_expr,
+                    );
+                }
+
                 let generator = Expr::Generator(self.parse_generator_expression(
                     parsed_expr.expr,
                     GeneratorExpressionInParentheses::Yes(start),
@@ -1431,31 +1441,37 @@ impl<'src> Parser<'src> {
                 }
             }
             _ => {
+                // grammar: `group`
+                if parsed_expr.expr.is_starred_expr() {
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "starred expression cannot be used here".to_string(),
+                        ),
+                        &parsed_expr,
+                    );
+                }
+
                 self.expect(TokenKind::Rpar);
 
                 parsed_expr.is_parenthesized = true;
                 parsed_expr
             }
-        };
-
-        self.restore_ctx(ParserCtxFlags::PARENTHESIZED_EXPR, saved_context);
-
-        parsed
+        }
     }
 
-    /// Parses multiple items separated by a comma into a `TupleExpr` node.
-    /// Uses `parse_func` to parse each item.
+    /// Parses multiple items separated by a comma into a tuple expression.
+    ///
+    /// Uses the `parse_func` to parse each item in the tuple.
     pub(super) fn parse_tuple_expression(
         &mut self,
         first_element: Expr,
         start: TextSize,
         parenthesized: TupleParenthesized,
-        // TODO: I would have expected that `parse_func` is the same depending on whether `parenthesized` is true or not, but that's not the case
-        // verify precedence.
         mut parse_func: impl FnMut(&mut Parser<'src>) -> ParsedExpr,
     ) -> ast::ExprTuple {
-        // In case of the tuple only having one element, we need to cover the
-        // range of the comma.
+        // TODO(dhruvmanila): Can we remove `parse_func` and use `parenthesized` to
+        // determine the parsing function?
+
         if !self.at_sequence_end() {
             self.expect(TokenKind::Comma);
         }
@@ -2134,7 +2150,6 @@ pub(super) enum GeneratorExpressionInParentheses {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
 enum StarredExpressionPrecedence {
     BitOr,
     Conditional,

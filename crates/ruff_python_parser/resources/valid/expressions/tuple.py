@@ -1,15 +1,27 @@
-a, b = 4, 5
-
-a,b
-(a,b)
+# With parentheses
 ()
+(())
+((()), ())
 (a,)
-((a,b))
+(a, b)
+(a, b,)
+((a, b))
 
-1, 2
-1 + 2,
-x and y,
-(1, 2,)
-(1,2,3,4)
-(x + 1, l,)
-1, 2, 3, 4
+# Without parentheses
+a,
+a, b
+a, b,
+
+# Starred expression
+*a,
+a, *b
+*a | b, *await x, (), *()
+(*a,)
+(a, *b)
+(*a | b, *await x, (), *())
+
+# Named expression
+(x := 1,)
+(x, y := 2)
+(x, y := 2, z)
+x, (y := 2), z
