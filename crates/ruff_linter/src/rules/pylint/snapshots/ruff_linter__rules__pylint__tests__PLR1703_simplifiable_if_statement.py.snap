@@ -1,0 +1,86 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+simplifiable_if_statement.py:3:1: PLR1703 [*] Simplifiable if-statement
+  |
+1 |   x = 2
+2 |   
+3 | / if x == 1:
+4 | |     is_one = True
+5 | | else:
+6 | |     is_one = False  # PLR1703
+  | |__________________^ PLR1703
+7 |   
+8 |   if x == 2:
+  |
+  = help: Simplify if-statement
+
+ℹ Safe fix
+1 1 | x = 2
+2 2 | 
+3   |-if x == 1:
+4   |-    is_one = True
+5   |-else:
+6   |-    is_one = False  # PLR1703
+  3 |+is_one = x == 1  # PLR1703
+7 4 | 
+8 5 | if x == 2:
+9 6 |     isnt_two = False
+
+simplifiable_if_statement.py:8:1: PLR1703 [*] Simplifiable if-statement
+   |
+ 6 |       is_one = False  # PLR1703
+ 7 |   
+ 8 | / if x == 2:
+ 9 | |     isnt_two = False
+10 | | else:
+11 | |     isnt_two = True  # PLR1703
+   | |___________________^ PLR1703
+12 |   
+13 |   if( x
+   |
+   = help: Simplify if-statement
+
+ℹ Safe fix
+5  5  | else:
+6  6  |     is_one = False  # PLR1703
+7  7  | 
+8     |-if x == 2:
+9     |-    isnt_two = False
+10    |-else:
+11    |-    isnt_two = True  # PLR1703
+   8  |+isnt_two = not x == 2  # PLR1703
+12 9  | 
+13 10 | if( x
+14 11 |     ==
+
+simplifiable_if_statement.py:13:1: PLR1703 [*] Simplifiable if-statement
+   |
+11 |       isnt_two = True  # PLR1703
+12 |   
+13 | / if( x
+14 | |     ==
+15 | |       2):
+16 | |     isnt_two = False
+17 | | else:
+18 | |     isnt_two = True  # PLR1703
+   | |___________________^ PLR1703
+   |
+   = help: Simplify if-statement
+
+ℹ Safe fix
+10 10 | else:
+11 11 |     isnt_two = True  # PLR1703
+12 12 | 
+13    |-if( x
+14    |-    ==
+15    |-      2):
+16    |-    isnt_two = False
+17    |-else:
+18    |-    isnt_two = True  # PLR1703
+   13 |+isnt_two = not x == 2  # PLR1703
+19 14 | 
+20 15 | 
+21 16 | # OK
+
+
