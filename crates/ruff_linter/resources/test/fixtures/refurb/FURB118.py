@@ -27,6 +27,10 @@ op_gte = lambda x, y: x >= y
 op_is = lambda x, y: x is y
 op_isnot = lambda x, y: x is not y
 op_in = lambda x, y: y in x
+op_itemgetter = lambda x: x[0]
+op_itemgetter = lambda x: (x[0], x[1], x[2])
+op_itemgetter = lambda x: (x[1:], x[2])
+op_itemgetter = lambda x: x[:]
 
 
 def op_not2(x):
@@ -48,6 +52,12 @@ op_notin = lambda x, y: y not in x
 op_and = lambda x, y: y and x
 op_or = lambda x, y: y or x
 op_in = lambda x, y: x in y
+op_itemgetter = lambda x: (1, x[1], x[2])
+op_itemgetter = lambda x: (x.y, x[1], x[2])
+op_itemgetter = lambda x, y: (x[0], y[0])
+op_itemgetter = lambda x, y: (x[0], y[0])
+op_itemgetter = lambda x: ()
+op_itemgetter = lambda x: (*x[0], x[1])
 
 
 def op_neg3(x, y):
