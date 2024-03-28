@@ -1284,6 +1284,11 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at a `{` token.
+    ///
+    /// See:
+    /// - <https://docs.python.org/3/reference/expressions.html#set-displays>
+    /// - <https://docs.python.org/3/reference/expressions.html#dictionary-displays>
+    /// - <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
     fn parse_set_or_dict_like_expression(&mut self) -> Expr {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
@@ -1318,6 +1323,13 @@ impl<'src> Parser<'src> {
 
         match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
+                if !key_or_element.is_parenthesized && key_or_element.expr.is_starred_expr() {
+                    self.add_error(
+                        ParseErrorType::IterableUnpackingInComprehension,
+                        &key_or_element,
+                    );
+                }
+
                 Expr::SetComp(self.parse_set_comprehension_expression(key_or_element.expr, start))
             }
             TokenKind::Colon => {
@@ -1765,6 +1777,9 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a set comprehension expression.
+    ///
+    /// See: <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
     fn parse_set_comprehension_expression(
         &mut self,
         element: Expr,
