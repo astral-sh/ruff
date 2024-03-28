@@ -34,7 +34,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
                 format!("<span title='Rule has been deprecated'>{WARNING_SYMBOL}</span>")
             }
             #[allow(deprecated)]
-            RuleGroup::Preview | RuleGroup::Nursery => {
+            RuleGroup::Preview => {
                 format!("<span title='Rule is in preview'>{PREVIEW_SYMBOL}</span>")
             }
             RuleGroup::Stable => {
