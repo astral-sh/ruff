@@ -23,9 +23,9 @@ use crate::noqa::Directive;
 /// ```
 ///
 #[violation]
-pub struct MultipleSpacesAfterNoqaColon;
+pub struct MultipleSpacesAfterNOQAColon;
 
-impl AlwaysFixableViolation for MultipleSpacesAfterNoqaColon {
+impl AlwaysFixableViolation for MultipleSpacesAfterNOQAColon {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`noqa` directives should only have one space after the colon")
@@ -53,9 +53,9 @@ impl AlwaysFixableViolation for MultipleSpacesAfterNoqaColon {
 /// ```
 ///
 #[violation]
-pub struct MissingSpaceAfterNoqaColon;
+pub struct MissingSpaceAfterNOQAColon;
 
-impl AlwaysFixableViolation for MissingSpaceAfterNoqaColon {
+impl AlwaysFixableViolation for MissingSpaceAfterNOQAColon {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`noqa` directives should have one space after the colon")
@@ -81,7 +81,7 @@ pub(crate) fn noqa_style(diagnostics: &mut Vec<Diagnostic>, indexer: &Indexer, l
                 let start = offset + TextSize::new(u32::try_from(cursor - 1).unwrap());
                 let end = start + TextSize::new(1);
                 let mut diagnostic =
-                    Diagnostic::new(MissingSpaceAfterNoqaColon, TextRange::new(start, end));
+                    Diagnostic::new(MissingSpaceAfterNOQAColon, TextRange::new(start, end));
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(' '.to_string(), end)));
                 diagnostics.push(diagnostic);
             }
@@ -90,7 +90,7 @@ pub(crate) fn noqa_style(diagnostics: &mut Vec<Diagnostic>, indexer: &Indexer, l
                 let start = offset + TextSize::new(u32::try_from(cursor + 1).unwrap());
                 let end = start + TextSize::new(u32::try_from(num_spaces - 1).unwrap());
                 let mut diagnostic =
-                    Diagnostic::new(MultipleSpacesAfterNoqaColon, TextRange::new(start, end));
+                    Diagnostic::new(MultipleSpacesAfterNOQAColon, TextRange::new(start, end));
                 diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
                 diagnostics.push(diagnostic);
             }

@@ -51,8 +51,8 @@ mod tests {
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_1.py"))]
     #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_2.py"))]
     #[test_case(Rule::InvalidFormatterSuppressionComment, Path::new("RUF028.py"))]
-    #[test_case(Rule::MultipleSpacesAfterNoqaColon, Path::new("RUF029.py"))]
-    #[test_case(Rule::MissingSpaceAfterNoqaColon, Path::new("RUF030.py"))]
+    #[test_case(Rule::MultipleSpacesAfterNOQAColon, Path::new("RUF029.py"))]
+    #[test_case(Rule::MissingSpaceAfterNOQAColon, Path::new("RUF030.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

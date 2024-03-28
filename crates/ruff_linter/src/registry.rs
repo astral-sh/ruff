@@ -280,14 +280,14 @@ impl Rule {
             | Rule::LineContainsTodo
             | Rule::LineContainsXxx
             | Rule::MissingSpaceAfterTodoColon
-            | Rule::MissingSpaceAfterNoqaColon
+            | Rule::MissingSpaceAfterNOQAColon
             | Rule::MissingTodoAuthor
             | Rule::MissingTodoColon
             | Rule::MissingTodoDescription
             | Rule::MissingTodoLink
             | Rule::MissingTrailingComma
             | Rule::MultiLineImplicitStringConcatenation
-            | Rule::MultipleSpacesAfterNoqaColon
+            | Rule::MultipleSpacesAfterNOQAColon
             | Rule::MultipleStatementsOnOneLineColon
             | Rule::MultipleStatementsOnOneLineSemicolon
             | Rule::ProhibitedTrailingComma
