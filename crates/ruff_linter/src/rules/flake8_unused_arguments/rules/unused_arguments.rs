@@ -1,17 +1,14 @@
-use std::iter;
-
-use regex::Regex;
 use ruff_python_ast as ast;
-use ruff_python_ast::{Parameter, Parameters};
+use ruff_python_ast::Parameters;
 
-use ruff_diagnostics::DiagnosticKind;
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, DiagnosticKind, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::{function_type, visibility};
-use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
+use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::{remove_parameter, Parentheses};
 use crate::registry::Rule;
 use crate::rules::flake8_unused_arguments::helpers;
 
@@ -33,16 +30,25 @@ use crate::rules::flake8_unused_arguments::helpers;
 /// def foo(bar):
 ///     return bar * 2
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as removing a function parameter
+/// can change the behavior of the program.
 #[violation]
 pub struct UnusedFunctionArgument {
     name: String,
 }
 
-impl Violation for UnusedFunctionArgument {
+impl AlwaysFixableViolation for UnusedFunctionArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedFunctionArgument { name } = self;
         format!("Unused function argument: `{name}`")
+    }
+
+    fn fix_title(&self) -> String {
+        let Self { name } = self;
+        format!("Remove argument: `{name}`")
     }
 }
 
@@ -66,16 +72,25 @@ impl Violation for UnusedFunctionArgument {
 ///     def foo(self, arg1):
 ///         print(arg1)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as removing a method parameter
+/// can change the behavior of the program.
 #[violation]
 pub struct UnusedMethodArgument {
     name: String,
 }
 
-impl Violation for UnusedMethodArgument {
+impl AlwaysFixableViolation for UnusedMethodArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedMethodArgument { name } = self;
         format!("Unused method argument: `{name}`")
+    }
+
+    fn fix_title(&self) -> String {
+        let Self { name } = self;
+        format!("Remove argument: `{name}`")
     }
 }
 
@@ -101,16 +116,25 @@ impl Violation for UnusedMethodArgument {
 ///     def foo(cls, arg1):
 ///         print(arg1)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as removing a method parameter
+/// can change the behavior of the program.
 #[violation]
 pub struct UnusedClassMethodArgument {
     name: String,
 }
 
-impl Violation for UnusedClassMethodArgument {
+impl AlwaysFixableViolation for UnusedClassMethodArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedClassMethodArgument { name } = self;
         format!("Unused class method argument: `{name}`")
+    }
+
+    fn fix_title(&self) -> String {
+        let Self { name } = self;
+        format!("Remove argument: `{name}`")
     }
 }
 
@@ -136,16 +160,25 @@ impl Violation for UnusedClassMethodArgument {
 ///     def foo(arg1):
 ///         print(arg1)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as removing a method parameter
+/// can change the behavior of the program.
 #[violation]
 pub struct UnusedStaticMethodArgument {
     name: String,
 }
 
-impl Violation for UnusedStaticMethodArgument {
+impl AlwaysFixableViolation for UnusedStaticMethodArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedStaticMethodArgument { name } = self;
         format!("Unused static method argument: `{name}`")
+    }
+
+    fn fix_title(&self) -> String {
+        let Self { name } = self;
+        format!("Remove argument: `{name}`")
     }
 }
 
@@ -168,16 +201,25 @@ impl Violation for UnusedStaticMethodArgument {
 /// my_list = [1, 2, 3, 4, 5]
 /// squares = map(lambda x: x**2, my_list)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as removing a lambda parameter
+/// can change the behavior of the program.
 #[violation]
 pub struct UnusedLambdaArgument {
     name: String,
 }
 
-impl Violation for UnusedLambdaArgument {
+impl AlwaysFixableViolation for UnusedLambdaArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedLambdaArgument { name } = self;
         format!("Unused lambda argument: `{name}`")
+    }
+
+    fn fix_title(&self) -> String {
+        let Self { name } = self;
+        format!("Remove argument: `{name}`")
     }
 }
 
@@ -211,101 +253,82 @@ impl Argumentable {
             Self::Lambda => Rule::UnusedLambdaArgument,
         }
     }
+
+    const fn skip_first_argument(self) -> usize {
+        match self {
+            Argumentable::Function | Argumentable::StaticMethod | Argumentable::Lambda => 0,
+            Argumentable::Method | Argumentable::ClassMethod => 1,
+        }
+    }
+
+    const fn parentheses(self) -> Parentheses {
+        match self {
+            Argumentable::Function
+            | Argumentable::Method
+            | Argumentable::ClassMethod
+            | Argumentable::StaticMethod => Parentheses::Preserve,
+            Argumentable::Lambda => Parentheses::Remove,
+        }
+    }
 }
 
-/// Check a plain function for unused arguments.
-fn function(
+/// Check a function or method for unused arguments.
+fn check(
     argumentable: Argumentable,
     parameters: &Parameters,
+    checker: &Checker,
     scope: &Scope,
-    semantic: &SemanticModel,
-    dummy_variable_rgx: &Regex,
-    ignore_variadic_names: bool,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
+    let ignore_variadic_names = checker
+        .settings
+        .flake8_unused_arguments
+        .ignore_variadic_names;
     let args = parameters
         .posonlyargs
         .iter()
         .chain(&parameters.args)
         .chain(&parameters.kwonlyargs)
+        .skip(argumentable.skip_first_argument())
         .map(|parameter_with_default| &parameter_with_default.parameter)
         .chain(
-            iter::once::<Option<&Parameter>>(parameters.vararg.as_deref())
-                .flatten()
+            parameters
+                .vararg
+                .as_deref()
+                .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         )
         .chain(
-            iter::once::<Option<&Parameter>>(parameters.kwarg.as_deref())
-                .flatten()
+            parameters
+                .kwarg
+                .as_deref()
+                .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         );
-    call(
-        argumentable,
-        args,
-        scope,
-        semantic,
-        dummy_variable_rgx,
-        diagnostics,
-    );
-}
 
-/// Check a method for unused arguments.
-fn method(
-    argumentable: Argumentable,
-    parameters: &Parameters,
-    scope: &Scope,
-    semantic: &SemanticModel,
-    dummy_variable_rgx: &Regex,
-    ignore_variadic_names: bool,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    let args = parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .chain(&parameters.kwonlyargs)
-        .skip(1)
-        .map(|parameter_with_default| &parameter_with_default.parameter)
-        .chain(
-            iter::once::<Option<&Parameter>>(parameters.vararg.as_deref())
-                .flatten()
-                .skip(usize::from(ignore_variadic_names)),
-        )
-        .chain(
-            iter::once::<Option<&Parameter>>(parameters.kwarg.as_deref())
-                .flatten()
-                .skip(usize::from(ignore_variadic_names)),
-        );
-    call(
-        argumentable,
-        args,
-        scope,
-        semantic,
-        dummy_variable_rgx,
-        diagnostics,
-    );
-}
-
-fn call<'a>(
-    argumentable: Argumentable,
-    parameters: impl Iterator<Item = &'a Parameter>,
-    scope: &Scope,
-    semantic: &SemanticModel,
-    dummy_variable_rgx: &Regex,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    diagnostics.extend(parameters.filter_map(|arg| {
+    let dummy_variable_rgx = &checker.settings.dummy_variable_rgx;
+    diagnostics.extend(args.filter_map(|arg| {
         let binding = scope
             .get(arg.name.as_str())
-            .map(|binding_id| semantic.binding(binding_id))?;
+            .map(|binding_id| checker.semantic().binding(binding_id))?;
         if binding.kind.is_argument()
             && !binding.is_used()
             && !dummy_variable_rgx.is_match(arg.name.as_str())
         {
-            Some(Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 argumentable.check_for(arg.name.to_string()),
                 binding.range(),
-            ))
+            );
+            diagnostic.try_set_fix(|| {
+                remove_parameter(
+                    binding,
+                    parameters,
+                    argumentable.parentheses(),
+                    checker.locator().contents(),
+                )
+                .map(Fix::unsafe_edit)
+            });
+            Some(diagnostic)
         } else {
             None
         }
@@ -346,16 +369,11 @@ pub(crate) fn unused_arguments(
                     if checker.enabled(Argumentable::Function.rule_code())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        function(
+                        check(
                             Argumentable::Function,
                             parameters,
+                            checker,
                             scope,
-                            checker.semantic(),
-                            &checker.settings.dummy_variable_rgx,
-                            checker
-                                .settings
-                                .flake8_unused_arguments
-                                .ignore_variadic_names,
                             diagnostics,
                         );
                     }
@@ -371,16 +389,11 @@ pub(crate) fn unused_arguments(
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        method(
+                        check(
                             Argumentable::Method,
                             parameters,
+                            checker,
                             scope,
-                            checker.semantic(),
-                            &checker.settings.dummy_variable_rgx,
-                            checker
-                                .settings
-                                .flake8_unused_arguments
-                                .ignore_variadic_names,
                             diagnostics,
                         );
                     }
@@ -396,16 +409,11 @@ pub(crate) fn unused_arguments(
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        method(
+                        check(
                             Argumentable::ClassMethod,
                             parameters,
+                            checker,
                             scope,
-                            checker.semantic(),
-                            &checker.settings.dummy_variable_rgx,
-                            checker
-                                .settings
-                                .flake8_unused_arguments
-                                .ignore_variadic_names,
                             diagnostics,
                         );
                     }
@@ -421,16 +429,11 @@ pub(crate) fn unused_arguments(
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        function(
+                        check(
                             Argumentable::StaticMethod,
                             parameters,
+                            checker,
                             scope,
-                            checker.semantic(),
-                            &checker.settings.dummy_variable_rgx,
-                            checker
-                                .settings
-                                .flake8_unused_arguments
-                                .ignore_variadic_names,
                             diagnostics,
                         );
                     }
@@ -440,16 +443,11 @@ pub(crate) fn unused_arguments(
         ScopeKind::Lambda(ast::ExprLambda { parameters, .. }) => {
             if let Some(parameters) = parameters {
                 if checker.enabled(Argumentable::Lambda.rule_code()) {
-                    function(
+                    check(
                         Argumentable::Lambda,
                         parameters,
+                        checker,
                         scope,
-                        checker.semantic(),
-                        &checker.settings.dummy_variable_rgx,
-                        checker
-                            .settings
-                            .flake8_unused_arguments
-                            .ignore_variadic_names,
                         diagnostics,
                     );
                 }

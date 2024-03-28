@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
 ---
-ARG.py:9:7: ARG001 Unused function argument: `self`
+ARG.py:9:7: ARG001 [*] Unused function argument: `self`
    |
  7 | # Unused arguments on functions.
  8 | ###
@@ -9,8 +9,19 @@ ARG.py:9:7: ARG001 Unused function argument: `self`
    |       ^^^^ ARG001
 10 |     print("Hello, world!")
    |
+   = help: Remove argument: `self`
 
-ARG.py:9:13: ARG001 Unused function argument: `x`
+ℹ Unsafe fix
+6  6  | ###
+7  7  | # Unused arguments on functions.
+8  8  | ###
+9     |-def f(self, x):
+   9  |+def f(x):
+10 10 |     print("Hello, world!")
+11 11 | 
+12 12 | 
+
+ARG.py:9:13: ARG001 [*] Unused function argument: `x`
    |
  7 | # Unused arguments on functions.
  8 | ###
@@ -18,47 +29,392 @@ ARG.py:9:13: ARG001 Unused function argument: `x`
    |             ^ ARG001
 10 |     print("Hello, world!")
    |
+   = help: Remove argument: `x`
 
-ARG.py:13:7: ARG001 Unused function argument: `cls`
+ℹ Unsafe fix
+6  6  | ###
+7  7  | # Unused arguments on functions.
+8  8  | ###
+9     |-def f(self, x):
+   9  |+def f(self):
+10 10 |     print("Hello, world!")
+11 11 | 
+12 12 | 
+
+ARG.py:13:7: ARG001 [*] Unused function argument: `cls`
    |
 13 | def f(cls, x):
    |       ^^^ ARG001
 14 |     print("Hello, world!")
    |
+   = help: Remove argument: `cls`
 
-ARG.py:13:12: ARG001 Unused function argument: `x`
+ℹ Unsafe fix
+10 10 |     print("Hello, world!")
+11 11 | 
+12 12 | 
+13    |-def f(cls, x):
+   13 |+def f(x):
+14 14 |     print("Hello, world!")
+15 15 | 
+16 16 | 
+
+ARG.py:13:12: ARG001 [*] Unused function argument: `x`
    |
 13 | def f(cls, x):
    |            ^ ARG001
 14 |     print("Hello, world!")
    |
+   = help: Remove argument: `x`
 
-ARG.py:17:7: ARG001 Unused function argument: `self`
+ℹ Unsafe fix
+10 10 |     print("Hello, world!")
+11 11 | 
+12 12 | 
+13    |-def f(cls, x):
+   13 |+def f(cls):
+14 14 |     print("Hello, world!")
+15 15 | 
+16 16 | 
+
+ARG.py:17:7: ARG001 [*] Unused function argument: `self`
    |
 17 | def f(self, x):
    |       ^^^^ ARG001
 18 |     ...
    |
+   = help: Remove argument: `self`
 
-ARG.py:17:13: ARG001 Unused function argument: `x`
+ℹ Unsafe fix
+14 14 |     print("Hello, world!")
+15 15 | 
+16 16 | 
+17    |-def f(self, x):
+   17 |+def f(x):
+18 18 |     ...
+19 19 | 
+20 20 | 
+
+ARG.py:17:13: ARG001 [*] Unused function argument: `x`
    |
 17 | def f(self, x):
    |             ^ ARG001
 18 |     ...
    |
+   = help: Remove argument: `x`
 
-ARG.py:21:7: ARG001 Unused function argument: `cls`
+ℹ Unsafe fix
+14 14 |     print("Hello, world!")
+15 15 | 
+16 16 | 
+17    |-def f(self, x):
+   17 |+def f(self):
+18 18 |     ...
+19 19 | 
+20 20 | 
+
+ARG.py:21:7: ARG001 [*] Unused function argument: `cls`
    |
 21 | def f(cls, x):
    |       ^^^ ARG001
 22 |     ...
    |
+   = help: Remove argument: `cls`
 
-ARG.py:21:12: ARG001 Unused function argument: `x`
+ℹ Unsafe fix
+18 18 |     ...
+19 19 | 
+20 20 | 
+21    |-def f(cls, x):
+   21 |+def f(x):
+22 22 |     ...
+23 23 | 
+24 24 | 
+
+ARG.py:21:12: ARG001 [*] Unused function argument: `x`
    |
 21 | def f(cls, x):
    |            ^ ARG001
 22 |     ...
    |
+   = help: Remove argument: `x`
 
+ℹ Unsafe fix
+18 18 |     ...
+19 19 | 
+20 20 | 
+21    |-def f(cls, x):
+   21 |+def f(cls):
+22 22 |     ...
+23 23 | 
+24 24 | 
 
+ARG.py:223:26: ARG001 [*] Unused function argument: `a2`
+    |
+221 | ###
+222 | 
+223 | def multiple_posonly(a1, a2: int = 1, /, b: int = 1, *, d: int, **e: int):
+    |                          ^^ ARG001
+224 |     print(a1, b, d, e)
+    |
+    = help: Remove argument: `a2`
+
+ℹ Unsafe fix
+220 220 | # Test with the different combinations of arguments
+221 221 | ###
+222 222 | 
+223     |-def multiple_posonly(a1, a2: int = 1, /, b: int = 1, *, d: int, **e: int):
+    223 |+def multiple_posonly(a1, /, b: int = 1, *, d: int, **e: int):
+224 224 |     print(a1, b, d, e)
+225 225 | 
+226 226 | 
+
+ARG.py:227:18: ARG001 [*] Unused function argument: `a`
+    |
+227 | def last_posonly(a: int = 1, /, b: int = 1, *, d: int, **e: int):
+    |                  ^ ARG001
+228 |     print(b, d, e)
+    |
+    = help: Remove argument: `a`
+
+ℹ Unsafe fix
+224 224 |     print(a1, b, d, e)
+225 225 | 
+226 226 | 
+227     |-def last_posonly(a: int = 1, /, b: int = 1, *, d: int, **e: int):
+    227 |+def last_posonly(b: int = 1, *, d: int, **e: int):
+228 228 |     print(b, d, e)
+229 229 | 
+230 230 | 
+
+ARG.py:231:39: ARG001 [*] Unused function argument: `c`
+    |
+231 | def last_after_posonly(a: int = 1, /, c: int = 1):
+    |                                       ^ ARG001
+232 |     print(a)
+    |
+    = help: Remove argument: `c`
+
+ℹ Unsafe fix
+228 228 |     print(b, d, e)
+229 229 | 
+230 230 | 
+231     |-def last_after_posonly(a: int = 1, /, c: int = 1):
+    231 |+def last_after_posonly(a: int = 1, /):
+232 232 |     print(a)
+233 233 | 
+234 234 | 
+
+ARG.py:235:24: ARG001 [*] Unused function argument: `b`
+    |
+235 | def arg(a: int = 1, /, b: int = 1, *, d: int = 1, **e: int):
+    |                        ^ ARG001
+236 |     print(a, d, e)
+    |
+    = help: Remove argument: `b`
+
+ℹ Unsafe fix
+232 232 |     print(a)
+233 233 | 
+234 234 | 
+235     |-def arg(a: int = 1, /, b: int = 1, *, d: int = 1, **e: int):
+    235 |+def arg(a: int = 1, /, *, d: int = 1, **e: int):
+236 236 |     print(a, d, e)
+237 237 | 
+238 238 | 
+
+ARG.py:239:51: ARG001 [*] Unused function argument: `c`
+    |
+239 | def vararg_and_kwonly(a: int = 1, /, b: int = 1, *c: int, d: int = 1, **e: int):
+    |                                                   ^ ARG001
+240 |     print(a, b, d, e)
+    |
+    = help: Remove argument: `c`
+
+ℹ Unsafe fix
+236 236 |     print(a, d, e)
+237 237 | 
+238 238 | 
+239     |-def vararg_and_kwonly(a: int = 1, /, b: int = 1, *c: int, d: int = 1, **e: int):
+    239 |+def vararg_and_kwonly(a: int = 1, /, b: int = 1, *, d: int = 1, **e: int):
+240 240 |     print(a, b, d, e)
+241 241 | 
+242 242 | 
+
+ARG.py:243:51: ARG001 [*] Unused function argument: `c`
+    |
+243 | def vararg_and_kwargs(a: int = 1, /, b: int = 1, *c: int, **e: int):
+    |                                                   ^ ARG001
+244 |     print(a, b, e)
+    |
+    = help: Remove argument: `c`
+
+ℹ Unsafe fix
+240 240 |     print(a, b, d, e)
+241 241 | 
+242 242 | 
+243     |-def vararg_and_kwargs(a: int = 1, /, b: int = 1, *c: int, **e: int):
+    243 |+def vararg_and_kwargs(a: int = 1, /, b: int = 1, **e: int):
+244 244 |     print(a, b, e)
+245 245 | 
+246 246 | 
+
+ARG.py:247:64: ARG001 [*] Unused function argument: `d2`
+    |
+247 | def multiple_kwonly(a: int = 1, /, b: int = 1, *, d1: int = 1, d2: int = 1, **e: int):
+    |                                                                ^^ ARG001
+248 |     print(a, b, d1, e)
+    |
+    = help: Remove argument: `d2`
+
+ℹ Unsafe fix
+244 244 |     print(a, b, e)
+245 245 | 
+246 246 | 
+247     |-def multiple_kwonly(a: int = 1, /, b: int = 1, *, d1: int = 1, d2: int = 1, **e: int):
+    247 |+def multiple_kwonly(a: int = 1, /, b: int = 1, *, d1: int = 1, **e: int):
+248 248 |     print(a, b, d1, e)
+249 249 | 
+250 250 | 
+
+ARG.py:251:65: ARG001 [*] Unused function argument: `d`
+    |
+251 | def last_kwonly_with_vararg(a: int = 1, /, b: int = 1, *c: int, d: int = 1, **e: int):
+    |                                                                 ^ ARG001
+252 |     print(a, b, c, e)
+    |
+    = help: Remove argument: `d`
+
+ℹ Unsafe fix
+248 248 |     print(a, b, d1, e)
+249 249 | 
+250 250 | 
+251     |-def last_kwonly_with_vararg(a: int = 1, /, b: int = 1, *c: int, d: int = 1, **e: int):
+    251 |+def last_kwonly_with_vararg(a: int = 1, /, b: int = 1, *c: int, **e: int):
+252 252 |     print(a, b, c, e)
+253 253 | 
+254 254 | 
+
+ARG.py:255:62: ARG001 [*] Unused function argument: `d`
+    |
+255 | def last_kwonly_without_vararg(a: int = 1, /, b: int = 1, *, d: int = 1, **e: int):
+    |                                                              ^ ARG001
+256 |     print(a, b, e)
+    |
+    = help: Remove argument: `d`
+
+ℹ Unsafe fix
+252 252 |     print(a, b, c, e)
+253 253 | 
+254 254 | 
+255     |-def last_kwonly_without_vararg(a: int = 1, /, b: int = 1, *, d: int = 1, **e: int):
+    255 |+def last_kwonly_without_vararg(a: int = 1, /, b: int = 1, **e: int):
+256 256 |     print(a, b, e)
+257 257 | 
+258 258 | 
+
+ARG.py:259:56: ARG001 [*] Unused function argument: `e`
+    |
+259 | def kwargs(a: int = 1, /, b: int = 1, *, d: int = 1, **e: int):
+    |                                                        ^ ARG001
+260 |     print(a, b, d)
+    |
+    = help: Remove argument: `e`
+
+ℹ Unsafe fix
+256 256 |     print(a, b, e)
+257 257 | 
+258 258 | 
+259     |-def kwargs(a: int = 1, /, b: int = 1, *, d: int = 1, **e: int):
+    259 |+def kwargs(a: int = 1, /, b: int = 1, *, d: int = 1):
+260 260 |     print(a, b, d)
+261 261 | 
+262 262 | 
+
+ARG.py:263:18: ARG001 [*] Unused function argument: `a`
+    |
+263 | def only_posonly(a, /):
+    |                  ^ ARG001
+264 |     ...
+    |
+    = help: Remove argument: `a`
+
+ℹ Unsafe fix
+260 260 |     print(a, b, d)
+261 261 | 
+262 262 | 
+263     |-def only_posonly(a, /):
+    263 |+def only_posonly():
+264 264 |     ...
+265 265 | 
+266 266 | 
+
+ARG.py:267:14: ARG001 [*] Unused function argument: `b`
+    |
+267 | def only_arg(b):
+    |              ^ ARG001
+268 |     ...
+    |
+    = help: Remove argument: `b`
+
+ℹ Unsafe fix
+264 264 |     ...
+265 265 | 
+266 266 | 
+267     |-def only_arg(b):
+    267 |+def only_arg():
+268 268 |     ...
+269 269 | 
+270 270 | 
+
+ARG.py:271:18: ARG001 [*] Unused function argument: `c`
+    |
+271 | def only_vararg(*c):
+    |                  ^ ARG001
+272 |     ...
+    |
+    = help: Remove argument: `c`
+
+ℹ Unsafe fix
+268 268 |     ...
+269 269 | 
+270 270 | 
+271     |-def only_vararg(*c):
+    271 |+def only_vararg():
+272 272 |     ...
+273 273 | 
+274 274 | 
+
+ARG.py:275:20: ARG001 [*] Unused function argument: `d`
+    |
+275 | def only_kwonly(*, d):
+    |                    ^ ARG001
+276 |     ...
+    |
+    = help: Remove argument: `d`
+
+ℹ Unsafe fix
+272 272 |     ...
+273 273 | 
+274 274 | 
+275     |-def only_kwonly(*, d):
+    275 |+def only_kwonly():
+276 276 |     ...
+277 277 | 
+278 278 | 
+
+ARG.py:279:19: ARG001 [*] Unused function argument: `e`
+    |
+279 | def only_kwargs(**e):
+    |                   ^ ARG001
+280 |     ...
+    |
+    = help: Remove argument: `e`
+
+ℹ Unsafe fix
+276 276 |     ...
+277 277 | 
+278 278 | 
+279     |-def only_kwargs(**e):
+    279 |+def only_kwargs():
+280 280 |     ...

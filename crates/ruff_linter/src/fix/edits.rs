@@ -1,17 +1,17 @@
 //! Interface for generating fix edits from higher-level actions (e.g., "remove an argument").
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Ok, Result};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Stmt};
+use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Parameters, Stmt};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::textwrap::dedent_to;
 use ruff_python_trivia::{
-    has_leading_content, is_python_whitespace, CommentRanges, PythonWhitespace, SimpleTokenKind,
-    SimpleTokenizer,
+    has_leading_content, is_python_whitespace, BackwardsTokenizer, CommentRanges, PythonWhitespace,
+    SimpleTokenKind, SimpleTokenizer,
 };
 use ruff_source_file::{Locator, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -127,12 +127,164 @@ pub(crate) enum Parentheses {
     Preserve,
 }
 
+/// Generic function to remove parameters in functions, methods or lambdas definitions.
+///
+/// Supports the removal of parentheses when this is the only parameter left.
+pub(crate) fn remove_parameter(
+    parameter: impl Ranged,
+    parameters: &Parameters,
+    parentheses: Parentheses,
+    source: &str,
+) -> Result<Edit> {
+    let mut range_to_remove = ParameterRangeToRemove::find_range(parameter.range(), parameters)?;
+
+    // If this is the last kwonlyarg with no vararg, the preceding star must be removed
+    if range_to_remove.parameter_kind.is_keyword_only()
+        && parameters.kwonlyargs.len() == 1
+        && parameters.vararg.is_none()
+    {
+        let mut tokenizer = BackwardsTokenizer::up_to(range_to_remove.start(), source, &[]);
+
+        let star = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Star)
+            .context("Unable to find previous star")?;
+
+        // The range to remove is expanded to include the previous star
+        range_to_remove.parameter_range =
+            TextRange::new(star.start(), range_to_remove.parameter_range.end());
+    }
+    let range_to_remove = range_to_remove;
+
+    // The varargs star is left in place if there are keyword only parameters
+    if range_to_remove.parameter_kind.is_variadic_positional() && !parameters.kwonlyargs.is_empty()
+    {
+        let star = SimpleTokenizer::starts_at(range_to_remove.start(), source)
+            .find(|token| token.kind == SimpleTokenKind::Star)
+            .context("unable to find leading star")?;
+        // As there are keyword only args, there is a comma after the vararg
+        let comma = SimpleTokenizer::starts_at(range_to_remove.end(), source)
+            .find(|token| token.kind == SimpleTokenKind::Comma)
+            .context("Unable to find trailing comma")?;
+        return Ok(Edit::deletion(star.end(), comma.start()));
+    }
+
+    if range_to_remove.after {
+        // Case 1: parameter is _not_ the last node, so delete from the start of the
+        // parameter to the end of the subsequent comma.
+        let mut tokenizer = SimpleTokenizer::starts_at(range_to_remove.end(), source);
+
+        // The positional only slash must be removed if this is the last posonly parameter.
+        if range_to_remove.parameter_kind.is_positional_only() && parameters.posonlyargs.len() == 1
+        {
+            tokenizer
+                .find(|token| token.kind == SimpleTokenKind::Slash)
+                .context("Unable to find trailing slash for positional only parameter")?;
+        }
+
+        // Find the trailing comma.
+        tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Comma)
+            .context("Unable to find trailing comma")?;
+
+        // Find the next non-whitespace token.
+        let next = tokenizer
+            .find(|token| {
+                token.kind != SimpleTokenKind::Whitespace && token.kind != SimpleTokenKind::Newline
+            })
+            .context("Unable to find next token")?;
+
+        Ok(Edit::deletion(range_to_remove.start(), next.start()))
+    } else if range_to_remove.before {
+        // Case 2: parameter is the last node, so delete from the start of the
+        // previous comma to the end of the argument.
+        let mut tokenizer = BackwardsTokenizer::up_to(range_to_remove.start(), source, &[]);
+
+        // Find the trailing comma.
+        let comma = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Comma)
+            .context("Unable to previous trailing comma")?;
+
+        Ok(Edit::deletion(comma.start(), range_to_remove.end()))
+    } else {
+        // Case 3: parameter is the only node, so delete the parameters (but preserve
+        // parentheses, if needed).
+        Ok(match parentheses {
+            Parentheses::Remove => Edit::range_deletion(parameters.range()),
+            Parentheses::Preserve => Edit::range_replacement("()".to_string(), parameters.range()),
+        })
+    }
+}
+
+struct ParameterRangeToRemove {
+    parameter_range: TextRange,
+    parameter_kind: ParameterKind,
+    before: bool,
+    after: bool,
+}
+
+#[derive(is_macro::Is)]
+enum ParameterKind {
+    PositionalOnly,
+    Positional,
+    KeywordOnly,
+    VariadicPositional,
+    VariadicKeyword,
+}
+
+impl Ranged for ParameterRangeToRemove {
+    fn range(&self) -> TextRange {
+        self.parameter_range
+    }
+}
+
+impl ParameterRangeToRemove {
+    fn find_range(parameter: TextRange, parameters: &Parameters) -> Result<Self> {
+        let mut before = false;
+        let mut after = false;
+        let mut parameter_range: Option<TextRange> = None;
+        let mut parameter_kind: Option<ParameterKind> = None;
+
+        let mut classify_range = |range: TextRange, kind: ParameterKind| {
+            if range.end() <= parameter.start() {
+                before = true;
+            } else if parameter.end() <= range.start() {
+                after = true;
+            } else {
+                parameter_range = Some(range);
+                parameter_kind = Some(kind);
+            }
+        };
+
+        for range in parameters.posonlyargs.iter().map(Ranged::range) {
+            classify_range(range, ParameterKind::PositionalOnly);
+        }
+        for range in parameters.args.iter().map(Ranged::range) {
+            classify_range(range, ParameterKind::Positional);
+        }
+        if let Some(range) = parameters.vararg.as_deref().map(Ranged::range) {
+            classify_range(range, ParameterKind::VariadicPositional);
+        }
+        for range in parameters.kwonlyargs.iter().map(Ranged::range) {
+            classify_range(range, ParameterKind::KeywordOnly);
+        }
+        if let Some(range) = parameters.kwarg.as_deref().map(Ranged::range) {
+            classify_range(range, ParameterKind::VariadicKeyword);
+        }
+
+        Ok(Self {
+            parameter_range: parameter_range.context("Unable to find parameter to delete")?,
+            parameter_kind: parameter_kind.context("Unable to find parameter to delete")?,
+            before,
+            after,
+        })
+    }
+}
+
 /// Generic function to remove arguments or keyword arguments in function
 /// calls and class definitions. (For classes `args` should be considered
 /// `bases`)
 ///
 /// Supports the removal of parentheses when this is the only (kw)arg left.
-/// For this behavior, set `remove_parentheses` to `true`.
 pub(crate) fn remove_argument<T: Ranged>(
     argument: &T,
     arguments: &Arguments,
