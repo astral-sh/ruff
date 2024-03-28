@@ -138,6 +138,7 @@ mod tests {
                     Rule::UnusedImport,
                     Rule::UnusedVariable,
                     Rule::TabIndentation,
+                    Rule::YodaConditions,
                 ])
             },
         )?;
@@ -157,6 +158,7 @@ mod tests {
                     Rule::UnusedImport,
                     Rule::UnusedVariable,
                     Rule::TabIndentation,
+                    Rule::YodaConditions,
                 ])
             },
         )?;

@@ -301,6 +301,8 @@ RUF100_0.py:107:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
 107     |-    d = 1  #noqa: F841, E50
     107 |+    d = 1  # noqa: F841
 108 108 |     e = 1  #noqa: E50
+109 109 | 
+110 110 | 
 
 RUF100_0.py:108:5: F841 [*] Local variable `e` is assigned to but never used
     |
@@ -316,6 +318,9 @@ RUF100_0.py:108:5: F841 [*] Local variable `e` is assigned to but never used
 106 106 |     # Invalid - nonexistant error code with multibyte character
 107 107 |     d = 1  #noqa: F841, E50
 108     |-    e = 1  #noqa: E50
+109 108 | 
+110 109 | 
+111 110 | # Check duplicate code detection
 
 RUF100_0.py:108:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
     |
@@ -332,3 +337,68 @@ RUF100_0.py:108:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
 107 107 |     d = 1  #noqa: F841, E50
 108     |-    e = 1  #noqa: E50
     108 |+    e = 1
+109 109 | 
+110 110 | 
+111 111 | # Check duplicate code detection
+
+RUF100_0.py:113:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`; unknown: `X200`)
+    |
+111 | # Check duplicate code detection
+112 | def foo():
+113 |     x = 2  # noqa: F841, F841, X200
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
+114 | 
+115 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
+    |
+    = help: Remove unused `noqa` directive
+
+ℹ Safe fix
+110 110 | 
+111 111 | # Check duplicate code detection
+112 112 | def foo():
+113     |-    x = 2  # noqa: F841, F841, X200
+    113 |+    x = 2  # noqa: F841
+114 114 | 
+115 115 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
+116 116 | 
+
+RUF100_0.py:115:19: RUF100 [*] Unused `noqa` directive (duplicated: `SIM300`, `SIM300`)
+    |
+113 |     x = 2  # noqa: F841, F841, X200
+114 | 
+115 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
+116 | 
+117 |     z = 2  # noqa: F841 F841  F841, F841, F841
+    |
+    = help: Remove unused `noqa` directive
+
+ℹ Safe fix
+112 112 | def foo():
+113 113 |     x = 2  # noqa: F841, F841, X200
+114 114 | 
+115     |-    y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
+    115 |+    y = 2 == bar  # noqa: SIM300, F841
+116 116 | 
+117 117 |     z = 2  # noqa: F841 F841  F841, F841, F841
+118 118 | 
+
+RUF100_0.py:117:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`, `F841`, `F841`, `F841`)
+    |
+115 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
+116 | 
+117 |     z = 2  # noqa: F841 F841  F841, F841, F841
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
+118 | 
+119 |     return
+    |
+    = help: Remove unused `noqa` directive
+
+ℹ Safe fix
+114 114 | 
+115 115 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
+116 116 | 
+117     |-    z = 2  # noqa: F841 F841  F841, F841, F841
+    117 |+    z = 2  # noqa: F841
+118 118 | 
+119 119 |     return

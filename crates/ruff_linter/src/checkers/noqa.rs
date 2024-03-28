@@ -1,5 +1,6 @@
 //! `NoQA` enforcement and validation.
 
+use std::collections::HashSet;
 use std::path::Path;
 
 use itertools::Itertools;
@@ -126,10 +127,12 @@ pub(crate) fn check_noqa(
                 }
                 Directive::Codes(directive) => {
                     let mut disabled_codes = vec![];
+                    let mut duplicated_codes = vec![];
                     let mut unknown_codes = vec![];
                     let mut unmatched_codes = vec![];
                     let mut valid_codes = vec![];
                     let mut self_ignore = per_file_ignores.contains(Rule::UnusedNOQA);
+                    let mut seen_codes = HashSet::new();
                     for code in directive.codes() {
                         let code = get_redirect_target(code).unwrap_or(code);
                         if Rule::UnusedNOQA.noqa_code() == code {
@@ -137,7 +140,9 @@ pub(crate) fn check_noqa(
                             break;
                         }
 
-                        if line.matches.iter().any(|match_| *match_ == code)
+                        if !seen_codes.insert(code) {
+                            duplicated_codes.push(code);
+                        } else if line.matches.iter().any(|match_| *match_ == code)
                             || settings
                                 .external
                                 .iter()
@@ -162,6 +167,7 @@ pub(crate) fn check_noqa(
                     }
 
                     if !(disabled_codes.is_empty()
+                        && duplicated_codes.is_empty()
                         && unknown_codes.is_empty()
                         && unmatched_codes.is_empty())
                     {
@@ -169,6 +175,10 @@ pub(crate) fn check_noqa(
                             UnusedNOQA {
                                 codes: Some(UnusedCodes {
                                     disabled: disabled_codes
+                                        .iter()
+                                        .map(|code| (*code).to_string())
+                                        .collect(),
+                                    duplicated: duplicated_codes
                                         .iter()
                                         .map(|code| (*code).to_string())
                                         .collect(),

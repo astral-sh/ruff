@@ -106,3 +106,14 @@ def f():
     # Invalid - nonexistant error code with multibyte character
     d = 1  #noqa: F841, E50
     e = 1  #noqa: E50
+
+
+# Check duplicate code detection
+def foo():
+    x = 2  # noqa: F841, F841, X200
+
+    y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
+
+    z = 2  # noqa: F841 F841  F841, F841, F841
+
+    return
