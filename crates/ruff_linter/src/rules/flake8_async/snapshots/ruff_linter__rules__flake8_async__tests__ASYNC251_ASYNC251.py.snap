@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+---
+ASYNC251.py:6:5: ASYNC251 Async functions should not call `time.sleep`
+  |
+5 | async def func():
+6 |     time.sleep(1)  # ASYNC251
+  |     ^^^^^^^^^^ ASYNC251
+  |

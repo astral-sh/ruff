@@ -1,23 +1,27 @@
-import urllib.request
-import requests
-import httpx
+import trio
 
 
-async def foo():
-    urllib.request.urlopen("http://example.com/foo/bar").read()
+async def func():
+    with trio.fail_after():
+        ...
 
 
-async def foo():
-    requests.get()
+async def func():
+    with trio.fail_at():
+        await ...
 
 
-async def foo():
-    httpx.get()
+async def func():
+    with trio.move_on_after():
+        ...
 
 
-async def foo():
-    requests.post()
+async def func():
+    with trio.move_at():
+        await ...
 
 
-async def foo():
-    httpx.post()
+async def func():
+    with trio.move_at():
+        async with trio.open_nursery() as nursery:
+            ...

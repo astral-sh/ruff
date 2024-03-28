@@ -1,53 +1,48 @@
-import os
-import subprocess
-import time
+import io
 from pathlib import Path
+
+
+async def foo():
+    open("")  # ASYNC230
+    io.open_code("")  # ASYNC230
+
+    with open(""):  # ASYNC230
+        ...
+
+    with open("") as f:  # ASYNC230
+        ...
+
+    with foo(), open(""):  # ASYNC230
+        ...
+
+    async with open(""):  # ASYNC230
+        ...
+
+
+def foo_sync():
+    open("")
 
 # Violation cases:
 
 
 async def func():
-    open("foo")
-
-
-async def func():
-    time.sleep(1)
-
-
-async def func():
-    subprocess.run("foo")
-
-
-async def func():
-    subprocess.call("foo")
-
-
-async def func():
-    subprocess.foo(0)
-
-
-async def func():
-    os.wait4(10)
-
-
-async def func():
-    os.wait(12)
+    open("foo")  # ASYNC230
 
 
 # Violation cases for pathlib:
 
 
 async def func():
-    Path("foo").open()  # ASYNC101
+    Path("foo").open()  # ASYNC230
 
 
 async def func():
     p = Path("foo")
-    p.open()  # ASYNC101
+    p.open()  # ASYNC230
 
 
 async def func():
-    with Path("foo").open() as f:  # ASYNC101
+    with Path("foo").open() as f:  # ASYNC230
         pass
 
 
@@ -55,13 +50,13 @@ async def func() -> None:
     p = Path("foo")
 
     async def bar():
-        p.open()  # ASYNC101
+        p.open()  # ASYNC230
 
 
 async def func() -> None:
     (p1, p2) = (Path("foo"), Path("bar"))
 
-    p1.open()  # ASYNC101
+    p1.open()  # ASYNC230
 
 
 # Non-violation cases for pathlib:
