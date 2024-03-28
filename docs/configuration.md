@@ -576,10 +576,6 @@ Options:
       --unsafe-fixes
           Include fixes that may not retain the original intent of the code.
           Use `--no-unsafe-fixes` to disable
-      --show-source
-          Show violations with source code. Use `--no-show-source` to disable.
-          (Deprecated: use `--output-format=full` or `--output-format=concise`
-          instead of `--show-source` and `--no-show-source`, respectively)
       --show-fixes
           Show an enumeration of all fixed lint violations. Use
           `--no-show-fixes` to disable
