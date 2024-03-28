@@ -82,17 +82,12 @@ impl<'a> Directive<'a> {
 
                     // Extract the comma-separated list of codes.
                     let mut codes = vec![];
-                    let mut code_ranges_full = vec![];
                     let mut codes_end = codes_start;
                     let mut leading_space = 0;
                     while let Some(code) = Self::lex_code(&text[codes_end + leading_space..]) {
                         codes.push(code);
-                        let start = TextSize::try_from(comment_start + codes_end).unwrap();
                         codes_end += leading_space;
                         codes_end += code.len();
-                        let end = TextSize::try_from(comment_start + codes_end).unwrap();
-                        let range = TextRange::new(start, end);
-                        code_ranges_full.push(range);
 
                         // Codes can be comma- or whitespace-delimited. Compute the length of the
                         // delimiter, but only add it in the next iteration, once we find the next
@@ -119,7 +114,6 @@ impl<'a> Directive<'a> {
                     Self::Codes(Codes {
                         range: range.add(offset),
                         codes,
-                        code_ranges_full,
                     })
                 }
                 None | Some('#') => {
@@ -184,19 +178,13 @@ impl Ranged for All {
 #[derive(Debug)]
 pub(crate) struct Codes<'a> {
     range: TextRange,
-    #[allow(clippy::struct_field_names)]
     codes: Vec<&'a str>,
-    code_ranges_full: Vec<TextRange>,
 }
 
 impl Codes<'_> {
     /// The codes that are ignored by the `noqa` directive.
     pub(crate) fn codes(&self) -> &[&str] {
         &self.codes
-    }
-
-    pub(crate) fn code_ranges_full(&self) -> &Vec<TextRange> {
-        &self.code_ranges_full
     }
 }
 

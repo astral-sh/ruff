@@ -46,10 +46,7 @@ pub(crate) fn check_noqa(
 
     // Remove any ignored diagnostics.
     'outer: for (index, diagnostic) in diagnostics.iter().enumerate() {
-        if matches!(
-            diagnostic.kind.rule(),
-            Rule::BlanketNOQA | Rule::NOQAMissingColon | Rule::NOQASpaceBeforeColon
-        ) {
+        if matches!(diagnostic.kind.rule(), Rule::BlanketNOQA) {
             continue;
         }
 

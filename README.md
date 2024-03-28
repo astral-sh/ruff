@@ -315,7 +315,6 @@ quality tools, including:
 - [flake8-logging](https://pypi.org/project/flake8-logging/)
 - [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
 - [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420)
-- [flake8-noqa](https://pypi.org/project/flake8-noqa/)
 - [flake8-pie](https://pypi.org/project/flake8-pie/)
 - [flake8-print](https://pypi.org/project/flake8-print/)
 - [flake8-pyi](https://pypi.org/project/flake8-pyi/)

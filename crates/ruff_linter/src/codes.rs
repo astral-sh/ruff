@@ -1068,12 +1068,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "007") => (RuleGroup::Stable, rules::flake8_logging::rules::ExceptionWithoutExcInfo),
         (Flake8Logging, "009") => (RuleGroup::Stable, rules::flake8_logging::rules::UndocumentedWarn),
 
-        // flake8-noqa
-        (Flake8Noqa, "002") => (RuleGroup::Preview, rules::flake8_noqa::rules::NOQAMissingColon),
-        (Flake8Noqa, "003") => (RuleGroup::Preview, rules::flake8_noqa::rules::NOQASpaceBeforeColon),
-        (Flake8Noqa, "004") => (RuleGroup::Preview, rules::flake8_noqa::rules::NOQAMultipleSpacesBeforeCode),
-        (Flake8Noqa, "005") => (RuleGroup::Preview, rules::flake8_noqa::rules::NOQADuplicateCodes),
-
         _ => return None,
     })
 }

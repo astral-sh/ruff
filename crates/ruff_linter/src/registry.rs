@@ -205,9 +205,6 @@ pub enum Linter {
     /// [refurb](https://pypi.org/project/refurb/)
     #[prefix = "FURB"]
     Refurb,
-    /// [flake8-noqa](https://pypi.org/project/flake8-noqa/)
-    #[prefix = "NQA"]
-    Flake8Noqa,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
@@ -293,10 +290,6 @@ impl Rule {
             | Rule::MultipleSpacesBeforeNOQACode
             | Rule::MultipleStatementsOnOneLineColon
             | Rule::MultipleStatementsOnOneLineSemicolon
-            | Rule::NOQADuplicateCodes
-            | Rule::NOQAMissingColon
-            | Rule::NOQAMultipleSpacesBeforeCode
-            | Rule::NOQASpaceBeforeColon
             | Rule::ProhibitedTrailingComma
             | Rule::ShebangLeadingWhitespace
             | Rule::ShebangMissingExecutableFile

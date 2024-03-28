@@ -16,8 +16,7 @@ use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::BlankLinesChecker;
 use crate::rules::{
     eradicate, flake8_commas, flake8_executable, flake8_fixme, flake8_implicit_str_concat,
-    flake8_noqa, flake8_pyi, flake8_quotes, flake8_todos, pycodestyle, pygrep_hooks, pylint,
-    pyupgrade, ruff,
+    flake8_pyi, flake8_quotes, flake8_todos, pycodestyle, pygrep_hooks, pylint, pyupgrade, ruff,
 };
 use crate::settings::LinterSettings;
 
@@ -201,15 +200,6 @@ pub(crate) fn check_tokens(
 
     if settings.rules.enabled(Rule::TooManyNewlinesAtEndOfFile) {
         pycodestyle::rules::too_many_newlines_at_end_of_file(&mut diagnostics, tokens);
-    }
-
-    if settings.rules.any_enabled(&[
-        Rule::NOQAMissingColon,
-        Rule::NOQASpaceBeforeColon,
-        Rule::NOQAMultipleSpacesBeforeCode,
-        Rule::NOQADuplicateCodes,
-    ]) {
-        flake8_noqa::rules::noqa_formatting(&mut diagnostics, indexer, locator);
     }
 
     diagnostics.retain(|diagnostic| settings.rules.enabled(diagnostic.kind.rule()));
