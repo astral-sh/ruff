@@ -50,6 +50,13 @@ pub(crate) fn check_tokens(
         pygrep_hooks::rules::blanket_noqa(&mut diagnostics, indexer, locator);
     }
 
+    if settings.rules.any_enabled(&[
+        Rule::MultipleSpacesBeforeNOQACode,
+        Rule::MissingSpaceBeforeNOQACode,
+    ]) {
+        ruff::rules::noqa_style(&mut diagnostics, indexer, locator);
+    }
+
     if settings.rules.enabled(Rule::BlanketTypeIgnore) {
         pygrep_hooks::rules::blanket_type_ignore(&mut diagnostics, indexer, locator);
     }

@@ -283,12 +283,14 @@ impl Rule {
             | Rule::LineContainsTodo
             | Rule::LineContainsXxx
             | Rule::MissingSpaceAfterTodoColon
+            | Rule::MissingSpaceBeforeNOQACode
             | Rule::MissingTodoAuthor
             | Rule::MissingTodoColon
             | Rule::MissingTodoDescription
             | Rule::MissingTodoLink
             | Rule::MissingTrailingComma
             | Rule::MultiLineImplicitStringConcatenation
+            | Rule::MultipleSpacesBeforeNOQACode
             | Rule::MultipleStatementsOnOneLineColon
             | Rule::MultipleStatementsOnOneLineSemicolon
             | Rule::NOQADuplicateCodes

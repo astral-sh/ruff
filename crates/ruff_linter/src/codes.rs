@@ -956,6 +956,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "026") => (RuleGroup::Preview, rules::ruff::rules::DefaultFactoryKwarg),
         (Ruff, "027") => (RuleGroup::Preview, rules::ruff::rules::MissingFStringSyntax),
         (Ruff, "028") => (RuleGroup::Preview, rules::ruff::rules::InvalidFormatterSuppressionComment),
+        (Ruff, "029") => (RuleGroup::Preview, rules::ruff::rules::MultipleSpacesBeforeNOQACode),
+        (Ruff, "030") => (RuleGroup::Preview, rules::ruff::rules::MissingSpaceBeforeNOQACode),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
         #[cfg(feature = "test-rules")]
