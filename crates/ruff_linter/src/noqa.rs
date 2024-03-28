@@ -591,7 +591,7 @@ fn add_noqa_inner(
             Some(Directive::All(_)) => {
                 // Does not get inserted into the map.
             }
-            Some(Directive::Codes(Codes { range, codes, .. })) => {
+            Some(Directive::Codes(Codes { range, codes })) => {
                 // Reconstruct the line based on the preserved rule codes.
                 // This enables us to tally the number of edits.
                 let output_start = output.len();

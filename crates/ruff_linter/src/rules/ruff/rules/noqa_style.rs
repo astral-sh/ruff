@@ -69,9 +69,7 @@ pub(crate) fn noqa_style(diagnostics: &mut Vec<Diagnostic>, indexer: &Indexer, l
     for range in indexer.comment_ranges() {
         let line = locator.slice(*range);
         let offset = range.start();
-        println!("---");
         if let Ok(Some(Directive::Codes(codes))) = Directive::try_extract(line, TextSize::new(0)) {
-            println!(">>>");
             let mut cursor = codes.range().start().to_usize();
             cursor += find_noqa_end(line).unwrap();
             let num_spaces = leading_whitespace_len(&line[cursor..]);
