@@ -1,0 +1,107 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+modified_iterating_set.py:4:1: PLE4703 [*] Iterated set `nums` is being modified inside for loop body.
+  |
+3 |   nums = {1, 2, 3}
+4 | / for num in nums:
+5 | |     nums.add(num + 1)
+  | |_____________________^ PLE4703
+6 |   
+7 |   animals = {"dog", "cat", "cow"}
+  |
+  = help: Consider iterating through a copy of it instead.
+
+ℹ Unsafe fix
+1 1 | # Positive cases
+2 2 | 
+3 3 | nums = {1, 2, 3}
+4   |-for num in nums:
+  4 |+for num in nums.copy():
+5 5 |     nums.add(num + 1)
+6 6 | 
+7 7 | animals = {"dog", "cat", "cow"}
+
+modified_iterating_set.py:8:1: PLE4703 [*] Iterated set `animals` is being modified inside for loop body.
+   |
+ 7 |   animals = {"dog", "cat", "cow"}
+ 8 | / for animal in animals:
+ 9 | |     animals.pop("cow")
+   | |______________________^ PLE4703
+10 |   
+11 |   fruits = {"apple", "orange", "grape"}
+   |
+   = help: Consider iterating through a copy of it instead.
+
+ℹ Unsafe fix
+5 5 |     nums.add(num + 1)
+6 6 | 
+7 7 | animals = {"dog", "cat", "cow"}
+8   |-for animal in animals:
+  8 |+for animal in animals.copy():
+9 9 |     animals.pop("cow")
+10 10 | 
+11 11 | fruits = {"apple", "orange", "grape"}
+
+modified_iterating_set.py:12:1: PLE4703 [*] Iterated set `fruits` is being modified inside for loop body.
+   |
+11 |   fruits = {"apple", "orange", "grape"}
+12 | / for fruit in fruits:
+13 | |     fruits.clear()
+   | |__________________^ PLE4703
+14 |   
+15 |   planets = {"mercury", "venus", "earth"}
+   |
+   = help: Consider iterating through a copy of it instead.
+
+ℹ Unsafe fix
+9  9  |     animals.pop("cow")
+10 10 | 
+11 11 | fruits = {"apple", "orange", "grape"}
+12    |-for fruit in fruits:
+   12 |+for fruit in fruits.copy():
+13 13 |     fruits.clear()
+14 14 | 
+15 15 | planets = {"mercury", "venus", "earth"}
+
+modified_iterating_set.py:16:1: PLE4703 [*] Iterated set `planets` is being modified inside for loop body.
+   |
+15 |   planets = {"mercury", "venus", "earth"}
+16 | / for planet in planets:
+17 | |     planets.discard("mercury")
+   | |______________________________^ PLE4703
+18 |   
+19 |   colors = {"red", "green", "blue"}
+   |
+   = help: Consider iterating through a copy of it instead.
+
+ℹ Unsafe fix
+13 13 |     fruits.clear()
+14 14 | 
+15 15 | planets = {"mercury", "venus", "earth"}
+16    |-for planet in planets:
+   16 |+for planet in planets.copy():
+17 17 |     planets.discard("mercury")
+18 18 | 
+19 19 | colors = {"red", "green", "blue"}
+
+modified_iterating_set.py:20:1: PLE4703 [*] Iterated set `colors` is being modified inside for loop body.
+   |
+19 |   colors = {"red", "green", "blue"}
+20 | / for color in colors:
+21 | |     colors.remove("red")
+   | |________________________^ PLE4703
+22 |   
+23 |   # Negative cases
+   |
+   = help: Consider iterating through a copy of it instead.
+
+ℹ Unsafe fix
+17 17 |     planets.discard("mercury")
+18 18 | 
+19 19 | colors = {"red", "green", "blue"}
+20    |-for color in colors:
+   20 |+for color in colors.copy():
+21 21 |     colors.remove("red")
+22 22 | 
+23 23 | # Negative cases

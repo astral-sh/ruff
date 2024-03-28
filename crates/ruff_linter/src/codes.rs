@@ -265,6 +265,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E2513") => (RuleGroup::Stable, rules::pylint::rules::InvalidCharacterEsc),
         (Pylint, "E2514") => (RuleGroup::Stable, rules::pylint::rules::InvalidCharacterNul),
         (Pylint, "E2515") => (RuleGroup::Stable, rules::pylint::rules::InvalidCharacterZeroWidthSpace),
+        (Pylint, "E4703") => (RuleGroup::Preview, rules::pylint::rules::ModifiedIteratingSet),
         (Pylint, "R0124") => (RuleGroup::Stable, rules::pylint::rules::ComparisonWithItself),
         (Pylint, "R0133") => (RuleGroup::Stable, rules::pylint::rules::ComparisonOfConstant),
         (Pylint, "R0202") => (RuleGroup::Preview, rules::pylint::rules::NoClassmethodDecorator),

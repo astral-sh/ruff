@@ -92,6 +92,7 @@ mod tests {
     #[test_case(Rule::LoggingTooFewArgs, Path::new("logging_too_few_args.py"))]
     #[test_case(Rule::LoggingTooManyArgs, Path::new("logging_too_many_args.py"))]
     #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"))]
+    #[test_case(Rule::ModifiedIteratingSet, Path::new("modified_iterating_set.py"))]
     #[test_case(
         Rule::NamedExprWithoutContext,
         Path::new("named_expr_without_context.py")
