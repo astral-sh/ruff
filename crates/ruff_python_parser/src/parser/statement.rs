@@ -195,7 +195,7 @@ impl<'src> Parser<'src> {
             }
             _ => {
                 let start = self.node_start();
-                let parsed_expr = self.parse_expression_list();
+                let parsed_expr = self.parse_star_expression_list();
 
                 if self.eat(TokenKind::Equal) {
                     Stmt::Assign(self.parse_assign_statement(parsed_expr, start))
