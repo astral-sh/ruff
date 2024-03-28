@@ -319,6 +319,11 @@ pub fn python_files_in_path<'a>(
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::new(pyproject_config);
     let mut seen = FxHashSet::default();
+
+    if let Some(config_path) = &pyproject_config.path {
+        seen.insert(config_path.parent().unwrap());
+    }
+
     if resolver.is_hierarchical() {
         for path in &paths {
             for ancestor in path.ancestors() {
@@ -329,6 +334,8 @@ pub fn python_files_in_path<'a>(
                         resolver.add(root, settings);
                         break;
                     }
+                } else {
+                    break;
                 }
             }
         }

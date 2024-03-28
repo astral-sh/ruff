@@ -207,6 +207,15 @@ impl RuleSet {
         *self = set.union(&RuleSet::from_rule(rule));
     }
 
+    #[inline]
+    pub fn set(&mut self, rule: Rule, enabled: bool) {
+        if enabled {
+            self.insert(rule);
+        } else {
+            self.remove(rule);
+        }
+    }
+
     /// Removes `rule` from the set.
     ///
     /// ## Examples
