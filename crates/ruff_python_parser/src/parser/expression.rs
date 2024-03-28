@@ -1264,6 +1264,15 @@ impl<'src> Parser<'src> {
 
         match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
+                // Parenthesized starred expression isn't allowed either but that is
+                // handled by the `parse_parenthesized_expression` method.
+                if !first_element.is_parenthesized && first_element.is_starred_expr() {
+                    self.add_error(
+                        ParseErrorType::IterableUnpackingInComprehension,
+                        &first_element,
+                    );
+                }
+
                 Expr::ListComp(self.parse_list_comprehension_expression(first_element.expr, start))
             }
             _ => Expr::List(self.parse_list_expression(first_element.expr, start)),
@@ -1719,6 +1728,9 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a list comprehension expression.
+    ///
+    /// See: <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
     fn parse_list_comprehension_expression(
         &mut self,
         element: Expr,
