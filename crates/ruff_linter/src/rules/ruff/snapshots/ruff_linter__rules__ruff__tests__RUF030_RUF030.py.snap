@@ -9,7 +9,7 @@ RUF030.py:5:14: RUF030 [*] `noqa` directives should have one space after the col
 6 | x = 2  # noqa:X700, X800
 7 | x = 2  # noqa:X100 X100 X100, X100, X100
   |
-  = help: Add missing space after colon
+  = help: Add missing space after the colon
 
 ℹ Safe fix
 2 2 | x = 2  # noqa: X100
@@ -29,7 +29,7 @@ RUF030.py:6:14: RUF030 [*] `noqa` directives should have one space after the col
   |              ^ RUF030
 7 | x = 2  # noqa:X100 X100 X100, X100, X100
   |
-  = help: Add missing space after colon
+  = help: Add missing space after the colon
 
 ℹ Safe fix
 3 3 | 
@@ -50,7 +50,7 @@ RUF030.py:7:14: RUF030 [*] `noqa` directives should have one space after the col
 8 | 
 9 | # OK
   |
-  = help: Add missing space after colon
+  = help: Add missing space after the colon
 
 ℹ Safe fix
 4 4 | # RUF029
