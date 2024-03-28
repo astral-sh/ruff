@@ -956,6 +956,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "026") => (RuleGroup::Preview, rules::ruff::rules::DefaultFactoryKwarg),
         (Ruff, "027") => (RuleGroup::Preview, rules::ruff::rules::MissingFStringSyntax),
         (Ruff, "028") => (RuleGroup::Preview, rules::ruff::rules::InvalidFormatterSuppressionComment),
+        (Ruff, "029") => (RuleGroup::Preview, rules::ruff::rules::MultipleSpacesBeforeNOQACode),
+        (Ruff, "030") => (RuleGroup::Preview, rules::ruff::rules::MissingSpaceBeforeNOQACode),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
         #[cfg(feature = "test-rules")]
@@ -1065,6 +1067,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "002") => (RuleGroup::Stable, rules::flake8_logging::rules::InvalidGetLoggerArgument),
         (Flake8Logging, "007") => (RuleGroup::Stable, rules::flake8_logging::rules::ExceptionWithoutExcInfo),
         (Flake8Logging, "009") => (RuleGroup::Stable, rules::flake8_logging::rules::UndocumentedWarn),
+
+        // flake8-noqa
+        (Flake8Noqa, "002") => (RuleGroup::Preview, rules::flake8_noqa::rules::NOQAMissingColon),
+        (Flake8Noqa, "003") => (RuleGroup::Preview, rules::flake8_noqa::rules::NOQASpaceBeforeColon),
+        (Flake8Noqa, "004") => (RuleGroup::Preview, rules::flake8_noqa::rules::NOQAMultipleSpacesBeforeCode),
+        (Flake8Noqa, "005") => (RuleGroup::Preview, rules::flake8_noqa::rules::NOQADuplicateCodes),
 
         _ => return None,
     })

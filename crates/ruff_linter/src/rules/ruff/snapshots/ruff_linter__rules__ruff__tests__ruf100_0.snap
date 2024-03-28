@@ -284,4 +284,64 @@ RUF100_0.py:93:92: RUF100 [*] Unused `noqa` directive (unused: `F401`)
 95 95 | 
 96 96 | def f():
 
+RUF100_0.py:107:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`, `X200`; unknown: `X200`, `X300`)
+    |
+105 | # Check duplicate code detection
+106 | def foo():
+107 |     x = 2  # noqa: F841, X200, F841, X200, X300
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
+108 | 
+109 |     y = 2  # noqa: F841, X200, F841, X250, X300
+    |
+    = help: Remove unused `noqa` directive
 
+ℹ Safe fix
+104 104 | 
+105 105 | # Check duplicate code detection
+106 106 | def foo():
+107     |-    x = 2  # noqa: F841, X200, F841, X200, X300
+    107 |+    x = 2  # noqa: F841
+108 108 | 
+109 109 |     y = 2  # noqa: F841, X200, F841, X250, X300
+110 110 | 
+
+RUF100_0.py:109:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`; unknown: `X200`, `X250`, `X300`)
+    |
+107 |     x = 2  # noqa: F841, X200, F841, X200, X300
+108 | 
+109 |     y = 2  # noqa: F841, X200, F841, X250, X300
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
+110 | 
+111 |     z = 2  # noqa: F841 F841  F841, F841, F841
+    |
+    = help: Remove unused `noqa` directive
+
+ℹ Safe fix
+106 106 | def foo():
+107 107 |     x = 2  # noqa: F841, X200, F841, X200, X300
+108 108 | 
+109     |-    y = 2  # noqa: F841, X200, F841, X250, X300
+    109 |+    y = 2  # noqa: F841
+110 110 | 
+111 111 |     z = 2  # noqa: F841 F841  F841, F841, F841
+112 112 | 
+
+RUF100_0.py:111:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`, `F841`, `F841`, `F841`)
+    |
+109 |     y = 2  # noqa: F841, X200, F841, X250, X300
+110 | 
+111 |     z = 2  # noqa: F841 F841  F841, F841, F841
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF100
+112 | 
+113 |     return
+    |
+    = help: Remove unused `noqa` directive
+
+ℹ Safe fix
+108 108 | 
+109 109 |     y = 2  # noqa: F841, X200, F841, X250, X300
+110 110 | 
+111     |-    z = 2  # noqa: F841 F841  F841, F841, F841
+    111 |+    z = 2  # noqa: F841
+112 112 | 
+113 113 |     return

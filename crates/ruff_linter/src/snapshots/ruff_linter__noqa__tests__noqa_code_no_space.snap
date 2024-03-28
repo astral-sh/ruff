@@ -10,6 +10,9 @@ Ok(
                 codes: [
                     "F401",
                 ],
+                code_ranges_full: [
+                    6..10,
+                ],
             },
         ),
     ),

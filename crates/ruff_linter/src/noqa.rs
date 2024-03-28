@@ -82,12 +82,17 @@ impl<'a> Directive<'a> {
 
                     // Extract the comma-separated list of codes.
                     let mut codes = vec![];
+                    let mut code_ranges_full = vec![];
                     let mut codes_end = codes_start;
                     let mut leading_space = 0;
                     while let Some(code) = Self::lex_code(&text[codes_end + leading_space..]) {
                         codes.push(code);
+                        let start = TextSize::try_from(comment_start + codes_end).unwrap();
                         codes_end += leading_space;
                         codes_end += code.len();
+                        let end = TextSize::try_from(comment_start + codes_end).unwrap();
+                        let range = TextRange::new(start, end);
+                        code_ranges_full.push(range);
 
                         // Codes can be comma- or whitespace-delimited. Compute the length of the
                         // delimiter, but only add it in the next iteration, once we find the next
@@ -114,6 +119,7 @@ impl<'a> Directive<'a> {
                     Self::Codes(Codes {
                         range: range.add(offset),
                         codes,
+                        code_ranges_full,
                     })
                 }
                 None | Some('#') => {
@@ -147,7 +153,7 @@ impl<'a> Directive<'a> {
 
     /// Lex an individual rule code (e.g., `F401`).
     #[inline]
-    fn lex_code(line: &str) -> Option<&str> {
+    pub(crate) fn lex_code(line: &str) -> Option<&str> {
         // Extract, e.g., the `F` in `F401`.
         let prefix = line.chars().take_while(char::is_ascii_uppercase).count();
         // Extract, e.g., the `401` in `F401`.
@@ -178,13 +184,19 @@ impl Ranged for All {
 #[derive(Debug)]
 pub(crate) struct Codes<'a> {
     range: TextRange,
+    #[allow(clippy::struct_field_names)]
     codes: Vec<&'a str>,
+    code_ranges_full: Vec<TextRange>,
 }
 
 impl Codes<'_> {
     /// The codes that are ignored by the `noqa` directive.
     pub(crate) fn codes(&self) -> &[&str] {
         &self.codes
+    }
+
+    pub(crate) fn code_ranges_full(&self) -> &Vec<TextRange> {
+        &self.code_ranges_full
     }
 }
 
@@ -215,7 +227,7 @@ pub(crate) fn rule_is_ignored(
     let line_range = locator.line_range(offset);
     match Directive::try_extract(locator.slice(line_range), line_range.start()) {
         Ok(Some(Directive::All(_))) => true,
-        Ok(Some(Directive::Codes(Codes { codes, range: _ }))) => includes(code, &codes),
+        Ok(Some(Directive::Codes(Codes { codes, .. }))) => includes(code, &codes),
         _ => false,
     }
 }
@@ -525,7 +537,7 @@ fn add_noqa_inner(
                     Directive::All(_) => {
                         continue;
                     }
-                    Directive::Codes(Codes { codes, range: _ }) => {
+                    Directive::Codes(Codes { codes, .. }) => {
                         if includes(diagnostic.kind.rule(), codes) {
                             continue;
                         }
@@ -542,7 +554,7 @@ fn add_noqa_inner(
                 Directive::All(_) => {
                     continue;
                 }
-                Directive::Codes(Codes { codes, range: _ }) => {
+                Directive::Codes(Codes { codes, .. }) => {
                     let rule = diagnostic.kind.rule();
                     if !includes(rule, codes) {
                         matches_by_line
@@ -591,7 +603,7 @@ fn add_noqa_inner(
             Some(Directive::All(_)) => {
                 // Does not get inserted into the map.
             }
-            Some(Directive::Codes(Codes { range, codes })) => {
+            Some(Directive::Codes(Codes { range, codes, .. })) => {
                 // Reconstruct the line based on the preserved rule codes.
                 // This enables us to tally the number of edits.
                 let output_start = output.len();

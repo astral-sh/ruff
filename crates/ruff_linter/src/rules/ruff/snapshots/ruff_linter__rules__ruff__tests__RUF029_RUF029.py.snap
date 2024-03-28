@@ -1,0 +1,55 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF029.py:5:16: RUF029 [*] `noqa` directives should only have one space before the code(s)
+  |
+4 | # RUF029
+5 | x = 2  # noqa:  X600
+  |                ^ RUF029
+6 | x = 2  # noqa:   X700, X800
+7 | x = 2  # noqa:                X100 X100 X100, X100, X100
+  |
+  = help: Remove extra space(s) before code(s)
+
+ℹ Safe fix
+2 2 | x = 2  # noqa: X100
+3 3 | 
+4 4 | # RUF029
+5   |-x = 2  # noqa:  X600
+  5 |+x = 2  # noqa: X600
+6 6 | x = 2  # noqa:   X700, X800
+7 7 | x = 2  # noqa:                X100 X100 X100, X100, X100
+
+RUF029.py:6:16: RUF029 [*] `noqa` directives should only have one space before the code(s)
+  |
+4 | # RUF029
+5 | x = 2  # noqa:  X600
+6 | x = 2  # noqa:   X700, X800
+  |                ^^ RUF029
+7 | x = 2  # noqa:                X100 X100 X100, X100, X100
+  |
+  = help: Remove extra space(s) before code(s)
+
+ℹ Safe fix
+3 3 | 
+4 4 | # RUF029
+5 5 | x = 2  # noqa:  X600
+6   |-x = 2  # noqa:   X700, X800
+  6 |+x = 2  # noqa: X700, X800
+7 7 | x = 2  # noqa:                X100 X100 X100, X100, X100
+
+RUF029.py:7:16: RUF029 [*] `noqa` directives should only have one space before the code(s)
+  |
+5 | x = 2  # noqa:  X600
+6 | x = 2  # noqa:   X700, X800
+7 | x = 2  # noqa:                X100 X100 X100, X100, X100
+  |                ^^^^^^^^^^^^^^^ RUF029
+  |
+  = help: Remove extra space(s) before code(s)
+
+ℹ Safe fix
+4 4 | # RUF029
+5 5 | x = 2  # noqa:  X600
+6 6 | x = 2  # noqa:   X700, X800
+7   |-x = 2  # noqa:                X100 X100 X100, X100, X100
+  7 |+x = 2  # noqa: X100 X100 X100, X100, X100

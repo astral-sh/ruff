@@ -1,0 +1,122 @@
+---
+source: crates/ruff_linter/src/rules/flake8_noqa/mod.rs
+---
+noqa.py:30:26: NQA005 [*] `noqa` has duplicate codes
+   |
+29 | # NQA005
+30 | x = 2  # noqa: X100, X200, X100, X200, X300
+   |                          ^^^^^^ NQA005
+31 | 
+32 | # NQA005
+   |
+   = help: Remove duplicate code
+
+ℹ Safe fix
+27 27 | x = 2  # noqa:X900, X901
+28 28 | 
+29 29 | # NQA005
+30    |-x = 2  # noqa: X100, X200, X100, X200, X300
+   30 |+x = 2  # noqa: X100, X200, X200, X300
+31 31 | 
+32 32 | # NQA005
+33 33 | x = 2  # noqa: X100, X200, X100, X250, X300
+
+noqa.py:30:32: NQA005 [*] `noqa` has duplicate codes
+   |
+29 | # NQA005
+30 | x = 2  # noqa: X100, X200, X100, X200, X300
+   |                                ^^^^^^ NQA005
+31 | 
+32 | # NQA005
+   |
+   = help: Remove duplicate code
+
+ℹ Safe fix
+27 27 | x = 2  # noqa:X900, X901
+28 28 | 
+29 29 | # NQA005
+30    |-x = 2  # noqa: X100, X200, X100, X200, X300
+   30 |+x = 2  # noqa: X100, X200, X100, X300
+31 31 | 
+32 32 | # NQA005
+33 33 | x = 2  # noqa: X100, X200, X100, X250, X300
+
+noqa.py:33:26: NQA005 [*] `noqa` has duplicate codes
+   |
+32 | # NQA005
+33 | x = 2  # noqa: X100, X200, X100, X250, X300
+   |                          ^^^^^^ NQA005
+34 | 
+35 | # NQA005
+   |
+   = help: Remove duplicate code
+
+ℹ Safe fix
+30 30 | x = 2  # noqa: X100, X200, X100, X200, X300
+31 31 | 
+32 32 | # NQA005
+33    |-x = 2  # noqa: X100, X200, X100, X250, X300
+   33 |+x = 2  # noqa: X100, X200, X250, X300
+34 34 | 
+35 35 | # NQA005
+36 36 | x = 2  # noqa: X100 X100 X100, X100, X100
+
+noqa.py:36:20: NQA005 [*] `noqa` has duplicate codes
+   |
+35 | # NQA005
+36 | x = 2  # noqa: X100 X100 X100, X100, X100
+   |                    ^^^^^ NQA005
+   |
+   = help: Remove duplicate code
+
+ℹ Safe fix
+33 33 | x = 2  # noqa: X100, X200, X100, X250, X300
+34 34 | 
+35 35 | # NQA005
+36    |-x = 2  # noqa: X100 X100 X100, X100, X100
+   36 |+x = 2  # noqa: X100 X100, X100, X100
+
+noqa.py:36:25: NQA005 [*] `noqa` has duplicate codes
+   |
+35 | # NQA005
+36 | x = 2  # noqa: X100 X100 X100, X100, X100
+   |                         ^^^^^ NQA005
+   |
+   = help: Remove duplicate code
+
+ℹ Safe fix
+33 33 | x = 2  # noqa: X100, X200, X100, X250, X300
+34 34 | 
+35 35 | # NQA005
+36    |-x = 2  # noqa: X100 X100 X100, X100, X100
+   36 |+x = 2  # noqa: X100 X100, X100, X100
+
+noqa.py:36:30: NQA005 [*] `noqa` has duplicate codes
+   |
+35 | # NQA005
+36 | x = 2  # noqa: X100 X100 X100, X100, X100
+   |                              ^^^^^^ NQA005
+   |
+   = help: Remove duplicate code
+
+ℹ Safe fix
+33 33 | x = 2  # noqa: X100, X200, X100, X250, X300
+34 34 | 
+35 35 | # NQA005
+36    |-x = 2  # noqa: X100 X100 X100, X100, X100
+   36 |+x = 2  # noqa: X100 X100 X100, X100
+
+noqa.py:36:36: NQA005 [*] `noqa` has duplicate codes
+   |
+35 | # NQA005
+36 | x = 2  # noqa: X100 X100 X100, X100, X100
+   |                                    ^^^^^^ NQA005
+   |
+   = help: Remove duplicate code
+
+ℹ Safe fix
+33 33 | x = 2  # noqa: X100, X200, X100, X250, X300
+34 34 | 
+35 35 | # NQA005
+36    |-x = 2  # noqa: X100 X100 X100, X100, X100
+   36 |+x = 2  # noqa: X100 X100 X100, X100
