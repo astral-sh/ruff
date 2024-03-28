@@ -929,6 +929,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::VerboseDecimalConstructor) {
                 refurb::rules::verbose_decimal_constructor(checker, call);
             }
+            if checker.enabled(Rule::VerboseDecimalFractionConstruction) {
+                refurb::rules::verbose_decimal_fraction_construction(checker, call);
+            }
             if checker.enabled(Rule::QuadraticListSummation) {
                 ruff::rules::quadratic_list_summation(checker, call);
             }
