@@ -11,7 +11,7 @@ use ruff_macros::CacheKey;
 
 use crate::display_settings;
 
-#[derive(Debug, CacheKey)]
+#[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub ignore_names: IgnoreNames,
     pub classmethod_decorators: Vec<String>,
@@ -85,7 +85,7 @@ static DEFAULTS: &[&str] = &[
     "maxDiff",
 ];
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum IgnoreNames {
     Default,
     UserProvided {

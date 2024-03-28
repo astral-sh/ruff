@@ -24,7 +24,7 @@ pub fn default_broad_exceptions() -> Vec<IdentifierPattern> {
     .to_vec()
 }
 
-#[derive(Debug, CacheKey)]
+#[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub fixture_parentheses: bool,
     pub parametrize_names_type: types::ParametrizeNameType,

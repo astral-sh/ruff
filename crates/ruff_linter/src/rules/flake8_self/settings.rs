@@ -17,7 +17,7 @@ pub const IGNORE_NAMES: [&str; 7] = [
     "_value_",
 ];
 
-#[derive(Debug, CacheKey)]
+#[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub ignore_names: Vec<String>,
 }

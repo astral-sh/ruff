@@ -7,7 +7,7 @@ use std::fmt::{Display, Formatter};
 use crate::display_settings;
 use ruff_macros::CacheKey;
 
-#[derive(Debug, CacheKey)]
+#[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub notice_rgx: Regex,
     pub author: Option<String>,

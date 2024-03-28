@@ -284,8 +284,8 @@ impl SupportedCodeActionKind {
             Self::QuickFix,
             Self::SourceFixAll,
             Self::SourceFixAllRuff,
-            // Self::SourceOrganizeImports,
-            // Self::SourceOrganizeImportsRuff
+            Self::SourceOrganizeImports,
+            Self::SourceOrganizeImportsRuff
         ]
         .into_iter()
     }

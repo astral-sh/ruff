@@ -2,7 +2,7 @@ use crate::display_settings;
 use ruff_macros::CacheKey;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, CacheKey)]
+#[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub functions_names: Vec<String>,
 }

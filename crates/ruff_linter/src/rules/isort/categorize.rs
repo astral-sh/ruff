@@ -270,7 +270,7 @@ pub(crate) fn categorize_imports<'a>(
     block_by_type
 }
 
-#[derive(Debug, Default, CacheKey)]
+#[derive(Debug, Clone, Default, CacheKey)]
 pub struct KnownModules {
     /// A map of known modules to their section.
     known: Vec<(glob::Pattern, ImportSection)>,

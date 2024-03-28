@@ -10,7 +10,7 @@ pub fn default_tmp_dirs() -> Vec<String> {
         .to_vec()
 }
 
-#[derive(Debug, CacheKey)]
+#[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub hardcoded_tmp_directory: Vec<String>,
     pub check_typed_exception: bool,

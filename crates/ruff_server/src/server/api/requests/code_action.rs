@@ -7,7 +7,7 @@ use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
 use types::{CodeActionKind, CodeActionOrCommand};
 
-use super::code_action_resolve::resolve_edit_for_fix_all;
+use super::code_action_resolve::{resolve_edit_for_fix_all, resolve_edit_for_organize_imports};
 
 pub(crate) struct CodeActions;
 
@@ -42,7 +42,7 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
         }
 
         if available_actions.contains(AvailableCodeActions::SOURCE_ORGANIZE_IMPORTS) {
-            todo!("Implement the `source.organizeImports` code action");
+            response.push(organize_imports(&snapshot).with_failure_code(ErrorCode::InternalError)?)
         }
 
         Ok(Some(response))
@@ -102,6 +102,36 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
             document,
             snapshot.url(),
             &snapshot.configuration().linter,
+            snapshot.encoding(),
+        )?;
+    }
+
+    Ok(types::CodeActionOrCommand::CodeAction(action))
+}
+
+fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
+    let mut action = types::CodeAction {
+        title: format!("{DIAGNOSTIC_NAME}: Organize imports"),
+        kind: Some(types::CodeActionKind::SOURCE_ORGANIZE_IMPORTS),
+        // This will be resolved later
+        edit: None,
+        data: Some(serde_json::to_value(snapshot.url()).expect("document url to serialize")),
+        ..Default::default()
+    };
+
+    if !snapshot
+        .server_settings()
+        .capabilities
+        .code_action_deferred_edit_resolution
+    {
+        let document = snapshot.document();
+
+        // We need to resolve the `edit` field now if we can't defer resolution to later
+        action = resolve_edit_for_organize_imports(
+            action,
+            document,
+            snapshot.url(),
+            snapshot.configuration().linter.clone(),
             snapshot.encoding(),
         )?;
     }
