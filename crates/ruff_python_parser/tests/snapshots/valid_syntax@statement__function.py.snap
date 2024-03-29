@@ -1140,17 +1140,26 @@ Module(
                                         ctx: Load,
                                     },
                                 ),
-                                slice: Starred(
-                                    ExprStarred {
+                                slice: Tuple(
+                                    ExprTuple {
                                         range: 887..890,
-                                        value: Name(
-                                            ExprName {
-                                                range: 888..890,
-                                                id: "Ts",
-                                                ctx: Load,
-                                            },
-                                        ),
+                                        elts: [
+                                            Starred(
+                                                ExprStarred {
+                                                    range: 887..890,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 888..890,
+                                                            id: "Ts",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
                                         ctx: Load,
+                                        parenthesized: false,
                                     },
                                 ),
                                 ctx: Load,
