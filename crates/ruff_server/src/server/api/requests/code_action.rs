@@ -91,8 +91,7 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
     };
 
     if !snapshot
-        .server_settings()
-        .capabilities
+        .resolved_client_capabilities()
         .code_action_deferred_edit_resolution
     {
         let document = snapshot.document();

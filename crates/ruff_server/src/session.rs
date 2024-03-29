@@ -14,7 +14,7 @@ use rustc_hash::FxHashMap;
 use crate::edit::{Document, DocumentVersion};
 use crate::PositionEncoding;
 
-use self::settings::ServerSettings;
+use self::settings::ResolvedClientCapabilities;
 
 /// The global state for the LSP
 pub(crate) struct Session {
@@ -22,16 +22,15 @@ pub(crate) struct Session {
     workspaces: Workspaces,
     /// The global position encoding, negotiated during LSP initialization.
     position_encoding: PositionEncoding,
-    /// Extension-specific settings, provided by the client, that apply to all workspace folders.
-    /// Some settings are also derived from client capabilities.
-    server_settings: Arc<settings::ServerSettings>,
+    /// Tracks what LSP features the client supports and doesn't support.
+    resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
 }
 
 /// An immutable snapshot of `Session` that references
 /// a specific document.
 pub(crate) struct DocumentSnapshot {
     configuration: Arc<RuffConfiguration>,
-    server_settings: Arc<ServerSettings>,
+    resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
     document_ref: DocumentRef,
     position_encoding: PositionEncoding,
     url: Url,
@@ -83,7 +82,9 @@ impl Session {
                 .as_ref()
                 .and_then(|encoding| encoding.try_into().ok())
                 .unwrap_or_default(),
-            server_settings: Arc::new(settings::ServerSettings::new(client_capabilities)),
+            resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
+                client_capabilities,
+            )),
             workspaces: Workspaces::new(workspaces)?,
         })
     }
@@ -91,7 +92,7 @@ impl Session {
     pub(crate) fn take_snapshot(&self, url: &Url) -> Option<DocumentSnapshot> {
         Some(DocumentSnapshot {
             configuration: self.workspaces.configuration(url)?.clone(),
-            server_settings: self.server_settings.clone(),
+            resolved_client_capabilities: self.resolved_client_capabilities.clone(),
             document_ref: self.workspaces.snapshot(url)?,
             position_encoding: self.position_encoding,
             url: url.clone(),
@@ -201,8 +202,8 @@ impl DocumentSnapshot {
         &self.configuration
     }
 
-    pub(crate) fn server_settings(&self) -> &ServerSettings {
-        &self.server_settings
+    pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
+        &self.resolved_client_capabilities
     }
 
     pub(crate) fn document(&self) -> &DocumentRef {

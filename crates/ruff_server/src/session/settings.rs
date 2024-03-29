@@ -1,24 +1,11 @@
 use lsp_types::ClientCapabilities;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub(crate) struct ServerSettings {
-    pub(crate) capabilities: ExtensionCapabilities,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub(crate) struct ExtensionCapabilities {
+pub(crate) struct ResolvedClientCapabilities {
     pub(crate) code_action_deferred_edit_resolution: bool,
 }
 
-impl ServerSettings {
-    pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
-        Self {
-            capabilities: ExtensionCapabilities::new(client_capabilities),
-        }
-    }
-}
-
-impl ExtensionCapabilities {
+impl ResolvedClientCapabilities {
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
         Self {
             code_action_deferred_edit_resolution: client_capabilities
