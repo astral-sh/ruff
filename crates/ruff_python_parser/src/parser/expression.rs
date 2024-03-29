@@ -1759,6 +1759,9 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a dictionary comprehension expression.
+    ///
+    /// See: <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
     fn parse_dictionary_comprehension_expression(
         &mut self,
         key: Expr,
