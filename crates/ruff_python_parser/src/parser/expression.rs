@@ -695,10 +695,8 @@ impl<'src> Parser<'src> {
         // Slice range doesn't include the `[` token.
         let slice_start = self.node_start();
 
-        // Create an error when receiving a empty slice to parse, e.g. `l[]`
-        if !self.at(TokenKind::Colon) && !self.at_expr() {
-            self.expect(TokenKind::Rsqb);
-
+        // Create an error when receiving an empty slice to parse, e.g. `x[]`
+        if self.eat(TokenKind::Rsqb) {
             let slice_range = self.node_range(slice_start);
             self.add_error(ParseErrorType::EmptySlice, slice_range);
 
@@ -727,6 +725,16 @@ impl<'src> Parser<'src> {
 
             slice = Expr::Tuple(ast::ExprTuple {
                 elts: slices,
+                ctx: ExprContext::Load,
+                range: self.node_range(slice_start),
+                parenthesized: false,
+            });
+        } else if slice.is_starred_expr() {
+            // If the only slice element is a starred expression, that is represented
+            // using a tuple expression with a single element. This is the second case
+            // in the `slices` rule in the Python grammar.
+            slice = Expr::Tuple(ast::ExprTuple {
+                elts: vec![slice],
                 ctx: ExprContext::Load,
                 range: self.node_range(slice_start),
                 parenthesized: false,
@@ -761,6 +769,18 @@ impl<'src> Parser<'src> {
                 return lower.expr;
             }
 
+            if !lower.is_parenthesized {
+                match lower.expr {
+                    Expr::Starred(_) => {
+                        self.add_error(ParseErrorType::StarredExpressionUsage, &lower);
+                    }
+                    Expr::Named(_) => {
+                        self.add_error(ParseErrorType::UnparenthesizedNamedExpression, &lower);
+                    }
+                    _ => {}
+                }
+            }
+
             Some(lower.expr)
         } else {
             None
@@ -772,14 +792,22 @@ impl<'src> Parser<'src> {
         let upper = if self.at_ts(UPPER_END_SET) {
             None
         } else {
-            Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+            let upper = self.parse_conditional_expression_or_higher();
+            if upper.is_unparenthesized_starred_expr() {
+                self.add_error(ParseErrorType::StarredExpressionUsage, &upper);
+            }
+            Some(Box::new(upper.expr))
         };
 
         let step = if self.eat(TokenKind::Colon) {
             if self.at_ts(STEP_END_SET) {
                 None
             } else {
-                Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+                let step = self.parse_conditional_expression_or_higher();
+                if step.is_unparenthesized_starred_expr() {
+                    self.add_error(ParseErrorType::StarredExpressionUsage, &step);
+                }
+                Some(Box::new(step.expr))
             }
         } else {
             None
@@ -1337,15 +1365,11 @@ impl<'src> Parser<'src> {
                 if !key_or_element.is_parenthesized {
                     match key_or_element.expr {
                         Expr::Starred(_) => self.add_error(
-                            ParseErrorType::OtherError(
-                                "starred expression cannot be used here".to_string(),
-                            ),
+                            ParseErrorType::StarredExpressionUsage,
                             &key_or_element.expr,
                         ),
                         Expr::Named(_) => self.add_error(
-                            ParseErrorType::OtherError(
-                                "unparenthesized named expression cannot be used here".to_string(),
-                            ),
+                            ParseErrorType::UnparenthesizedNamedExpression,
                             &key_or_element,
                         ),
                         _ => {}
@@ -1443,12 +1467,7 @@ impl<'src> Parser<'src> {
             _ => {
                 // grammar: `group`
                 if parsed_expr.expr.is_starred_expr() {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "starred expression cannot be used here".to_string(),
-                        ),
-                        &parsed_expr,
-                    );
+                    self.add_error(ParseErrorType::StarredExpressionUsage, &parsed_expr);
                 }
 
                 self.expect(TokenKind::Rpar);
@@ -1570,12 +1589,7 @@ impl<'src> Parser<'src> {
             } else {
                 let key = parser.parse_conditional_expression_or_higher();
                 if !key.is_parenthesized && key.expr.is_starred_expr() {
-                    parser.add_error(
-                        ParseErrorType::OtherError(
-                            "starred expression cannot be used here".to_string(),
-                        ),
-                        &key,
-                    );
+                    parser.add_error(ParseErrorType::StarredExpressionUsage, &key);
                 }
 
                 keys.push(Some(key.expr));
@@ -1583,12 +1597,7 @@ impl<'src> Parser<'src> {
 
                 let value = parser.parse_conditional_expression_or_higher();
                 if !value.is_parenthesized && value.expr.is_starred_expr() {
-                    parser.add_error(
-                        ParseErrorType::OtherError(
-                            "starred expression cannot be used here".to_string(),
-                        ),
-                        &value,
-                    );
+                    parser.add_error(ParseErrorType::StarredExpressionUsage, &value);
                 }
 
                 values.push(value.expr);
@@ -1684,12 +1693,7 @@ impl<'src> Parser<'src> {
 
         match expr {
             Expr::Starred(_) => {
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "starred expression cannot be used here".to_string(),
-                    ),
-                    expr,
-                );
+                self.add_error(ParseErrorType::StarredExpressionUsage, expr);
             }
             Expr::Yield(_) | Expr::YieldFrom(_) => {
                 self.add_error(
@@ -2025,6 +2029,13 @@ impl<'src> Parser<'src> {
 pub(super) struct ParsedExpr {
     pub(super) expr: Expr,
     pub(super) is_parenthesized: bool,
+}
+
+impl ParsedExpr {
+    #[inline]
+    const fn is_unparenthesized_starred_expr(&self) -> bool {
+        !self.is_parenthesized && self.expr.is_starred_expr()
+    }
 }
 
 impl From<Expr> for ParsedExpr {
