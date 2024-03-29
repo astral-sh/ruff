@@ -1,11 +1,8 @@
-(x for y in z)
-(a async for i in iter)
-(b for c in d if x in w if y and yy if z)
-(a for b in c if d and e for f in j if k > h)
-(a for b in c if d and e async for f in j if k > h)
-foo(x for i in data)
-foo(a, x for i in data)
-foo(a, x for i, j in data)
+(x for target in iter)
+(x async for target in iter)
+(x for target in iter if x in y if a and b if c)
+(x for target1 in iter1 if x and y for target2 in iter2 if a > b)
+(x for target1 in iter1 if x and y async for target2 in iter2 if a > b)
 
 # Named expression
 (x := y + 1 for y in z)
