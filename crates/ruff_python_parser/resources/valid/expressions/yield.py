@@ -1,11 +1,16 @@
-yield *y
+yield
 yield x
 yield x + 1
-yield a and b
-yield f()
+yield x and y
+yield call()
 yield [1, 2]
 yield {3, 4}
-yield {i: 5}
-yield 7, 8
-yield (9, 10)
-yield 1 == 1
+yield {x: 5}
+yield x, y
+yield (x, y)
+yield x == y
+yield (x := 1)
+yield *y
+yield x, *y
+yield *x,
+yield *x | y
