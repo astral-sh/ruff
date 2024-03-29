@@ -1,11 +1,12 @@
 use crate::lint::fixes_for_diagnostics;
 use crate::server::api::LSPResult;
+use crate::server::SupportedCodeActionKind;
 use crate::server::{client::Notifier, Result};
-use crate::server::{AvailableCodeActions, SupportedCodeActionKind};
 use crate::session::DocumentSnapshot;
 use crate::DIAGNOSTIC_NAME;
 use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
+use rustc_hash::FxHashSet;
 use types::{CodeActionKind, CodeActionOrCommand};
 
 use super::code_action_resolve::resolve_edit_for_fix_all;
@@ -23,26 +24,24 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
         _notifier: Notifier,
         params: types::CodeActionParams,
     ) -> Result<Option<types::CodeActionResponse>> {
-        let available_actions = available_code_actions(params.context.only);
-        // fast path - return early if no actions are available
-        if available_actions.is_empty() {
-            return Ok(None);
-        }
-
         let mut response: types::CodeActionResponse = types::CodeActionResponse::default();
 
-        if available_actions.contains(AvailableCodeActions::QUICK_FIX) {
+        let supported_code_actions = supported_code_actions(params.context.only);
+
+        tracing::error!("{supported_code_actions:?}");
+
+        if supported_code_actions.contains(&SupportedCodeActionKind::QuickFix) {
             response.extend(
                 quick_fix(&snapshot, params.context.diagnostics)
                     .with_failure_code(ErrorCode::InternalError)?,
             );
         }
 
-        if available_actions.contains(AvailableCodeActions::SOURCE_FIX_ALL) {
+        if supported_code_actions.contains(&SupportedCodeActionKind::SourceFixAll) {
             response.push(fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
         }
 
-        if available_actions.contains(AvailableCodeActions::SOURCE_ORGANIZE_IMPORTS) {
+        if supported_code_actions.contains(&SupportedCodeActionKind::SourceOrganizeImports) {
             todo!("Implement the `source.organizeImports` code action");
         }
 
@@ -109,23 +108,23 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
     Ok(types::CodeActionOrCommand::CodeAction(action))
 }
 
-/// If `action_filter` is `None`, this returns [`SupportedCodeAction::all()`]. Otherwise,
+/// If `action_filter` is `None`, this returns [`SupportedCodeActionKind::all()`]. Otherwise,
 /// the list is filtered.
-fn available_code_actions(action_filter: Option<Vec<CodeActionKind>>) -> AvailableCodeActions {
+fn supported_code_actions(
+    action_filter: Option<Vec<CodeActionKind>>,
+) -> FxHashSet<SupportedCodeActionKind> {
     let Some(action_filter) = action_filter else {
-        return SupportedCodeActionKind::all()
-            .fold(AvailableCodeActions::empty(), |available, kind| {
-                available | kind.makes_available()
-            });
+        return SupportedCodeActionKind::all().collect();
     };
 
     SupportedCodeActionKind::all()
-        .filter(|action| {
-            action_filter
-                .iter()
-                .any(|kind| action.kind().as_str().starts_with(kind.as_str()))
+        .filter(move |action| {
+            action_filter.iter().any(|filter| {
+                action
+                    .kinds()
+                    .iter()
+                    .any(|kind| kind.as_str().starts_with(filter.as_str()))
+            })
         })
-        .fold(AvailableCodeActions::empty(), |available, kind| {
-            available | kind.makes_available()
-        })
+        .collect()
 }

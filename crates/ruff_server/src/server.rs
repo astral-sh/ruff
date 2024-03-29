@@ -195,7 +195,7 @@ impl Server {
                 CodeActionOptions {
                     code_action_kinds: Some(
                         SupportedCodeActionKind::all()
-                            .map(SupportedCodeActionKind::kind)
+                            .flat_map(|action| action.kinds().into_iter())
                             .collect(),
                     ),
                     work_done_progress_options: WorkDoneProgressOptions {
@@ -238,54 +238,33 @@ impl Server {
     }
 }
 
-bitflags::bitflags! {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    struct AvailableCodeActions: u8 {
-        const QUICK_FIX = 0b0000_0001;
-        const SOURCE_FIX_ALL = 0b0000_0010;
-        const SOURCE_ORGANIZE_IMPORTS = 0b0000_0100;
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum SupportedCodeActionKind {
     QuickFix,
     SourceFixAll,
-    SourceFixAllRuff,
     #[allow(dead_code)] // TODO: remove
     SourceOrganizeImports,
-    #[allow(dead_code)] // TODO: remove
-    SourceOrganizeImportsRuff,
 }
 
 impl SupportedCodeActionKind {
-    fn kind(self) -> CodeActionKind {
+    /// Returns the possible LSP code action kind(s) that map to this code action.
+    fn kinds(self) -> Vec<CodeActionKind> {
         match self {
-            Self::QuickFix => CodeActionKind::QUICKFIX,
-            Self::SourceFixAll => CodeActionKind::SOURCE_FIX_ALL,
-            Self::SourceFixAllRuff => crate::SOURCE_FIX_ALL_RUFF,
-            Self::SourceOrganizeImports => CodeActionKind::SOURCE_ORGANIZE_IMPORTS,
-            Self::SourceOrganizeImportsRuff => crate::SOURCE_ORGANIZE_IMPORTS_RUFF,
+            Self::QuickFix => vec![CodeActionKind::QUICKFIX],
+            Self::SourceFixAll => vec![CodeActionKind::SOURCE_FIX_ALL, crate::SOURCE_FIX_ALL_RUFF],
+            Self::SourceOrganizeImports => vec![
+                CodeActionKind::SOURCE_ORGANIZE_IMPORTS,
+                crate::SOURCE_ORGANIZE_IMPORTS_RUFF,
+            ],
         }
     }
 
-    fn makes_available(self) -> AvailableCodeActions {
-        match self {
-            Self::QuickFix => AvailableCodeActions::QUICK_FIX,
-            Self::SourceFixAll | Self::SourceFixAllRuff => AvailableCodeActions::SOURCE_FIX_ALL,
-            Self::SourceOrganizeImports | Self::SourceOrganizeImportsRuff => {
-                AvailableCodeActions::SOURCE_ORGANIZE_IMPORTS
-            }
-        }
-    }
-
+    /// Returns all code actions kinds that the server currently supports.
     fn all() -> impl Iterator<Item = Self> {
         [
             Self::QuickFix,
             Self::SourceFixAll,
-            Self::SourceFixAllRuff,
             // Self::SourceOrganizeImports,
-            // Self::SourceOrganizeImportsRuff
         ]
         .into_iter()
     }
@@ -296,7 +275,7 @@ impl TryFrom<CodeActionKind> for SupportedCodeActionKind {
 
     fn try_from(kind: CodeActionKind) -> std::result::Result<Self, Self::Error> {
         for supported_kind in Self::all() {
-            if kind == supported_kind.kind() {
+            if supported_kind.kinds().contains(&kind) {
                 return Ok(supported_kind);
             }
         }

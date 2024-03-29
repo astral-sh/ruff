@@ -2375,7 +2375,6 @@ name = "ruff_server"
 version = "0.2.2"
 dependencies = [
  "anyhow",
- "bitflags 2.5.0",
  "crossbeam",
  "insta",
  "jod-thread",

@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use crate::lint::{fixes_for_diagnostics, DiagnosticFix};
 use crate::server::api::LSPResult;
+use crate::server::SupportedCodeActionKind;
 use crate::server::{client::Notifier, Result};
-use crate::server::{AvailableCodeActions, SupportedCodeActionKind};
 use crate::session::DocumentSnapshot;
 use crate::PositionEncoding;
 use lsp_server::ErrorCode;
@@ -30,7 +30,7 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
     ) -> Result<types::CodeAction> {
         let document = snapshot.document();
 
-        let supported: SupportedCodeActionKind = action
+        let action_kind: SupportedCodeActionKind = action
             .kind
             .clone()
             .ok_or(anyhow::anyhow!("No kind was given for code action"))
@@ -38,25 +38,23 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
             .try_into()
             .map_err(|()| anyhow::anyhow!("Code action was of an invalid kind"))
             .with_failure_code(ErrorCode::InvalidParams)?;
-        let available_action = supported.makes_available();
 
-        // ensures that only one code action kind was made available
-        debug_assert!(
-            (available_action & (available_action - AvailableCodeActions::all()))
-                == AvailableCodeActions::empty()
-        );
-
-        if available_action == AvailableCodeActions::SOURCE_FIX_ALL {
-            resolve_edit_for_fix_all(
+        match action_kind {
+            SupportedCodeActionKind::SourceFixAll => resolve_edit_for_fix_all(
                 action,
                 document,
                 snapshot.url(),
                 &snapshot.configuration().linter,
                 snapshot.encoding(),
             )
-            .with_failure_code(ErrorCode::InternalError)
-        } else {
-            Err(anyhow::anyhow!("")).with_failure_code(ErrorCode::InvalidParams)
+            .with_failure_code(ErrorCode::InternalError),
+            SupportedCodeActionKind::SourceOrganizeImports => {
+                todo!("Support `source.organizeImports`")
+            }
+            SupportedCodeActionKind::QuickFix => Err(anyhow::anyhow!(
+                "Got a code action that should not need additional resolution: {action_kind:?}"
+            ))
+            .with_failure_code(ErrorCode::InvalidParams),
         }
     }
 }

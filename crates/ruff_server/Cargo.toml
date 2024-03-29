@@ -26,7 +26,6 @@ ruff_text_size = { path = "../ruff_text_size" }
 ruff_workspace = { path = "../ruff_workspace" }
 
 anyhow = { workspace = true }
-bitflags = { workspace = true }
 crossbeam = { workspace = true }
 jod-thread = { workspace = true }
 libc = { workspace = true }
