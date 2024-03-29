@@ -299,5 +299,5 @@ Module(
    |
 11 | # Mixed starred expression and named expression
 12 | x[*x := 1]
-   |   ^^ Syntax Error: invalid named assignment target
+   |   ^^ Syntax Error: assignment expression target must be an identifier
    |
