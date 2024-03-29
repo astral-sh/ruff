@@ -110,11 +110,18 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &mut Checker, call: &
                 }
             }
             Expr::FString(ast::ExprFString { value, .. }) => {
-                // TODO(dhruvmanila): This doesn't consider f-strings that are implicitly concatenated
-                // to strings. For example, `f"%Y-%m-%dT%H:%M:%S{('.%f' if millis else '')}" "%z"`
-                for f_string in value.f_strings() {
-                    if f_string.literals().any(|literal| literal.contains("%z")) {
-                        return;
+                for f_string_part in value {
+                    match f_string_part {
+                        ast::FStringPart::Literal(string) => {
+                            if string.contains("%z") {
+                                return;
+                            }
+                        }
+                        ast::FStringPart::FString(f_string) => {
+                            if f_string.literals().any(|literal| literal.contains("%z")) {
+                                return;
+                            }
+                        }
                     }
                 }
             }
