@@ -102,11 +102,30 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &mut Checker, call: &
     }
 
     // Does the `strptime` call contain a format string with a timezone specifier?
-    if let Some(Expr::StringLiteral(ast::ExprStringLiteral { value: format, .. })) =
-        call.arguments.args.get(1).as_ref()
-    {
-        if format.to_str().contains("%z") {
-            return;
+    if let Some(expr) = call.arguments.args.get(1) {
+        match expr {
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+                if value.to_str().contains("%z") {
+                    return;
+                }
+            }
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                for f_string_part in value {
+                    match f_string_part {
+                        ast::FStringPart::Literal(string) => {
+                            if string.contains("%z") {
+                                return;
+                            }
+                        }
+                        ast::FStringPart::FString(f_string) => {
+                            if f_string.literals().any(|literal| literal.contains("%z")) {
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
         }
     };
 
