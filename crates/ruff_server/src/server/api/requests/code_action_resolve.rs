@@ -1,3 +1,6 @@
+use std::borrow::Cow;
+
+use crate::lint::{fixes_for_diagnostics, DiagnosticFix};
 use crate::server::api::LSPResult;
 use crate::server::{client::Notifier, Result};
 use crate::server::{AvailableCodeActions, SupportedCodeActionKind};
@@ -5,6 +8,7 @@ use crate::session::DocumentSnapshot;
 use crate::PositionEncoding;
 use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
+use ruff_linter::settings::LinterSettings;
 use types::WorkspaceEdit;
 
 pub(crate) struct CodeActionResolve;
@@ -14,7 +18,7 @@ impl super::RequestHandler for CodeActionResolve {
 }
 
 impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
-    fn document_url(params: &types::CodeAction) -> std::borrow::Cow<types::Url> {
+    fn document_url(params: &types::CodeAction) -> Cow<types::Url> {
         let uri: lsp_types::Url = serde_json::from_value(params.data.clone().unwrap_or_default())
             .expect("code actions should have a URI in their data fields");
         std::borrow::Cow::Owned(uri)
@@ -61,26 +65,20 @@ pub(super) fn resolve_edit_for_fix_all(
     mut action: types::CodeAction,
     document: &crate::edit::Document,
     url: &types::Url,
-    linter_settings: &ruff_linter::settings::LinterSettings,
+    linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<types::CodeAction> {
     let diagnostics = crate::lint::check(document, linter_settings, encoding);
 
-    let fixes = crate::lint::fixes_for_diagnostics(
-        document,
-        url,
-        encoding,
-        document.version(),
-        diagnostics,
-    )
-    .collect::<crate::Result<Vec<_>>>()?;
+    let fixes = fixes_for_diagnostics(document, url, encoding, document.version(), diagnostics)
+        .collect::<crate::Result<Vec<_>>>()?;
 
     action.edit = fix_all_edit(fixes.as_slice());
 
     Ok(action)
 }
 
-fn fix_all_edit(fixes: &[crate::lint::DiagnosticFix]) -> Option<WorkspaceEdit> {
+fn fix_all_edit(fixes: &[DiagnosticFix]) -> Option<WorkspaceEdit> {
     let edits_made: Vec<_> = fixes
         .iter()
         .filter(|fix| fix.applicability.is_safe())

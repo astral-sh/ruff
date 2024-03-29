@@ -1,3 +1,4 @@
+use crate::lint::fixes_for_diagnostics;
 use crate::server::api::LSPResult;
 use crate::server::{client::Notifier, Result};
 use crate::server::{AvailableCodeActions, SupportedCodeActionKind};
@@ -55,7 +56,7 @@ fn quick_fix(
 ) -> crate::Result<impl Iterator<Item = CodeActionOrCommand> + '_> {
     let document = snapshot.document();
 
-    let fixes = crate::lint::fixes_for_diagnostics(
+    let fixes = fixes_for_diagnostics(
         document,
         snapshot.url(),
         snapshot.encoding(),
