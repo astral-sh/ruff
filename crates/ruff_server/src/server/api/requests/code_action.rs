@@ -53,20 +53,14 @@ fn quick_fix(
 ) -> crate::Result<impl Iterator<Item = CodeActionOrCommand> + '_> {
     let document = snapshot.document();
 
-    let fixes = fixes_for_diagnostics(
-        document,
-        snapshot.url(),
-        snapshot.encoding(),
-        document.version(),
-        diagnostics,
-    )?;
+    let fixes = fixes_for_diagnostics(document, snapshot.encoding(), diagnostics)?;
 
     Ok(fixes.into_iter().map(|fix| {
         types::CodeActionOrCommand::CodeAction(types::CodeAction {
             title: format!("{DIAGNOSTIC_NAME} ({}): {}", fix.code, fix.title),
             kind: Some(types::CodeActionKind::QUICKFIX),
             edit: Some(types::WorkspaceEdit {
-                document_changes: Some(types::DocumentChanges::Edits(fix.document_edits.clone())),
+                changes: Some([(snapshot.url().clone(), fix.edits)].into_iter().collect()),
                 ..Default::default()
             }),
             diagnostics: Some(vec![fix.fixed_diagnostic.clone()]),

@@ -79,7 +79,7 @@ pub(super) fn resolve_edit_for_fix_all(
         changes: Some(
             [(
                 url.clone(),
-                crate::fix::fix_all(document, linter_settings, encoding)?,
+                fix_all_edit(document, linter_settings, encoding)?,
             )]
             .into_iter()
             .collect(),
@@ -88,12 +88,38 @@ pub(super) fn resolve_edit_for_fix_all(
     })
 }
 
+pub(super) fn fix_all_edit(
+    document: &crate::edit::Document,
+    linter_settings: &LinterSettings,
+    encoding: PositionEncoding,
+) -> crate::Result<Vec<types::TextEdit>> {
+    crate::fix::fix_all(document, linter_settings, encoding)
+}
+
 pub(super) fn resolve_edit_for_organize_imports(
     document: &crate::edit::Document,
     url: &types::Url,
     linter_settings: &ruff_linter::settings::LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<types::WorkspaceEdit> {
+    Ok(types::WorkspaceEdit {
+        changes: Some(
+            [(
+                url.clone(),
+                organize_imports_edit(document, linter_settings, encoding)?,
+            )]
+            .into_iter()
+            .collect(),
+        ),
+        ..Default::default()
+    })
+}
+
+pub(super) fn organize_imports_edit(
+    document: &crate::edit::Document,
+    linter_settings: &LinterSettings,
+    encoding: PositionEncoding,
+) -> crate::Result<Vec<types::TextEdit>> {
     let mut linter_settings = linter_settings.clone();
     linter_settings.rules = [
         Rule::UnsortedImports,       // I001
@@ -102,15 +128,5 @@ pub(super) fn resolve_edit_for_organize_imports(
     .into_iter()
     .collect();
 
-    Ok(types::WorkspaceEdit {
-        changes: Some(
-            [(
-                url.clone(),
-                crate::fix::fix_all(document, &linter_settings, encoding)?,
-            )]
-            .into_iter()
-            .collect(),
-        ),
-        ..Default::default()
-    })
+    crate::fix::fix_all(document, &linter_settings, encoding)
 }
