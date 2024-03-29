@@ -28,8 +28,6 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
 
         let supported_code_actions = supported_code_actions(params.context.only);
 
-        tracing::error!("{supported_code_actions:?}");
-
         if supported_code_actions.contains(&SupportedCodeActionKind::QuickFix) {
             response.extend(
                 quick_fix(&snapshot, params.context.diagnostics)
