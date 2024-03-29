@@ -68,8 +68,7 @@ pub(super) fn resolve_edit_for_fix_all(
 ) -> crate::Result<types::CodeAction> {
     let diagnostics = crate::lint::check(document, linter_settings, encoding);
 
-    let fixes = fixes_for_diagnostics(document, url, encoding, document.version(), diagnostics)
-        .collect::<crate::Result<Vec<_>>>()?;
+    let fixes = fixes_for_diagnostics(document, url, encoding, document.version(), diagnostics)?;
 
     action.edit = fix_all_edit(fixes.as_slice());
 

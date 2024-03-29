@@ -97,7 +97,7 @@ pub(crate) fn fixes_for_diagnostics<'d>(
     encoding: PositionEncoding,
     version: crate::edit::DocumentVersion,
     diagnostics: Vec<lsp_types::Diagnostic>,
-) -> impl Iterator<Item = crate::Result<DiagnosticFix>> + 'd {
+) -> crate::Result<Vec<DiagnosticFix>> {
     diagnostics
         .into_iter()
         .map(move |mut diagnostic| {
@@ -139,6 +139,7 @@ pub(crate) fn fixes_for_diagnostics<'d>(
             }))
         })
         .filter_map(crate::Result::transpose)
+        .collect()
 }
 
 fn to_lsp_diagnostic(

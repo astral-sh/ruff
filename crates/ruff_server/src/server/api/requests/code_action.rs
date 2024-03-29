@@ -61,8 +61,7 @@ fn quick_fix(
         snapshot.encoding(),
         document.version(),
         diagnostics,
-    )
-    .collect::<crate::Result<Vec<_>>>()?;
+    )?;
 
     Ok(fixes.into_iter().map(|fix| {
         types::CodeActionOrCommand::CodeAction(types::CodeAction {
