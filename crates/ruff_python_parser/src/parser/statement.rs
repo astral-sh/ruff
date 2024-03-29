@@ -195,7 +195,7 @@ impl<'src> Parser<'src> {
             }
             _ => {
                 let start = self.node_start();
-                let parsed_expr = self.parse_expressions();
+                let parsed_expr = self.parse_expression_list();
 
                 if self.eat(TokenKind::Equal) {
                     Stmt::Assign(self.parse_assign_statement(parsed_expr, start))
@@ -271,7 +271,7 @@ impl<'src> Parser<'src> {
 
         let value = self
             .at_expr()
-            .then(|| Box::new(self.parse_expressions().expr));
+            .then(|| Box::new(self.parse_expression_list().expr));
 
         ast::StmtReturn {
             range: self.node_range(start),
@@ -287,7 +287,7 @@ impl<'src> Parser<'src> {
         let exc = if self.at(TokenKind::Newline) {
             None
         } else {
-            let exc = self.parse_expressions();
+            let exc = self.parse_expression_list();
 
             if let Expr::Tuple(node) = &exc.expr {
                 if !node.parenthesized {
@@ -304,7 +304,7 @@ impl<'src> Parser<'src> {
         };
 
         let cause = (exc.is_some() && self.eat(TokenKind::From)).then(|| {
-            let cause = self.parse_expressions();
+            let cause = self.parse_expression_list();
 
             if let Expr::Tuple(ast::ExprTuple {
                 parenthesized: false,
@@ -569,13 +569,13 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-assignment_stmt>
     fn parse_assign_statement(&mut self, target: ParsedExpr, start: TextSize) -> ast::StmtAssign {
         let mut targets = vec![target.expr];
-        let mut value = self.parse_expressions();
+        let mut value = self.parse_expression_list();
 
         if self.at(TokenKind::Equal) {
             self.parse_list(RecoveryContextKind::AssignmentTargets, |parser| {
                 parser.bump(TokenKind::Equal);
 
-                let mut parsed_expr = parser.parse_expressions();
+                let mut parsed_expr = parser.parse_expression_list();
 
                 std::mem::swap(&mut value, &mut parsed_expr);
 
@@ -625,7 +625,10 @@ impl<'src> Parser<'src> {
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
         let simple = target.expr.is_name_expr() && !target.is_parenthesized;
-        let annotation = self.parse_expressions();
+
+        // Annotation is actually just an `expression` but we use `expressions`
+        // for better error recovery in case tuple isn't parenthesized.
+        let annotation = self.parse_expression_list();
 
         if matches!(
             annotation.expr,
@@ -642,7 +645,7 @@ impl<'src> Parser<'src> {
 
         let value = self
             .eat(TokenKind::Equal)
-            .then(|| Box::new(self.parse_expressions().expr));
+            .then(|| Box::new(self.parse_expression_list().expr));
 
         ast::StmtAnnAssign {
             target: Box::new(target.expr),
@@ -678,7 +681,7 @@ impl<'src> Parser<'src> {
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
-        let value = self.parse_expressions();
+        let value = self.parse_expression_list();
 
         ast::StmtAugAssign {
             target: Box::new(target.expr),
@@ -766,7 +769,7 @@ impl<'src> Parser<'src> {
             let type_ = if p.at(TokenKind::Colon) && !is_star {
                 None
             } else {
-                let parsed_expr = p.parse_expressions();
+                let parsed_expr = p.parse_expression_list();
                 if matches!(
                     parsed_expr.expr,
                     Expr::Tuple(ast::ExprTuple {
@@ -839,14 +842,14 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::For);
 
         let saved_context = self.set_ctx(ParserCtxFlags::FOR_TARGET);
-        let mut target = self.parse_expressions();
+        let mut target = self.parse_expression_list();
         self.restore_ctx(ParserCtxFlags::FOR_TARGET, saved_context);
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
         self.expect(TokenKind::In);
 
-        let iter = self.parse_expressions();
+        let iter = self.parse_expression_list();
 
         self.expect(TokenKind::Colon);
 
@@ -911,7 +914,7 @@ impl<'src> Parser<'src> {
         parameters.range = self.node_range(parameters_start);
 
         let returns = self.eat(TokenKind::Rarrow).then(|| {
-            let returns = self.parse_expressions();
+            let returns = self.parse_expression_list();
             if !returns.is_parenthesized && matches!(returns.expr, Expr::Tuple(_)) {
                 self.add_error(
                     ParseErrorType::OtherError(
