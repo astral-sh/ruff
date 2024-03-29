@@ -129,7 +129,6 @@ impl<'src> Parser<'src> {
     /// the [Python grammar] depending on whether named expressions are allowed.
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    #[allow(dead_code)]
     pub(super) fn parse_star_expression_or_higher(
         &mut self,
         allow_named_expression: AllowNamedExpression,
@@ -1261,7 +1260,8 @@ impl<'src> Parser<'src> {
             });
         }
 
-        let first_element = self.parse_named_expression_or_higher();
+        // Parse the first element with a more general rule and limit it later.
+        let first_element = self.parse_star_expression_or_higher(AllowNamedExpression::Yes);
 
         match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
@@ -1446,7 +1446,11 @@ impl<'src> Parser<'src> {
         let mut elts = vec![first_element];
 
         self.parse_comma_separated_list(RecoveryContextKind::ListElements, |parser| {
-            elts.push(parser.parse_named_expression_or_higher().expr);
+            elts.push(
+                parser
+                    .parse_star_expression_or_higher(AllowNamedExpression::Yes)
+                    .expr,
+            );
         });
 
         self.expect(TokenKind::Rsqb);
@@ -2002,7 +2006,6 @@ enum StarredExpressionPrecedence {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
 pub(super) enum AllowNamedExpression {
     Yes,
     No,
