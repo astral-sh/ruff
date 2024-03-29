@@ -119,6 +119,10 @@ pub enum ParseErrorType {
     SimpleStmtAndCompoundStmtInSameLine,
     /// An invalid usage of iterable unpacking in a comprehension was found.
     IterableUnpackingInComprehension,
+    /// An unparenthesized named expression was found where it is not allowed.
+    UnparenthesizedNamedExpression,
+    /// An invalid usage of a starred expression was found.
+    StarredExpressionUsage,
 
     /// An invalid `match` case pattern was found.
     InvalidMatchPatternLiteral { pattern: TokenKind },
@@ -182,6 +186,12 @@ impl std::fmt::Display for ParseErrorType {
             }
             ParseErrorType::IterableUnpackingInComprehension => {
                 write!(f, "iterable unpacking cannot be used in a comprehension")
+            }
+            ParseErrorType::UnparenthesizedNamedExpression => {
+                write!(f, "unparenthesized named expression cannot be used here")
+            }
+            ParseErrorType::StarredExpressionUsage => {
+                write!(f, "starred expression cannot be used here")
             }
             ParseErrorType::PositionalArgumentError => {
                 write!(f, "positional argument follows keyword argument unpacking")
