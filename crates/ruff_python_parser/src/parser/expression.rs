@@ -1298,8 +1298,8 @@ impl<'src> Parser<'src> {
         }
 
         if self.eat(TokenKind::DoubleStar) {
-            // Handle dict unpack
-            let value = self.parse_conditional_expression_or_higher();
+            // Handle dictionary unpacking
+            let value = self.parse_expression_with_bitwise_or_precedence();
             return Expr::Dict(self.parse_dictionary_expression(None, value.expr, start));
         }
 
@@ -1313,6 +1313,26 @@ impl<'src> Parser<'src> {
                 Expr::SetComp(self.parse_set_comprehension_expression(key_or_element.expr, start))
             }
             TokenKind::Colon => {
+                // Now, we know that it's either a dictionary expression or a dictionary comprehension.
+                // In either case, the key is limited to an `expression`.
+                if !key_or_element.is_parenthesized {
+                    match key_or_element.expr {
+                        Expr::Starred(_) => self.add_error(
+                            ParseErrorType::OtherError(
+                                "starred expression cannot be used here".to_string(),
+                            ),
+                            &key_or_element.expr,
+                        ),
+                        Expr::Named(_) => self.add_error(
+                            ParseErrorType::OtherError(
+                                "unparenthesized named expression cannot be used here".to_string(),
+                            ),
+                            &key_or_element,
+                        ),
+                        _ => {}
+                    }
+                }
+
                 self.bump(TokenKind::Colon);
                 let value = self.parse_conditional_expression_or_higher();
 
@@ -1510,12 +1530,33 @@ impl<'src> Parser<'src> {
         self.parse_comma_separated_list(RecoveryContextKind::DictElements, |parser| {
             if parser.eat(TokenKind::DoubleStar) {
                 keys.push(None);
+                values.push(parser.parse_expression_with_bitwise_or_precedence().expr);
             } else {
-                keys.push(Some(parser.parse_conditional_expression_or_higher().expr));
+                let key = parser.parse_conditional_expression_or_higher();
+                if !key.is_parenthesized && key.expr.is_starred_expr() {
+                    parser.add_error(
+                        ParseErrorType::OtherError(
+                            "starred expression cannot be used here".to_string(),
+                        ),
+                        &key,
+                    );
+                }
 
+                keys.push(Some(key.expr));
                 parser.expect(TokenKind::Colon);
+
+                let value = parser.parse_conditional_expression_or_higher();
+                if !value.is_parenthesized && value.expr.is_starred_expr() {
+                    parser.add_error(
+                        ParseErrorType::OtherError(
+                            "starred expression cannot be used here".to_string(),
+                        ),
+                        &value,
+                    );
+                }
+
+                values.push(value.expr);
             }
-            values.push(parser.parse_conditional_expression_or_higher().expr);
         });
 
         self.expect(TokenKind::Rbrace);
