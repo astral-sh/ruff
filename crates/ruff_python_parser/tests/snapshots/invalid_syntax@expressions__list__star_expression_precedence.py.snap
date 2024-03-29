@@ -370,6 +370,16 @@ Module(
 ## Errors
 
   |
+1 | # For list expression, the minimum binding power of star expression is bitwise or.
+2 | 
+3 | [(*x), y]
+  |   ^^ Syntax Error: starred expression cannot be used here
+4 | [*x in y, z]
+5 | [*not x, z]
+  |
+
+
+  |
 3 | [(*x), y]
 4 | [*x in y, z]
   |     ^^ Syntax Error: Expected an expression or a ']'
