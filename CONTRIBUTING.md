@@ -33,26 +33,17 @@ Welcome! We're happy to have you here. Thank you in advance for your contributio
 
 ## The Basics
 
-Ruff welcomes contributions in the form of Pull Requests.
+Ruff welcomes contributions in the form of pull requests.
 
 For small changes (e.g., bug fixes), feel free to submit a PR.
 
 For larger changes (e.g., new lint rules, new functionality, new configuration options), consider
 creating an [**issue**](https://github.com/astral-sh/ruff/issues) outlining your proposed change.
-You can also join us on [**Discord**](https://discord.com/invite/astral-sh) to discuss your idea with the
+You can also join us on [Discord](https://discord.com/invite/astral-sh) to discuss your idea with the
 community. We've labeled [beginner-friendly tasks](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
 in the issue tracker, along with [bugs](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Abug)
 and [improvements](https://github.com/astral-sh/ruff/issues?q=is%3Aissue+is%3Aopen+label%3Aaccepted)
 that are ready for contributions.
-
-If you're looking for a place to start, we recommend implementing a new lint rule (see:
-[_Adding a new lint rule_](#example-adding-a-new-lint-rule), which will allow you to learn from and
-pattern-match against the examples in the existing codebase. Many lint rules are inspired by
-existing Python plugins, which can be used as a reference implementation.
-
-As a concrete example: consider taking on one of the rules from the [`flake8-pyi`](https://github.com/astral-sh/ruff/issues/848)
-plugin, and looking to the originating [Python source](https://github.com/PyCQA/flake8-pyi) for
-guidance.
 
 If you have suggestions on how we might improve the contributing documentation, [let us know](https://github.com/astral-sh/ruff/discussions/5693)!
 
@@ -107,7 +98,7 @@ RUFF_UPDATE_SCHEMA=1 cargo test  # Rust testing and updating ruff.schema.json
 pre-commit run --all-files --show-diff-on-failure  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
-These checks will run on GitHub Actions when you open your Pull Request, but running them locally
+These checks will run on GitHub Actions when you open your pull request, but running them locally
 will save you time and expedite the merge process.
 
 Note that many code changes also require updating the snapshot tests, which is done interactively
@@ -117,7 +108,14 @@ after running `cargo test` like so:
 cargo insta review
 ```
 
-Your Pull Request will be reviewed by a maintainer, which may involve a few rounds of iteration
+If your pull request relates to a specific lint rule, include the category and rule code in the
+title, as in the following examples:
+
+- \[`flake8-bugbear`\] Avoid false positive for usage after `continue` (`B031`)
+- \[`flake8-simplify`\] Detect implicit `else` cases in `needless-bool` (`SIM103`)
+- \[`pycodestyle`\] Implement `redundant-backslash` (`E502`)
+
+Your pull request will be reviewed by a maintainer, which may involve a few rounds of iteration
 prior to merging.
 
 ### Project Structure
@@ -199,11 +197,14 @@ and calling out to lint rule analyzer functions as it goes.
 If you need to inspect the AST, you can run `cargo dev print-ast` with a Python file. Grep
 for the `Diagnostic::new` invocations to understand how other, similar rules are implemented.
 
-Once you're satisfied with your code, add tests for your rule. See [rule testing](#rule-testing-fixtures-and-snapshots)
-for more details.
+Once you're satisfied with your code, add tests for your rule
+(see: [rule testing](#rule-testing-fixtures-and-snapshots)), and regenerate the documentation and
+associated assets (like our JSON Schema) with `cargo dev generate-all`.
 
-Finally, regenerate the documentation and other generated assets (like our JSON Schema) with:
-`cargo dev generate-all`.
+Finally, submit a pull request, and include the category, rule name, and rule code in the title, as
+in:
+
+> \[`pycodestyle`\] Implement `redundant-backslash` (`E502`)
 
 #### Rule naming convention
 
