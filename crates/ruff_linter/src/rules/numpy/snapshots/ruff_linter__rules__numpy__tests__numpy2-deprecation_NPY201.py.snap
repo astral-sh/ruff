@@ -836,6 +836,7 @@ NPY201.py:104:5: NPY201 [*] `np.unicode_` will be removed in NumPy 2.0. Use `num
     104 |+    np.str_("asf")
 105 105 | 
 106 106 |     np.who()
+107 107 | 
 
 NPY201.py:106:5: NPY201 `np.who` will be removed in NumPy 2.0. Use an IDE variable explorer or `locals()` instead.
     |
@@ -843,6 +844,24 @@ NPY201.py:106:5: NPY201 `np.who` will be removed in NumPy 2.0. Use an IDE variab
 105 | 
 106 |     np.who()
     |     ^^^^^^ NPY201
+107 | 
+108 |     np.row_stack(([1,2], [3,4]))
     |
+
+NPY201.py:108:5: NPY201 [*] `np.row_stack` will be removed in NumPy 2.0. Use `numpy.vstack` instead.
+    |
+106 |     np.who()
+107 | 
+108 |     np.row_stack(([1,2], [3,4]))
+    |     ^^^^^^^^^^^^ NPY201
+    |
+    = help: Replace with `numpy.vstack`
+
+ℹ Safe fix
+105 105 | 
+106 106 |     np.who()
+107 107 | 
+108     |-    np.row_stack(([1,2], [3,4]))
+    108 |+    np.vstack(([1,2], [3,4]))
 
 
