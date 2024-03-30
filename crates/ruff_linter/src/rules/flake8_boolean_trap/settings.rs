@@ -1,8 +1,10 @@
-//! Settings for the `flake8_boolean_trap` plugin.
+//! Settings for the `flake8-boolean-trap` plugin.
+
+use std::fmt;
+
+use ruff_macros::CacheKey;
 
 use crate::display_settings;
-use ruff_macros::CacheKey;
-use std::fmt;
 
 #[derive(Debug, CacheKey, Default)]
 pub struct Settings {

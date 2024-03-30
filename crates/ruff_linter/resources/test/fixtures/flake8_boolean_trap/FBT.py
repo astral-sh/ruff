@@ -31,8 +31,7 @@ def function(
     kwonly_nonboolvalued_boolhint: bool = 1,
     kwonly_nonboolvalued_boolstrhint: "bool" = 1,
     **kw,
-):
-    ...
+): ...
 
 
 def used(do):
@@ -131,6 +130,7 @@ class Fit:
     def __post_init__(self, force: bool) -> None:
         print(force)
 
+
 Fit(force=True)
 
 
@@ -153,5 +153,4 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-
     foo: bool = Field(True, exclude=True)

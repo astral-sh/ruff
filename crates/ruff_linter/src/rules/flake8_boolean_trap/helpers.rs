@@ -1,6 +1,9 @@
-use crate::checkers::ast::Checker;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::SemanticModel;
+
+use crate::checkers::ast::Checker;
+use crate::settings::LinterSettings;
 
 /// Returns `true` if a function call is allowed to use a boolean trap.
 pub(super) fn is_allowed_func_call(name: &str) -> bool {
@@ -46,22 +49,20 @@ pub(super) fn is_allowed_func_call(name: &str) -> bool {
 }
 
 /// Returns `true` if a call is allowed by the user to use a boolean trap.
-pub(super) fn is_user_allowed_func_call(call: &ast::ExprCall, checker: &Checker) -> bool {
-    let extend_immutable_calls: Vec<QualifiedName> = checker
-        .settings
-        .flake8_boolean_trap
-        .extend_allowed_calls
-        .iter()
-        .map(|target| QualifiedName::from_dotted_name(target))
-        .collect();
-
-    checker
-        .semantic()
+pub(super) fn is_user_allowed_func_call(
+    call: &ast::ExprCall,
+    semantic: &SemanticModel,
+    settings: &LinterSettings,
+) -> bool {
+    semantic
         .resolve_qualified_name(call.func.as_ref())
         .is_some_and(|qualified_name| {
-            extend_immutable_calls
+            settings
+                .flake8_boolean_trap
+                .extend_allowed_calls
                 .iter()
-                .any(|target| qualified_name == *target)
+                .map(|target| QualifiedName::from_dotted_name(target))
+                .any(|target| qualified_name == target)
         })
 }
 
@@ -99,7 +100,7 @@ pub(super) fn allow_boolean_trap(call: &ast::ExprCall, checker: &Checker) -> boo
     }
 
     // If the call is explicitly allowed by the user, then the boolean trap is allowed.
-    if is_user_allowed_func_call(call, checker) {
+    if is_user_allowed_func_call(call, checker.semantic(), checker.settings) {
         return true;
     }
 
