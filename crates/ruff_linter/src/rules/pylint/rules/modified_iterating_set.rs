@@ -7,11 +7,20 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `set` being modified during the iteration on the set.
+/// Checks for loops in which a `set` is modified during iteration.
 ///
 /// ## Why is this bad?
-/// If `set` is modified during the iteration, it will cause `RuntimeError`.
-/// This could be fixed by using temporal copy of the set to iterate.
+/// If a `set` is modified during iteration, it will cause a `RuntimeError`.
+///
+/// If you need to modify a `set` within a loop, consider iterating over a copy
+/// of the `set` instead.
+///
+/// ## Known problems
+/// This rule favors false negatives over false positives. Specifically, it
+/// will only detect variables that can be inferred to be a `set` type based on
+/// local type inference, and will only detect modifications that are made
+/// directly on the variable itself (e.g., `set.add()`), as opposed to
+/// modifications within other function calls (e.g., `some_function(set)`).
 ///
 /// ## Example
 /// ```python
@@ -37,26 +46,17 @@ pub struct ModifiedIteratingSet {
 impl AlwaysFixableViolation for ModifiedIteratingSet {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Iterated set `{}` is being modified inside for loop body.",
-            self.name
-        )
+        let ModifiedIteratingSet { name } = self;
+        format!("Iterated set `{name}` is modified within the `for` loop",)
     }
 
     fn fix_title(&self) -> String {
-        format!("Consider iterating through a copy of it instead.")
+        let ModifiedIteratingSet { name } = self;
+        format!("Iterate over a copy of `{name}`")
     }
 }
 
-fn is_method_modifying(identifier: &str) -> bool {
-    (identifier == "add")
-        || (identifier == "clear")
-        || (identifier == "discard")
-        || (identifier == "pop")
-        || (identifier == "remove")
-}
-
-// PLE4703
+/// PLE4703
 pub(crate) fn modified_iterating_set(checker: &mut Checker, for_stmt: &StmtFor) {
     let Some(name) = for_stmt.iter.as_name_expr() else {
         return;
@@ -69,8 +69,7 @@ pub(crate) fn modified_iterating_set(checker: &mut Checker, for_stmt: &StmtFor) 
         return;
     }
 
-    let mut is_modified = false;
-    for stmt in &for_stmt.body {
+    if for_stmt.body.iter().any(|stmt| {
         // name_of_set.modify_method()
         // ^---------^ ^-----------^
         //    value        attr
@@ -79,30 +78,27 @@ pub(crate) fn modified_iterating_set(checker: &mut Checker, for_stmt: &StmtFor) 
         // ^-------------------------^
         //        expr, stmt
         let Stmt::Expr(ast::StmtExpr { value: expr, .. }) = stmt else {
-            continue;
+            return false;
         };
 
         let Some(func) = expr.as_call_expr().map(|exprcall| &exprcall.func) else {
-            continue;
+            return false;
         };
 
         let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
-            continue;
+            return false;
         };
 
         let Some(value) = value.as_name_expr() else {
-            continue;
+            return false;
         };
 
         let Some(binding_id_value) = checker.semantic().only_binding(value) else {
-            continue;
+            return false;
         };
-        if binding_id == binding_id_value && is_method_modifying(attr.as_str()) {
-            is_modified = true;
-        }
-    }
 
-    if is_modified {
+        binding_id == binding_id_value && modifies_set(attr.as_str())
+    }) {
         let mut diagnostic = Diagnostic::new(
             ModifiedIteratingSet {
                 name: name.id.clone(),
@@ -110,9 +106,14 @@ pub(crate) fn modified_iterating_set(checker: &mut Checker, for_stmt: &StmtFor) 
             for_stmt.range(),
         );
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            format!("{}.copy()", name.id),
+            format!("{}.copy()", checker.locator().slice(name)),
             name.range(),
         )));
         checker.diagnostics.push(diagnostic);
     }
+}
+
+/// Returns `true` if the method modifies the set.
+fn modifies_set(identifier: &str) -> bool {
+    matches!(identifier, "add" | "clear" | "discard" | "pop" | "remove")
 }

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-modified_iterating_set.py:4:1: PLE4703 [*] Iterated set `nums` is being modified inside for loop body.
+modified_iterating_set.py:4:1: PLE4703 [*] Iterated set `nums` is modified within the `for` loop
   |
 3 |   nums = {1, 2, 3}
 4 | / for num in nums:
@@ -10,7 +10,7 @@ modified_iterating_set.py:4:1: PLE4703 [*] Iterated set `nums` is being modified
 6 |   
 7 |   animals = {"dog", "cat", "cow"}
   |
-  = help: Consider iterating through a copy of it instead.
+  = help: Iterate over a copy of `nums`
 
 ℹ Unsafe fix
 1 1 | # Errors
@@ -22,7 +22,7 @@ modified_iterating_set.py:4:1: PLE4703 [*] Iterated set `nums` is being modified
 6 6 | 
 7 7 | animals = {"dog", "cat", "cow"}
 
-modified_iterating_set.py:8:1: PLE4703 [*] Iterated set `animals` is being modified inside for loop body.
+modified_iterating_set.py:8:1: PLE4703 [*] Iterated set `animals` is modified within the `for` loop
    |
  7 |   animals = {"dog", "cat", "cow"}
  8 | / for animal in animals:
@@ -31,7 +31,7 @@ modified_iterating_set.py:8:1: PLE4703 [*] Iterated set `animals` is being modif
 10 |   
 11 |   fruits = {"apple", "orange", "grape"}
    |
-   = help: Consider iterating through a copy of it instead.
+   = help: Iterate over a copy of `animals`
 
 ℹ Unsafe fix
 5 5 |     nums.add(num + 1)
@@ -43,7 +43,7 @@ modified_iterating_set.py:8:1: PLE4703 [*] Iterated set `animals` is being modif
 10 10 | 
 11 11 | fruits = {"apple", "orange", "grape"}
 
-modified_iterating_set.py:12:1: PLE4703 [*] Iterated set `fruits` is being modified inside for loop body.
+modified_iterating_set.py:12:1: PLE4703 [*] Iterated set `fruits` is modified within the `for` loop
    |
 11 |   fruits = {"apple", "orange", "grape"}
 12 | / for fruit in fruits:
@@ -52,7 +52,7 @@ modified_iterating_set.py:12:1: PLE4703 [*] Iterated set `fruits` is being modif
 14 |   
 15 |   planets = {"mercury", "venus", "earth"}
    |
-   = help: Consider iterating through a copy of it instead.
+   = help: Iterate over a copy of `fruits`
 
 ℹ Unsafe fix
 9  9  |     animals.pop("cow")
@@ -64,7 +64,7 @@ modified_iterating_set.py:12:1: PLE4703 [*] Iterated set `fruits` is being modif
 14 14 | 
 15 15 | planets = {"mercury", "venus", "earth"}
 
-modified_iterating_set.py:16:1: PLE4703 [*] Iterated set `planets` is being modified inside for loop body.
+modified_iterating_set.py:16:1: PLE4703 [*] Iterated set `planets` is modified within the `for` loop
    |
 15 |   planets = {"mercury", "venus", "earth"}
 16 | / for planet in planets:
@@ -73,7 +73,7 @@ modified_iterating_set.py:16:1: PLE4703 [*] Iterated set `planets` is being modi
 18 |   
 19 |   colors = {"red", "green", "blue"}
    |
-   = help: Consider iterating through a copy of it instead.
+   = help: Iterate over a copy of `planets`
 
 ℹ Unsafe fix
 13 13 |     fruits.clear()
@@ -85,7 +85,7 @@ modified_iterating_set.py:16:1: PLE4703 [*] Iterated set `planets` is being modi
 18 18 | 
 19 19 | colors = {"red", "green", "blue"}
 
-modified_iterating_set.py:20:1: PLE4703 [*] Iterated set `colors` is being modified inside for loop body.
+modified_iterating_set.py:20:1: PLE4703 [*] Iterated set `colors` is modified within the `for` loop
    |
 19 |   colors = {"red", "green", "blue"}
 20 | / for color in colors:
@@ -94,7 +94,7 @@ modified_iterating_set.py:20:1: PLE4703 [*] Iterated set `colors` is being modif
 22 |   
 23 |   # OK
    |
-   = help: Consider iterating through a copy of it instead.
+   = help: Iterate over a copy of `colors`
 
 ℹ Unsafe fix
 17 17 |     planets.discard("mercury")
