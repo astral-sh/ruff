@@ -1051,7 +1051,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "157") => (RuleGroup::Preview, rules::refurb::rules::VerboseDecimalConstructor),
         (Refurb, "161") => (RuleGroup::Preview, rules::refurb::rules::BitCount),
         (Refurb, "163") => (RuleGroup::Preview, rules::refurb::rules::RedundantLogBase),
-        (Refurb, "164") => (RuleGroup::Preview, rules::refurb::rules::VerboseDecimalFractionConstruction),
+        (Refurb, "164") => (RuleGroup::Preview, rules::refurb::rules::UnnecessaryFromFloat),
         (Refurb, "167") => (RuleGroup::Preview, rules::refurb::rules::RegexFlagAlias),
         (Refurb, "168") => (RuleGroup::Preview, rules::refurb::rules::IsinstanceTypeNone),
         (Refurb, "169") => (RuleGroup::Preview, rules::refurb::rules::TypeNoneComparison),

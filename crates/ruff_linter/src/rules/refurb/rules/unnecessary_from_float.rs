@@ -44,12 +44,12 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
 /// - [Python documentation: `fractions`](https://docs.python.org/3/library/fractions.html)
 #[violation]
-pub struct VerboseDecimalFractionConstruction {
+pub struct UnnecessaryFromFloat {
     method_name: String,
     constructor: String,
 }
 
-impl Violation for VerboseDecimalFractionConstruction {
+impl Violation for UnnecessaryFromFloat {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -66,7 +66,7 @@ impl Violation for VerboseDecimalFractionConstruction {
 }
 
 /// FURB164
-pub(crate) fn verbose_decimal_fraction_construction(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn unnecessary_from_float(checker: &mut Checker, call: &ExprCall) {
     let Some(qualified_name) = checker.semantic().resolve_qualified_name(&call.func) else {
         return;
     };
@@ -92,7 +92,7 @@ pub(crate) fn verbose_decimal_fraction_construction(checker: &mut Checker, call:
     };
 
     let mut diagnostic = Diagnostic::new(
-        VerboseDecimalFractionConstruction {
+        UnnecessaryFromFloat {
             method_name: (*method_name).to_string(),
             constructor: (*constructor).to_string(),
         },

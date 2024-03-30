@@ -21,8 +21,8 @@ pub(crate) use single_item_membership_test::*;
 pub(crate) use slice_copy::*;
 pub(crate) use type_none_comparison::*;
 pub(crate) use unnecessary_enumerate::*;
+pub(crate) use unnecessary_from_float::*;
 pub(crate) use verbose_decimal_constructor::*;
-pub(crate) use verbose_decimal_fraction_construction::*;
 
 mod bit_count;
 mod check_and_remove_from_set;
@@ -47,5 +47,5 @@ mod single_item_membership_test;
 mod slice_copy;
 mod type_none_comparison;
 mod unnecessary_enumerate;
+mod unnecessary_from_float;
 mod verbose_decimal_constructor;
-mod verbose_decimal_fraction_construction;

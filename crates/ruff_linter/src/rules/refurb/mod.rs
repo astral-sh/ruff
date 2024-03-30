@@ -27,7 +27,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryEnumerate, Path::new("FURB148.py"))]
     #[test_case(Rule::MathConstant, Path::new("FURB152.py"))]
     #[test_case(Rule::VerboseDecimalConstructor, Path::new("FURB157.py"))]
-    #[test_case(Rule::VerboseDecimalFractionConstruction, Path::new("FURB164.py"))]
+    #[test_case(Rule::UnnecessaryFromFloat, Path::new("FURB164.py"))]
     #[test_case(Rule::PrintEmptyString, Path::new("FURB105.py"))]
     #[test_case(Rule::ImplicitCwd, Path::new("FURB177.py"))]
     #[test_case(Rule::SingleItemMembershipTest, Path::new("FURB171.py"))]
