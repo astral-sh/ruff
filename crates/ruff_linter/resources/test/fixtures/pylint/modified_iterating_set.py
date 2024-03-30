@@ -20,6 +20,11 @@ colors = {"red", "green", "blue"}
 for color in colors:
     colors.remove("red")
 
+odds = {1, 3, 5}
+for num in odds:
+    if num > 1:
+        odds.add(num + 1)
+
 # OK
 
 nums = {1, 2, 3}

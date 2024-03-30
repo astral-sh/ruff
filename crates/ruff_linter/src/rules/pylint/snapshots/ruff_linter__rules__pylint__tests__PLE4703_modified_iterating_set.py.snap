@@ -92,7 +92,7 @@ modified_iterating_set.py:20:1: PLE4703 [*] Iterated set `colors` is modified wi
 21 | |     colors.remove("red")
    | |________________________^ PLE4703
 22 |   
-23 |   # OK
+23 |   odds = {1, 3, 5}
    |
    = help: Iterate over a copy of `colors`
 
@@ -104,4 +104,26 @@ modified_iterating_set.py:20:1: PLE4703 [*] Iterated set `colors` is modified wi
    20 |+for color in colors.copy():
 21 21 |     colors.remove("red")
 22 22 | 
-23 23 | # OK
+23 23 | odds = {1, 3, 5}
+
+modified_iterating_set.py:24:1: PLE4703 [*] Iterated set `odds` is modified within the `for` loop
+   |
+23 |   odds = {1, 3, 5}
+24 | / for num in odds:
+25 | |     if num > 1:
+26 | |         odds.add(num + 1)
+   | |_________________________^ PLE4703
+27 |   
+28 |   # OK
+   |
+   = help: Iterate over a copy of `odds`
+
+ℹ Unsafe fix
+21 21 |     colors.remove("red")
+22 22 | 
+23 23 | odds = {1, 3, 5}
+24    |-for num in odds:
+   24 |+for num in odds.copy():
+25 25 |     if num > 1:
+26 26 |         odds.add(num + 1)
+27 27 |

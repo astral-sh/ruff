@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Stmt, StmtFor};
+use ruff_python_ast::helpers::any_over_body;
+use ruff_python_ast::{self as ast, Expr, StmtFor};
 use ruff_python_semantic::analyze::typing::is_set;
 use ruff_text_size::Ranged;
 
@@ -69,19 +70,8 @@ pub(crate) fn modified_iterating_set(checker: &mut Checker, for_stmt: &StmtFor) 
         return;
     }
 
-    if for_stmt.body.iter().any(|stmt| {
-        // name_of_set.modify_method()
-        // ^---------^ ^-----------^
-        //    value        attr
-        // ^-----------------------^
-        //           func
-        // ^-------------------------^
-        //        expr, stmt
-        let Stmt::Expr(ast::StmtExpr { value: expr, .. }) = stmt else {
-            return false;
-        };
-
-        let Some(func) = expr.as_call_expr().map(|exprcall| &exprcall.func) else {
+    let is_modified = any_over_body(&for_stmt.body, &|expr| {
+        let Some(func) = expr.as_call_expr().map(|call| &call.func) else {
             return false;
         };
 
@@ -93,12 +83,14 @@ pub(crate) fn modified_iterating_set(checker: &mut Checker, for_stmt: &StmtFor) 
             return false;
         };
 
-        let Some(binding_id_value) = checker.semantic().only_binding(value) else {
+        let Some(value_id) = checker.semantic().only_binding(value) else {
             return false;
         };
 
-        binding_id == binding_id_value && modifies_set(attr.as_str())
-    }) {
+        binding_id == value_id && modifies_set(attr.as_str())
+    });
+
+    if is_modified {
         let mut diagnostic = Diagnostic::new(
             ModifiedIteratingSet {
                 name: name.id.clone(),
