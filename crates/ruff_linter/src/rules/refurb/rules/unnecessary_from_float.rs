@@ -3,22 +3,17 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_text_size::Ranged;
 
-use crate::{checkers::ast::Checker, importer::ImportRequest};
+use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for unnecessary `from_float`, `from_decimal` method called
-/// when constructing `Decimal` and `Fraction`.
+/// Checks for unnecessary `from_float` and `from_decimal` usages to construct
+/// `Decimal` and `Fraction` instances.
 ///
 /// ## Why is this bad?
-/// From Python 3.2, it is possible to directly construct `Fraction`
-/// from `float` and `Decimal`, or `Decimal` from `float` by passing argument to
-/// the constructor.
-/// There is no need to use `from_float` or `from_decimal` instances, thus prefer directly using
-/// the constructor as it is more readable and idiomatic.
-///
-/// Further, if `Decimal` of special values i.e. `inf`, `-inf`, `Infinity`, `-Infinity` and `nan`
-/// is constructed, there is no need to construct via float instance.
-/// For example, expression like `Decimal("inf")` is possible.
+/// Since Python 3.2, the `Fraction` and `Decimal` classes can be constructed
+/// by passing float or decimal instances to the constructor directly. As such,
+/// the use of `from_float` and `from_decimal` methods is unnecessary, and
+/// should be avoided in favor of the more concise constructor syntax.
 ///
 /// ## Examples
 /// ```python
@@ -33,20 +28,16 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 /// Decimal(4.2)
 /// Decimal("inf")
 /// Fraction(4.2)
-/// Fraction(Decimal("4.2"))
+/// Fraction(Decimal(4.2))
 /// ```
-/// ## Fix safety
-/// This rule's fix is marked as unsafe, as the target of the method call
-/// could be a user-defined `Decimal` or `Fraction` class, rather
-/// than method from the built-in module.
 ///
 /// ## References
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
 /// - [Python documentation: `fractions`](https://docs.python.org/3/library/fractions.html)
 #[violation]
 pub struct UnnecessaryFromFloat {
-    method_name: String,
-    constructor: String,
+    method_name: MethodName,
+    constructor: Constructor,
 }
 
 impl Violation for UnnecessaryFromFloat {
@@ -54,82 +45,100 @@ impl Violation for UnnecessaryFromFloat {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Verbose method `{}` when constructing `{}`",
-            self.method_name, self.constructor
-        )
+        let UnnecessaryFromFloat {
+            method_name,
+            constructor,
+        } = self;
+        format!("Verbose method `{method_name}` in `{constructor}` construction",)
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Use constructor `{}` directly", self.constructor))
+        let UnnecessaryFromFloat { constructor, .. } = self;
+        Some(format!("Replace with `{constructor}` constructor"))
     }
 }
 
 /// FURB164
 pub(crate) fn unnecessary_from_float(checker: &mut Checker, call: &ExprCall) {
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(&call.func) else {
+    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &*call.func else {
         return;
     };
 
-    if !matches!(
-        qualified_name.segments(),
-        ["decimal", "Decimal", "from_float"]
-            | ["fractions", "Fraction", "from_float" | "from_decimal"]
+    // The method name must be either `from_float` or `from_decimal`.
+    let method_name = match attr.as_str() {
+        "from_float" => MethodName::FromFloat,
+        "from_decimal" => MethodName::FromDecimal,
+        _ => return,
+    };
+
+    // The value must be either `decimal.Decimal` or `fractions.Fraction`.
+    let Some(constructor) =
+        checker
+            .semantic()
+            .resolve_qualified_name(value)
+            .and_then(|qualified_name| match qualified_name.segments() {
+                ["decimal", "Decimal"] => Some(Constructor::Decimal),
+                ["fractions", "Fraction"] => Some(Constructor::Fraction),
+                _ => None,
+            })
+    else {
+        return;
+    };
+
+    // `Decimal.from_decimal` doesn't exist.
+    if matches!(
+        (method_name, constructor),
+        (MethodName::FromDecimal, Constructor::Decimal)
     ) {
         return;
     }
 
-    let [module, constructor, method_name] = qualified_name.segments() else {
-        return;
-    };
-
-    let Some(value) = (if method_name == &"from_float" {
-        call.arguments.find_argument("f", 0)
-    } else {
-        call.arguments.find_argument("dec", 0)
-    }) else {
-        return;
-    };
-
     let mut diagnostic = Diagnostic::new(
         UnnecessaryFromFloat {
-            method_name: (*method_name).to_string(),
-            constructor: (*constructor).to_string(),
+            method_name,
+            constructor,
         },
         call.range(),
     );
 
-    let new_constructor = checker.importer().get_or_import_symbol(
-        &ImportRequest::import_from(module, constructor),
-        call.start(),
-        checker.semantic(),
+    let edit = Edit::range_replacement(
+        checker.locator().slice(&**value).to_string(),
+        call.func.range(),
     );
-    let Ok((_, new_constructor)) = new_constructor else {
-        checker.diagnostics.push(diagnostic);
-        return;
-    };
-    let edit = Edit::range_replacement(new_constructor, call.func.range());
 
-    // Short-circuit case for special values, such as
-    // `Decimal.from_float(float("inf"))` to `Decimal("inf")`.
+    // Short-circuit case for special values, such as: `Decimal.from_float(float("inf"))` to `Decimal("inf")`.
     'short_circuit: {
-        if !(constructor == &"Decimal" && method_name == &"from_float") {
+        if !matches!(constructor, Constructor::Decimal) {
             break 'short_circuit;
         };
+        if !(method_name == MethodName::FromFloat) {
+            break 'short_circuit;
+        };
+
+        let Some(value) = (match method_name {
+            MethodName::FromFloat => call.arguments.find_argument("f", 0),
+            MethodName::FromDecimal => call.arguments.find_argument("dec", 0),
+        }) else {
+            return;
+        };
+
         let Expr::Call(
-            inner_call @ ast::ExprCall {
+            call @ ast::ExprCall {
                 func, arguments, ..
             },
         ) = value
         else {
             break 'short_circuit;
         };
+
+        // Must be a call to the `float` builtin.
         let Some(func_name) = func.as_name_expr() else {
             break 'short_circuit;
         };
-        if !(func_name.id == "float" && checker.semantic().is_builtin("float")) {
+        if func_name.id != "float" {
             break 'short_circuit;
         };
+
         // Must have exactly one argument, which is a string literal.
         if arguments.keywords.len() != 0 {
             break 'short_circuit;
@@ -145,20 +154,52 @@ pub(crate) fn unnecessary_from_float(checker: &mut Checker, call: &ExprCall) {
             "inf" | "-inf" | "infinity" | "-infinity" | "nan"
         ) {
             break 'short_circuit;
+        }
+
+        if !checker.semantic().is_builtin("float") {
+            break 'short_circuit;
         };
 
-        diagnostic.set_fix(Fix::unsafe_edits(
+        let replacement = checker.locator().slice(float).to_string();
+        diagnostic.set_fix(Fix::safe_edits(
             edit,
-            [Edit::range_replacement(
-                format!("\"{}\"", float.value.to_str()),
-                inner_call.range(),
-            )],
+            [Edit::range_replacement(replacement, call.range())],
         ));
         checker.diagnostics.push(diagnostic);
 
         return;
     }
 
-    diagnostic.set_fix(Fix::unsafe_edit(edit));
+    diagnostic.set_fix(Fix::safe_edit(edit));
     checker.diagnostics.push(diagnostic);
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum MethodName {
+    FromFloat,
+    FromDecimal,
+}
+
+impl std::fmt::Display for MethodName {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            MethodName::FromFloat => fmt.write_str("from_float"),
+            MethodName::FromDecimal => fmt.write_str("from_decimal"),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum Constructor {
+    Decimal,
+    Fraction,
+}
+
+impl std::fmt::Display for Constructor {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Constructor::Decimal => fmt.write_str("Decimal"),
+            Constructor::Fraction => fmt.write_str("Fraction"),
+        }
+    }
 }
