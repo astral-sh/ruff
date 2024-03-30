@@ -1,4 +1,4 @@
-# Positive cases
+# Errors
 
 nums = {1, 2, 3}
 for num in nums:
@@ -20,7 +20,7 @@ colors = {"red", "green", "blue"}
 for color in colors:
     colors.remove("red")
 
-# Negative cases
+# OK
 
 nums = {1, 2, 3}
 for num in nums.copy():
@@ -38,13 +38,18 @@ for fruit in fruits:
     temp_fruits.clear(fruit)
 
 colors = {"red", "green", "blue"}
+
+
 def add_colors():
     colors = {"cyan", "magenta", "yellow"}
     for color in colors:
+
         def add_color():
             global colors
             colors.add(color)
+
         add_color()
+
 
 add_colors()
 print(colors)

@@ -13,7 +13,7 @@ modified_iterating_set.py:4:1: PLE4703 [*] Iterated set `nums` is being modified
   = help: Consider iterating through a copy of it instead.
 
 ℹ Unsafe fix
-1 1 | # Positive cases
+1 1 | # Errors
 2 2 | 
 3 3 | nums = {1, 2, 3}
 4   |-for num in nums:
@@ -92,7 +92,7 @@ modified_iterating_set.py:20:1: PLE4703 [*] Iterated set `colors` is being modif
 21 | |     colors.remove("red")
    | |________________________^ PLE4703
 22 |   
-23 |   # Negative cases
+23 |   # OK
    |
    = help: Consider iterating through a copy of it instead.
 
@@ -104,4 +104,4 @@ modified_iterating_set.py:20:1: PLE4703 [*] Iterated set `colors` is being modif
    20 |+for color in colors.copy():
 21 21 |     colors.remove("red")
 22 22 | 
-23 23 | # Negative cases
+23 23 | # OK
