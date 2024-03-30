@@ -809,6 +809,10 @@ pub struct LintCommonOptions {
     #[option_group]
     pub flake8_bandit: Option<Flake8BanditOptions>,
 
+    /// Options for the `flake8-boolean-trap` plugin.
+    #[option_group]
+    pub flake8_boolean_trap: Option<Flake8BooleanTrapOptions>,
+
     /// Options for the `flake8-bugbear` plugin.
     #[option_group]
     pub flake8_bugbear: Option<Flake8BugbearOptions>,
@@ -1042,6 +1046,32 @@ impl Flake8BanditOptions {
                 .chain(self.hardcoded_tmp_directory_extend.unwrap_or_default())
                 .collect(),
             check_typed_exception: self.check_typed_exception.unwrap_or(false),
+        }
+    }
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct Flake8BooleanTrapOptions {
+    /// Additional callable functions with which to allow boolean traps.
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `pydantic.Field`, rather than
+    /// `Field`).
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "extend-allowed-calls = [\"pydantic.Field\", \"django.db.models.Value\"]"
+    )]
+    pub extend_allowed_calls: Option<Vec<String>>,
+}
+
+impl Flake8BooleanTrapOptions {
+    pub fn into_settings(self) -> ruff_linter::rules::flake8_boolean_trap::settings::Settings {
+        ruff_linter::rules::flake8_boolean_trap::settings::Settings {
+            extend_allowed_calls: self.extend_allowed_calls.unwrap_or_default(),
         }
     }
 }
