@@ -40,10 +40,7 @@ pub(crate) fn delete_stmt(
     locator: &Locator,
     indexer: &Indexer,
 ) -> Edit {
-    if parent
-        .map(|parent| is_lone_child(stmt, parent))
-        .unwrap_or_default()
-    {
+    if parent.is_some_and(|parent| is_lone_child(stmt, parent)) {
         // If removing this node would lead to an invalid syntax tree, replace
         // it with a `pass`.
         Edit::range_replacement("pass".to_string(), stmt.range())

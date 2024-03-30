@@ -1,14 +1,10 @@
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::Tok;
-use ruff_text_size::{TextRange, TextSize};
-
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::StringLike;
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange};
 
-use crate::lex::docstring_detection::StateMachine;
-
-use crate::settings::LinterSettings;
+use crate::checkers::ast::Checker;
 
 use super::super::settings::Quote;
 
@@ -256,29 +252,31 @@ fn text_ends_at_quote(locator: &Locator, range: TextRange, quote: Quote) -> bool
 }
 
 /// Q002
-fn docstring(locator: &Locator, range: TextRange, settings: &LinterSettings) -> Option<Diagnostic> {
-    let quotes_settings = &settings.flake8_quotes;
+fn docstring(checker: &mut Checker, range: TextRange) {
+    let quotes_settings = &checker.settings.flake8_quotes;
+    let locator = checker.locator();
 
     let text = locator.slice(range);
     let trivia: Trivia = text.into();
     if trivia.has_empty_text()
-        && text_ends_at_quote(locator, range, settings.flake8_quotes.docstring_quotes)
+        && text_ends_at_quote(locator, range, quotes_settings.docstring_quotes)
     {
         // Fixing this would result in a one-sided multi-line docstring, which would
         // introduce a syntax error.
-        return Some(Diagnostic::new(
+        checker.diagnostics.push(Diagnostic::new(
             BadQuotesDocstring {
                 preferred_quote: quotes_settings.docstring_quotes,
             },
             range,
         ));
+        return;
     }
 
     if trivia
         .raw_text
         .contains(good_docstring(quotes_settings.docstring_quotes))
     {
-        return None;
+        return;
     }
 
     let mut diagnostic = Diagnostic::new(
@@ -302,18 +300,13 @@ fn docstring(locator: &Locator, range: TextRange, settings: &LinterSettings) -> 
         fixed_contents,
         range,
     )));
-    Some(diagnostic)
+    checker.diagnostics.push(diagnostic);
 }
 
 /// Q000, Q001
-fn strings(
-    locator: &Locator,
-    sequence: &[TextRange],
-    settings: &LinterSettings,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
-
-    let quotes_settings = &settings.flake8_quotes;
+fn strings(checker: &mut Checker, sequence: &[TextRange]) {
+    let quotes_settings = &checker.settings.flake8_quotes;
+    let locator = checker.locator();
 
     let trivia = sequence
         .iter()
@@ -377,20 +370,20 @@ fn strings(
                 fixed_contents,
                 *range,
             )));
-            diagnostics.push(diagnostic);
+            checker.diagnostics.push(diagnostic);
         } else if trivia.last_quote_char != quotes_settings.inline_quotes.as_char()
             // If we're not using the preferred type, only allow use to avoid escapes.
             && !relax_quote
         {
             if trivia.has_empty_text()
-                && text_ends_at_quote(locator, *range, settings.flake8_quotes.inline_quotes)
+                && text_ends_at_quote(locator, *range, quotes_settings.inline_quotes)
             {
                 // Fixing this would introduce a syntax error. For example, changing the initial
                 // single quotes to double quotes would result in a syntax error:
                 // ```python
                 // ''"assert" ' SAM macro definitions '''
                 // ```
-                diagnostics.push(Diagnostic::new(
+                checker.diagnostics.push(Diagnostic::new(
                     BadQuotesInlineString {
                         preferred_quote: quotes_settings.inline_quotes,
                     },
@@ -399,17 +392,13 @@ fn strings(
                 continue;
             }
 
-            if text_starts_at_consecutive_quote(
-                locator,
-                *range,
-                settings.flake8_quotes.inline_quotes,
-            ) {
+            if text_starts_at_consecutive_quote(locator, *range, quotes_settings.inline_quotes) {
                 // Fixing this would introduce a syntax error. For example, changing the double
                 // doubles to single quotes would result in a syntax error:
                 // ```python
                 // ''"assert" ' SAM macro definitions '''
                 // ```
-                diagnostics.push(Diagnostic::new(
+                checker.diagnostics.push(Diagnostic::new(
                     BadQuotesInlineString {
                         preferred_quote: quotes_settings.inline_quotes,
                     },
@@ -436,120 +425,40 @@ fn strings(
                 fixed_contents,
                 *range,
             )));
-            diagnostics.push(diagnostic);
+            checker.diagnostics.push(diagnostic);
         }
-    }
-
-    diagnostics
-}
-
-/// A builder for the f-string range.
-///
-/// For now, this is limited to the outermost f-string and doesn't support
-/// nested f-strings.
-#[derive(Debug, Default)]
-struct FStringRangeBuilder {
-    start_location: TextSize,
-    end_location: TextSize,
-    nesting: u32,
-}
-
-impl FStringRangeBuilder {
-    fn visit_token(&mut self, token: &Tok, range: TextRange) {
-        match token {
-            Tok::FStringStart(_) => {
-                if self.nesting == 0 {
-                    self.start_location = range.start();
-                }
-                self.nesting += 1;
-            }
-            Tok::FStringEnd => {
-                self.nesting = self.nesting.saturating_sub(1);
-                if self.nesting == 0 {
-                    self.end_location = range.end();
-                }
-            }
-            _ => {}
-        }
-    }
-
-    /// Returns `true` if the lexer is currently inside of a f-string.
-    ///
-    /// It'll return `false` once the `FStringEnd` token for the outermost
-    /// f-string is visited.
-    const fn in_fstring(&self) -> bool {
-        self.nesting > 0
-    }
-
-    /// Returns the complete range of the previously visited f-string.
-    ///
-    /// This method should only be called once the lexer is outside of any
-    /// f-string otherwise it might return an invalid range.
-    ///
-    /// It doesn't consume the builder because there can be multiple f-strings
-    /// throughout the source code.
-    fn finish(&self) -> TextRange {
-        debug_assert!(!self.in_fstring());
-        TextRange::new(self.start_location, self.end_location)
     }
 }
 
 /// Generate `flake8-quote` diagnostics from a token stream.
-pub(crate) fn check_string_quotes(
-    diagnostics: &mut Vec<Diagnostic>,
-    lxr: &[LexResult],
-    locator: &Locator,
-    settings: &LinterSettings,
-) {
-    // Keep track of sequences of strings, which represent implicit string
-    // concatenation, and should thus be handled as a single unit.
-    let mut sequence = vec![];
-    let mut state_machine = StateMachine::default();
-    let mut fstring_range_builder = FStringRangeBuilder::default();
-    for &(ref tok, range) in lxr.iter().flatten() {
-        fstring_range_builder.visit_token(tok, range);
-        if fstring_range_builder.in_fstring() {
-            continue;
-        }
-
-        let is_docstring = state_machine.consume(tok);
-
-        // If this is a docstring, consume the existing sequence, then consume the
-        // docstring, then move on.
-        if is_docstring {
-            if !sequence.is_empty() {
-                diagnostics.extend(strings(locator, &sequence, settings));
-                sequence.clear();
-            }
-            if let Some(diagnostic) = docstring(locator, range, settings) {
-                diagnostics.push(diagnostic);
-            }
-        } else {
-            match tok {
-                Tok::String { .. } => {
-                    // If this is a string, add it to the sequence.
-                    sequence.push(range);
-                }
-                Tok::FStringEnd => {
-                    // If this is the end of an f-string, add the entire f-string
-                    // range to the sequence.
-                    sequence.push(fstring_range_builder.finish());
-                }
-                Tok::Comment(..) | Tok::NonLogicalNewline => continue,
-                _ => {
-                    // Otherwise, consume the sequence.
-                    if !sequence.is_empty() {
-                        diagnostics.extend(strings(locator, &sequence, settings));
-                        sequence.clear();
-                    }
-                }
-            }
-        }
+pub(crate) fn check_string_quotes(checker: &mut Checker, string_like: StringLike) {
+    // Ignore if the string is part of a forward reference. For example,
+    // `x: "Literal['foo', 'bar']"`.
+    if checker.semantic().in_string_type_definition() {
+        return;
     }
 
-    // If we have an unterminated sequence, consume it.
-    if !sequence.is_empty() {
-        diagnostics.extend(strings(locator, &sequence, settings));
-        sequence.clear();
+    // If the string is part of a f-string, ignore it.
+    if checker
+        .indexer()
+        .fstring_ranges()
+        .outermost(string_like.start())
+        .is_some_and(|outer| outer.start() < string_like.start() && string_like.end() < outer.end())
+    {
+        return;
+    }
+
+    let ranges: Vec<TextRange> = match string_like {
+        StringLike::String(node) => node.value.iter().map(Ranged::range).collect(),
+        StringLike::Bytes(node) => node.value.iter().map(Ranged::range).collect(),
+        StringLike::FString(node) => node.value.iter().map(Ranged::range).collect(),
+    };
+
+    if checker.semantic().in_docstring() {
+        for range in ranges {
+            docstring(checker, range);
+        }
+    } else {
+        strings(checker, &ranges);
     }
 }

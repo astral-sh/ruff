@@ -73,6 +73,7 @@ use super::helpers::{is_pytest_parametrize, split_names};
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[violation]
 pub struct PytestParametrizeNamesWrongType {
+    single_argument: bool,
     expected: types::ParametrizeNameType,
 }
 
@@ -81,13 +82,43 @@ impl Violation for PytestParametrizeNamesWrongType {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestParametrizeNamesWrongType { expected } = self;
-        format!("Wrong name(s) type in `@pytest.mark.parametrize`, expected `{expected}`")
+        let PytestParametrizeNamesWrongType {
+            single_argument,
+            expected,
+        } = self;
+        let expected_string = {
+            if *single_argument {
+                "`str`".to_string()
+            } else {
+                match expected {
+                    types::ParametrizeNameType::Csv => format!("a {expected}"),
+                    types::ParametrizeNameType::Tuple | types::ParametrizeNameType::List => {
+                        format!("`{expected}`")
+                    }
+                }
+            }
+        };
+        format!("Wrong type passed to first argument of `@pytest.mark.parametrize`; expected {expected_string}")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let PytestParametrizeNamesWrongType { expected } = self;
-        Some(format!("Use a `{expected}` for parameter names"))
+        let PytestParametrizeNamesWrongType {
+            single_argument,
+            expected,
+        } = self;
+        let expected_string = {
+            if *single_argument {
+                "string".to_string()
+            } else {
+                match expected {
+                    types::ParametrizeNameType::Csv => format!("{expected}"),
+                    types::ParametrizeNameType::Tuple | types::ParametrizeNameType::List => {
+                        format!("`{expected}`")
+                    }
+                }
+            }
+        };
+        Some(format!("Use a {expected_string} for the first argument"))
     }
 }
 
@@ -328,6 +359,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         .unwrap_or(expr.range());
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
+                                single_argument: false,
                                 expected: names_type,
                             },
                             name_range,
@@ -362,6 +394,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                         .unwrap_or(expr.range());
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
+                                single_argument: false,
                                 expected: names_type,
                             },
                             name_range,
@@ -400,6 +433,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                     types::ParametrizeNameType::List => {
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
+                                single_argument: false,
                                 expected: names_type,
                             },
                             expr.range(),
@@ -418,6 +452,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                     types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
+                                single_argument: false,
                                 expected: names_type,
                             },
                             expr.range(),
@@ -444,6 +479,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                     types::ParametrizeNameType::Tuple => {
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
+                                single_argument: false,
                                 expected: names_type,
                             },
                             expr.range(),
@@ -463,6 +499,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                     types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
+                                single_argument: false,
                                 expected: names_type,
                             },
                             expr.range(),
@@ -607,10 +644,15 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
 ///              Tokenize this range to locate the comma.
 /// )
 /// ```
-fn trailing_comma(element: &Expr, source: &str) -> Option<TextSize> {
-    SimpleTokenizer::starts_at(element.end(), source)
-        .find(|token| token.kind == SimpleTokenKind::Comma)
-        .map(|token| token.start())
+fn trailing_comma(element: &Expr, source: &str, max_index: TextSize) -> TextSize {
+    for token in SimpleTokenizer::starts_at(element.end(), source) {
+        if matches!(token.kind, SimpleTokenKind::Comma) {
+            return token.start();
+        } else if token.start() >= max_index {
+            return max_index;
+        }
+    }
+    max_index
 }
 
 /// PT014
@@ -635,9 +677,9 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
                 if let Some(prev) = prev {
                     let values_end = values.end() - TextSize::new(1);
                     let previous_end =
-                        trailing_comma(prev, checker.locator().contents()).unwrap_or(values_end);
+                        trailing_comma(prev, checker.locator().contents(), values_end);
                     let element_end =
-                        trailing_comma(element, checker.locator().contents()).unwrap_or(values_end);
+                        trailing_comma(element, checker.locator().contents(), values_end);
                     let deletion_range = TextRange::new(previous_end, element_end);
                     if !checker
                         .indexer()
@@ -657,6 +699,7 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
 fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
     let mut diagnostic = Diagnostic::new(
         PytestParametrizeNamesWrongType {
+            single_argument: true,
             expected: types::ParametrizeNameType::Csv,
         },
         expr.range(),

@@ -522,6 +522,14 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                     guideline: Some("Use an IDE variable explorer or `locals()` instead."),
                 },
             }),
+            ["numpy", "row_stack"] => Some(Replacement {
+                existing: "row_stack",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "vstack",
+                    compatibility: Compatibility::BackwardsCompatible,
+                },
+            }),
             _ => None,
         });
 

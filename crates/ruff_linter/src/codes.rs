@@ -295,6 +295,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         #[allow(deprecated)]
         (Pylint, "R6301") => (RuleGroup::Nursery, rules::pylint::rules::NoSelfUse),
         (Pylint, "W0108") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryLambda),
+        (Pylint, "W0117") => (RuleGroup::Preview, rules::pylint::rules::NanComparison),
         (Pylint, "W0120") => (RuleGroup::Stable, rules::pylint::rules::UselessElseOnLoop),
         (Pylint, "W0127") => (RuleGroup::Stable, rules::pylint::rules::SelfAssigningVariable),
         (Pylint, "W0128") => (RuleGroup::Preview, rules::pylint::rules::RedeclaredAssignedName),
@@ -1044,11 +1045,14 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "132") => (RuleGroup::Nursery, rules::refurb::rules::CheckAndRemoveFromSet),
         (Refurb, "136") => (RuleGroup::Preview, rules::refurb::rules::IfExprMinMax),
         (Refurb, "140") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedStarmap),
+        (Refurb, "142") => (RuleGroup::Preview, rules::refurb::rules::ForLoopSetMutations),
         (Refurb, "145") => (RuleGroup::Preview, rules::refurb::rules::SliceCopy),
         (Refurb, "148") => (RuleGroup::Preview, rules::refurb::rules::UnnecessaryEnumerate),
         (Refurb, "152") => (RuleGroup::Preview, rules::refurb::rules::MathConstant),
+        (Refurb, "157") => (RuleGroup::Preview, rules::refurb::rules::VerboseDecimalConstructor),
         (Refurb, "161") => (RuleGroup::Preview, rules::refurb::rules::BitCount),
         (Refurb, "163") => (RuleGroup::Preview, rules::refurb::rules::RedundantLogBase),
+        (Refurb, "164") => (RuleGroup::Preview, rules::refurb::rules::UnnecessaryFromFloat),
         (Refurb, "167") => (RuleGroup::Preview, rules::refurb::rules::RegexFlagAlias),
         (Refurb, "168") => (RuleGroup::Preview, rules::refurb::rules::IsinstanceTypeNone),
         (Refurb, "169") => (RuleGroup::Preview, rules::refurb::rules::TypeNoneComparison),
@@ -1056,6 +1060,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "177") => (RuleGroup::Preview, rules::refurb::rules::ImplicitCwd),
         (Refurb, "180") => (RuleGroup::Preview, rules::refurb::rules::MetaClassABCMeta),
         (Refurb, "181") => (RuleGroup::Preview, rules::refurb::rules::HashlibDigestHex),
+        (Refurb, "187") => (RuleGroup::Preview, rules::refurb::rules::ListReverseCopy),
 
         // flake8-logging
         (Flake8Logging, "001") => (RuleGroup::Stable, rules::flake8_logging::rules::DirectLoggerInstantiation),

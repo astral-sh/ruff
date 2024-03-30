@@ -926,6 +926,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::RedundantLogBase) {
                 refurb::rules::redundant_log_base(checker, call);
             }
+            if checker.enabled(Rule::VerboseDecimalConstructor) {
+                refurb::rules::verbose_decimal_constructor(checker, call);
+            }
+            if checker.enabled(Rule::UnnecessaryFromFloat) {
+                refurb::rules::unnecessary_from_float(checker, call);
+            }
             if checker.enabled(Rule::QuadraticListSummation) {
                 ruff::rules::quadratic_list_summation(checker, call);
             }
@@ -1282,6 +1288,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::MagicValueComparison) {
                 pylint::rules::magic_value_comparison(checker, left, comparators);
+            }
+            if checker.enabled(Rule::NanComparison) {
+                pylint::rules::nan_comparison(checker, left, comparators);
             }
             if checker.enabled(Rule::InDictKeys) {
                 flake8_simplify::rules::key_in_dict_compare(checker, compare);

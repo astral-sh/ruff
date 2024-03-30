@@ -293,8 +293,8 @@ pub struct Options {
     pub builtins: Option<Vec<String>>,
 
     /// Mark the specified directories as namespace packages. For the purpose of
-    /// module resolution, Ruff will treat those directories as if they
-    /// contained an `__init__.py` file.
+    /// module resolution, Ruff will treat those directories and all their subdirectories
+    /// as if they contained an `__init__.py` file.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -596,7 +596,7 @@ pub struct LintCommonOptions {
         default = "[]",
         value_type = "list[RuleSelector]",
         example = r#"
-            # On top of the default `select` (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            # On top of the default `select` (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
             extend-select = ["B", "Q"]
         "#
     )]
@@ -808,6 +808,10 @@ pub struct LintCommonOptions {
     /// Options for the `flake8-bandit` plugin.
     #[option_group]
     pub flake8_bandit: Option<Flake8BanditOptions>,
+
+    /// Options for the `flake8-boolean-trap` plugin.
+    #[option_group]
+    pub flake8_boolean_trap: Option<Flake8BooleanTrapOptions>,
 
     /// Options for the `flake8-bugbear` plugin.
     #[option_group]
@@ -1051,6 +1055,32 @@ impl Flake8BanditOptions {
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct Flake8BooleanTrapOptions {
+    /// Additional callable functions with which to allow boolean traps.
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `pydantic.Field`, rather than
+    /// `Field`).
+    #[option(
+        default = "[]",
+        value_type = "list[str]",
+        example = "extend-allowed-calls = [\"pydantic.Field\", \"django.db.models.Value\"]"
+    )]
+    pub extend_allowed_calls: Option<Vec<String>>,
+}
+
+impl Flake8BooleanTrapOptions {
+    pub fn into_settings(self) -> ruff_linter::rules::flake8_boolean_trap::settings::Settings {
+        ruff_linter::rules::flake8_boolean_trap::settings::Settings {
+            extend_allowed_calls: self.extend_allowed_calls.unwrap_or_default(),
+        }
+    }
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8BugbearOptions {
     /// Additional callable functions to consider "immutable" when evaluating, e.g., the
     /// `function-call-in-default-argument` rule (`B008`) or `function-call-in-dataclass-defaults`
@@ -1131,15 +1161,16 @@ impl Flake8ComprehensionsOptions {
 pub struct Flake8CopyrightOptions {
     /// The regular expression used to match the copyright notice, compiled
     /// with the [`regex`](https://docs.rs/regex/latest/regex/) crate.
-    ///
-    /// Defaults to `(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}(-\d{4})*`, which matches
+    /// Defaults to `(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*`, which matches
     /// the following:
+    ///
     /// - `Copyright 2023`
     /// - `Copyright (C) 2023`
     /// - `Copyright 2021-2023`
     /// - `Copyright (C) 2021-2023`
+    /// - `Copyright (C) 2021, 2023`
     #[option(
-        default = r#"(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}([-,]\d{4})*"#,
+        default = r#"(?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|,\s)\d{4})*"#,
         value_type = "str",
         example = r#"notice-rgx = "(?i)Copyright \\(C\\) \\d{4}""#
     )]
@@ -2962,6 +2993,7 @@ pub struct FormatOptions {
     pub indent_style: Option<IndentStyle>,
 
     /// Configures the preferred quote character for strings. The recommended options are
+    ///
     /// * `double` (default): Use double quotes `"`
     /// * `single`: Use single quotes `'`
     ///

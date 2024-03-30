@@ -17,14 +17,28 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// __all__ = ["A"]
-/// __all__.append("B")
+/// import sys
+///
+/// __all__ = ["A", "B"]
+///
+/// if sys.version_info >= (3, 10):
+///     __all__.append("C")
+///
+/// if sys.version_info >= (3, 11):
+///     __all__.remove("B")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import sys
+///
 /// __all__ = ["A"]
-/// __all__ += ["B"]
+///
+/// if sys.version_info < (3, 11):
+///     __all__ += ["B"]
+///
+/// if sys.version_info >= (3, 10):
+///     __all__ += ["C"]
 /// ```
 #[violation]
 pub struct UnsupportedMethodCallOnAll {

@@ -22,7 +22,7 @@ ruff_python_formatter = { path = "../ruff_python_formatter" }
 ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_python_trivia = { path = "../ruff_python_trivia" }
-ruff_workspace = { path = "../ruff_workspace", features = ["schemars"]}
+ruff_workspace = { path = "../ruff_workspace", features = ["schemars"] }
 
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["wrap_help"] }
@@ -31,7 +31,6 @@ imara-diff = { workspace = true }
 indicatif = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
-once_cell = { workspace = true }
 pretty_assertions = { workspace = true }
 rayon = { workspace = true }
 regex = { workspace = true }

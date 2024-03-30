@@ -18,6 +18,7 @@ use {
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
 
+use crate::string::StringQuotes;
 use crate::{prelude::*, DocstringCodeLineWidth, FormatModuleError};
 
 use super::NormalizedString;
@@ -126,7 +127,9 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     let mut lines = docstring.split('\n').peekable();
 
     // Start the string
-    write!(f, [normalized.prefix(), normalized.quotes()])?;
+    let kind = normalized.kind();
+    let quotes = StringQuotes::from(kind);
+    write!(f, [kind.prefix(), quotes])?;
     // We track where in the source docstring we are (in source code byte offsets)
     let mut offset = normalized.start();
 
@@ -142,7 +145,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
 
     // Edge case: The first line is `""" "content`, so we need to insert chaperone space that keep
     // inner quotes and closing quotes from getting to close to avoid `""""content`
-    if trim_both.starts_with(normalized.quotes().quote_char.as_char()) {
+    if trim_both.starts_with(quotes.quote_char.as_char()) {
         space().fmt(f)?;
     }
 
@@ -169,7 +172,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
         {
             space().fmt(f)?;
         }
-        normalized.quotes().fmt(f)?;
+        quotes.fmt(f)?;
         return Ok(());
     }
 
@@ -195,7 +198,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
         offset,
         stripped_indentation,
         already_normalized,
-        quote_char: normalized.quotes().quote_char,
+        quote_char: quotes.quote_char,
         code_example: CodeExample::default(),
     }
     .add_iter(lines)?;
@@ -208,7 +211,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
         space().fmt(f)?;
     }
 
-    write!(f, [normalized.quotes()])
+    write!(f, [quotes])
 }
 
 fn contains_unescaped_newline(haystack: &str) -> bool {
@@ -1570,7 +1573,7 @@ fn docstring_format_source(
 /// that avoids `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
 /// so `content\\ """` doesn't need a space while `content\\\ """` does.
 fn needs_chaperone_space(normalized: &NormalizedString, trim_end: &str) -> bool {
-    trim_end.ends_with(normalized.quotes().quote_char.as_char())
+    trim_end.ends_with(normalized.kind().quote_style().as_char())
         || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
 }
 

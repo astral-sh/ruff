@@ -100,6 +100,16 @@ impl<'a> GroupNameFinder<'a> {
             self.usage_count += value;
         }
     }
+
+    /// Reset the usage count for the group name by the given value.
+    /// This function is called when there is a `continue`, `break`, or `return` statement.
+    fn reset_usage_count(&mut self) {
+        if let Some(last) = self.counter_stack.last_mut() {
+            *last.last_mut().unwrap() = 0;
+        } else {
+            self.usage_count = 0;
+        }
+    }
 }
 
 impl<'a> Visitor<'a> for GroupNameFinder<'a> {
@@ -196,6 +206,15 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 } else if let Some(expr) = value {
                     self.visit_expr(expr);
                 }
+            }
+            Stmt::Continue(_) | Stmt::Break(_) => {
+                self.reset_usage_count();
+            }
+            Stmt::Return(ast::StmtReturn { value, range: _ }) => {
+                if let Some(expr) = value {
+                    self.visit_expr(expr);
+                }
+                self.reset_usage_count();
             }
             _ => visitor::walk_stmt(self, stmt),
         }

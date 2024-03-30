@@ -83,12 +83,7 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
         else {
             return None;
         };
-
-        let Some(slice_start) = int.as_i32() else {
-            return None;
-        };
-
-        Some(slice_start)
+        Some(int.as_i32()?)
     } else {
         None
     };

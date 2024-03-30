@@ -4,6 +4,7 @@ use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
+use ruff_python_ast::all::DunderAllName;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::Stmt;
 use ruff_source_file::Locator;
@@ -370,7 +371,7 @@ impl<'a> FromIterator<Binding<'a>> for Bindings<'a> {
 #[derive(Debug, Clone)]
 pub struct Export<'a> {
     /// The names of the bindings exported via `__all__`.
-    pub names: Box<[&'a str]>,
+    pub names: Box<[DunderAllName<'a>]>,
 }
 
 /// A binding for an `import`, keyed on the name to which the import is bound.

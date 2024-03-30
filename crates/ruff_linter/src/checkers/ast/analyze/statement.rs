@@ -1318,6 +1318,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::TryExceptInLoop) {
                     perflint::rules::try_except_in_loop(checker, body);
                 }
+                if checker.enabled(Rule::ForLoopSetMutations) {
+                    refurb::rules::for_loop_set_mutations(checker, for_stmt);
+                }
             }
         }
         Stmt::Try(ast::StmtTry {
@@ -1505,6 +1508,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         }
                     }
                 }
+            }
+            if checker.enabled(Rule::ListReverseCopy) {
+                refurb::rules::list_assign_reversed(checker, assign);
             }
         }
         Stmt::AnnAssign(

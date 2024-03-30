@@ -4,12 +4,12 @@ use std::str::FromStr;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, AnyStringKind, Expr};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
-use ruff_python_parser::{lexer, AsMode, StringKind, Tok};
+use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -260,9 +260,7 @@ fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -
         }
         contents.push('(');
         if is_multi_line {
-            let Some(indent) = indent else {
-                return None;
-            };
+            let indent = indent?;
 
             for item in &arguments {
                 contents.push_str(stylist.line_ending().as_str());
@@ -352,7 +350,7 @@ fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
 /// UP031
 pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
-    let mut strings: Vec<(TextRange, StringKind)> = vec![];
+    let mut strings: Vec<(TextRange, AnyStringKind)> = vec![];
     let mut extension = None;
     for (tok, range) in lexer::lex_starts_at(
         checker.locator().slice(expr),

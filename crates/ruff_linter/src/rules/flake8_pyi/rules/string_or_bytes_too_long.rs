@@ -12,11 +12,14 @@ use crate::checkers::ast::Checker;
 /// in stub (`.pyi`) files.
 ///
 /// ## Why is this bad?
-/// If a function has a default value where the string or bytes representation
-/// is greater than 50 characters, it is likely to be an implementation detail
-/// or a constant that varies depending on the system you're running on.
+/// If a function or variable has a default value where the string or bytes
+/// representation is greater than 50 characters long, it is likely to be an
+/// implementation detail or a constant that varies depending on the system
+/// you're running on.
 ///
-/// Consider replacing such constants with ellipses (`...`).
+/// Although IDEs may find them useful, default values are ignored by type
+/// checkers, the primary consumers of stub files. Replace very long constants
+/// with ellipses (`...`) to simplify the stub.
 ///
 /// ## Example
 /// ```python

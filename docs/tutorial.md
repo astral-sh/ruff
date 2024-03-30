@@ -180,7 +180,7 @@ specifically, we'll want to make note of the minimum supported Python version:
 
 ### Rule Selection
 
-Ruff supports [over 700 lint rules](rules.md) split across over 50 built-in plugins, but
+Ruff supports [over 800 lint rules](rules.md) split across over 50 built-in plugins, but
 determining the right set of rules will depend on your project's needs: some rules may be too
 strict, some are framework-specific, and so on.
 

@@ -10,14 +10,21 @@ docstring_singles_mixed_quotes_module_singleline_var_1.py:1:1: Q002 Single quote
   |
   = help: Replace single quotes docstring with double quotes
 
-docstring_singles_mixed_quotes_module_singleline_var_1.py:1:3: Q000 Double quotes found but single quotes preferred
+docstring_singles_mixed_quotes_module_singleline_var_1.py:1:29: Q002 [*] Single quote docstring found but double quotes preferred
   |
 1 | ''"Start with empty string" ' and lint docstring safely'
-  |   ^^^^^^^^^^^^^^^^^^^^^^^^^ Q000
+  |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q002
 2 | 
 3 | def foo():
   |
-  = help: Replace double quotes with single quotes
+  = help: Replace single quotes docstring with double quotes
+
+ℹ Safe fix
+1   |-''"Start with empty string" ' and lint docstring safely'
+  1 |+''"Start with empty string" " and lint docstring safely"
+2 2 | 
+3 3 | def foo():
+4 4 |     pass
 
 docstring_singles_mixed_quotes_module_singleline_var_1.py:5:1: Q001 [*] Double quote multiline found but single quotes preferred
   |

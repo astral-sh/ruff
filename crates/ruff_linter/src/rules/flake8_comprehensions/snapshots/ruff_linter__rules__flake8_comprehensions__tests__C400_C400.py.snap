@@ -43,7 +43,7 @@ C400.py:3:12: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
 7 7 | 
 8 8 | # Short-circuit case, combine with C416 and should produce x = list(range(3))
 
-C400.py:9:5: C400 [*] Unnecessary generator (rewrite using `list()`
+C400.py:9:5: C400 [*] Unnecessary generator (rewrite using `list()`)
    |
  8 | # Short-circuit case, combine with C416 and should produce x = list(range(3))
  9 | x = list(x for x in range(3))
@@ -63,7 +63,7 @@ C400.py:9:5: C400 [*] Unnecessary generator (rewrite using `list()`
 11 11 |     x for x in range(3)
 12 12 | )
 
-C400.py:10:5: C400 [*] Unnecessary generator (rewrite using `list()`
+C400.py:10:5: C400 [*] Unnecessary generator (rewrite using `list()`)
    |
  8 |   # Short-circuit case, combine with C416 and should produce x = list(range(3))
  9 |   x = list(x for x in range(3))
