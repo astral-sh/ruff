@@ -284,4 +284,18 @@ RUF100_0.py:93:92: RUF100 [*] Unused `noqa` directive (unused: `F401`)
 95 95 | 
 96 96 | def f():
 
+RUF100_0.py:107:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
+    |
+105 | def f():
+106 |     # Invalid - nonexistant error code with multibyte character
+107 |     d = 1  #noqa: F841, E50
+    |            ^^^^^^^^^^^^^^^^ RUF100
+    |
+    = help: Remove unused `noqa` directive
 
+ℹ Safe fix
+104 104 | 
+105 105 | def f():
+106 106 |     # Invalid - nonexistant error code with multibyte character
+107     |-    d = 1  #noqa: F841, E50
+    107 |+    d = 1  # noqa: F841

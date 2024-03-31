@@ -97,10 +97,17 @@ pub(crate) fn delete_comment(range: TextRange, locator: &Locator) -> Edit {
     }
     // Ex) `x = 1  # noqa here`
     else {
-        Edit::deletion(
-            range.start() + "# ".text_len(),
-            range.end() + trailing_space_len,
-        )
+        if suffix.is_empty() {
+            // if there's no comment after the deleted noqa, delete the entire range
+            let full_line_end = locator.full_line_end(line_range.end());
+            Edit::deletion(line_range.start() - leading_space_len, full_line_end)
+        } else {
+            // if there is something after the deleted noqa, keep it in a comment
+            Edit::range_replacement(
+                "# ".to_string(),
+                TextRange::new(range.start(), range.end() + trailing_space_len),
+            )
+        }
     }
 }
 

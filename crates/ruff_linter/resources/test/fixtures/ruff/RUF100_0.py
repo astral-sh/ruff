@@ -100,3 +100,8 @@ def f():
 
     Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
     """  # noqa
+
+
+def f():
+    # Invalid - nonexistant error code with multibyte character
+    d = 1  #noqa: F841, E50
