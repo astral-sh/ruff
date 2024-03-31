@@ -1929,20 +1929,18 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses an `await` expression.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at an `await` token.
+    ///
     /// See: <https://docs.python.org/3/reference/expressions.html#await-expression>
     fn parse_await_expression(&mut self) -> ast::ExprAwait {
         let start = self.node_start();
         self.bump(TokenKind::Await);
-        let parsed_expr = self.parse_expression_with_precedence(Precedence::Await);
 
-        if matches!(parsed_expr.expr, Expr::Starred(_)) {
-            self.add_error(
-                ParseErrorType::OtherError(
-                    "starred expression is not allowed in an `await` statement".to_string(),
-                ),
-                &parsed_expr,
-            );
-        }
+        let parsed_expr = self.parse_expression_with_precedence(Precedence::Await);
 
         ast::ExprAwait {
             value: Box::new(parsed_expr.expr),
