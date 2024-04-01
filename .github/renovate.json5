@@ -46,6 +46,12 @@
       matchPackagePatterns: ["monaco"],
       description: "Weekly update of the Monaco editor",
     },
+    {
+      groupName: "strum",
+      matchManagers: ["cargo"],
+      matchPackagePatterns: ["strum"],
+      description: "Weekly update of strum dependencies",
+    },
   ],
   vulnerabilityAlerts: {
     commitMessageSuffix: "",
