@@ -134,7 +134,7 @@ mod tests {
             let $value = std::format!("{:#?}", $value).replace("\\\\", "/");
             // `insta::assert_snapshot` uses the debug representation of the string, which would
             // be a single line containing `\n`
-            insta::assert_display_snapshot!($value);
+            insta::assert_snapshot!($value);
         }};
     }
 
