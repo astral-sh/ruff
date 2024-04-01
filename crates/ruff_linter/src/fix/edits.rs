@@ -83,6 +83,7 @@ pub(crate) fn delete_comment(range: TextRange, locator: &Locator) -> Edit {
     }
     // Ex) `x = 1  # noqa`
     else if range.end() + trailing_space_len == line_range.end() {
+        // Replace `x = 1  # noqa` with `x = 1`.
         Edit::deletion(range.start() - leading_space_len, line_range.end())
     }
     // Ex) `x = 1  # noqa  # type: ignore`
@@ -93,13 +94,15 @@ pub(crate) fn delete_comment(range: TextRange, locator: &Locator) -> Edit {
         ))
         .starts_with('#')
     {
+        // Replace `# noqa  # type: ignore` with `# type: ignore`.
         Edit::deletion(range.start(), range.end() + trailing_space_len)
     }
     // Ex) `x = 1  # noqa here`
     else {
-        Edit::deletion(
-            range.start() + "# ".text_len(),
-            range.end() + trailing_space_len,
+        // Replace `# noqa here` with `# here`.
+        Edit::range_replacement(
+            "# ".to_string(),
+            TextRange::new(range.start(), range.end() + trailing_space_len),
         )
     }
 }
