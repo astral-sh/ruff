@@ -2736,11 +2736,17 @@ pub enum BoolOp {
 }
 
 impl BoolOp {
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             BoolOp::And => "and",
             BoolOp::Or => "or",
         }
+    }
+}
+
+impl fmt::Display for BoolOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
@@ -2763,7 +2769,7 @@ pub enum Operator {
 }
 
 impl Operator {
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Operator::Add => "+",
             Operator::Sub => "-",
@@ -2782,6 +2788,12 @@ impl Operator {
     }
 }
 
+impl fmt::Display for Operator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// See also [unaryop](https://docs.python.org/3/library/ast.html#ast.unaryop)
 #[derive(Clone, Debug, PartialEq, is_macro::Is, Copy, Hash, Eq)]
 pub enum UnaryOp {
@@ -2792,13 +2804,19 @@ pub enum UnaryOp {
 }
 
 impl UnaryOp {
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             UnaryOp::Invert => "~",
             UnaryOp::Not => "not",
             UnaryOp::UAdd => "+",
             UnaryOp::USub => "-",
         }
+    }
+}
+
+impl fmt::Display for UnaryOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
@@ -2818,7 +2836,7 @@ pub enum CmpOp {
 }
 
 impl CmpOp {
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             CmpOp::Eq => "==",
             CmpOp::NotEq => "!=",
@@ -2831,6 +2849,12 @@ impl CmpOp {
             CmpOp::In => "in",
             CmpOp::NotIn => "not in",
         }
+    }
+}
+
+impl fmt::Display for CmpOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
