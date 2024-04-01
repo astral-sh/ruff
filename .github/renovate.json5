@@ -4,7 +4,7 @@
   suppressNotifications: ["prEditedNotification"],
   extends: ["config:recommended"],
   labels: ["internal"],
-  schedule: ["before 4am on Monday"],
+  schedule: ["on Monday"],
   separateMajorMinor: false,
   enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "npm"],
   cargo: {
