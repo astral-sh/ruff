@@ -223,14 +223,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                     if checker.enabled(Rule::MixedCaseVariableInClassScope) {
-                        if let ScopeKind::Class(ast::StmtClassDef { arguments, .. }) =
-                            &checker.semantic.current_scope().kind
+                        if let ScopeKind::Class(class_def) = &checker.semantic.current_scope().kind
                         {
                             pep8_naming::rules::mixed_case_variable_in_class_scope(
-                                checker,
-                                expr,
-                                id,
-                                arguments.as_deref(),
+                                checker, expr, id, class_def,
                             );
                         }
                     }
