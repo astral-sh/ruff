@@ -1,6 +1,7 @@
 """
 Default projects for ecosystem checks
 """
+
 from ruff_ecosystem.projects import (
     CheckOptions,
     FormatOptions,
