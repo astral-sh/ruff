@@ -1635,13 +1635,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "pep440_rs"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15efd4d885c29126cc93e12af3087896e2518bd5ca0fb328c19c4ef9cecfa8be"
+dependencies = [
+ "once_cell",
+ "serde",
+ "unicode-width",
+ "unscanny",
+]
+
+[[package]]
 name = "pep508_rs"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "910c513bea0f4f833122321c0f20e8c704e01de98692f6989c2ec21f43d88b1e"
 dependencies = [
  "once_cell",
- "pep440_rs",
+ "pep440_rs 0.4.0",
  "regex",
  "serde",
  "thiserror",
@@ -1774,7 +1786,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95c3dd745f99aa3c554b7bb00859f7d18c2f1d6afd749ccc86d60b61e702abd9"
 dependencies = [
  "indexmap",
- "pep440_rs",
+ "pep440_rs 0.4.0",
  "pep508_rs",
  "serde",
  "toml",
@@ -2151,7 +2163,7 @@ dependencies = [
  "once_cell",
  "path-absolutize",
  "pathdiff",
- "pep440_rs",
+ "pep440_rs 0.5.0",
  "pyproject-toml",
  "quick-junit",
  "regex",
@@ -2473,7 +2485,7 @@ dependencies = [
  "itertools 0.12.1",
  "log",
  "path-absolutize",
- "pep440_rs",
+ "pep440_rs 0.5.0",
  "regex",
  "ruff_cache",
  "ruff_formatter",
@@ -3262,6 +3274,12 @@ dependencies = [
  "phf_codegen",
  "rand",
 ]
+
+[[package]]
+name = "unscanny"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9df2af067a7953e9c3831320f35c1cc0600c30d44d9f7a12b01db1cd88d6b47"
 
 [[package]]
 name = "untrusted"
