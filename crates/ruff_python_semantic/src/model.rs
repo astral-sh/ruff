@@ -1794,6 +1794,9 @@ bitflags! {
         ///
         /// `__future__`-style type annotations are only enabled if the `annotations` feature
         /// is enabled via `from __future__ import annotations`.
+        ///
+        /// Note that this flag is only set when we are actually *visiting* the deferred definition,
+        /// not when we "pass by" it when initially traversing the source tree.
         const FUTURE_TYPE_DEFINITION = 1 << 6;
 
         /// The model is in an exception handler.
