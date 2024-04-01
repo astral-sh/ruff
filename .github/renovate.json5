@@ -6,6 +6,7 @@
   labels: ["internal"],
   schedule: ["on Monday"],
   separateMajorMinor: false,
+  prHourlyLimit: 10,
   enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "npm"],
   cargo: {
     // See https://docs.renovatebot.com/configuration-options/#rangestrategy
