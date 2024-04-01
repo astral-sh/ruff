@@ -635,9 +635,17 @@ enum Follows {
     Other,
     Decorator,
     Def,
+    /// A function whose body is a dummy (...), if the ellipsis is on the same line as the def.
+    DummyDef,
     Import,
     FromImport,
     Docstring,
+}
+
+impl Follows {
+    const fn is_any_def(self) -> bool {
+        matches!(self, Follows::Def | Follows::DummyDef)
+    }
 }
 
 impl Follows {
@@ -769,6 +777,10 @@ impl<'a> BlankLinesChecker<'a> {
                 }
             }
 
+            if logical_line.last_token == TokenKind::Ellipsis {
+                state.follows = Follows::DummyDef;
+            }
+
             if logical_line.is_docstring {
                 state.follows = Follows::Docstring;
             }
@@ -801,7 +813,9 @@ impl<'a> BlankLinesChecker<'a> {
             // Only applies to methods.
             && matches!(line.kind,  LogicalLineKind::Function | LogicalLineKind::Decorator)
             // Allow groups of one-liners.
-            && !(matches!(state.follows, Follows::Def) && !matches!(line.last_token, TokenKind::Colon))
+            && !(state.follows.is_any_def() && line.last_token != TokenKind::Colon)
+            // Allow a function/method to follow a function/method with a dummy body.
+            && !matches!(state.follows, Follows::DummyDef)
             && matches!(state.class_status, Status::Inside(_))
             // The class/parent method's docstring can directly precede the def.
             // Allow following a decorator (if there is an error it will be triggered on the first decorator).
@@ -852,7 +866,9 @@ impl<'a> BlankLinesChecker<'a> {
             // Allow following a decorator (if there is an error it will be triggered on the first decorator).
             && !matches!(state.follows, Follows::Decorator)
             // Allow groups of one-liners.
-            && !(matches!(state.follows, Follows::Def) && !matches!(line.last_token, TokenKind::Colon))
+            && !(state.follows.is_any_def() && line.last_token != TokenKind::Colon)
+            // Allow a function/method to follow a function/method with a dummy body.
+            && !matches!(state.follows, Follows::DummyDef)
             // Only trigger on non-indented classes and functions (for example functions within an if are ignored)
             && line.indent_length == 0
             // Only apply to functions or classes.
@@ -1018,7 +1034,9 @@ impl<'a> BlankLinesChecker<'a> {
             // Do not trigger when the def/class follows an "indenting token" (if/while/etc...).
             && prev_indent_length.is_some_and(|prev_indent_length| prev_indent_length >= line.indent_length)
             // Allow groups of one-liners.
-            && !(matches!(state.follows, Follows::Def) && line.last_token != TokenKind::Colon)
+            && !(state.follows.is_any_def() && line.last_token != TokenKind::Colon)
+            // Allow a function/method to follow a function/method with a dummy body.
+            && !matches!(state.follows, Follows::DummyDef)
             // Blank lines in stub files are only used for grouping. Don't enforce blank lines.
             && !self.source_type.is_stub()
         {
