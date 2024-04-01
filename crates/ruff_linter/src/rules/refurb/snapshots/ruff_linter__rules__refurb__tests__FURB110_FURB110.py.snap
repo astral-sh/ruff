@@ -1,0 +1,63 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB110.py:1:5: FURB110 [*] Replace `x if x or y` with `x or y`
+  |
+1 | z = x if x else y  # FURB110
+  |     ^^^^^^^^^^^^^ FURB110
+2 | 
+3 | z = x \
+  |
+  = help: Use `or` expression
+
+ℹ Unsafe fix
+1   |-z = x if x else y  # FURB110
+  1 |+z = x or y  # FURB110
+2 2 | 
+3 3 | z = x \
+4 4 |     if x else y  # FURB110
+
+FURB110.py:3:5: FURB110 [*] Replace `x if x or y` with `x or y`
+  |
+1 |   z = x if x else y  # FURB110
+2 |   
+3 |   z = x \
+  |  _____^
+4 | |     if x else y  # FURB110
+  | |_______________^ FURB110
+5 |   
+6 |   z = x if x \
+  |
+  = help: Use `or` expression
+
+ℹ Unsafe fix
+1 1 | z = x if x else y  # FURB110
+2 2 | 
+3   |-z = x \
+4   |-    if x else y  # FURB110
+  3 |+z = x or y  # FURB110
+5 4 | 
+6 5 | z = x if x \
+7 6 |     else  \
+
+FURB110.py:6:5: FURB110 [*] Replace `x if x or y` with `x or y`
+  |
+4 |       if x else y  # FURB110
+5 |   
+6 |   z = x if x \
+  |  _____^
+7 | |     else  \
+8 | |         y  # FURB110
+  | |_________^ FURB110
+  |
+  = help: Use `or` expression
+
+ℹ Unsafe fix
+3 3 | z = x \
+4 4 |     if x else y  # FURB110
+5 5 | 
+6   |-z = x if x \
+7   |-    else  \
+  6 |+z = x \
+  7 |+    or  \
+8 8 |         y  # FURB110
