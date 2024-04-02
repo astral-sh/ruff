@@ -15,11 +15,11 @@ use crate::rules::flake8_comprehensions::fixes;
 ///
 /// ## Why is this bad?
 /// `any` and `all` take any iterators, including generators. Converting a generator to a list
-/// by way of a list comprehension is unnecessary and reduces performance due to the
-/// overhead of creating the list.
+/// by way of a list comprehension is unnecessary and requires iterating all values, even if `any`
+/// or `all` could short-circuit early.
 ///
 /// For example, compare the performance of `all` with a list comprehension against that
-/// of a generator (~40x faster here):
+/// of a generator in a case where an early short-circuit is possible (almost 40x faster):
 ///
 /// ```console
 /// In [1]: %timeit all([i for i in range(1000)])
@@ -28,6 +28,12 @@ use crate::rules::flake8_comprehensions::fixes;
 /// In [2]: %timeit all(i for i in range(1000))
 /// 212 ns ± 0.892 ns per loop (mean ± std. dev. of 7 runs, 1,000,000 loops each)
 /// ```
+///
+/// This performance difference is due to short-circuiting; if the entire iterable has to be
+/// traversed, the comprehension version may even be a bit faster (list allocation overhead is not
+/// necessarily greater than generator overhead).
+///
+/// The generator version is more memory-efficient.
 ///
 /// ## Examples
 /// ```python
@@ -42,9 +48,10 @@ use crate::rules::flake8_comprehensions::fixes;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as it may occasionally drop comments
-/// when rewriting the comprehension. In most cases, though, comments will be
-/// preserved.
+/// This rule's fix is marked as unsafe, as it can change the behavior of the code if the iteration
+/// has side effects (due to laziness and short-circuiting). The fix may also drop comments when
+/// rewriting some comprehensions.
+///
 #[violation]
 pub struct UnnecessaryComprehensionAnyAll;
 
