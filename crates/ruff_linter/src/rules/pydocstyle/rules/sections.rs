@@ -1386,7 +1386,7 @@ fn blanks_and_section_underline(
                         SectionUnderlineAfterName {
                             name: context.section_name().to_string(),
                         },
-                        docstring.range(),
+                        context.section_name_range(),
                     );
                     let range = TextRange::new(context.following_range().start(), blank_lines_end);
                     // Delete any blank lines between the header and the underline.
@@ -1407,7 +1407,7 @@ fn blanks_and_section_underline(
                         SectionUnderlineMatchesSectionLength {
                             name: context.section_name().to_string(),
                         },
-                        docstring.range(),
+                        context.section_name_range(),
                     );
                     // Replace the existing underline with a line of the appropriate length.
                     let content = format!(
@@ -1432,7 +1432,7 @@ fn blanks_and_section_underline(
                         SectionUnderlineNotOverIndented {
                             name: context.section_name().to_string(),
                         },
-                        docstring.range(),
+                        context.section_name_range(),
                     );
                     // Replace the existing indentation with whitespace of the appropriate length.
                     let range = TextRange::at(
@@ -1467,7 +1467,7 @@ fn blanks_and_section_underline(
                                 EmptyDocstringSection {
                                     name: context.section_name().to_string(),
                                 },
-                                docstring.range(),
+                                context.section_name_range(),
                             ));
                         }
                     } else if checker.enabled(Rule::BlankLinesBetweenHeaderAndContent) {
@@ -1475,7 +1475,7 @@ fn blanks_and_section_underline(
                             BlankLinesBetweenHeaderAndContent {
                                 name: context.section_name().to_string(),
                             },
-                            docstring.range(),
+                            context.section_name_range(),
                         );
                         // Delete any blank lines between the header and content.
                         diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
@@ -1491,7 +1491,7 @@ fn blanks_and_section_underline(
                         EmptyDocstringSection {
                             name: context.section_name().to_string(),
                         },
-                        docstring.range(),
+                        context.section_name_range(),
                     ));
                 }
             }
@@ -1505,7 +1505,7 @@ fn blanks_and_section_underline(
                     DashedUnderlineAfterSection {
                         name: context.section_name().to_string(),
                     },
-                    docstring.range(),
+                    context.section_name_range(),
                 );
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
@@ -1539,7 +1539,7 @@ fn blanks_and_section_underline(
                         BlankLinesBetweenHeaderAndContent {
                             name: context.section_name().to_string(),
                         },
-                        docstring.range(),
+                        context.section_name_range(),
                     );
                     let range = TextRange::new(context.following_range().start(), blank_lines_end);
                     // Delete any blank lines between the header and content.
@@ -1556,7 +1556,7 @@ fn blanks_and_section_underline(
                 DashedUnderlineAfterSection {
                     name: context.section_name().to_string(),
                 },
-                docstring.range(),
+                context.section_name_range(),
             );
             // Add a dashed line (of the appropriate length) under the section header.
             let content = format!(
@@ -1577,7 +1577,7 @@ fn blanks_and_section_underline(
                 EmptyDocstringSection {
                     name: context.section_name().to_string(),
                 },
-                docstring.range(),
+                context.section_name_range(),
             ));
         }
     }
@@ -1592,15 +1592,15 @@ fn common_section(
     if checker.enabled(Rule::CapitalizeSectionName) {
         let capitalized_section_name = context.kind().as_str();
         if context.section_name() != capitalized_section_name {
+            let section_range = context.section_name_range();
             let mut diagnostic = Diagnostic::new(
                 CapitalizeSectionName {
                     name: context.section_name().to_string(),
                 },
-                docstring.range(),
+                section_range,
             );
             // Replace the section title with the capitalized variant. This requires
             // locating the start and end of the section name.
-            let section_range = context.section_name_range();
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 capitalized_section_name.to_string(),
                 section_range,
@@ -1612,16 +1612,17 @@ fn common_section(
     if checker.enabled(Rule::SectionNotOverIndented) {
         let leading_space = leading_space(context.summary_line());
         if leading_space.len() > docstring.indentation.len() {
+            let section_range = context.section_name_range();
             let mut diagnostic = Diagnostic::new(
                 SectionNotOverIndented {
                     name: context.section_name().to_string(),
                 },
-                docstring.range(),
+                section_range,
             );
+
             // Replace the existing indentation with whitespace of the appropriate length.
             let content = clean_space(docstring.indentation);
             let fix_range = TextRange::at(context.start(), leading_space.text_len());
-
             diagnostic.set_fix(Fix::safe_edit(if content.is_empty() {
                 Edit::range_deletion(fix_range)
             } else {
@@ -1641,11 +1642,12 @@ fn common_section(
                 .take_while(|line| line.trim().is_empty())
                 .count();
             if num_blank_lines < 2 {
+                let section_range = context.section_name_range();
                 let mut diagnostic = Diagnostic::new(
                     NoBlankLineAfterSection {
                         name: context.section_name().to_string(),
                     },
-                    docstring.range(),
+                    section_range,
                 );
                 // Add a newline at the beginning of the next section.
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
@@ -1682,11 +1684,12 @@ fn common_section(
                     context.end(),
                 );
 
+                let section_range = context.section_name_range();
                 let mut diagnostic = Diagnostic::new(
                     BlankLineAfterLastSection {
                         name: context.section_name().to_string(),
                     },
-                    docstring.range(),
+                    section_range,
                 );
                 diagnostic.set_fix(Fix::safe_edit(edit));
                 checker.diagnostics.push(diagnostic);
@@ -1699,11 +1702,12 @@ fn common_section(
             .previous_line()
             .is_some_and(|line| line.trim().is_empty())
         {
+            let section_range = context.section_name_range();
             let mut diagnostic = Diagnostic::new(
                 NoBlankLineBeforeSection {
                     name: context.section_name().to_string(),
                 },
-                docstring.range(),
+                section_range,
             );
             // Add a blank line before the section.
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
@@ -1897,7 +1901,7 @@ fn numpy_section(
                 NewLineAfterSectionName {
                     name: context.section_name().to_string(),
                 },
-                docstring.range(),
+                context.section_name_range(),
             );
             let section_range = context.section_name_range();
             diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(TextRange::at(
@@ -1931,7 +1935,7 @@ fn google_section(
                 SectionNameEndsInColon {
                     name: context.section_name().to_string(),
                 },
-                docstring.range(),
+                context.section_name_range(),
             );
             // Replace the suffix.
             let section_name_range = context.section_name_range();

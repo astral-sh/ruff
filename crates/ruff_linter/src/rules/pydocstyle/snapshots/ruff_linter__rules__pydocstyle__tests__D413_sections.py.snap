@@ -1,15 +1,12 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:65:5: D413 [*] Missing blank line after last section ("Returns")
+sections.py:67:5: D413 [*] Missing blank line after last section ("Returns")
    |
-63 |   @expect("D414: Section has no content ('Returns')")
-64 |   def no_underline_and_no_newline():  # noqa: D416
-65 |       """Toggle the gizmo.
-   |  _____^
-66 | | 
-67 | |     Returns"""
-   | |______________^ D413
+65 |     """Toggle the gizmo.
+66 | 
+67 |     Returns"""
+   |     ^^^^^^^ D413
    |
    = help: Add blank line after "Returns"
 
@@ -25,18 +22,14 @@ sections.py:65:5: D413 [*] Missing blank line after last section ("Returns")
 69 71 | 
 70 72 | @expect(_D213)
 
-sections.py:120:5: D413 [*] Missing blank line after last section ("Returns")
+sections.py:122:5: D413 [*] Missing blank line after last section ("Returns")
     |
-118 |   @expect("D413: Missing blank line after last section ('Returns')")
-119 |   def no_blank_line_after_last_section():  # noqa: D416
-120 |       """Toggle the gizmo.
-    |  _____^
-121 | | 
-122 | |     Returns
-123 | |     -------
-124 | |     A value of some sort.
-125 | |     """
-    | |_______^ D413
+120 |     """Toggle the gizmo.
+121 | 
+122 |     Returns
+    |     ^^^^^^^ D413
+123 |     -------
+124 |     A value of some sort.
     |
     = help: Add blank line after "Returns"
 
@@ -49,17 +42,14 @@ sections.py:120:5: D413 [*] Missing blank line after last section ("Returns")
 126 127 | 
 127 128 | 
 
-sections.py:170:5: D413 [*] Missing blank line after last section ("Returns")
+sections.py:172:5: D413 [*] Missing blank line after last section ("Returns")
     |
-168 |   @expect("D414: Section has no content ('Returns')")
-169 |   def section_underline_overindented_and_contentless():  # noqa: D416
-170 |       """Toggle the gizmo.
-    |  _____^
-171 | | 
-172 | |     Returns
-173 | |         -------
-174 | |     """
-    | |_______^ D413
+170 |     """Toggle the gizmo.
+171 | 
+172 |     Returns
+    |     ^^^^^^^ D413
+173 |         -------
+174 |     """
     |
     = help: Add blank line after "Returns"
 
@@ -72,16 +62,14 @@ sections.py:170:5: D413 [*] Missing blank line after last section ("Returns")
 175 176 | 
 176 177 | 
 
-sections.py:519:5: D413 [*] Missing blank line after last section ("Parameters")
+sections.py:521:5: D413 [*] Missing blank line after last section ("Parameters")
     |
-518 |   def replace_equals_with_dash():
-519 |       """Equal length equals should be replaced with dashes.
-    |  _____^
-520 | | 
-521 | |     Parameters
-522 | |     ==========
-523 | |     """
-    | |_______^ D413
+519 |     """Equal length equals should be replaced with dashes.
+520 | 
+521 |     Parameters
+    |     ^^^^^^^^^^ D413
+522 |     ==========
+523 |     """
     |
     = help: Add blank line after "Parameters"
 
@@ -94,16 +82,14 @@ sections.py:519:5: D413 [*] Missing blank line after last section ("Parameters")
 524 525 | 
 525 526 | 
 
-sections.py:527:5: D413 [*] Missing blank line after last section ("Parameters")
+sections.py:529:5: D413 [*] Missing blank line after last section ("Parameters")
     |
-526 |   def replace_equals_with_dash2():
-527 |       """Here, the length of equals is not the same.
-    |  _____^
-528 | | 
-529 | |     Parameters
-530 | |     ===========
-531 | |     """
-    | |_______^ D413
+527 |     """Here, the length of equals is not the same.
+528 | 
+529 |     Parameters
+    |     ^^^^^^^^^^ D413
+530 |     ===========
+531 |     """
     |
     = help: Add blank line after "Parameters"
 
@@ -116,18 +102,13 @@ sections.py:527:5: D413 [*] Missing blank line after last section ("Parameters")
 532 533 | 
 533 534 | 
 
-sections.py:548:5: D413 [*] Missing blank line after last section ("Args")
+sections.py:550:5: D413 [*] Missing blank line after last section ("Args")
     |
-547 |   def lowercase_sub_section_header():
-548 |       """Below, `returns:` should _not_ be considered a section header.
-    |  _____^
-549 | | 
-550 | |     Args:
-551 | |         Here's a note.
-552 | | 
-553 | |         returns:
-554 | |     """
-    | |_______^ D413
+548 |     """Below, `returns:` should _not_ be considered a section header.
+549 | 
+550 |     Args:
+    |     ^^^^ D413
+551 |         Here's a note.
     |
     = help: Add blank line after "Args"
 
@@ -140,18 +121,13 @@ sections.py:548:5: D413 [*] Missing blank line after last section ("Args")
 555 556 | 
 556 557 | 
 
-sections.py:558:5: D413 [*] Missing blank line after last section ("Returns")
+sections.py:563:9: D413 [*] Missing blank line after last section ("Returns")
     |
-557 |   def titlecase_sub_section_header():
-558 |       """Below, `Returns:` should be considered a section header.
-    |  _____^
-559 | | 
-560 | |     Args:
-561 | |         Here's a note.
-562 | | 
-563 | |         Returns:
-564 | |     """
-    | |_______^ D413
+561 |         Here's a note.
+562 | 
+563 |         Returns:
+    |         ^^^^^^^ D413
+564 |     """
     |
     = help: Add blank line after "Returns"
 
@@ -164,20 +140,14 @@ sections.py:558:5: D413 [*] Missing blank line after last section ("Returns")
 565 566 | 
 566 567 | 
 
-sections.py:588:5: D413 [*] Missing blank line after last section ("Parameters")
+sections.py:590:5: D413 [*] Missing blank line after last section ("Parameters")
     |
-587 |   def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213
-588 |       """Test that lower case subsection header is valid even if it has the same name as section kind.
-    |  _____^
-589 | | 
-590 | |     Parameters:
-591 | |     ----------
-592 | |     parameters:
-593 | |         A list of string parameters
-594 | |     value:
-595 | |         Some value
-596 | |     """
-    | |_______^ D413
+588 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
+589 | 
+590 |     Parameters:
+    |     ^^^^^^^^^^ D413
+591 |     ----------
+592 |     parameters:
     |
     = help: Add blank line after "Parameters"
 
