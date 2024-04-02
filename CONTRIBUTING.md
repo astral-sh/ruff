@@ -123,8 +123,8 @@ prior to merging.
 Ruff is structured as a monorepo with a [flat crate structure](https://matklad.github.io/2021/08/22/large-rust-workspaces.html),
 such that all crates are contained in a flat `crates` directory.
 
-The vast majority of the code, including all lint rules, lives in the `ruff` crate (located at
-`crates/ruff_linter`). As a contributor, that's the crate that'll be most relevant to you.
+The vast majority of the code, including all lint rules, lives in the `ruff_linter` crate (located
+at `crates/ruff_linter`). As a contributor, that's the crate that'll be most relevant to you.
 
 At the time of writing, the repository includes the following crates:
 
