@@ -15,11 +15,10 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/notebook_d
 def compound_statement():
 
     a = """
-    This looks like a docstring but is not in a notebook because notebooks can't be imported as a module.
-    Ruff should leave it as is
+    This is a multiline string ending with a semicolon
     """;
 
-    b = "another normal string"
+    b = "Another normal string"
     pass
 ```
 
@@ -44,17 +43,14 @@ source_type                = Ipynb
     This looks like a docstring but is not in a notebook because notebooks can't be imported as a module.
     Ruff should leave it as is
 """
-
 "another normal string"
 
 
 def compound_statement():
     a = """
-    This looks like a docstring but is not in a notebook because notebooks can't be imported as a module.
-    Ruff should leave it as is
+    This is a multiline string ending with a semicolon
     """
-
-    b = "another normal string"
+    b = "Another normal string"
     pass
 ```
 
@@ -85,10 +81,8 @@ Ruff should leave it as is
 
 def compound_statement():
     a = """
-    This looks like a docstring but is not in a notebook because notebooks can't be imported as a module.
-    Ruff should leave it as is
+    This is a multiline string ending with a semicolon
     """
-
-    b = "another normal string"
+    b = "Another normal string"
     pass
 ```
