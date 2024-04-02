@@ -2355,6 +2355,7 @@ dependencies = [
  "unicode-ident",
  "unicode-normalization",
  "unicode_names2",
+ "walkdir",
 ]
 
 [[package]]

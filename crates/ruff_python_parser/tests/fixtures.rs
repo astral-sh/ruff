@@ -5,39 +5,58 @@ use std::path::Path;
 
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{AnnotationType, Slice, Snippet, SourceAnnotation};
+
 use ruff_python_ast::visitor::preorder::{walk_module, PreorderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Mod};
-
 use ruff_python_parser::{Mode, ParseErrorType, Program};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 #[test]
+fn valid_syntax() {
+    insta::glob!("../resources", "valid/**/*.py", test_valid_syntax);
+}
+
+#[test]
 fn invalid_syntax() {
-    let test_file = |input_path: &Path| {
-        let source = fs::read_to_string(input_path).expect("Expected test file to exist");
+    insta::glob!("../resources", "invalid/**/*.py", test_invalid_syntax);
+}
 
-        let program = Program::parse_str(&source, Mode::Module);
+#[test]
+fn inline_ok() {
+    // TODO(dhruvmanila): remove settings once there are tests
+    insta::with_settings!({
+        allow_empty_glob => true,
+    }, {
+        insta::glob!("../resources/inline", "ok/**/*.py", test_valid_syntax);
+    });
+}
 
-        assert!(
-            !program.is_valid(),
-            "{input_path:?}: Expected parser to generate at least one syntax error for a program containing syntax errors."
-        );
+#[test]
+fn inline_err() {
+    // TODO(dhruvmanila): remove settings once there are tests
+    insta::with_settings!({
+        allow_empty_glob => true,
+    }, {
+        insta::glob!("../resources/inline", "err/**/*.py", test_invalid_syntax);
+    });
+}
 
-        validate_ast(program.ast(), source.text_len(), input_path);
+/// Asserts that the parser generates no syntax errors for a valid program.
+/// Snapshots the AST.
+fn test_valid_syntax(input_path: &Path) {
+    let source = fs::read_to_string(input_path).expect("Expected test file to exist");
+    let program = Program::parse_str(&source, Mode::Module);
 
-        let mut output = String::new();
-        writeln!(&mut output, "## AST").unwrap();
-        writeln!(&mut output, "\n```\n{:#?}\n```", program.ast()).unwrap();
-
-        writeln!(&mut output, "## Errors\n").unwrap();
-
+    if !program.is_valid() {
         let line_index = LineIndex::from_source_text(&source);
         let source_code = SourceCode::new(&source, &line_index);
 
+        let mut message = "Expected no syntax errors for a valid program but the parser generated the following errors:\n".to_string();
+
         for error in program.errors() {
             writeln!(
-                &mut output,
+                &mut message,
                 "{}\n",
                 CodeFrame {
                     range: error.location,
@@ -48,63 +67,66 @@ fn invalid_syntax() {
             .unwrap();
         }
 
-        insta::with_settings!({
-            omit_expression => true,
-            input_file => input_path,
-            prepend_module_to_snapshot => false,
-        }, {
-            insta::assert_snapshot!(output);
-        });
-    };
+        panic!("{input_path:?}: {message}");
+    }
 
-    insta::glob!("../resources", "invalid/**/*.{py,pyi}", test_file);
+    validate_ast(program.ast(), source.text_len(), input_path);
+
+    let mut output = String::new();
+    writeln!(&mut output, "## AST").unwrap();
+    writeln!(&mut output, "\n```\n{:#?}\n```", program.ast()).unwrap();
+
+    insta::with_settings!({
+        omit_expression => true,
+        input_file => input_path,
+        prepend_module_to_snapshot => false,
+    }, {
+        insta::assert_snapshot!(output);
+    });
 }
 
-#[test]
-fn valid_syntax() {
-    let test_file = |input_path: &Path| {
-        let source = fs::read_to_string(input_path).expect("Expected test file to exist");
+/// Assert that the parser generates at least one syntax error for the given input file.
+/// Snapshots the AST and the error messages.
+fn test_invalid_syntax(input_path: &Path) {
+    let source = fs::read_to_string(input_path).expect("Expected test file to exist");
+    let program = Program::parse_str(&source, Mode::Module);
 
-        let program = Program::parse_str(&source, Mode::Module);
+    assert!(
+        !program.is_valid(),
+        "{input_path:?}: Expected parser to generate at least one syntax error for a program containing syntax errors."
+    );
 
-        if !program.is_valid() {
-            let line_index = LineIndex::from_source_text(&source);
-            let source_code = SourceCode::new(&source, &line_index);
+    validate_ast(program.ast(), source.text_len(), input_path);
 
-            let mut message = "Expected no syntax errors for a valid program but the parser generated the following errors:\n".to_string();
+    let mut output = String::new();
+    writeln!(&mut output, "## AST").unwrap();
+    writeln!(&mut output, "\n```\n{:#?}\n```", program.ast()).unwrap();
 
-            for error in program.errors() {
-                writeln!(
-                    &mut message,
-                    "{}\n",
-                    CodeFrame {
-                        range: error.location,
-                        error,
-                        source_code: &source_code,
-                    }
-                )
-                .unwrap();
+    writeln!(&mut output, "## Errors\n").unwrap();
+
+    let line_index = LineIndex::from_source_text(&source);
+    let source_code = SourceCode::new(&source, &line_index);
+
+    for error in program.errors() {
+        writeln!(
+            &mut output,
+            "{}\n",
+            CodeFrame {
+                range: error.location,
+                error,
+                source_code: &source_code,
             }
+        )
+        .unwrap();
+    }
 
-            panic!("{input_path:?}: {message}");
-        }
-
-        validate_ast(program.ast(), source.text_len(), input_path);
-
-        let mut output = String::new();
-        writeln!(&mut output, "## AST").unwrap();
-        writeln!(&mut output, "\n```\n{:#?}\n```", program.ast()).unwrap();
-
-        insta::with_settings!({
-            omit_expression => true,
-            input_file => input_path,
-            prepend_module_to_snapshot => false,
-        }, {
-            insta::assert_snapshot!(output);
-        });
-    };
-
-    insta::glob!("../resources", "valid/**/*.{py,pyi}", test_file);
+    insta::with_settings!({
+        omit_expression => true,
+        input_file => input_path,
+        prepend_module_to_snapshot => false,
+    }, {
+        insta::assert_snapshot!(output);
+    });
 }
 
 // Test that is intentionally ignored by default.
@@ -253,19 +275,19 @@ impl<'ast> PreorderVisitor<'ast> for ValidateAstVisitor<'ast> {
         );
 
         if let Some(previous) = self.previous {
-            assert_ne!(previous.range().ordering(node.range()),  Ordering::Greater,
-                    "{path}: The ranges of the nodes are not strictly increasing when traversing the AST in pre-order.\nPrevious node: {previous:#?}\n\nCurrent node: {node:#?}\n\nRoot: {root:#?}",
-                    path = self.test_path.display(),
-                    root = self.parents.first()
-                );
+            assert_ne!(previous.range().ordering(node.range()), Ordering::Greater,
+                "{path}: The ranges of the nodes are not strictly increasing when traversing the AST in pre-order.\nPrevious node: {previous:#?}\n\nCurrent node: {node:#?}\n\nRoot: {root:#?}",
+                path = self.test_path.display(),
+                root = self.parents.first()
+            );
         }
 
         if let Some(parent) = self.parents.last() {
             assert!(parent.range().contains_range(node.range()),
-                    "{path}: The range of the parent node does not fully enclose the range of the child node.\nParent node: {parent:#?}\n\nChild node: {node:#?}\n\nRoot: {root:#?}",
-                    path = self.test_path.display(),
-                    root = self.parents.first()
-                );
+                "{path}: The range of the parent node does not fully enclose the range of the child node.\nParent node: {parent:#?}\n\nChild node: {node:#?}\n\nRoot: {root:#?}",
+                path = self.test_path.display(),
+                root = self.parents.first()
+            );
         }
 
         self.parents.push(node);
