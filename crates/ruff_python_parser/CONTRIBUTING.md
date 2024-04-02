@@ -9,24 +9,24 @@ in the source code itself, and are extracted to a separate file and run with the
 test suite. They are written in the form of comments with a specific format. There
 are two forms of inline tests:
 
-1. Test that the parser successfully parses the input with no syntax errors. They're
-   written in the following format:
+Test that the parser successfully parses the input with no syntax errors. They're
+written in the following format:
 
-    ```rs
-    // test this_is_the_test_name
-    // def foo():
-    //     pass
-    println!("some rust code");
-    ```
+```rs
+// test this_is_the_test_name
+// def foo():
+//     pass
+println!("some rust code");
+```
 
-2. Test that the parser fails to parse the input with a syntax error. They're written
-   in the following format:
+Test that the parser fails to parse the input with a syntax error. They're written
+in the following format:
 
-    ```rs
-    // test_err this_is_the_test_name
-    // [1, 2
-    println!("some rust code");
-    ```
+```rs
+// test_err this_is_the_test_name
+// [1, 2
+println!("some rust code");
+```
 
 Note that the difference between the two is the `test` and `test_err` keywords.
 The comment block must be independent of any other comment blocks. For example, the
