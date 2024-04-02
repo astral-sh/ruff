@@ -31,7 +31,7 @@ use crate::rules::flake8_comprehensions::fixes;
 ///
 /// This performance difference is due to short-circuiting; if the entire iterable has to be
 /// traversed, the comprehension version may even be a bit faster (list allocation overhead is not
-/// necessarily greater than generator overhead.)
+/// necessarily greater than generator overhead).
 ///
 /// The generator version is more memory-efficient.
 ///
