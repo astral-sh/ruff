@@ -36,6 +36,7 @@ ruff_source_file = { path = "../ruff_source_file" }
 
 annotate-snippets = { workspace = true }
 insta = { workspace = true, features = ["glob"] }
+walkdir = { workspace = true }
 
 [build-dependencies]
 anyhow = { workspace = true }
