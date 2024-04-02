@@ -31,9 +31,10 @@ use crate::rules::flake8_comprehensions::fixes;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as it may occasionally drop comments
-/// when rewriting the comprehension. In most cases, though, comments will be
-/// preserved.
+/// This rule's fix is marked as unsafe, as short-circuiting may change the behavior of the code,
+/// if the iteration has side effects. Also, the fix may occasionally drop comments when rewriting
+/// the comprehension. In most cases, though, comments will be preserved.
+
 #[violation]
 pub struct UnnecessaryComprehension {
     obj_type: String,
