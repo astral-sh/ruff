@@ -110,7 +110,9 @@ pub enum ParseErrorType {
     /// A parameter was found after a vararg
     ParamFollowsVarKeywordParam,
     /// A positional argument follows a keyword argument.
-    PositionalArgumentError,
+    PositionalFollowsKeywordArgument,
+    /// A positional argument follows a keyword argument unpacking.
+    PositionalFollowsKeywordUnpacking,
     /// An iterable argument unpacking `*args` follows keyword argument unpacking `**kwargs`.
     UnpackedArgumentError,
     /// A non-default argument follows a default argument.
@@ -140,8 +142,6 @@ pub enum ParseErrorType {
     },
     /// A duplicate argument was found in a function definition.
     DuplicateArgumentError(String),
-    /// A keyword argument was repeated.
-    DuplicateKeywordArgumentError(String),
     /// An f-string error containing the [`FStringErrorType`].
     FStringError(FStringErrorType),
     /// Parser encountered an error during lexing.
@@ -193,7 +193,10 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::StarredExpressionUsage => {
                 write!(f, "starred expression cannot be used here")
             }
-            ParseErrorType::PositionalArgumentError => {
+            ParseErrorType::PositionalFollowsKeywordArgument => {
+                write!(f, "positional argument follows keyword argument")
+            }
+            ParseErrorType::PositionalFollowsKeywordUnpacking => {
                 write!(f, "positional argument follows keyword argument unpacking")
             }
             ParseErrorType::EmptySlice => write!(f, "slice cannot be empty"),
@@ -228,9 +231,6 @@ impl std::fmt::Display for ParseErrorType {
             }
             ParseErrorType::DuplicateArgumentError(arg_name) => {
                 write!(f, "duplicate argument '{arg_name}' in function definition")
-            }
-            ParseErrorType::DuplicateKeywordArgumentError(arg_name) => {
-                write!(f, "keyword argument repeated: {arg_name}")
             }
             ParseErrorType::FStringError(ref fstring_error) => {
                 write!(f, "f-string: {fstring_error}")

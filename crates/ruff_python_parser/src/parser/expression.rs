@@ -664,53 +664,86 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lpar);
 
-        let saved_context = self.set_ctx(ParserCtxFlags::ARGUMENTS);
-
-        let mut args: Vec<Expr> = vec![];
-        let mut keywords: Vec<ast::Keyword> = vec![];
-        let mut has_seen_kw_arg = false;
-        let mut has_seen_kw_unpack = false;
+        let mut args = vec![];
+        let mut keywords = vec![];
+        let mut seen_keyword_argument = false; // foo = 1
+        let mut seen_keyword_unpacking = false; // **foo
 
         self.parse_comma_separated_list(RecoveryContextKind::Arguments, |parser| {
             let argument_start = parser.node_start();
             if parser.at(TokenKind::DoubleStar) {
-                parser.eat(TokenKind::DoubleStar);
+                parser.bump(TokenKind::DoubleStar);
 
                 let value = parser.parse_conditional_expression_or_higher();
+
+                if !value.is_parenthesized {
+                    match value.expr {
+                        Expr::Yield(_) | Expr::YieldFrom(_) => parser.add_error(
+                            ParseErrorType::OtherError(
+                                "Unparenthesized yield expression cannot be used here".to_string(),
+                            ),
+                            &value,
+                        ),
+                        Expr::Starred(_) => {
+                            parser.add_error(ParseErrorType::StarredExpressionUsage, &value);
+                        }
+                        _ => {}
+                    }
+                }
+
                 keywords.push(ast::Keyword {
                     arg: None,
                     value: value.expr,
                     range: parser.node_range(argument_start),
                 });
 
-                has_seen_kw_unpack = true;
+                seen_keyword_unpacking = true;
             } else {
                 let start = parser.node_start();
                 let mut parsed_expr = parser.parse_named_expression_or_higher();
 
+                if parsed_expr.is_unparenthesized_yield_expr() {
+                    parser.add_error(
+                        ParseErrorType::OtherError(
+                            "unparenthesized yield expression cannot be used here".to_string(),
+                        ),
+                        &parsed_expr,
+                    );
+                }
+
                 match parser.current_token_kind() {
                     TokenKind::Async | TokenKind::For => {
+                        if parsed_expr.is_unparenthesized_starred_expr() {
+                            parser.add_error(
+                                ParseErrorType::IterableUnpackingInComprehension,
+                                &parsed_expr,
+                            );
+                        }
+
                         parsed_expr = Expr::Generator(parser.parse_generator_expression(
                             parsed_expr.expr,
                             GeneratorExpressionInParentheses::No(start),
                         ))
                         .into();
                     }
-                    _ => {}
-                }
-
-                if has_seen_kw_unpack && parsed_expr.expr.is_starred_expr() {
-                    parser.add_error(ParseErrorType::UnpackedArgumentError, &parsed_expr);
+                    _ => {
+                        if seen_keyword_unpacking && parsed_expr.is_unparenthesized_starred_expr() {
+                            parser.add_error(ParseErrorType::UnpackedArgumentError, &parsed_expr);
+                        }
+                    }
                 }
 
                 if parser.eat(TokenKind::Equal) {
-                    has_seen_kw_arg = true;
+                    seen_keyword_argument = true;
                     let arg = if let Expr::Name(ident_expr) = parsed_expr.expr {
                         ast::Identifier {
                             id: ident_expr.id,
                             range: ident_expr.range,
                         }
                     } else {
+                        // TODO(dhruvmanila): Parser shouldn't drop the `parsed_expr` if it's
+                        // not a name expression. We could add the expression into `args` but
+                        // that means the error is a missing comma instead.
                         parser.add_error(
                             ParseErrorType::OtherError("Expected a parameter name".to_string()),
                             &parsed_expr,
@@ -722,6 +755,21 @@ impl<'src> Parser<'src> {
                     };
 
                     let value = parser.parse_conditional_expression_or_higher();
+                    if !value.is_parenthesized {
+                        match value.expr {
+                            Expr::Yield(_) | Expr::YieldFrom(_) => parser.add_error(
+                                ParseErrorType::OtherError(
+                                    "Unparenthesized yield expression cannot be used here"
+                                        .to_string(),
+                                ),
+                                &value,
+                            ),
+                            Expr::Starred(_) => {
+                                parser.add_error(ParseErrorType::StarredExpressionUsage, &value);
+                            }
+                            _ => {}
+                        }
+                    }
 
                     keywords.push(ast::Keyword {
                         arg: Some(arg),
@@ -729,31 +777,31 @@ impl<'src> Parser<'src> {
                         range: parser.node_range(argument_start),
                     });
                 } else {
-                    if has_seen_kw_arg
-                        && !(has_seen_kw_unpack || matches!(parsed_expr.expr, Expr::Starred(_)))
-                    {
-                        parser.add_error(ParseErrorType::PositionalArgumentError, &parsed_expr);
+                    if !parsed_expr.is_unparenthesized_starred_expr() {
+                        if seen_keyword_unpacking {
+                            parser.add_error(
+                                ParseErrorType::PositionalFollowsKeywordUnpacking,
+                                &parsed_expr,
+                            );
+                        } else if seen_keyword_argument {
+                            parser.add_error(
+                                ParseErrorType::PositionalFollowsKeywordArgument,
+                                &parsed_expr,
+                            );
+                        }
                     }
                     args.push(parsed_expr.expr);
                 }
             }
         });
 
-        self.restore_ctx(ParserCtxFlags::ARGUMENTS, saved_context);
-
         self.expect(TokenKind::Rpar);
 
-        let arguments = ast::Arguments {
+        ast::Arguments {
             range: self.node_range(start),
             args: args.into_boxed_slice(),
             keywords: keywords.into_boxed_slice(),
-        };
-
-        if let Err(error) = helpers::validate_arguments(&arguments) {
-            self.add_error(error.error, error.location);
         }
-
-        arguments
     }
 
     /// Parses a subscript expression.
@@ -1437,7 +1485,7 @@ impl<'src> Parser<'src> {
             TokenKind::Async | TokenKind::For => {
                 // Parenthesized starred expression isn't allowed either but that is
                 // handled by the `parse_parenthesized_expression` method.
-                if !first_element.is_parenthesized && first_element.is_starred_expr() {
+                if first_element.is_unparenthesized_starred_expr() {
                     self.add_error(
                         ParseErrorType::IterableUnpackingInComprehension,
                         &first_element,
@@ -1496,7 +1544,7 @@ impl<'src> Parser<'src> {
 
         match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
-                if !key_or_element.is_parenthesized && key_or_element.expr.is_starred_expr() {
+                if key_or_element.is_unparenthesized_starred_expr() {
                     self.add_error(
                         ParseErrorType::IterableUnpackingInComprehension,
                         &key_or_element,
@@ -1593,7 +1641,7 @@ impl<'src> Parser<'src> {
             }
             TokenKind::Async | TokenKind::For => {
                 // grammar: `genexp`
-                if !parsed_expr.is_parenthesized && parsed_expr.expr.is_starred_expr() {
+                if parsed_expr.is_unparenthesized_starred_expr() {
                     self.add_error(
                         ParseErrorType::IterableUnpackingInComprehension,
                         &parsed_expr,
@@ -2261,6 +2309,11 @@ impl ParsedExpr {
     #[inline]
     const fn is_unparenthesized_starred_expr(&self) -> bool {
         !self.is_parenthesized && self.expr.is_starred_expr()
+    }
+
+    #[inline]
+    const fn is_unparenthesized_yield_expr(&self) -> bool {
+        !self.is_parenthesized && matches!(self.expr, Expr::Yield(_) | Expr::YieldFrom(_))
     }
 }
 
