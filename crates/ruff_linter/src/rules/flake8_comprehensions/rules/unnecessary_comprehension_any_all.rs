@@ -33,7 +33,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// traversed, the comprehension version may even be a bit faster (list allocation overhead is not
 /// necessarily greater than generator overhead.)
 ///
-/// The generator version will be more memory-efficient.
+/// The generator version is more memory-efficient.
 ///
 /// ## Examples
 /// ```python
