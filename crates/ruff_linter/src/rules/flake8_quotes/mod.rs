@@ -195,4 +195,61 @@ mod tests {
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
+
+    #[test_case(Path::new("doubles_all.py"))]
+    fn only_inline(path: &Path) -> Result<()> {
+        let snapshot = format!("only_inline_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_quotes").join(path).as_path(),
+            &LinterSettings {
+                flake8_quotes: super::settings::Settings {
+                    inline_quotes: Quote::Single,
+                    multiline_quotes: Quote::Single,
+                    docstring_quotes: Quote::Single,
+                    avoid_escape: true,
+                },
+                ..LinterSettings::for_rules(vec![Rule::BadQuotesInlineString])
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("doubles_all.py"))]
+    fn only_multiline(path: &Path) -> Result<()> {
+        let snapshot = format!("only_multiline_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_quotes").join(path).as_path(),
+            &LinterSettings {
+                flake8_quotes: super::settings::Settings {
+                    inline_quotes: Quote::Single,
+                    multiline_quotes: Quote::Single,
+                    docstring_quotes: Quote::Single,
+                    avoid_escape: true,
+                },
+                ..LinterSettings::for_rules(vec![Rule::BadQuotesMultilineString])
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("doubles_all.py"))]
+    fn only_docstring(path: &Path) -> Result<()> {
+        let snapshot = format!("only_docstring_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_quotes").join(path).as_path(),
+            &LinterSettings {
+                flake8_quotes: super::settings::Settings {
+                    inline_quotes: Quote::Single,
+                    multiline_quotes: Quote::Single,
+                    docstring_quotes: Quote::Single,
+                    avoid_escape: true,
+                },
+                ..LinterSettings::for_rules(vec![Rule::BadQuotesDocstring])
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
 }

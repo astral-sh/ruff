@@ -223,14 +223,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                     if checker.enabled(Rule::MixedCaseVariableInClassScope) {
-                        if let ScopeKind::Class(ast::StmtClassDef { arguments, .. }) =
-                            &checker.semantic.current_scope().kind
+                        if let ScopeKind::Class(class_def) = &checker.semantic.current_scope().kind
                         {
                             pep8_naming::rules::mixed_case_variable_in_class_scope(
-                                checker,
-                                expr,
-                                id,
-                                arguments.as_deref(),
+                                checker, expr, id, class_def,
                             );
                         }
                     }
@@ -928,6 +924,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::VerboseDecimalConstructor) {
                 refurb::rules::verbose_decimal_constructor(checker, call);
+            }
+            if checker.enabled(Rule::UnnecessaryFromFloat) {
+                refurb::rules::unnecessary_from_float(checker, call);
             }
             if checker.enabled(Rule::QuadraticListSummation) {
                 ruff::rules::quadratic_list_summation(checker, call);

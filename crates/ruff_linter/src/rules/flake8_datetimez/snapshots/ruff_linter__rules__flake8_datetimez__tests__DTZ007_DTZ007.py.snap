@@ -46,5 +46,7 @@ DTZ007.py:35:1: DTZ007 Naive datetime constructed using `datetime.datetime.strpt
 34 | # no replace orastimezone unqualified
 35 | datetime.strptime("something", "something")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ007
+36 | 
+37 | # F-strings
    |
    = help: Call `.replace(tzinfo=<timezone>)` or `.astimezone()` to convert to an aware datetime

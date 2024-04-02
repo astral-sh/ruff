@@ -5,6 +5,7 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::registry::Rule;
 
 use super::super::settings::Quote;
 
@@ -334,6 +335,11 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
 
     for (range, trivia) in sequence.iter().zip(trivia) {
         if trivia.is_multiline {
+            // If multiline strings aren't enforced, ignore it.
+            if !checker.enabled(Rule::BadQuotesMultilineString) {
+                continue;
+            }
+
             // If our string is or contains a known good string, ignore it.
             if trivia
                 .raw_text
@@ -375,6 +381,11 @@ fn strings(checker: &mut Checker, sequence: &[TextRange]) {
             // If we're not using the preferred type, only allow use to avoid escapes.
             && !relax_quote
         {
+            // If inline strings aren't enforced, ignore it.
+            if !checker.enabled(Rule::BadQuotesInlineString) {
+                continue;
+            }
+
             if trivia.has_empty_text()
                 && text_ends_at_quote(locator, *range, quotes_settings.inline_quotes)
             {
@@ -455,10 +466,14 @@ pub(crate) fn check_string_quotes(checker: &mut Checker, string_like: StringLike
     };
 
     if checker.semantic().in_docstring() {
-        for range in ranges {
-            docstring(checker, range);
+        if checker.enabled(Rule::BadQuotesDocstring) {
+            for range in ranges {
+                docstring(checker, range);
+            }
         }
     } else {
-        strings(checker, &ranges);
+        if checker.any_enabled(&[Rule::BadQuotesInlineString, Rule::BadQuotesMultilineString]) {
+            strings(checker, &ranges);
+        }
     }
 }

@@ -120,25 +120,6 @@ E731.py:57:5: E731 Do not assign a `lambda` expression, use a `def`
 59 60 | 
 60 61 | class Scope:
 
-E731.py:64:5: E731 Do not assign a `lambda` expression, use a `def`
-   |
-63 |     # E731
-64 |     f: Callable[[int], int] = lambda x: 2 * x
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
-   |
-   = help: Rewrite `f` as a `def`
-
-ℹ Display-only fix
-61 61 |     from typing import Callable
-62 62 | 
-63 63 |     # E731
-64    |-    f: Callable[[int], int] = lambda x: 2 * x
-   64 |+    def f(x: int) -> int:
-   65 |+        return 2 * x
-65 66 | 
-66 67 | 
-67 68 | def scope():
-
 E731.py:73:9: E731 Do not assign a `lambda` expression, use a `def`
    |
 71 |     x: Callable[[int], int]
@@ -383,5 +364,6 @@ E731.py:147:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 149     |-    )
     147 |+    def f():
     148 |+        return (i := 1),
-
-
+150 149 | 
+151 150 | 
+152 151 | from dataclasses import dataclass
