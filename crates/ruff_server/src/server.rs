@@ -52,9 +52,8 @@ impl Server {
         let workspaces = init_params
             .workspace_folders
             .map(|folders| folders.into_iter().map(|folder| folder.uri).collect())
-            .or_else(|| init_params.root_uri.map(|u| vec![u]))
             .or_else(|| {
-                tracing::debug!("No root URI or workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
+                tracing::debug!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
                 Some(vec![types::Url::from_file_path(std::env::current_dir().ok()?).ok()?])
             })
             .ok_or_else(|| {
