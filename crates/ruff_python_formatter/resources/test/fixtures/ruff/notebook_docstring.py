@@ -7,9 +7,8 @@
 
 
 def compound_statement():
-
-    a = """
-    This is a multiline string ending with a semicolon
+    """
+    This is a docstring in a notebook
     """;
 
     b = "Another normal string"

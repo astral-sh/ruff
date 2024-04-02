@@ -13,9 +13,8 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/notebook_d
 
 
 def compound_statement():
-
-    a = """
-    This is a multiline string ending with a semicolon
+    """
+    This is a docstring in a notebook
     """;
 
     b = "Another normal string"
@@ -48,8 +47,8 @@ source_type                = Ipynb
 
 
 def compound_statement():
-    a = """
-    This is a multiline string ending with a semicolon
+    """
+    This is a docstring in a notebook
     """
 
     b = "Another normal string"
@@ -82,8 +81,8 @@ Ruff should leave it as is
 
 
 def compound_statement():
-    a = """
-    This is a multiline string ending with a semicolon
+    """
+    This is a docstring in a notebook
     """
 
     b = "Another normal string"
