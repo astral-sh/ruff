@@ -5,6 +5,7 @@ use lsp_types::CodeActionKind;
 pub use server::Server;
 
 mod edit;
+mod fix;
 mod format;
 mod lint;
 mod server;

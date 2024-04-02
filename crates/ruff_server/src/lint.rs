@@ -35,7 +35,6 @@ pub(crate) struct DiagnosticFix {
     pub(crate) fixed_diagnostic: lsp_types::Diagnostic,
     pub(crate) title: String,
     pub(crate) code: String,
-    pub(crate) applicability: Applicability,
     pub(crate) document_edits: Vec<lsp_types::TextDocumentEdit>,
 }
 
@@ -129,7 +128,6 @@ pub(crate) fn fixes_for_diagnostics<'d>(
             }];
             Ok(Some(DiagnosticFix {
                 fixed_diagnostic,
-                applicability: associated_data.fix.applicability(),
                 code: associated_data.code,
                 title: associated_data
                     .kind

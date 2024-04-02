@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 
-use crate::lint::{fixes_for_diagnostics, DiagnosticFix};
 use crate::server::api::LSPResult;
 use crate::server::SupportedCodeAction;
 use crate::server::{client::Notifier, Result};
@@ -9,7 +8,6 @@ use crate::PositionEncoding;
 use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
 use ruff_linter::settings::LinterSettings;
-use types::WorkspaceEdit;
 
 pub(crate) struct CodeActionResolve;
 
@@ -40,13 +38,15 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
             .with_failure_code(ErrorCode::InvalidParams)?;
 
         action.edit = match action_kind {
-            SupportedCodeAction::SourceFixAll => resolve_edit_for_fix_all(
-                document,
-                snapshot.url(),
-                &snapshot.configuration().linter,
-                snapshot.encoding(),
-            )
-            .with_failure_code(ErrorCode::InternalError)?,
+            SupportedCodeAction::SourceFixAll => Some(
+                resolve_edit_for_fix_all(
+                    document,
+                    snapshot.url(),
+                    &snapshot.configuration().linter,
+                    snapshot.encoding(),
+                )
+                .with_failure_code(ErrorCode::InternalError)?,
+            ),
             SupportedCodeAction::SourceOrganizeImports => {
                 todo!("Support `source.organizeImports`")
             }
@@ -67,32 +67,16 @@ pub(super) fn resolve_edit_for_fix_all(
     url: &types::Url,
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
-) -> crate::Result<Option<types::WorkspaceEdit>> {
-    let diagnostics = crate::lint::check(document, linter_settings, encoding);
-
-    let fixes = fixes_for_diagnostics(document, url, encoding, document.version(), diagnostics)?;
-
-    Ok(fix_all_edit(fixes.as_slice()))
-}
-
-fn fix_all_edit(fixes: &[DiagnosticFix]) -> Option<WorkspaceEdit> {
-    let edits_made: Vec<_> = fixes
-        .iter()
-        .filter(|fix| fix.applicability.is_safe())
-        .collect();
-
-    if edits_made.is_empty() {
-        return None;
-    }
-
-    Some(types::WorkspaceEdit {
-        document_changes: Some(types::DocumentChanges::Edits(
-            edits_made
-                .into_iter()
-                .flat_map(|fixes| fixes.document_edits.iter())
-                .cloned()
-                .collect(),
-        )),
+) -> crate::Result<types::WorkspaceEdit> {
+    Ok(types::WorkspaceEdit {
+        changes: Some(
+            [(
+                url.clone(),
+                crate::fix::fix_all(document, linter_settings, encoding)?,
+            )]
+            .into_iter()
+            .collect(),
+        ),
         ..Default::default()
     })
 }

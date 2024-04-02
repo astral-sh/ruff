@@ -2,11 +2,13 @@
 
 mod document;
 mod range;
+mod replacement;
 
 pub use document::Document;
 pub(crate) use document::DocumentVersion;
 use lsp_types::PositionEncodingKind;
 pub(crate) use range::{RangeExt, ToRangeExt};
+pub(crate) use replacement::Replacement;
 
 /// A convenient enumeration for supported text encodings. Can be converted to [`lsp_types::PositionEncodingKind`].
 // Please maintain the order from least to greatest priority for the derived `Ord` impl.

@@ -90,12 +90,12 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
         )
     } else {
         (
-            resolve_edit_for_fix_all(
+            Some(resolve_edit_for_fix_all(
                 document,
                 snapshot.url(),
                 &snapshot.configuration().linter,
                 snapshot.encoding(),
-            )?,
+            )?),
             None,
         )
     };
