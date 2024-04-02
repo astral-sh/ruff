@@ -1,6 +1,6 @@
 use crate::lint::fixes_for_diagnostics;
 use crate::server::api::LSPResult;
-use crate::server::SupportedCodeActionKind;
+use crate::server::SupportedCodeAction;
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
 use crate::DIAGNOSTIC_NAME;
@@ -28,18 +28,18 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
 
         let supported_code_actions = supported_code_actions(params.context.only);
 
-        if supported_code_actions.contains(&SupportedCodeActionKind::QuickFix) {
+        if supported_code_actions.contains(&SupportedCodeAction::QuickFix) {
             response.extend(
                 quick_fix(&snapshot, params.context.diagnostics)
                     .with_failure_code(ErrorCode::InternalError)?,
             );
         }
 
-        if supported_code_actions.contains(&SupportedCodeActionKind::SourceFixAll) {
+        if supported_code_actions.contains(&SupportedCodeAction::SourceFixAll) {
             response.push(fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
         }
 
-        if supported_code_actions.contains(&SupportedCodeActionKind::SourceOrganizeImports) {
+        if supported_code_actions.contains(&SupportedCodeAction::SourceOrganizeImports) {
             todo!("Implement the `source.organizeImports` code action");
         }
 
@@ -77,31 +77,35 @@ fn quick_fix(
 }
 
 fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
-    let mut action = types::CodeAction {
-        title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
-        kind: Some(types::CodeActionKind::SOURCE_FIX_ALL),
-        // This will be resolved later
-        edit: None,
-        data: Some(serde_json::to_value(snapshot.url()).expect("document url to serialize")),
-        ..Default::default()
-    };
+    let document = snapshot.document();
 
-    if !snapshot
+    let (edit, data) = if snapshot
         .resolved_client_capabilities()
         .code_action_deferred_edit_resolution
     {
-        let document = snapshot.document();
-
-        // We need to resolve the `edit` field now if we can't defer resolution to later
-        action = resolve_edit_for_fix_all(
-            action,
-            document,
-            snapshot.url(),
-            &snapshot.configuration().linter,
-            snapshot.encoding(),
-        )?;
-    }
-
+        // The editor will request the edit in a `CodeActionsResolve` request
+        (
+            None,
+            Some(serde_json::to_value(snapshot.url()).expect("document url to serialize")),
+        )
+    } else {
+        (
+            resolve_edit_for_fix_all(
+                document,
+                snapshot.url(),
+                &snapshot.configuration().linter,
+                snapshot.encoding(),
+            )?,
+            None,
+        )
+    };
+    let action = types::CodeAction {
+        title: format!("{DIAGNOSTIC_NAME}: Fix all auto-fixable problems"),
+        kind: Some(types::CodeActionKind::SOURCE_FIX_ALL),
+        edit,
+        data,
+        ..Default::default()
+    };
     Ok(types::CodeActionOrCommand::CodeAction(action))
 }
 
@@ -109,12 +113,12 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
 /// the list is filtered.
 fn supported_code_actions(
     action_filter: Option<Vec<CodeActionKind>>,
-) -> FxHashSet<SupportedCodeActionKind> {
+) -> FxHashSet<SupportedCodeAction> {
     let Some(action_filter) = action_filter else {
-        return SupportedCodeActionKind::all().collect();
+        return SupportedCodeAction::all().collect();
     };
 
-    SupportedCodeActionKind::all()
+    SupportedCodeAction::all()
         .filter(move |action| {
             action_filter.iter().any(|filter| {
                 action

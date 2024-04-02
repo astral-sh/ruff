@@ -194,7 +194,7 @@ impl Server {
             code_action_provider: Some(types::CodeActionProviderCapability::Options(
                 CodeActionOptions {
                     code_action_kinds: Some(
-                        SupportedCodeActionKind::all()
+                        SupportedCodeAction::all()
                             .flat_map(|action| action.kinds().into_iter())
                             .collect(),
                     ),
@@ -238,15 +238,23 @@ impl Server {
     }
 }
 
+/// The code actions we support.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum SupportedCodeActionKind {
+pub(crate) enum SupportedCodeAction {
+    /// Maps to the `quickfix` code action kind. Quick fix code actions are shown under
+    /// their respective diagnostics. Quick fixes are only created where the fix applicability is
+    /// at least [`ruff_diagnostics::Applicability::Unsafe`].
     QuickFix,
+    /// Maps to the `source.fixAll` and `source.fixAll.ruff` code action kinds.
+    /// This is a source action that applies all safe fixes to the currently open document.
     SourceFixAll,
+    /// Maps to `source.organizeImports` and `source.organizeImports.ruff` code action kinds.
+    /// This is a source action that applies import sorting fixes to the currently open document.
     #[allow(dead_code)] // TODO: remove
     SourceOrganizeImports,
 }
 
-impl SupportedCodeActionKind {
+impl SupportedCodeAction {
     /// Returns the possible LSP code action kind(s) that map to this code action.
     fn kinds(self) -> Vec<CodeActionKind> {
         match self {
@@ -270,7 +278,7 @@ impl SupportedCodeActionKind {
     }
 }
 
-impl TryFrom<CodeActionKind> for SupportedCodeActionKind {
+impl TryFrom<CodeActionKind> for SupportedCodeAction {
     type Error = ();
 
     fn try_from(kind: CodeActionKind) -> std::result::Result<Self, Self::Error> {

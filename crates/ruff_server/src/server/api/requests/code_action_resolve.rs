@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::lint::{fixes_for_diagnostics, DiagnosticFix};
 use crate::server::api::LSPResult;
-use crate::server::SupportedCodeActionKind;
+use crate::server::SupportedCodeAction;
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
 use crate::PositionEncoding;
@@ -26,11 +26,11 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
         _notifier: Notifier,
-        action: types::CodeAction,
+        mut action: types::CodeAction,
     ) -> Result<types::CodeAction> {
         let document = snapshot.document();
 
-        let action_kind: SupportedCodeActionKind = action
+        let action_kind: SupportedCodeAction = action
             .kind
             .clone()
             .ok_or(anyhow::anyhow!("No kind was given for code action"))
@@ -39,40 +39,40 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
             .map_err(|()| anyhow::anyhow!("Code action was of an invalid kind"))
             .with_failure_code(ErrorCode::InvalidParams)?;
 
-        match action_kind {
-            SupportedCodeActionKind::SourceFixAll => resolve_edit_for_fix_all(
-                action,
+        action.edit = match action_kind {
+            SupportedCodeAction::SourceFixAll => resolve_edit_for_fix_all(
                 document,
                 snapshot.url(),
                 &snapshot.configuration().linter,
                 snapshot.encoding(),
             )
-            .with_failure_code(ErrorCode::InternalError),
-            SupportedCodeActionKind::SourceOrganizeImports => {
+            .with_failure_code(ErrorCode::InternalError)?,
+            SupportedCodeAction::SourceOrganizeImports => {
                 todo!("Support `source.organizeImports`")
             }
-            SupportedCodeActionKind::QuickFix => Err(anyhow::anyhow!(
-                "Got a code action that should not need additional resolution: {action_kind:?}"
-            ))
-            .with_failure_code(ErrorCode::InvalidParams),
-        }
+            SupportedCodeAction::QuickFix => {
+                return Err(anyhow::anyhow!(
+                    "Got a code action that should not need additional resolution: {action_kind:?}"
+                ))
+                .with_failure_code(ErrorCode::InvalidParams)
+            }
+        };
+
+        Ok(action)
     }
 }
 
 pub(super) fn resolve_edit_for_fix_all(
-    mut action: types::CodeAction,
     document: &crate::edit::Document,
     url: &types::Url,
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
-) -> crate::Result<types::CodeAction> {
+) -> crate::Result<Option<types::WorkspaceEdit>> {
     let diagnostics = crate::lint::check(document, linter_settings, encoding);
 
     let fixes = fixes_for_diagnostics(document, url, encoding, document.version(), diagnostics)?;
 
-    action.edit = fix_all_edit(fixes.as_slice());
-
-    Ok(action)
+    Ok(fix_all_edit(fixes.as_slice()))
 }
 
 fn fix_all_edit(fixes: &[DiagnosticFix]) -> Option<WorkspaceEdit> {
