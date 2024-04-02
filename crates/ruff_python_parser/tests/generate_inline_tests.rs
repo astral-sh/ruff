@@ -49,7 +49,7 @@ fn install_tests(tests: &HashMap<String, Test>, target_dir: &str) -> Result<()> 
 
     if !unreferenced.is_empty() {
         anyhow::bail!(
-            "Unreferenced test files found for which no comment exists:\n  {}\n",
+            "Unreferenced test files found for which no comment exists:\n  {}\nPlease delete these files manually\n",
             unreferenced
                 .iter()
                 .map(|path| path.strip_prefix(&root_dir).unwrap().display())
@@ -75,7 +75,7 @@ fn install_tests(tests: &HashMap<String, Test>, target_dir: &str) -> Result<()> 
 
     if !updated_files.is_empty() {
         let mut message = format!(
-            "Following files were not up-to date and has been updated:\n  {}\nRe-run the tests with `cargo test`\n",
+            "Following files were not up-to date and has been updated:\n  {}\nRe-run the tests with `cargo test` to update the test snapshots\n",
             updated_files
                 .iter()
                 .map(|path| path.strip_prefix(&root_dir).unwrap().display())
