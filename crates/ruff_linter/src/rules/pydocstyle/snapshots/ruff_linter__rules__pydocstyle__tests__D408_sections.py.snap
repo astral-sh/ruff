@@ -1,14 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:96:5: D408 [*] Section underline should be in the line following the section's name ("Returns")
+sections.py:98:5: D408 [*] Section underline should be in the line following the section's name ("Returns")
    |
-94 |     """Toggle the gizmo.
-95 | 
 96 |     Returns
-   |     ^^^^^^^ D408
 97 | 
 98 |     -------
+   |     ^^^^^^^ D408
+99 |     A value of some sort.
    |
    = help: Add underline to "Returns"
 

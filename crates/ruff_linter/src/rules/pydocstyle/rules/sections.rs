@@ -2,6 +2,7 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::FxHashSet;
+use std::ops::Add;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -10,8 +11,8 @@ use ruff_python_ast::docstrings::{clean_space, leading_space};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::ParameterWithDefault;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
-use ruff_python_trivia::{textwrap::dedent, PythonWhitespace};
-use ruff_source_file::NewlineWithTrailingNewline;
+use ruff_python_trivia::{textwrap::dedent, Cursor};
+use ruff_source_file::{Line, NewlineWithTrailingNewline};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -1377,50 +1378,41 @@ fn blanks_and_section_underline(
     }
 
     if let Some(non_blank_line) = following_lines.next() {
-        let dash_line_found = is_dashed_underline(&non_blank_line);
-
-        if dash_line_found {
+        if let Some(dashed_line) = find_underline(&non_blank_line, '-') {
             if blank_lines_after_header > 0 {
                 if checker.enabled(Rule::SectionUnderlineAfterName) {
                     let mut diagnostic = Diagnostic::new(
                         SectionUnderlineAfterName {
                             name: context.section_name().to_string(),
                         },
-                        context.section_name_range(),
+                        dashed_line,
                     );
-                    let range = TextRange::new(context.following_range().start(), blank_lines_end);
+
                     // Delete any blank lines between the header and the underline.
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
+                    diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                        context.following_range().start(),
+                        blank_lines_end,
+                    )));
+
                     checker.diagnostics.push(diagnostic);
                 }
             }
 
-            if non_blank_line
-                .trim()
-                .chars()
-                .filter(|char| *char == '-')
-                .count()
-                != context.section_name().len()
-            {
+            if dashed_line.len().to_usize() != context.section_name().len() {
                 if checker.enabled(Rule::SectionUnderlineMatchesSectionLength) {
                     let mut diagnostic = Diagnostic::new(
                         SectionUnderlineMatchesSectionLength {
                             name: context.section_name().to_string(),
                         },
-                        context.section_name_range(),
+                        dashed_line,
                     );
+
                     // Replace the existing underline with a line of the appropriate length.
-                    let content = format!(
-                        "{}{}{}",
-                        clean_space(docstring.indentation),
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                         "-".repeat(context.section_name().len()),
-                        checker.stylist().line_ending().as_str()
-                    );
-                    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                        content,
-                        blank_lines_end,
-                        non_blank_line.full_end(),
+                        dashed_line,
                     )));
+
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -1432,8 +1424,9 @@ fn blanks_and_section_underline(
                         SectionUnderlineNotOverIndented {
                             name: context.section_name().to_string(),
                         },
-                        context.section_name_range(),
+                        dashed_line,
                     );
+
                     // Replace the existing indentation with whitespace of the appropriate length.
                     let range = TextRange::at(
                         blank_lines_end,
@@ -1445,6 +1438,7 @@ fn blanks_and_section_underline(
                     } else {
                         Edit::range_replacement(contents, range)
                     }));
+
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -1496,42 +1490,45 @@ fn blanks_and_section_underline(
                 }
             }
         } else {
-            let equal_line_found = non_blank_line
-                .chars()
-                .all(|char| char.is_whitespace() || char == '=');
-
             if checker.enabled(Rule::DashedUnderlineAfterSection) {
-                let mut diagnostic = Diagnostic::new(
-                    DashedUnderlineAfterSection {
-                        name: context.section_name().to_string(),
-                    },
-                    context.section_name_range(),
-                );
-                // Add a dashed line (of the appropriate length) under the section header.
-                let content = format!(
-                    "{}{}{}",
-                    checker.stylist().line_ending().as_str(),
-                    clean_space(docstring.indentation),
-                    "-".repeat(context.section_name().len()),
-                );
-                if equal_line_found
-                    && non_blank_line.trim_whitespace().len() == context.section_name().len()
-                {
+                if let Some(equal_line) = find_underline(&non_blank_line, '=') {
+                    let mut diagnostic = Diagnostic::new(
+                        DashedUnderlineAfterSection {
+                            name: context.section_name().to_string(),
+                        },
+                        equal_line,
+                    );
+
                     // If an existing underline is an equal sign line of the appropriate length,
                     // replace it with a dashed line.
-                    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                        content,
-                        context.summary_range().end(),
-                        non_blank_line.end(),
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        "-".repeat(context.section_name().len()),
+                        equal_line,
                     )));
+
+                    checker.diagnostics.push(diagnostic);
                 } else {
-                    // Otherwise, insert a dashed line after the section header.
+                    let mut diagnostic = Diagnostic::new(
+                        DashedUnderlineAfterSection {
+                            name: context.section_name().to_string(),
+                        },
+                        context.section_name_range(),
+                    );
+
+                    // Add a dashed line (of the appropriate length) under the section header.
+                    let content = format!(
+                        "{}{}{}",
+                        checker.stylist().line_ending().as_str(),
+                        clean_space(docstring.indentation),
+                        "-".repeat(context.section_name().len()),
+                    );
                     diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                         content,
                         context.summary_range().end(),
                     )));
+
+                    checker.diagnostics.push(diagnostic);
                 }
-                checker.diagnostics.push(diagnostic);
             }
             if blank_lines_after_header > 0 {
                 if checker.enabled(Rule::BlankLinesBetweenHeaderAndContent) {
@@ -1548,9 +1545,8 @@ fn blanks_and_section_underline(
                 }
             }
         }
-    }
-    // Nothing but blank lines after the section header.
-    else {
+    } else {
+        // Nothing but blank lines after the section header.
         if checker.enabled(Rule::DashedUnderlineAfterSection) {
             let mut diagnostic = Diagnostic::new(
                 DashedUnderlineAfterSection {
@@ -1558,6 +1554,7 @@ fn blanks_and_section_underline(
                 },
                 context.section_name_range(),
             );
+
             // Add a dashed line (of the appropriate length) under the section header.
             let content = format!(
                 "{}{}{}",
@@ -1565,11 +1562,11 @@ fn blanks_and_section_underline(
                 clean_space(docstring.indentation),
                 "-".repeat(context.section_name().len()),
             );
-
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 content,
                 context.summary_range().end(),
             )));
+
             checker.diagnostics.push(diagnostic);
         }
         if checker.enabled(Rule::EmptyDocstringSection) {
@@ -1804,10 +1801,11 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
     let leading_space = leading_space(first_line.as_str());
     let relevant_lines = std::iter::once(first_line)
         .chain(following_lines)
-        .map(|l| l.as_str())
         .filter(|line| {
-            line.is_empty() || (line.starts_with(leading_space) && !is_dashed_underline(line))
+            line.is_empty()
+                || (line.starts_with(leading_space) && find_underline(line, '-').is_none())
         })
+        .map(|line| line.as_str())
         .join("\n");
     let args_content = dedent(&relevant_lines);
 
@@ -1995,7 +1993,35 @@ fn parse_google_sections(
     }
 }
 
-fn is_dashed_underline(line: &str) -> bool {
-    let trimmed_line = line.trim();
-    !trimmed_line.is_empty() && trimmed_line.chars().all(|char| char == '-')
+/// Returns the [`TextRange`] of the underline, if a line consists of only dashes.
+fn find_underline(line: &Line, dash: char) -> Option<TextRange> {
+    let mut cursor = Cursor::new(line.as_str());
+
+    // Eat leading whitespace.
+    cursor.eat_while(char::is_whitespace);
+
+    // Determine the start of the dashes.
+    let offset = cursor.token_len();
+
+    // Consume the dashes.
+    cursor.start_token();
+    cursor.eat_while(|c| c == dash);
+
+    // Determine the end of the dashes.
+    let len = cursor.token_len();
+
+    // If there are no dashes, return None.
+    if len == TextSize::new(0) {
+        return None;
+    }
+
+    // Eat trailing whitespace.
+    cursor.eat_while(char::is_whitespace);
+
+    // If there are any characters after the dashes, return None.
+    if !cursor.is_eof() {
+        return None;
+    }
+
+    Some(TextRange::at(offset, len).add(line.start()))
 }

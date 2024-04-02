@@ -331,13 +331,11 @@ sections.py:503:9: D407 [*] Missing dashed underline after section ("Args")
 505 506 | 
 506 507 |         """
 
-sections.py:521:5: D407 [*] Missing dashed underline after section ("Parameters")
+sections.py:522:5: D407 [*] Missing dashed underline after section ("Parameters")
     |
-519 |     """Equal length equals should be replaced with dashes.
-520 | 
 521 |     Parameters
-    |     ^^^^^^^^^^ D407
 522 |     ==========
+    |     ^^^^^^^^^^ D407
 523 |     """
     |
     = help: Add dashed line under "Parameters"
@@ -352,13 +350,11 @@ sections.py:521:5: D407 [*] Missing dashed underline after section ("Parameters"
 524 524 | 
 525 525 | 
 
-sections.py:529:5: D407 [*] Missing dashed underline after section ("Parameters")
+sections.py:530:5: D407 [*] Missing dashed underline after section ("Parameters")
     |
-527 |     """Here, the length of equals is not the same.
-528 | 
 529 |     Parameters
-    |     ^^^^^^^^^^ D407
 530 |     ===========
+    |     ^^^^^^^^^^^ D407
 531 |     """
     |
     = help: Add dashed line under "Parameters"
@@ -367,10 +363,11 @@ sections.py:529:5: D407 [*] Missing dashed underline after section ("Parameters"
 527 527 |     """Here, the length of equals is not the same.
 528 528 | 
 529 529 |     Parameters
+530     |-    ===========
     530 |+    ----------
-530 531 |     ===========
-531 532 |     """
-532 533 | 
+531 531 |     """
+532 532 | 
+533 533 | 
 
 sections.py:550:5: D407 [*] Missing dashed underline after section ("Args")
     |
