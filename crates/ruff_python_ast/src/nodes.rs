@@ -2735,6 +2735,21 @@ pub enum BoolOp {
     Or,
 }
 
+impl BoolOp {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            BoolOp::And => "and",
+            BoolOp::Or => "or",
+        }
+    }
+}
+
+impl fmt::Display for BoolOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// See also [operator](https://docs.python.org/3/library/ast.html#ast.operator)
 #[derive(Clone, Debug, PartialEq, is_macro::Is, Copy, Hash, Eq)]
 pub enum Operator {
@@ -2753,6 +2768,32 @@ pub enum Operator {
     FloorDiv,
 }
 
+impl Operator {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Operator::Add => "+",
+            Operator::Sub => "-",
+            Operator::Mult => "*",
+            Operator::MatMult => "@",
+            Operator::Div => "/",
+            Operator::Mod => "%",
+            Operator::Pow => "**",
+            Operator::LShift => "<<",
+            Operator::RShift => ">>",
+            Operator::BitOr => "|",
+            Operator::BitXor => "^",
+            Operator::BitAnd => "&",
+            Operator::FloorDiv => "//",
+        }
+    }
+}
+
+impl fmt::Display for Operator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// See also [unaryop](https://docs.python.org/3/library/ast.html#ast.unaryop)
 #[derive(Clone, Debug, PartialEq, is_macro::Is, Copy, Hash, Eq)]
 pub enum UnaryOp {
@@ -2760,6 +2801,23 @@ pub enum UnaryOp {
     Not,
     UAdd,
     USub,
+}
+
+impl UnaryOp {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            UnaryOp::Invert => "~",
+            UnaryOp::Not => "not",
+            UnaryOp::UAdd => "+",
+            UnaryOp::USub => "-",
+        }
+    }
+}
+
+impl fmt::Display for UnaryOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 /// See also [cmpop](https://docs.python.org/3/library/ast.html#ast.cmpop)
@@ -2775,6 +2833,29 @@ pub enum CmpOp {
     IsNot,
     In,
     NotIn,
+}
+
+impl CmpOp {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            CmpOp::Eq => "==",
+            CmpOp::NotEq => "!=",
+            CmpOp::Lt => "<",
+            CmpOp::LtE => "<=",
+            CmpOp::Gt => ">",
+            CmpOp::GtE => ">=",
+            CmpOp::Is => "is",
+            CmpOp::IsNot => "is not",
+            CmpOp::In => "in",
+            CmpOp::NotIn => "not in",
+        }
+    }
+}
+
+impl fmt::Display for CmpOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 /// See also [comprehension](https://docs.python.org/3/library/ast.html#ast.comprehension)
@@ -3281,23 +3362,6 @@ impl Deref for TypeParams {
 }
 
 pub type Suite = Vec<Stmt>;
-
-impl CmpOp {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            CmpOp::Eq => "==",
-            CmpOp::NotEq => "!=",
-            CmpOp::Lt => "<",
-            CmpOp::LtE => "<=",
-            CmpOp::Gt => ">",
-            CmpOp::GtE => ">=",
-            CmpOp::Is => "is",
-            CmpOp::IsNot => "is not",
-            CmpOp::In => "in",
-            CmpOp::NotIn => "not in",
-        }
-    }
-}
 
 impl Parameters {
     pub fn empty(range: TextRange) -> Self {
