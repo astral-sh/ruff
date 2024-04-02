@@ -18,7 +18,7 @@ def get_str():
 
 _ = int(get_str()[2:], 16)
 
-# Ok
+# OK
 
 _ = int("0b1100", 0)
 _ = int("123", 3)

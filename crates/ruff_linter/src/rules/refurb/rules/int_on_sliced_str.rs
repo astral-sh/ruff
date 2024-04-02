@@ -1,16 +1,21 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{Expr, ExprCall, Identifier};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for uses of converting a string starting with `0b`, `0o`, or `0x` to an int, by removing
-/// two first symbols and explicitly set the base.
+/// Checks for uses of `int` with an explicit base in which a string expression
+/// is stripped of its leading prefix (i.e., `0b`, `0o`, or `0x`).
 ///
 /// ## Why is this bad?
-/// Rather than set the base explicitly, call the `int` with the base of zero, and let automatically
-/// deduce the base by the prefix.
+/// Given an integer string with a prefix (e.g., `0xABC`), Python can automatically
+/// determine the base of the integer by the prefix without needing to specify
+/// it explicitly.
+///
+/// Instead of `int(num[2:], 16)`, use `int(num, 0)`, which will automatically
+/// deduce the base based on the prefix.
 ///
 /// ## Example
 /// ```python
@@ -36,55 +41,69 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Fix safety
-/// The rule's fix is marked as unsafe, because there is no way for `ruff` to detect whether
-/// the stripped prefix was a valid Python `int` prefix.
+/// The rule's fix is marked as unsafe, as Ruff cannot guarantee that the
+/// argument to `int` will remain valid when its base is included in the
+/// function call.
+///
 /// ## References
 /// - [Python documentation: `int`](https://docs.python.org/3/library/functions.html#int)
 #[violation]
-pub struct IntOnSlicedStr;
+pub struct IntOnSlicedStr {
+    base: u8,
+}
 
 impl AlwaysFixableViolation for IntOnSlicedStr {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of `int` with the explicit `base` after removing the prefix")
+        let IntOnSlicedStr { base } = self;
+        format!("Use of `int` with explicit `base={base}` after removing prefix")
     }
 
     fn fix_title(&self) -> String {
-        format!("Use `int` with `base` 0 instead")
+        format!("Replace with `base=0`")
     }
 }
 
 pub(crate) fn int_on_sliced_str(checker: &mut Checker, call: &ExprCall) {
-    if !checker
-        .semantic()
-        .resolve_qualified_name(call.func.as_ref())
-        .is_some_and(|name| matches!(name.segments(), ["" | "builtins", "int"]))
-    {
+    // Verify that the function is `int`.
+    let Expr::Name(name) = call.func.as_ref() else {
+        return;
+    };
+    if name.id.as_str() != "int" {
         return;
     }
-    let (arg, base_keyword, base) = match (
+    if !checker.semantic().is_builtin("int") {
+        return;
+    }
+
+    // There must be exactly two arguments (e.g., `int(num[2:], 16)`).
+    let (expression, base) = match (
         call.arguments.args.as_ref(),
         call.arguments.keywords.as_ref(),
     ) {
-        ([arg], [base_kw_arg])
-            if base_kw_arg.arg.as_ref().map(Identifier::as_str) == Some("base") =>
-        {
-            (arg, "base=", &base_kw_arg.value)
+        ([expression], [base]) if base.arg.as_ref().map(Identifier::as_str) == Some("base") => {
+            (expression, &base.value)
         }
-        ([arg, base_arg], []) => (arg, "", base_arg),
+        ([expression, base], []) => (expression, base),
         _ => {
             return;
         }
     };
-    if !base
+
+    // The base must be a number literal with a value of 2, 8, or 16.
+    let Some(base_u8) = base
         .as_number_literal_expr()
         .and_then(|base| base.value.as_int())
-        .is_some_and(|base| matches!(base.as_u8(), Some(2 | 8 | 16)))
-    {
+        .and_then(ruff_python_ast::Int::as_u8)
+    else {
         return;
     };
+    if !matches!(base_u8, 2 | 8 | 16) {
+        return;
+    }
 
-    let Expr::Subscript(expr_subscript) = arg else {
+    // Determine whether the expression is a slice of a string (e.g., `num[2:]`).
+    let Expr::Subscript(expr_subscript) = expression else {
         return;
     };
     let Expr::Slice(expr_slice) = expr_subscript.slice.as_ref() else {
@@ -96,23 +115,20 @@ pub(crate) fn int_on_sliced_str(checker: &mut Checker, call: &ExprCall) {
     if !expr_slice
         .lower
         .as_ref()
-        .and_then(|x| x.as_number_literal_expr())
-        .and_then(|x| x.value.as_int())
-        .is_some_and(|x| x.as_u8() == Some(2))
+        .and_then(|expr| expr.as_number_literal_expr())
+        .and_then(|expr| expr.value.as_int())
+        .is_some_and(|expr| expr.as_u8() == Some(2))
     {
         return;
     }
-    checker
-        .diagnostics
-        .push(
-            Diagnostic::new(IntOnSlicedStr, call.range).with_fix(Fix::unsafe_edit(
-                Edit::range_replacement(
-                    format!(
-                        "int({}, {base_keyword}0)",
-                        checker.locator().slice(expr_subscript.value.as_ref())
-                    ),
-                    call.range,
-                ),
-            )),
-        );
+
+    let mut diagnostic = Diagnostic::new(IntOnSlicedStr { base: base_u8 }, call.range());
+    diagnostic.set_fix(Fix::unsafe_edits(
+        Edit::range_replacement(
+            checker.locator().slice(&*expr_subscript.value).to_string(),
+            expression.range(),
+        ),
+        [Edit::range_replacement("0".to_string(), base.range())],
+    ));
+    checker.diagnostics.push(diagnostic);
 }
