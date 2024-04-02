@@ -1521,4 +1521,29 @@ a,b
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
+
+    #[test]
+    fn test_stringized_annotation() {
+        let parse_ast = parse_suite(
+            r#"
+from typing_extensions import TypeAlias
+
+
+Alias1 = (
+    int
+    | str
+    | bool
+)  # parentheses required
+
+Alias2: TypeAlias = """
+    int
+    | str
+    | bool
+"""
+"#
+            .trim(),
+        )
+        .unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
 }
