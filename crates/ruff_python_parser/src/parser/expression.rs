@@ -372,6 +372,18 @@ impl<'src> Parser<'src> {
                 }
                 Expr::Lambda(lambda_expr).into()
             }
+            TokenKind::Yield => {
+                let expr = self.parse_yield_expression();
+                if previous_precedence > Precedence::Initial {
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "`yield` expression cannot be used here".to_string(),
+                        ),
+                        &expr,
+                    );
+                }
+                expr.into()
+            }
             _ => self.parse_atom(),
         };
 
@@ -577,7 +589,6 @@ impl<'src> Parser<'src> {
 
             TokenKind::Lsqb => self.parse_list_like_expression(),
             TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
-            TokenKind::Yield => self.parse_yield_expression(),
 
             kind => {
                 if kind.is_keyword() {
