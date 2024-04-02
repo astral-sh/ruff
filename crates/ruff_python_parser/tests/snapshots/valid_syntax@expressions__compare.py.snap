@@ -7,17 +7,17 @@ input_file: crates/ruff_python_parser/resources/valid/expressions/compare.py
 ```
 Module(
     ModModule {
-        range: 0..129,
+        range: 0..542,
         body: [
             Expr(
                 StmtExpr {
-                    range: 0..6,
+                    range: 9..15,
                     value: Compare(
                         ExprCompare {
-                            range: 0..6,
+                            range: 9..15,
                             left: Name(
                                 ExprName {
-                                    range: 0..1,
+                                    range: 9..10,
                                     id: "a",
                                     ctx: Load,
                                 },
@@ -28,7 +28,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
-                                        range: 5..6,
+                                        range: 14..15,
                                         id: "b",
                                         ctx: Load,
                                     },
@@ -40,13 +40,13 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 7..12,
+                    range: 16..21,
                     value: Compare(
                         ExprCompare {
-                            range: 7..12,
+                            range: 16..21,
                             left: Name(
                                 ExprName {
-                                    range: 7..8,
+                                    range: 16..17,
                                     id: "b",
                                     ctx: Load,
                                 },
@@ -57,7 +57,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
-                                        range: 11..12,
+                                        range: 20..21,
                                         id: "a",
                                         ctx: Load,
                                     },
@@ -69,13 +69,13 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 13..18,
+                    range: 22..27,
                     value: Compare(
                         ExprCompare {
-                            range: 13..18,
+                            range: 22..27,
                             left: Name(
                                 ExprName {
-                                    range: 13..14,
+                                    range: 22..23,
                                     id: "b",
                                     ctx: Load,
                                 },
@@ -86,7 +86,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
-                                        range: 17..18,
+                                        range: 26..27,
                                         id: "a",
                                         ctx: Load,
                                     },
@@ -98,13 +98,13 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 19..25,
+                    range: 28..34,
                     value: Compare(
                         ExprCompare {
-                            range: 19..25,
+                            range: 28..34,
                             left: Name(
                                 ExprName {
-                                    range: 19..20,
+                                    range: 28..29,
                                     id: "a",
                                     ctx: Load,
                                 },
@@ -115,7 +115,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
-                                        range: 24..25,
+                                        range: 33..34,
                                         id: "b",
                                         ctx: Load,
                                     },
@@ -127,13 +127,13 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 26..32,
+                    range: 35..41,
                     value: Compare(
                         ExprCompare {
-                            range: 26..32,
+                            range: 35..41,
                             left: Name(
                                 ExprName {
-                                    range: 26..27,
+                                    range: 35..36,
                                     id: "a",
                                     ctx: Load,
                                 },
@@ -144,7 +144,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
-                                        range: 31..32,
+                                        range: 40..41,
                                         id: "b",
                                         ctx: Load,
                                     },
@@ -156,13 +156,13 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 33..39,
+                    range: 42..48,
                     value: Compare(
                         ExprCompare {
-                            range: 33..39,
+                            range: 42..48,
                             left: Name(
                                 ExprName {
-                                    range: 33..34,
+                                    range: 42..43,
                                     id: "a",
                                     ctx: Load,
                                 },
@@ -173,7 +173,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
-                                        range: 38..39,
+                                        range: 47..48,
                                         id: "b",
                                         ctx: Load,
                                     },
@@ -185,13 +185,13 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 40..46,
+                    range: 49..55,
                     value: Compare(
                         ExprCompare {
-                            range: 40..46,
+                            range: 49..55,
                             left: Name(
                                 ExprName {
-                                    range: 40..41,
+                                    range: 49..50,
                                     id: "a",
                                     ctx: Load,
                                 },
@@ -202,7 +202,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
-                                        range: 45..46,
+                                        range: 54..55,
                                         id: "c",
                                         ctx: Load,
                                     },
@@ -214,13 +214,13 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 47..53,
+                    range: 56..62,
                     value: Compare(
                         ExprCompare {
-                            range: 47..53,
+                            range: 56..62,
                             left: Name(
                                 ExprName {
-                                    range: 47..48,
+                                    range: 56..57,
                                     id: "a",
                                     ctx: Load,
                                 },
@@ -231,7 +231,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
-                                        range: 52..53,
+                                        range: 61..62,
                                         id: "b",
                                         ctx: Load,
                                     },
@@ -243,13 +243,13 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 54..64,
+                    range: 63..73,
                     value: Compare(
                         ExprCompare {
-                            range: 54..64,
+                            range: 63..73,
                             left: Name(
                                 ExprName {
-                                    range: 54..55,
+                                    range: 63..64,
                                     id: "a",
                                     ctx: Load,
                                 },
@@ -260,7 +260,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
-                                        range: 63..64,
+                                        range: 72..73,
                                         id: "c",
                                         ctx: Load,
                                     },
@@ -272,13 +272,13 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 65..75,
+                    range: 74..84,
                     value: Compare(
                         ExprCompare {
-                            range: 65..75,
+                            range: 74..84,
                             left: Name(
                                 ExprName {
-                                    range: 65..66,
+                                    range: 74..75,
                                     id: "a",
                                     ctx: Load,
                                 },
@@ -289,7 +289,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
-                                        range: 74..75,
+                                        range: 83..84,
                                         id: "b",
                                         ctx: Load,
                                     },
@@ -301,13 +301,312 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 76..128,
+                    range: 110..156,
                     value: Compare(
                         ExprCompare {
-                            range: 76..128,
+                            range: 110..156,
                             left: Name(
                                 ExprName {
-                                    range: 76..77,
+                                    range: 110..111,
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                NotIn,
+                                IsNot,
+                                NotIn,
+                                NotIn,
+                                IsNot,
+                            ],
+                            comparators: [
+                                Name(
+                                    ExprName {
+                                        range: 119..120,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 128..129,
+                                        id: "c",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 137..138,
+                                        id: "d",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 146..147,
+                                        id: "e",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 155..156,
+                                        id: "f",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 177..203,
+                    value: Compare(
+                        ExprCompare {
+                            range: 177..203,
+                            left: BinOp(
+                                ExprBinOp {
+                                    range: 177..182,
+                                    left: Name(
+                                        ExprName {
+                                            range: 177..178,
+                                            id: "a",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    op: BitOr,
+                                    right: Name(
+                                        ExprName {
+                                            range: 181..182,
+                                            id: "b",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            ops: [
+                                Lt,
+                                NotIn,
+                            ],
+                            comparators: [
+                                BinOp(
+                                    ExprBinOp {
+                                        range: 185..190,
+                                        left: Name(
+                                            ExprName {
+                                                range: 185..186,
+                                                id: "c",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        op: BitOr,
+                                        right: Name(
+                                            ExprName {
+                                                range: 189..190,
+                                                id: "d",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                                BinOp(
+                                    ExprBinOp {
+                                        range: 198..203,
+                                        left: Name(
+                                            ExprName {
+                                                range: 198..199,
+                                                id: "e",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        op: BitAnd,
+                                        right: Name(
+                                            ExprName {
+                                                range: 202..203,
+                                                id: "f",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 379..393,
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 379..393,
+                            op: Not,
+                            operand: Compare(
+                                ExprCompare {
+                                    range: 383..393,
+                                    left: Name(
+                                        ExprName {
+                                            range: 383..384,
+                                            id: "x",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ops: [
+                                        NotIn,
+                                    ],
+                                    comparators: [
+                                        Name(
+                                            ExprName {
+                                                range: 392..393,
+                                                id: "y",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 395..416,
+                    value: BoolOp(
+                        ExprBoolOp {
+                            range: 395..416,
+                            op: Or,
+                            values: [
+                                Name(
+                                    ExprName {
+                                        range: 395..396,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                BoolOp(
+                                    ExprBoolOp {
+                                        range: 400..416,
+                                        op: And,
+                                        values: [
+                                            Compare(
+                                                ExprCompare {
+                                                    range: 400..410,
+                                                    left: Name(
+                                                        ExprName {
+                                                            range: 400..401,
+                                                            id: "y",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ops: [
+                                                        NotIn,
+                                                    ],
+                                                    comparators: [
+                                                        Name(
+                                                            ExprName {
+                                                                range: 409..410,
+                                                                id: "z",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 415..416,
+                                                    id: "a",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 417..429,
+                    value: Compare(
+                        ExprCompare {
+                            range: 417..429,
+                            left: Name(
+                                ExprName {
+                                    range: 417..418,
+                                    id: "x",
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                Eq,
+                            ],
+                            comparators: [
+                                Await(
+                                    ExprAwait {
+                                        range: 422..429,
+                                        value: Name(
+                                            ExprName {
+                                                range: 428..429,
+                                                id: "y",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 430..446,
+                    value: Compare(
+                        ExprCompare {
+                            range: 430..446,
+                            left: Name(
+                                ExprName {
+                                    range: 430..431,
+                                    id: "x",
+                                    ctx: Load,
+                                },
+                            ),
+                            ops: [
+                                IsNot,
+                            ],
+                            comparators: [
+                                Await(
+                                    ExprAwait {
+                                        range: 439..446,
+                                        value: Name(
+                                            ExprName {
+                                                range: 445..446,
+                                                id: "y",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 489..541,
+                    value: Compare(
+                        ExprCompare {
+                            range: 489..541,
+                            left: Name(
+                                ExprName {
+                                    range: 489..490,
                                     id: "a",
                                     ctx: Load,
                                 },
@@ -326,63 +625,63 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
-                                        range: 80..81,
+                                        range: 493..494,
                                         id: "b",
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
-                                        range: 85..86,
+                                        range: 498..499,
                                         id: "c",
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
-                                        range: 89..90,
+                                        range: 502..503,
                                         id: "d",
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
-                                        range: 94..95,
+                                        range: 507..508,
                                         id: "e",
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
-                                        range: 103..104,
+                                        range: 516..517,
                                         id: "f",
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
-                                        range: 112..113,
+                                        range: 525..526,
                                         id: "g",
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
-                                        range: 117..118,
+                                        range: 530..531,
                                         id: "h",
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
-                                        range: 122..123,
+                                        range: 535..536,
                                         id: "i",
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
-                                        range: 127..128,
+                                        range: 540..541,
                                         id: "j",
                                         ctx: Load,
                                     },
