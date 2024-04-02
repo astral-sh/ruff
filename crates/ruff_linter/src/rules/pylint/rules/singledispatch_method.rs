@@ -9,13 +9,13 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 
 /// ## What it does
-/// Checks for `@singledispatch` decorators on class and instance methods.
+/// Checks for methods decorated with `@singledispatch`.
 ///
 /// ## Why is this bad?
 /// The `@singledispatch` decorator is intended for use with functions, not methods.
 ///
 /// Instead, use the `@singledispatchmethod` decorator, or migrate the method to a
-/// standalone function or `@staticmethod`.
+/// standalone function.
 ///
 /// ## Example
 /// ```python
@@ -88,7 +88,9 @@ pub(crate) fn singledispatch_method(
     );
     if !matches!(
         type_,
-        function_type::FunctionType::Method | function_type::FunctionType::ClassMethod
+        function_type::FunctionType::Method
+            | function_type::FunctionType::ClassMethod
+            | function_type::FunctionType::StaticMethod
     ) {
         return;
     }
