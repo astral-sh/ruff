@@ -142,6 +142,8 @@ pub enum ParseErrorType {
     },
     /// A duplicate argument was found in a function definition.
     DuplicateArgumentError(String),
+    /// A keyword argument was repeated.
+    DuplicateKeywordArgumentError(String),
     /// An f-string error containing the [`FStringErrorType`].
     FStringError(FStringErrorType),
     /// Parser encountered an error during lexing.
@@ -231,6 +233,9 @@ impl std::fmt::Display for ParseErrorType {
             }
             ParseErrorType::DuplicateArgumentError(arg_name) => {
                 write!(f, "duplicate argument '{arg_name}' in function definition")
+            }
+            ParseErrorType::DuplicateKeywordArgumentError(arg_name) => {
+                write!(f, "keyword argument repeated: {arg_name}")
             }
             ParseErrorType::FStringError(ref fstring_error) => {
                 write!(f, "f-string: {fstring_error}")

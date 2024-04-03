@@ -671,9 +671,7 @@ impl<'src> Parser<'src> {
 
         self.parse_comma_separated_list(RecoveryContextKind::Arguments, |parser| {
             let argument_start = parser.node_start();
-            if parser.at(TokenKind::DoubleStar) {
-                parser.bump(TokenKind::DoubleStar);
-
+            if parser.eat(TokenKind::DoubleStar) {
                 let value = parser.parse_conditional_expression_or_higher();
 
                 if !value.is_parenthesized {
@@ -797,11 +795,19 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Rpar);
 
-        ast::Arguments {
+        let arguments = ast::Arguments {
             range: self.node_range(start),
             args: args.into_boxed_slice(),
             keywords: keywords.into_boxed_slice(),
+        };
+
+        if let Err(errors) = helpers::validate_arguments(&arguments) {
+            for error in errors {
+                self.add_error(error.error, error.location);
+            }
         }
+
+        arguments
     }
 
     /// Parses a subscript expression.

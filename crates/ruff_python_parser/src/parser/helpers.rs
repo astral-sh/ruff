@@ -123,3 +123,32 @@ pub(super) fn validate_parameters(parameters: &ast::Parameters) -> Result<(), Pa
 
     Ok(())
 }
+
+pub(super) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), Vec<ParseError>> {
+    let mut errors = vec![];
+
+    let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
+        arguments.keywords.len(),
+        BuildHasherDefault::default(),
+    );
+
+    for (name, range) in arguments
+        .keywords
+        .iter()
+        .filter_map(|argument| argument.arg.as_ref().map(|arg| (arg, argument.range)))
+    {
+        let arg_name = name.as_str();
+        if !all_arg_names.insert(arg_name) {
+            errors.push(ParseError {
+                error: ParseErrorType::DuplicateKeywordArgumentError(arg_name.to_string()),
+                location: range,
+            });
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
