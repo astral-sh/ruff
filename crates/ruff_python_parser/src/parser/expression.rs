@@ -946,33 +946,42 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a boolean operation expression.
+    ///
+    /// Note that the boolean `not` operator is parsed as a unary operator and
+    /// not as a boolean operation.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `or` or `and` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/expressions.html#boolean-operations>
     fn parse_bool_operation_expression(
         &mut self,
         lhs: Expr,
         start: TextSize,
-        op: TokenKind,
-        op_bp: Precedence,
+        operator_token: TokenKind,
+        operator_binding_power: Precedence,
     ) -> ast::ExprBoolOp {
         let mut values = vec![lhs];
         let mut progress = ParserProgress::default();
 
-        // Keep adding `expr` to `values` until we see a different
-        // boolean operation than `op`.
+        // Keep adding the expression to `values` until we see a different
+        // token than `operator_token`.
         loop {
             progress.assert_progressing(self);
-            let parsed_expr = self.parse_expression_with_precedence(op_bp);
+
+            let parsed_expr = self.parse_expression_with_precedence(operator_binding_power);
             values.push(parsed_expr.expr);
 
-            if self.current_token_kind() != op {
+            if !self.eat(operator_token) {
                 break;
             }
-
-            self.next_token();
         }
 
         ast::ExprBoolOp {
             values,
-            op: BoolOp::try_from(op).unwrap(),
+            op: BoolOp::try_from(operator_token).unwrap(),
             range: self.node_range(start),
         }
     }
