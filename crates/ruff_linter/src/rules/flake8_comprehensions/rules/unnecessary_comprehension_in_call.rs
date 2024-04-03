@@ -11,15 +11,19 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes;
 
 /// ## What it does
-/// Checks for unnecessary list comprehensions passed to `any` and `all`.
+/// Checks for unnecessary list comprehensions passed to builtin functions that take an iterable.
 ///
 /// ## Why is this bad?
-/// `any` and `all` take any iterators, including generators. Converting a generator to a list
-/// by way of a list comprehension is unnecessary and requires iterating all values, even if `any`
-/// or `all` could short-circuit early.
+/// Many builtin functions (this rule currently covers `any`, `all`, `min`, `max`, and `sum`) take
+/// any iterable, including a generator. Converting a generator to a list by way of a list
+/// comprehension is unnecessary and wastes memory for large iterables by fully materializing a
+/// list rather than handling values one at a time.
 ///
-/// For example, compare the performance of `all` with a list comprehension against that
-/// of a generator in a case where an early short-circuit is possible (almost 40x faster):
+/// `any` and `all` can also short-circuit iteration, saving a lot of time. The unnecessary
+/// comprehension forces a full iteration of the input iterable, giving up the benefits of
+/// short-circuiting. For example, compare the performance of `all` with a list comprehension
+/// against that of a generator in a case where an early short-circuit is possible (almost 40x
+/// faster):
 ///
 /// ```console
 /// In [1]: %timeit all([i for i in range(1000)])
@@ -29,22 +33,28 @@ use crate::rules::flake8_comprehensions::fixes;
 /// 212 ns ± 0.892 ns per loop (mean ± std. dev. of 7 runs, 1,000,000 loops each)
 /// ```
 ///
-/// This performance difference is due to short-circuiting; if the entire iterable has to be
+/// This performance difference is due to short-circuiting. If the entire iterable has to be
 /// traversed, the comprehension version may even be a bit faster (list allocation overhead is not
-/// necessarily greater than generator overhead).
-///
-/// The generator version is more memory-efficient.
+/// necessarily greater than generator overhead). So applying this rule simplifies the code and
+/// will usually save memory, but in the absence of short-circuiting it may not improve (and may
+/// even slightly regress, though the difference will be small) performance.
 ///
 /// ## Examples
 /// ```python
 /// any([x.id for x in bar])
 /// all([x.id for x in bar])
+/// sum([x.val for x in bar])
+/// min([x.val for x in bar])
+/// max([x.val for x in bar])
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// any(x.id for x in bar)
 /// all(x.id for x in bar)
+/// sum(x.val for x in bar)
+/// min(x.val for x in bar])
+/// max(x.val for x in bar)
 /// ```
 ///
 /// ## Fix safety
@@ -53,9 +63,9 @@ use crate::rules::flake8_comprehensions::fixes;
 /// rewriting some comprehensions.
 ///
 #[violation]
-pub struct UnnecessaryComprehensionAnyAll;
+pub struct UnnecessaryComprehensionInCall;
 
-impl Violation for UnnecessaryComprehensionAnyAll {
+impl Violation for UnnecessaryComprehensionInCall {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -69,7 +79,7 @@ impl Violation for UnnecessaryComprehensionAnyAll {
 }
 
 /// C419
-pub(crate) fn unnecessary_comprehension_any_all(
+pub(crate) fn unnecessary_comprehension_in_call(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
@@ -82,7 +92,7 @@ pub(crate) fn unnecessary_comprehension_any_all(
     let Expr::Name(ast::ExprName { id, .. }) = func else {
         return;
     };
-    if !matches!(id.as_str(), "all" | "any") {
+    if !matches!(id.as_str(), "all" | "any" | "sum" | "min" | "max") {
         return;
     }
     let [arg] = args else {
@@ -100,9 +110,9 @@ pub(crate) fn unnecessary_comprehension_any_all(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnnecessaryComprehensionAnyAll, arg.range());
+    let mut diagnostic = Diagnostic::new(UnnecessaryComprehensionInCall, arg.range());
     diagnostic.try_set_fix(|| {
-        fixes::fix_unnecessary_comprehension_any_all(expr, checker.locator(), checker.stylist())
+        fixes::fix_unnecessary_comprehension_in_call(expr, checker.locator(), checker.stylist())
     });
     checker.diagnostics.push(diagnostic);
 }

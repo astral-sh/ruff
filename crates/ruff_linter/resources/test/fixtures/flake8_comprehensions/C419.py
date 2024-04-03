@@ -7,12 +7,18 @@ all(  # first comment
     [x.id for x in bar],  # second comment
 )  # third comment
 any({x.id for x in bar})
+sum([x.val for x in bar])
+min([x.val for x in bar])
+max([x.val for x in bar])
 
 # OK
 all(x.id for x in bar)
 all(x.id for x in bar)
 any(x.id for x in bar)
 all((x.id for x in bar))
+sum(x.val for x in bar)
+min(x.val for x in bar)
+max(x.val for x in bar)
 
 
 async def f() -> bool:
