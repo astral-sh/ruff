@@ -218,7 +218,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::UnexpectedIndentation => write!(f, "unexpected indentation"),
             ParseErrorType::InvalidAssignmentTarget => write!(f, "invalid assignment target"),
             ParseErrorType::InvalidNamedAssignmentTarget => {
-                write!(f, "invalid named assignment target")
+                write!(f, "assignment expression target must be an identifier")
             }
             ParseErrorType::InvalidAugmentedAssignmentTarget => {
                 write!(f, "invalid augmented assignment target")

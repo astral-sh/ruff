@@ -1,12 +1,8 @@
-if x := 1:
-    pass
-
-(x := 5)
-(x := (y * z))
-{x := 1}
-[x := 1]
-(x := 1 + 1)
-(x, y := a and b)
-{x, y := a < b}
-[x, y := ...]
-f(a := b, c := d)
+(name := 0)
+(name := (x * y))
+(name := 1 + 1)
+(name := (*x, y))
+(name := x if True else y)
+(name := lambda x: x)
+(name := (yield x))
+(name := (yield from x))
