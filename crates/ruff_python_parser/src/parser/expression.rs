@@ -986,44 +986,80 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parse a comparison expression.
+    ///
+    /// This includes the following operators:
+    /// - Value comparisons: `==`, `!=`, `<`, `<=`, `>`, and `>=`.
+    /// - Membership tests: `in` and `not in`.
+    /// - Identity tests: `is` and `is not`.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at any of the comparison operators.
+    ///
+    /// See: <https://docs.python.org/3/reference/expressions.html#comparisons>
     fn parse_compare_expression(
         &mut self,
         lhs: Expr,
         start: TextSize,
-        op: TokenKind,
-        op_bp: Precedence,
+        operator: TokenKind,
+        operator_binding_power: Precedence,
     ) -> ast::ExprCompare {
-        let mut comparators = vec![];
-        let op = token_kind_to_cmp_op([op, self.current_token_kind()]).unwrap();
-        let mut ops = vec![op];
+        let compare_operator = token_kind_to_cmp_op([operator, self.current_token_kind()]).unwrap();
 
-        if matches!(op, CmpOp::IsNot | CmpOp::NotIn) {
-            self.next_token();
+        // Bump the appropriate token when the compare operator is made up of
+        // two separate tokens.
+        match compare_operator {
+            CmpOp::IsNot => {
+                self.bump(TokenKind::Not);
+            }
+            CmpOp::NotIn => {
+                self.bump(TokenKind::In);
+            }
+            _ => {}
         }
+
+        let mut comparators = vec![];
+        let mut compare_operators = vec![compare_operator];
 
         let mut progress = ParserProgress::default();
 
         loop {
             progress.assert_progressing(self);
-            let parsed_expr = self.parse_expression_with_precedence(op_bp);
+
+            let parsed_expr = self.parse_expression_with_precedence(operator_binding_power);
             comparators.push(parsed_expr.expr);
 
-            if let Ok(op) = token_kind_to_cmp_op([self.current_token_kind(), self.peek()]) {
-                if matches!(op, CmpOp::IsNot | CmpOp::NotIn) {
-                    self.next_token();
+            let next_operator = self.current_token_kind();
+            if !next_operator.is_compare_operator() {
+                break;
+            }
+            self.bump(next_operator); // compare operator
+
+            if let Ok(compare_operator) =
+                token_kind_to_cmp_op([next_operator, self.current_token_kind()])
+            {
+                // Bump the appropriate token when the compare operator is made up of
+                // two separate tokens.
+                match compare_operator {
+                    CmpOp::IsNot => {
+                        self.bump(TokenKind::Not);
+                    }
+                    CmpOp::NotIn => {
+                        self.bump(TokenKind::In);
+                    }
+                    _ => {}
                 }
 
-                ops.push(op);
+                compare_operators.push(compare_operator);
             } else {
                 break;
             }
-
-            self.next_token();
         }
 
         ast::ExprCompare {
             left: Box::new(lhs),
-            ops: ops.into_boxed_slice(),
+            ops: compare_operators.into_boxed_slice(),
             comparators: comparators.into_boxed_slice(),
             range: self.node_range(start),
         }
