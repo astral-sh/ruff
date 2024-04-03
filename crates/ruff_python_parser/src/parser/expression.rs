@@ -891,14 +891,24 @@ impl<'src> Parser<'src> {
         })
     }
 
+    /// Parses a unary expression.
+    ///
+    /// This includes the unary arithmetic `+` and `-`, bitwise `~`, and the
+    /// boolean `not` operators.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at any of the unary operators.
+    ///
+    /// See: <https://docs.python.org/3/reference/expressions.html#unary-arithmetic-and-bitwise-operations>
     pub(super) fn parse_unary_expression(&mut self) -> ast::ExprUnaryOp {
         let start = self.node_start();
 
         let op = UnaryOp::try_from(self.current_token_kind())
-            .expect("Expected operator to be a unary operator token.");
+            .expect("current token should be a unary operator");
         self.bump(self.current_token_kind());
 
-        let operand = if matches!(op, UnaryOp::Not) {
+        let operand = if op.is_not() {
             self.parse_expression_with_precedence(Precedence::Not)
         } else {
             // plus, minus and tilde
