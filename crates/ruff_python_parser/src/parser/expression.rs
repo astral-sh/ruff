@@ -343,6 +343,8 @@ impl<'src> Parser<'src> {
             }) => "boolean",
             Expr::If(_) => "conditional",
             Expr::Lambda(_) => "lambda",
+            Expr::Yield(_) | Expr::YieldFrom(_) => "yield",
+            Expr::Starred(_) => "starred",
             _ => return parsed_expr,
         };
 
