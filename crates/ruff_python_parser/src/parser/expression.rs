@@ -319,6 +319,41 @@ impl<'src> Parser<'src> {
         lhs
     }
 
+    /// Parses an expression with a minimum precedence of bitwise `or`.
+    ///
+    /// This methods actually parses the expression using the `expression` rule
+    /// of the [Python grammar] and then validates the parsed expression. In a
+    /// sense, it matches the `bitwise_or` rule of the [Python grammar].
+    ///
+    /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
+    fn parse_expression_with_bitwise_or_precedence(&mut self) -> ParsedExpr {
+        let parsed_expr = self.parse_conditional_expression_or_higher();
+
+        if parsed_expr.is_parenthesized {
+            // Parentheses resets the precedence, so we don't need to validate it.
+            return parsed_expr;
+        }
+
+        let expr_name = match parsed_expr.expr {
+            Expr::Compare(_) => "comparison",
+            Expr::BoolOp(_)
+            | Expr::UnaryOp(ast::ExprUnaryOp {
+                op: ast::UnaryOp::Not,
+                ..
+            }) => "boolean",
+            Expr::If(_) => "conditional",
+            Expr::Lambda(_) => "lambda",
+            _ => return parsed_expr,
+        };
+
+        self.add_error(
+            ParseErrorType::OtherError(format!("{expr_name} expression cannot be used here")),
+            &parsed_expr,
+        );
+
+        parsed_expr
+    }
+
     /// Parses a name.
     ///
     /// For an invalid name, the `id` field will be an empty string and the `ctx`
@@ -1299,8 +1334,7 @@ impl<'src> Parser<'src> {
         if self.eat(TokenKind::DoubleStar) {
             // Handle dictionary unpacking. Here, the grammar is `'**' bitwise_or`
             // which requires limiting the expression.
-            let value = self.parse_conditional_expression_or_higher();
-            self.validate_expression_with_bitwise_or_precedence(&value);
+            let value = self.parse_expression_with_bitwise_or_precedence();
 
             return Expr::Dict(self.parse_dictionary_expression(None, value.expr, start));
         }
@@ -1550,10 +1584,7 @@ impl<'src> Parser<'src> {
 
                 // Handle dictionary unpacking. Here, the grammar is `'**' bitwise_or`
                 // which requires limiting the expression.
-                let value = parser.parse_conditional_expression_or_higher();
-                parser.validate_expression_with_bitwise_or_precedence(&value);
-
-                values.push(value.expr);
+                values.push(parser.parse_expression_with_bitwise_or_precedence().expr);
             } else {
                 let key = parser.parse_conditional_expression_or_higher();
                 if !key.is_parenthesized && key.expr.is_starred_expr() {
@@ -1806,46 +1837,20 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Star);
 
-        let parsed_expr = self.parse_conditional_expression_or_higher();
-        if precedence.is_bitwise_or() {
-            self.validate_expression_with_bitwise_or_precedence(&parsed_expr);
-        }
+        let parsed_expr = match precedence {
+            StarredExpressionPrecedence::Conditional => {
+                self.parse_conditional_expression_or_higher()
+            }
+            StarredExpressionPrecedence::BitOr => {
+                self.parse_expression_with_bitwise_or_precedence()
+            }
+        };
 
         ast::ExprStarred {
             value: Box::new(parsed_expr.expr),
             ctx: ExprContext::Load,
             range: self.node_range(start),
         }
-    }
-
-    /// Validate the given expression to ensure that it's precedence is _not_ lower
-    /// than the bitwise or precedence. If it is, report an error.
-    ///
-    /// Note that this method does not report an error for named expressions. This means that
-    /// the caller should either be using [`Parser::parse_conditional_expression_or_higher`]
-    /// or report an error for named expressions separately.
-    fn validate_expression_with_bitwise_or_precedence(&mut self, parsed_expr: &ParsedExpr) {
-        if parsed_expr.is_parenthesized {
-            // Parentheses resets the precedence, so we don't need to validate it.
-            return;
-        }
-
-        let expr_name = match parsed_expr.expr {
-            Expr::Compare(_) => "comparison",
-            Expr::BoolOp(_)
-            | Expr::UnaryOp(ast::ExprUnaryOp {
-                op: ast::UnaryOp::Not,
-                ..
-            }) => "boolean",
-            Expr::If(_) => "conditional",
-            Expr::Lambda(_) => "lambda",
-            _ => return,
-        };
-
-        self.add_error(
-            ParseErrorType::OtherError(format!("{expr_name} expression cannot be used here")),
-            parsed_expr,
-        );
     }
 
     /// See: <https://docs.python.org/3/reference/expressions.html#await-expression>
@@ -2158,12 +2163,6 @@ pub(super) enum GeneratorExpressionInParentheses {
 enum StarredExpressionPrecedence {
     BitOr,
     Conditional,
-}
-
-impl StarredExpressionPrecedence {
-    const fn is_bitwise_or(self) -> bool {
-        matches!(self, StarredExpressionPrecedence::BitOr)
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
