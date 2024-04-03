@@ -830,10 +830,6 @@ enum RecoveryContextKind {
     /// When parsing a list of f-string elements which are either literal elements
     /// or expressions.
     FStringElements,
-
-    /// When parsing a single string or a list of strings that are implicitly
-    /// concatenated e.g., `"foo"`, `b"foo"`, `f"foo"`, `"foo" "bar"`.
-    Strings,
 }
 
 impl RecoveryContextKind {
@@ -936,33 +932,27 @@ impl RecoveryContextKind {
                 p.at(with_item_kind.list_terminator())
             }
             RecoveryContextKind::FStringElements => {
+                // Tokens other than `FStringEnd` and `}` are for better error recovery
                 p.at_ts(TokenSet::new([
                     TokenKind::FStringEnd,
-                    // For better error recovery
-                    //
-                    // ```python
-                    // # List terminates with a newline
+                    // test_err unterminated_fstring_newline_recovery
                     // f"hello
-                    //
-                    // x = 1
-                    // ```
-                    TokenKind::Newline,
-                    // ```python
-                    // # List terminates with a `}`
+                    // 1 + 1
+                    // f"hello {x
+                    // 2 + 2
+                    // f"hello {x:
+                    // 3 + 3
                     // f"hello {x}
-                    //
-                    // x = 1
-                    // ```
+                    // 4 + 4
+                    TokenKind::Newline,
+                    // When the parser is parsing f-string elements inside format spec,
+                    // the terminator would be `}`.
+
+                    // test fstring_format_spec_terminator
+                    // f"hello {x:} world"
+                    // f"hello {x:.3f} world"
                     TokenKind::Rbrace,
                 ]))
-            }
-            RecoveryContextKind::Strings => {
-                // This is basically a negation of the FIRST set as there can be
-                // any token after a string depending on the context.
-                !matches!(
-                    p.current_token_kind(),
-                    TokenKind::String | TokenKind::FStringStart
-                )
             }
         }
     }
@@ -1008,11 +998,6 @@ impl RecoveryContextKind {
                 TokenKind::FStringMiddle
                 // Expression element
                 | TokenKind::Lbrace
-            ),
-            RecoveryContextKind::Strings => matches!(
-                p.current_token_kind(),
-                // "foo" f"bar"
-                TokenKind::String | TokenKind::FStringStart
             ),
         }
     }
@@ -1100,10 +1085,6 @@ impl RecoveryContextKind {
             RecoveryContextKind::FStringElements => ParseErrorType::OtherError(
                 "Expected an f-string element or the end of the f-string".to_string(),
             ),
-            RecoveryContextKind::Strings => ParseErrorType::OtherError(
-                "Expected a string or byte literal, f-string or the end of the string list"
-                    .to_string(),
-            ),
         }
     }
 }
@@ -1142,7 +1123,6 @@ bitflags! {
         const WITH_ITEMS_SINGLE_PARENTHESIZED_GENERATOR_EXPRESSION = 1 << 26;
         const WITH_ITEMS_UNPARENTHESIZED = 1 << 27;
         const F_STRING_ELEMENTS = 1 << 28;
-        const STRINGS = 1 << 29;
     }
 }
 
@@ -1196,7 +1176,6 @@ impl RecoveryContext {
                 WithItemKind::Unparenthesized => RecoveryContext::WITH_ITEMS_UNPARENTHESIZED,
             },
             RecoveryContextKind::FStringElements => RecoveryContext::F_STRING_ELEMENTS,
-            RecoveryContextKind::Strings => RecoveryContext::STRINGS,
         }
     }
 
@@ -1262,7 +1241,6 @@ impl RecoveryContext {
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized)
             }
             RecoveryContext::F_STRING_ELEMENTS => RecoveryContextKind::FStringElements,
-            RecoveryContext::STRINGS => RecoveryContextKind::Strings,
             _ => return None,
         })
     }
