@@ -705,8 +705,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     args,
                 );
             }
-            if checker.enabled(Rule::UnnecessaryComprehensionAnyAll) {
-                flake8_comprehensions::rules::unnecessary_comprehension_any_all(
+            if checker.enabled(Rule::UnnecessaryComprehensionInCall) {
+                flake8_comprehensions::rules::unnecessary_comprehension_in_call(
                     checker, expr, func, args, keywords,
                 );
             }
