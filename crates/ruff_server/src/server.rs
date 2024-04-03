@@ -49,6 +49,10 @@ impl Server {
         let client_capabilities = init_params.capabilities;
         let server_capabilities = Self::server_capabilities(&client_capabilities);
 
+        let user_settings = crate::session::SettingsController::from_value(
+            init_params.initialization_options.unwrap_or_default(),
+        )?;
+
         let workspaces = init_params
             .workspace_folders
             .map(|folders| folders.into_iter().map(|folder| folder.uri).collect())
@@ -74,7 +78,12 @@ impl Server {
             conn,
             threads,
             worker_threads,
-            session: Session::new(&client_capabilities, &server_capabilities, &workspaces)?,
+            session: Session::new(
+                &client_capabilities,
+                &server_capabilities,
+                &workspaces,
+                user_settings,
+            )?,
             client_capabilities,
         })
     }

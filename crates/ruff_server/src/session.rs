@@ -1,5 +1,6 @@
 //! Data model, state management, and configuration resolution.
 
+mod capabilities;
 mod settings;
 
 use std::collections::BTreeMap;
@@ -14,7 +15,9 @@ use rustc_hash::FxHashMap;
 use crate::edit::{Document, DocumentVersion};
 use crate::PositionEncoding;
 
-use self::settings::ResolvedClientCapabilities;
+use self::capabilities::ResolvedClientCapabilities;
+use self::settings::ResolvedUserSettings;
+pub(crate) use self::settings::SettingsController;
 
 /// The global state for the LSP
 pub(crate) struct Session {
@@ -22,6 +25,8 @@ pub(crate) struct Session {
     workspaces: Workspaces,
     /// The global position encoding, negotiated during LSP initialization.
     position_encoding: PositionEncoding,
+    /// Manages all user settings.
+    settings_controller: SettingsController,
     /// Tracks what LSP features the client supports and doesn't support.
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
 }
@@ -31,6 +36,8 @@ pub(crate) struct Session {
 pub(crate) struct DocumentSnapshot {
     configuration: Arc<RuffConfiguration>,
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
+    #[allow(dead_code)]
+    user_settings: settings::ResolvedUserSettings,
     document_ref: DocumentRef,
     position_encoding: PositionEncoding,
     url: Url,
@@ -75,6 +82,7 @@ impl Session {
         client_capabilities: &ClientCapabilities,
         server_capabilities: &ServerCapabilities,
         workspaces: &[Url],
+        settings_controller: SettingsController,
     ) -> crate::Result<Self> {
         Ok(Self {
             position_encoding: server_capabilities
@@ -85,6 +93,7 @@ impl Session {
             resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
                 client_capabilities,
             )),
+            settings_controller,
             workspaces: Workspaces::new(workspaces)?,
         })
     }
@@ -93,6 +102,7 @@ impl Session {
         Some(DocumentSnapshot {
             configuration: self.workspaces.configuration(url)?.clone(),
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
+            user_settings: self.workspaces.settings(url, &self.settings_controller),
             document_ref: self.workspaces.snapshot(url)?,
             position_encoding: self.position_encoding,
             url: url.clone(),
@@ -279,6 +289,18 @@ impl Workspaces {
             .ok_or_else(|| anyhow!("Workspace not found for {url}"))?
             .open_documents
             .close(url)
+    }
+
+    fn settings(&self, url: &Url, settings_map: &SettingsController) -> ResolvedUserSettings {
+        self.entry_for_url(url).map_or_else(
+            || {
+                tracing::warn!(
+                    "Workspace not found for {url}. Global settings will be used for this document"
+                );
+                settings_map.global_settings()
+            },
+            |(path, _)| settings_map.settings_for_workspace(path),
+        )
     }
 
     fn workspace_for_url(&self, url: &Url) -> Option<&Workspace> {
