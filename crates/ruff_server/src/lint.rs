@@ -16,14 +16,26 @@ use ruff_python_index::Indexer;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::AsMode;
 use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 use serde::{Deserialize, Serialize};
 
 use crate::{edit::ToRangeExt, PositionEncoding, DIAGNOSTIC_NAME};
 
-#[derive(Serialize, Deserialize)]
-pub(crate) struct DiagnosticFix {
+/// This is serialized on the diagnostic `data` field.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub(crate) struct AssociatedDiagnosticData {
     pub(crate) kind: DiagnosticKind,
     pub(crate) fix: Fix,
+    pub(crate) code: String,
+}
+
+/// Describes a fix for `fixed_diagnostic` that applies `document_edits` to the source.
+#[derive(Clone, Debug)]
+pub(crate) struct DiagnosticFix {
+    pub(crate) fixed_diagnostic: lsp_types::Diagnostic,
+    pub(crate) title: String,
+    pub(crate) code: String,
+    pub(crate) document_edits: Vec<lsp_types::TextDocumentEdit>,
 }
 
 pub(crate) fn check(
@@ -78,6 +90,56 @@ pub(crate) fn check(
         .collect()
 }
 
+pub(crate) fn fixes_for_diagnostics<'d>(
+    document: &'d crate::edit::Document,
+    url: &'d lsp_types::Url,
+    encoding: PositionEncoding,
+    version: crate::edit::DocumentVersion,
+    diagnostics: Vec<lsp_types::Diagnostic>,
+) -> crate::Result<Vec<DiagnosticFix>> {
+    diagnostics
+        .into_iter()
+        .map(move |mut diagnostic| {
+            let Some(data) = diagnostic.data.take() else {
+                return Ok(None);
+            };
+            let fixed_diagnostic = diagnostic;
+            let associated_data: crate::lint::AssociatedDiagnosticData =
+                serde_json::from_value(data).map_err(|err| {
+                    anyhow::anyhow!("failed to deserialize diagnostic data: {err}")
+                })?;
+            let edits = associated_data
+                .fix
+                .edits()
+                .iter()
+                .map(|edit| lsp_types::TextEdit {
+                    range: edit
+                        .range()
+                        .to_range(document.contents(), document.index(), encoding),
+                    new_text: edit.content().unwrap_or_default().to_string(),
+                });
+
+            let document_edits = vec![lsp_types::TextDocumentEdit {
+                text_document: lsp_types::OptionalVersionedTextDocumentIdentifier::new(
+                    url.clone(),
+                    version,
+                ),
+                edits: edits.map(lsp_types::OneOf::Left).collect(),
+            }];
+            Ok(Some(DiagnosticFix {
+                fixed_diagnostic,
+                code: associated_data.code,
+                title: associated_data
+                    .kind
+                    .suggestion
+                    .unwrap_or(associated_data.kind.name),
+                document_edits,
+            }))
+        })
+        .filter_map(crate::Result::transpose)
+        .collect()
+}
+
 fn to_lsp_diagnostic(
     diagnostic: Diagnostic,
     document: &crate::edit::Document,
@@ -92,9 +154,10 @@ fn to_lsp_diagnostic(
     let data = fix.and_then(|fix| {
         fix.applies(Applicability::Unsafe)
             .then(|| {
-                serde_json::to_value(&DiagnosticFix {
+                serde_json::to_value(&AssociatedDiagnosticData {
                     kind: kind.clone(),
                     fix,
+                    code: rule.noqa_code().to_string(),
                 })
                 .ok()
             })

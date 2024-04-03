@@ -72,10 +72,10 @@ impl Server {
 
         Ok(Self {
             conn,
-            client_capabilities,
             threads,
             worker_threads,
-            session: Session::new(&server_capabilities, &workspaces)?,
+            session: Session::new(&client_capabilities, &server_capabilities, &workspaces)?,
+            client_capabilities,
         })
     }
 
@@ -192,14 +192,15 @@ impl Server {
             position_encoding: Some(position_encoding.into()),
             code_action_provider: Some(types::CodeActionProviderCapability::Options(
                 CodeActionOptions {
-                    code_action_kinds: Some(vec![
-                        CodeActionKind::QUICKFIX,
-                        CodeActionKind::SOURCE_ORGANIZE_IMPORTS,
-                    ]),
+                    code_action_kinds: Some(
+                        SupportedCodeAction::all()
+                            .flat_map(|action| action.kinds().into_iter())
+                            .collect(),
+                    ),
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: Some(true),
                     },
-                    resolve_provider: Some(false),
+                    resolve_provider: Some(true),
                 },
             )),
             workspace: Some(types::WorkspaceServerCapabilities {
@@ -233,5 +234,58 @@ impl Server {
             )),
             ..Default::default()
         }
+    }
+}
+
+/// The code actions we support.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum SupportedCodeAction {
+    /// Maps to the `quickfix` code action kind. Quick fix code actions are shown under
+    /// their respective diagnostics. Quick fixes are only created where the fix applicability is
+    /// at least [`ruff_diagnostics::Applicability::Unsafe`].
+    QuickFix,
+    /// Maps to the `source.fixAll` and `source.fixAll.ruff` code action kinds.
+    /// This is a source action that applies all safe fixes to the currently open document.
+    SourceFixAll,
+    /// Maps to `source.organizeImports` and `source.organizeImports.ruff` code action kinds.
+    /// This is a source action that applies import sorting fixes to the currently open document.
+    #[allow(dead_code)] // TODO: remove
+    SourceOrganizeImports,
+}
+
+impl SupportedCodeAction {
+    /// Returns the possible LSP code action kind(s) that map to this code action.
+    fn kinds(self) -> Vec<CodeActionKind> {
+        match self {
+            Self::QuickFix => vec![CodeActionKind::QUICKFIX],
+            Self::SourceFixAll => vec![CodeActionKind::SOURCE_FIX_ALL, crate::SOURCE_FIX_ALL_RUFF],
+            Self::SourceOrganizeImports => vec![
+                CodeActionKind::SOURCE_ORGANIZE_IMPORTS,
+                crate::SOURCE_ORGANIZE_IMPORTS_RUFF,
+            ],
+        }
+    }
+
+    /// Returns all code actions kinds that the server currently supports.
+    fn all() -> impl Iterator<Item = Self> {
+        [
+            Self::QuickFix,
+            Self::SourceFixAll,
+            // Self::SourceOrganizeImports,
+        ]
+        .into_iter()
+    }
+}
+
+impl TryFrom<CodeActionKind> for SupportedCodeAction {
+    type Error = ();
+
+    fn try_from(kind: CodeActionKind) -> std::result::Result<Self, Self::Error> {
+        for supported_kind in Self::all() {
+            if supported_kind.kinds().contains(&kind) {
+                return Ok(supported_kind);
+            }
+        }
+        Err(())
     }
 }
