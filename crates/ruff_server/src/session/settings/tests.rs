@@ -7,8 +7,15 @@ mod fixtures;
 /// `expected()` function for that fixture.
 macro_rules! test_deserialize {
     (fixture: $fixture:ident, into: $into:ty$(,)?) => {{
+        #[cfg(not(windows))]
         const JSON: &str = include_str!(std::concat!(
             "tests/fixtures/",
+            std::stringify!($fixture),
+            ".json"
+        ));
+        #[cfg(windows)]
+        const JSON: &str = include_str!(std::concat!(
+            r#"tests\fixtures\"#,
             std::stringify!($fixture),
             ".json"
         ));
