@@ -190,6 +190,9 @@ impl<'src> Parser<'src> {
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_simple_expression(&mut self) -> ParsedExpr {
+        // TODO(dhruvmanila): Need to add `disallow` parameter which will be a bitflag
+        // which can tell us which all expressions to disallow because this method is a
+        // combination of a **lot** of grammar rules.
         self.parse_expression_with_precedence(Precedence::Initial)
     }
 
@@ -1876,6 +1879,12 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a `yield` expression.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `yield` token.
+    ///
     /// See: <https://docs.python.org/3/reference/expressions.html#yield-expressions>
     fn parse_yield_expression(&mut self) -> Expr {
         let start = self.node_start();
@@ -1887,7 +1896,7 @@ impl<'src> Parser<'src> {
 
         let value = self
             .at_expr()
-            .then(|| Box::new(self.parse_expression_list().expr));
+            .then(|| Box::new(self.parse_star_expression_list().expr));
 
         Expr::Yield(ast::ExprYield {
             value,
@@ -1897,35 +1906,45 @@ impl<'src> Parser<'src> {
 
     /// Parses a `yield from` expression.
     ///
+    /// This method should not be used directly. Use [`Parser::parse_yield_expression`]
+    /// even when parsing a `yield from` expression.
+    ///
     /// See: <https://docs.python.org/3/reference/expressions.html#yield-expressions>
     fn parse_yield_from_expression(&mut self, start: TextSize) -> Expr {
-        // The grammar rule to use here is `expression` but we're using `expressions`
-        // for better error recovery.
-        let parsed_expr = self.parse_expression_list();
+        // Grammar:
+        //     'yield' 'from' expression
+        //
+        // Here, a tuple expression isn't allowed without the parentheses. But, we
+        // allow it here to report better error message.
+        //
+        // Now, this also solves another problem. Take the following example:
+        //
+        // ```python
+        // yield from x, y
+        // ```
+        //
+        // If we didn't use the `parse_expression_list` method here, the parser
+        // would have stopped at the comma. Then, the outer expression would
+        // have been a tuple expression with two elements: `yield from x` and `y`.
+        let expr = self.parse_expression_list().expr;
 
-        match &parsed_expr.expr {
-            Expr::Starred(ast::ExprStarred { value, .. }) => {
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "starred expression is not allowed in a `yield from` statement".to_string(),
-                    ),
-                    value.as_ref(),
-                );
+        match &expr {
+            Expr::Starred(_) => {
+                self.add_error(ParseErrorType::StarredExpressionUsage, &expr);
             }
             Expr::Tuple(tuple) if !tuple.parenthesized => {
                 self.add_error(
                     ParseErrorType::OtherError(
-                        "unparenthesized tuple is not allowed in a `yield from` statement"
-                            .to_string(),
+                        "unparenthesized tuple cannot be used here".to_string(),
                     ),
-                    tuple,
+                    &expr,
                 );
             }
             _ => {}
         }
 
         Expr::YieldFrom(ast::ExprYieldFrom {
-            value: Box::new(parsed_expr.expr),
+            value: Box::new(expr),
             range: self.node_range(start),
         })
     }
