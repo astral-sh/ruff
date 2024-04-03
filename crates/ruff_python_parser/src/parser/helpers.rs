@@ -74,14 +74,14 @@ pub(super) fn token_kind_to_cmp_op(kind: [TokenKind; 2]) -> Result<CmpOp, ()> {
     Ok(match kind {
         [TokenKind::Is, TokenKind::Not] => CmpOp::IsNot,
         [TokenKind::Is, _] => CmpOp::Is,
+        [TokenKind::Not, TokenKind::In] => CmpOp::NotIn,
         [TokenKind::In, _] => CmpOp::In,
         [TokenKind::EqEqual, _] => CmpOp::Eq,
-        [TokenKind::Less, _] => CmpOp::Lt,
-        [TokenKind::Greater, _] => CmpOp::Gt,
         [TokenKind::NotEqual, _] => CmpOp::NotEq,
+        [TokenKind::Less, _] => CmpOp::Lt,
         [TokenKind::LessEqual, _] => CmpOp::LtE,
+        [TokenKind::Greater, _] => CmpOp::Gt,
         [TokenKind::GreaterEqual, _] => CmpOp::GtE,
-        [TokenKind::Not, TokenKind::In] => CmpOp::NotIn,
         _ => return Err(()),
     })
 }
