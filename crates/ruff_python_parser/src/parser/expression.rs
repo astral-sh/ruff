@@ -193,12 +193,17 @@ impl<'src> Parser<'src> {
         self.parse_expression_with_precedence(Precedence::Initial)
     }
 
-    /// Binding powers of operators for a Pratt parser.
+    /// Returns the binding power of the current token for a Pratt parser.
     ///
-    /// See <https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html>
-    fn current_op(&mut self) -> (Precedence, TokenKind, Associativity) {
-        const NOT_AN_OP: (Precedence, TokenKind, Associativity) =
+    /// This includes the precedence and associativity of the current token.
+    /// If the current token is not an operator, it returns [`Precedence::Unknown`],
+    /// [`TokenKind::Unknown`], and [`Associativity::Left`] respectively.
+    ///
+    /// See: <https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html>
+    fn current_binding_power(&mut self) -> (Precedence, TokenKind, Associativity) {
+        const NOT_AN_OPERATOR: (Precedence, TokenKind, Associativity) =
             (Precedence::Unknown, TokenKind::Unknown, Associativity::Left);
+
         let kind = self.current_token_kind();
 
         match kind {
@@ -234,14 +239,15 @@ impl<'src> Parser<'src> {
             | TokenKind::Percent
             | TokenKind::At => (Precedence::MulDivRemain, kind, Associativity::Left),
             TokenKind::DoubleStar => (Precedence::Exponent, kind, Associativity::Right),
-            _ => NOT_AN_OP,
+            _ => NOT_AN_OPERATOR,
         }
     }
 
-    /// Parses expression with binding power of at least bp.
+    /// Parses an expression with binding power of at least `previous_precedence`.
     ///
-    /// Uses the Pratt parser algorithm.
-    /// See <https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html>
+    /// This method uses the [Pratt parsing algorithm].
+    ///
+    /// [Pratt parsing algorithm]: https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     fn parse_expression_with_precedence(&mut self, previous_precedence: Precedence) -> ParsedExpr {
         let start = self.node_start();
         let mut lhs = self.parse_lhs_expression(previous_precedence);
@@ -251,44 +257,50 @@ impl<'src> Parser<'src> {
         loop {
             progress.assert_progressing(self);
 
-            let (current_precedence, op, associativity) = self.current_op();
+            let (current_precedence, token, associativity) = self.current_binding_power();
             if current_precedence < previous_precedence {
                 break;
             }
 
             // Don't parse a `CompareExpr` if we are parsing a `Comprehension` or `ForStmt`
-            if op.is_compare_operator() && self.has_ctx(ParserCtxFlags::FOR_TARGET) {
+            if token.is_compare_operator() && self.has_ctx(ParserCtxFlags::FOR_TARGET) {
                 break;
             }
 
-            let op_bp = match associativity {
+            let operator_binding_power = match associativity {
                 Associativity::Left => current_precedence.increment_precedence(),
                 Associativity::Right => current_precedence,
             };
 
-            self.bump(op);
+            self.bump(token);
 
-            // We need to create a dedicated node for boolean operations,
-            // even though boolean operations are infix.
-            if op.is_bool_operator() {
-                lhs =
-                    Expr::BoolOp(self.parse_bool_operation_expression(lhs.expr, start, op, op_bp))
-                        .into();
+            // We need to create a dedicated node for boolean operations and
+            // comparison operations even though they are infix operators.
+            if token.is_bool_operator() {
+                lhs = Expr::BoolOp(self.parse_bool_operation_expression(
+                    lhs.expr,
+                    start,
+                    token,
+                    operator_binding_power,
+                ))
+                .into();
+                continue;
+            } else if token.is_compare_operator() {
+                lhs = Expr::Compare(self.parse_compare_expression(
+                    lhs.expr,
+                    start,
+                    token,
+                    operator_binding_power,
+                ))
+                .into();
                 continue;
             }
 
-            // Same here as well
-            if op.is_compare_operator() {
-                lhs =
-                    Expr::Compare(self.parse_compare_expression(lhs.expr, start, op, op_bp)).into();
-                continue;
-            }
-
-            let rhs = self.parse_expression_with_precedence(op_bp);
+            let rhs = self.parse_expression_with_precedence(operator_binding_power);
 
             lhs.expr = Expr::BinOp(ast::ExprBinOp {
                 left: Box::new(lhs.expr),
-                op: Operator::try_from(op).unwrap(),
+                op: Operator::try_from(token).unwrap(),
                 right: Box::new(rhs.expr),
                 range: self.node_range(start),
             });
