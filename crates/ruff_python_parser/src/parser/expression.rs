@@ -2043,14 +2043,61 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses an `if` expression.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at an `if` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/expressions.html#conditional-expressions>
     fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIf {
         self.bump(TokenKind::If);
 
         let test = self.parse_simple_expression();
+        if !test.is_parenthesized {
+            match test.expr {
+                Expr::Lambda(_) => {
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "unparenthesized lambda expression cannot be used here".to_string(),
+                        ),
+                        &test,
+                    );
+                }
+                Expr::Yield(_) | Expr::YieldFrom(_) => {
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "unparenthesized yield expression cannot be used here".to_string(),
+                        ),
+                        &test,
+                    );
+                }
+                Expr::Starred(_) => {
+                    self.add_error(ParseErrorType::StarredExpressionUsage, &test);
+                }
+                _ => {}
+            }
+        }
 
         self.expect(TokenKind::Else);
 
         let orelse = self.parse_conditional_expression_or_higher();
+        if !orelse.is_parenthesized {
+            match orelse.expr {
+                Expr::Yield(_) | Expr::YieldFrom(_) => {
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "unparenthesized yield expression cannot be used here".to_string(),
+                        ),
+                        &orelse,
+                    );
+                }
+                Expr::Starred(_) => {
+                    self.add_error(ParseErrorType::StarredExpressionUsage, &orelse);
+                }
+                _ => {}
+            }
+        }
 
         ast::ExprIf {
             body: Box::new(body),
