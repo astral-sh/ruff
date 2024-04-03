@@ -26,13 +26,15 @@ use crate::rules::pydocstyle::settings::Convention;
 /// Checks for over-indented sections in docstrings.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule enforces a consistent style for docstrings with multiple
+/// sections.
 ///
-/// Each section should use consistent indentation, with the section headers
-/// matching the indentation of the docstring's opening quotes, and the
-/// section bodies being indented one level further.
+/// Multiline docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body. The convention is that all sections should use
+/// consistent indentation. In each section, the header should match the
+/// indentation of the docstring's opening quotes, and the body should be
+/// indented one level further.
 ///
 /// ## Example
 /// ```python
@@ -106,15 +108,20 @@ impl AlwaysFixableViolation for SectionNotOverIndented {
 /// Checks for over-indented section underlines in docstrings.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule enforces a consistent style for multiline numpy-style docstrings,
+/// and helps prevent incorrect syntax in docstrings using reStructuredText.
 ///
-/// Some docstring formats (like reStructuredText) use underlines to separate
-/// section bodies from section headers.
+/// Multiline numpy-style docstrings are typically composed of a summary line,
+/// followed by a blank line, followed by a series of sections. Each section
+/// has a section header and a section body, and there should be a series of
+/// underline characters in the line following the header. The underline should
+/// have the same indentation as the header.
 ///
-/// Avoid over-indenting the section underlines, as this can cause syntax
-/// errors in reStructuredText.
+/// This rule enforces a consistent style for multiline numpy-style docstrings
+/// with sections. If your docstring uses reStructuredText, the rule also
+/// helps protect against incorrect reStructuredText syntax, which would cause
+/// errors if you tried to use a tool such as Sphinx to generate documentation
+/// from the docstring.
 ///
 /// This rule is enabled when using the `numpy` convention, and disabled when
 /// using the `google` or `pep257` conventions.
@@ -132,12 +139,12 @@ impl AlwaysFixableViolation for SectionNotOverIndented {
 ///         Time spent traveling.
 ///
 ///     Returns
-///     -------
+///           -------
 ///     float
 ///         Speed as distance divided by time.
 ///
 ///     Raises
-///     ------
+///       ------
 ///     FasterThanLightError
 ///         If speed is greater than the speed of light.
 ///     """
@@ -205,11 +212,12 @@ impl AlwaysFixableViolation for SectionUnderlineNotOverIndented {
 /// letters.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// For stylistic consistency, all section headers in a docstring should be
+/// capitalized.
 ///
-/// Section headers should be capitalized, for consistency.
+/// Multiline docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections. Each section typically has
+/// a header and a body.
 ///
 /// ## Example
 /// ```python
@@ -280,22 +288,24 @@ impl AlwaysFixableViolation for CapitalizeSectionName {
 }
 
 /// ## What it does
-/// Checks that section headers in docstrings that are not followed by a
-/// newline.
+/// Checks for section headers in docstrings that are followed by non-newline
+/// characters.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule enforces a consistent style for multiline numpy-style docstrings.
 ///
-/// Section headers should be followed by a newline, and not by another
-/// character (like a colon), for consistency.
+/// Multiline numpy-style docstrings are typically composed of a summary line,
+/// followed by a blank line, followed by a series of sections. Each section
+/// has a section header and a section body. The section header should be
+/// followed by a newline, rather than by some other character (like a colon).
 ///
 /// This rule is enabled when using the `numpy` convention, and disabled
 /// when using the `google` or `pep257` conventions.
 ///
 /// ## Example
 /// ```python
+/// # The `Parameters`, `Returns` and `Raises` section headers are all followed
+/// # by a colon in this function's docstring:
 /// def calculate_speed(distance: float, time: float) -> float:
 ///     """Calculate speed as distance divided by time.
 ///
@@ -380,12 +390,19 @@ impl AlwaysFixableViolation for NewLineAfterSectionName {
 /// underlines.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule enforces a consistent style for multiline numpy-style docstrings,
+/// and helps prevent incorrect syntax in docstrings using reStructuredText.
 ///
-/// Some docstring formats (like reStructuredText) use underlines to separate
-/// section bodies from section headers.
+/// Multiline numpy-style docstrings are typically composed of a summary line,
+/// followed by a blank line, followed by a series of sections. Each section
+/// has a section header and a section body, and the header should be followed
+/// by a series of underline characters in the following line.
+///
+/// This rule enforces a consistent style for multiline numpy-style docstrings
+/// with sections. If your docstring uses reStructuredText, the rule also
+/// helps protect against incorrect reStructuredText syntax, which would cause
+/// errors if you tried to use a tool such as Sphinx to generate documentation
+/// from the docstring.
 ///
 /// This rule is enabled when using the `numpy` convention, and disabled
 /// when using the `google` or `pep257` conventions.
@@ -476,15 +493,19 @@ impl AlwaysFixableViolation for DashedUnderlineAfterSection {
 /// immediately following the section name.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule enforces a consistent style for multiline numpy-style docstrings,
+/// and helps prevent incorrect syntax in docstrings using reStructuredText.
 ///
-/// Some docstring formats (like reStructuredText) use underlines to separate
-/// section bodies from section headers.
+/// Multiline numpy-style docstrings are typically composed of a summary line,
+/// followed by a blank line, followed by a series of sections. Each section
+/// has a header and a body. There should be a series of underline characters
+/// in the line immediately below the header.
 ///
-/// When present, section underlines should be positioned on the line
-/// immediately following the section header.
+/// This rule enforces a consistent style for multiline numpy-style docstrings
+/// with sections. If your docstring uses reStructuredText, the rule also
+/// helps protect against incorrect reStructuredText syntax, which would cause
+/// errors if you tried to use a tool such as Sphinx to generate documentation
+/// from the docstring.
 ///
 /// This rule is enabled when using the `numpy` convention, and disabled
 /// when using the `google` or `pep257` conventions.
@@ -578,15 +599,20 @@ impl AlwaysFixableViolation for SectionUnderlineAfterName {
 /// the corresponding section header.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule enforces a consistent style for multiline numpy-style docstrings,
+/// and helps prevent incorrect syntax in docstrings using reStructuredText.
 ///
-/// Some docstring formats (like reStructuredText) use underlines to separate
-/// section bodies from section headers.
+/// Multiline numpy-style docstrings are typically composed of a summary line,
+/// followed by a blank line, followed by a series of sections. Each section
+/// has a section header and a section body, and there should be a series of
+/// underline characters in the line following the header. The length of the
+/// underline should exactly match the length of the section header.
 ///
-/// When present, section underlines should match the length of the
-/// corresponding section header.
+/// This rule enforces a consistent style for multiline numpy-style docstrings
+/// with sections. If your docstring uses reStructuredText, the rule also
+/// helps protect against incorrect reStructuredText syntax, which would cause
+/// errors if you tried to use a tool such as Sphinx to generate documentation
+/// from the docstring.
 ///
 /// This rule is enabled when using the `numpy` convention, and disabled
 /// when using the `google` or `pep257` conventions.
@@ -677,12 +703,14 @@ impl AlwaysFixableViolation for SectionUnderlineMatchesSectionLength {
 /// line.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
-///
-/// Docstring sections should be separated by a blank line, for consistency and
+/// This rule enforces consistency in your docstrings, and helps ensure
 /// compatibility with documentation tooling.
+///
+/// Multiline docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body. If a multiline numpy-style or Google-style docstring
+/// consists of multiple sections, each section should be separated by a single
+/// blank line.
 ///
 /// This rule is enabled when using the `numpy` and `google` conventions, and
 /// disabled when using the `pep257` convention.
@@ -768,15 +796,15 @@ impl AlwaysFixableViolation for NoBlankLineAfterSection {
 }
 
 /// ## What it does
-/// Checks for docstring sections that are separated by a blank line.
+/// Checks for docstring sections that are not separated by a blank line.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule enforces consistency in numpy-style and Google-style docstrings,
+/// and helps ensure compatibility with documentation tooling.
 ///
-/// Docstring sections should be separated by a blank line, for consistency and
-/// compatibility with documentation tooling.
+/// Multiline docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body. Sections should be separated by a single blank line.
 ///
 /// This rule is enabled when using the `numpy` and `google` conventions, and
 /// disabled when using the `pep257` convention.
@@ -861,19 +889,18 @@ impl AlwaysFixableViolation for NoBlankLineBeforeSection {
 }
 
 /// ## What it does
-/// Checks for missing blank lines after the last section of a multi-line
+/// Checks for missing blank lines after the last section of a multiline
 /// docstring.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
+/// This rule enforces a consistent style for multiline docstrings.
+///
+/// Multiline docstrings are typically composed of a summary line, followed by
 /// a blank line, followed by a series of sections, each with a section header
 /// and a section body.
 ///
-/// In some projects, the last section of a docstring is followed by a blank line,
-/// for consistency and compatibility.
-///
 /// This rule may not apply to all projects; its applicability is a matter of
-/// convention. By default, this rule is disabled when using the `google`,
+/// convention. By default, the rule is disabled when using the `google`,
 /// `numpy`, and `pep257` conventions.
 ///
 /// ## Example
@@ -957,15 +984,16 @@ impl AlwaysFixableViolation for BlankLineAfterLastSection {
 }
 
 /// ## What it does
-/// Checks for docstrings that contain empty sections.
+/// Checks for docstrings with empty sections.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// An empty section in a multiline docstring likely indicates an unfinished
+/// or incomplete docstring.
 ///
-/// Empty docstring sections are indicative of missing documentation. Empty
-/// sections should either be removed or filled in with relevant documentation.
+/// Multiline docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body. Each section body should be non-empty; empty sections
+/// should either have content added to them, or be removed entirely.
 ///
 /// ## Example
 /// ```python
@@ -1046,12 +1074,13 @@ impl Violation for EmptyDocstringSection {
 /// Checks for docstring section headers that do not end with a colon.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
+/// This rule enforces a consistent style for multiline Google-style
+/// docstrings. If a multiline Google-style docstring consists of multiple
+/// sections, each section header should end with a colon.
+///
+/// Multiline docstrings are typically composed of a summary line, followed by
 /// a blank line, followed by a series of sections, each with a section header
 /// and a section body.
-///
-/// In a docstring, each section header should end with a colon, for
-/// consistency.
 ///
 /// This rule is enabled when using the `google` convention, and disabled when
 /// using the `pep257` and `numpy` conventions.
@@ -1128,13 +1157,14 @@ impl AlwaysFixableViolation for SectionNameEndsInColon {
 /// parameters in the function.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule helps prevent you from leaving Google-style docstrings unfinished
+/// or incomplete. Multiline Google-style docstrings should describe all
+/// parameters for the function they are documenting.
 ///
-/// Function docstrings often include a section for function arguments, which
-/// should include documentation for every argument. Undocumented arguments are
-/// indicative of missing documentation.
+/// Multiline docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body. Function docstrings often include a section for
+/// function arguments; this rule is concerned with that section only.
 ///
 /// This rule is enabled when using the `google` convention, and disabled when
 /// using the `pep257` and `numpy` conventions.
@@ -1210,16 +1240,16 @@ impl Violation for UndocumentedParam {
 }
 
 /// ## What it does
-/// Checks for docstring sections that contain blank lines between the section
-/// header and the section body.
+/// Checks for docstring sections that contain blank lines between a section
+/// header and a section body.
 ///
 /// ## Why is this bad?
-/// Multi-line docstrings are typically composed of a summary line, followed by
-/// a blank line, followed by a series of sections, each with a section header
-/// and a section body.
+/// This rule enforces a consistent style for multiline docstrings.
 ///
-/// Docstring sections should not contain blank lines between the section header
-/// and the section body, for consistency.
+/// Multiline docstrings are typically composed of a summary line, followed by
+/// a blank line, followed by a series of sections, each with a section header
+/// and a section body. There should be no blank lines between a section header
+/// and a section body.
 ///
 /// ## Example
 /// ```python
