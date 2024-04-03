@@ -124,7 +124,9 @@ pub(super) fn validate_parameters(parameters: &ast::Parameters) -> Result<(), Pa
     Ok(())
 }
 
-pub(super) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), ParseError> {
+pub(super) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), Vec<ParseError>> {
+    let mut errors = vec![];
+
     let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
         arguments.keywords.len(),
         BuildHasherDefault::default(),
@@ -137,12 +139,16 @@ pub(super) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), Parse
     {
         let arg_name = name.as_str();
         if !all_arg_names.insert(arg_name) {
-            return Err(ParseError {
+            errors.push(ParseError {
                 error: ParseErrorType::DuplicateKeywordArgumentError(arg_name.to_string()),
                 location: range,
             });
         }
     }
 
-    Ok(())
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
 }
