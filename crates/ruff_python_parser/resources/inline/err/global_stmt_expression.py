@@ -1,0 +1,1 @@
+global x + 1
