@@ -912,6 +912,13 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses an attribute expression.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `.` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/expressions.html#attribute-references>
     pub(super) fn parse_attribute_expression(
         &mut self,
         value: Expr,
