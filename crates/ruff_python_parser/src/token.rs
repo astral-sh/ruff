@@ -879,7 +879,7 @@ impl TryFrom<TokenKind> for BoolOp {
 }
 
 impl TryFrom<&Tok> for UnaryOp {
-    type Error = ();
+    type Error = String;
 
     fn try_from(value: &Tok) -> Result<Self, Self::Error> {
         TokenKind::from_token(value).try_into()
@@ -887,7 +887,7 @@ impl TryFrom<&Tok> for UnaryOp {
 }
 
 impl TryFrom<TokenKind> for UnaryOp {
-    type Error = ();
+    type Error = String;
 
     fn try_from(value: TokenKind) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -895,7 +895,7 @@ impl TryFrom<TokenKind> for UnaryOp {
             TokenKind::Minus => UnaryOp::USub,
             TokenKind::Tilde => UnaryOp::Invert,
             TokenKind::Not => UnaryOp::Not,
-            _ => return Err(()),
+            _ => return Err(format!("unexpected token: {value:?}")),
         })
     }
 }
