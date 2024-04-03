@@ -1,11 +1,11 @@
 use ruff_linter::{
-    linter::FixerResult,
+    linter::{FixerResult, LinterResult},
     settings::{flags, types::UnsafeFixes, LinterSettings},
     source_kind::SourceKind,
 };
 use ruff_python_ast::PySourceType;
 use ruff_source_file::LineIndex;
-use std::path::Path;
+use std::{borrow::Cow, path::Path};
 
 use crate::{
     edit::{Replacement, ToRangeExt},
@@ -24,7 +24,17 @@ pub(crate) fn fix_all(
     // TODO(jane): Support Jupyter Notebooks
     let source_kind = SourceKind::Python(source.to_string());
 
-    let FixerResult { transformed, .. } = ruff_linter::linter::lint_fix(
+    // We need to iteratively apply all safe fixes onto a single file and then
+    // create a diff between the modified file and the original source to use as a single workspace
+    // edit.
+    // If we simply generated the diagnostics with `check_path` and then applied fixes individually,
+    // there's a possibility they could overlap or introduce new problems that need to be fixed,
+    // which is inconsistent with how `ruff check --fix` works.
+    let FixerResult {
+        transformed,
+        result: LinterResult { error, .. },
+        ..
+    } = ruff_linter::linter::lint_fix(
         Path::new("<filename>"),
         None,
         flags::Noqa::Enabled,
@@ -33,6 +43,18 @@ pub(crate) fn fix_all(
         &source_kind,
         source_type,
     )?;
+
+    if let Some(error) = error {
+        // abort early if a parsing error occurred
+        return Err(anyhow::anyhow!(
+            "A parsing error occurred during `fix_all`: {error}"
+        ));
+    }
+
+    // fast path: if `transformed` is still borrowed, no changes were made and we can return early
+    if let Cow::Borrowed(_) = transformed {
+        return Ok(vec![]);
+    }
 
     let modified = transformed.source_code();
 

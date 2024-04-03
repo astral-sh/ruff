@@ -22,15 +22,15 @@ impl Replacement {
             .iter()
             .copied()
             .zip(modified_line_starts.iter().copied());
-        for (source_line_start, formatted_line_start) in line_iter.by_ref() {
-            if source_line_start != formatted_line_start
+        for (source_line_start, modified_line_start) in line_iter.by_ref() {
+            if source_line_start != modified_line_start
                 || source[TextRange::new(source_start, source_line_start)]
-                    != modified[TextRange::new(replaced_start, formatted_line_start)]
+                    != modified[TextRange::new(replaced_start, modified_line_start)]
             {
                 break;
             }
             source_start = source_line_start;
-            replaced_start = formatted_line_start;
+            replaced_start = modified_line_start;
         }
 
         let mut line_iter = line_iter.rev();
