@@ -15,7 +15,7 @@ use crate::rules::flake8_comprehensions::fixes;
 ///
 /// ## Why is this bad?
 /// Many builtin functions (this rule currently covers `any`, `all`, `min`, `max`, and `sum`) take
-/// any iterable, including a generator. Converting a generator to a list by way of a list
+/// any iterable, including a generator. Constructing a temporary list by way of a list
 /// comprehension is unnecessary and wastes memory for large iterables by fully materializing a
 /// list rather than handling values one at a time.
 ///
@@ -33,11 +33,13 @@ use crate::rules::flake8_comprehensions::fixes;
 /// 212 ns ± 0.892 ns per loop (mean ± std. dev. of 7 runs, 1,000,000 loops each)
 /// ```
 ///
-/// This performance difference is due to short-circuiting. If the entire iterable has to be
-/// traversed, the comprehension version may even be a bit faster (list allocation overhead is not
-/// necessarily greater than generator overhead). So applying this rule simplifies the code and
-/// will usually save memory, but in the absence of short-circuiting it may not improve (and may
-/// even slightly regress, though the difference will be small) performance.
+/// This performance improvement is due to short-circuiting. If the entire iterable has to be
+/// traversed, the comprehension version may even be a bit faster: list allocation overhead is not
+/// necessarily greater than generator overhead.
+///
+/// Applying this rule simplifies the code and will usually save memory, but in the absence of
+/// short-circuiting it may not improve performance. (It may even slightly regress performance,
+/// though the difference will usually be small.)
 ///
 /// ## Examples
 /// ```python
