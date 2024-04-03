@@ -98,65 +98,65 @@ C419.py:9:5: C419 [*] Unnecessary list comprehension
 11 11 | # OK
 12 12 | all(x.id for x in bar)
 
-C419.py:31:5: C419 [*] Unnecessary list comprehension
+C419.py:28:5: C419 [*] Unnecessary list comprehension
    |
-29 |   # Special comment handling
-30 |   any(
-31 |       [  # lbracket comment
+26 |   # Special comment handling
+27 |   any(
+28 |       [  # lbracket comment
    |  _____^
-32 | |         # second line comment
-33 | |         i.bit_count()
-34 | |         # random middle comment
-35 | |         for i in range(5)  # rbracket comment
-36 | |     ]  # rpar comment
+29 | |         # second line comment
+30 | |         i.bit_count()
+31 | |         # random middle comment
+32 | |         for i in range(5)  # rbracket comment
+33 | |     ]  # rpar comment
    | |_____^ C419
-37 |       # trailing comment
-38 |   )
+34 |       # trailing comment
+35 |   )
    |
    = help: Remove unnecessary list comprehension
 
 ℹ Unsafe fix
-28 28 | 
-29 29 | # Special comment handling
-30 30 | any(
-31    |-    [  # lbracket comment
-32    |-        # second line comment
-33    |-        i.bit_count()
-   31 |+    # lbracket comment
-   32 |+    # second line comment
-   33 |+    i.bit_count()
-34 34 |         # random middle comment
-35    |-        for i in range(5)  # rbracket comment
-36    |-    ]  # rpar comment
-   35 |+        for i in range(5)  # rbracket comment  # rpar comment
-37 36 |     # trailing comment
-38 37 | )
-39 38 | 
+25 25 | 
+26 26 | # Special comment handling
+27 27 | any(
+28    |-    [  # lbracket comment
+29    |-        # second line comment
+30    |-        i.bit_count()
+   28 |+    # lbracket comment
+   29 |+    # second line comment
+   30 |+    i.bit_count()
+31 31 |         # random middle comment
+32    |-        for i in range(5)  # rbracket comment
+33    |-    ]  # rpar comment
+   32 |+        for i in range(5)  # rbracket comment  # rpar comment
+34 33 |     # trailing comment
+35 34 | )
+36 35 | 
 
-C419.py:42:5: C419 [*] Unnecessary list comprehension
+C419.py:39:5: C419 [*] Unnecessary list comprehension
    |
-40 |   # Weird case where the function call, opening bracket, and comment are all
-41 |   # on the same line.
-42 |   any([  # lbracket comment
+37 |   # Weird case where the function call, opening bracket, and comment are all
+38 |   # on the same line.
+39 |   any([  # lbracket comment
    |  _____^
-43 | |         # second line comment
-44 | |         i.bit_count() for i in range(5)  # rbracket comment
-45 | |     ]  # rpar comment
+40 | |         # second line comment
+41 | |         i.bit_count() for i in range(5)  # rbracket comment
+42 | |     ]  # rpar comment
    | |_____^ C419
-46 |   )
+43 |   )
    |
    = help: Remove unnecessary list comprehension
 
 ℹ Unsafe fix
-39 39 | 
-40 40 | # Weird case where the function call, opening bracket, and comment are all
-41 41 | # on the same line.
-42    |-any([  # lbracket comment
-43    |-        # second line comment
-44    |-        i.bit_count() for i in range(5)  # rbracket comment
-45    |-    ]  # rpar comment
-   42 |+any(
-   43 |+# lbracket comment
-   44 |+# second line comment
-   45 |+i.bit_count() for i in range(5)  # rbracket comment  # rpar comment
-46 46 | )
+36 36 | 
+37 37 | # Weird case where the function call, opening bracket, and comment are all
+38 38 | # on the same line.
+39    |-any([  # lbracket comment
+40    |-        # second line comment
+41    |-        i.bit_count() for i in range(5)  # rbracket comment
+42    |-    ]  # rpar comment
+   39 |+any(
+   40 |+# lbracket comment
+   41 |+# second line comment
+   42 |+i.bit_count() for i in range(5)  # rbracket comment  # rpar comment
+43 43 | )
