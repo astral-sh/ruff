@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/expressions/await.py
 ```
 Module(
     ModModule {
-        range: 0..147,
+        range: 0..211,
         body: [
             Expr(
                 StmtExpr {
@@ -352,6 +352,154 @@ Module(
                             orelse: NoneLiteral(
                                 ExprNoneLiteral {
                                     range: 142..146,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 147..158,
+                    value: Await(
+                        ExprAwait {
+                            range: 147..158,
+                            value: Tuple(
+                                ExprTuple {
+                                    range: 153..158,
+                                    elts: [
+                                        Starred(
+                                            ExprStarred {
+                                                range: 154..156,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 155..156,
+                                                        id: "x",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: true,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 159..178,
+                    value: Await(
+                        ExprAwait {
+                            range: 159..178,
+                            value: Lambda(
+                                ExprLambda {
+                                    range: 166..177,
+                                    parameters: Some(
+                                        Parameters {
+                                            range: 173..174,
+                                            posonlyargs: [],
+                                            args: [
+                                                ParameterWithDefault {
+                                                    range: 173..174,
+                                                    parameter: Parameter {
+                                                        range: 173..174,
+                                                        name: Identifier {
+                                                            id: "x",
+                                                            range: 173..174,
+                                                        },
+                                                        annotation: None,
+                                                    },
+                                                    default: None,
+                                                },
+                                            ],
+                                            vararg: None,
+                                            kwonlyargs: [],
+                                            kwarg: None,
+                                        },
+                                    ),
+                                    body: Name(
+                                        ExprName {
+                                            range: 176..177,
+                                            id: "x",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 179..192,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 179..192,
+                            left: Await(
+                                ExprAwait {
+                                    range: 179..186,
+                                    value: Name(
+                                        ExprName {
+                                            range: 185..186,
+                                            id: "x",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            op: Pow,
+                            right: UnaryOp(
+                                ExprUnaryOp {
+                                    range: 190..192,
+                                    op: USub,
+                                    operand: Name(
+                                        ExprName {
+                                            range: 191..192,
+                                            id: "x",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 193..211,
+                    value: BinOp(
+                        ExprBinOp {
+                            range: 193..211,
+                            left: Await(
+                                ExprAwait {
+                                    range: 193..200,
+                                    value: Name(
+                                        ExprName {
+                                            range: 199..200,
+                                            id: "x",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            op: Pow,
+                            right: Await(
+                                ExprAwait {
+                                    range: 204..211,
+                                    value: Name(
+                                        ExprName {
+                                            range: 210..211,
+                                            id: "y",
+                                            ctx: Load,
+                                        },
+                                    ),
                                 },
                             ),
                         },
