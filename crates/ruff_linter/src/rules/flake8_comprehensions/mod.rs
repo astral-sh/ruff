@@ -20,6 +20,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryCollectionCall, Path::new("C408.py"))]
     #[test_case(Rule::UnnecessaryComprehension, Path::new("C416.py"))]
     #[test_case(Rule::UnnecessaryComprehensionInCall, Path::new("C419.py"))]
+    #[test_case(Rule::UnnecessaryComprehensionInCall, Path::new("C419_2.py"))]
     #[test_case(Rule::UnnecessaryDoubleCastOrProcess, Path::new("C414.py"))]
     #[test_case(Rule::UnnecessaryGeneratorDict, Path::new("C402.py"))]
     #[test_case(Rule::UnnecessaryGeneratorList, Path::new("C400.py"))]
