@@ -16,8 +16,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// ## Why is this bad?
 /// Many builtin functions (this rule currently covers `any`, `all`, `min`, `max`, and `sum`) take
 /// any iterable, including a generator. Constructing a temporary list via list comprehension is
-/// unnecessary and wastes memory for large iterables by fully materializing a list rather than
-/// handling values one at a time.
+/// unnecessary and wastes memory for large iterables.
 ///
 /// `any` and `all` can also short-circuit iteration, saving a lot of time. The unnecessary
 /// comprehension forces a full iteration of the input iterable, giving up the benefits of
