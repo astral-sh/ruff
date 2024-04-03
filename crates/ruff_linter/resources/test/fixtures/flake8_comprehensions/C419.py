@@ -7,18 +7,19 @@ all(  # first comment
     [x.id for x in bar],  # second comment
 )  # third comment
 any({x.id for x in bar})
-sum([x.val for x in bar])
-min([x.val for x in bar])
-max([x.val for x in bar])
 
 # OK
 all(x.id for x in bar)
 all(x.id for x in bar)
 any(x.id for x in bar)
 all((x.id for x in bar))
-sum(x.val for x in bar)
-min(x.val for x in bar)
-max(x.val for x in bar)
+# no lint if shadowed
+def all(x): pass
+all([x.id for x in bar])
+# we don't lint on these in stable yet
+sum([x.val for x in bar])
+min([x.val for x in bar])
+max([x.val for x in bar])
 
 
 async def f() -> bool:

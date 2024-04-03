@@ -75,7 +75,7 @@ C419.py:7:5: C419 [*] Unnecessary list comprehension
   7 |+    x.id for x in bar  # second comment
 8 8 | )  # third comment
 9 9 | any({x.id for x in bar})
-10 10 | sum([x.val for x in bar])
+10 10 | 
 
 C419.py:9:5: C419 [*] Unnecessary list comprehension
    |
@@ -83,8 +83,8 @@ C419.py:9:5: C419 [*] Unnecessary list comprehension
  8 | )  # third comment
  9 | any({x.id for x in bar})
    |     ^^^^^^^^^^^^^^^^^^^ C419
-10 | sum([x.val for x in bar])
-11 | min([x.val for x in bar])
+10 | 
+11 | # OK
    |
    = help: Remove unnecessary list comprehension
 
@@ -94,131 +94,69 @@ C419.py:9:5: C419 [*] Unnecessary list comprehension
 8  8  | )  # third comment
 9     |-any({x.id for x in bar})
    9  |+any(x.id for x in bar)
-10 10 | sum([x.val for x in bar])
-11 11 | min([x.val for x in bar])
-12 12 | max([x.val for x in bar])
+10 10 | 
+11 11 | # OK
+12 12 | all(x.id for x in bar)
 
-C419.py:10:5: C419 [*] Unnecessary list comprehension
+C419.py:31:5: C419 [*] Unnecessary list comprehension
    |
- 8 | )  # third comment
- 9 | any({x.id for x in bar})
-10 | sum([x.val for x in bar])
-   |     ^^^^^^^^^^^^^^^^^^^^ C419
-11 | min([x.val for x in bar])
-12 | max([x.val for x in bar])
-   |
-   = help: Remove unnecessary list comprehension
-
-ℹ Unsafe fix
-7  7  |     [x.id for x in bar],  # second comment
-8  8  | )  # third comment
-9  9  | any({x.id for x in bar})
-10    |-sum([x.val for x in bar])
-   10 |+sum(x.val for x in bar)
-11 11 | min([x.val for x in bar])
-12 12 | max([x.val for x in bar])
-13 13 | 
-
-C419.py:11:5: C419 [*] Unnecessary list comprehension
-   |
- 9 | any({x.id for x in bar})
-10 | sum([x.val for x in bar])
-11 | min([x.val for x in bar])
-   |     ^^^^^^^^^^^^^^^^^^^^ C419
-12 | max([x.val for x in bar])
-   |
-   = help: Remove unnecessary list comprehension
-
-ℹ Unsafe fix
-8  8  | )  # third comment
-9  9  | any({x.id for x in bar})
-10 10 | sum([x.val for x in bar])
-11    |-min([x.val for x in bar])
-   11 |+min(x.val for x in bar)
-12 12 | max([x.val for x in bar])
-13 13 | 
-14 14 | # OK
-
-C419.py:12:5: C419 [*] Unnecessary list comprehension
-   |
-10 | sum([x.val for x in bar])
-11 | min([x.val for x in bar])
-12 | max([x.val for x in bar])
-   |     ^^^^^^^^^^^^^^^^^^^^ C419
-13 | 
-14 | # OK
-   |
-   = help: Remove unnecessary list comprehension
-
-ℹ Unsafe fix
-9  9  | any({x.id for x in bar})
-10 10 | sum([x.val for x in bar])
-11 11 | min([x.val for x in bar])
-12    |-max([x.val for x in bar])
-   12 |+max(x.val for x in bar)
-13 13 | 
-14 14 | # OK
-15 15 | all(x.id for x in bar)
-
-C419.py:30:5: C419 [*] Unnecessary list comprehension
-   |
-28 |   # Special comment handling
-29 |   any(
-30 |       [  # lbracket comment
+29 |   # Special comment handling
+30 |   any(
+31 |       [  # lbracket comment
    |  _____^
-31 | |         # second line comment
-32 | |         i.bit_count()
-33 | |         # random middle comment
-34 | |         for i in range(5)  # rbracket comment
-35 | |     ]  # rpar comment
+32 | |         # second line comment
+33 | |         i.bit_count()
+34 | |         # random middle comment
+35 | |         for i in range(5)  # rbracket comment
+36 | |     ]  # rpar comment
    | |_____^ C419
-36 |       # trailing comment
-37 |   )
+37 |       # trailing comment
+38 |   )
    |
    = help: Remove unnecessary list comprehension
 
 ℹ Unsafe fix
-27 27 | 
-28 28 | # Special comment handling
-29 29 | any(
-30    |-    [  # lbracket comment
-31    |-        # second line comment
-32    |-        i.bit_count()
-   30 |+    # lbracket comment
-   31 |+    # second line comment
-   32 |+    i.bit_count()
-33 33 |         # random middle comment
-34    |-        for i in range(5)  # rbracket comment
-35    |-    ]  # rpar comment
-   34 |+        for i in range(5)  # rbracket comment  # rpar comment
-36 35 |     # trailing comment
-37 36 | )
-38 37 | 
+28 28 | 
+29 29 | # Special comment handling
+30 30 | any(
+31    |-    [  # lbracket comment
+32    |-        # second line comment
+33    |-        i.bit_count()
+   31 |+    # lbracket comment
+   32 |+    # second line comment
+   33 |+    i.bit_count()
+34 34 |         # random middle comment
+35    |-        for i in range(5)  # rbracket comment
+36    |-    ]  # rpar comment
+   35 |+        for i in range(5)  # rbracket comment  # rpar comment
+37 36 |     # trailing comment
+38 37 | )
+39 38 | 
 
-C419.py:41:5: C419 [*] Unnecessary list comprehension
+C419.py:42:5: C419 [*] Unnecessary list comprehension
    |
-39 |   # Weird case where the function call, opening bracket, and comment are all
-40 |   # on the same line.
-41 |   any([  # lbracket comment
+40 |   # Weird case where the function call, opening bracket, and comment are all
+41 |   # on the same line.
+42 |   any([  # lbracket comment
    |  _____^
-42 | |         # second line comment
-43 | |         i.bit_count() for i in range(5)  # rbracket comment
-44 | |     ]  # rpar comment
+43 | |         # second line comment
+44 | |         i.bit_count() for i in range(5)  # rbracket comment
+45 | |     ]  # rpar comment
    | |_____^ C419
-45 |   )
+46 |   )
    |
    = help: Remove unnecessary list comprehension
 
 ℹ Unsafe fix
-38 38 | 
-39 39 | # Weird case where the function call, opening bracket, and comment are all
-40 40 | # on the same line.
-41    |-any([  # lbracket comment
-42    |-        # second line comment
-43    |-        i.bit_count() for i in range(5)  # rbracket comment
-44    |-    ]  # rpar comment
-   41 |+any(
-   42 |+# lbracket comment
-   43 |+# second line comment
-   44 |+i.bit_count() for i in range(5)  # rbracket comment  # rpar comment
-45 45 | )
+39 39 | 
+40 40 | # Weird case where the function call, opening bracket, and comment are all
+41 41 | # on the same line.
+42    |-any([  # lbracket comment
+43    |-        # second line comment
+44    |-        i.bit_count() for i in range(5)  # rbracket comment
+45    |-    ]  # rpar comment
+   42 |+any(
+   43 |+# lbracket comment
+   44 |+# second line comment
+   45 |+i.bit_count() for i in range(5)  # rbracket comment  # rpar comment
+46 46 | )

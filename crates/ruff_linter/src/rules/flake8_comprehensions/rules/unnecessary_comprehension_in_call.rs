@@ -89,10 +89,13 @@ pub(crate) fn unnecessary_comprehension_in_call(
     if !keywords.is_empty() {
         return;
     }
+
     let Expr::Name(ast::ExprName { id, .. }) = func else {
         return;
     };
-    if !matches!(id.as_str(), "all" | "any" | "sum" | "min" | "max") {
+    if !(matches!(id.as_str(), "any" | "all")
+        || (checker.settings.preview.is_enabled() && matches!(id.as_str(), "sum" | "min" | "max")))
+    {
         return;
     }
     let [arg] = args else {
