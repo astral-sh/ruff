@@ -655,11 +655,6 @@ impl SequenceMatchPatternParentheses {
 bitflags! {
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
     struct ParserCtxFlags: u8 {
-        const PARENTHESIZED_EXPR = 1 << 0;
-
-        // NOTE: `ARGUMENTS` can be removed once the heuristic in `parse_with_items`
-        // is improved.
-        const ARGUMENTS = 1 << 1;
         const FOR_TARGET = 1 << 2;
     }
 }
