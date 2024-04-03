@@ -190,9 +190,6 @@ impl<'src> Parser<'src> {
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_simple_expression(&mut self) -> ParsedExpr {
-        // TODO(dhruvmanila): Need to add `disallow` parameter which will be a bitflag
-        // which can tell us which all expressions to disallow because this method is a
-        // combination of a **lot** of grammar rules.
         self.parse_expression_with_precedence(Precedence::Initial)
     }
 
@@ -247,7 +244,7 @@ impl<'src> Parser<'src> {
     /// See <https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html>
     fn parse_expression_with_precedence(&mut self, previous_precedence: Precedence) -> ParsedExpr {
         let start = self.node_start();
-        let mut lhs = self.parse_lhs_expression();
+        let mut lhs = self.parse_lhs_expression(previous_precedence);
 
         let mut progress = ParserProgress::default();
 
@@ -300,18 +297,93 @@ impl<'src> Parser<'src> {
         lhs
     }
 
-    pub(super) fn parse_lhs_expression(&mut self) -> ParsedExpr {
+    /// Parses the left-hand side of an expression.
+    ///
+    /// This includes prefix expressions such as unary operators, boolean `not`,
+    /// `await`, `lambda`. It also parses atoms and postfix expressions.
+    ///
+    /// The given [`Precedence`] is used to determine if the parsed expression
+    /// is valid in that context. For example, a unary operator is not valid
+    /// in an `await` expression in which case the `previous_precedence` would
+    /// be [`Precedence::Await`].
+    fn parse_lhs_expression(&mut self, previous_precedence: Precedence) -> ParsedExpr {
         let start = self.node_start();
         let mut lhs = match self.current_token_kind() {
-            TokenKind::Plus | TokenKind::Minus | TokenKind::Not | TokenKind::Tilde => {
-                Expr::UnaryOp(self.parse_unary_expression()).into()
+            unary_tok @ (TokenKind::Plus | TokenKind::Minus | TokenKind::Tilde) => {
+                let unary_expr = self.parse_unary_expression();
+                if previous_precedence > Precedence::PosNegBitNot
+                    // > The power operator `**` binds less tightly than an arithmetic
+                    // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
+                    //
+                    // Reference: https://docs.python.org/3/reference/expressions.html#id21
+                    && previous_precedence != Precedence::Exponent
+                {
+                    self.add_error(
+                        ParseErrorType::OtherError(format!(
+                            "unary `{unary_tok}` expression cannot be used here",
+                        )),
+                        &unary_expr,
+                    );
+                }
+                Expr::UnaryOp(unary_expr).into()
             }
-            TokenKind::Star => Expr::Starred(
-                self.parse_starred_expression(StarredExpressionPrecedence::Conditional),
-            )
-            .into(),
-            TokenKind::Await => Expr::Await(self.parse_await_expression()).into(),
-            TokenKind::Lambda => Expr::Lambda(self.parse_lambda_expr()).into(),
+            TokenKind::Not => {
+                let unary_expr = self.parse_unary_expression();
+                if previous_precedence > Precedence::Not {
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "boolean `not` expression cannot be used here".to_string(),
+                        ),
+                        &unary_expr,
+                    );
+                }
+                Expr::UnaryOp(unary_expr).into()
+            }
+            TokenKind::Star => {
+                let starred_expr =
+                    self.parse_starred_expression(StarredExpressionPrecedence::Conditional);
+                if previous_precedence > Precedence::Initial {
+                    self.add_error(ParseErrorType::StarredExpressionUsage, &starred_expr);
+                }
+                Expr::Starred(starred_expr).into()
+            }
+            TokenKind::Await => {
+                let await_expr = self.parse_await_expression();
+                // `await` expressions cannot be nested
+                if previous_precedence >= Precedence::Await {
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "`await` expression cannot be used here".to_string(),
+                        ),
+                        &await_expr,
+                    );
+                }
+                Expr::Await(await_expr).into()
+            }
+            TokenKind::Lambda => {
+                let lambda_expr = self.parse_lambda_expr();
+                if previous_precedence > Precedence::Initial {
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "`lambda` expression cannot be used here".to_string(),
+                        ),
+                        &lambda_expr,
+                    );
+                }
+                Expr::Lambda(lambda_expr).into()
+            }
+            TokenKind::Yield => {
+                let expr = self.parse_yield_expression();
+                if previous_precedence > Precedence::Initial {
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "`yield` expression cannot be used here".to_string(),
+                        ),
+                        &expr,
+                    );
+                }
+                expr.into()
+            }
             _ => self.parse_atom(),
         };
 
@@ -517,7 +589,6 @@ impl<'src> Parser<'src> {
 
             TokenKind::Lsqb => self.parse_list_like_expression(),
             TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
-            TokenKind::Yield => self.parse_yield_expression(),
 
             kind => {
                 if kind.is_keyword() {
