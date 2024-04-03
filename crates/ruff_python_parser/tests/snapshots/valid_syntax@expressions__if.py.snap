@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/expressions/if.py
 ```
 Module(
     ModModule {
-        range: 0..171,
+        range: 0..423,
         body: [
             Expr(
                 StmtExpr {
@@ -381,6 +381,228 @@ Module(
                             ],
                             ctx: Load,
                             parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 214..240,
+                    value: If(
+                        ExprIf {
+                            range: 214..240,
+                            test: BooleanLiteral(
+                                ExprBooleanLiteral {
+                                    range: 219..223,
+                                    value: true,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 214..215,
+                                    id: "x",
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Lambda(
+                                ExprLambda {
+                                    range: 229..240,
+                                    parameters: Some(
+                                        Parameters {
+                                            range: 236..237,
+                                            posonlyargs: [],
+                                            args: [
+                                                ParameterWithDefault {
+                                                    range: 236..237,
+                                                    parameter: Parameter {
+                                                        range: 236..237,
+                                                        name: Identifier {
+                                                            id: "y",
+                                                            range: 236..237,
+                                                        },
+                                                        annotation: None,
+                                                    },
+                                                    default: None,
+                                                },
+                                            ],
+                                            vararg: None,
+                                            kwonlyargs: [],
+                                            kwarg: None,
+                                        },
+                                    ),
+                                    body: Name(
+                                        ExprName {
+                                            range: 239..240,
+                                            id: "y",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 302..323,
+                    value: If(
+                        ExprIf {
+                            range: 302..323,
+                            test: Yield(
+                                ExprYield {
+                                    range: 308..315,
+                                    value: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 314..315,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 302..303,
+                                    id: "x",
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Name(
+                                ExprName {
+                                    range: 322..323,
+                                    id: "y",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 324..350,
+                    value: If(
+                        ExprIf {
+                            range: 324..350,
+                            test: YieldFrom(
+                                ExprYieldFrom {
+                                    range: 330..342,
+                                    value: Name(
+                                        ExprName {
+                                            range: 341..342,
+                                            id: "x",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 324..325,
+                                    id: "x",
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Name(
+                                ExprName {
+                                    range: 349..350,
+                                    id: "y",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 351..376,
+                    value: If(
+                        ExprIf {
+                            range: 351..376,
+                            test: Lambda(
+                                ExprLambda {
+                                    range: 357..368,
+                                    parameters: Some(
+                                        Parameters {
+                                            range: 364..365,
+                                            posonlyargs: [],
+                                            args: [
+                                                ParameterWithDefault {
+                                                    range: 364..365,
+                                                    parameter: Parameter {
+                                                        range: 364..365,
+                                                        name: Identifier {
+                                                            id: "x",
+                                                            range: 364..365,
+                                                        },
+                                                        annotation: None,
+                                                    },
+                                                    default: None,
+                                                },
+                                            ],
+                                            vararg: None,
+                                            kwonlyargs: [],
+                                            kwarg: None,
+                                        },
+                                    ),
+                                    body: Name(
+                                        ExprName {
+                                            range: 367..368,
+                                            id: "x",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 351..352,
+                                    id: "x",
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Name(
+                                ExprName {
+                                    range: 375..376,
+                                    id: "y",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 408..423,
+                    value: If(
+                        ExprIf {
+                            range: 409..422,
+                            test: Name(
+                                ExprName {
+                                    range: 414..415,
+                                    id: "y",
+                                    ctx: Load,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 409..410,
+                                    id: "x",
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Name(
+                                ExprName {
+                                    range: 421..422,
+                                    id: "z",
+                                    ctx: Load,
+                                },
+                            ),
                         },
                     ),
                 },
