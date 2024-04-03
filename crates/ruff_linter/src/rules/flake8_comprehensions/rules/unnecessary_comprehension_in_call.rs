@@ -53,7 +53,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// any(x.id for x in bar)
 /// all(x.id for x in bar)
 /// sum(x.val for x in bar)
-/// min(x.val for x in bar])
+/// min(x.val for x in bar)
 /// max(x.val for x in bar)
 /// ```
 ///
