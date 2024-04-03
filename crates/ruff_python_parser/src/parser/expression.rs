@@ -1969,6 +1969,22 @@ impl<'src> Parser<'src> {
         helpers::set_expr_ctx(&mut target, ExprContext::Store);
 
         let value = self.parse_conditional_expression_or_higher();
+        if !value.is_parenthesized {
+            match value.expr {
+                Expr::Yield(_) | Expr::YieldFrom(_) => {
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "unparenthesized yield expression cannot be used here".to_string(),
+                        ),
+                        &value,
+                    );
+                }
+                Expr::Starred(_) => {
+                    self.add_error(ParseErrorType::StarredExpressionUsage, &value);
+                }
+                _ => {}
+            }
+        }
 
         ast::ExprNamed {
             target: Box::new(target),
