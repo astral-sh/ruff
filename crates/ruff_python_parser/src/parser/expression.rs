@@ -2190,12 +2190,20 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a lambda expression.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `lambda` token.
+    ///
     /// See: <https://docs.python.org/3/reference/expressions.html#lambda>
     fn parse_lambda_expr(&mut self) -> ast::ExprLambda {
         let start = self.node_start();
         self.bump(TokenKind::Lambda);
 
-        let parameters: Option<Box<ast::Parameters>> = if self.at(TokenKind::Colon) {
+        let parameters = if self.at(TokenKind::Colon) {
+            // test lambda_with_no_parameters
+            // lambda: 1
             None
         } else {
             Some(Box::new(self.parse_parameters(FunctionKind::Lambda)))
@@ -2203,35 +2211,40 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Colon);
 
-        // Check for forbidden tokens in the `lambda`'s body
-        match self.current_token_kind() {
-            TokenKind::Yield => self.add_error(
-                ParseErrorType::OtherError(
-                    "`yield` not allowed in a `lambda` expression".to_string(),
-                ),
-                self.current_token_range(),
-            ),
-            TokenKind::Star => {
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "starred expression not allowed in a `lambda` expression".to_string(),
-                    ),
-                    self.current_token_range(),
-                );
-            }
-            TokenKind::DoubleStar => {
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "double starred expression not allowed in a `lambda` expression"
-                            .to_string(),
-                    ),
-                    self.current_token_range(),
-                );
-            }
-            _ => {}
-        }
-
+        // test lambda_with_valid_body
+        // lambda x: x
+        // lambda x: x if True else y
+        // lambda x: await x
+        // lambda x: lambda y: x + y
+        // lambda x: (yield x)  # Parenthesized `yield` is fine
+        // lambda x: x, *y
         let body = self.parse_conditional_expression_or_higher();
+
+        if !body.is_parenthesized {
+            match body.expr {
+                // test_err lambda_body_with_yield_expr
+                // lambda x: yield y
+                // lambda x: yield from y
+                Expr::Yield(_) | Expr::YieldFrom(_) => {
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "unparenthesized yield expression cannot be used here".to_string(),
+                        ),
+                        &body,
+                    );
+                }
+
+                // test_err lambda_body_with_starred_expr
+                // lambda x: *y
+                // lambda x: *y,
+                // lambda x: *y, z
+                // lambda x: *y and z
+                Expr::Starred(_) => {
+                    self.add_error(ParseErrorType::StarredExpressionUsage, &body);
+                }
+                _ => {}
+            }
+        }
 
         ast::ExprLambda {
             body: Box::new(body.expr),

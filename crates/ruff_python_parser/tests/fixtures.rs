@@ -24,22 +24,12 @@ fn invalid_syntax() {
 
 #[test]
 fn inline_ok() {
-    // TODO(dhruvmanila): remove settings once there are tests
-    insta::with_settings!({
-        allow_empty_glob => true,
-    }, {
-        insta::glob!("../resources/inline", "ok/**/*.py", test_valid_syntax);
-    });
+    insta::glob!("../resources/inline", "ok/**/*.py", test_valid_syntax);
 }
 
 #[test]
 fn inline_err() {
-    // TODO(dhruvmanila): remove settings once there are tests
-    insta::with_settings!({
-        allow_empty_glob => true,
-    }, {
-        insta::glob!("../resources/inline", "err/**/*.py", test_invalid_syntax);
-    });
+    insta::glob!("../resources/inline", "err/**/*.py", test_invalid_syntax);
 }
 
 /// Asserts that the parser generates no syntax errors for a valid program.
