@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/expressions/bool_op.py
 ```
 Module(
     ModModule {
-        range: 0..54,
+        range: 0..142,
         body: [
             Expr(
                 StmtExpr {
@@ -164,6 +164,229 @@ Module(
                                 Name(
                                     ExprName {
                                         range: 52..53,
+                                        id: "c",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 54..88,
+                    value: BoolOp(
+                        ExprBoolOp {
+                            range: 54..88,
+                            op: Or,
+                            values: [
+                                BoolOp(
+                                    ExprBoolOp {
+                                        range: 54..67,
+                                        op: And,
+                                        values: [
+                                            Name(
+                                                ExprName {
+                                                    range: 54..55,
+                                                    id: "a",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 60..61,
+                                                    id: "b",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 66..67,
+                                                    id: "c",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 71..72,
+                                        id: "d",
+                                        ctx: Load,
+                                    },
+                                ),
+                                BoolOp(
+                                    ExprBoolOp {
+                                        range: 76..83,
+                                        op: And,
+                                        values: [
+                                            Name(
+                                                ExprName {
+                                                    range: 76..77,
+                                                    id: "e",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 82..83,
+                                                    id: "f",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 87..88,
+                                        id: "g",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 89..105,
+                    value: BoolOp(
+                        ExprBoolOp {
+                            range: 89..105,
+                            op: Or,
+                            values: [
+                                BoolOp(
+                                    ExprBoolOp {
+                                        range: 89..100,
+                                        op: And,
+                                        values: [
+                                            Name(
+                                                ExprName {
+                                                    range: 89..90,
+                                                    id: "a",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            UnaryOp(
+                                                ExprUnaryOp {
+                                                    range: 95..100,
+                                                    op: Not,
+                                                    operand: Name(
+                                                        ExprName {
+                                                            range: 99..100,
+                                                            id: "b",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 104..105,
+                                        id: "c",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 106..124,
+                    value: Yield(
+                        ExprYield {
+                            range: 106..124,
+                            value: Some(
+                                BoolOp(
+                                    ExprBoolOp {
+                                        range: 112..124,
+                                        op: Or,
+                                        values: [
+                                            BoolOp(
+                                                ExprBoolOp {
+                                                    range: 112..119,
+                                                    op: And,
+                                                    values: [
+                                                        Name(
+                                                            ExprName {
+                                                                range: 112..113,
+                                                                id: "a",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        Name(
+                                                            ExprName {
+                                                                range: 118..119,
+                                                                id: "b",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 123..124,
+                                                    id: "c",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 125..141,
+                    value: BoolOp(
+                        ExprBoolOp {
+                            range: 125..141,
+                            op: Or,
+                            values: [
+                                BoolOp(
+                                    ExprBoolOp {
+                                        range: 125..136,
+                                        op: And,
+                                        values: [
+                                            UnaryOp(
+                                                ExprUnaryOp {
+                                                    range: 125..130,
+                                                    op: Not,
+                                                    operand: Name(
+                                                        ExprName {
+                                                            range: 129..130,
+                                                            id: "a",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 135..136,
+                                                    id: "b",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 140..141,
                                         id: "c",
                                         ctx: Load,
                                     },
