@@ -680,7 +680,7 @@ impl<'a> SemanticModel<'a> {
     /// print(python_version)
     /// ```
     ///
-    /// ...then `resolve_call_path(${python_version})` will resolve to `sys.version_info`.
+    /// ...then `resolve_qualified_name(${python_version})` will resolve to `sys.version_info`.
     pub fn resolve_qualified_name<'name, 'expr: 'name>(
         &self,
         value: &'expr Expr,
