@@ -9,3 +9,7 @@ await 7, 8
 await (9, 10)
 await 1 == 1
 await x if True else None
+await (*x,)
+await (lambda x: x)
+await x ** -x
+await x ** await y
