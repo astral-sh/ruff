@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/expressions/dictionary.py
 ```
 Module(
     ModModule {
-        range: 0..544,
+        range: 0..622,
         body: [
             Expr(
                 StmtExpr {
@@ -878,15 +878,43 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 416..437,
+                    range: 460..471,
                     value: Dict(
                         ExprDict {
-                            range: 416..437,
+                            range: 460..471,
+                            keys: [
+                                None,
+                            ],
+                            values: [
+                                UnaryOp(
+                                    ExprUnaryOp {
+                                        range: 464..469,
+                                        op: Not,
+                                        operand: Name(
+                                            ExprName {
+                                                range: 468..469,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 494..515,
+                    value: Dict(
+                        ExprDict {
+                            range: 494..515,
                             keys: [
                                 Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 417..418,
+                                            range: 495..496,
                                             value: Int(
                                                 1,
                                             ),
@@ -897,23 +925,23 @@ Module(
                             values: [
                                 If(
                                     ExprIf {
-                                        range: 420..436,
+                                        range: 498..514,
                                         test: BooleanLiteral(
                                             ExprBooleanLiteral {
-                                                range: 425..429,
+                                                range: 503..507,
                                                 value: true,
                                             },
                                         ),
                                         body: Name(
                                             ExprName {
-                                                range: 420..421,
+                                                range: 498..499,
                                                 id: "x",
                                                 ctx: Load,
                                             },
                                         ),
                                         orelse: Name(
                                             ExprName {
-                                                range: 435..436,
+                                                range: 513..514,
                                                 id: "y",
                                                 ctx: Load,
                                             },
@@ -927,29 +955,29 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 438..497,
+                    range: 516..575,
                     value: DictComp(
                         ExprDictComp {
-                            range: 438..497,
+                            range: 516..575,
                             key: If(
                                 ExprIf {
-                                    range: 439..455,
+                                    range: 517..533,
                                     test: BooleanLiteral(
                                         ExprBooleanLiteral {
-                                            range: 444..448,
+                                            range: 522..526,
                                             value: true,
                                         },
                                     ),
                                     body: Name(
                                         ExprName {
-                                            range: 439..440,
+                                            range: 517..518,
                                             id: "x",
                                             ctx: Load,
                                         },
                                     ),
                                     orelse: Name(
                                         ExprName {
-                                            range: 454..455,
+                                            range: 532..533,
                                             id: "y",
                                             ctx: Load,
                                         },
@@ -958,37 +986,37 @@ Module(
                             ),
                             value: Name(
                                 ExprName {
-                                    range: 457..458,
+                                    range: 535..536,
                                     id: "y",
                                     ctx: Load,
                                 },
                             ),
                             generators: [
                                 Comprehension {
-                                    range: 459..477,
+                                    range: 537..555,
                                     target: Name(
                                         ExprName {
-                                            range: 463..464,
+                                            range: 541..542,
                                             id: "x",
                                             ctx: Store,
                                         },
                                     ),
                                     iter: Call(
                                         ExprCall {
-                                            range: 468..477,
+                                            range: 546..555,
                                             func: Name(
                                                 ExprName {
-                                                    range: 468..473,
+                                                    range: 546..551,
                                                     id: "range",
                                                     ctx: Load,
                                                 },
                                             ),
                                             arguments: Arguments {
-                                                range: 473..477,
+                                                range: 551..555,
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 474..476,
+                                                            range: 552..554,
                                                             value: Int(
                                                                 10,
                                                             ),
@@ -1003,30 +1031,30 @@ Module(
                                     is_async: false,
                                 },
                                 Comprehension {
-                                    range: 478..496,
+                                    range: 556..574,
                                     target: Name(
                                         ExprName {
-                                            range: 482..483,
+                                            range: 560..561,
                                             id: "y",
                                             ctx: Store,
                                         },
                                     ),
                                     iter: Call(
                                         ExprCall {
-                                            range: 487..496,
+                                            range: 565..574,
                                             func: Name(
                                                 ExprName {
-                                                    range: 487..492,
+                                                    range: 565..570,
                                                     id: "range",
                                                     ctx: Load,
                                                 },
                                             ),
                                             arguments: Arguments {
-                                                range: 492..496,
+                                                range: 570..574,
                                                 args: [
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 493..495,
+                                                            range: 571..573,
                                                             value: Int(
                                                                 10,
                                                             ),
@@ -1047,19 +1075,19 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 498..522,
+                    range: 576..600,
                     value: Dict(
                         ExprDict {
-                            range: 498..522,
+                            range: 576..600,
                             keys: [
                                 Some(
                                     Set(
                                         ExprSet {
-                                            range: 499..505,
+                                            range: 577..583,
                                             elts: [
                                                 NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 500..501,
+                                                        range: 578..579,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -1067,7 +1095,7 @@ Module(
                                                 ),
                                                 NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 503..504,
+                                                        range: 581..582,
                                                         value: Int(
                                                             2,
                                                         ),
@@ -1080,7 +1108,7 @@ Module(
                                 Some(
                                     Name(
                                         ExprName {
-                                            range: 510..511,
+                                            range: 588..589,
                                             id: "x",
                                             ctx: Load,
                                         },
@@ -1090,7 +1118,7 @@ Module(
                             values: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 507..508,
+                                        range: 585..586,
                                         value: Int(
                                             3,
                                         ),
@@ -1098,12 +1126,12 @@ Module(
                                 ),
                                 Dict(
                                     ExprDict {
-                                        range: 513..520,
+                                        range: 591..598,
                                         keys: [
                                             Some(
                                                 NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 514..515,
+                                                        range: 592..593,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -1114,7 +1142,7 @@ Module(
                                         values: [
                                             NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 517..518,
+                                                    range: 595..596,
                                                     value: Int(
                                                         2,
                                                     ),
@@ -1130,15 +1158,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 523..543,
+                    range: 601..621,
                     value: Dict(
                         ExprDict {
-                            range: 523..543,
+                            range: 601..621,
                             keys: [
                                 Some(
                                     Name(
                                         ExprName {
-                                            range: 525..526,
+                                            range: 603..604,
                                             id: "x",
                                             ctx: Load,
                                         },
@@ -1147,7 +1175,7 @@ Module(
                                 Some(
                                     Name(
                                         ExprName {
-                                            range: 535..536,
+                                            range: 613..614,
                                             id: "z",
                                             ctx: Load,
                                         },
@@ -1157,14 +1185,14 @@ Module(
                             values: [
                                 Name(
                                     ExprName {
-                                        range: 530..531,
+                                        range: 608..609,
                                         id: "y",
                                         ctx: Load,
                                     },
                                 ),
                                 Name(
                                     ExprName {
-                                        range: 540..541,
+                                        range: 618..619,
                                         id: "a",
                                         ctx: Load,
                                     },

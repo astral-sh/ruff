@@ -319,43 +319,37 @@ impl<'src> Parser<'src> {
         lhs
     }
 
-    /// Parses a bitwise `or` expression or higher.
+    /// Parses an expression with a minimum precedence of bitwise `or`.
     ///
-    /// Matches the `bitwise_or` rule in the [Python grammar].
-    ///
-    /// This method delegates the parsing to [`Parser::parse_expression_with_precedence`]
-    /// with the minimum binding power of [`Precedence::BitOr`]. The main purpose of this
-    /// method is to report an error when certain expressions are parsed successfully
-    /// but are not allowed here.
+    /// This methods actually parses the expression using the `expression` rule
+    /// of the [Python grammar] and then validates the parsed expression. In a
+    /// sense, it matches the `bitwise_or` rule of the [Python grammar].
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_expression_with_bitwise_or_precedence(&mut self) -> ParsedExpr {
-        let parsed_expr = self.parse_expression_with_precedence(Precedence::BitOr);
+        let parsed_expr = self.parse_conditional_expression_or_higher();
 
-        // Parenthesized expressions have a higher precedence than bitwise `or` expressions,
-        // so they're allowed here.
         if parsed_expr.is_parenthesized {
+            // Parentheses resets the precedence, so we don't need to validate it.
             return parsed_expr;
         }
 
-        match parsed_expr.expr {
-            Expr::UnaryOp(ast::ExprUnaryOp {
+        let expr_name = match parsed_expr.expr {
+            Expr::Compare(_) => "comparison",
+            Expr::BoolOp(_)
+            | Expr::UnaryOp(ast::ExprUnaryOp {
                 op: ast::UnaryOp::Not,
                 ..
-            }) => {
-                self.add_error(
-                    ParseErrorType::OtherError("unary `not` expression cannot be used here".into()),
-                    &parsed_expr,
-                );
-            }
-            Expr::Lambda(_) => {
-                self.add_error(
-                    ParseErrorType::OtherError("lambda expression cannot be used here".into()),
-                    &parsed_expr,
-                );
-            }
-            _ => {}
-        }
+            }) => "boolean",
+            Expr::If(_) => "conditional",
+            Expr::Lambda(_) => "lambda",
+            _ => return parsed_expr,
+        };
+
+        self.add_error(
+            ParseErrorType::OtherError(format!("{expr_name} expression cannot be used here")),
+            &parsed_expr,
+        );
 
         parsed_expr
     }
@@ -1338,8 +1332,10 @@ impl<'src> Parser<'src> {
         }
 
         if self.eat(TokenKind::DoubleStar) {
-            // Handle dictionary unpacking
+            // Handle dictionary unpacking. Here, the grammar is `'**' bitwise_or`
+            // which requires limiting the expression.
             let value = self.parse_expression_with_bitwise_or_precedence();
+
             return Expr::Dict(self.parse_dictionary_expression(None, value.expr, start));
         }
 
@@ -1585,6 +1581,9 @@ impl<'src> Parser<'src> {
         self.parse_comma_separated_list(RecoveryContextKind::DictElements, |parser| {
             if parser.eat(TokenKind::DoubleStar) {
                 keys.push(None);
+
+                // Handle dictionary unpacking. Here, the grammar is `'**' bitwise_or`
+                // which requires limiting the expression.
                 values.push(parser.parse_expression_with_bitwise_or_precedence().expr);
             } else {
                 let key = parser.parse_conditional_expression_or_higher();
@@ -1682,25 +1681,21 @@ impl<'src> Parser<'src> {
 
     /// Helper function to validate the comprehension iter and `if` expressions.
     fn validate_comprehension_iter_and_if_expr(&mut self, parsed_expr: &ParsedExpr) {
-        let ParsedExpr {
-            expr,
-            is_parenthesized,
-        } = parsed_expr;
-
-        if *is_parenthesized {
+        if parsed_expr.is_parenthesized {
+            // Parentheses resets the precedence, so we don't need to validate it.
             return;
         }
 
-        match expr {
+        match parsed_expr.expr {
             Expr::Starred(_) => {
-                self.add_error(ParseErrorType::StarredExpressionUsage, expr);
+                self.add_error(ParseErrorType::StarredExpressionUsage, parsed_expr);
             }
             Expr::Yield(_) | Expr::YieldFrom(_) => {
                 self.add_error(
                     ParseErrorType::OtherError(
                         "unparenthesized yield expression cannot be used here".to_string(),
                     ),
-                    expr,
+                    parsed_expr,
                 );
             }
             Expr::Lambda(_) => {
@@ -1708,7 +1703,7 @@ impl<'src> Parser<'src> {
                     ParseErrorType::OtherError(
                         "unparenthesized lambda expression cannot be used here".to_string(),
                     ),
-                    expr,
+                    parsed_expr,
                 );
             }
             _ => {}
@@ -1821,16 +1816,20 @@ impl<'src> Parser<'src> {
 
     /// Parses a starred expression with the given precedence.
     ///
-    /// If the precedence is bitwise or, the expression is parsed using the `bitwise_or`
-    /// rule. Otherwise, it's parsed using the `expression` rule. Refer to the
-    /// [Python grammar] for more information.
+    /// The expression is parsed with the highest precedence. If the precedence
+    /// of the parsed expression is lower than the given precedence, an error
+    /// is reported.
+    ///
+    /// For example, if the given precedence is [`StarredExpressionPrecedence::BitOr`],
+    /// the comparison expression is not allowed.
+    ///
+    /// Refer to the [Python grammar] for more information.
     ///
     /// # Panics
     ///
     /// If the parser isn't positioned at a `*` token.
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    #[allow(dead_code)]
     fn parse_starred_expression(
         &mut self,
         precedence: StarredExpressionPrecedence,
@@ -1839,11 +1838,11 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Star);
 
         let parsed_expr = match precedence {
-            StarredExpressionPrecedence::BitOr => {
-                self.parse_expression_with_bitwise_or_precedence()
-            }
             StarredExpressionPrecedence::Conditional => {
                 self.parse_conditional_expression_or_higher()
+            }
+            StarredExpressionPrecedence::BitOr => {
+                self.parse_expression_with_bitwise_or_precedence()
             }
         };
 

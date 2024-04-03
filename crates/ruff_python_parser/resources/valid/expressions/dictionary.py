@@ -31,6 +31,8 @@
 {"a": "b", **c, "d": "e"}
 {1: 2, **{'nested': 'dict'}}
 {x * 1: y ** 2, **call()}
+# Here, `not` isn't allowed but parentheses resets the precedence
+{**(not x)}
 
 # Random expressions
 {1: x if True else y}

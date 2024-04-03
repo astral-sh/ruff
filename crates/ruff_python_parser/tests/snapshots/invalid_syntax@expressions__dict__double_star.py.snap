@@ -50,57 +50,57 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 136..161,
-                    value: If(
-                        ExprIf {
-                            range: 136..161,
-                            test: BooleanLiteral(
-                                ExprBooleanLiteral {
-                                    range: 150..154,
-                                    value: true,
-                                },
-                            ),
-                            body: Dict(
-                                ExprDict {
-                                    range: 136..146,
-                                    keys: [
-                                        Some(
-                                            Name(
-                                                ExprName {
-                                                    range: 137..138,
-                                                    id: "a",
-                                                    ctx: Load,
-                                                },
-                                            ),
+                    range: 136..162,
+                    value: Dict(
+                        ExprDict {
+                            range: 136..162,
+                            keys: [
+                                Some(
+                                    Name(
+                                        ExprName {
+                                            range: 137..138,
+                                            id: "a",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                None,
+                            ],
+                            values: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 140..141,
+                                        value: Int(
+                                            1,
                                         ),
-                                        None,
-                                    ],
-                                    values: [
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                range: 140..141,
-                                                value: Int(
-                                                    1,
-                                                ),
+                                    },
+                                ),
+                                If(
+                                    ExprIf {
+                                        range: 145..161,
+                                        test: BooleanLiteral(
+                                            ExprBooleanLiteral {
+                                                range: 150..154,
+                                                value: true,
                                             },
                                         ),
-                                        Name(
+                                        body: Name(
                                             ExprName {
                                                 range: 145..146,
                                                 id: "x",
                                                 ctx: Load,
                                             },
                                         ),
-                                    ],
-                                },
-                            ),
-                            orelse: Name(
-                                ExprName {
-                                    range: 160..161,
-                                    id: "y",
-                                    ctx: Load,
-                                },
-                            ),
+                                        orelse: Name(
+                                            ExprName {
+                                                range: 160..161,
+                                                id: "y",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
                         },
                     ),
                 },
@@ -189,15 +189,6 @@ Module(
                                     ),
                                 ),
                                 None,
-                                Some(
-                                    Name(
-                                        ExprName {
-                                            range: 199..200,
-                                            id: "y",
-                                            ctx: Load,
-                                        },
-                                    ),
-                                ),
                             ],
                             values: [
                                 NumberLiteral(
@@ -208,18 +199,26 @@ Module(
                                         ),
                                     },
                                 ),
-                                Name(
-                                    ExprName {
-                                        range: 194..195,
-                                        id: "x",
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 200..200,
-                                        id: "",
-                                        ctx: Invalid,
+                                BoolOp(
+                                    ExprBoolOp {
+                                        range: 194..200,
+                                        op: Or,
+                                        values: [
+                                            Name(
+                                                ExprName {
+                                                    range: 194..195,
+                                                    id: "x",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 199..200,
+                                                    id: "y",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
                                     },
                                 ),
                             ],
@@ -238,15 +237,6 @@ Module(
                                 Some(
                                     Name(
                                         ExprName {
-                                            range: 211..212,
-                                            id: "y",
-                                            ctx: Load,
-                                        },
-                                    ),
-                                ),
-                                Some(
-                                    Name(
-                                        ExprName {
                                             range: 214..215,
                                             id: "b",
                                             ctx: Load,
@@ -255,18 +245,26 @@ Module(
                                 ),
                             ],
                             values: [
-                                Name(
-                                    ExprName {
-                                        range: 205..206,
-                                        id: "x",
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 212..212,
-                                        id: "",
-                                        ctx: Invalid,
+                                BoolOp(
+                                    ExprBoolOp {
+                                        range: 205..212,
+                                        op: And,
+                                        values: [
+                                            Name(
+                                                ExprName {
+                                                    range: 205..206,
+                                                    id: "x",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 211..212,
+                                                    id: "y",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
                                     },
                                 ),
                                 NumberLiteral(
@@ -352,29 +350,30 @@ Module(
                             range: 242..252,
                             keys: [
                                 None,
-                                Some(
-                                    Name(
-                                        ExprName {
-                                            range: 250..251,
-                                            id: "y",
-                                            ctx: Load,
-                                        },
-                                    ),
-                                ),
                             ],
                             values: [
-                                Name(
-                                    ExprName {
-                                        range: 245..246,
-                                        id: "x",
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 251..251,
-                                        id: "",
-                                        ctx: Invalid,
+                                Compare(
+                                    ExprCompare {
+                                        range: 245..251,
+                                        left: Name(
+                                            ExprName {
+                                                range: 245..246,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ops: [
+                                            In,
+                                        ],
+                                        comparators: [
+                                            Name(
+                                                ExprName {
+                                                    range: 250..251,
+                                                    id: "y",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
                                     },
                                 ),
                             ],
@@ -390,35 +389,30 @@ Module(
                             range: 253..267,
                             keys: [
                                 None,
-                                Some(
-                                    UnaryOp(
-                                        ExprUnaryOp {
-                                            range: 258..264,
-                                            op: Not,
-                                            operand: Name(
+                            ],
+                            values: [
+                                Compare(
+                                    ExprCompare {
+                                        range: 256..266,
+                                        left: Name(
+                                            ExprName {
+                                                range: 256..257,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ops: [
+                                            NotIn,
+                                        ],
+                                        comparators: [
+                                            Name(
                                                 ExprName {
-                                                    range: 262..264,
-                                                    id: "in",
+                                                    range: 265..266,
+                                                    id: "y",
                                                     ctx: Load,
                                                 },
                                             ),
-                                        },
-                                    ),
-                                ),
-                            ],
-                            values: [
-                                Name(
-                                    ExprName {
-                                        range: 256..257,
-                                        id: "x",
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 265..266,
-                                        id: "y",
-                                        ctx: Load,
+                                        ],
                                     },
                                 ),
                             ],
@@ -434,29 +428,30 @@ Module(
                             range: 268..277,
                             keys: [
                                 None,
-                                Some(
-                                    Name(
-                                        ExprName {
-                                            range: 275..276,
-                                            id: "y",
-                                            ctx: Load,
-                                        },
-                                    ),
-                                ),
                             ],
                             values: [
-                                Name(
-                                    ExprName {
-                                        range: 271..272,
-                                        id: "x",
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 276..276,
-                                        id: "",
-                                        ctx: Invalid,
+                                Compare(
+                                    ExprCompare {
+                                        range: 271..276,
+                                        left: Name(
+                                            ExprName {
+                                                range: 271..272,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ops: [
+                                            Lt,
+                                        ],
+                                        comparators: [
+                                            Name(
+                                                ExprName {
+                                                    range: 275..276,
+                                                    id: "y",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
                                     },
                                 ),
                             ],
@@ -493,28 +488,9 @@ Module(
   |
 4 | {**x := 1}
 5 | {a: 1, **x if True else y}
-  |            ^^ Syntax Error: expected Comma, found If
+  |          ^^^^^^^^^^^^^^^^ Syntax Error: conditional expression cannot be used here
 6 | {**lambda x: x, b: 2}
 7 | {a: 1, **x or y}
-  |
-
-
-  |
-4 | {**x := 1}
-5 | {a: 1, **x if True else y}
-  |                          ^ Syntax Error: Expected a statement
-6 | {**lambda x: x, b: 2}
-7 | {a: 1, **x or y}
-  |
-
-
-  |
-4 | {**x := 1}
-5 | {a: 1, **x if True else y}
-  |                           ^ Syntax Error: Expected a statement
-6 | {**lambda x: x, b: 2}
-7 | {a: 1, **x or y}
-8 | {**x and y, b: 2}
   |
 
 
@@ -532,17 +508,7 @@ Module(
 5 | {a: 1, **x if True else y}
 6 | {**lambda x: x, b: 2}
 7 | {a: 1, **x or y}
-  |            ^^ Syntax Error: expected Comma, found Or
-8 | {**x and y, b: 2}
-9 | {a: 1, **not x, b: 2}
-  |
-
-
-  |
-5 | {a: 1, **x if True else y}
-6 | {**lambda x: x, b: 2}
-7 | {a: 1, **x or y}
-  |                ^ Syntax Error: expected Colon, found Rbrace
+  |          ^^^^^^ Syntax Error: boolean expression cannot be used here
 8 | {**x and y, b: 2}
 9 | {a: 1, **not x, b: 2}
   |
@@ -552,17 +518,7 @@ Module(
  6 | {**lambda x: x, b: 2}
  7 | {a: 1, **x or y}
  8 | {**x and y, b: 2}
-   |      ^^^ Syntax Error: expected Comma, found And
- 9 | {a: 1, **not x, b: 2}
-10 | {**x in y}
-   |
-
-
-   |
- 6 | {**lambda x: x, b: 2}
- 7 | {a: 1, **x or y}
- 8 | {**x and y, b: 2}
-   |           ^ Syntax Error: expected Colon, found Comma
+   |    ^^^^^^^ Syntax Error: boolean expression cannot be used here
  9 | {a: 1, **not x, b: 2}
 10 | {**x in y}
    |
@@ -572,7 +528,7 @@ Module(
  7 | {a: 1, **x or y}
  8 | {**x and y, b: 2}
  9 | {a: 1, **not x, b: 2}
-   |          ^^^^^ Syntax Error: unary `not` expression cannot be used here
+   |          ^^^^^ Syntax Error: boolean expression cannot be used here
 10 | {**x in y}
 11 | {**x not in y}
    |
@@ -582,17 +538,7 @@ Module(
  8 | {**x and y, b: 2}
  9 | {a: 1, **not x, b: 2}
 10 | {**x in y}
-   |      ^^ Syntax Error: Expected an expression or a '}'
-11 | {**x not in y}
-12 | {**x < y}
-   |
-
-
-   |
- 8 | {**x and y, b: 2}
- 9 | {a: 1, **not x, b: 2}
-10 | {**x in y}
-   |          ^ Syntax Error: expected Colon, found Rbrace
+   |    ^^^^^^ Syntax Error: comparison expression cannot be used here
 11 | {**x not in y}
 12 | {**x < y}
    |
@@ -602,25 +548,7 @@ Module(
  9 | {a: 1, **not x, b: 2}
 10 | {**x in y}
 11 | {**x not in y}
-   |      ^^^ Syntax Error: expected Comma, found Not
-12 | {**x < y}
-   |
-
-
-   |
- 9 | {a: 1, **not x, b: 2}
-10 | {**x in y}
-11 | {**x not in y}
-   |          ^^ Syntax Error: Expected an identifier, but found a keyword 'in' that cannot be used here
-12 | {**x < y}
-   |
-
-
-   |
- 9 | {a: 1, **not x, b: 2}
-10 | {**x in y}
-11 | {**x not in y}
-   |             ^ Syntax Error: expected Colon, found Name
+   |    ^^^^^^^^^^ Syntax Error: comparison expression cannot be used here
 12 | {**x < y}
    |
 
@@ -629,13 +557,5 @@ Module(
 10 | {**x in y}
 11 | {**x not in y}
 12 | {**x < y}
-   |      ^ Syntax Error: expected Comma, found Less
-   |
-
-
-   |
-10 | {**x in y}
-11 | {**x not in y}
-12 | {**x < y}
-   |         ^ Syntax Error: expected Colon, found Rbrace
+   |    ^^^^^ Syntax Error: comparison expression cannot be used here
    |

@@ -50,21 +50,31 @@ Module(
                             elts: [
                                 Starred(
                                     ExprStarred {
-                                        range: 94..96,
-                                        value: Name(
-                                            ExprName {
-                                                range: 95..96,
-                                                id: "x",
-                                                ctx: Load,
+                                        range: 94..101,
+                                        value: Compare(
+                                            ExprCompare {
+                                                range: 95..101,
+                                                left: Name(
+                                                    ExprName {
+                                                        range: 95..96,
+                                                        id: "x",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ops: [
+                                                    In,
+                                                ],
+                                                comparators: [
+                                                    Name(
+                                                        ExprName {
+                                                            range: 100..101,
+                                                            id: "y",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ],
                                             },
                                         ),
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 100..101,
-                                        id: "y",
                                         ctx: Load,
                                     },
                                 ),
@@ -127,21 +137,29 @@ Module(
                             elts: [
                                 Starred(
                                     ExprStarred {
-                                        range: 119..121,
-                                        value: Name(
-                                            ExprName {
-                                                range: 120..121,
-                                                id: "x",
-                                                ctx: Load,
+                                        range: 119..127,
+                                        value: BoolOp(
+                                            ExprBoolOp {
+                                                range: 120..127,
+                                                op: And,
+                                                values: [
+                                                    Name(
+                                                        ExprName {
+                                                            range: 120..121,
+                                                            id: "x",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    Name(
+                                                        ExprName {
+                                                            range: 126..127,
+                                                            id: "y",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ],
                                             },
                                         ),
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 126..127,
-                                        id: "y",
                                         ctx: Load,
                                     },
                                 ),
@@ -166,21 +184,29 @@ Module(
                             elts: [
                                 Starred(
                                     ExprStarred {
-                                        range: 133..135,
-                                        value: Name(
-                                            ExprName {
-                                                range: 134..135,
-                                                id: "x",
-                                                ctx: Load,
+                                        range: 133..140,
+                                        value: BoolOp(
+                                            ExprBoolOp {
+                                                range: 134..140,
+                                                op: Or,
+                                                values: [
+                                                    Name(
+                                                        ExprName {
+                                                            range: 134..135,
+                                                            id: "x",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    Name(
+                                                        ExprName {
+                                                            range: 139..140,
+                                                            id: "y",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ],
                                             },
                                         ),
-                                        ctx: Load,
-                                    },
-                                ),
-                                Name(
-                                    ExprName {
-                                        range: 139..140,
-                                        id: "y",
                                         ctx: Load,
                                     },
                                 ),
@@ -198,47 +224,40 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 145..166,
-                    value: Tuple(
-                        ExprTuple {
-                            range: 145..166,
+                    range: 145..167,
+                    value: Set(
+                        ExprSet {
+                            range: 145..167,
                             elts: [
-                                If(
-                                    ExprIf {
-                                        range: 145..163,
-                                        test: BooleanLiteral(
-                                            ExprBooleanLiteral {
-                                                range: 152..156,
-                                                value: true,
+                                Starred(
+                                    ExprStarred {
+                                        range: 146..163,
+                                        value: If(
+                                            ExprIf {
+                                                range: 147..163,
+                                                test: BooleanLiteral(
+                                                    ExprBooleanLiteral {
+                                                        range: 152..156,
+                                                        value: true,
+                                                    },
+                                                ),
+                                                body: Name(
+                                                    ExprName {
+                                                        range: 147..148,
+                                                        id: "x",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                orelse: Name(
+                                                    ExprName {
+                                                        range: 162..163,
+                                                        id: "y",
+                                                        ctx: Load,
+                                                    },
+                                                ),
                                             },
                                         ),
-                                        body: Set(
-                                            ExprSet {
-                                                range: 145..148,
-                                                elts: [
-                                                    Starred(
-                                                        ExprStarred {
-                                                            range: 146..148,
-                                                            value: Name(
-                                                                ExprName {
-                                                                    range: 147..148,
-                                                                    id: "x",
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                ],
-                                            },
-                                        ),
-                                        orelse: Name(
-                                            ExprName {
-                                                range: 162..163,
-                                                id: "y",
-                                                ctx: Load,
-                                            },
-                                        ),
+                                        ctx: Load,
                                     },
                                 ),
                                 Name(
@@ -249,8 +268,6 @@ Module(
                                     },
                                 ),
                             ],
-                            ctx: Load,
-                            parenthesized: false,
                         },
                     ),
                 },
@@ -374,7 +391,7 @@ Module(
   |
 3 | {(*x), y}
 4 | {*x in y, z}
-  |     ^^ Syntax Error: Expected an expression or a '}'
+  |   ^^^^^^ Syntax Error: comparison expression cannot be used here
 5 | {*not x, z}
 6 | {*x and y, z}
   |
@@ -384,7 +401,7 @@ Module(
 3 | {(*x), y}
 4 | {*x in y, z}
 5 | {*not x, z}
-  |   ^^^^^ Syntax Error: unary `not` expression cannot be used here
+  |   ^^^^^ Syntax Error: boolean expression cannot be used here
 6 | {*x and y, z}
 7 | {*x or y, z}
   |
@@ -394,7 +411,7 @@ Module(
 4 | {*x in y, z}
 5 | {*not x, z}
 6 | {*x and y, z}
-  |     ^^^ Syntax Error: expected Comma, found And
+  |   ^^^^^^^ Syntax Error: boolean expression cannot be used here
 7 | {*x or y, z}
 8 | {*x if True else y, z}
   |
@@ -404,7 +421,7 @@ Module(
 5 | {*not x, z}
 6 | {*x and y, z}
 7 | {*x or y, z}
-  |     ^^ Syntax Error: expected Comma, found Or
+  |   ^^^^^^ Syntax Error: boolean expression cannot be used here
 8 | {*x if True else y, z}
 9 | {*lambda x: x, z}
   |
@@ -414,27 +431,7 @@ Module(
  6 | {*x and y, z}
  7 | {*x or y, z}
  8 | {*x if True else y, z}
-   |     ^^ Syntax Error: Expected an expression or a '}'
- 9 | {*lambda x: x, z}
-10 | {*x := 2, z}
-   |
-
-
-   |
- 6 | {*x and y, z}
- 7 | {*x or y, z}
- 8 | {*x if True else y, z}
-   |                      ^ Syntax Error: Expected a statement
- 9 | {*lambda x: x, z}
-10 | {*x := 2, z}
-   |
-
-
-   |
- 6 | {*x and y, z}
- 7 | {*x or y, z}
- 8 | {*x if True else y, z}
-   |                       ^ Syntax Error: Expected a statement
+   |   ^^^^^^^^^^^^^^^^ Syntax Error: conditional expression cannot be used here
  9 | {*lambda x: x, z}
 10 | {*x := 2, z}
    |
