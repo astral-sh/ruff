@@ -110,7 +110,9 @@ pub enum ParseErrorType {
     /// A parameter was found after a vararg
     ParamFollowsVarKeywordParam,
     /// A positional argument follows a keyword argument.
-    PositionalArgumentError,
+    PositionalFollowsKeywordArgument,
+    /// A positional argument follows a keyword argument unpacking.
+    PositionalFollowsKeywordUnpacking,
     /// An iterable argument unpacking `*args` follows keyword argument unpacking `**kwargs`.
     UnpackedArgumentError,
     /// A non-default argument follows a default argument.
@@ -193,7 +195,10 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::StarredExpressionUsage => {
                 write!(f, "starred expression cannot be used here")
             }
-            ParseErrorType::PositionalArgumentError => {
+            ParseErrorType::PositionalFollowsKeywordArgument => {
+                write!(f, "positional argument follows keyword argument")
+            }
+            ParseErrorType::PositionalFollowsKeywordUnpacking => {
                 write!(f, "positional argument follows keyword argument unpacking")
             }
             ParseErrorType::EmptySlice => write!(f, "slice cannot be empty"),
