@@ -14,7 +14,7 @@ use crate::string::{parse_fstring_literal_element, parse_string_literal, StringT
 use crate::token_set::TokenSet;
 use crate::{FStringErrorType, Mode, ParseErrorType, Tok, TokenKind};
 
-use super::{RecoveryContextKind, TupleParenthesized};
+use super::{Parenthesized, RecoveryContextKind};
 
 /// Tokens that can appear after an expression.
 pub(super) const END_EXPR_SET: TokenSet = TokenSet::new([
@@ -91,7 +91,7 @@ impl<'src> Parser<'src> {
             Expr::Tuple(self.parse_tuple_expression(
                 parsed_expr.expr,
                 start,
-                TupleParenthesized::No,
+                Parenthesized::No,
                 Parser::parse_conditional_expression_or_higher,
             ))
             .into()
@@ -113,7 +113,7 @@ impl<'src> Parser<'src> {
             Expr::Tuple(self.parse_tuple_expression(
                 parsed_expr.expr,
                 start,
-                TupleParenthesized::No,
+                Parenthesized::No,
                 |parser| parser.parse_star_expression_or_higher(AllowNamedExpression::No),
             ))
             .into()
@@ -1728,7 +1728,7 @@ impl<'src> Parser<'src> {
                 let tuple = self.parse_tuple_expression(
                     parsed_expr.expr,
                     start,
-                    TupleParenthesized::Yes,
+                    Parenthesized::Yes,
                     |parser| parser.parse_star_expression_or_higher(AllowNamedExpression::Yes),
                 );
 
@@ -1777,7 +1777,7 @@ impl<'src> Parser<'src> {
         &mut self,
         first_element: Expr,
         start: TextSize,
-        parenthesized: TupleParenthesized,
+        parenthesized: Parenthesized,
         mut parse_func: impl FnMut(&mut Parser<'src>) -> ParsedExpr,
     ) -> ast::ExprTuple {
         // TODO(dhruvmanila): Can we remove `parse_func` and use `parenthesized` to
