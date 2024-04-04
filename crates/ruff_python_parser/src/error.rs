@@ -98,6 +98,8 @@ pub enum ParseErrorType {
     EmptyGlobalNames,
     /// An empty nonlocal names list was found during parsing, e.g `nonlocal`.
     EmptyNonlocalNames,
+    /// An empty delete targets list was found during parsing, e.g `del`.
+    EmptyDeleteTargets,
 
     /// An unparenthesized named expression was found where it is not allowed.
     UnparenthesizedNamedExpression,
@@ -219,6 +221,9 @@ impl std::fmt::Display for ParseErrorType {
             }
             ParseErrorType::EmptyNonlocalNames => {
                 f.write_str("`nonlocal` statement must have at least one name")
+            }
+            ParseErrorType::EmptyDeleteTargets => {
+                f.write_str("`del` statement must have at least one target")
             }
             ParseErrorType::ParamFollowsVarKeywordParam => {
                 write!(f, "parameters cannot follow var-keyword parameter")
