@@ -1489,7 +1489,8 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::FUTURE_TYPE_DEFINITION)
     }
 
-    /// Return `true` if the model is in any kind of deferred type definition.
+    /// Return `true` if the model is visiting any kind of type definition
+    /// that was previously deferred when initially traversing the AST
     pub const fn in_deferred_type_definition(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::DEFERRED_TYPE_DEFINITION)
@@ -1601,6 +1602,20 @@ impl<'a> SemanticModel<'a> {
     pub const fn in_dunder_all_definition(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::DUNDER_ALL_DEFINITION)
+    }
+
+    /// Return `true` if the model is visiting an item in a class's bases tuple
+    /// (e.g. `Foo` in `class Bar(Foo): ...`)
+    pub const fn in_class_base(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::CLASS_BASE)
+    }
+
+    /// Return `true` if the model is visiting an item in a class's bases tuple
+    /// that was initially deferred while traversing the AST.
+    /// (This only happens in stub files.)
+    pub const fn in_deferred_class_base(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::DEFERRED_CLASS_BASE)
     }
 
     /// Return an iterator over all bindings shadowed by the given [`BindingId`], within the
@@ -1977,6 +1992,20 @@ bitflags! {
         /// f"first {x} second {y}"
         /// ```
         const F_STRING_REPLACEMENT_FIELD = 1 << 23;
+
+        /// The model is visiting the bases tuple of a class.
+        ///
+        /// For example, the model could be visiting `Foo` or `Bar` in:
+        ///
+        /// ```python
+        /// class Baz(Foo, Bar):
+        ///     pass
+        /// ```
+        const CLASS_BASE = 1 << 24;
+
+        /// The model is visiting a class base that was initially deferred
+        /// while traversing the AST. (This only happens in stub files.)
+        const DEFERRED_CLASS_BASE = 1 << 25;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();

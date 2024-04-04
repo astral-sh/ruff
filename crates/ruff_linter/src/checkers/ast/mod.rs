@@ -712,7 +712,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 if let Some(arguments) = arguments {
+                    self.semantic.flags |= SemanticModelFlags::CLASS_BASE;
                     self.visit_arguments(arguments);
+                    self.semantic.flags -= SemanticModelFlags::CLASS_BASE;
                 }
 
                 let definition = docstrings::extraction::extract_definition(
@@ -935,6 +937,16 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         // Step 0: Pre-processing
+        if self.source_type.is_stub()
+            && self.semantic.in_class_base()
+            && !self.semantic.in_deferred_class_base()
+        {
+            self.visit
+                .class_bases
+                .push((expr, self.semantic.snapshot()));
+            return;
+        }
+
         if !self.semantic.in_typing_literal()
             && !self.semantic.in_deferred_type_definition()
             && self.semantic.in_type_definition()
@@ -1965,6 +1977,22 @@ impl<'a> Checker<'a> {
         scope.add(id, binding_id);
     }
 
+    fn visit_deferred_class_bases(&mut self) {
+        let snapshot = self.semantic.snapshot();
+        let deferred_bases = std::mem::take(&mut self.visit.class_bases);
+        debug_assert!(
+            self.source_type.is_stub() || deferred_bases.is_empty(),
+            "Class bases should never be deferred outside of stub files"
+        );
+        for (expr, snapshot) in deferred_bases {
+            self.semantic.restore(snapshot);
+            // Set this flag to avoid infinite recursion, or we'll just defer it again:
+            self.semantic.flags |= SemanticModelFlags::DEFERRED_CLASS_BASE;
+            self.visit_expr(expr);
+        }
+        self.semantic.restore(snapshot);
+    }
+
     fn visit_deferred_future_type_definitions(&mut self) {
         let snapshot = self.semantic.snapshot();
         while !self.visit.future_type_definitions.is_empty() {
@@ -2097,6 +2125,7 @@ impl<'a> Checker<'a> {
     /// annotations.
     fn visit_deferred(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
         while !self.visit.is_empty() {
+            self.visit_deferred_class_bases();
             self.visit_deferred_functions();
             self.visit_deferred_type_param_definitions();
             self.visit_deferred_lambdas();
