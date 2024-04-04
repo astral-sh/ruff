@@ -128,7 +128,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pylint::rules::potential_index_error(checker, value, slice);
             }
             if checker.enabled(Rule::SortedMinMax) {
-                refurb::rules::sorted_min_max(checker, expr);
+                refurb::rules::sorted_min_max(checker, subscript);
             }
 
             pandas_vet::rules::subscript(checker, value, expr);
