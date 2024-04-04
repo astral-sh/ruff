@@ -91,8 +91,14 @@ impl std::fmt::Display for FStringErrorType {
 pub enum ParseErrorType {
     /// An unexpected error occurred.
     OtherError(String),
+
     /// An empty slice was found during parsing, e.g `l[]`.
     EmptySlice,
+    /// An empty global names list was found during parsing, e.g `global`.
+    EmptyGlobalNames,
+    /// An empty nonlocal names list was found during parsing, e.g `nonlocal`.
+    EmptyNonlocalNames,
+
     /// An invalid expression was found in the assignment `target`.
     InvalidAssignmentTarget,
     /// An invalid expression was found in the named assignment `target`.
@@ -202,6 +208,12 @@ impl std::fmt::Display for ParseErrorType {
                 write!(f, "positional argument follows keyword argument unpacking")
             }
             ParseErrorType::EmptySlice => write!(f, "slice cannot be empty"),
+            ParseErrorType::EmptyGlobalNames => {
+                f.write_str("`global` statement must have at least one name")
+            }
+            ParseErrorType::EmptyNonlocalNames => {
+                f.write_str("`nonlocal` statement must have at least one name")
+            }
             ParseErrorType::ParamFollowsVarKeywordParam => {
                 write!(f, "parameters cannot follow var-keyword parameter")
             }

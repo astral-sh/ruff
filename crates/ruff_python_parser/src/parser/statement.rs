@@ -418,6 +418,12 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a `pass` statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `pass` token.
+    ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-pass_stmt>
     fn parse_pass_statement(&mut self) -> ast::StmtPass {
         let start = self.node_start();
@@ -427,6 +433,12 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a `continue` statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `continue` token.
+    ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-continue_stmt>
     fn parse_continue_statement(&mut self) -> ast::StmtContinue {
         let start = self.node_start();
@@ -436,6 +448,12 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a `break` statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `break` token.
+    ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-break_stmt>
     fn parse_break_statement(&mut self) -> ast::StmtBreak {
         let start = self.node_start();
@@ -474,11 +492,27 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Global);
 
+        // test_err global_stmt_trailing_comma
+        // global ,
+        // global x,
+        // global x, y,
+
+        // test_err global_stmt_expression
+        // global x + 1
         let names = self.parse_comma_separated_list_into_vec(
             RecoveryContextKind::Identifiers,
             Parser::parse_identifier,
         );
 
+        if names.is_empty() {
+            // test_err global_stmt_empty
+            // global
+            self.add_error(ParseErrorType::EmptyGlobalNames, self.current_token_range());
+        }
+
+        // test global_stmt
+        // global x
+        // global x, y, z
         ast::StmtGlobal {
             range: self.node_range(start),
             names,
@@ -496,11 +530,30 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Nonlocal);
 
+        // test_err nonlocal_stmt_trailing_comma
+        // nonlocal ,
+        // nonlocal x,
+        // nonlocal x, y,
+
+        // test_err nonlocal_stmt_expression
+        // nonlocal x + 1
         let names = self.parse_comma_separated_list_into_vec(
             RecoveryContextKind::Identifiers,
             Parser::parse_identifier,
         );
 
+        if names.is_empty() {
+            // test_err nonlocal_stmt_empty
+            // nonlocal
+            self.add_error(
+                ParseErrorType::EmptyNonlocalNames,
+                self.current_token_range(),
+            );
+        }
+
+        // test nonlocal_stmt
+        // nonlocal x
+        // nonlocal x, y, z
         ast::StmtNonlocal {
             range: self.node_range(start),
             names,
