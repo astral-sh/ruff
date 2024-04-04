@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crate::edit::DocumentVersion;
 use crate::server;
 use crate::server::api::LSPResult;
 use crate::server::client;
@@ -22,8 +21,6 @@ pub(crate) struct ExecuteCommand;
 #[derive(Deserialize)]
 struct TextDocumentArgument {
     uri: types::Url,
-    #[allow(dead_code)] // needed for deserialization
-    version: DocumentVersion,
 }
 
 impl super::RequestHandler for ExecuteCommand {
