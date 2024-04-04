@@ -100,6 +100,8 @@ pub enum ParseErrorType {
     EmptyNonlocalNames,
     /// An empty delete targets list was found during parsing, e.g `del`.
     EmptyDeleteTargets,
+    /// An empty import names list was found during parsing, e.g., `import`.
+    EmptyImportNames,
 
     /// An unparenthesized named expression was found where it is not allowed.
     UnparenthesizedNamedExpression,
@@ -224,6 +226,9 @@ impl std::fmt::Display for ParseErrorType {
             }
             ParseErrorType::EmptyDeleteTargets => {
                 f.write_str("`del` statement must have at least one target")
+            }
+            ParseErrorType::EmptyImportNames => {
+                f.write_str("Expected one or more symbol names after import")
             }
             ParseErrorType::ParamFollowsVarKeywordParam => {
                 write!(f, "parameters cannot follow var-keyword parameter")
