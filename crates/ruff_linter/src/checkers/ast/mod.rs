@@ -32,8 +32,8 @@ use itertools::Itertools;
 use log::debug;
 use ruff_python_ast::{
     self as ast, all::DunderAllName, Comprehension, ElifElseClause, ExceptHandler, Expr,
-    ExprContext, Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt,
-    Suite, UnaryOp,
+    ExprContext, FStringElement, Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters,
+    Pattern, Stmt, Suite, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -1579,6 +1579,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 .type_param_definitions
                 .push((bound, self.semantic.snapshot()));
         }
+    }
+
+    fn visit_f_string_element(&mut self, f_string_element: &'a FStringElement) {
+        let snapshot = self.semantic.flags;
+        if f_string_element.is_expression() {
+            self.semantic.flags |= SemanticModelFlags::F_STRING_REPLACEMENT_FIELD;
+        }
+        visitor::walk_f_string_element(self, f_string_element);
+        self.semantic.flags = snapshot;
     }
 }
 

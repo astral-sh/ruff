@@ -449,13 +449,8 @@ pub(crate) fn check_string_quotes(checker: &mut Checker, string_like: StringLike
         return;
     }
 
-    // If the string is part of a f-string, ignore it.
-    if checker
-        .indexer()
-        .fstring_ranges()
-        .outermost(string_like.start())
-        .is_some_and(|outer| outer.start() < string_like.start() && string_like.end() < outer.end())
-    {
+    // TODO(dhruvmanila): Support checking for escaped quotes in f-strings.
+    if checker.semantic().in_f_string_replacement_field() {
         return;
     }
 
