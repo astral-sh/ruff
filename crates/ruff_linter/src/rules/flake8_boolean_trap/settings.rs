@@ -6,7 +6,7 @@ use ruff_macros::CacheKey;
 
 use crate::display_settings;
 
-#[derive(Debug, CacheKey, Default)]
+#[derive(Debug, Clone, CacheKey, Default)]
 pub struct Settings {
     pub extend_allowed_calls: Vec<String>,
 }

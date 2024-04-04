@@ -7,6 +7,7 @@ use crate::session::DocumentSnapshot;
 use crate::PositionEncoding;
 use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
+use ruff_linter::codes::Rule;
 use ruff_linter::settings::LinterSettings;
 
 pub(crate) struct CodeActionResolve;
@@ -47,9 +48,15 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
                 )
                 .with_failure_code(ErrorCode::InternalError)?,
             ),
-            SupportedCodeAction::SourceOrganizeImports => {
-                todo!("Support `source.organizeImports`")
-            }
+            SupportedCodeAction::SourceOrganizeImports => Some(
+                resolve_edit_for_organize_imports(
+                    document,
+                    snapshot.url(),
+                    &snapshot.configuration().linter,
+                    snapshot.encoding(),
+                )
+                .with_failure_code(ErrorCode::InternalError)?,
+            ),
             SupportedCodeAction::QuickFix => {
                 return Err(anyhow::anyhow!(
                     "Got a code action that should not need additional resolution: {action_kind:?}"
@@ -73,6 +80,33 @@ pub(super) fn resolve_edit_for_fix_all(
             [(
                 url.clone(),
                 crate::fix::fix_all(document, linter_settings, encoding)?,
+            )]
+            .into_iter()
+            .collect(),
+        ),
+        ..Default::default()
+    })
+}
+
+pub(super) fn resolve_edit_for_organize_imports(
+    document: &crate::edit::Document,
+    url: &types::Url,
+    linter_settings: &ruff_linter::settings::LinterSettings,
+    encoding: PositionEncoding,
+) -> crate::Result<types::WorkspaceEdit> {
+    let mut linter_settings = linter_settings.clone();
+    linter_settings.rules = [
+        Rule::UnsortedImports,       // I001
+        Rule::MissingRequiredImport, // I002
+    ]
+    .into_iter()
+    .collect();
+
+    Ok(types::WorkspaceEdit {
+        changes: Some(
+            [(
+                url.clone(),
+                crate::fix::fix_all(document, &linter_settings, encoding)?,
             )]
             .into_iter()
             .collect(),
