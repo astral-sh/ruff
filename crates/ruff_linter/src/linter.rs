@@ -2,10 +2,11 @@ use std::borrow::Cow;
 use std::ops::Deref;
 use std::path::Path;
 
+use anstream::eprintln;
 use anyhow::{anyhow, Result};
-use colored::Colorize;
 use itertools::Itertools;
 use log::error;
+use owo_colors::OwoColorize;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;

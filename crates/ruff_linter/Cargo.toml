@@ -30,11 +30,11 @@ ruff_text_size = { path = "../ruff_text_size" }
 
 aho-corasick = { workspace = true }
 annotate-snippets = { workspace = true, features = ["color"] }
+anstream = { workspace = true }
 anyhow = { workspace = true }
 bitflags = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive", "string"], optional = true }
-colored = { workspace = true }
 fern = { workspace = true }
 glob = { workspace = true }
 globset = { workspace = true }
@@ -47,6 +47,7 @@ log = { workspace = true }
 memchr = { workspace = true }
 natord = { workspace = true }
 once_cell = { workspace = true }
+owo-colors = { workspace = true }
 path-absolutize = { workspace = true, features = [
   "once_cell_cache",
   "use_unix_paths_on_wasm",
@@ -75,8 +76,6 @@ url = { workspace = true }
 [dev-dependencies]
 insta = { workspace = true }
 test-case = { workspace = true }
-# Disable colored output in tests
-colored = { workspace = true, features = ["no-color"] }
 
 [features]
 default = []

@@ -5,8 +5,8 @@ use std::io::Write;
 
 use anyhow::Result;
 use bitflags::bitflags;
-use colored::Colorize;
 use itertools::{iterate, Itertools};
+use owo_colors::OwoColorize;
 use serde::Serialize;
 
 use ruff_linter::fs::relativize_path;

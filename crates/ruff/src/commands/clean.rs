@@ -2,7 +2,7 @@ use std::fs::remove_dir_all;
 use std::io::{self, BufWriter, Write};
 
 use anyhow::Result;
-use colored::Colorize;
+use owo_colors::OwoColorize;
 use path_absolutize::path_dedot;
 use walkdir::WalkDir;
 

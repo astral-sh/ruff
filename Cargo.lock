@@ -1561,6 +1561,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
+name = "owo-colors"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "caff54706df99d2a78a5a4e3455ff45448d81ef1bb63c22cd14052ca0e993a3f"
+
+[[package]]
 name = "parking_lot"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1997,6 +2003,7 @@ dependencies = [
 name = "ruff"
 version = "0.3.5"
 dependencies = [
+ "anstream",
  "anyhow",
  "argfile",
  "bincode",
@@ -2006,7 +2013,6 @@ dependencies = [
  "clap",
  "clap_complete_command",
  "clearscreen",
- "colored",
  "filetime",
  "ignore",
  "insta",
@@ -2017,6 +2023,7 @@ dependencies = [
  "mimalloc",
  "notify",
  "num_cpus",
+ "owo-colors",
  "path-absolutize",
  "rayon",
  "regex",
@@ -2161,11 +2168,11 @@ version = "0.3.5"
 dependencies = [
  "aho-corasick",
  "annotate-snippets 0.9.2",
+ "anstream",
  "anyhow",
  "bitflags 2.5.0",
  "chrono",
  "clap",
- "colored",
  "fern",
  "glob",
  "globset",
@@ -2179,6 +2186,7 @@ dependencies = [
  "memchr",
  "natord",
  "once_cell",
+ "owo-colors",
  "path-absolutize",
  "pathdiff",
  "pep440_rs 0.5.0",
@@ -2493,7 +2501,6 @@ name = "ruff_workspace"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "colored",
  "dirs 5.0.1",
  "glob",
  "globset",
@@ -2501,6 +2508,7 @@ dependencies = [
  "is-macro",
  "itertools 0.12.1",
  "log",
+ "owo-colors",
  "path-absolutize",
  "pep440_rs 0.5.0",
  "regex",

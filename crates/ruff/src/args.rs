@@ -8,7 +8,7 @@ use std::sync::Arc;
 use anyhow::bail;
 use clap::builder::{TypedValueParser, ValueParserFactory};
 use clap::{command, Parser};
-use colored::Colorize;
+use owo_colors::OwoColorize;
 use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashMap;
@@ -1053,7 +1053,6 @@ pub enum FormatRangeParseError {
 
 impl std::fmt::Display for FormatRangeParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let tip = "  tip:".bold().green();
         match self {
             FormatRangeParseError::StartGreaterThanEnd(start, end) => {
                 write!(
@@ -1062,7 +1061,8 @@ impl std::fmt::Display for FormatRangeParseError {
                     start_invalid=start.to_string().bold().yellow(),
                     end_invalid=end.to_string().bold().yellow(),
                     start=start.to_string().green().bold(),
-                    end=end.to_string().green().bold()
+                    end=end.to_string().green().bold(),
+                    tip="  tip:".bold().green()
                 )
             }
             FormatRangeParseError::InvalidStart(inner) => inner.write(f, true),
@@ -1148,7 +1148,8 @@ pub enum LineColumnParseError {
 
 impl LineColumnParseError {
     fn write(&self, f: &mut std::fmt::Formatter, start_range: bool) -> std::fmt::Result {
-        let tip = "tip:".bold().green();
+        let tip = "tip:".bold();
+        let tip = tip.green();
 
         let range = if start_range { "start" } else { "end" };
 

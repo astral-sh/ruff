@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 use std::io::Write;
 use std::num::NonZeroUsize;
 
-use colored::Colorize;
+use owo_colors::OwoColorize;
 
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;

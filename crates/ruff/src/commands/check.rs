@@ -4,9 +4,9 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::Result;
-use colored::Colorize;
 use ignore::Error;
 use log::{debug, error, warn};
+use owo_colors::OwoColorize;
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
@@ -226,6 +226,7 @@ mod test {
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
+    use ruff_linter::colors;
     use ruff_linter::message::{Emitter, EmitterContext, TextEmitter};
     use ruff_linter::registry::Rule;
     use ruff_linter::settings::types::UnsafeFixes;
@@ -280,7 +281,7 @@ mod test {
             UnsafeFixes::Enabled,
         )
         .unwrap();
-        let mut output = Vec::new();
+        let mut output = colors::none(Vec::new());
 
         TextEmitter::default()
             .with_show_fix_status(true)
@@ -291,7 +292,7 @@ mod test {
             )
             .unwrap();
 
-        let messages = String::from_utf8(output).unwrap();
+        let messages = String::from_utf8(output.into_inner()).unwrap();
 
         insta::with_settings!({
             omit_expression => true,

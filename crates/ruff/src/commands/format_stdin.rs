@@ -4,6 +4,7 @@ use std::path::Path;
 use anyhow::Result;
 use log::error;
 
+use ruff_linter::colors;
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{match_exclusion, python_file_at_path, Resolver};
@@ -111,7 +112,7 @@ fn format_source_code(
     match &formatted {
         FormattedSource::Formatted(formatted) => match mode {
             FormatMode::Write => {
-                let mut writer = stdout().lock();
+                let mut writer = colors::auto(stdout()).lock();
                 formatted
                     .write(&mut writer)
                     .map_err(|err| FormatCommandError::Write(path.map(Path::to_path_buf), err))?;
@@ -120,7 +121,7 @@ fn format_source_code(
             FormatMode::Diff => {
                 use std::io::Write;
                 write!(
-                    &mut stdout().lock(),
+                    &mut colors::auto(stdout()).lock(),
                     "{}",
                     source_kind.diff(formatted, path).unwrap()
                 )
@@ -130,7 +131,7 @@ fn format_source_code(
         FormattedSource::Unchanged => {
             // Write to stdout regardless of whether the source was formatted
             if mode.is_write() {
-                let mut writer = stdout().lock();
+                let mut writer = colors::auto(stdout()).lock();
                 source_kind
                     .write(&mut writer)
                     .map_err(|err| FormatCommandError::Write(path.map(Path::to_path_buf), err))?;

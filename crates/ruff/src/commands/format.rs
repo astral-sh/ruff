@@ -6,9 +6,9 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::Result;
-use colored::Colorize;
 use itertools::Itertools;
 use log::{error, warn};
+use owo_colors::OwoColorize;
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rustc_hash::FxHashSet;
@@ -16,6 +16,7 @@ use thiserror::Error;
 use tracing::debug;
 
 use ruff_diagnostics::SourceMap;
+use ruff_linter::colors;
 use ruff_linter::fs;
 use ruff_linter::logging::{DisplayParseError, LogLevel};
 use ruff_linter::registry::Rule;
@@ -189,10 +190,10 @@ pub(crate) fn format(
     match mode {
         FormatMode::Write => {}
         FormatMode::Check => {
-            results.write_changed(&mut stdout().lock())?;
+            results.write_changed(&mut colors::auto(stdout()).lock())?;
         }
         FormatMode::Diff => {
-            results.write_diff(&mut stdout().lock())?;
+            results.write_diff(&mut colors::auto(stdout()).lock())?;
         }
     }
 
@@ -200,9 +201,9 @@ pub(crate) fn format(
     if config_arguments.log_level >= LogLevel::Default {
         if mode.is_diff() {
             // Allow piping the diff to e.g. a file by writing the summary to stderr
-            results.write_summary(&mut stderr().lock())?;
+            results.write_summary(&mut colors::auto(stderr()).lock())?;
         } else {
-            results.write_summary(&mut stdout().lock())?;
+            results.write_summary(&mut colors::auto(stdout()).lock())?;
         }
     }
 

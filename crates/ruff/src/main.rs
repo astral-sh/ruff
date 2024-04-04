@@ -1,7 +1,8 @@
 use std::process::ExitCode;
 
+use anstream::eprintln;
 use clap::{Parser, Subcommand};
-use colored::Colorize;
+use owo_colors::OwoColorize;
 
 use ruff::args::{Args, Command};
 use ruff::{run, ExitStatus};

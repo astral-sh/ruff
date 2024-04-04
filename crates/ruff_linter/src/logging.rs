@@ -3,15 +3,16 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use anyhow::Result;
-use colored::Colorize;
 use fern;
 use log::Level;
 use once_cell::sync::Lazy;
+use owo_colors::OwoColorize;
 use ruff_python_parser::{ParseError, ParseErrorType};
 use rustc_hash::FxHashSet;
 
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode, SourceLocation};
 
+use crate::colors;
 use crate::fs;
 use crate::source_kind::SourceKind;
 use ruff_notebook::Notebook;
@@ -22,7 +23,7 @@ pub static IDENTIFIERS: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(Mutex::defaul
 #[macro_export]
 macro_rules! warn_user_once_by_id {
     ($id:expr, $($arg:tt)*) => {
-        use colored::Colorize;
+        use owo_colors::OwoColorize;
         use log::warn;
 
         if let Ok(mut states) = $crate::logging::IDENTIFIERS.lock() {
@@ -42,7 +43,7 @@ pub static MESSAGES: Lazy<Mutex<FxHashSet<String>>> = Lazy::new(Mutex::default);
 #[macro_export]
 macro_rules! warn_user_once_by_message {
     ($($arg:tt)*) => {
-        use colored::Colorize;
+        use owo_colors::OwoColorize;
         use log::warn;
 
         if let Ok(mut states) = $crate::logging::MESSAGES.lock() {
@@ -59,7 +60,7 @@ macro_rules! warn_user_once_by_message {
 #[macro_export]
 macro_rules! warn_user_once {
     ($($arg:tt)*) => {
-        use colored::Colorize;
+        use owo_colors::OwoColorize;
         use log::warn;
 
         static WARNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -73,7 +74,7 @@ macro_rules! warn_user_once {
 #[macro_export]
 macro_rules! warn_user {
     ($($arg:tt)*) => {{
-        use colored::Colorize;
+        use owo_colors::OwoColorize;
         use log::warn;
 
         let message = format!("{}", format_args!($($arg)*));
@@ -152,7 +153,10 @@ pub fn set_up_logging(level: LogLevel) -> Result<()> {
         })
         .level(level.level_filter())
         .level_for("globset", log::LevelFilter::Warn)
-        .chain(std::io::stderr())
+        .chain(fern::Output::writer(
+            Box::new(colors::auto(std::io::stderr())),
+            "\n",
+        ))
         .apply()?;
     Ok(())
 }

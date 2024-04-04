@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::num::NonZeroUsize;
 
-use colored::{Color, ColoredString, Colorize, Styles};
+use owo_colors::{OwoColorize, Style};
 
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use similar::{ChangeTag, TextDiff};
@@ -81,7 +81,7 @@ impl Display for Diff<'_> {
                         ChangeTag::Equal => " ",
                     };
 
-                    let line_style = LineStyle::from(change.tag());
+                    let line_style = diff_line_style(change.tag());
 
                     let old_index = change.old_index().map(OneIndexed::from_zero_indexed);
                     let new_index = change.new_index().map(OneIndexed::from_zero_indexed);
@@ -97,14 +97,14 @@ impl Display for Diff<'_> {
                             index: new_index,
                             width: digit_with
                         },
-                        line_style.apply_to(sign).bold()
+                        sign.style(line_style).bold()
                     )?;
 
                     for (emphasized, value) in change.iter_strings_lossy() {
                         if emphasized {
-                            write!(f, "{}", line_style.apply_to(&value).underline().on_black())?;
+                            write!(f, "{}", value.style(line_style).underline().on_black())?;
                         } else {
-                            write!(f, "{}", line_style.apply_to(&value))?;
+                            write!(f, "{}", value.style(line_style))?;
                         }
                     }
                     if change.missing_newline() {
@@ -118,52 +118,11 @@ impl Display for Diff<'_> {
     }
 }
 
-struct LineStyle {
-    fgcolor: Option<Color>,
-    style: Option<Styles>,
-}
-
-impl LineStyle {
-    fn apply_to(&self, input: &str) -> ColoredString {
-        let mut colored = ColoredString::from(input);
-        if let Some(color) = self.fgcolor {
-            colored = colored.color(color);
-        }
-
-        if let Some(style) = self.style {
-            match style {
-                Styles::Clear => colored.clear(),
-                Styles::Bold => colored.bold(),
-                Styles::Dimmed => colored.dimmed(),
-                Styles::Underline => colored.underline(),
-                Styles::Reversed => colored.reversed(),
-                Styles::Italic => colored.italic(),
-                Styles::Blink => colored.blink(),
-                Styles::Hidden => colored.hidden(),
-                Styles::Strikethrough => colored.strikethrough(),
-            }
-        } else {
-            colored
-        }
-    }
-}
-
-impl From<ChangeTag> for LineStyle {
-    fn from(value: ChangeTag) -> Self {
-        match value {
-            ChangeTag::Equal => LineStyle {
-                fgcolor: None,
-                style: Some(Styles::Dimmed),
-            },
-            ChangeTag::Delete => LineStyle {
-                fgcolor: Some(Color::Red),
-                style: None,
-            },
-            ChangeTag::Insert => LineStyle {
-                fgcolor: Some(Color::Green),
-                style: None,
-            },
-        }
+fn diff_line_style(change_tag: ChangeTag) -> Style {
+    match change_tag {
+        ChangeTag::Equal => Style::new().dimmed(),
+        ChangeTag::Delete => Style::new().red(),
+        ChangeTag::Insert => Style::new().green(),
     }
 }
 

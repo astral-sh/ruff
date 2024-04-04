@@ -22,7 +22,6 @@ ruff_cache = { path = "../ruff_cache" }
 ruff_macros = { path = "../ruff_macros" }
 
 anyhow = { workspace = true }
-colored = { workspace = true }
 dirs = { workspace = true }
 ignore = { workspace = true }
 is-macro = { workspace = true }
@@ -30,6 +29,7 @@ itertools = { workspace = true }
 log = { workspace = true }
 glob = { workspace = true }
 globset = { workspace = true }
+owo-colors = { workspace = true }
 path-absolutize = { workspace = true }
 pep440_rs = { workspace = true, features = ["serde"] }
 regex = { workspace = true }

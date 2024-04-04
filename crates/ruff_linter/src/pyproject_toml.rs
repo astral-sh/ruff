@@ -1,5 +1,5 @@
-use colored::Colorize;
 use log::warn;
+use owo_colors::OwoColorize;
 use pyproject_toml::PyProjectToml;
 use ruff_text_size::{TextRange, TextSize};
 

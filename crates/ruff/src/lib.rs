@@ -10,10 +10,11 @@ use std::sync::mpsc::channel;
 use anyhow::Result;
 use args::{GlobalConfigArgs, ServerCommand};
 use clap::CommandFactory;
-use colored::Colorize;
 use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
+use owo_colors::OwoColorize;
 
+use ruff_linter::colors;
 use ruff_linter::logging::{set_up_logging, LogLevel};
 use ruff_linter::settings::flags::FixMode;
 use ruff_linter::settings::types::SerializationFormat;
@@ -145,10 +146,6 @@ pub fn run(
         }));
     }
 
-    // Enabled ANSI colors on Windows 10.
-    #[cfg(windows)]
-    assert!(colored::control::set_virtual_terminal(true).is_ok());
-
     set_up_logging(global_options.log_level())?;
 
     if let Some(deprecated_alias_warning) = deprecated_alias_warning {
@@ -225,13 +222,12 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
 
     let mut writer: Box<dyn Write> = match cli.output_file {
         Some(path) if !cli.watch => {
-            colored::control::set_override(false);
             let file = File::create(path)?;
-            Box::new(BufWriter::new(file))
+            Box::new(BufWriter::new(colors::none(file)))
         }
-        _ => Box::new(BufWriter::new(io::stdout())),
+        _ => Box::new(BufWriter::new(colors::auto(io::stdout()))),
     };
-    let stderr_writer = Box::new(BufWriter::new(io::stderr()));
+    let stderr_writer = Box::new(BufWriter::new(colors::auto(io::stderr())));
 
     let is_stdin = is_stdin(&cli.files, cli.stdin_filename.as_deref());
     let files = resolve_default_files(cli.files, is_stdin);

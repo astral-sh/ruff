@@ -11,7 +11,7 @@ use ruff_diagnostics::SourceMap;
 use ruff_notebook::{Cell, Notebook, NotebookError};
 use ruff_python_ast::PySourceType;
 
-use colored::Colorize;
+use owo_colors::OwoColorize;
 
 use crate::fs;
 

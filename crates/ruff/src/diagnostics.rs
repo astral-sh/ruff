@@ -8,11 +8,12 @@ use std::ops::{Add, AddAssign};
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use colored::Colorize;
 use log::{debug, error, warn};
+use owo_colors::OwoColorize;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
+use ruff_linter::colors;
 use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult, ParseSource};
 use ruff_linter::logging::DisplayParseError;
 use ruff_linter::message::Message;
@@ -444,7 +445,7 @@ pub(crate) fn lint_stdin(
                     // But only write a diff if it's non-empty.
                     if !fixed.is_empty() {
                         write!(
-                            &mut io::stdout().lock(),
+                            &mut colors::auto(io::stdout()).lock(),
                             "{}",
                             source_kind.diff(&transformed, path).unwrap()
                         )?;

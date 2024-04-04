@@ -156,6 +156,7 @@ mod tests {
     use ruff_source_file::{OneIndexed, SourceFileBuilder};
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
+    use crate::colors;
     use crate::message::{Emitter, EmitterContext, Message};
 
     pub(super) fn create_messages() -> Vec<Message> {
@@ -337,10 +338,10 @@ def foo():
     ) -> String {
         let notebook_indexes = FxHashMap::default();
         let context = EmitterContext::new(&notebook_indexes);
-        let mut output: Vec<u8> = Vec::new();
+        let mut output = colors::none(Vec::new());
         emitter.emit(&mut output, messages, &context).unwrap();
 
-        String::from_utf8(output).expect("Output to be valid UTF-8")
+        String::from_utf8(output.into_inner()).expect("Output to be valid UTF-8")
     }
 
     pub(super) fn capture_emitter_notebook_output(
@@ -349,9 +350,9 @@ def foo():
         notebook_indexes: &FxHashMap<String, NotebookIndex>,
     ) -> String {
         let context = EmitterContext::new(notebook_indexes);
-        let mut output: Vec<u8> = Vec::new();
+        let mut output = colors::none(Vec::new());
         emitter.emit(&mut output, messages, &context).unwrap();
 
-        String::from_utf8(output).expect("Output to be valid UTF-8")
+        String::from_utf8(output.into_inner()).expect("Output to be valid UTF-8")
     }
 }

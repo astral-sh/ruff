@@ -19,6 +19,7 @@ use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::{Locator, SourceFileBuilder};
 use ruff_text_size::Ranged;
 
+use crate::colors;
 use crate::directives;
 use crate::fix::{fix_file, FixResult};
 use crate::linter::{check_path, LinterResult, TokenSource};
@@ -293,7 +294,7 @@ pub(crate) fn print_jupyter_messages(
     path: &Path,
     notebook: &Notebook,
 ) -> String {
-    let mut output = Vec::new();
+    let mut output = colors::none(Vec::new());
 
     TextEmitter::default()
         .with_show_fix_status(true)
@@ -310,11 +311,11 @@ pub(crate) fn print_jupyter_messages(
         )
         .unwrap();
 
-    String::from_utf8(output).unwrap()
+    String::from_utf8(output.into_inner()).unwrap()
 }
 
 pub(crate) fn print_messages(messages: &[Message]) -> String {
-    let mut output = Vec::new();
+    let mut output = colors::none(Vec::new());
 
     TextEmitter::default()
         .with_show_fix_status(true)
@@ -328,7 +329,7 @@ pub(crate) fn print_messages(messages: &[Message]) -> String {
         )
         .unwrap();
 
-    String::from_utf8(output).unwrap()
+    String::from_utf8(output.into_inner()).unwrap()
 }
 
 #[macro_export]

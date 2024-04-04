@@ -5,12 +5,13 @@ use std::io::Write;
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use bitflags::bitflags;
-use colored::Colorize;
+use owo_colors::OwoColorize;
 
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::colors;
 use crate::fs::relativize_path;
 use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
@@ -284,10 +285,7 @@ impl Display for MessageCodeFrame<'_> {
             }],
             footer,
             opt: FormatOptions {
-                #[cfg(test)]
-                color: false,
-                #[cfg(not(test))]
-                color: colored::control::SHOULD_COLORIZE.should_colorize(),
+                color: colors::enabled(&std::io::stdout()),
                 ..FormatOptions::default()
             },
         };
