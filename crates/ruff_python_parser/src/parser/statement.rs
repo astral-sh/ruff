@@ -778,36 +778,23 @@ impl<'src> Parser<'src> {
     ///
     /// If the parser isn't positioned at a `type` token.
     ///
-    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-type_stmt>
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#the-type-statement>
     fn parse_type_alias_statement(&mut self) -> ast::StmtTypeAlias {
         let start = self.node_start();
         self.bump(TokenKind::Type);
 
-        let (tok, tok_range) = self.next_token();
-        let name = if let Tok::Name { name } = tok {
-            Expr::Name(ast::ExprName {
-                id: name.to_string(),
-                ctx: ExprContext::Store,
-                range: tok_range,
-            })
-        } else {
-            // TODO(dhruvmanila): This recovery isn't possible currently because the soft keyword
-            // transformer will always convert the `type` token to a `Name` token if it's not
-            // followed by a `Name` token.
-            self.add_error(
-                ParseErrorType::OtherError(format!("expecting identifier, got {tok}")),
-                tok_range,
-            );
-            Expr::Name(ast::ExprName {
-                id: String::new(),
-                ctx: ExprContext::Invalid,
-                range: tok_range,
-            })
-        };
+        let mut name = Expr::Name(self.parse_name());
+        helpers::set_expr_ctx(&mut name, ExprContext::Store);
+
         let type_params = self.try_parse_type_params();
 
         self.expect(TokenKind::Equal);
 
+        // test_err type_alias_invalid_value_expr
+        // type x = *y
+        // type x = yield y
+        // type x = yield from y
+        // type x = x := 1
         let value = self.parse_conditional_expression_or_higher(AllowStarredExpression::No);
 
         ast::StmtTypeAlias {
@@ -2071,7 +2058,6 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#type-parameter-lists>
     fn parse_type_params(&mut self) -> ast::TypeParams {
         let start = self.node_start();
-
         self.bump(TokenKind::Lsqb);
 
         let type_params = self.parse_comma_separated_list_into_vec(
@@ -2093,6 +2079,16 @@ impl<'src> Parser<'src> {
     fn parse_type_param(&mut self) -> ast::TypeParam {
         let start = self.node_start();
 
+        // TODO(dhruvmanila): CPython throws an error if `TypeVarTuple` or `ParamSpec`
+        // has bounds:
+        //
+        //    type X[*T: int] = int
+        //             ^^^^^
+        // SyntaxError: cannot use bound with TypeVarTuple
+        //
+        // We should do the same but currently we can't without throwing away the parsed
+        // expression because the AST can't contain it.
+
         if self.eat(TokenKind::Star) {
             let name = self.parse_identifier();
             ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple {
@@ -2107,12 +2103,31 @@ impl<'src> Parser<'src> {
             })
         } else {
             let name = self.parse_identifier();
-            let bound = self.eat(TokenKind::Colon).then(|| {
-                Box::new(
-                    self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
-                        .expr,
-                )
-            });
+
+            let bound = if self.eat(TokenKind::Colon) {
+                if self.at_expr() {
+                    // test_err type_param_invalid_bound_expr
+                    // type X[T: *int] = int
+                    // type X[T: yield x] = int
+                    // type X[T: yield from x] = int
+                    // type X[T: x := int] = int
+                    Some(Box::new(
+                        self.parse_conditional_expression_or_higher(AllowStarredExpression::No)
+                            .expr,
+                    ))
+                } else {
+                    // test_err type_param_missing_bound
+                    // type X[T: ] = int
+                    // type X[T1: , T2] = int
+                    self.add_error(
+                        ParseErrorType::OtherError("Expected an expression".to_string()),
+                        self.current_token_range(),
+                    );
+                    None
+                }
+            } else {
+                None
+            };
 
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
                 range: self.node_range(start),
