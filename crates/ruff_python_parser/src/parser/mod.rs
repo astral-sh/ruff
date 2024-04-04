@@ -743,17 +743,27 @@ impl WithItemKind {
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
-enum TupleParenthesized {
-    /// The tuple is parenthesized, e.g., `(a, b)`.
+enum Parenthesized {
+    /// The elements are parenthesized, e.g., `(a, b)`.
     Yes,
-    /// The tuple is not parenthesized, e.g., `a, b`.
+    /// The elements are not parenthesized, e.g., `a, b`.
     No,
 }
 
-impl TupleParenthesized {
-    /// Returns `true` if the tuple is parenthesized.
+impl From<bool> for Parenthesized {
+    fn from(value: bool) -> Self {
+        if value {
+            Parenthesized::Yes
+        } else {
+            Parenthesized::No
+        }
+    }
+}
+
+impl Parenthesized {
+    /// Returns `true` if the parenthesized value is `Yes`.
     const fn is_yes(self) -> bool {
-        matches!(self, TupleParenthesized::Yes)
+        matches!(self, Parenthesized::Yes)
     }
 }
 
@@ -778,7 +788,7 @@ enum RecoveryContextKind {
     TypeParams,
 
     /// When parsing a list of names in a `from ... import ...` statement
-    ImportFromAsNames,
+    ImportFromAsNames(Parenthesized),
 
     /// When parsing a list of names in an `import` statement
     ImportNames,
@@ -799,7 +809,7 @@ enum RecoveryContextKind {
     DictElements,
 
     /// When parsing a list of elements in a tuple expression e.g., `(1, 2)`
-    TupleElements(TupleParenthesized),
+    TupleElements(Parenthesized),
 
     /// When parsing a list of patterns in a match statement with an optional
     /// parentheses, e.g., `case a, b: ...`, `case (a, b): ...`, `case [a, b]: ...`
@@ -851,7 +861,7 @@ impl RecoveryContextKind {
                 | RecoveryContextKind::Parameters(_)
                 | RecoveryContextKind::TypeParams
                 | RecoveryContextKind::DeleteTargets
-                | RecoveryContextKind::ImportFromAsNames
+                | RecoveryContextKind::ImportFromAsNames(Parenthesized::Yes)
         )
     }
 
@@ -886,7 +896,7 @@ impl RecoveryContextKind {
             // The names of an import statement cannot be parenthesized, so it
             // always ends with a newline.
             RecoveryContextKind::ImportNames => p.at(TokenKind::Newline),
-            RecoveryContextKind::ImportFromAsNames => {
+            RecoveryContextKind::ImportFromAsNames(_) => {
                 matches!(
                     p.current_token_kind(),
                     // `from a import (b, c)`
@@ -966,7 +976,7 @@ impl RecoveryContextKind {
             RecoveryContextKind::AssignmentTargets => p.at(TokenKind::Equal),
             RecoveryContextKind::TypeParams => p.at_type_param(),
             RecoveryContextKind::ImportNames => p.at(TokenKind::Name),
-            RecoveryContextKind::ImportFromAsNames => {
+            RecoveryContextKind::ImportFromAsNames(_) => {
                 matches!(p.current_token_kind(), TokenKind::Star | TokenKind::Name)
             }
             RecoveryContextKind::Slices => p.at(TokenKind::Colon) || p.at_expr(),
@@ -1031,8 +1041,12 @@ impl RecoveryContextKind {
             RecoveryContextKind::TypeParams => ParseErrorType::OtherError(
                 "Expected a type parameter or the end of the type parameter list".to_string(),
             ),
-            RecoveryContextKind::ImportFromAsNames => {
-                ParseErrorType::OtherError("Expected an import name or a ')'".to_string())
+            RecoveryContextKind::ImportFromAsNames(parenthesized) => {
+                if parenthesized.is_yes() {
+                    ParseErrorType::OtherError("Expected an import name or a ')'".to_string())
+                } else {
+                    ParseErrorType::OtherError("Expected an import name".to_string())
+                }
             }
             RecoveryContextKind::ImportNames => {
                 ParseErrorType::OtherError("Expected an import name".to_string())
@@ -1100,7 +1114,8 @@ bitflags! {
         const EXCEPT = 1 << 3;
         const ASSIGNMENT_TARGETS = 1 << 4;
         const TYPE_PARAMS = 1 << 5;
-        const IMPORT_FROM_AS_NAMES = 1 << 6;
+        const IMPORT_FROM_AS_NAMES_PARENTHESIZED = 1 << 6;
+        const IMPORT_FROM_AS_NAMES_UNPARENTHESIZED = 1 << 29;
         const IMPORT_NAMES = 1 << 7;
         const SLICES = 1 << 8;
         const LIST_ELEMENTS = 1 << 9;
@@ -1135,15 +1150,18 @@ impl RecoveryContext {
             RecoveryContextKind::Except => RecoveryContext::EXCEPT,
             RecoveryContextKind::AssignmentTargets => RecoveryContext::ASSIGNMENT_TARGETS,
             RecoveryContextKind::TypeParams => RecoveryContext::TYPE_PARAMS,
-            RecoveryContextKind::ImportFromAsNames => RecoveryContext::IMPORT_FROM_AS_NAMES,
+            RecoveryContextKind::ImportFromAsNames(parenthesized) => match parenthesized {
+                Parenthesized::Yes => RecoveryContext::IMPORT_FROM_AS_NAMES_PARENTHESIZED,
+                Parenthesized::No => RecoveryContext::IMPORT_FROM_AS_NAMES_UNPARENTHESIZED,
+            },
             RecoveryContextKind::ImportNames => RecoveryContext::IMPORT_NAMES,
             RecoveryContextKind::Slices => RecoveryContext::SLICES,
             RecoveryContextKind::ListElements => RecoveryContext::LIST_ELEMENTS,
             RecoveryContextKind::SetElements => RecoveryContext::SET_ELEMENTS,
             RecoveryContextKind::DictElements => RecoveryContext::DICT_ELEMENTS,
             RecoveryContextKind::TupleElements(parenthesized) => match parenthesized {
-                TupleParenthesized::Yes => RecoveryContext::TUPLE_ELEMENTS_PARENTHESIZED,
-                TupleParenthesized::No => RecoveryContext::TUPLE_ELEMENTS_UNPARENTHESIZED,
+                Parenthesized::Yes => RecoveryContext::TUPLE_ELEMENTS_PARENTHESIZED,
+                Parenthesized::No => RecoveryContext::TUPLE_ELEMENTS_UNPARENTHESIZED,
             },
             RecoveryContextKind::SequenceMatchPattern(parentheses) => match parentheses {
                 None => RecoveryContext::SEQUENCE_MATCH_PATTERN,
@@ -1190,17 +1208,22 @@ impl RecoveryContext {
             RecoveryContext::EXCEPT => RecoveryContextKind::Except,
             RecoveryContext::ASSIGNMENT_TARGETS => RecoveryContextKind::AssignmentTargets,
             RecoveryContext::TYPE_PARAMS => RecoveryContextKind::TypeParams,
-            RecoveryContext::IMPORT_FROM_AS_NAMES => RecoveryContextKind::ImportFromAsNames,
+            RecoveryContext::IMPORT_FROM_AS_NAMES_PARENTHESIZED => {
+                RecoveryContextKind::ImportFromAsNames(Parenthesized::Yes)
+            }
+            RecoveryContext::IMPORT_FROM_AS_NAMES_UNPARENTHESIZED => {
+                RecoveryContextKind::ImportFromAsNames(Parenthesized::No)
+            }
             RecoveryContext::IMPORT_NAMES => RecoveryContextKind::ImportNames,
             RecoveryContext::SLICES => RecoveryContextKind::Slices,
             RecoveryContext::LIST_ELEMENTS => RecoveryContextKind::ListElements,
             RecoveryContext::SET_ELEMENTS => RecoveryContextKind::SetElements,
             RecoveryContext::DICT_ELEMENTS => RecoveryContextKind::DictElements,
             RecoveryContext::TUPLE_ELEMENTS_PARENTHESIZED => {
-                RecoveryContextKind::TupleElements(TupleParenthesized::Yes)
+                RecoveryContextKind::TupleElements(Parenthesized::Yes)
             }
             RecoveryContext::TUPLE_ELEMENTS_UNPARENTHESIZED => {
-                RecoveryContextKind::TupleElements(TupleParenthesized::No)
+                RecoveryContextKind::TupleElements(Parenthesized::No)
             }
             RecoveryContext::SEQUENCE_MATCH_PATTERN => {
                 RecoveryContextKind::SequenceMatchPattern(None)

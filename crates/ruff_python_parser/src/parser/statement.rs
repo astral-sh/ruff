@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use itertools::Itertools;
+
 use ruff_python_ast::{
     self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt, WithItem,
 };
@@ -14,7 +16,7 @@ use crate::parser::{
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, Tok, TokenKind};
 
-use super::TupleParenthesized;
+use super::Parenthesized;
 
 /// Tokens that can appear after an expression.
 /// Tokens that represent compound statements.
@@ -381,17 +383,33 @@ impl<'src> Parser<'src> {
     ///
     /// If the parser isn't positioned at an `import` token.
     ///
-    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-import_stmt>
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#the-import-statement>
     fn parse_import_statement(&mut self) -> ast::StmtImport {
         let start = self.node_start();
         self.bump(TokenKind::Import);
+
+        // test_err import_stmt_parenthesized_names
+        // import (a)
+        // import (a, b)
+
+        // test_err import_stmt_star_import
+        // import *
+        // import x, *, y
+
+        // test_err import_stmt_trailing_comma
+        // import ,
+        // import x, y,
 
         let names = self.parse_comma_separated_list_into_vec(
             RecoveryContextKind::ImportNames,
             Parser::parse_alias,
         );
 
-        // TODO(dhruvmanila): Error when `*` is used
+        if names.is_empty() {
+            // test_err import_stmt_empty
+            // import
+            self.add_error(ParseErrorType::EmptyImportNames, self.current_token_range());
+        }
 
         ast::StmtImport {
             range: self.node_range(start),
@@ -413,18 +431,16 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::From);
 
         let mut module = None;
-        let mut level = if self.eat(TokenKind::Ellipsis) { 3 } else { 0 };
+        let mut leading_dots = if self.eat(TokenKind::Ellipsis) { 3 } else { 0 };
         let mut progress = ParserProgress::default();
 
         while self.at_ts(DOT_ELLIPSIS_SET) {
             progress.assert_progressing(self);
 
             if self.eat(TokenKind::Dot) {
-                level += 1;
-            }
-
-            if self.eat(TokenKind::Ellipsis) {
-                level += 3;
+                leading_dots += 1;
+            } else if self.eat(TokenKind::Ellipsis) {
+                leading_dots += 3;
             }
         }
 
@@ -432,33 +448,143 @@ impl<'src> Parser<'src> {
             module = Some(self.parse_dotted_name());
         };
 
-        if level == 0 && module.is_none() {
-            let range = self.current_token_range();
+        if leading_dots == 0 && module.is_none() {
+            // test_err from_import_missing_module
+            // from
+            // from import x
             self.add_error(
-                ParseErrorType::OtherError("missing module name".to_string()),
-                range,
+                ParseErrorType::OtherError("Expected a module name".to_string()),
+                self.current_token_range(),
             );
         }
 
+        // test from_import_no_space
+        // from.import x
+        // from...import x
         self.expect(TokenKind::Import);
 
-        let parenthesized = self.eat(TokenKind::Lpar);
+        let names_start = self.node_start();
+        let mut names = vec![];
+        let mut seen_star_import = false;
 
-        let names = self.parse_comma_separated_list_into_vec(
-            RecoveryContextKind::ImportFromAsNames,
-            Parser::parse_alias,
+        let parenthesized = Parenthesized::from(self.eat(TokenKind::Lpar));
+
+        // test_err from_import_unparenthesized_trailing_comma
+        // from a import b,
+        // from a import b as c,
+        // from a import b, c,
+        self.parse_comma_separated_list(
+            RecoveryContextKind::ImportFromAsNames(parenthesized),
+            |parser| {
+                let alias = parser.parse_alias();
+                seen_star_import |= alias.name.id == "*";
+                names.push(alias);
+            },
         );
 
-        // TODO(dhruvmanila): Error when `*` is mixed with other names.
+        if names.is_empty() {
+            // test_err from_import_empty_names
+            // from x import
+            // from x import ()
+            // from x import ,,
+            self.add_error(ParseErrorType::EmptyImportNames, self.current_token_range());
+        }
 
-        if parenthesized {
+        if seen_star_import && names.len() > 1 {
+            // test_err from_import_star_with_other_names
+            // from x import *, a
+            // from x import a, *, b
+            // from x import *, a as b
+            self.add_error(
+                ParseErrorType::OtherError("Star import must be the only import".to_string()),
+                self.node_range(names_start),
+            );
+        }
+
+        if parenthesized.is_yes() {
+            // test_err from_import_missing_rpar
+            // from x import (a, b
+            // 1 + 1
+            // from x import (a, b,
+            // 2 + 2
             self.expect(TokenKind::Rpar);
         }
 
         ast::StmtImportFrom {
             module,
             names,
-            level: Some(level),
+            level: Some(leading_dots),
+            range: self.node_range(start),
+        }
+    }
+
+    /// Parses an `import` or `from` import name.
+    ///
+    /// See:
+    /// - <https://docs.python.org/3/reference/simple_stmts.html#the-import-statement>
+    /// - <https://docs.python.org/3/library/ast.html#ast.alias>
+    fn parse_alias(&mut self) -> ast::Alias {
+        let start = self.node_start();
+        if self.eat(TokenKind::Star) {
+            let range = self.node_range(start);
+            return ast::Alias {
+                name: ast::Identifier {
+                    id: "*".into(),
+                    range,
+                },
+                asname: None,
+                range,
+            };
+        }
+
+        let name = self.parse_dotted_name();
+
+        let asname = if self.eat(TokenKind::As) {
+            if self.at(TokenKind::Name) {
+                Some(self.parse_identifier())
+            } else {
+                // test_err import_alias_missing_asname
+                // import x as
+                self.add_error(
+                    ParseErrorType::OtherError("Expected symbol after `as`".to_string()),
+                    self.current_token_range(),
+                );
+                None
+            }
+        } else {
+            None
+        };
+
+        ast::Alias {
+            range: self.node_range(start),
+            name,
+            asname,
+        }
+    }
+
+    /// Parses a dotted name.
+    ///
+    /// A dotted name is a sequence of identifiers separated by a single dot.
+    fn parse_dotted_name(&mut self) -> ast::Identifier {
+        let start = self.node_start();
+
+        let mut identifiers = vec![self.parse_identifier()];
+        let mut progress = ParserProgress::default();
+
+        while self.eat(TokenKind::Dot) {
+            progress.assert_progressing(self);
+
+            // test_err dotted_name_multiple_dots
+            // import a..b
+            // import a...b
+            identifiers.push(self.parse_identifier());
+        }
+
+        // test dotted_name_normalized_spaces
+        // import a.b.c
+        // import a .  b  . c
+        ast::Identifier {
+            id: identifiers.into_iter().map(|id| id.id).join("."),
             range: self.node_range(start),
         }
     }
@@ -1560,7 +1686,7 @@ impl<'src> Parser<'src> {
             let tuple = self.parse_tuple_expression(
                 subject.expr,
                 subject_start,
-                TupleParenthesized::No,
+                Parenthesized::No,
                 Parser::parse_named_expression_or_higher,
             );
 
@@ -1936,56 +2062,6 @@ impl<'src> Parser<'src> {
                 name,
                 bound,
             })
-        }
-    }
-
-    fn parse_dotted_name(&mut self) -> ast::Identifier {
-        let start = self.node_start();
-
-        self.parse_identifier();
-
-        let mut progress = ParserProgress::default();
-        while self.eat(TokenKind::Dot) {
-            progress.assert_progressing(self);
-
-            let id = self.parse_identifier();
-            if !id.is_valid() {
-                self.add_error(
-                    ParseErrorType::OtherError("invalid identifier".into()),
-                    id.range,
-                );
-            }
-        }
-
-        let range = self.node_range(start);
-
-        ast::Identifier {
-            id: self.src_text(range).into(),
-            range,
-        }
-    }
-
-    fn parse_alias(&mut self) -> ast::Alias {
-        let start = self.node_start();
-        if self.eat(TokenKind::Star) {
-            let range = self.node_range(start);
-            return ast::Alias {
-                name: ast::Identifier {
-                    id: "*".into(),
-                    range,
-                },
-                asname: None,
-                range,
-            };
-        }
-
-        let name = self.parse_dotted_name();
-        let asname = self.eat(TokenKind::As).then(|| self.parse_identifier());
-
-        ast::Alias {
-            range: self.node_range(start),
-            name,
-            asname,
         }
     }
 

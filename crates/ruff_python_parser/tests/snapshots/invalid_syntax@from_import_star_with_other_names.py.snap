@@ -1,0 +1,148 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/from_import_star_with_other_names.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..65,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    range: 0..18,
+                    module: Some(
+                        Identifier {
+                            id: "x",
+                            range: 5..6,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 14..15,
+                            name: Identifier {
+                                id: "*",
+                                range: 14..15,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 17..18,
+                            name: Identifier {
+                                id: "a",
+                                range: 17..18,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: Some(
+                        0,
+                    ),
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 19..40,
+                    module: Some(
+                        Identifier {
+                            id: "x",
+                            range: 24..25,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 33..34,
+                            name: Identifier {
+                                id: "a",
+                                range: 33..34,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 36..37,
+                            name: Identifier {
+                                id: "*",
+                                range: 36..37,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 39..40,
+                            name: Identifier {
+                                id: "b",
+                                range: 39..40,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: Some(
+                        0,
+                    ),
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 41..64,
+                    module: Some(
+                        Identifier {
+                            id: "x",
+                            range: 46..47,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 55..56,
+                            name: Identifier {
+                                id: "*",
+                                range: 55..56,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 58..64,
+                            name: Identifier {
+                                id: "a",
+                                range: 58..59,
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: "b",
+                                    range: 63..64,
+                                },
+                            ),
+                        },
+                    ],
+                    level: Some(
+                        0,
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | from x import *, a
+  |               ^^^^ Syntax Error: Star import must be the only import
+2 | from x import a, *, b
+3 | from x import *, a as b
+  |
+
+
+  |
+1 | from x import *, a
+2 | from x import a, *, b
+  |               ^^^^^^^ Syntax Error: Star import must be the only import
+3 | from x import *, a as b
+  |
+
+
+  |
+1 | from x import *, a
+2 | from x import a, *, b
+3 | from x import *, a as b
+  |               ^^^^^^^^^ Syntax Error: Star import must be the only import
+  |
