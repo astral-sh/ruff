@@ -78,6 +78,10 @@ impl super::SyncRequestHandler for ExecuteCommand {
         }
 
         if !changes.is_empty() {
+            // check if we can apply a workspace edit
+            if !session.resolved_client_capabilities().apply_edit {
+                return Err(anyhow::anyhow!("Cannot send workspace edit to client: the client does not support `workspace/applyEdit`")).with_failure_code(ErrorCode::InternalError);
+            }
             apply_edit(
                 requester,
                 command.label(),

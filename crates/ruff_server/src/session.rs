@@ -140,6 +140,10 @@ impl Session {
         Ok(())
     }
 
+    pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
+        &self.resolved_client_capabilities
+    }
+
     pub(crate) fn encoding(&self) -> PositionEncoding {
         self.position_encoding
     }
