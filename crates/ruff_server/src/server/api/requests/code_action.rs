@@ -110,30 +110,35 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
 }
 
 fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
-    let mut action = types::CodeAction {
-        title: format!("{DIAGNOSTIC_NAME}: Organize imports"),
-        kind: Some(types::CodeActionKind::SOURCE_ORGANIZE_IMPORTS),
-        // This will be resolved later
-        edit: None,
-        data: Some(serde_json::to_value(snapshot.url()).expect("document url to serialize")),
-        ..Default::default()
-    };
+    let document = snapshot.document();
 
-    if !snapshot
+    let (edit, data) = if snapshot
         .resolved_client_capabilities()
         .code_action_deferred_edit_resolution
     {
-        let document = snapshot.document();
-
-        // We need to resolve the `edit` field now if we can't defer resolution to later
-        action.edit = Some(resolve_edit_for_organize_imports(
-            document,
-            snapshot.url(),
-            snapshot.configuration().linter.clone(),
-            snapshot.encoding(),
-        )?);
-    }
-
+        // The edit will be resolved later in the `CodeActionsResolve` request
+        (
+            None,
+            Some(serde_json::to_value(snapshot.url()).expect("document url to serialize")),
+        )
+    } else {
+        (
+            Some(resolve_edit_for_organize_imports(
+                document,
+                snapshot.url(),
+                snapshot.configuration().linter.clone(),
+                snapshot.encoding(),
+            )?),
+            None,
+        )
+    };
+    let action = types::CodeAction {
+        title: format!("{DIAGNOSTIC_NAME}: Organize imports"),
+        kind: Some(types::CodeActionKind::SOURCE_ORGANIZE_IMPORTS),
+        edit,
+        data,
+        ..Default::default()
+    };
     Ok(types::CodeActionOrCommand::CodeAction(action))
 }
 

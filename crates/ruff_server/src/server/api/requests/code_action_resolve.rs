@@ -7,6 +7,7 @@ use crate::session::DocumentSnapshot;
 use crate::PositionEncoding;
 use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
+use ruff_linter::codes::Rule;
 use ruff_linter::settings::LinterSettings;
 
 pub(crate) struct CodeActionResolve;
@@ -94,8 +95,8 @@ pub(super) fn resolve_edit_for_organize_imports(
     encoding: PositionEncoding,
 ) -> crate::Result<types::WorkspaceEdit> {
     linter_settings.rules = [
-        ruff_linter::registry::Rule::from_code("I001").unwrap(),
-        ruff_linter::registry::Rule::from_code("I002").unwrap(),
+        Rule::UnusedImport,          // I001
+        Rule::MissingRequiredImport, // I002
     ]
     .into_iter()
     .collect();
