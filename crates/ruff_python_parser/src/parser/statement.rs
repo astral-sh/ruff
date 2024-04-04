@@ -489,16 +489,49 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-assert_stmt>
+    /// Parses an `assert` statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at an `assert` token.
+    ///
+    /// See: <https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement>
     fn parse_assert_statement(&mut self) -> ast::StmtAssert {
         let start = self.node_start();
         self.bump(TokenKind::Assert);
 
+        // test_err assert_empty_test
+        // assert
+
+        // TODO(dhruvmanila): Disallow starred and yield expression
+        // test_err assert_invalid_test_expr
+        // assert *x
+        // assert assert x
+        // assert yield x
+        // assert x := 1
         let test = self.parse_conditional_expression_or_higher();
 
-        let msg = self
-            .eat(TokenKind::Comma)
-            .then(|| Box::new(self.parse_conditional_expression_or_higher().expr));
+        let msg = if self.eat(TokenKind::Comma) {
+            if self.at_expr() {
+                // TODO(dhruvmanila): Disallow starred and yield expression
+                // test_err assert_invalid_msg_expr
+                // assert False, *x
+                // assert False, assert x
+                // assert False, yield x
+                // assert False, x := 1
+                Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+            } else {
+                // test_err assert_empty_msg
+                // assert x,
+                self.add_error(
+                    ParseErrorType::OtherError("Expected an expression".to_string()),
+                    self.current_token_range(),
+                );
+                None
+            }
+        } else {
+            None
+        };
 
         ast::StmtAssert {
             test: Box::new(test.expr),
