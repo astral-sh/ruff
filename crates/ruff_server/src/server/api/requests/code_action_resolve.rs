@@ -52,7 +52,7 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
                 resolve_edit_for_organize_imports(
                     document,
                     snapshot.url(),
-                    snapshot.configuration().linter.clone(),
+                    &snapshot.configuration().linter,
                     snapshot.encoding(),
                 )
                 .with_failure_code(ErrorCode::InternalError)?,
@@ -91,33 +91,26 @@ pub(super) fn resolve_edit_for_fix_all(
 pub(super) fn resolve_edit_for_organize_imports(
     document: &crate::edit::Document,
     url: &types::Url,
-    mut linter_settings: ruff_linter::settings::LinterSettings,
+    linter_settings: &ruff_linter::settings::LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<types::WorkspaceEdit> {
+    let mut linter_settings = linter_settings.clone();
     linter_settings.rules = [
-        Rule::UnusedImport,          // I001
+        Rule::UnsortedImports,       // I001
         Rule::MissingRequiredImport, // I002
     ]
     .into_iter()
     .collect();
 
-    let diagnostics = crate::lint::check(document, &linter_settings, encoding);
-
-    let fixes = crate::lint::fixes_for_diagnostics(
-        document,
-        url,
-        encoding,
-        document.version(),
-        diagnostics,
-    )?;
-
     Ok(types::WorkspaceEdit {
-        document_changes: Some(types::DocumentChanges::Edits(
-            fixes
-                .into_iter()
-                .flat_map(|fix| fix.document_edits.into_iter())
-                .collect(),
-        )),
+        changes: Some(
+            [(
+                url.clone(),
+                crate::fix::fix_all(document, &linter_settings, encoding)?,
+            )]
+            .into_iter()
+            .collect(),
+        ),
         ..Default::default()
     })
 }

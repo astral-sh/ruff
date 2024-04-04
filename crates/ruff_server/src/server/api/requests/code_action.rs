@@ -26,11 +26,11 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
     ) -> Result<Option<types::CodeActionResponse>> {
         let mut response: types::CodeActionResponse = types::CodeActionResponse::default();
 
-        let supported_code_actions = supported_code_actions(params.context.only);
+        let supported_code_actions = supported_code_actions(params.context.only.clone());
 
         if supported_code_actions.contains(&SupportedCodeAction::QuickFix) {
             response.extend(
-                quick_fix(&snapshot, params.context.diagnostics)
+                quick_fix(&snapshot, params.context.diagnostics.clone())
                     .with_failure_code(ErrorCode::InternalError)?,
             );
         }
@@ -126,7 +126,7 @@ fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
             Some(resolve_edit_for_organize_imports(
                 document,
                 snapshot.url(),
-                snapshot.configuration().linter.clone(),
+                &snapshot.configuration().linter,
                 snapshot.encoding(),
             )?),
             None,
