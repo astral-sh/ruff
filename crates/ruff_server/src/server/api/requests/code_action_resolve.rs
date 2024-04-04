@@ -47,9 +47,15 @@ impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
                 )
                 .with_failure_code(ErrorCode::InternalError)?,
             ),
-            SupportedCodeAction::SourceOrganizeImports => {
-                todo!("Support `source.organizeImports`")
-            }
+            SupportedCodeAction::SourceOrganizeImports => Some(
+                resolve_edit_for_organize_imports(
+                    document,
+                    snapshot.url(),
+                    snapshot.configuration().linter.clone(),
+                    snapshot.encoding(),
+                )
+                .with_failure_code(ErrorCode::InternalError)?,
+            ),
             SupportedCodeAction::QuickFix => {
                 return Err(anyhow::anyhow!(
                     "Got a code action that should not need additional resolution: {action_kind:?}"
@@ -77,6 +83,40 @@ pub(super) fn resolve_edit_for_fix_all(
             .into_iter()
             .collect(),
         ),
+        ..Default::default()
+    })
+}
+
+pub(super) fn resolve_edit_for_organize_imports(
+    document: &crate::edit::Document,
+    url: &types::Url,
+    mut linter_settings: ruff_linter::settings::LinterSettings,
+    encoding: PositionEncoding,
+) -> crate::Result<types::WorkspaceEdit> {
+    linter_settings.rules = [
+        ruff_linter::registry::Rule::from_code("I001").unwrap(),
+        ruff_linter::registry::Rule::from_code("I002").unwrap(),
+    ]
+    .into_iter()
+    .collect();
+
+    let diagnostics = crate::lint::check(document, &linter_settings, encoding);
+
+    let fixes = crate::lint::fixes_for_diagnostics(
+        document,
+        url,
+        encoding,
+        document.version(),
+        diagnostics,
+    )?;
+
+    Ok(types::WorkspaceEdit {
+        document_changes: Some(types::DocumentChanges::Edits(
+            fixes
+                .into_iter()
+                .flat_map(|fix| fix.document_edits.into_iter())
+                .collect(),
+        )),
         ..Default::default()
     })
 }
