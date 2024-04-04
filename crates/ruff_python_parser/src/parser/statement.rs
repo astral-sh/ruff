@@ -1,7 +1,5 @@
 use std::fmt::Display;
 
-use itertools::Itertools;
-
 use ruff_python_ast::{
     self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, Stmt, WithItem,
 };
@@ -425,38 +423,38 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-import_stmt>
     fn parse_from_import_statement(&mut self) -> ast::StmtImportFrom {
-        const DOT_ELLIPSIS_SET: TokenSet = TokenSet::new([TokenKind::Dot, TokenKind::Ellipsis]);
-
         let start = self.node_start();
         self.bump(TokenKind::From);
 
-        let mut module = None;
-        let mut leading_dots = if self.eat(TokenKind::Ellipsis) { 3 } else { 0 };
+        let mut leading_dots = 0;
         let mut progress = ParserProgress::default();
 
-        while self.at_ts(DOT_ELLIPSIS_SET) {
+        loop {
             progress.assert_progressing(self);
 
             if self.eat(TokenKind::Dot) {
                 leading_dots += 1;
             } else if self.eat(TokenKind::Ellipsis) {
                 leading_dots += 3;
+            } else {
+                break;
             }
         }
 
-        if self.at(TokenKind::Name) {
-            module = Some(self.parse_dotted_name());
+        let module = if self.at(TokenKind::Name) {
+            Some(self.parse_dotted_name())
+        } else {
+            if leading_dots == 0 {
+                // test_err from_import_missing_module
+                // from
+                // from import x
+                self.add_error(
+                    ParseErrorType::OtherError("Expected a module name".to_string()),
+                    self.current_token_range(),
+                );
+            }
+            None
         };
-
-        if leading_dots == 0 && module.is_none() {
-            // test_err from_import_missing_module
-            // from
-            // from import x
-            self.add_error(
-                ParseErrorType::OtherError("Expected a module name".to_string()),
-                self.current_token_range(),
-            );
-        }
 
         // test from_import_no_space
         // from.import x
@@ -495,6 +493,7 @@ impl<'src> Parser<'src> {
             // from x import *, a
             // from x import a, *, b
             // from x import *, a as b
+            // from x import *, *, a
             self.add_error(
                 ParseErrorType::OtherError("Star import must be the only import".to_string()),
                 self.node_range(names_start),
@@ -568,7 +567,7 @@ impl<'src> Parser<'src> {
     fn parse_dotted_name(&mut self) -> ast::Identifier {
         let start = self.node_start();
 
-        let mut identifiers = vec![self.parse_identifier()];
+        let mut dotted_name = self.parse_identifier().id;
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::Dot) {
@@ -577,14 +576,15 @@ impl<'src> Parser<'src> {
             // test_err dotted_name_multiple_dots
             // import a..b
             // import a...b
-            identifiers.push(self.parse_identifier());
+            dotted_name.push('.');
+            dotted_name.push_str(&self.parse_identifier());
         }
 
         // test dotted_name_normalized_spaces
         // import a.b.c
         // import a .  b  . c
         ast::Identifier {
-            id: identifiers.into_iter().map(|id| id.id).join("."),
+            id: dotted_name,
             range: self.node_range(start),
         }
     }

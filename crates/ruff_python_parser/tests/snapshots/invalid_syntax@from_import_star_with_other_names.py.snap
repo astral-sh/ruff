@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/from_import_star_with
 ```
 Module(
     ModModule {
-        range: 0..65,
+        range: 0..87,
         body: [
             ImportFrom(
                 StmtImportFrom {
@@ -118,6 +118,46 @@ Module(
                     ),
                 },
             ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 65..86,
+                    module: Some(
+                        Identifier {
+                            id: "x",
+                            range: 70..71,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 79..80,
+                            name: Identifier {
+                                id: "*",
+                                range: 79..80,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 82..83,
+                            name: Identifier {
+                                id: "*",
+                                range: 82..83,
+                            },
+                            asname: None,
+                        },
+                        Alias {
+                            range: 85..86,
+                            name: Identifier {
+                                id: "a",
+                                range: 85..86,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: Some(
+                        0,
+                    ),
+                },
+            ),
         ],
     },
 )
@@ -137,6 +177,7 @@ Module(
 2 | from x import a, *, b
   |               ^^^^^^^ Syntax Error: Star import must be the only import
 3 | from x import *, a as b
+4 | from x import *, *, a
   |
 
 
@@ -145,4 +186,13 @@ Module(
 2 | from x import a, *, b
 3 | from x import *, a as b
   |               ^^^^^^^^^ Syntax Error: Star import must be the only import
+4 | from x import *, *, a
+  |
+
+
+  |
+2 | from x import a, *, b
+3 | from x import *, a as b
+4 | from x import *, *, a
+  |               ^^^^^^^ Syntax Error: Star import must be the only import
   |
