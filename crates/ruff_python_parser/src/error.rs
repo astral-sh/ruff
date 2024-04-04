@@ -99,6 +99,11 @@ pub enum ParseErrorType {
     /// An empty nonlocal names list was found during parsing, e.g `nonlocal`.
     EmptyNonlocalNames,
 
+    /// An unparenthesized named expression was found where it is not allowed.
+    UnparenthesizedNamedExpression,
+    /// An unparenthesized tuple expression was found where it is not allowed.
+    UnparenthesizedTupleExpression,
+
     /// An invalid expression was found in the assignment `target`.
     InvalidAssignmentTarget,
     /// An invalid expression was found in the named assignment `target`.
@@ -127,8 +132,6 @@ pub enum ParseErrorType {
     SimpleStmtAndCompoundStmtInSameLine,
     /// An invalid usage of iterable unpacking in a comprehension was found.
     IterableUnpackingInComprehension,
-    /// An unparenthesized named expression was found where it is not allowed.
-    UnparenthesizedNamedExpression,
     /// An invalid usage of a starred expression was found.
     StarredExpressionUsage,
 
@@ -197,6 +200,9 @@ impl std::fmt::Display for ParseErrorType {
             }
             ParseErrorType::UnparenthesizedNamedExpression => {
                 write!(f, "unparenthesized named expression cannot be used here")
+            }
+            ParseErrorType::UnparenthesizedTupleExpression => {
+                write!(f, "unparenthesized tuple expression cannot be used here")
             }
             ParseErrorType::StarredExpressionUsage => {
                 write!(f, "starred expression cannot be used here")
