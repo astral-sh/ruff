@@ -1,0 +1,93 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/invalid_fstring_literal_element.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..58,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..26,
+                    value: FString(
+                        ExprFString {
+                            range: 0..26,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 0..26,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 2..25,
+                                                        value: "",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Single,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 27..57,
+                    value: FString(
+                        ExprFString {
+                            range: 27..57,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 27..57,
+                                            elements: [
+                                                Literal(
+                                                    FStringLiteralElement {
+                                                        range: 31..54,
+                                                        value: "",
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: true,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | f'hello \N{INVALID} world'
+  |            ^^^^^^^ Syntax Error: Got unexpected unicode
+2 | f"""hello \N{INVALID} world"""
+  |
+
+
+  |
+1 | f'hello \N{INVALID} world'
+2 | f"""hello \N{INVALID} world"""
+  |              ^^^^^^^ Syntax Error: Got unexpected unicode
+  |
