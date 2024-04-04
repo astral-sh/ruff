@@ -245,6 +245,11 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Del);
 
+        // test_err del_incomplete_target
+        // del x, y.
+        // z
+        // del x, y[
+        // z
         let targets = self.parse_comma_separated_list_into_vec(
             RecoveryContextKind::DeleteTargets,
             |parser| {
@@ -252,11 +257,25 @@ impl<'src> Parser<'src> {
                 helpers::set_expr_ctx(&mut target.expr, ExprContext::Del);
 
                 if !helpers::is_valid_del_target(&target.expr) {
+                    // test_err invalid_del_target
+                    // del x + 1
+                    // del {'x': 1}
+                    // del {'x', 'y'}
+                    // del None, True, False, 1, 1.0, "abc"
                     parser.add_error(ParseErrorType::InvalidDeleteTarget, &target.expr);
                 }
                 target.expr
             },
         );
+
+        if targets.is_empty() {
+            // test_err del_stmt_empty
+            // del
+            self.add_error(
+                ParseErrorType::EmptyDeleteTargets,
+                self.current_token_range(),
+            );
+        }
 
         ast::StmtDelete {
             targets,
