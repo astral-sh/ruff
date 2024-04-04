@@ -1,8 +1,7 @@
-b = """
-    This is a multiline string
-    ending with a useless
-    semicolon.
+"""
+    This is a multiline docstring
+    ending with a useless semicolon.
 """;
 
 
-a = "Another string. Keep the distance between 'a' and 'b'."
+"Another string. Keep the distance between 'a' and 'b'."
