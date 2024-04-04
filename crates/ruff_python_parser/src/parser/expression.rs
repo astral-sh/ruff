@@ -1139,17 +1139,23 @@ impl<'src> Parser<'src> {
     ///
     /// See: <https://docs.python.org/3/reference/grammar.html> (Search "strings:")
     pub(super) fn parse_strings(&mut self) -> Expr {
+        const STRING_START_SET: TokenSet =
+            TokenSet::new([TokenKind::String, TokenKind::FStringStart]);
+
         let start = self.node_start();
         let mut strings = vec![];
 
-        self.parse_list(RecoveryContextKind::Strings, |parser| {
-            let string = match parser.current_token_kind() {
-                TokenKind::String => parser.parse_string(),
-                TokenKind::FStringStart => StringType::FString(parser.parse_fstring()),
-                _ => unreachable!("Expected `String` or `FStringStart` token"),
-            };
-            strings.push(string);
-        });
+        let mut progress = ParserProgress::default();
+
+        while self.at_ts(STRING_START_SET) {
+            progress.assert_progressing(self);
+
+            if self.at(TokenKind::String) {
+                strings.push(self.parse_string_or_byte_literal());
+            } else {
+                strings.push(StringType::FString(self.parse_fstring()));
+            }
+        }
 
         let range = self.node_range(start);
 
@@ -1177,12 +1183,16 @@ impl<'src> Parser<'src> {
     }
 
     /// Handles implicitly concatenated strings.
+    ///
+    /// # Panics
+    ///
+    /// If the length of `strings` is less than 2.
     fn handle_implicitly_concatenated_strings(
         &mut self,
         strings: Vec<StringType>,
         range: TextRange,
     ) -> Expr {
-        debug_assert!(strings.len() > 1);
+        assert!(strings.len() > 1);
 
         let mut has_fstring = false;
         let mut byte_literal_count = 0;
@@ -1198,6 +1208,17 @@ impl<'src> Parser<'src> {
         if has_bytes {
             match byte_literal_count.cmp(&strings.len()) {
                 Ordering::Less => {
+                    // TODO(dhruvmanila): This is not an ideal recovery because the parser
+                    // replaces the byte literals with an invalid string literal node. Any
+                    // downstream tools can extract the raw bytes from the range.
+                    //
+                    // We could convert the node into a string and mark it as invalid
+                    // and would be clever to mark the type which is fewer in quantity.
+
+                    // test_err mixed_bytes_and_non_bytes_literals
+                    // 'first' b'second'
+                    // f'first' b'second'
+                    // 'first' f'second' b'third'
                     self.add_error(
                         ParseErrorType::OtherError(
                             "cannot mix bytes and non-bytes literals".to_string(),
@@ -1213,7 +1234,7 @@ impl<'src> Parser<'src> {
                     for string in strings {
                         values.push(match string {
                             StringType::Bytes(value) => value,
-                            _ => ast::BytesLiteral::invalid(string.range()),
+                            _ => unreachable!("Expected `StringType::Bytes`"),
                         });
                     }
                     return Expr::from(ast::ExprBytesLiteral {
@@ -1224,6 +1245,28 @@ impl<'src> Parser<'src> {
                 Ordering::Greater => unreachable!(),
             }
         }
+
+        // TODO(dhruvmanila): Parser drops unterminated strings here as well
+        // because the lexer doesn't emit them.
+
+        // test_err implicitly_concatenated_unterminated_string
+        // 'hello' 'world
+        // 1 + 1
+        // 'hello' f'world {x}
+        // 2 + 2
+
+        // test_err implicitly_concatenated_unterminated_string_multiline
+        // (
+        //     'hello'
+        //     f'world {x}
+        // )
+        // 1 + 1
+        // (
+        //     'first'
+        //     'second
+        //     f'third'
+        // )
+        // 2 + 2
 
         if !has_fstring {
             let mut values = Vec::with_capacity(strings.len());
@@ -1256,14 +1299,16 @@ impl<'src> Parser<'src> {
         })
     }
 
-    /// Parses a single string literal.
+    /// Parses a single string or byte literal.
     ///
     /// This does not handle implicitly concatenated strings.
     ///
     /// # Panics
     ///
     /// If the parser isn't positioned at a `String` token.
-    fn parse_string(&mut self) -> StringType {
+    ///
+    /// See: <https://docs.python.org/3.13/reference/lexical_analysis.html#string-and-bytes-literals>
+    fn parse_string_or_byte_literal(&mut self) -> StringType {
         let (Tok::String { value, kind }, range) = self.bump(TokenKind::String) else {
             unreachable!()
         };
@@ -1275,12 +1320,19 @@ impl<'src> Parser<'src> {
                 self.add_error(ParseErrorType::Lexical(error.into_error()), location);
 
                 if kind.is_byte_string() {
+                    // test_err invalid_byte_literal
+                    // b'123a𝐁c'
+                    // rb"a𝐁c123"
+                    // b"""123a𝐁c"""
                     StringType::Bytes(ast::BytesLiteral {
                         value: Box::new([]),
                         range,
                         flags: ast::BytesLiteralFlags::from(kind).with_invalid(),
                     })
                 } else {
+                    // test_err invalid_string_literal
+                    // 'hello \N{INVALID} world'
+                    // """hello \N{INVALID} world"""
                     StringType::Str(ast::StringLiteral {
                         value: "".into(),
                         range,
@@ -1300,6 +1352,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `FStringStart` token.
     ///
     /// See: <https://docs.python.org/3/reference/grammar.html> (Search "fstring:")
+    /// See: <https://docs.python.org/3/reference/lexical_analysis.html#formatted-string-literals>
     fn parse_fstring(&mut self) -> ast::FString {
         let start = self.node_start();
 
@@ -1338,6 +1391,9 @@ impl<'src> Parser<'src> {
                     FStringElement::Literal(
                         parse_fstring_literal_element(value, kind, range).unwrap_or_else(
                             |lex_error| {
+                                // test_err invalid_fstring_literal_element
+                                // f'hello \N{INVALID} world'
+                                // f"""hello \N{INVALID} world"""
                                 let location = lex_error.location();
                                 parser.add_error(
                                     ParseErrorType::Lexical(lex_error.into_error()),
@@ -1380,11 +1436,26 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `{` token.
     fn parse_fstring_expression_element(&mut self) -> ast::FStringExpressionElement {
         let start = self.node_start();
-
         self.bump(TokenKind::Lbrace);
 
-        let value = self.parse_expression_list();
+        // test_err f_string_empty_expression
+        // f"{}"
+        // f"{  }"
+
+        // test_err f_string_invalid_starred_expr
+        // # Starred expression inside f-string has a minimum precedence of bitwise or.
+        // f"{*}"
+        // f"{*x and y}"
+        // f"{*yield x}"
+        let value = self.parse_star_expression_list();
+
         if !value.is_parenthesized && value.expr.is_lambda_expr() {
+            // TODO(dhruvmanila): This requires making some changes in lambda expression
+            // parsing logic to handle the emitted `FStringMiddle` token in case the
+            // lambda expression is not parenthesized.
+
+            // test_err f_string_lambda_without_parentheses
+            // f"{lambda x: x}"
             self.add_error(
                 ParseErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
                 value.range(),
@@ -1409,6 +1480,8 @@ impl<'src> Parser<'src> {
                     "r" => ConversionFlag::Repr,
                     "a" => ConversionFlag::Ascii,
                     _ => {
+                        // test_err f_string_invalid_conversion_flag_name_tok
+                        // f"{x!z}"
                         self.add_error(
                             ParseErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
                             conversion_flag_range,
@@ -1417,6 +1490,9 @@ impl<'src> Parser<'src> {
                     }
                 }
             } else {
+                // test_err f_string_invalid_conversion_flag_other_tok
+                // f"{x!123}"
+                // f"{x!'a'}"
                 self.add_error(
                     ParseErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
                     conversion_flag_range,
@@ -1440,6 +1516,22 @@ impl<'src> Parser<'src> {
 
         // We're using `eat` here instead of `expect` to use the f-string specific error type.
         if !self.eat(TokenKind::Rbrace) {
+            // TODO(dhruvmanila): This requires some changes in the lexer. One of them
+            // would be to emit `FStringEnd`. Currently, the following test cases doesn't
+            // really work as expected. Refer https://github.com/astral-sh/ruff/pull/10372
+
+            // test_err f_string_unclosed_lbrace
+            // f"{"
+            // f"{foo!r"
+            // f"{foo="
+            // f"{"
+            // f"""{"""
+
+            // The lexer does emit `FStringEnd` for the following test cases:
+
+            // test_err f_string_unclosed_lbrace_in_format_spec
+            // f"hello {x:"
+            // f"hello {x:.3f"
             self.add_error(
                 ParseErrorType::FStringError(FStringErrorType::UnclosedLbrace),
                 self.current_token_range(),
