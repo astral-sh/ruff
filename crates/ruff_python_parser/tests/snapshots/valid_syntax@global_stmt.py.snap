@@ -1,20 +1,20 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/valid/statement/global.py
+input_file: crates/ruff_python_parser/resources/inline/ok/global_stmt.py
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..23,
+        range: 0..24,
         body: [
             Global(
                 StmtGlobal {
                     range: 0..8,
                     names: [
                         Identifier {
-                            id: "a",
+                            id: "x",
                             range: 7..8,
                         },
                     ],
@@ -25,15 +25,15 @@ Module(
                     range: 9..23,
                     names: [
                         Identifier {
-                            id: "a",
+                            id: "x",
                             range: 16..17,
                         },
                         Identifier {
-                            id: "b",
+                            id: "y",
                             range: 19..20,
                         },
                         Identifier {
-                            id: "c",
+                            id: "z",
                             range: 22..23,
                         },
                     ],
