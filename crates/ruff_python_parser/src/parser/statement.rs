@@ -291,6 +291,12 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a `raise` statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `raise` token.
+    ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-raise_stmt>
     fn parse_raise_statement(&mut self) -> ast::StmtRaise {
         let start = self.node_start();
@@ -299,37 +305,45 @@ impl<'src> Parser<'src> {
         let exc = if self.at(TokenKind::Newline) {
             None
         } else {
+            // TODO(dhruvmanila): Disallow starred and yield expression
+            // test_err raise_stmt_invalid_exc
+            // raise *x
+            // raise yield x
+            // raise x := 1
             let exc = self.parse_expression_list();
 
-            if let Expr::Tuple(node) = &exc.expr {
-                if !node.parenthesized {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "unparenthesized tuple not allowed in `raise` statement".to_string(),
-                        ),
-                        node.range,
-                    );
-                }
+            if let Some(ast::ExprTuple {
+                parenthesized: false,
+                ..
+            }) = exc.as_tuple_expr()
+            {
+                // test_err raise_stmt_unparenthesized_tuple_exc
+                // raise x,
+                // raise x, y
+                // raise x, y from z
+                self.add_error(ParseErrorType::UnparenthesizedTupleExpression, &exc);
             }
 
             Some(Box::new(exc.expr))
         };
 
         let cause = (exc.is_some() && self.eat(TokenKind::From)).then(|| {
+            // TODO(dhruvmanila): Disallow starred and yield expression
+            // test_err raise_stmt_invalid_cause
+            // raise x from *y
+            // raise x from yield y
+            // raise x from y := 1
             let cause = self.parse_expression_list();
 
-            if let Expr::Tuple(ast::ExprTuple {
+            if let Some(ast::ExprTuple {
                 parenthesized: false,
-                range: tuple_range,
                 ..
-            }) = &cause.expr
+            }) = cause.as_tuple_expr()
             {
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "unparenthesized tuple not allowed in `raise from` statement".to_string(),
-                    ),
-                    tuple_range,
-                );
+                // test_err raise_stmt_unparenthesized_tuple_cause
+                // raise x from y,
+                // raise x from y, z
+                self.add_error(ParseErrorType::UnparenthesizedTupleExpression, &cause);
             }
 
             Box::new(cause.expr)
