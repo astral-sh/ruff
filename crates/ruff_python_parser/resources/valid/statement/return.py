@@ -1,8 +1,14 @@
 return
-return a and b
-return 1 < 2
-return None
-return 1, 2,
 return x
-return f()
-return a.f()
+return *x
+return *x | y
+return *x, *y
+return (x := 1)
+return None
+return x and y
+return 1 < 2
+return 1, 2,
+return call()
+return attr.value()
+return await x
+return lambda x: y
