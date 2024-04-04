@@ -59,13 +59,13 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ExprSubscript) {
         return;
     }
 
-    let Some(name) = match_sorted_min_max(subscript, checker.semantic()) else {
+    let Some(index) = match_sorted_min_max(subscript, checker.semantic()) else {
         return;
     };
 
     let mut diagnostic = Diagnostic::new(SortedMinMax, subscript.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-        name.to_string(),
+        index.to_string(),
         subscript.start(),
         subscript.end(),
     )));
