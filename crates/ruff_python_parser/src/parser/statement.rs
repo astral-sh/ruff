@@ -264,14 +264,26 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a `return` statement.
+    ///
+    /// # Panics
+    ///
+    /// If the parser isn't positioned at a `return` token.
+    ///
     /// See: <https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-return_stmt>
     fn parse_return_statement(&mut self) -> ast::StmtReturn {
         let start = self.node_start();
         self.bump(TokenKind::Return);
 
+        // test_err return_stmt_invalid_expr
+        // return *
+        // return yield x
+        // return yield from x
+        // return x := 1
+        // return *x and y
         let value = self
             .at_expr()
-            .then(|| Box::new(self.parse_expression_list().expr));
+            .then(|| Box::new(self.parse_star_expression_list().expr));
 
         ast::StmtReturn {
             range: self.node_range(start),
