@@ -2125,8 +2125,9 @@ impl<'a> Checker<'a> {
         self.semantic.restore(snapshot);
     }
 
-    /// Visit all deferred lambdas. Returns a list of snapshots, such that the caller can restore
-    /// the semantic model to the state it was in before visiting the deferred lambdas.
+    /// After initial traversal of the souce tree has been completed,
+    /// visit all lambdas. Lambdas are deferred during the initial traversal
+    /// for the same reason as function bodies.
     fn visit_deferred_lambdas(&mut self) {
         let snapshot = self.semantic.snapshot();
         while !self.visit.lambdas.is_empty() {
