@@ -1997,36 +1997,34 @@ impl<'src> Parser<'src> {
         if self.eat(TokenKind::Newline) {
             if self.at(TokenKind::Indent) {
                 return self.parse_block();
-            } else {
-                // test_err clause_expect_indented_block
-                // # Here, the error is highlighted at the `pass` token
-                // if True:
-                // pass
-                // # The parser is at the end of the program, so let's highlight
-                // # at the newline token after `:`
-                // if True:
-                self.add_error(
-                    ParseErrorType::OtherError(format!(
-                        "Expected an indented block after {parent_clause}"
-                    )),
-                    if self.current_token_range().is_empty() {
-                        newline_range
-                    } else {
-                        self.current_token_range()
-                    },
-                );
             }
+            // test_err clause_expect_indented_block
+            // # Here, the error is highlighted at the `pass` token
+            // if True:
+            // pass
+            // # The parser is at the end of the program, so let's highlight
+            // # at the newline token after `:`
+            // if True:
+            self.add_error(
+                ParseErrorType::OtherError(format!(
+                    "Expected an indented block after {parent_clause}"
+                )),
+                if self.current_token_range().is_empty() {
+                    newline_range
+                } else {
+                    self.current_token_range()
+                },
+            );
         } else {
             if self.at_simple_stmt() {
                 return self.parse_simple_statements();
-            } else {
-                // test_err clause_expect_single_statement
-                // if True: if True: pass
-                self.add_error(
-                    ParseErrorType::OtherError("Expected a single statement".to_string()),
-                    self.current_token_range(),
-                );
             }
+            // test_err clause_expect_single_statement
+            // if True: if True: pass
+            self.add_error(
+                ParseErrorType::OtherError("Expected a single statement".to_string()),
+                self.current_token_range(),
+            );
         }
 
         Vec::new()
@@ -2449,25 +2447,25 @@ struct ParsedWithItem {
     used_ambiguous_lpar: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum ElifOrElse {
     Elif,
     Else,
 }
 
 impl ElifOrElse {
-    const fn is_elif(&self) -> bool {
+    const fn is_elif(self) -> bool {
         matches!(self, ElifOrElse::Elif)
     }
 
-    const fn as_token_kind(&self) -> TokenKind {
+    const fn as_token_kind(self) -> TokenKind {
         match self {
             ElifOrElse::Elif => TokenKind::Elif,
             ElifOrElse::Else => TokenKind::Else,
         }
     }
 
-    const fn as_clause(&self) -> Clause {
+    const fn as_clause(self) -> Clause {
         match self {
             ElifOrElse::Elif => Clause::ElIf,
             ElifOrElse::Else => Clause::Else,
