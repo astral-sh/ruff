@@ -9,6 +9,7 @@ use ruff_python_ast::ExprSubscript;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
 use ruff_python_ast::Number;
 use ruff_text_size::Ranged;
 
@@ -38,7 +39,11 @@ use ruff_text_size::Ranged;
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 
 #[violation]
-pub struct SortedMinMax;
+pub struct SortedMinMax {
+    min_max: MinMax,
+    expression: SourceCodeSnippet,
+    replacement: SourceCodeSnippet,
+}
 
 impl Violation for SortedMinMax {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
@@ -63,7 +68,16 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ExprSubscript) {
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(SortedMinMax, subscript.range());
+    let replacement = format!("{}(sorted())", if index == 0 { "min" } else { "max" });
+
+    let mut diagnostic = Diagnostic::new(
+        SortedMinMax {
+            min_max: if index == 0 { MinMax::Min } else { MinMax::Max },
+            expression: SourceCodeSnippet::from_str(checker.locator().slice(subscript)),
+            replacement: SourceCodeSnippet::new(replacement),
+        },
+        subscript.range(),
+    );
     diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
         index.to_string(),
         subscript.start(),
@@ -100,5 +114,10 @@ pub(crate) fn match_sorted_min_max(
     None
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum MinMax {
+    Min,
+    Max,
+}
 // TODO:
 // - Caveat reverse=True with -1 as unsafe
