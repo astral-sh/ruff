@@ -271,7 +271,7 @@ impl SupportedCodeAction {
         [
             Self::QuickFix,
             Self::SourceFixAll,
-            // Self::SourceOrganizeImports,
+            Self::SourceOrganizeImports,
         ]
         .into_iter()
     }
