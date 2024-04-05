@@ -32,31 +32,6 @@ pub(super) fn set_expr_ctx(expr: &mut Expr, new_ctx: ExprContext) {
 }
 
 /// Check if the given expression is itself or contains an expression that is
-/// valid on the left hand side of an assignment. For example, identifiers,
-/// starred expressions, attribute expressions, subscript expressions,
-/// list and tuple unpacking are valid assignment targets.
-pub(super) fn is_valid_assignment_target(expr: &Expr) -> bool {
-    match expr {
-        Expr::Starred(ast::ExprStarred { value, .. }) => is_valid_assignment_target(value),
-        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            elts.iter().all(is_valid_assignment_target)
-        }
-        Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) => true,
-        _ => false,
-    }
-}
-
-/// Check if the given expression is itself or contains an expression that is
-/// valid on the left hand side of an augmented assignment. For example, identifiers,
-/// attribute and subscript expressions are valid augmented assignment targets.
-pub(super) fn is_valid_aug_assignment_target(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_)
-    )
-}
-
-/// Check if the given expression is itself or contains an expression that is
 /// valid as a target of a `del` statement.
 pub(super) fn is_valid_del_target(expr: &Expr) -> bool {
     // https://github.com/python/cpython/blob/d864b0094f9875c5613cbb0b7f7f3ca8f1c6b606/Parser/action_helpers.c#L1150-L1180

@@ -1,0 +1,167 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/ann_assign_stmt_invalid_target.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..51,
+        body: [
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 0..18,
+                    target: StringLiteral(
+                        ExprStringLiteral {
+                            range: 0..5,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 0..5,
+                                        value: "abc",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Double,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            range: 7..10,
+                            id: "str",
+                            ctx: Load,
+                        },
+                    ),
+                    value: Some(
+                        StringLiteral(
+                            ExprStringLiteral {
+                                range: 13..18,
+                                value: StringLiteralValue {
+                                    inner: Single(
+                                        StringLiteral {
+                                            range: 13..18,
+                                            value: "def",
+                                            flags: StringLiteralFlags {
+                                                quote_style: Double,
+                                                prefix: Empty,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                },
+                            },
+                        ),
+                    ),
+                    simple: false,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 19..50,
+                    target: List(
+                        ExprList {
+                            range: 19..29,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 20..23,
+                                        value: Int(
+                                            123,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 25..28,
+                                        value: Int(
+                                            456,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Tuple(
+                        ExprTuple {
+                            range: 31..41,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 32..35,
+                                        id: "int",
+                                        ctx: Load,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 37..40,
+                                        id: "int",
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                    value: Some(
+                        Tuple(
+                            ExprTuple {
+                                range: 44..50,
+                                elts: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 45..46,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 48..49,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                                parenthesized: true,
+                            },
+                        ),
+                    ),
+                    simple: false,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | "abc": str = "def"
+  | ^^^^^ Syntax Error: invalid assignment target
+2 | [123, 456]: (int, int) = (1, 2)
+  |
+
+
+  |
+1 | "abc": str = "def"
+2 | [123, 456]: (int, int) = (1, 2)
+  |  ^^^ Syntax Error: invalid assignment target
+  |
+
+
+  |
+1 | "abc": str = "def"
+2 | [123, 456]: (int, int) = (1, 2)
+  |       ^^^ Syntax Error: invalid assignment target
+  |

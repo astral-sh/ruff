@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/statement/annotated_assign
 ```
 Module(
     ModModule {
-        range: 0..55,
+        range: 0..84,
         body: [
             AnnAssign(
                 StmtAnnAssign {
@@ -155,6 +155,54 @@ Module(
                                 ],
                                 ctx: Load,
                                 parenthesized: true,
+                            },
+                        ),
+                    ),
+                    simple: true,
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    range: 56..83,
+                    target: Name(
+                        ExprName {
+                            range: 56..57,
+                            id: "x",
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: If(
+                        ExprIf {
+                            range: 59..79,
+                            test: BooleanLiteral(
+                                ExprBooleanLiteral {
+                                    range: 66..70,
+                                    value: true,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 59..62,
+                                    id: "int",
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Name(
+                                ExprName {
+                                    range: 76..79,
+                                    id: "str",
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    value: Some(
+                        NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 82..83,
+                                value: Int(
+                                    1,
+                                ),
                             },
                         ),
                     ),

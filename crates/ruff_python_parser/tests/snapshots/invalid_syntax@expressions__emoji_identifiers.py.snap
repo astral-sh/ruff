@@ -11,7 +11,7 @@ Module(
         body: [
             Assign(
                 StmtAssign {
-                    range: 0..5,
+                    range: 0..30,
                     targets: [
                         Name(
                             ExprName {
@@ -32,7 +32,7 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 32..37,
+                    range: 32..41,
                     targets: [
                         Name(
                             ExprName {
@@ -87,20 +87,9 @@ Module(
 1 | a = (🐶
 2 |     # comment 🐶
 3 | )
-  | ^ Syntax Error: Expected a statement
+  | ^ Syntax Error: Expected an assignment target
 4 | 
 5 | a = (🐶 +
-  |
-
-
-  |
-1 | a = (🐶
-2 |     # comment 🐶
-3 | )
-  |  ^ Syntax Error: Expected a statement
-4 | 
-5 | a = (🐶 +
-6 |     # comment
   |
 
 
@@ -109,6 +98,26 @@ Module(
 4 | 
 5 | a = (🐶 +
   |      ^^ Syntax Error: Got unexpected token 🐶
+6 |     # comment
+7 | 🐶)
+  |
+
+
+  |
+3 | )
+4 | 
+5 | a = (🐶 +
+  |         ^ Syntax Error: Expected an assignment target
+6 |     # comment
+7 | 🐶)
+  |
+
+
+  |
+3 | )
+4 | 
+5 | a = (🐶 +
+  | ^^^^^^^^^ Syntax Error: use `;` to separate simple statements
 6 |     # comment
 7 | 🐶)
   |
