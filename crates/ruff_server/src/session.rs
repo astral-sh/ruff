@@ -96,12 +96,10 @@ impl Session {
     }
 
     pub(crate) fn take_snapshot(&self, url: &Url) -> Option<DocumentSnapshot> {
-        let resolved_settings = self.workspaces.client_settings(url, &self.global_settings);
-        tracing::info!("Resolved settings for document {url}: {resolved_settings:?}");
         Some(DocumentSnapshot {
             configuration: self.workspaces.configuration(url)?.clone(),
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
-            client_settings: resolved_settings,
+            client_settings: self.workspaces.client_settings(url, &self.global_settings),
             document_ref: self.workspaces.snapshot(url)?,
             position_encoding: self.position_encoding,
             url: url.clone(),
