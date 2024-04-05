@@ -1,5 +1,6 @@
-use std::{collections::HashMap, str::FromStr};
+use std::str::FromStr;
 
+use crate::edit::WorkspaceEditTracker;
 use crate::server::api::LSPResult;
 use crate::server::client;
 use crate::server::schedule::Task;
@@ -9,7 +10,6 @@ use crate::{edit::DocumentVersion, server};
 use lsp_server::ErrorCode;
 use lsp_types::{self as types, request as req};
 use serde::Deserialize;
-use types::TextDocumentEdit;
 
 #[derive(Debug)]
 enum Command {
@@ -24,12 +24,6 @@ pub(crate) struct ExecuteCommand;
 struct TextDocumentArgument {
     uri: types::Url,
     version: DocumentVersion,
-}
-
-#[derive(Debug)]
-enum CommandEditTracker {
-    DocumentChanges(Vec<types::TextDocumentEdit>),
-    Changes(HashMap<types::Url, Vec<types::TextEdit>>),
 }
 
 impl super::RequestHandler for ExecuteCommand {
@@ -51,11 +45,17 @@ impl super::SyncRequestHandler for ExecuteCommand {
             return Err(anyhow::anyhow!("Cannot execute the '{}' command: the client does not support `workspace/applyEdit`", command.label())).with_failure_code(ErrorCode::InternalError);
         }
 
-        let mut edit_tracker =
-            CommandEditTracker::new(session.resolved_client_capabilities().document_changes);
-        for arg in params.arguments {
-            let TextDocumentArgument { uri, version } =
-                serde_json::from_value(arg).with_failure_code(ErrorCode::InvalidParams)?;
+        let mut arguments: Vec<TextDocumentArgument> = params
+            .arguments
+            .into_iter()
+            .map(|value| serde_json::from_value(value).with_failure_code(ErrorCode::InvalidParams))
+            .collect::<server::Result<_>>()?;
+
+        arguments.sort_by(|a, b| a.uri.cmp(&b.uri));
+        arguments.dedup_by(|a, b| a.uri == b.uri);
+
+        let mut edit_tracker = WorkspaceEditTracker::new(session.resolved_client_capabilities());
+        for TextDocumentArgument { uri, version } in arguments {
             let snapshot = session
                 .take_snapshot(&uri)
                 .ok_or(anyhow::anyhow!("Document snapshot not available for {uri}",))
@@ -69,14 +69,14 @@ impl super::SyncRequestHandler for ExecuteCommand {
                     )
                     .with_failure_code(ErrorCode::InternalError)?;
                     edit_tracker
-                        .add_edits_for_document(uri, version, edits)
+                        .set_edits_for_document(uri, version, edits)
                         .with_failure_code(ErrorCode::InternalError)?;
                 }
                 Command::Format => {
                     let response = super::format::format_document(&snapshot)?;
                     if let Some(edits) = response {
                         edit_tracker
-                            .add_edits_for_document(uri, version, edits)
+                            .set_edits_for_document(uri, version, edits)
                             .with_failure_code(ErrorCode::InternalError)?;
                     }
                 }
@@ -88,7 +88,7 @@ impl super::SyncRequestHandler for ExecuteCommand {
                     )
                     .with_failure_code(ErrorCode::InternalError)?;
                     edit_tracker
-                        .add_edits_for_document(uri, version, edits)
+                        .set_edits_for_document(uri, version, edits)
                         .with_failure_code(ErrorCode::InternalError)?;
                 }
             }
@@ -127,66 +127,6 @@ impl FromStr for Command {
             "ruff.applyOrganizeImports" => Self::OrganizeImports,
             _ => return Err(anyhow::anyhow!("Invalid command `{name}`")),
         })
-    }
-}
-
-impl CommandEditTracker {
-    fn new(document_changes_supported: bool) -> Self {
-        if document_changes_supported {
-            Self::DocumentChanges(Vec::default())
-        } else {
-            Self::Changes(HashMap::default())
-        }
-    }
-
-    fn add_edits_for_document(
-        &mut self,
-        uri: types::Url,
-        version: DocumentVersion,
-        edits: Vec<types::TextEdit>,
-    ) -> crate::Result<()> {
-        match self {
-            Self::DocumentChanges(document_edits) => {
-                if document_edits
-                    .iter()
-                    .any(|document| document.text_document.uri == uri)
-                {
-                    return Err(anyhow::anyhow!("Attempted to add edits for a document that was already edited - did you pass in the same document twice?"));
-                }
-                document_edits.push(TextDocumentEdit {
-                    text_document: types::OptionalVersionedTextDocumentIdentifier {
-                        uri,
-                        version: Some(version),
-                    },
-                    edits: edits.into_iter().map(types::OneOf::Left).collect(),
-                });
-                Ok(())
-            }
-            Self::Changes(changes) => {
-                if changes.get(&uri).is_some() {
-                    return Err(anyhow::anyhow!("Attempted to add edits for a document that was already edited - did you pass in the same document twice?"));
-                }
-                changes.insert(uri, edits);
-                Ok(())
-            }
-        }
-    }
-
-    fn is_empty(&self) -> bool {
-        match self {
-            Self::DocumentChanges(document_edits) => document_edits.is_empty(),
-            Self::Changes(changes) => changes.is_empty(),
-        }
-    }
-
-    fn into_workspace_edit(self) -> types::WorkspaceEdit {
-        match self {
-            Self::DocumentChanges(document_edits) => types::WorkspaceEdit {
-                document_changes: Some(types::DocumentChanges::Edits(document_edits)),
-                ..Default::default()
-            },
-            Self::Changes(changes) => types::WorkspaceEdit::new(changes),
-        }
     }
 }
 

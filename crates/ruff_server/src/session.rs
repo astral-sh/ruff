@@ -15,7 +15,7 @@ use rustc_hash::FxHashMap;
 use crate::edit::{Document, DocumentVersion};
 use crate::PositionEncoding;
 
-use self::capabilities::ResolvedClientCapabilities;
+pub(crate) use self::capabilities::ResolvedClientCapabilities;
 use self::settings::ResolvedClientSettings;
 pub(crate) use self::settings::{AllSettings, ClientSettings};
 
