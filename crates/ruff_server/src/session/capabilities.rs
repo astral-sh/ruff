@@ -4,6 +4,7 @@ use lsp_types::ClientCapabilities;
 pub(crate) struct ResolvedClientCapabilities {
     pub(crate) code_action_deferred_edit_resolution: bool,
     pub(crate) apply_edit: bool,
+    pub(crate) document_changes: bool,
 }
 
 impl ResolvedClientCapabilities {
@@ -25,10 +26,18 @@ impl ResolvedClientCapabilities {
             .and_then(|workspace| workspace.apply_edit)
             .unwrap_or_default();
 
+        let document_changes = client_capabilities
+            .workspace
+            .as_ref()
+            .and_then(|workspace| workspace.workspace_edit.as_ref())
+            .and_then(|workspace_edit| workspace_edit.document_changes)
+            .unwrap_or_default();
+
         Self {
             code_action_deferred_edit_resolution: code_action_data_support
                 && code_action_edit_resolution,
             apply_edit,
+            document_changes,
         }
     }
 }
