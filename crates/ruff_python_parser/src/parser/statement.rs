@@ -790,6 +790,11 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Equal);
 
+        // test_err type_alias_incomplete_stmt
+        // type
+        // type x
+        // type x =
+
         // test_err type_alias_invalid_value_expr
         // type x = *y
         // type x = yield y
@@ -2091,12 +2096,18 @@ impl<'src> Parser<'src> {
 
         if self.eat(TokenKind::Star) {
             let name = self.parse_identifier();
+
+            // test_err type_param_type_var_tuple_bound
+            // type X[*T: int] = int
             ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple {
                 range: self.node_range(start),
                 name,
             })
         } else if self.eat(TokenKind::DoubleStar) {
             let name = self.parse_identifier();
+
+            // test_err type_param_param_spec_bound
+            // type X[**T: int] = int
             ast::TypeParam::ParamSpec(ast::TypeParamParamSpec {
                 range: self.node_range(start),
                 name,
