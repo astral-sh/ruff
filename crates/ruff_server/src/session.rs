@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::{ops::Deref, sync::Arc};
 
 use anyhow::anyhow;
-use lsp_types::{ClientCapabilities, ServerCapabilities, Url};
+use lsp_types::{ClientCapabilities, Url};
 use ruff_workspace::resolver::{ConfigurationTransformer, Relativity};
 use rustc_hash::FxHashMap;
 
@@ -80,16 +80,12 @@ pub(crate) struct DocumentRef {
 impl Session {
     pub(crate) fn new(
         client_capabilities: &ClientCapabilities,
-        server_capabilities: &ServerCapabilities,
+        position_encoding: PositionEncoding,
         workspaces: &[Url],
         settings_controller: SettingsController,
     ) -> crate::Result<Self> {
         Ok(Self {
-            position_encoding: server_capabilities
-                .position_encoding
-                .as_ref()
-                .and_then(|encoding| encoding.try_into().ok())
-                .unwrap_or_default(),
+            position_encoding,
             resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
                 client_capabilities,
             )),

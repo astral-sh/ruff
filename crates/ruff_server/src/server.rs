@@ -47,7 +47,8 @@ impl Server {
         let init_params: types::InitializeParams = serde_json::from_value(params)?;
 
         let client_capabilities = init_params.capabilities;
-        let server_capabilities = Self::server_capabilities(&client_capabilities);
+        let position_encoding = Self::find_best_position_encoding(&client_capabilities);
+        let server_capabilities = Self::server_capabilities(position_encoding);
 
         let user_settings = crate::session::SettingsController::from_value(
             init_params.initialization_options.unwrap_or_default(),
@@ -80,7 +81,7 @@ impl Server {
             worker_threads,
             session: Session::new(
                 &client_capabilities,
-                &server_capabilities,
+                position_encoding,
                 &workspaces,
                 user_settings,
             )?,
@@ -185,8 +186,8 @@ impl Server {
         }
     }
 
-    fn server_capabilities(client_capabilities: &ClientCapabilities) -> types::ServerCapabilities {
-        let position_encoding = client_capabilities
+    fn find_best_position_encoding(client_capabilities: &ClientCapabilities) -> PositionEncoding {
+        client_capabilities
             .general
             .as_ref()
             .and_then(|general_capabilities| general_capabilities.position_encodings.as_ref())
@@ -196,7 +197,10 @@ impl Server {
                     .filter_map(|encoding| PositionEncoding::try_from(encoding).ok())
                     .max() // this selects the highest priority position encoding
             })
-            .unwrap_or_default();
+            .unwrap_or_default()
+    }
+
+    fn server_capabilities(position_encoding: PositionEncoding) -> types::ServerCapabilities {
         types::ServerCapabilities {
             position_encoding: Some(position_encoding.into()),
             code_action_provider: Some(types::CodeActionProviderCapability::Options(
