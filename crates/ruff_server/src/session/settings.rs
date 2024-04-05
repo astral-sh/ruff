@@ -4,24 +4,21 @@ use lsp_types::Url;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 
-#[cfg(test)]
-mod tests;
-
-pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, UserSettings>;
+pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
 
 /// Built from the initialization options provided by the client.
 pub(crate) struct AllSettings {
-    pub(crate) global_settings: UserSettings,
+    pub(crate) global_settings: ClientSettings,
     pub(crate) workspace_settings: WorkspaceSettingsMap,
 }
 
-/// Resolved user settings for a specific document. These settings are meant to be
+/// Resolved client settings for a specific document. These settings are meant to be
 /// used directly by the server, and are *not* a 1:1 representation with how the client
 /// sends them.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[allow(dead_code, clippy::struct_excessive_bools)]
-pub(crate) struct ResolvedUserSettings {
+pub(crate) struct ResolvedClientSettings {
     fix_all: bool,
     organize_imports: bool,
     lint_enable: bool,
@@ -29,11 +26,11 @@ pub(crate) struct ResolvedUserSettings {
     fix_violation_enable: bool,
 }
 
-/// This is a direct representation of the user settings schema sent by the client.
+/// This is a direct representation of the settings schema sent by the client.
 #[derive(Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct UserSettings {
+pub(crate) struct ClientSettings {
     fix_all: Option<bool>,
     organize_imports: Option<bool>,
     lint: Option<Lint>,
@@ -41,14 +38,14 @@ pub(crate) struct UserSettings {
 }
 
 /// This is a direct representation of the workspace settings schema,
-/// which inherits the schema of [`UserSettings`] and adds extra fields
+/// which inherits the schema of [`ClientSettings`] and adds extra fields
 /// to describe the workspace it applies to.
 #[derive(Debug, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 struct WorkspaceSettings {
     #[serde(flatten)]
-    user_settings: UserSettings,
+    settings: ClientSettings,
     workspace: Url,
 }
 
@@ -82,12 +79,12 @@ struct CodeActionSettings {
 enum InitializationOptions {
     #[serde(rename_all = "camelCase")]
     HasWorkspaces {
-        global_settings: UserSettings,
+        global_settings: ClientSettings,
         #[serde(rename = "settings")]
         workspace_settings: Vec<WorkspaceSettings>,
     },
     GlobalOnly {
-        settings: Option<UserSettings>,
+        settings: Option<ClientSettings>,
     },
 }
 
@@ -116,32 +113,29 @@ impl AllSettings {
                 .into_iter()
                 .flatten()
                 .map(|workspace_settings| {
-                    (
-                        workspace_settings.workspace,
-                        workspace_settings.user_settings,
-                    )
+                    (workspace_settings.workspace, workspace_settings.settings)
                 })
                 .collect(),
         }
     }
 }
 
-impl ResolvedUserSettings {
-    /// Resolves a series of user settings, prioritizing workspace settings over global settings.
+impl ResolvedClientSettings {
+    /// Resolves a series of client settings, prioritizing workspace settings over global settings.
     /// Any fields not specified by either are set to their defaults.
     pub(super) fn with_workspace(
-        workspace_settings: &UserSettings,
-        global_settings: &UserSettings,
+        workspace_settings: &ClientSettings,
+        global_settings: &ClientSettings,
     ) -> Self {
         Self::new_impl(&[workspace_settings, global_settings])
     }
 
     /// Resolves global settings only.
-    pub(super) fn global_only(global_settings: &UserSettings) -> Self {
+    pub(super) fn global_only(global_settings: &ClientSettings) -> Self {
         Self::new_impl(&[global_settings])
     }
 
-    fn new_impl(all_settings: &[&UserSettings]) -> Self {
+    fn new_impl(all_settings: &[&ClientSettings]) -> Self {
         Self {
             fix_all: Self::resolve_or(all_settings, |settings| settings.fix_all, true),
             organize_imports: Self::resolve_or(
@@ -180,8 +174,8 @@ impl ResolvedUserSettings {
     }
 
     fn resolve_or<T>(
-        all_settings: &[&UserSettings],
-        get: impl Fn(&UserSettings) -> Option<T>,
+        all_settings: &[&ClientSettings],
+        get: impl Fn(&ClientSettings) -> Option<T>,
         default: T,
     ) -> T {
         all_settings
@@ -195,5 +189,257 @@ impl ResolvedUserSettings {
 impl Default for InitializationOptions {
     fn default() -> Self {
         Self::GlobalOnly { settings: None }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use insta::assert_debug_snapshot;
+
+    use super::*;
+
+    /// Deserializes a JSON file at `resources/test/fixtures` + the path provided.
+    macro_rules! fixture {
+        ($path:expr) => {
+            serde_json::from_str(include_str!(std::concat!(
+                "../../resources/test/fixtures/",
+                $path
+            )))
+            .expect("test fixture JSON should deserialize")
+        };
+    }
+
+    #[test]
+    fn test_vs_code_init_options_deserialize() {
+        let options: InitializationOptions =
+            fixture!("settings/vs_code_initialization_options.json");
+
+        assert_debug_snapshot!(options, @r###"
+        HasWorkspaces {
+            global_settings: ClientSettings {
+                fix_all: Some(
+                    false,
+                ),
+                organize_imports: Some(
+                    true,
+                ),
+                lint: Some(
+                    Lint {
+                        enable: Some(
+                            true,
+                        ),
+                    },
+                ),
+                code_action: Some(
+                    CodeAction {
+                        disable_rule_comment: Some(
+                            CodeActionSettings {
+                                enable: Some(
+                                    false,
+                                ),
+                            },
+                        ),
+                        fix_violation: Some(
+                            CodeActionSettings {
+                                enable: Some(
+                                    false,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            },
+            workspace_settings: [
+                WorkspaceSettings {
+                    settings: ClientSettings {
+                        fix_all: Some(
+                            true,
+                        ),
+                        organize_imports: Some(
+                            true,
+                        ),
+                        lint: Some(
+                            Lint {
+                                enable: Some(
+                                    true,
+                                ),
+                            },
+                        ),
+                        code_action: Some(
+                            CodeAction {
+                                disable_rule_comment: Some(
+                                    CodeActionSettings {
+                                        enable: Some(
+                                            false,
+                                        ),
+                                    },
+                                ),
+                                fix_violation: Some(
+                                    CodeActionSettings {
+                                        enable: Some(
+                                            false,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                    workspace: Url {
+                        scheme: "file",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: None,
+                        port: None,
+                        path: "/Users/test/projects/pandas",
+                        query: None,
+                        fragment: None,
+                    },
+                },
+                WorkspaceSettings {
+                    settings: ClientSettings {
+                        fix_all: Some(
+                            true,
+                        ),
+                        organize_imports: Some(
+                            true,
+                        ),
+                        lint: Some(
+                            Lint {
+                                enable: Some(
+                                    true,
+                                ),
+                            },
+                        ),
+                        code_action: Some(
+                            CodeAction {
+                                disable_rule_comment: Some(
+                                    CodeActionSettings {
+                                        enable: Some(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                fix_violation: Some(
+                                    CodeActionSettings {
+                                        enable: Some(
+                                            false,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                    workspace: Url {
+                        scheme: "file",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: None,
+                        port: None,
+                        path: "/Users/test/projects/scipy",
+                        query: None,
+                        fragment: None,
+                    },
+                },
+            ],
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_vs_code_workspace_settings_resolve() {
+        let options = fixture!("settings/vs_code_initialization_options.json");
+        let AllSettings {
+            global_settings,
+            workspace_settings,
+        } = AllSettings::from_init_options(options);
+        let url = Url::parse("file:///Users/test/projects/pandas").expect("url should parse");
+        assert_eq!(
+            ResolvedClientSettings::with_workspace(
+                workspace_settings.get(&url).expect("workspace setting should exist"),
+                &global_settings
+            ),
+            ResolvedClientSettings {
+                fix_all: true,
+                organize_imports: true,
+                lint_enable: true,
+                disable_rule_comment_enable: false,
+                fix_violation_enable: false,
+            }
+        );
+        let url = Url::parse("file:///Users/test/projects/scipy").expect("url should parse");
+        assert_eq!(
+            ResolvedClientSettings::with_workspace(
+                workspace_settings.get(&url).expect("workspace setting should exist"),
+                &global_settings
+            ),
+            ResolvedClientSettings {
+                fix_all: true,
+                organize_imports: true,
+                lint_enable: true,
+                disable_rule_comment_enable: true,
+                fix_violation_enable: false,
+            }
+        );
+    }
+
+    #[test]
+    fn test_global_only_init_options_deserialize() {
+        let options: InitializationOptions = fixture!("settings/global_only.json");
+
+        assert_debug_snapshot!(options, @r###"
+        GlobalOnly {
+            settings: Some(
+                ClientSettings {
+                    fix_all: Some(
+                        false,
+                    ),
+                    organize_imports: None,
+                    lint: Some(
+                        Lint {
+                            enable: None,
+                        },
+                    ),
+                    code_action: Some(
+                        CodeAction {
+                            disable_rule_comment: Some(
+                                CodeActionSettings {
+                                    enable: Some(
+                                        false,
+                                    ),
+                                },
+                            ),
+                            fix_violation: None,
+                        },
+                    ),
+                },
+            ),
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_global_only_resolves_correctly() {
+        let options = fixture!("settings/global_only.json");
+
+        let AllSettings {
+            global_settings, ..
+        } = AllSettings::from_init_options(options);
+        assert_eq!(
+            ResolvedClientSettings::global_only(&global_settings),
+            ResolvedClientSettings {
+                fix_all: false,
+                organize_imports: true,
+                lint_enable: true,
+                disable_rule_comment_enable: false,
+                fix_violation_enable: true,
+            }
+        );
+    }
+
+    #[test]
+    fn test_empty_init_options_deserialize() {
+        let _: InitializationOptions = fixture!("settings/empty.json");
     }
 }

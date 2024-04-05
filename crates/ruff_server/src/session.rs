@@ -16,8 +16,8 @@ use crate::edit::{Document, DocumentVersion};
 use crate::PositionEncoding;
 
 use self::capabilities::ResolvedClientCapabilities;
-use self::settings::ResolvedUserSettings;
-pub(crate) use self::settings::{AllSettings, UserSettings};
+use self::settings::ResolvedClientSettings;
+pub(crate) use self::settings::{AllSettings, ClientSettings};
 
 /// The global state for the LSP
 pub(crate) struct Session {
@@ -26,7 +26,7 @@ pub(crate) struct Session {
     /// The global position encoding, negotiated during LSP initialization.
     position_encoding: PositionEncoding,
     /// Global settings provided by the client.
-    global_settings: UserSettings,
+    global_settings: ClientSettings,
     /// Tracks what LSP features the client supports and doesn't support.
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
 }
@@ -37,7 +37,7 @@ pub(crate) struct DocumentSnapshot {
     configuration: Arc<RuffConfiguration>,
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
     #[allow(dead_code)]
-    user_settings: settings::ResolvedUserSettings,
+    client_settings: settings::ResolvedClientSettings,
     document_ref: DocumentRef,
     position_encoding: PositionEncoding,
     url: Url,
@@ -57,7 +57,7 @@ pub(crate) struct Workspaces(BTreeMap<PathBuf, Workspace>);
 pub(crate) struct Workspace {
     open_documents: OpenDocuments,
     configuration: Arc<RuffConfiguration>,
-    settings: UserSettings,
+    settings: ClientSettings,
 }
 
 #[derive(Default)]
@@ -82,8 +82,8 @@ impl Session {
     pub(crate) fn new(
         client_capabilities: &ClientCapabilities,
         position_encoding: PositionEncoding,
-        global_settings: UserSettings,
-        workspaces: Vec<(Url, UserSettings)>,
+        global_settings: ClientSettings,
+        workspaces: Vec<(Url, ClientSettings)>,
     ) -> crate::Result<Self> {
         Ok(Self {
             position_encoding,
@@ -99,7 +99,7 @@ impl Session {
         Some(DocumentSnapshot {
             configuration: self.workspaces.configuration(url)?.clone(),
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
-            user_settings: self.workspaces.settings(url, &self.global_settings),
+            client_settings: self.workspaces.settings(url, &self.global_settings),
             document_ref: self.workspaces.snapshot(url)?,
             position_encoding: self.position_encoding,
             url: url.clone(),
@@ -227,7 +227,7 @@ impl DocumentSnapshot {
 }
 
 impl Workspaces {
-    fn new(workspaces: Vec<(Url, UserSettings)>) -> crate::Result<Self> {
+    fn new(workspaces: Vec<(Url, ClientSettings)>) -> crate::Result<Self> {
         Ok(Self(
             workspaces
                 .into_iter()
@@ -237,7 +237,8 @@ impl Workspaces {
     }
 
     fn open_workspace_folder(&mut self, folder_url: &Url) -> crate::Result<()> {
-        let (path, workspace) = Workspace::new(folder_url, UserSettings::default())?;
+        // TODO(jane): find a way to allow for workspace settings to be updated dynamically
+        let (path, workspace) = Workspace::new(folder_url, ClientSettings::default())?;
         self.0.insert(path, workspace);
         Ok(())
     }
@@ -289,15 +290,17 @@ impl Workspaces {
             .close(url)
     }
 
-    fn settings(&self, url: &Url, global_settings: &UserSettings) -> ResolvedUserSettings {
+    fn settings(&self, url: &Url, global_settings: &ClientSettings) -> ResolvedClientSettings {
         self.workspace_for_url(url).map_or_else(
             || {
                 tracing::warn!(
                     "Workspace not found for {url}. Global settings will be used for this document"
                 );
-                ResolvedUserSettings::global_only(global_settings)
+                ResolvedClientSettings::global_only(global_settings)
             },
-            |workspace| ResolvedUserSettings::with_workspace(&workspace.settings, global_settings),
+            |workspace| {
+                ResolvedClientSettings::with_workspace(&workspace.settings, global_settings)
+            },
         )
     }
 
@@ -327,7 +330,7 @@ impl Workspaces {
 }
 
 impl Workspace {
-    pub(crate) fn new(root: &Url, settings: UserSettings) -> crate::Result<(PathBuf, Self)> {
+    pub(crate) fn new(root: &Url, settings: ClientSettings) -> crate::Result<(PathBuf, Self)> {
         let path = root
             .to_file_path()
             .map_err(|()| anyhow!("workspace URL was not a file path!"))?;

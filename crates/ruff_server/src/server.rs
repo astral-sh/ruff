@@ -22,8 +22,8 @@ use self::schedule::event_loop_thread;
 use self::schedule::Scheduler;
 use self::schedule::Task;
 use crate::session::AllSettings;
+use crate::session::ClientSettings;
 use crate::session::Session;
-use crate::session::UserSettings;
 use crate::PositionEncoding;
 
 mod api;
@@ -60,7 +60,7 @@ impl Server {
         let mut workspace_for_uri = |uri| {
             let settings = workspace_settings.remove(&uri).unwrap_or_else(|| {
                 tracing::warn!("No workspace settings found for {uri}");
-                UserSettings::default()
+                ClientSettings::default()
             });
             (uri, settings)
         };
