@@ -96,22 +96,39 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ExprSubscript) {
             operand,
             ..
         }) => {
-            let Expr::NumberLiteral(ExprNumberLiteral {
+            if let Expr::NumberLiteral(ExprNumberLiteral {
                 value: Number::Int(index),
                 ..
             }) = operand.as_ref()
-            else {
-                return;
-            };
-            if *index == 1 {
-                index.as_i64()
+            {
+                if *index == 1 {
+                    index.as_i64().map(|i| -i)
+                } else {
+                    None
+                }
             } else {
-                None
+                return;
             }
         }
         _ => return,
     }) else {
         return;
+    };
+
+    let reversed = if let Expr::Call(ExprCall { arguments, .. }) = value.as_ref() {
+        arguments.keywords.iter().any(|keyword| {
+            // Is the keyword "reverse" and is the value `true`?
+            keyword
+                .arg
+                .as_ref()
+                .map_or(false, |arg| arg.as_str() == "reverse")
+                && keyword
+                    .value
+                    .as_boolean_literal_expr()
+                    .map_or(false, |b| b.value)
+        })
+    } else {
+        false
     };
 
     let replacement = format!("{}(sorted())", if index == 0 { "min" } else { "max" });
