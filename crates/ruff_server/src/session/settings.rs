@@ -4,19 +4,15 @@ use lsp_types::Url;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 
+/// Maps a workspace URI to its associated client settings. Used during server initialization.
 pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
-
-/// Built from the initialization options provided by the client.
-pub(crate) struct AllSettings {
-    pub(crate) global_settings: ClientSettings,
-    pub(crate) workspace_settings: WorkspaceSettingsMap,
-}
 
 /// Resolved client settings for a specific document. These settings are meant to be
 /// used directly by the server, and are *not* a 1:1 representation with how the client
 /// sends them.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
+// TODO(jane): Remove dead code warning
 #[allow(dead_code, clippy::struct_excessive_bools)]
 pub(crate) struct ResolvedClientSettings {
     fix_all: bool,
@@ -88,6 +84,13 @@ enum InitializationOptions {
     },
 }
 
+/// Built from the initialization options provided by the client.
+pub(crate) struct AllSettings {
+    pub(crate) global_settings: ClientSettings,
+    /// If this is `None`, the client only passed in global settings.
+    pub(crate) workspace_settings: Option<WorkspaceSettingsMap>,
+}
+
 impl AllSettings {
     /// Initializes the controller from the serialized initialization options.
     /// This fails if `options` are not valid initialization options.
@@ -112,13 +115,12 @@ impl AllSettings {
 
         Self {
             global_settings,
-            workspace_settings: workspace_settings
-                .into_iter()
-                .flatten()
-                .map(|workspace_settings| {
-                    (workspace_settings.workspace, workspace_settings.settings)
-                })
-                .collect(),
+            workspace_settings: workspace_settings.map(|workspace_settings| {
+                workspace_settings
+                    .into_iter()
+                    .map(|settings| (settings.workspace, settings.settings))
+                    .collect()
+            }),
         }
     }
 }
@@ -134,7 +136,7 @@ impl ResolvedClientSettings {
     }
 
     /// Resolves global settings only.
-    pub(super) fn global_only(global_settings: &ClientSettings) -> Self {
+    pub(super) fn global(global_settings: &ClientSettings) -> Self {
         Self::new_impl(&[global_settings])
     }
 
@@ -148,7 +150,7 @@ impl ResolvedClientSettings {
             ),
             lint_enable: Self::resolve_or(
                 all_settings,
-                |settings| settings.lint.as_ref().and_then(|lint| lint.enable),
+                |settings| settings.lint.as_ref()?.enable,
                 true,
             ),
             disable_rule_comment_enable: Self::resolve_or(
@@ -156,9 +158,10 @@ impl ResolvedClientSettings {
                 |settings| {
                     settings
                         .code_action
-                        .as_ref()
-                        .and_then(|code_action| code_action.disable_rule_comment.as_ref())
-                        .and_then(|disable_rule_comment| disable_rule_comment.enable)
+                        .as_ref()?
+                        .disable_rule_comment
+                        .as_ref()?
+                        .enable
                 },
                 true,
             ),
@@ -167,15 +170,19 @@ impl ResolvedClientSettings {
                 |settings| {
                     settings
                         .code_action
-                        .as_ref()
-                        .and_then(|code_action| code_action.fix_violation.as_ref())
-                        .and_then(|fix_violation| fix_violation.enable)
+                        .as_ref()?
+                        .fix_violation
+                        .as_ref()?
+                        .enable
                 },
                 true,
             ),
         }
     }
 
+    /// Attempts to resolve a setting using a list of available client settings as sources.
+    /// Client settings that come earlier in the list take priority. `default` will be returned
+    /// if none of the settings specify the requested setting.
     fn resolve_or<T>(
         all_settings: &[&ClientSettings],
         get: impl Fn(&ClientSettings) -> Option<T>,
@@ -198,24 +205,24 @@ impl Default for InitializationOptions {
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
+    use serde::de::DeserializeOwned;
 
     use super::*;
 
-    /// Deserializes a JSON file at `resources/test/fixtures` + the path provided.
-    macro_rules! fixture {
-        ($path:expr) => {
-            serde_json::from_str(include_str!(std::concat!(
-                "../../resources/test/fixtures/",
-                $path
-            )))
-            .expect("test fixture JSON should deserialize")
-        };
+    const VS_CODE_INIT_OPTIONS_FIXTURE: &str =
+        include_str!("../../resources/test/fixtures/settings/vs_code_initialization_options.json");
+    const GLOBAL_ONLY_INIT_OPTIONS_FIXTURE: &str =
+        include_str!("../../resources/test/fixtures/settings/global_only.json");
+    const EMPTY_INIT_OPTIONS_FIXTURE: &str =
+        include_str!("../../resources/test/fixtures/settings/empty.json");
+
+    fn deserialize_fixture<T: DeserializeOwned>(content: &str) -> T {
+        serde_json::from_str(content).expect("test fixture JSON should deserialize")
     }
 
     #[test]
     fn test_vs_code_init_options_deserialize() {
-        let options: InitializationOptions =
-            fixture!("settings/vs_code_initialization_options.json");
+        let options: InitializationOptions = deserialize_fixture(VS_CODE_INIT_OPTIONS_FIXTURE);
 
         assert_debug_snapshot!(options, @r###"
         HasWorkspaces {
@@ -352,12 +359,13 @@ mod tests {
 
     #[test]
     fn test_vs_code_workspace_settings_resolve() {
-        let options = fixture!("settings/vs_code_initialization_options.json");
+        let options = deserialize_fixture(VS_CODE_INIT_OPTIONS_FIXTURE);
         let AllSettings {
             global_settings,
             workspace_settings,
         } = AllSettings::from_init_options(options);
         let url = Url::parse("file:///Users/test/projects/pandas").expect("url should parse");
+        let workspace_settings = workspace_settings.expect("workspace settings should exist");
         assert_eq!(
             ResolvedClientSettings::with_workspace(
                 workspace_settings
@@ -393,7 +401,7 @@ mod tests {
 
     #[test]
     fn test_global_only_init_options_deserialize() {
-        let options: InitializationOptions = fixture!("settings/global_only.json");
+        let options: InitializationOptions = deserialize_fixture(GLOBAL_ONLY_INIT_OPTIONS_FIXTURE);
 
         assert_debug_snapshot!(options, @r###"
         GlobalOnly {
@@ -428,13 +436,13 @@ mod tests {
 
     #[test]
     fn test_global_only_resolves_correctly() {
-        let options = fixture!("settings/global_only.json");
+        let options = deserialize_fixture(GLOBAL_ONLY_INIT_OPTIONS_FIXTURE);
 
         let AllSettings {
             global_settings, ..
         } = AllSettings::from_init_options(options);
         assert_eq!(
-            ResolvedClientSettings::global_only(&global_settings),
+            ResolvedClientSettings::global(&global_settings),
             ResolvedClientSettings {
                 fix_all: false,
                 organize_imports: true,
@@ -447,6 +455,8 @@ mod tests {
 
     #[test]
     fn test_empty_init_options_deserialize() {
-        let _: InitializationOptions = fixture!("settings/empty.json");
+        let options: InitializationOptions = deserialize_fixture(EMPTY_INIT_OPTIONS_FIXTURE);
+
+        assert_eq!(options, InitializationOptions::default());
     }
 }

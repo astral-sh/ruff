@@ -96,10 +96,12 @@ impl Session {
     }
 
     pub(crate) fn take_snapshot(&self, url: &Url) -> Option<DocumentSnapshot> {
+        let resolved_settings = self.workspaces.client_settings(url, &self.global_settings);
+        tracing::info!("Resolved settings for document {url}: {resolved_settings:?}");
         Some(DocumentSnapshot {
             configuration: self.workspaces.configuration(url)?.clone(),
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
-            client_settings: self.workspaces.settings(url, &self.global_settings),
+            client_settings: resolved_settings,
             document_ref: self.workspaces.snapshot(url)?,
             position_encoding: self.position_encoding,
             url: url.clone(),
@@ -290,13 +292,17 @@ impl Workspaces {
             .close(url)
     }
 
-    fn settings(&self, url: &Url, global_settings: &ClientSettings) -> ResolvedClientSettings {
+    fn client_settings(
+        &self,
+        url: &Url,
+        global_settings: &ClientSettings,
+    ) -> ResolvedClientSettings {
         self.workspace_for_url(url).map_or_else(
             || {
                 tracing::warn!(
                     "Workspace not found for {url}. Global settings will be used for this document"
                 );
-                ResolvedClientSettings::global_only(global_settings)
+                ResolvedClientSettings::global(global_settings)
             },
             |workspace| {
                 ResolvedClientSettings::with_workspace(&workspace.settings, global_settings)

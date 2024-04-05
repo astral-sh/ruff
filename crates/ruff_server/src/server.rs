@@ -58,6 +58,9 @@ impl Server {
         } = AllSettings::from_value(init_params.initialization_options.unwrap_or_default());
 
         let mut workspace_for_uri = |uri| {
+            let Some(workspace_settings) = workspace_settings.as_mut() else {
+                return (uri, ClientSettings::default());
+            };
             let settings = workspace_settings.remove(&uri).unwrap_or_else(|| {
                 tracing::warn!("No workspace settings found for {uri}");
                 ClientSettings::default()
