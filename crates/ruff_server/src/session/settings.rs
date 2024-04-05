@@ -95,7 +95,7 @@ impl AllSettings {
         Self::from_init_options(
             serde_json::from_value(options)
                 .map_err(|err| {
-                    tracing::error!("Failed to deserialize initialization options: {err}");
+                    tracing::error!("Failed to deserialize initialization options: {err}. Falling back to default client settings...");
                 })
                 .unwrap_or_default(),
         )
