@@ -626,3 +626,6 @@ Ruff's color output is powered by the [`owo-colors`](https://crates.io/crates/ow
 [`anstream`](https://crates.io/crates/anstream) crates, which attempt to automatically detect
 whether the output stream supports color. However, you can force colors off by setting the
 `NO_COLOR` environment variable to any value (e.g., `NO_COLOR=1`).
+
+[`anstream`](https://crates.io/crates/anstream) also supports the `CLICOLOR` and `CLICOLOR_FORCE`
+environment variables (see the [spec](https://bixense.com/clicolors/)).
