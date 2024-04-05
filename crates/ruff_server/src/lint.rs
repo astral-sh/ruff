@@ -35,7 +35,7 @@ pub(crate) struct DiagnosticFix {
     pub(crate) fixed_diagnostic: lsp_types::Diagnostic,
     pub(crate) title: String,
     pub(crate) code: String,
-    pub(crate) document_edits: Vec<lsp_types::TextDocumentEdit>,
+    pub(crate) edits: Vec<lsp_types::TextEdit>,
 }
 
 pub(crate) fn check(
@@ -90,11 +90,9 @@ pub(crate) fn check(
         .collect()
 }
 
-pub(crate) fn fixes_for_diagnostics<'d>(
-    document: &'d crate::edit::Document,
-    url: &'d lsp_types::Url,
+pub(crate) fn fixes_for_diagnostics(
+    document: &crate::edit::Document,
     encoding: PositionEncoding,
-    version: crate::edit::DocumentVersion,
     diagnostics: Vec<lsp_types::Diagnostic>,
 ) -> crate::Result<Vec<DiagnosticFix>> {
     diagnostics
@@ -118,14 +116,6 @@ pub(crate) fn fixes_for_diagnostics<'d>(
                         .to_range(document.contents(), document.index(), encoding),
                     new_text: edit.content().unwrap_or_default().to_string(),
                 });
-
-            let document_edits = vec![lsp_types::TextDocumentEdit {
-                text_document: lsp_types::OptionalVersionedTextDocumentIdentifier::new(
-                    url.clone(),
-                    version,
-                ),
-                edits: edits.map(lsp_types::OneOf::Left).collect(),
-            }];
             Ok(Some(DiagnosticFix {
                 fixed_diagnostic,
                 code: associated_data.code,
@@ -133,7 +123,7 @@ pub(crate) fn fixes_for_diagnostics<'d>(
                     .kind
                     .suggestion
                     .unwrap_or(associated_data.kind.name),
-                document_edits,
+                edits: edits.collect(),
             }))
         })
         .filter_map(crate::Result::transpose)

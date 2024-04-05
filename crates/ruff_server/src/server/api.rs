@@ -41,6 +41,7 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
                 BackgroundSchedule::LatencySensitive,
             )
         }
+        request::ExecuteCommand::METHOD => local_request_task::<request::ExecuteCommand>(req),
         request::Format::METHOD => {
             background_request_task::<request::Format>(req, BackgroundSchedule::Fmt)
         }
@@ -87,13 +88,12 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
     })
 }
 
-#[allow(dead_code)]
 fn local_request_task<'a, R: traits::SyncRequestHandler>(
     req: server::Request,
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_request::<R>(req)?;
-    Ok(Task::local(|session, notifier, responder| {
-        let result = R::run(session, notifier, params);
+    Ok(Task::local(|session, notifier, requester, responder| {
+        let result = R::run(session, notifier, requester, params);
         respond::<R>(id, result, &responder);
     }))
 }
@@ -119,7 +119,7 @@ fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
     notif: server::Notification,
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_notification::<N>(notif)?;
-    Ok(Task::local(move |session, notifier, _| {
+    Ok(Task::local(move |session, notifier, _, _| {
         if let Err(err) = N::run(session, notifier, params) {
             tracing::error!("An error occurred while running {id}: {err}");
         }

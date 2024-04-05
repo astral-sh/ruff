@@ -1,3 +1,4 @@
+use crate::edit::WorkspaceEditTracker;
 use crate::lint::fixes_for_diagnostics;
 use crate::server::api::LSPResult;
 use crate::server::SupportedCodeAction;
@@ -50,30 +51,34 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
 fn quick_fix(
     snapshot: &DocumentSnapshot,
     diagnostics: Vec<types::Diagnostic>,
-) -> crate::Result<impl Iterator<Item = CodeActionOrCommand> + '_> {
+) -> crate::Result<Vec<CodeActionOrCommand>> {
     let document = snapshot.document();
 
-    let fixes = fixes_for_diagnostics(
-        document,
-        snapshot.url(),
-        snapshot.encoding(),
-        document.version(),
-        diagnostics,
-    )?;
+    let fixes = fixes_for_diagnostics(document, snapshot.encoding(), diagnostics)?;
 
-    Ok(fixes.into_iter().map(|fix| {
-        types::CodeActionOrCommand::CodeAction(types::CodeAction {
-            title: format!("{DIAGNOSTIC_NAME} ({}): {}", fix.code, fix.title),
-            kind: Some(types::CodeActionKind::QUICKFIX),
-            edit: Some(types::WorkspaceEdit {
-                document_changes: Some(types::DocumentChanges::Edits(fix.document_edits.clone())),
+    fixes
+        .into_iter()
+        .map(|fix| {
+            let mut tracker = WorkspaceEditTracker::new(snapshot.resolved_client_capabilities());
+
+            tracker.set_edits_for_document(
+                snapshot.url().clone(),
+                document.version(),
+                fix.edits,
+            )?;
+
+            Ok(types::CodeActionOrCommand::CodeAction(types::CodeAction {
+                title: format!("{DIAGNOSTIC_NAME} ({}): {}", fix.code, fix.title),
+                kind: Some(types::CodeActionKind::QUICKFIX),
+                edit: Some(tracker.into_workspace_edit()),
+                diagnostics: Some(vec![fix.fixed_diagnostic.clone()]),
+                data: Some(
+                    serde_json::to_value(snapshot.url()).expect("document url to serialize"),
+                ),
                 ..Default::default()
-            }),
-            diagnostics: Some(vec![fix.fixed_diagnostic.clone()]),
-            data: Some(serde_json::to_value(snapshot.url()).expect("document url to serialize")),
-            ..Default::default()
+            }))
         })
-    }))
+        .collect()
 }
 
 fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
@@ -92,9 +97,11 @@ fn fix_all(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCommand> {
         (
             Some(resolve_edit_for_fix_all(
                 document,
+                snapshot.resolved_client_capabilities(),
                 snapshot.url(),
                 &snapshot.configuration().linter,
                 snapshot.encoding(),
+                document.version(),
             )?),
             None,
         )
@@ -125,9 +132,11 @@ fn organize_imports(snapshot: &DocumentSnapshot) -> crate::Result<CodeActionOrCo
         (
             Some(resolve_edit_for_organize_imports(
                 document,
+                snapshot.resolved_client_capabilities(),
                 snapshot.url(),
                 &snapshot.configuration().linter,
                 snapshot.encoding(),
+                document.version(),
             )?),
             None,
         )

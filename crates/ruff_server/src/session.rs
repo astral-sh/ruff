@@ -15,7 +15,7 @@ use rustc_hash::FxHashMap;
 use crate::edit::{Document, DocumentVersion};
 use crate::PositionEncoding;
 
-use self::capabilities::ResolvedClientCapabilities;
+pub(crate) use self::capabilities::ResolvedClientCapabilities;
 use self::settings::ResolvedClientSettings;
 pub(crate) use self::settings::{AllSettings, ClientSettings};
 
@@ -138,6 +138,10 @@ impl Session {
     pub(crate) fn close_workspace_folder(&mut self, url: &Url) -> crate::Result<()> {
         self.workspaces.close_workspace_folder(url)?;
         Ok(())
+    }
+
+    pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
+        &self.resolved_client_capabilities
     }
 
     pub(crate) fn encoding(&self) -> PositionEncoding {
