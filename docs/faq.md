@@ -126,14 +126,16 @@ Despite these differences, many users have successfully switched from Pylint to 
 those using Ruff alongside a [type checker](faq.md#how-does-ruff-compare-to-mypy-or-pyright-or-pyre),
 which can cover some of the functionality that Pylint provides.
 
-Like Flake8, Pylint supports plugins (called "checkers"), while Ruff implements all rules natively.
-Therefore, the rule group `PY` also includes some of those rules that when using Pylint need to be
-explicitly activated through plugins. Unlike Pylint, Ruff is capable of automatically fixing its own
-lint violations.
+Like Flake8, Pylint supports plugins (called "checkers"), while Ruff implements all rules natively
+and does not support custom or third-party rules. Unlike Pylint, Ruff is capable of automatically
+fixing its own lint violations.
 
-Another difference is that Ruff uses a slightly different definition when it comes to counting
-branches in code. Ruff does count try blocks themselves as branches and therefore will warn earlier
-about [`too-many-branches`](rules/too-many-branches.md) (`PLR0912`).
+In some cases, Ruff's rules may yield slightly different rules than their Pylint counterparts. For
+example, Ruff's [`too-many-branches`](rules/too-many-branches.md) does not count `try` blocks as
+their own branches, unlike Pylint's `R0912`. Ruff's `PY` rule group also includes a small number of
+rules from Pylint _extensions_ (like [`magic-value-comparison`](https://docs.astral.sh/ruff/rules/magic-value-comparison/)),
+which need to be explicitly activated when using Pylint. By enabling Ruff's `PY` group, you may
+see violations for rules that weren't previously enabled through your Pylint configuration.
 
 Pylint parity is being tracked in [#970](https://github.com/astral-sh/ruff/issues/970).
 
