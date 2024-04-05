@@ -21,7 +21,9 @@ use types::WorkspaceFoldersServerCapabilities;
 use self::schedule::event_loop_thread;
 use self::schedule::Scheduler;
 use self::schedule::Task;
+use crate::session::AllSettings;
 use crate::session::Session;
+use crate::session::UserSettings;
 use crate::PositionEncoding;
 
 mod api;
@@ -50,16 +52,28 @@ impl Server {
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
         let server_capabilities = Self::server_capabilities(position_encoding);
 
-        let user_settings = crate::session::SettingsController::from_value(
-            init_params.initialization_options.unwrap_or_default(),
-        )?;
+        let AllSettings {
+            global_settings,
+            mut workspace_settings,
+        } = AllSettings::from_value(init_params.initialization_options.unwrap_or_default())?;
+
+        let mut workspace_for_uri = |uri| {
+            let settings = workspace_settings.remove(&uri).unwrap_or_else(|| {
+                tracing::warn!("No workspace settings found for {uri}");
+                UserSettings::default()
+            });
+            (uri, settings)
+        };
 
         let workspaces = init_params
             .workspace_folders
-            .map(|folders| folders.into_iter().map(|folder| folder.uri).collect())
+            .map(|folders| folders.into_iter().map(|folder| {
+                workspace_for_uri(folder.uri)
+            }).collect())
             .or_else(|| {
                 tracing::debug!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
-                Some(vec![types::Url::from_file_path(std::env::current_dir().ok()?).ok()?])
+                let uri = types::Url::from_file_path(std::env::current_dir().ok()?).ok()?;
+                Some(vec![workspace_for_uri(uri)])
             })
             .ok_or_else(|| {
                 anyhow::anyhow!("Failed to get the current working directory while creating a default workspace.")
@@ -82,8 +96,8 @@ impl Server {
             session: Session::new(
                 &client_capabilities,
                 position_encoding,
-                &workspaces,
-                user_settings,
+                global_settings,
+                workspaces,
             )?,
             client_capabilities,
         })

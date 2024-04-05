@@ -42,50 +42,36 @@ fn test_vs_code_workspace_settings_resolve() {
         fixture: vs_code_initialization_options,
         into: InitializationOptions,
     };
-    let settings_map = SettingsController::from_init_options(options);
+    let AllSettings {
+        global_settings,
+        workspace_settings,
+    } = AllSettings::from_init_options(options);
+    let url = Url::parse("file:///Users/test/projects/pandas").unwrap();
     assert_eq!(
-        settings_map.settings_for_workspace(Path::new("/Users/test/projects/pandas")),
+        ResolvedUserSettings::with_workspace(
+            workspace_settings.get(&url).unwrap(),
+            &global_settings
+        ),
         ResolvedUserSettings {
-            fix_all: FixAll(true),
-            organize_imports: OrganizeImports(true),
-            lint_enable: LintEnable(true),
-            run: RunWhen::OnType,
-            disable_rule_comment_enable: CodeActionEnable(false),
-            fix_violation_enable: CodeActionEnable(false),
-            log_level: LogLevel::Error,
+            fix_all: true,
+            organize_imports: true,
+            lint_enable: true,
+            disable_rule_comment_enable: false,
+            fix_violation_enable: false,
         }
     );
+    let url = Url::parse("file:///Users/test/projects/scipy").unwrap();
     assert_eq!(
-        settings_map.settings_for_workspace(Path::new("/Users/test/projects/scipy")),
+        ResolvedUserSettings::with_workspace(
+            workspace_settings.get(&url).unwrap(),
+            &global_settings
+        ),
         ResolvedUserSettings {
-            fix_all: FixAll(true),
-            organize_imports: OrganizeImports(true),
-            lint_enable: LintEnable(true),
-            run: RunWhen::OnType,
-            disable_rule_comment_enable: CodeActionEnable(true),
-            fix_violation_enable: CodeActionEnable(false),
-            log_level: LogLevel::Error,
-        }
-    );
-}
-
-#[test]
-fn test_vs_code_unknown_workspace_resolves_to_fallback() {
-    let options = test_deserialize! {
-        fixture: vs_code_initialization_options,
-        into: InitializationOptions,
-    };
-    let settings_map = SettingsController::from_init_options(options);
-    assert_eq!(
-        settings_map.settings_for_workspace(Path::new("/Users/test/invalid/workspace")),
-        ResolvedUserSettings {
-            fix_all: FixAll(false),
-            organize_imports: OrganizeImports(true),
-            lint_enable: LintEnable(true),
-            run: RunWhen::OnType,
-            disable_rule_comment_enable: CodeActionEnable(false),
-            fix_violation_enable: CodeActionEnable(false),
-            log_level: LogLevel::Error,
+            fix_all: true,
+            organize_imports: true,
+            lint_enable: true,
+            disable_rule_comment_enable: true,
+            fix_violation_enable: false,
         }
     );
 }
@@ -105,17 +91,17 @@ fn test_global_only_resolves_correctly() {
         into: InitializationOptions,
     };
 
-    let settings_map = SettingsController::from_init_options(options);
+    let AllSettings {
+        global_settings, ..
+    } = AllSettings::from_init_options(options);
     assert_eq!(
-        settings_map.settings_for_workspace(Path::new("/Users/test/some/workspace")),
+        ResolvedUserSettings::global_only(&global_settings),
         ResolvedUserSettings {
-            fix_all: FixAll(false),
-            organize_imports: OrganizeImports(true),
-            lint_enable: LintEnable(true),
-            run: RunWhen::OnSave,
-            disable_rule_comment_enable: CodeActionEnable(false),
-            fix_violation_enable: CodeActionEnable(true),
-            log_level: LogLevel::Warn,
+            fix_all: false,
+            organize_imports: true,
+            lint_enable: true,
+            disable_rule_comment_enable: false,
+            fix_violation_enable: true,
         }
     );
 }

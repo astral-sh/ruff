@@ -17,7 +17,7 @@ use crate::PositionEncoding;
 
 use self::capabilities::ResolvedClientCapabilities;
 use self::settings::ResolvedUserSettings;
-pub(crate) use self::settings::SettingsController;
+pub(crate) use self::settings::{AllSettings, UserSettings};
 
 /// The global state for the LSP
 pub(crate) struct Session {
@@ -25,8 +25,8 @@ pub(crate) struct Session {
     workspaces: Workspaces,
     /// The global position encoding, negotiated during LSP initialization.
     position_encoding: PositionEncoding,
-    /// Manages all user settings.
-    settings_controller: SettingsController,
+    /// Global settings provided by the client.
+    global_settings: UserSettings,
     /// Tracks what LSP features the client supports and doesn't support.
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
 }
@@ -57,6 +57,7 @@ pub(crate) struct Workspaces(BTreeMap<PathBuf, Workspace>);
 pub(crate) struct Workspace {
     open_documents: OpenDocuments,
     configuration: Arc<RuffConfiguration>,
+    settings: UserSettings,
 }
 
 #[derive(Default)]
@@ -81,15 +82,15 @@ impl Session {
     pub(crate) fn new(
         client_capabilities: &ClientCapabilities,
         position_encoding: PositionEncoding,
-        workspaces: &[Url],
-        settings_controller: SettingsController,
+        global_settings: UserSettings,
+        workspaces: Vec<(Url, UserSettings)>,
     ) -> crate::Result<Self> {
         Ok(Self {
             position_encoding,
+            global_settings,
             resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
                 client_capabilities,
             )),
-            settings_controller,
             workspaces: Workspaces::new(workspaces)?,
         })
     }
@@ -98,7 +99,7 @@ impl Session {
         Some(DocumentSnapshot {
             configuration: self.workspaces.configuration(url)?.clone(),
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
-            user_settings: self.workspaces.settings(url, &self.settings_controller),
+            user_settings: self.workspaces.settings(url, &self.global_settings),
             document_ref: self.workspaces.snapshot(url)?,
             position_encoding: self.position_encoding,
             url: url.clone(),
@@ -226,16 +227,17 @@ impl DocumentSnapshot {
 }
 
 impl Workspaces {
-    fn new(urls: &[Url]) -> crate::Result<Self> {
+    fn new(workspaces: Vec<(Url, UserSettings)>) -> crate::Result<Self> {
         Ok(Self(
-            urls.iter()
-                .map(Workspace::new)
+            workspaces
+                .into_iter()
+                .map(|(url, settings)| Workspace::new(&url, settings))
                 .collect::<crate::Result<_>>()?,
         ))
     }
 
     fn open_workspace_folder(&mut self, folder_url: &Url) -> crate::Result<()> {
-        let (path, workspace) = Workspace::new(folder_url)?;
+        let (path, workspace) = Workspace::new(folder_url, UserSettings::default())?;
         self.0.insert(path, workspace);
         Ok(())
     }
@@ -287,15 +289,15 @@ impl Workspaces {
             .close(url)
     }
 
-    fn settings(&self, url: &Url, settings_map: &SettingsController) -> ResolvedUserSettings {
-        self.entry_for_url(url).map_or_else(
+    fn settings(&self, url: &Url, global_settings: &UserSettings) -> ResolvedUserSettings {
+        self.workspace_for_url(url).map_or_else(
             || {
                 tracing::warn!(
                     "Workspace not found for {url}. Global settings will be used for this document"
                 );
-                settings_map.global_settings()
+                ResolvedUserSettings::global_only(global_settings)
             },
-            |(path, _)| settings_map.settings_for_workspace(path),
+            |workspace| ResolvedUserSettings::with_workspace(&workspace.settings, global_settings),
         )
     }
 
@@ -325,7 +327,7 @@ impl Workspaces {
 }
 
 impl Workspace {
-    pub(crate) fn new(root: &Url) -> crate::Result<(PathBuf, Self)> {
+    pub(crate) fn new(root: &Url, settings: UserSettings) -> crate::Result<(PathBuf, Self)> {
         let path = root
             .to_file_path()
             .map_err(|()| anyhow!("workspace URL was not a file path!"))?;
@@ -337,6 +339,7 @@ impl Workspace {
             Self {
                 open_documents: OpenDocuments::default(),
                 configuration: Arc::new(configuration),
+                settings,
             },
         ))
     }

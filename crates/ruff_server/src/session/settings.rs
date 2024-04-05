@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::ops::Deref;
 
 use lsp_types::Url;
 use rustc_hash::FxHashMap;
@@ -7,13 +7,12 @@ use serde::Deserialize;
 #[cfg(test)]
 mod tests;
 
-/// Built from the initialization options sent by the client.
-/// If workspace settings were specified, `workspace_settings` will be populated.
-/// Otherwise, it will be empty.
-#[derive(Debug)]
-pub(crate) struct SettingsController {
-    global_settings: UserSettings,
-    workspace_settings: FxHashMap<Url, UserSettings>,
+pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, UserSettings>;
+
+/// Built from the initialization options provided by the client.
+pub(crate) struct AllSettings {
+    pub(crate) global_settings: UserSettings,
+    pub(crate) workspace_settings: WorkspaceSettingsMap,
 }
 
 /// Resolved user settings for a specific document. These settings are meant to be
@@ -21,27 +20,24 @@ pub(crate) struct SettingsController {
 /// sends them.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-#[allow(dead_code)]
+#[allow(dead_code, clippy::struct_excessive_bools)]
 pub(crate) struct ResolvedUserSettings {
-    fix_all: FixAll,
-    organize_imports: OrganizeImports,
-    lint_enable: LintEnable,
-    run: RunWhen,
-    disable_rule_comment_enable: CodeActionEnable,
-    fix_violation_enable: CodeActionEnable,
-    log_level: LogLevel,
+    fix_all: bool,
+    organize_imports: bool,
+    lint_enable: bool,
+    disable_rule_comment_enable: bool,
+    fix_violation_enable: bool,
 }
 
 /// This is a direct representation of the user settings schema sent by the client.
 #[derive(Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-struct UserSettings {
-    fix_all: Option<FixAll>,
-    organize_imports: Option<OrganizeImports>,
+pub(crate) struct UserSettings {
+    fix_all: Option<bool>,
+    organize_imports: Option<bool>,
     lint: Option<Lint>,
     code_action: Option<CodeAction>,
-    log_level: Option<LogLevel>,
 }
 
 /// This is a direct representation of the workspace settings schema,
@@ -56,38 +52,11 @@ struct WorkspaceSettings {
     workspace: Url,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[serde(transparent)]
-#[repr(transparent)]
-struct FixAll(bool);
-
-#[derive(Clone, Copy, Debug, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[serde(transparent)]
-#[repr(transparent)]
-struct OrganizeImports(bool);
-
 #[derive(Debug, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 struct Lint {
-    enable: Option<LintEnable>,
-    run: Option<RunWhen>,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[serde(transparent)]
-#[repr(transparent)]
-struct LintEnable(bool);
-
-#[derive(Clone, Copy, Debug, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[serde(rename_all = "camelCase")]
-enum RunWhen {
-    OnType,
-    OnSave,
+    enable: Option<bool>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -102,24 +71,7 @@ struct CodeAction {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 struct CodeActionSettings {
-    enable: Option<CodeActionEnable>,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[serde(transparent)]
-#[repr(transparent)]
-struct CodeActionEnable(bool);
-
-#[derive(Clone, Copy, Debug, Default, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[serde(rename_all = "lowercase")]
-enum LogLevel {
-    #[default]
-    Error,
-    Warn,
-    Info,
-    Debug,
+    enable: Option<bool>,
 }
 
 /// This is the exact schema for initialization options sent in by the client
@@ -139,7 +91,7 @@ enum InitializationOptions {
     },
 }
 
-impl SettingsController {
+impl AllSettings {
     /// Initializes the controller from the serialized initialization options.
     /// This fails if `options` are not valid initialization options.
     pub(crate) fn from_value(options: serde_json::Value) -> crate::Result<Self> {
@@ -172,113 +124,76 @@ impl SettingsController {
                 .collect(),
         }
     }
-
-    /// Resolves user settings for a workspace.
-    /// `path` must be an exact path to the workspace - passing in a path
-    /// to a document will not work here.
-    pub(super) fn settings_for_workspace(&self, path: &Path) -> ResolvedUserSettings {
-        let Ok(url) = Url::from_file_path(path) else {
-            tracing::error!(
-                "Workspace path {} could not be turned into a URI",
-                path.display()
-            );
-            return self.global_settings();
-        };
-        if let Some(workspace_settings) = self.workspace_settings.get(&url) {
-            ResolvedUserSettings::resolve(&[workspace_settings, &self.global_settings])
-        } else {
-            // If workspace settings are empty, this likely means that the initialization options
-            // were `GlobalOnly`.
-            // This is what most LSP clients will use, so we don't want them to barrage them
-            // with misleading warnings.
-            if !self.workspace_settings.is_empty() {
-                tracing::warn!(
-                    "No workspace-specific settings were found for workspace path {url}"
-                );
-            }
-            self.global_settings()
-        }
-    }
-
-    /// Resolves the global user settings, ignoring any workspace-specific
-    /// overrides.
-    pub(super) fn global_settings(&self) -> ResolvedUserSettings {
-        ResolvedUserSettings::resolve(&[&self.global_settings])
-    }
 }
 
 impl ResolvedUserSettings {
-    /// Resolves a series of user settings in order of priority,
-    /// where the highest-priority settings come first.
-    /// Any fields not specified by any of these user settings are set to their defaults.
-    fn resolve(all_settings: &[&UserSettings]) -> Self {
+    /// Resolves a series of user settings, prioritizing workspace settings over global settings.
+    /// Any fields not specified by either are set to their defaults.
+    pub(super) fn with_workspace(
+        workspace_settings: &UserSettings,
+        global_settings: &UserSettings,
+    ) -> Self {
+        Self::new_impl(&[workspace_settings, global_settings])
+    }
+
+    /// Resolves global settings only.
+    pub(super) fn global_only(global_settings: &UserSettings) -> Self {
+        Self::new_impl(&[global_settings])
+    }
+
+    fn new_impl(all_settings: &[&UserSettings]) -> Self {
         Self {
-            fix_all: Self::_resolve(all_settings, |settings| settings.fix_all),
-            organize_imports: Self::_resolve(all_settings, |settings| settings.organize_imports),
-            lint_enable: Self::_resolve(all_settings, |settings| {
-                settings.lint.as_ref().and_then(|lint| lint.enable)
-            }),
-            run: Self::_resolve(all_settings, |settings| {
-                settings.lint.as_ref().and_then(|lint| lint.run)
-            }),
-            disable_rule_comment_enable: Self::_resolve(all_settings, |settings| {
-                settings
-                    .code_action
-                    .as_ref()
-                    .and_then(|code_action| code_action.disable_rule_comment.as_ref())
-                    .and_then(|disable_rule_comment| disable_rule_comment.enable)
-            }),
-            fix_violation_enable: Self::_resolve(all_settings, |settings| {
-                settings
-                    .code_action
-                    .as_ref()
-                    .and_then(|code_action| code_action.fix_violation.as_ref())
-                    .and_then(|fix_violation| fix_violation.enable)
-            }),
-            log_level: Self::_resolve(all_settings, |settings| settings.log_level),
+            fix_all: Self::resolve_or(all_settings, |settings| settings.fix_all, true),
+            organize_imports: Self::resolve_or(
+                all_settings,
+                |settings| settings.organize_imports,
+                true,
+            ),
+            lint_enable: Self::resolve_or(
+                all_settings,
+                |settings| settings.lint.as_ref().and_then(|lint| lint.enable),
+                true,
+            ),
+            disable_rule_comment_enable: Self::resolve_or(
+                all_settings,
+                |settings| {
+                    settings
+                        .code_action
+                        .as_ref()
+                        .and_then(|code_action| code_action.disable_rule_comment.as_ref())
+                        .and_then(|disable_rule_comment| disable_rule_comment.enable)
+                },
+                true,
+            ),
+            fix_violation_enable: Self::resolve_or(
+                all_settings,
+                |settings| {
+                    settings
+                        .code_action
+                        .as_ref()
+                        .and_then(|code_action| code_action.fix_violation.as_ref())
+                        .and_then(|fix_violation| fix_violation.enable)
+                },
+                true,
+            ),
         }
     }
 
-    fn _resolve<T: Default>(
+    fn resolve_or<T>(
         all_settings: &[&UserSettings],
-        get: impl Fn(&&UserSettings) -> Option<T>,
+        get: impl Fn(&UserSettings) -> Option<T>,
+        default: T,
     ) -> T {
-        all_settings.iter().find_map(get).unwrap_or_default()
+        all_settings
+            .iter()
+            .map(Deref::deref)
+            .find_map(get)
+            .unwrap_or(default)
     }
 }
 
 impl Default for InitializationOptions {
     fn default() -> Self {
         Self::GlobalOnly { settings: None }
-    }
-}
-
-impl Default for FixAll {
-    fn default() -> Self {
-        Self(true)
-    }
-}
-
-impl Default for OrganizeImports {
-    fn default() -> Self {
-        Self(true)
-    }
-}
-
-impl Default for LintEnable {
-    fn default() -> Self {
-        Self(true)
-    }
-}
-
-impl Default for RunWhen {
-    fn default() -> Self {
-        Self::OnType
-    }
-}
-
-impl Default for CodeActionEnable {
-    fn default() -> Self {
-        Self(true)
     }
 }
