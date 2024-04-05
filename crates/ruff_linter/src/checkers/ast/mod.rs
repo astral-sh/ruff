@@ -2125,7 +2125,7 @@ impl<'a> Checker<'a> {
         self.semantic.restore(snapshot);
     }
 
-    /// After initial traversal of the souce tree has been completed,
+    /// After initial traversal of the source tree has been completed,
     /// visit all lambdas. Lambdas are deferred during the initial traversal
     /// for the same reason as function bodies.
     fn visit_deferred_lambdas(&mut self) {
