@@ -27,7 +27,7 @@ struct TextDocumentArgument {
 }
 
 #[derive(Debug)]
-enum EditTracker {
+enum CommandEditTracker {
     DocumentChanges(Vec<types::TextDocumentEdit>),
     Changes(HashMap<types::Url, Vec<types::TextEdit>>),
 }
@@ -52,7 +52,7 @@ impl super::SyncRequestHandler for ExecuteCommand {
         }
 
         let mut edit_tracker =
-            EditTracker::new(session.resolved_client_capabilities().document_changes);
+            CommandEditTracker::new(session.resolved_client_capabilities().document_changes);
         for arg in params.arguments {
             let TextDocumentArgument { uri, version } =
                 serde_json::from_value(arg).with_failure_code(ErrorCode::InvalidParams)?;
@@ -130,7 +130,7 @@ impl FromStr for Command {
     }
 }
 
-impl EditTracker {
+impl CommandEditTracker {
     fn new(document_changes_supported: bool) -> Self {
         if document_changes_supported {
             Self::DocumentChanges(Vec::default())
