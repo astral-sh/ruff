@@ -5,8 +5,11 @@ use ruff_diagnostics::FixAvailability;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Expr;
+use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprNumberLiteral;
 use ruff_python_ast::ExprSubscript;
-use ruff_python_semantic::SemanticModel;
+use ruff_python_ast::ExprUnaryOp;
+use ruff_python_ast::UnaryOp;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
@@ -64,7 +67,50 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ExprSubscript) {
         return;
     }
 
-    let Some(index) = match_sorted_min_max(subscript, checker.semantic()) else {
+    let ExprSubscript { slice, value, .. } = &subscript;
+
+    // Early return if index is not unary or a number literal
+    if !(slice.is_number_literal_expr() || slice.is_unary_op_expr()) {
+        return;
+    }
+
+    let Expr::Call(ExprCall { func, .. }) = value.as_ref() else {
+        return;
+    };
+    // Check if the value is a call to `sorted()`
+    if !matches!(func.as_ref(), Expr::Name(name) if name.id == "sorted" && checker.semantic().is_builtin(name.id.as_str()))
+    {
+        return;
+    };
+
+    let Some(index) = (match slice.as_ref() {
+        // [0]
+        Expr::NumberLiteral(ExprNumberLiteral {
+            value: Number::Int(index),
+            ..
+        }) if *index == 0 => index.as_i64(),
+
+        // [-1]
+        Expr::UnaryOp(ExprUnaryOp {
+            op: UnaryOp::USub,
+            operand,
+            ..
+        }) => {
+            let Expr::NumberLiteral(ExprNumberLiteral {
+                value: Number::Int(index),
+                ..
+            }) = operand.as_ref()
+            else {
+                return;
+            };
+            if *index == 1 {
+                index.as_i64()
+            } else {
+                None
+            }
+        }
+        _ => return,
+    }) else {
         return;
     };
 
@@ -84,34 +130,6 @@ pub(crate) fn sorted_min_max(checker: &mut Checker, subscript: &ExprSubscript) {
         subscript.end(),
     )));
     checker.diagnostics.push(diagnostic);
-}
-
-pub(crate) fn match_sorted_min_max(
-    ExprSubscript { value, slice, .. }: &ExprSubscript,
-    semantic: &SemanticModel,
-) -> Option<i8> {
-    // Early return if index is not 0 or 1
-    let index = {
-        if let Expr::NumberLiteral(number_literal) = slice.as_ref() {
-            if let Number::Int(number) = &number_literal.value {
-                return number
-                    .as_i8()
-                    .and_then(|n| if n == 0 || n == 1 { Some(n) } else { None });
-            }
-        }
-        None
-    };
-
-    // Check if the value is a call to `sorted()`
-    if let Expr::Call(call) = value.as_ref() {
-        if let Expr::Name(name) = call.func.as_ref() {
-            if name.id == "sorted" && semantic.is_builtin(name.id.as_str()) {
-                return index;
-            }
-        }
-    }
-
-    None
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
