@@ -68,12 +68,16 @@ impl super::SyncRequestHandler for ExecuteCommand {
                         snapshot.encoding(),
                     )
                     .with_failure_code(ErrorCode::InternalError)?;
-                    edit_tracker.add_edits_for_document(uri, version, edits);
+                    edit_tracker
+                        .add_edits_for_document(uri, version, edits)
+                        .with_failure_code(ErrorCode::InternalError)?;
                 }
                 Command::Format => {
                     let response = super::format::format_document(&snapshot)?;
                     if let Some(edits) = response {
-                        edit_tracker.add_edits_for_document(uri, version, edits);
+                        edit_tracker
+                            .add_edits_for_document(uri, version, edits)
+                            .with_failure_code(ErrorCode::InternalError)?;
                     }
                 }
                 Command::OrganizeImports => {
@@ -83,7 +87,9 @@ impl super::SyncRequestHandler for ExecuteCommand {
                         snapshot.encoding(),
                     )
                     .with_failure_code(ErrorCode::InternalError)?;
-                    edit_tracker.add_edits_for_document(uri, version, edits);
+                    edit_tracker
+                        .add_edits_for_document(uri, version, edits)
+                        .with_failure_code(ErrorCode::InternalError)?;
                 }
             }
         }
@@ -137,36 +143,31 @@ impl EditTracker {
         &mut self,
         uri: types::Url,
         version: DocumentVersion,
-        new_edits: Vec<types::TextEdit>,
-    ) {
+        edits: Vec<types::TextEdit>,
+    ) -> crate::Result<()> {
         match self {
             Self::DocumentChanges(document_edits) => {
-                if let Some(existing_edits) = document_edits
-                    .iter_mut()
-                    .find(|document| document.text_document.uri == uri)
+                if document_edits
+                    .iter()
+                    .any(|document| document.text_document.uri == uri)
                 {
-                    // A single task should only ever be operating on one version of a document. To operate on multiple simultaneous document versions
-                    // is a logic error.
-                    debug_assert_eq!(existing_edits.text_document.version, Some(version));
-                    existing_edits
-                        .edits
-                        .extend(new_edits.into_iter().map(types::OneOf::Left));
-                } else {
-                    document_edits.push(TextDocumentEdit {
-                        text_document: types::OptionalVersionedTextDocumentIdentifier {
-                            uri,
-                            version: Some(version),
-                        },
-                        edits: new_edits.into_iter().map(types::OneOf::Left).collect(),
-                    });
+                    return Err(anyhow::anyhow!("Attempted to add edits for a document that was already edited - did you pass in the same document twice?"));
                 }
+                document_edits.push(TextDocumentEdit {
+                    text_document: types::OptionalVersionedTextDocumentIdentifier {
+                        uri,
+                        version: Some(version),
+                    },
+                    edits: edits.into_iter().map(types::OneOf::Left).collect(),
+                });
+                Ok(())
             }
             Self::Changes(changes) => {
-                if let Some(existing_edits) = changes.get_mut(&uri) {
-                    existing_edits.extend(new_edits);
-                } else {
-                    changes.insert(uri, new_edits);
+                if changes.get(&uri).is_some() {
+                    return Err(anyhow::anyhow!("Attempted to add edits for a document that was already edited - did you pass in the same document twice?"));
                 }
+                changes.insert(uri, edits);
+                Ok(())
             }
         }
     }
