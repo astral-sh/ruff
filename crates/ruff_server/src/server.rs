@@ -55,7 +55,7 @@ impl Server {
         let AllSettings {
             global_settings,
             mut workspace_settings,
-        } = AllSettings::from_value(init_params.initialization_options.unwrap_or_default())?;
+        } = AllSettings::from_value(init_params.initialization_options.unwrap_or_default());
 
         let mut workspace_for_uri = |uri| {
             let settings = workspace_settings.remove(&uri).unwrap_or_else(|| {

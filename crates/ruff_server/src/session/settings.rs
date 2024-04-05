@@ -91,11 +91,14 @@ enum InitializationOptions {
 impl AllSettings {
     /// Initializes the controller from the serialized initialization options.
     /// This fails if `options` are not valid initialization options.
-    pub(crate) fn from_value(options: serde_json::Value) -> crate::Result<Self> {
-        let options = serde_json::from_value(options).map_err(|err| {
-            anyhow::anyhow!("Failed to deserialize initialization options: {err}")
-        })?;
-        Ok(Self::from_init_options(options))
+    pub(crate) fn from_value(options: serde_json::Value) -> Self {
+        Self::from_init_options(
+            serde_json::from_value(options)
+                .map_err(|err| {
+                    tracing::error!("Failed to deserialize initialization options: {err}");
+                })
+                .unwrap_or_default(),
+        )
     }
 
     fn from_init_options(options: InitializationOptions) -> Self {
@@ -357,7 +360,9 @@ mod tests {
         let url = Url::parse("file:///Users/test/projects/pandas").expect("url should parse");
         assert_eq!(
             ResolvedClientSettings::with_workspace(
-                workspace_settings.get(&url).expect("workspace setting should exist"),
+                workspace_settings
+                    .get(&url)
+                    .expect("workspace setting should exist"),
                 &global_settings
             ),
             ResolvedClientSettings {
@@ -371,7 +376,9 @@ mod tests {
         let url = Url::parse("file:///Users/test/projects/scipy").expect("url should parse");
         assert_eq!(
             ResolvedClientSettings::with_workspace(
-                workspace_settings.get(&url).expect("workspace setting should exist"),
+                workspace_settings
+                    .get(&url)
+                    .expect("workspace setting should exist"),
                 &global_settings
             ),
             ResolvedClientSettings {
